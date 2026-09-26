@@ -208,7 +208,7 @@ shippable.
 | T08 | Progress: summary, controls, tables — **shipped** (card deleted) | ~1,300 | `fast` + `frontend` |
 | T09 | Progress: overlays, heatmaps, data-viz roles — **shipped** (card deleted) | ~1,200 | `fast` + `frontend` |
 | T10 | Exercise history and Sessions | ~1,300 | `fast` + `frontend` |
-| T11 | Groups tab: stream, record sheet, shell, state panels | ~1,500 | `fast` + `frontend` |
+| T11 | Groups tab: stream, record sheet, shell, state panels — **shipped** (card deleted) | ~1,500 | `fast` + `frontend` |
 | T12 | Leaderboards | ~700 | `fast` + `frontend` |
 | T13 | Group management | ~1,200 | `fast` + `frontend` |
 | T14 | Group exercises and linking | ~1,400 | `fast` + `frontend` |

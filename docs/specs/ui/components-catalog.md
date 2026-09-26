@@ -148,11 +148,13 @@ Brief entrypoint inventory of the current reusable UI component set.
     exercise page's and View Session's non-content states; the catalogue's
     and the exercise editor's loading and error (DLM-T07); Progress's
     loading, error and empty states (DLM-T08) and the history sheets' (inline,
-    DLM-T09)
+    DLM-T09); every group state panel, wrapped by `GroupStateView` and friends
+    (DLM-T11)
   - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body with the page
     gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
     other `ScrollView` props through (refresh, keyboard insets). Used by the
-    session view, exercise page, View Session, Gyms and the group session view
+    session view, exercise page, View Session, Gyms and the group session view;
+    the Groups tab (`ScreenScroll` with `refreshControl`, DLM-T11)
   - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule-strong`
     turning `danger` while invalid, the error below (`<testID>-error` or
     `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
@@ -175,26 +177,30 @@ Brief entrypoint inventory of the current reusable UI component set.
     (`stats-<kind>-history-metric-chip-*` / `-view-chip-*`, DLM-T09), and
     `ExerciseCoreFields`' weight entry
     (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
-    exercise form's pending state)
+    exercise form's pending state), and the Groups tab's `Stream` |
+    `Leaderboards` (`groups-segment-*`, DLM-T11)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
     labels. Logs' level filter (DLM-T04), the exercise list's `Show never-done` (`multi`, `exercise-list-visibility-*`),
-    and the catalogue's Show deleted control (`multi`)
+    the catalogue's Show deleted control (`multi`), and the Groups tab's group
+    chips (`single`, `groups-stream-filter-*`, DLM-T11)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
     role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), the
-    exercise list's `Deleted` (`faint`, DLM-T06)
+    exercise list's `Deleted` (`faint`, DLM-T06), and a group record card's
+    boards (DLM-T11)
   - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
     is no success or warning hue: the glyph and words carry the state. An
     optional `title` (Archivo 700, a `header`) names a message that is a reason
     ("Sign-in unavailable"). Settings' developer-tool outcomes (DLM-T04);
     Sign-in, the first-sync gate and Profile (DLM-T05); the catalogue's outcome
-    and the exercise editor's save failure (DLM-T07)
+    and the exercise editor's save failure (DLM-T07); the group offline marker,
+    write notice and inline error (DLM-T11)
   - `PageHeader` / `SectionHeader` (`page-header.tsx`, DLM-T03) — a tab
     screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
     intro; a section's heading (Archivo 700 `lg`) with an optional caps text
-    action. Today and Train; `PageHeader` also More and Settings (DLM-T04) and
-    Sign in (DLM-T05)
+    action. Today and Train; `PageHeader` also More and Settings (DLM-T04),
+    Sign in (DLM-T05) and Groups (DLM-T11)
   - `ListRow` also takes an `accessibilityHint` for a pressable row (DLM-T03),
     and a `description` (a wrapping `ink-muted` second line) and
     `accessibilityRole="link"` for a row that opens the browser (DLM-T04: the
@@ -374,14 +380,14 @@ Brief entrypoint inventory of the current reusable UI component set.
 11. Group components (M22)
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
 - Purpose:
-  - `GroupStreamSessionCard` — the stream card (member, status pill, start · gym, sets · kg · exercises computed on the device, the `N records` label (M25-T10, `-records`), group names in All); one press target
-  - `GroupStreamMembershipItem` — "X joined / left the group / was removed" row; pressable only where it opens another screen
-  - `GroupFilterChips` — one `SegmentedChips` chip per group, exactly one selected (no `All`), wrapping rather than scrolling sideways; the Groups screen's group selector
-  - `GroupStreamList` — `FlatList` with `RefreshControl`, online older-page loading, and a Retry footer; (M25-T10) it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
-  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): title (`dave — group record` / `— PR`), group exercise and value, board badges, `Session in progress`, the status via `GroupCertificationStatus` (`Not certified yet` / `Certified by …` / `Voided · set …`, first and on the muted panel when voided), and its group where names are shown (Today); the summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
-  - `GroupStreamSentenceItem` (M25-T10) — a record-removed or link item: a light row with one sentence, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
-  - `RecordSetSheet` (M25-T10) — the row detail (E2) shared by record cards and board rows: an in-route bottom `Modal` with the value, logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, the actions my relationship allows (`Certify` primary; `Remove my certification` / `Cancel certification` danger, confirmed with `Alert.alert`), `View full session`, and `Close`. Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-overlay`, `-title`, `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`, `-close`
-  - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker
+  - `GroupStreamSessionCard` — the stream card, a `Card` link (design language DLM-T11): member (Archivo 700), status in words (`Training now` beside the `set-current` ring, `Completed · 45m` in `ink-muted`), start · gym, sets · kg · exercises computed on the device in Plex Mono, the `N records` label in `record` (M25-T10, `-records`), group names in All; one press target
+  - `GroupStreamMembershipItem` — "X joined / left the group / was removed" light row behind a `rule` hairline, `ink-muted` (`streamRowStyles`, shared with `GroupStreamSentenceItem`); pressable only where it opens another screen
+  - `GroupFilterChips` — a single `ChipGroup` with one chip per group, exactly one selected (no `All`), wrapping rather than scrolling sideways; the Groups screen's group selector
+  - `GroupStreamList` — `FlatList` on `groupScreenStyles` with `RefreshControl`, online older-page loading, and an inline `StatePanel` Retry footer; (M25-T10) it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
+  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): a `Card` whose `record` band (`-band`) carries the title (`dave — group record` / `— PR`), then the group exercise and its value in bold `record` Plex Mono (`140.0 × 1 · 1RM 142.5`), board `Tag`s, `Session in progress`, the status via `GroupCertificationStatus` (`Not certified yet` / `Certified by …` / `Voided · set …`), and its group where names are shown (Today). A voided card has no band, fades to `ink-faint` and puts its status first (DLM-T11-D2). The summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and an outline `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-band`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
+  - `GroupStreamSentenceItem` (M25-T10) — a record-removed or link item: a light row with one sentence behind a `rule` hairline, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
+  - `RecordSetSheet` (M25-T10; a `Sheet` since DLM-T11) — the row detail (E2) shared by record cards and board rows, titled with the lifter and the exercise: the set and 1RM as `record` `Stat`s, then the logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, `Certify` (the sheet's one `accent`), `Remove my certification` / `Cancel certification` as `danger` `ListRow`s (confirmed with `Alert.alert`), and `View full session` as a `ListRow` with a chevron. No Close: the backdrop (`Close set details`) dismisses it (G5). Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-backdrop`, `-header` (the title), `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`
+  - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker: a neutral `Notice` with the `offline` glyph, live (08 pattern 7)
   - `GroupMemberRow`, `GroupSummaryRow` — Members-screen and My groups rows; `GroupMemberRow` takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron
   - `GroupMemberActionSheet` (M22-T05) — `GroupActionSheet` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin` (secondary), `Transfer ownership` / `Remove from group` (danger; the caller confirms with `Alert.alert`), `Cancel`. testIDs `group-member-actions-sheet`, `group-member-action-<action>`
   - `GroupActionSheet` (M25-T08) — the in-route bottom `Modal` behind both action sheets: title, optional subtitle, one button per action (danger when destructive), `Cancel`. testIDs `<prefix>-sheet` / `-overlay` / `-cancel` and `<actionPrefix>-<key>`
@@ -392,18 +398,19 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `StandardExercisePicker` (M25-T08) — search and list of the bundled standard exercises to copy into a group
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
   - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09) — the Groups screen's Leaderboards segment: one whole-card press target per group exercise (name, view label, `Archived` tag, up to three podium rows, empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
-  - `GroupCertificationStatus` — a record's certification state: a check `Icon` (certified), a ring (not yet) or none (voided) beside its label; the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `RecordSetSheet` and `GroupBoardRow`
+  - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `RecordSetSheet` and `GroupBoardRow`
   - `GroupBoardRow` (M25-T09) — one full-board row as a single accessibility element (rank, member, value, e1RM detail, date, the certification mark on All); my row on the muted panel; (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
   - `GroupBoardHistoryItem` (M25-T09) — one lead change: date and sentence. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
-  - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: a spinner, or the failure with `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
+  - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: an inline `StatePanel`, loading, or the failure with an outline `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
   - `UsernameGate` + `useUsernameGate(userId)` (M22-T05) — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
   - `GroupDetailsForm` (M22-T05) — the shared create / edit form: name (1–50) and optional description (≤280, counter) with inline validation, the write's failure above the submit button
-  - `GroupWriteNotice` (M22-T05) — inline error / success outcome of a group write
-  - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` / `Join with a code` buttons
+  - `GroupWriteNotice` (M22-T05) — inline outcome of a group write: a `danger` `Notice`, or a neutral one with the `success` glyph (08 pattern 9)
+  - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` (the screen's one primary) / `Join with a code` (outline) buttons
   - `FriendSessionContent` — the friend's session body on View Session's cards (`components/session-detail/`): a `SessionFactsCard` headed by the member and status, then an `ExerciseSetsCard` per exercise (rows `group-session-set-row-<setId>`), read-only, no record band
   - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07; design language DLM-T06) — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch beside the filter, a chip solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
   - `GroupExercisePickSheet` (M25-T07) — in-route bottom `Modal` for an unlinked group exercise: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (M25-T08 group page) confirms with `Link` and adds nothing to a session
-  - `GroupStateView`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels (not the pending generic `EmptyState`)
+  - `GroupStateView`, `GroupLoadingState`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels, thin wrappers over `StatePanel` (inline; the sign-in panel centres on the page) since DLM-T11, so their call sites did not change; `GroupInlineError` is a `danger` `Notice` with an outline `Retry`
+  - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll` (DLM-T11). `groupFormStyles` in the same file is still legacy (DLM-T13)
   - `usePullToRefresh`, `groupScreenStyles`, `groupFormStyles` — pull spinner state, the shared page shell and action row, and the write-form field styles
 
 12. Exercise core fields (M25)
@@ -574,8 +581,7 @@ design-language vocabulary (`uiRoles` / `uiFonts` / `uiGeometry`):
 - `IconActionButton` → built as `IconButton`; `EmptyState` / state panels →
   `StatePanel`; `ScreenContainer` / `ScreenScrollContainer` → `Screen` /
   `ScreenScroll`; `FormField` → `FormField` (DLM-T01, 2026-09-24). The group
-  state panels (`components/groups/`) move onto `StatePanel` with the groups
-  screens.
+  state panels (`components/groups/`) wrap `StatePanel` (DLM-T11).
 - Covered, no longer pending: `ModalSurface` / `ModalBackdrop` → `Sheet`;
   `PressableRowCard` → `Card` with `onPress`, or `ListRow` with `onPress`.
 

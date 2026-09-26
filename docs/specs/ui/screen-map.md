@@ -43,8 +43,8 @@ Brief entrypoint map of the current mobile screens.
   link a caps text button). An active workout is a `Card` marked by the
   `set-current` ring and "Active session", with `Resume workout` as the one
   `accent`. The recent sessions are one `Card` of `ListRow`s. State panels are
-  `StatePanel`s. The group activity items keep the groups screens' styling
-  until DLM-T11
+  `StatePanel`s. The group activity items are the Groups stream's own cards
+  and panels (DLM-T11: session and record `Card`s, the offline `Notice`)
   - until the separate planning milestone supplies its read/materialization
     interface, the planning slot uses the approved `Watch this space 👀`
     placeholder and links to Train without inventing plan data
@@ -470,6 +470,15 @@ Brief entrypoint map of the current mobile screens.
     `Certify` inline
   - Leaderboards (M25-T09): the group's podium cards (see the group screen
     history below for their states)
+- Presentation (design language, DLM-T11; `design-targets/groups.md`): a
+  `ScreenScroll` on `paper` (the stream a `FlatList` on the same shell), the
+  `Groups` `PageHeader` with `My groups` a caps text button beside it, the
+  group chips a single `ChipGroup`, and `Stream` | `Leaderboards` a
+  `SegmentedControl`. Session cards are `Card` links (`Training now` beside the
+  `set-current` ring); record cards carry the `record` band and open the row
+  detail `Sheet` (no Close; `Certify` its one `accent`). The empty state's
+  `Create group` is the screen's one primary. Every group route shares this
+  page shell (`groupScreenStyles`) and its state panels (`StatePanel`)
 - Key states (high level):
   - signed-out / auth-unconfigured sign-in-required card (no group RPC runs)
   - no-groups explanatory empty state with `Create group` / `Join with a code`

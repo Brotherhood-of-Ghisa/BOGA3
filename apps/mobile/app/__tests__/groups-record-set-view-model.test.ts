@@ -155,7 +155,7 @@ describe('recordSetActionsFor (P10–P11, D3–D5)', () => {
 describe('the sheet (E2)', () => {
   const now = new Date(2026, 8, 17).getTime();
 
-  it('converted board row: value with e1RM, the logged line, date, logged-as, certify', () => {
+  it('converted board row: value with 1RM, the logged line, date, logged-as, certify', () => {
     expect(
       buildRecordSetSheet(recordSetFromBoardRow('g1', exercise, boardRow()), {
         myUserId: 'me',
@@ -166,7 +166,9 @@ describe('the sheet (E2)', () => {
       }),
     ).toEqual({
       title: 'dave · Bench Press',
-      valueLabel: '51.25 kg × 5 (e1RM 59.79 kg)',
+      valueLabel: '51.25 × 5 · 1RM 59.8',
+      setFigure: '51.25 × 5',
+      oneRepMaxFigure: '59.8',
       loggedLabel: 'Logged 102.5 kg total · counted as 51.25 kg per side',
       dateLabel: '12 Sep 2026',
       loggedAsLabel: 'Logged as "Bench Press"',
@@ -188,7 +190,9 @@ describe('the sheet (E2)', () => {
     );
     expect(mine).toMatchObject({
       title: 'You · Bench Press',
-      valueLabel: '140 kg × 1',
+      valueLabel: '140.0 × 1',
+      setFigure: '140.0 × 1',
+      oneRepMaxFigure: null,
       loggedLabel: null,
       dateLabel: '12 Sep 2026 · Iron Temple',
       loggedAsLabel: 'Logged as "Bench (comp grip)"',

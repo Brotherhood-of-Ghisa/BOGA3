@@ -427,7 +427,7 @@ appId: com.dinoderek.mobile
 # record card, since the sets predate the link.
 - extendedWaitUntil:
     visible:
-      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} linked Bench Press to Prowler Push — now #1 on Weight and e1RM"
+      text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} linked Bench Press to Prowler Push — now #1 on Weight and 1RM"
     timeout: 15000
 - takeScreenshot: "groups-07b-6-stream-link-item"
 - tapOn:
@@ -487,8 +487,10 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-record-sheet-certify"
 - takeScreenshot: "groups-07b-7-row-detail"
+# No Close (G5): tap the dimmed backdrop above the sheet, by point (the
+# backdrop is hidden from accessibility on iOS 26).
 - tapOn:
-    id: "group-record-sheet-close"
+    point: "50%,12%"
 - assertNotVisible:
     id: "group-record-sheet"
 - tapOn:
@@ -561,7 +563,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible:
     id: "group-stream-record-card-${output.groupsRecordKey}-value"
-    text: "Prowler Push\\s+55 kg × 5 · e1RM .* kg"
+    text: "Prowler Push\\s+55\\.0 × 5 · 1RM [0-9.]+"
 - assertVisible:
     id: "group-stream-record-card-${output.groupsRecordKey}-status"
     text: "Not certified yet"
@@ -641,8 +643,10 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "group-record-sheet-certify"
 - takeScreenshot: "groups-07c-6-row-detail-certified"
+# No Close (G5): tap the dimmed backdrop above the sheet, by point (the
+# backdrop is hidden from accessibility on iOS 26).
 - tapOn:
-    id: "group-record-sheet-close"
+    point: "50%,12%"
 - assertNotVisible:
     id: "group-record-sheet"
 
@@ -757,8 +761,12 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-record-sheet-status"
     text: "Certified by ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} · .*"
+# No Close (G5): tap the dimmed backdrop above the sheet, by point (the
+# backdrop is hidden from accessibility on iOS 26).
 - tapOn:
-    id: "group-record-sheet-close"
+    point: "50%,12%"
+- assertNotVisible:
+    id: "group-record-sheet"
 # Both All and Certified have lost this exercise's contribution.
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.unlinkGroupExerciseId}?metric=weight&scope=all"
 - extendedWaitUntil:
@@ -897,8 +905,12 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "group-record-sheet-certify"
 - takeScreenshot: "groups-08b-2-row-detail-former"
+# No Close (G5): tap the dimmed backdrop above the sheet, by point (the
+# backdrop is hidden from accessibility on iOS 26).
 - tapOn:
-    id: "group-record-sheet-close"
+    point: "50%,12%"
+- assertNotVisible:
+    id: "group-record-sheet"
 
 # --- 9. The removed counterparty's next read is NOT_FOUND (AC11) ----------------
 - runScript:

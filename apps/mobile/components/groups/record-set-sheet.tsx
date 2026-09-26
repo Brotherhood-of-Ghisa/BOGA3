@@ -1,8 +1,18 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { UiButton, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import {
+  ActionButton,
+  Icon,
+  ListRow,
+  Sheet,
+  Stat,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import {
   DESTRUCTIVE_RECORD_SET_ACTIONS,
   RECORD_SET_ACTION_LABELS,
@@ -36,10 +46,12 @@ type RecordSetSheetProps = {
 
 /**
  * The record set row detail (product E2), shared by board rows and stream
- * record cards: values, the as-logged value when converted, date and gym,
- * "Logged as", the certification line, and the certification actions my
- * relationship to the set allows (08 pattern 11). Every write is online-only;
- * removals confirm first.
+ * record cards: a `Sheet` (G5) with the values, the as-logged value when
+ * converted, date and gym, "Logged as", the certification line, and the
+ * certification actions my relationship to the set allows (08 pattern 11):
+ * `Certify` is the sheet's one primary, a removal a `danger` row. The backdrop
+ * dismisses it; there is no Close. Every write is online-only; removals confirm
+ * first.
  */
 export function RecordSetSheet({ detail, userId, myRole, certification, onClose }: RecordSetSheetProps) {
   const router = useRouter();
@@ -94,100 +106,119 @@ export function RecordSetSheet({ detail, userId, myRole, certification, onClose 
   };
 
   return (
-    <Modal animationType="fade" onRequestClose={onClose} transparent visible={shown !== null}>
-      <View style={styles.root}>
-        <Pressable accessibilityLabel="Close set details" onPress={onClose} style={styles.scrim} testID="group-record-sheet-overlay" />
-        {shown && model ? (
-          <View style={styles.panel} testID="group-record-sheet">
-            <ScrollView contentContainerStyle={styles.body}>
-              <UiText testID="group-record-sheet-title" variant="title">
-                {model.title}
-              </UiText>
-              <UiText testID="group-record-sheet-value" variant="label">
-                {model.valueLabel}
-              </UiText>
-              {model.loggedLabel ? (
-                <UiText testID="group-record-sheet-logged" variant="bodyMuted">
-                  {model.loggedLabel}
-                </UiText>
+    <Sheet
+      dismissLabel="Close set details"
+      onDismiss={onClose}
+      testID="group-record-sheet"
+      title={model?.title}
+      visible={shown !== null}>
+      {shown && model ? (
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <View style={styles.facts}>
+            <View accessibilityLabel={model.valueLabel} accessible style={styles.figures} testID="group-record-sheet-value">
+              <Stat emphasis="record" label="Set" value={model.setFigure} />
+              {model.oneRepMaxFigure ? <Stat emphasis="record" label="1RM" value={model.oneRepMaxFigure} /> : null}
+            </View>
+            {model.loggedLabel ? (
+              <Text allowFontScaling={false} style={styles.muted} testID="group-record-sheet-logged">
+                {model.loggedLabel}
+              </Text>
+            ) : null}
+            <Text allowFontScaling={false} style={styles.line} testID="group-record-sheet-date">
+              {model.dateLabel}
+            </Text>
+            {model.loggedAsLabel ? (
+              <Text allowFontScaling={false} style={styles.muted} testID="group-record-sheet-logged-as">
+                {model.loggedAsLabel}
+              </Text>
+            ) : null}
+            {model.provisionalLabel ? (
+              <Text allowFontScaling={false} style={styles.muted} testID="group-record-sheet-provisional">
+                {model.provisionalLabel}
+              </Text>
+            ) : null}
+            <View style={styles.status}>
+              <GroupCertificationStatus
+                label={model.statusLabel}
+                status={model.status}
+                testID="group-record-sheet-status"
+              />
+              {model.lifterNote ? (
+                <Text allowFontScaling={false} style={styles.muted} testID="group-record-sheet-lifter-note">
+                  {model.lifterNote}
+                </Text>
               ) : null}
-              <UiText testID="group-record-sheet-date" variant="subtitle">
-                {model.dateLabel}
-              </UiText>
-              {model.loggedAsLabel ? (
-                <UiText testID="group-record-sheet-logged-as" variant="bodyMuted">
-                  {model.loggedAsLabel}
-                </UiText>
-              ) : null}
-              {model.provisionalLabel ? (
-                <UiText testID="group-record-sheet-provisional" variant="bodyMuted">
-                  {model.provisionalLabel}
-                </UiText>
-              ) : null}
-              <View style={styles.status}>
-                <GroupCertificationStatus
-                  label={model.statusLabel}
-                  status={model.status}
-                  testID="group-record-sheet-status"
-                />
-                {model.lifterNote ? (
-                  <UiText testID="group-record-sheet-lifter-note" variant="bodyMuted">
-                    {model.lifterNote}
-                  </UiText>
-                ) : null}
-              </View>
-              {notice ? (
-                <GroupWriteNotice message={notice.message} testID="group-record-sheet-notice" tone={notice.tone} />
-              ) : null}
-              {model.actions.map((action) => (
-                <UiButton
+            </View>
+            {notice ? (
+              <GroupWriteNotice message={notice.message} testID="group-record-sheet-notice" tone={notice.tone} />
+            ) : null}
+            {model.actions.includes('certify') ? (
+              <ActionButton
+                disabled={pending}
+                label={RECORD_SET_ACTION_LABELS.certify}
+                onPress={() => perform('certify', shown)}
+                testID="group-record-sheet-certify"
+                variant="primary"
+              />
+            ) : null}
+          </View>
+          <View>
+            {model.actions
+              .filter((action) => DESTRUCTIVE_RECORD_SET_ACTIONS.has(action))
+              .map((action) => (
+                <ListRow
                   disabled={pending}
                   key={action}
                   label={RECORD_SET_ACTION_LABELS[action]}
                   onPress={() => perform(action, shown)}
                   testID={`group-record-sheet-${action}`}
-                  variant={DESTRUCTIVE_RECORD_SET_ACTIONS.has(action) ? 'danger' : 'primary'}
+                  tone="danger"
                 />
               ))}
-              {model.canViewSession ? (
-                <UiButton
-                  label="View full session"
-                  onPress={() => {
-                    onClose();
-                    router.push(`/group-session/${shown.member.user_id}/${shown.sessionId}`);
-                  }}
-                  testID="group-record-sheet-view-session"
-                  variant="secondary"
-                />
-              ) : null}
-              <UiButton label="Close" onPress={onClose} testID="group-record-sheet-close" variant="secondary" />
-            </ScrollView>
+            {model.canViewSession ? (
+              <ListRow
+                label="View full session"
+                onPress={() => {
+                  onClose();
+                  router.push(`/group-session/${shown.member.user_id}/${shown.sessionId}`);
+                }}
+                testID="group-record-sheet-view-session"
+                trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
+              />
+            ) : null}
           </View>
-        ) : null}
-      </View>
-    </Modal>
+        </ScrollView>
+      ) : null}
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  scroll: {
+    paddingBottom: uiSpace.sm,
   },
-  scrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  panel: {
-    maxHeight: '85%',
-    borderTopLeftRadius: uiRadius.md,
-    borderTopRightRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-  },
-  body: {
+  facts: {
     gap: uiSpace.sm,
-    padding: uiSpace.xl,
-    paddingBottom: uiSpace.xl * 2,
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.md,
+  },
+  figures: {
+    flexDirection: 'row',
+    gap: uiSpace.xl,
+  },
+  line: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  muted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
   status: {
     gap: uiSpace.xs,

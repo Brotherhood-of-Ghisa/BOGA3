@@ -1,6 +1,4 @@
-import { StyleSheet, View } from 'react-native';
-
-import { UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Notice } from '@/components/ui';
 
 type GroupWriteNoticeProps = {
   tone: 'error' | 'success';
@@ -8,41 +6,15 @@ type GroupWriteNoticeProps = {
   testID: string;
 };
 
-/** Inline outcome of a group write: the failure (nothing changed) or the confirmation. */
+/**
+ * Inline outcome of a group write: the failure (nothing changed) in `danger`,
+ * or the confirmation with the `success` glyph. No success hue (G3): the glyph
+ * and the words carry it.
+ */
 export function GroupWriteNotice({ tone, message, testID }: GroupWriteNoticeProps) {
-  const error = tone === 'error';
-  return (
-    <View
-      accessibilityLiveRegion="polite"
-      accessibilityRole={error ? 'alert' : undefined}
-      style={[styles.notice, error ? styles.error : styles.success]}
-      testID={testID}>
-      <UiText style={error ? styles.errorText : styles.successText} variant="label">
-        {message}
-      </UiText>
-    </View>
+  return tone === 'error' ? (
+    <Notice live message={message} testID={testID} tone="danger" />
+  ) : (
+    <Notice icon="success" live message={message} testID={testID} />
   );
 }
-
-const styles = StyleSheet.create({
-  notice: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-  },
-  error: {
-    borderColor: uiColors.actionDangerSubtleBorder,
-    backgroundColor: uiColors.actionDangerSubtleBg,
-  },
-  success: {
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
-  },
-  errorText: {
-    color: uiColors.actionDangerText,
-  },
-  successText: {
-    color: uiColors.textSuccess,
-  },
-});

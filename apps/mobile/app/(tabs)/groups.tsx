@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import {
   GroupFilterChips,
@@ -17,7 +17,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { SegmentedChips, UiButton, UiText, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, PageHeader, ScreenScroll, SegmentedControl, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   getGroupBoardPodiums,
@@ -111,10 +111,15 @@ function GroupsTabContent({ userId }: { userId: string }) {
   const header = (
     <View style={groupScreenStyles.header}>
       <View style={styles.titleRow}>
-        <UiText accessibilityRole="header" style={styles.title} testID="groups-title" variant="title">
-          Groups
-        </UiText>
-        <UiButton label="My groups" onPress={() => router.push('/group/mine')} testID="groups-my-groups-button" variant="secondary" />
+        <View style={styles.title} testID="groups-title">
+          <PageHeader title="Groups" />
+        </View>
+        <ActionButton
+          label="My groups"
+          onPress={() => router.push('/group/mine')}
+          testID="groups-my-groups-button"
+          variant="text"
+        />
       </View>
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={segmentResource.lastUpdatedAtMs ?? mine.lastUpdatedAtMs} /> : null}
       {inlineError && (groups !== null || segmentResource.data !== null) ? (
@@ -123,12 +128,12 @@ function GroupsTabContent({ userId }: { userId: string }) {
       {hasGroups ? (
         <>
           <GroupFilterChips groups={groups} onChange={setPickedGroupId} selectedGroupId={selectedGroupId} />
-          <SegmentedChips
+          <SegmentedControl
+            accessibilityLabel="Stream or leaderboards"
             onChange={setSegment}
             options={SEGMENT_OPTIONS}
             testIDPrefix="groups-segment"
             value={segment}
-            variant="joined"
           />
         </>
       ) : null}
@@ -137,11 +142,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
 
   if (!hasGroups || !selectedGroupId) {
     return (
-      <ScrollView
-        contentContainerStyle={groupScreenStyles.content}
-        refreshControl={refreshControl}
-        style={groupScreenStyles.screen}
-        testID="groups-screen">
+      <ScreenScroll refreshControl={refreshControl} testID="groups-screen">
         {header}
         {groups ? (
           <GroupsEmptyState testID="groups-empty-state">
@@ -150,17 +151,13 @@ function GroupsTabContent({ userId }: { userId: string }) {
         ) : (
           <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRefresh} testIDPrefix="groups" />
         )}
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
   if (segment === 'leaderboards') {
     return (
-      <ScrollView
-        contentContainerStyle={groupScreenStyles.content}
-        refreshControl={refreshControl}
-        style={groupScreenStyles.screen}
-        testID="groups-screen">
+      <ScreenScroll refreshControl={refreshControl} testID="groups-screen">
         {header}
         <GroupLeaderboardsPage
           boards={boards}
@@ -170,7 +167,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
           onRetry={onRefresh}
           userId={userId}
         />
-      </ScrollView>
+      </ScreenScroll>
     );
   }
 
@@ -214,7 +211,5 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
-    fontSize: uiTypography.size.xxl,
-    lineHeight: 30,
   },
 });

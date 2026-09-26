@@ -1,6 +1,6 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { UiText, uiColors, uiSpace } from '@/components/ui';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { StreamSentenceViewModel } from '@/src/groups';
 
 /**
@@ -14,31 +14,46 @@ export function GroupStreamSentenceItem({ item, showGroupName }: { item: StreamS
     <View
       accessibilityLabel={showGroupName ? `${item.sentence}, ${item.groupName}` : item.sentence}
       accessible
-      style={styles.row}
+      style={streamRowStyles.row}
       testID={testID}>
-      <UiText style={styles.sentence} testID={`${testID}-sentence`} variant="label">
+      <Text allowFontScaling={false} style={streamRowStyles.sentence} testID={`${testID}-sentence`}>
         {item.sentence}
-      </UiText>
+      </Text>
       {showGroupName ? (
-        <UiText numberOfLines={1} variant="subtitle">
+        <Text allowFontScaling={false} numberOfLines={1} style={streamRowStyles.group}>
           {item.groupName}
-        </UiText>
+        </Text>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+/** The stream's light rows (membership, link, record removed): words on the page ground behind a `rule` hairline. */
+export const streamRowStyles = StyleSheet.create({
   row: {
-    minHeight: 44,
+    minHeight: uiGeometry.tapTarget,
     justifyContent: 'center',
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: uiColors.borderMuted,
+    borderLeftWidth: uiBorder.width,
+    borderLeftColor: uiRoles.rule,
+  },
+  pressed: {
+    backgroundColor: uiRoles.surfaceSubtle,
   },
   sentence: {
-    color: uiColors.textSecondary,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  group: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
   },
 });

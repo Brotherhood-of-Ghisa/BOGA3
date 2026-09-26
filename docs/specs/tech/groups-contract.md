@@ -1772,24 +1772,26 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
     record` / `N records`) counts those records, non-voided, deduplicated by
     `set_id`. It is a label, not a link.
   - Record card (`GroupStreamRecordCard`): `<name> — group record` when any
-    listed board has `group_record`, else `— PR`; `<exercise>  140 kg × 1`,
-    plus ` · e1RM 142.5 kg` when an e1RM board is listed; badges per board,
-    Weight then e1RM, `PR · <metric>` then `Group record · <metric>`;
+    listed board has `group_record`, else `— PR`; `<exercise>`, then the
+    figures `140.0 × 1`, plus ` · 1RM 142.5` when an e1RM board is listed (no
+    unit in a figure, and the metric reads `1RM`: display copy only, the key
+    stays `e1rm`; DLM-T11-D4); badges per board, Weight then 1RM, `PR ·
+    <metric>` then `Group record · <metric>`;
     `Session in progress` while provisional; `Not certified yet` (ring icon),
     `Certified by <name|you>` (check icon; `Certified` when the certifier is
-    gone), or `Voided · set edited|deleted` (no icon; the voided card on the
-    muted panel, status
-    first). `Certify` shows when not voided, not certified, and not mine; the
+    gone), or `Voided · set edited|deleted` (no icon; the voided card loses
+    its `record` band and fades, status first). `Certify` shows when not voided, not certified, and not mine; the
     group name shows in All.
   - `record_voided` and `link` are light rows (`GroupStreamSentenceItem`),
     not pressable: `dave's Bench Press record removed (140 kg × 1) — set
-    edited · Now #1 on Weight: sam 138 kg · No one holds #1 on e1RM`; `dave
-    linked A, B to Bench Press — now #1 on Weight and e1RM` (or `— now #2 on
-    Weight, #1 on e1RM`, `off the <metric> board`; `unlinked … from`; a null
+    edited · Now #1 on Weight: sam 138 kg · No one holds #1 on 1RM`; `dave
+    linked A, B to Bench Press — now #1 on Weight and 1RM` (or `— now #2 on
+    Weight, #1 on 1RM`, `off the <metric> board`; `unlinked … from`; a null
     exercise name reads `an exercise`). My name reads `You` / `Your`.
-- **Row detail sheet** (`RecordSetSheet`, an in-route `Modal`), opened from a
-  record card or a full-board row (`GroupBoardRow` is now a press target). It
-  shows `<name> · <group exercise>`, `140 kg × 1 (e1RM 142.5 kg)`, the
+- **Row detail sheet** (`RecordSetSheet`, an in-route `Sheet` with no Close
+  since DLM-T11: the backdrop dismisses it), opened from a record card or a
+  full-board row (`GroupBoardRow` is now a press target). It shows `<name> ·
+  <group exercise>`, the figures `140.0 × 1` and `1RM 142.5` (DLM-T11-D4), the
   as-logged value when `load_factor` is 2 (`Logged 70 kg per side · counted
   as 140 kg total`) or 0.5 (`Logged 140 kg total · counted as 70 kg per
   side`), `12 Sep 2026 · <gym>`, `Logged as "<name>"` (the board row's
@@ -2116,9 +2118,10 @@ group screen, and Today details above where they differ. No server change.
   reads `(former)`.
 - **As-built (M25-T10, flow extension).** Step 7b first waits for the stream's
   link item (`<user_d> linked Bench Press to Prowler Push — now #1 on Weight
-  and e1RM`), then, on All · Weight, opens row 1's detail sheet: `Logged 102.5
+  and 1RM`, since DLM-T11), then, on All · Weight, opens row 1's detail sheet: `Logged 102.5
   kg total · counted as 51.25 kg per side`, `Logged as "Bench Press"`, `Not
-  certified yet`, and `Certify` for the owner, closed without certifying. Step
+  certified yet`, and `Certify` for the owner, closed without certifying (a
+  backdrop tap by point since DLM-T11: the sheet has no Close). Step
   8b opens the former member's row: no `Certify`. No new fixture user or
   counterparty step; certifying on device followed in M25-T11 (below).
 - **As-built (M25-T11, flow extension).** New step 7c, after 7b's History and
@@ -2135,7 +2138,7 @@ group screen, and Today details above where they differ. No server change.
     `runScript` has no sleep) and fail after 90 s, longer than the 30 s
     `pg_cron` sweep.
   - **Device.** The record card (`group-stream-record-card-<key>`: `—
-    group record`, `Prowler Push  55 kg × 5 · e1RM … kg`, `Not certified
+    group record`, `Prowler Push` then `55.0 × 5 · 1RM …` (DLM-T11), `Not certified
     yet`) and its session card's `1 record`. Tapping the card's `Certify`
     shows the notice and `Certified by you`, and hides `Certify`. After
     `await-certified`: the podium's Certified · e1RM row 1, the Certified

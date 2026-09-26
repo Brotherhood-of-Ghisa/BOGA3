@@ -1,19 +1,23 @@
 import { StyleSheet } from 'react-native';
 
-import { uiBorder, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiColors, uiRadius, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
-/** Shared page shell for the group routes. */
+/**
+ * Shared page shell for the group routes: the `Screen` / `ScreenScroll` ground
+ * and gutter (`paper`, `lg` gutter, `md` between blocks), for the lists that
+ * cannot be a `ScreenScroll` (a `FlatList`) and the routes not yet moved onto it.
+ */
 export const groupScreenStyles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: uiColors.surfacePage,
+    backgroundColor: uiRoles.paper,
   },
   content: {
-    padding: uiSpace.xl,
-    gap: uiSpace.lg,
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
   },
   header: {
-    gap: uiSpace.lg,
+    gap: uiSpace.md,
   },
   /** A row of equal-width actions. */
   actionRow: {

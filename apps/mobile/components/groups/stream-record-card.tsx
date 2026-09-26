@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { UiButton, UiSurface, UiText, uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Card, Icon, Tag, uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { RecordSetWriteNotice, StreamRecordCardViewModel } from '@/src/groups';
 
 import { GroupCertificationStatus } from './certification-status';
@@ -23,11 +23,13 @@ type GroupStreamRecordCardProps = {
 
 /**
  * A record card (product E3, P14, P15; 08 pattern 6): who, the group exercise
- * and value, one badge per board it broke, and the certification status in
- * text. It sits below its session card. The summary is one press target that
- * opens the row detail; Certify sits beside it (not inside, so it stays its own
- * accessibility element) and certifies without opening it. A voided card stays,
- * on the muted surface, with its status first (D15).
+ * and value, one tag per board it broke, and the certification status in text.
+ * It sits below its session card. A standing record carries the `record` band
+ * with its title and its value in bold `record` (T11-D2), as the app's own
+ * records do. The summary is one press target that opens the row detail;
+ * Certify sits beside it (not inside, so it stays its own accessibility
+ * element) and certifies without opening it. A voided card stays, without the
+ * band and faded, with its status first (D15).
  */
 export function GroupStreamRecordCard({
   card,
@@ -39,84 +41,153 @@ export function GroupStreamRecordCard({
   notice = null,
 }: GroupStreamRecordCardProps) {
   const testID = `group-stream-record-card-${card.key}`;
+  const voided = card.voided;
+  const status = <GroupCertificationStatus label={card.statusLabel} status={card.status} testID={`${testID}-status`} />;
+  const title = (
+    <Text
+      allowFontScaling={false}
+      numberOfLines={1}
+      style={voided ? [styles.voidedTitle, styles.faint] : styles.bandTitle}
+      testID={`${testID}-title`}>
+      {card.title}
+    </Text>
+  );
+
   return (
-    <UiSurface style={styles.card} testID={testID} variant={card.voided ? 'panelMuted' : 'card'}>
+    <Card style={styles.card} testID={testID}>
       <Pressable
         accessibilityHint={pressHint}
         accessibilityLabel={card.accessibilityLabel}
         accessibilityRole="button"
         onPress={() => onPress(card)}
-        style={({ pressed }) => [styles.summary, pressed ? styles.pressed : null]}
+        style={({ pressed }) => (pressed ? styles.pressed : null)}
         testID={`${testID}-open`}>
-        {card.voided ? (
-          <GroupCertificationStatus label={card.statusLabel} status={card.status} testID={`${testID}-status`} />
-        ) : null}
-        <UiText numberOfLines={1} testID={`${testID}-title`} variant="title">
-          {card.title}
-        </UiText>
-        <UiText testID={`${testID}-value`} variant="body">
-          {`${card.exerciseLabel}  ${card.valueLabel}`}
-        </UiText>
-        <View style={styles.badges}>
-          {card.badges.map((badge) => (
-            <View key={badge} style={styles.badge}>
-              <UiText variant="subtitle">{badge}</UiText>
-            </View>
-          ))}
-        </View>
-        {card.provisionalLabel ? (
-          <UiText testID={`${testID}-provisional`} variant="bodyMuted">
-            {card.provisionalLabel}
-          </UiText>
-        ) : null}
-        {card.voided ? null : (
-          <GroupCertificationStatus label={card.statusLabel} status={card.status} testID={`${testID}-status`} />
+        {voided ? null : (
+          <View style={styles.band} testID={`${testID}-band`}>
+            <Icon color={uiRoles.record} name="arrow-up" size="xs" />
+            {title}
+          </View>
         )}
-        {showGroupName ? (
-          <UiText numberOfLines={1} style={styles.group} testID={`${testID}-group`} variant="bodyMuted">
-            {card.groupName}
-          </UiText>
-        ) : null}
+        <View style={styles.body}>
+          {voided ? status : null}
+          {voided ? title : null}
+          <Text allowFontScaling={false} style={[styles.exercise, voided ? styles.faint : null]} testID={`${testID}-value`}>
+            {card.exerciseLabel}
+            {'\n'}
+            <Text allowFontScaling={false} style={[styles.value, voided ? styles.faint : null]}>
+              {card.valueLabel}
+            </Text>
+          </Text>
+          {card.badges.length > 0 ? (
+            <View style={styles.tags}>
+              {card.badges.map((badge) => (
+                <Tag key={badge} label={badge} tone={voided ? 'faint' : 'neutral'} />
+              ))}
+            </View>
+          ) : null}
+          {card.provisionalLabel ? (
+            <Text allowFontScaling={false} style={styles.muted} testID={`${testID}-provisional`}>
+              {card.provisionalLabel}
+            </Text>
+          ) : null}
+          {voided ? null : status}
+          {showGroupName ? (
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={[styles.muted, voided ? styles.faint : null]}
+              testID={`${testID}-group`}>
+              {card.groupName}
+            </Text>
+          ) : null}
+        </View>
       </Pressable>
-      {card.canCertify && onCertify ? (
-        <UiButton
-          disabled={certifying}
-          label="Certify"
-          onPress={() => onCertify(card)}
-          testID={`${testID}-certify`}
-          variant="secondary"
-        />
+      {(card.canCertify && onCertify) || notice ? (
+        <View style={styles.actions}>
+          {card.canCertify && onCertify ? (
+            <ActionButton
+              disabled={certifying}
+              label="Certify"
+              onPress={() => onCertify(card)}
+              testID={`${testID}-certify`}
+              variant="outline"
+            />
+          ) : null}
+          {notice ? <GroupWriteNotice message={notice.message} testID={`${testID}-notice`} tone={notice.tone} /> : null}
+        </View>
       ) : null}
-      {notice ? <GroupWriteNotice message={notice.message} testID={`${testID}-notice`} tone={notice.tone} /> : null}
-    </UiSurface>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  // Indented under the session card it belongs to.
   card: {
     marginLeft: uiSpace.md,
-    padding: uiSpace.md,
-    gap: uiSpace.sm,
-  },
-  summary: {
-    gap: uiSpace.xs,
   },
   pressed: {
-    opacity: 0.92,
+    backgroundColor: uiRoles.surfaceSubtle,
   },
-  badges: {
+  band: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.xs,
+    backgroundColor: uiRoles.recordWash,
+    borderBottomWidth: uiBorder.width,
+    borderBottomColor: uiRoles.recordRule,
+  },
+  bandTitle: {
+    flex: 1,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.record,
+  },
+  voidedTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+  },
+  body: {
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
+    gap: uiSpace.xs,
+  },
+  exercise: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  value: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '700',
+    color: uiRoles.record,
+  },
+  tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: uiSpace.xs,
   },
-  badge: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
-  },
-  group: {
+  muted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
+  // A voided record has stepped back: every line fades, the status stays readable.
+  faint: {
+    color: uiRoles.inkFaint,
+  },
+  actions: {
+    paddingHorizontal: uiSpace.md,
+    paddingBottom: uiSpace.md,
+    gap: uiSpace.sm,
   },
 });

@@ -4,6 +4,7 @@
 // sentences (M25-T10), and filter chips. No React, no I/O.
 
 import { formatCompactDuration } from '@/src/data/session-list';
+import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
 
 import { computeGroupSessionMetrics } from './session-metrics';
 import type {
@@ -168,9 +169,9 @@ export type StreamRecordCardViewModel = {
   /** "dana — group record" / "dana — PR". */
   title: string;
   exerciseLabel: string;
-  /** "140 kg × 1", plus " · e1RM 142.5 kg" when an e1RM board is listed. */
+  /** "140.0 × 1", plus " · 1RM 142.5" when a 1RM board is listed (figures: no unit, design-language §6). */
   valueLabel: string;
-  /** Per listed board, Weight then e1RM: "PR · Weight", then "Group record · Weight" when flagged. */
+  /** Per listed board, Weight then 1RM: "PR · Weight", then "Group record · Weight" when flagged. */
   badges: string[];
   /** "Voided · set edited|set deleted", "Certified by …", or "Not certified yet". */
   statusLabel: string;
@@ -232,7 +233,8 @@ const buildMembershipItem = (item: StreamMembershipItem): StreamMembershipViewMo
 // ---- Record cards, record-removed and link items (M25-T10) ---------------------
 
 export const YOU_NAME = 'You';
-export const METRIC_NAMES: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: 'e1RM' };
+// Display copy only (G7): the metric key stays `e1rm` in params, RPCs and view keys.
+export const METRIC_NAMES: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: '1RM' };
 const METRIC_ORDER: GroupBoardMetric[] = ['weight', 'e1rm'];
 const metricRank = (metric: GroupBoardMetric): number => METRIC_ORDER.indexOf(metric);
 const metricName = (metric: GroupBoardMetric): string => METRIC_NAMES[metric] ?? String(metric);
@@ -256,8 +258,11 @@ export const formatStreamPersonName = (member: GroupMemberRef, myUserId: string 
 const formatPossessive = (member: GroupMemberRef, myUserId: string | null): string =>
   isMyUser(member.user_id, myUserId) ? 'Your' : `${formatMemberName(member.username)}'s`;
 
-/** "140 kg × 1". */
+/** "140 kg × 1", for sentences (prose keeps its unit). */
 export const formatSetValue = (weightKg: number, reps: number): string => `${formatKg(weightKg)} kg × ${reps}`;
+
+/** "140.0 × 1", for a figure slot: the app's weight figure, no unit (design-language §6). */
+export const formatSetFigure = (weightKg: number, reps: number): string => `${formatWeightFigure(weightKg)} × ${reps}`;
 
 /** "Certified by sam" / "Certified by you" / "Certified" (the certifier's account is gone). */
 export const formatCertifiedBy = (certifiedBy: GroupMemberRef | null, myUserId: string | null): string => {
@@ -270,7 +275,7 @@ export const formatCertifiedBy = (certifiedBy: GroupMemberRef | null, myUserId: 
 /** "Voided · set edited" / "Voided · set deleted". */
 export const formatVoidedLabel = (reason: StreamRecordVoidReason): string => `Voided · set ${reason}`;
 
-/** Board badges in Weight, then e1RM order; a group record also lists its PR (E3). */
+/** Board badges in Weight, then 1RM order; a group record also lists its PR (E3). */
 export const formatRecordBadges = (boards: StreamRecordItem['boards']): string[] =>
   [...boards]
     .sort((a, b) => metricRank(a.metric) - metricRank(b.metric))
@@ -284,11 +289,11 @@ const buildRecordCard = (item: StreamRecordItem, myUserId: string | null): Strea
   const title = `${formatStreamPersonName(item.member, myUserId)} — ${
     item.boards.some((board) => board.group_record) ? 'group record' : 'PR'
   }`;
-  const setValue = formatSetValue(item.weight_kg, item.reps);
+  const setFigure = formatSetFigure(item.weight_kg, item.reps);
   const valueLabel =
     item.e1rm_kg !== null && item.boards.some((board) => board.metric === 'e1rm')
-      ? `${setValue} · e1RM ${formatKg(item.e1rm_kg)} kg`
-      : setValue;
+      ? `${setFigure} · 1RM ${formatOneRepMaxFigure(item.e1rm_kg)}`
+      : setFigure;
   const voided = item.voided !== null;
   let statusLabel = RECORD_UNCERTIFIED_LABEL;
   let status: RecordCertificationStatus = 'uncertified';
@@ -325,7 +330,7 @@ const buildRecordCard = (item: StreamRecordItem, myUserId: string | null): Strea
 
 /**
  * "dana's Bench Press record removed (140 kg × 1) — set edited · Now #1 on
- * Weight: sam 138 kg · No one holds #1 on e1RM" (D15).
+ * Weight: sam 138 kg · No one holds #1 on 1RM" (D15).
  */
 export const formatRecordVoidedSentence = (item: StreamRecordVoidedItem, myUserId: string | null): string => {
   const head = `${formatPossessive(item.member, myUserId)} ${item.group_exercise.name} record removed (${formatSetValue(
@@ -342,7 +347,7 @@ export const formatRecordVoidedSentence = (item: StreamRecordVoidedItem, myUserI
   return [head, ...leaders].join(' · ');
 };
 
-/** " — now #1 on Weight and e1RM", " — now #2 on Weight, #1 on e1RM", " — off the e1RM board"; "" with no effects. */
+/** " — now #1 on Weight and 1RM", " — now #2 on Weight, #1 on 1RM", " — off the 1RM board"; "" with no effects. */
 export const formatLinkEffects = (effects: StreamLinkItem['effects']): string => {
   const sorted = [...effects].sort((a, b) => metricRank(a.metric) - metricRank(b.metric));
   const ranked = sorted.flatMap((effect) => (effect.after ? [{ metric: effect.metric, rank: effect.after.rank }] : []));
@@ -358,7 +363,7 @@ export const formatLinkEffects = (effects: StreamLinkItem['effects']): string =>
   return parts.length > 0 ? ` — ${parts.join(', ')}` : '';
 };
 
-/** "dana linked Bench (comp grip) to Bench Press — now #1 on e1RM" / "dana unlinked A from Bench Press — off the Weight board" (P16). */
+/** "dana linked Bench (comp grip) to Bench Press — now #1 on 1RM" / "dana unlinked A from Bench Press — off the Weight board" (P16). */
 export const formatLinkSentence = (item: StreamLinkItem, myUserId: string | null): string => {
   const names = item.exercises.map((exercise) => exercise.name?.trim() || 'an exercise');
   const exercises = names.length > 0 ? names.join(', ') : 'an exercise';

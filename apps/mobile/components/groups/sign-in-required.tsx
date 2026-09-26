@@ -1,13 +1,12 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
 
+import { Screen, StatePanel } from '@/components/ui';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 
-import { GroupStateView } from './group-state-view';
 import { groupScreenStyles } from './screen-styles';
 
-/** Signed out or auth-unconfigured (C3.2.5): groups need an account. */
+/** Signed out or auth-unconfigured (C3.2.5): groups need an account. The panel centres on the page. */
 export function GroupsSignInRequired({
   isConfigured,
   leading,
@@ -17,20 +16,22 @@ export function GroupsSignInRequired({
 }) {
   const router = useRouter();
   return (
-    <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
+    <Screen style={groupScreenStyles.content}>
       {leading}
-      <GroupStateView
-        actionLabel={isConfigured ? 'Sign in' : undefined}
-        actionTestID="groups-sign-in-button"
+      <StatePanel
+        action={
+          isConfigured
+            ? { label: 'Sign in', onPress: () => router.push(SIGN_IN_ROUTE), testID: 'groups-sign-in-button' }
+            : undefined
+        }
         body={
           isConfigured
             ? 'Groups are shared with other lifters, so they need an account.'
             : 'Groups need an account, and sign-in is not available in this build.'
         }
-        onAction={() => router.push(SIGN_IN_ROUTE)}
         testID="groups-signed-out-state"
         title="Sign in to use groups"
       />
-    </View>
+    </Screen>
   );
 }

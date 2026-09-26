@@ -12,7 +12,7 @@
  */
 
 import * as mockReact from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet, type ViewStyle } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -66,6 +66,7 @@ jest.mock('@/src/groups/api', () => ({
   cancelGroupCertification: jest.fn(),
 }));
 
+import { uiRoles } from '@/components/ui';
 import { groupCache } from '@/src/data/schema';
 import {
   GROUP_OFFLINE_ACTION_MESSAGE,
@@ -155,6 +156,14 @@ afterEach(() => {
   fixture.close();
 });
 
+/** testIDs of the host components under `root` painted `accent` (G6: one primary per sheet). */
+type TestNode = typeof screen.UNSAFE_root;
+const accentGrounds = (root: TestNode): string[] =>
+  root
+    .findAll((node: TestNode) => typeof node.type === 'string')
+    .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent)
+    .map((node: TestNode) => String(node.props.testID));
+
 const openGroupStream = async () => {
   mockParams = { groupId: GROUP_ID };
   render(<GroupsTabRoute />);
@@ -175,11 +184,16 @@ describe('stream items (E3, D15, P16)', () => {
     await openGroupStream();
 
     expect(screen.getByTestId('group-stream-link-ev-link-1-sentence')).toHaveTextContent(
-      'dave linked Bench (comp grip) to Bench Press — now #1 on Weight and e1RM',
+      'dave linked Bench (comp grip) to Bench Press — now #1 on Weight and 1RM',
     );
     expect(screen.getByTestId('group-stream-session-card-u2:s1-records')).toHaveTextContent('1 record');
     expect(screen.getByTestId(`${RECORD_CARD}-title`)).toHaveTextContent('dave — group record');
-    expect(screen.getByTestId(`${RECORD_CARD}-value`)).toHaveTextContent('Bench Press  140 kg × 1 · e1RM 142.5 kg');
+    // The exercise, then its figures: no unit, `1RM` (G7).
+    expect(screen.getByTestId(`${RECORD_CARD}-value`)).toHaveTextContent(/^Bench Press\s+140\.0 × 1 · 1RM 142\.5$/);
+    // A standing record carries the `record` band with its title (T11-D2); a voided one has none.
+    expect(screen.getByTestId(`${RECORD_CARD}-band`)).toHaveTextContent('dave — group record');
+    expect(screen.queryByTestId('group-stream-record-card-ev-old-band')).toBeNull();
+    expect(screen.getByTestId('group-stream-record-card-ev-old-title')).toHaveTextContent('dave — group record');
     expect(screen.getByTestId(`${RECORD_CARD}-status`)).toHaveTextContent('Not certified yet');
     expect(screen.getByTestId(`${RECORD_CARD}-certify`)).toBeTruthy();
     expect(screen.getByTestId('group-stream-record-card-ev-old-status')).toHaveTextContent('Voided · set deleted');
@@ -329,8 +343,12 @@ describe('the row detail sheet (E2)', () => {
 
   it('shows values, date and gym, logged-as from the session detail, and View full session', async () => {
     await openSheet();
-    expect(screen.getByTestId('group-record-sheet-title')).toHaveTextContent('dave · Bench Press');
-    expect(screen.getByTestId('group-record-sheet-value')).toHaveTextContent('140 kg × 1 (e1RM 142.5 kg)');
+    // The sheet's title row (a `Sheet`, G5) names the lifter and the exercise.
+    expect(screen.getByTestId('group-record-sheet-header')).toHaveTextContent('dave · Bench Press');
+    expect(screen.getByTestId('group-record-sheet-value').props.accessibilityLabel).toBe('140.0 × 1 · 1RM 142.5');
+    // No Close: the backdrop dismisses. Certify is the sheet's one accent (G6).
+    expect(screen.queryByTestId('group-record-sheet-close')).toBeNull();
+    expect(accentGrounds(screen.getByTestId('group-record-sheet'))).toEqual(['group-record-sheet-certify']);
     expect(screen.queryByTestId('group-record-sheet-logged')).toBeNull();
     expect(await screen.findByTestId('group-record-sheet-logged-as')).toHaveTextContent('Logged as "Bench (comp grip)"');
     expect(screen.getByTestId('group-record-sheet-date')).toHaveTextContent('12 Sep 2026 · Iron Temple');
@@ -464,7 +482,7 @@ describe('full-board rows open the sheet (card AC8)', () => {
 
     fireEvent.press(await screen.findByTestId('group-board-row-1'));
     expect(await screen.findByTestId('group-record-sheet')).toBeTruthy();
-    expect(screen.getByTestId('group-record-sheet-title')).toHaveTextContent('dave · Prowler Push');
+    expect(screen.getByTestId('group-record-sheet-header')).toHaveTextContent('dave · Prowler Push');
     expect(screen.getByTestId('group-record-sheet-logged')).toHaveTextContent('Logged 102.5 kg total · counted as 51.25 kg per side');
     expect(screen.getByTestId('group-record-sheet-logged-as')).toHaveTextContent('Logged as "Bench Press"');
 
@@ -504,7 +522,8 @@ describe('full-board rows open the sheet (card AC8)', () => {
     fireEvent.press(await screen.findByTestId('group-board-row-1'));
     expect(await screen.findByTestId('group-record-sheet')).toBeTruthy();
     expect(screen.queryByTestId('group-record-sheet-certify')).toBeNull();
-    fireEvent.press(screen.getByTestId('group-record-sheet-close'));
+    fireEvent.press(screen.getByTestId('group-record-sheet-backdrop', { includeHiddenElements: true }));
+    await waitFor(() => expect(screen.queryByTestId('group-record-sheet')).toBeNull());
 
     fireEvent.press(screen.getByTestId('group-board-row-2'));
     expect(await screen.findByTestId('group-record-sheet-cancel')).toBeTruthy();
