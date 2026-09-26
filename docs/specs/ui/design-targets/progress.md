@@ -6,7 +6,8 @@ of the design-language migration. Chosen by the user on 2026-09-24
 palette picked from on-device renders. **Palette accepted** by the user on
 2026-09-25 (`B2`). **Accepted** by the user in the DLM-T08 screen gallery on
 2026-09-25; the history sheets and heatmaps **accepted** in the DLM-T09 gallery
-on 2026-09-26.
+on 2026-09-26; exercise history and Sessions **accepted** in the DLM-T10
+gallery on 2026-09-26.
 
 ## Target
 
