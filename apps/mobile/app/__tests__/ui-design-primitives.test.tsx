@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
+  Platform,
   StyleSheet,
   Text,
   type StyleProp,
@@ -276,6 +278,31 @@ describe('ListRow', () => {
     rerender(<ListRow label="Chest" onPress={jest.fn()} testID="row" />);
     expect(screen.getByTestId('row').props.accessibilityState).toEqual({ selected: false, disabled: false });
   });
+
+  it('is a radio when given checked: announced checked, with no ground change', () => {
+    const { rerender } = render(<ListRow checked label="Bench Press" onPress={jest.fn()} testID="row" />);
+    const row = screen.getByTestId('row');
+    expect(row.props.accessibilityRole).toBe('radio');
+    expect(row.props.accessibilityState).toEqual({ checked: true });
+    expect(flatStyle(row).backgroundColor).toBeUndefined();
+    expect(flatStyle(screen.getByText('Bench Press')).color).toBe(uiRoles.ink);
+
+    rerender(<ListRow checked={false} disabled label="Bench Press" onPress={jest.fn()} testID="row" />);
+    expect(screen.getByTestId('row').props.accessibilityState).toEqual({ checked: false, disabled: true });
+  });
+
+  it('reads a row without onPress as one element when accessible, and hands out its host view', () => {
+    const ref = { current: null };
+    render(
+      <ListRow accessibilityLabel="Bench, Total load, Not linked" accessible ref={ref} testID="row">
+        <Text>Bench</Text>
+      </ListRow>,
+    );
+    const row = screen.getByTestId('row');
+    expect(row.props.accessible).toBe(true);
+    expect(row.props.accessibilityLabel).toBe('Bench, Total load, Not linked');
+    expect(ref.current).not.toBeNull();
+  });
 });
 
 describe('Sheet', () => {
@@ -306,6 +333,41 @@ describe('Sheet', () => {
 
     fireEvent(panel, 'accessibilityEscape');
     expect(onDismiss).toHaveBeenCalledTimes(2);
+  });
+
+  describe('onDismissed', () => {
+    const sheetModal = () => screen.UNSAFE_getByType(Modal);
+    const renderSheet = (visible: boolean, onDismissed: () => void) => (
+      <Sheet dismissLabel="Dismiss" onDismiss={jest.fn()} onDismissed={onDismissed} testID="sheet" visible={visible}>
+        <Text>Body</Text>
+      </Sheet>
+    );
+
+    it('fires on iOS from the native modal once it has gone, not when visible turns false', () => {
+      const onDismissed = jest.fn();
+      const { rerender } = render(renderSheet(true, onDismissed));
+      expect(sheetModal().props.testID).toBe('sheet-modal');
+
+      rerender(renderSheet(false, onDismissed));
+      expect(onDismissed).not.toHaveBeenCalled();
+      act(() => sheetModal().props.onDismiss());
+      expect(onDismissed).toHaveBeenCalledTimes(1);
+    });
+
+    it('fires at once on Android, which has no Modal.onDismiss', () => {
+      const os = jest.replaceProperty(Platform, 'OS', 'android');
+      const onDismissed = jest.fn();
+      const { rerender } = render(renderSheet(true, onDismissed));
+      expect(sheetModal().props.onDismiss).toBeUndefined();
+      expect(onDismissed).not.toHaveBeenCalled();
+
+      rerender(renderSheet(false, onDismissed));
+      expect(onDismissed).toHaveBeenCalledTimes(1);
+      // Staying hidden does not fire it again.
+      rerender(renderSheet(false, onDismissed));
+      expect(onDismissed).toHaveBeenCalledTimes(1);
+      os.restore();
+    });
   });
 
   it('pads the bottom by the larger of the home-indicator inset and the sheet padding', () => {

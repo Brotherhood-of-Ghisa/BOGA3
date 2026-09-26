@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,11 @@ export type SheetProps = {
   // escape gesture. There is
   // no Cancel button: tapping outside is the dismissal (`design-language.md` §4).
   onDismiss: () => void;
+  // Called once the sheet has gone after `visible` turns false: on iOS from the
+  // native modal's dismissal, on Android at once. A native `Alert` opened from
+  // here cannot collide with the closing sheet (iOS presents nothing over a
+  // modal that is still dismissing): the unlink chooser's confirmation.
+  onDismissed?: () => void;
   // Accessibility label of the backdrop, e.g. `Dismiss options`.
   dismissLabel: string;
   title?: string;
@@ -25,7 +30,7 @@ export type SheetProps = {
   // Usually `ListRow`s.
   children: ReactNode;
   // `<testID>` on the panel, `<testID>-backdrop` on the backdrop, `<testID>-header`
-  // on the title row.
+  // on the title row, `<testID>-modal` on the native modal.
   testID?: string;
 };
 
@@ -35,6 +40,7 @@ export type SheetProps = {
 export function Sheet({
   visible,
   onDismiss,
+  onDismissed,
   dismissLabel,
   title,
   headerLeading,
@@ -44,6 +50,12 @@ export function Sheet({
   testID,
 }: SheetProps) {
   const insets = useSafeAreaInsets();
+  const wasVisible = useRef(visible);
+  useEffect(() => {
+    // Android has no `Modal.onDismiss`; its modal is gone once hidden.
+    if (Platform.OS !== 'ios' && wasVisible.current && !visible) onDismissed?.();
+    wasVisible.current = visible;
+  }, [visible, onDismissed]);
 
   const content = (
     <>
@@ -74,7 +86,9 @@ export function Sheet({
             testID={testID ? `${testID}-header` : undefined}>
             {headerLeading}
             {title ? (
-              <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
+              // Two lines, so a title naming an item and its context (`Bench Press · Garage
+              // Gym`) wraps rather than losing the context.
+              <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={2} style={styles.title}>
                 {title}
               </Text>
             ) : null}
@@ -87,7 +101,13 @@ export function Sheet({
   );
 
   return (
-    <Modal animationType="fade" onRequestClose={onDismiss} transparent visible={visible}>
+    <Modal
+      animationType="fade"
+      onDismiss={Platform.OS === 'ios' ? onDismissed : undefined}
+      onRequestClose={onDismiss}
+      testID={testID ? `${testID}-modal` : undefined}
+      transparent
+      visible={visible}>
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

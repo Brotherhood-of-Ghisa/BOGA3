@@ -190,3 +190,70 @@ Jest only (no flow reaches them): Join (the counterparty joins by script), the
 empty create form, Edit, a regenerated code's notice, and the offline and
 error states of each screen. `groups-08` (the stream) and `groups-09` (a
 board) end the same flow but show no T13 screen.
+
+## Group exercises and linking (DLM-T14)
+
+**Accepted** by the user in the DLM-T14 gallery on 2026-09-26, with `Sheet`
+titles wrapping to two lines (the pick sheet's `<exercise> · <group>`). This
+section is the appearance target of `group-exercise-unlink.md`, whose behaviour
+brief stays (T14-D4).
+
+### Brief
+
+- **Exercises section.** `Exercises` is a micro-label with `Add exercise` as
+  an outline beside it (owner/admin): `Invite` is the group screen's one
+  `accent` (T13-D1). The rows are one `Card` of dense `ListRow`s behind
+  `rule-soft` hairlines: the name in Archivo 600, the weight entry and my link
+  status (`Linked: …` / `Not linked`) in `ink-muted`, an `Archived` `Tag`
+  centred on the text and a chevron when the row opens the exercise actions.
+  `Unlink…` is a `danger` text button and `Link your exercise` an outline, both
+  under the row. Outcomes are `Notice`s (neutral with the `success` glyph, or
+  `danger`, G3); a failed links read is a `danger` `Notice` with an outline
+  `Retry`. The row accessibility labels are unchanged.
+- **Add exercise.** `From catalogue` | `Custom` is a `SegmentedControl`. The
+  catalogue is a micro-label, a `SearchField` and one `Card` of radio rows (the
+  weight entry on the right in `ink-muted`): the pick is `radio-on` in `ink`,
+  with no ground change. The form is a `Card`: the copy note in `ink-muted`,
+  T07's fields, a `danger` `Notice` on failure and the submit, the screen's one
+  `accent`. Rename uses the same form.
+- **The pick sheet** (also opened by the session picker) is a `Sheet` titled
+  `<exercise> · <group>`, with no Cancel (G5): radio `ListRow`s (`radio-on` /
+  `radio-off` in `ink`, no ground change), the other exercises under a
+  `SearchField` with unavailable ones in `ink-faint` beside their reason, the
+  notes in `ink-muted`, a `danger` `Notice` and the confirm, the sheet's one
+  `accent` (T14-D3).
+- **The unlink chooser** is a `Sheet` (`Your linked exercises`, then
+  `<exercise> · <group>` in `ink-muted`) with no Cancel: one row per personal
+  exercise, its name wrapping, and a `danger` text `Unlink`. The native
+  confirmation opens only once the sheet has gone (`Sheet.onDismissed`,
+  T14-D2); its `Cancel` / `Unlink` are OS chrome.
+- **The Link screen.** The outcome is a `Notice` (neutral with the `success`
+  glyph, or `danger`) in place of bare coloured text. `Linked`, `Suggested`
+  and `All group exercises` are micro-labels over `Card`s of dense rows (a
+  group's name in Archivo 700 above its card): `Unlink` a `danger` text button,
+  `Link` an outline. A `SearchField` filters; empty, offline and error states
+  are T11's `StatePanel`s and notices. No `accent`: the screen has no primary.
+
+### States
+
+Device: iPhone simulator at 390pt width, light. All from `ios-groups-e2e`.
+
+| Screenshot (flow) | State |
+| --- | --- |
+| `groups-add-exercise-catalogue` (`groups-two-user-stream`) | From catalogue: a search, the picked radio row and the prefilled form |
+| `groups-add-exercise-custom` (`groups-two-user-stream`) | Custom: the empty form |
+| `groups-04b-1-exercises-added` (`groups-two-user-stream`) | the section with two exercises, `Link your exercise` under each |
+| `groups-04b-2-pick-sheet-link-only` (`groups-two-user-stream`) | the pick sheet, link-only: the suggestion checked, `Link` |
+| `groups-04b-3-exercise-linked-renamed-archived` (`groups-two-user-stream`) | the archive notice, a renamed row, an archived row with its `Tag` |
+| `groups-unlink-01-linked-row` (`groups-two-user-stream`) | a row linked twice: `Unlink…` |
+| `groups-unlink-02-chooser` (`groups-two-user-stream`) | the chooser sheet |
+| `groups-unlink-03-confirmation` (`groups-two-user-stream`) | the native confirmation after the chooser has gone |
+| `groups-unlink-04-success` (`groups-two-user-stream`) | the unlink notice, the second link kept |
+| `groups-unlink-05-preserved-record` (`groups-two-user-stream`) | the record card, still certified |
+| `groups-link-01-link-screen` (`groups-link-exercise`) | the Link screen: search, `Suggested`, `All group exercises` |
+| `groups-link-02-linked` (`groups-link-exercise`) | after `Link`: the notice and the `Linked` card |
+| `groups-link-06-exercise-page-link-screen` (`groups-link-exercise`) | the Link screen from the exercise page's ⋮ |
+
+Jest only: the empty section, the failed links read with `Retry`, a failed
+link in the pick sheet, unavailable choices, the Link screen's deleted,
+offline and error states, and the Android `onDismissed` path.

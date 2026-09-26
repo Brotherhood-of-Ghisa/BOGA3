@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupInlineError,
@@ -8,12 +8,24 @@ import {
   GroupOfflineBanner,
   GroupStateView,
   GroupsSignInRequired,
-  groupFormStyles,
-  groupScreenStyles,
+  GroupWriteNotice,
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { UiButton, UiSurface, UiText, uiColors, uiSpace } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  ListRow,
+  Notice,
+  Screen,
+  ScreenScroll,
+  SearchField,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { linkExercise } from '@/src/data/exercise-group-links';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -49,7 +61,7 @@ export default function ExerciseLinkRoute() {
   return <ExerciseLinkContent userId={user.id} />;
 }
 
-type Notice = { tone: 'success' | 'error'; text: string };
+type LinkNotice = { tone: 'success' | 'error'; text: string };
 
 function ExerciseLinkContent({ userId }: { userId: string }) {
   const params = useLocalSearchParams<{ exerciseDefinitionId?: string | string[] }>();
@@ -58,7 +70,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   const linking = useGroupExerciseLinking({ userId });
   const { pulling, onRefresh } = usePullToRefresh(linking.refresh);
   const [query, setQuery] = useState('');
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<LinkNotice | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const unlink = useExerciseUnlink({
     offline: linking.offline, reloadLinks: linking.reloadLinks,
@@ -84,36 +96,36 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
 
   if (catalog.status === 'error') {
     return (
-      <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
+      <Screen style={styles.stateScreen}>
         <Stack.Screen options={{ title }} />
         <GroupStateView
           body={catalog.lastError ?? 'Try again in a moment.'}
           testID="exercise-link-catalog-error"
           title="Couldn't load your exercises"
         />
-      </View>
+      </Screen>
     );
   }
 
   if (!exerciseDefinitionId || (!catalogLoading && !exercise)) {
     return (
-      <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
+      <Screen style={styles.stateScreen}>
         <Stack.Screen options={{ title }} />
         <GroupStateView
           body="Open this screen from an exercise's menu."
           testID="exercise-link-missing-state"
           title="This exercise isn't available"
         />
-      </View>
+      </Screen>
     );
   }
 
   if (!exercise || !model) {
     return (
-      <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
+      <Screen style={styles.stateScreen}>
         <Stack.Screen options={{ title }} />
         <GroupLoadingState testID="exercise-link-loading" />
-      </View>
+      </Screen>
     );
   }
 
@@ -144,56 +156,62 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   const offeredCount = model.suggested.length + model.groups.reduce((total, group) => total + group.rows.length, 0);
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
+    <ScreenScroll
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      style={groupScreenStyles.screen}
       testID="exercise-link-screen">
       <Stack.Screen options={{ title }} />
       {linking.offline ? <GroupOfflineBanner lastUpdatedAtMs={linking.lastUpdatedAtMs} /> : null}
-      {notice ? (
-        <UiText
-          accessibilityLiveRegion="polite"
-          accessibilityRole={notice.tone === 'error' ? 'alert' : undefined}
-          style={notice.tone === 'error' ? styles.errorText : styles.successText}
-          testID="exercise-link-notice">
-          {notice.text}
-        </UiText>
-      ) : null}
+      {notice ? <GroupWriteNotice message={notice.text} testID="exercise-link-notice" tone={notice.tone} /> : null}
       {loaded && inlineError ? (
         <GroupInlineError error={inlineError} onRetry={onRefresh} testID="exercise-link-inline-error" />
       ) : null}
 
       {linking.linksError ? (
-        <View style={styles.section}>
-          <UiText accessibilityRole="alert" style={styles.errorText} testID="exercise-link-links-error">{linking.linksError}</UiText>
-          <UiButton label="Retry reading links" onPress={() => void linking.reloadLinks()} style={styles.unlinkButton} testID="exercise-link-links-retry" variant="secondary" />
-        </View>
+        <Notice
+          action={
+            <ActionButton
+              accessibilityLabel="Retry reading links"
+              label="Retry"
+              onPress={() => void linking.reloadLinks()}
+              testID="exercise-link-links-retry"
+              variant="outline"
+            />
+          }
+          live
+          message={linking.linksError}
+          testID="exercise-link-links-error"
+          tone="danger"
+        />
       ) : !linking.linksReady ? <GroupLoadingState testID="exercise-link-links-loading" /> : null}
       {linking.linksReady && model.linked.length > 0 ? (
         <Section title="Linked">
-          {model.linked.map((row) => (
-            <UiSurface key={row.key} style={styles.row} testID={`exercise-link-linked-row-${row.groupExerciseId}`}>
-              <View style={styles.rowText}>
-                <UiText>
-                  {row.groupExerciseName}
-                  <UiText variant="bodyMuted"> · {row.groupName}</UiText>
-                </UiText>
-                {row.statusLabel ? <UiText variant="bodyMuted">{row.statusLabel}</UiText> : null}
-                {row.loadModeNote ? <UiText variant="bodyMuted">{row.loadModeNote}</UiText> : null}
-              </View>
-              <UiButton
-                accessibilityLabel={`Unlink from ${row.groupExerciseName} in ${row.groupName}`}
-                disabled={mutationPending}
-                label={unlink.pending ? 'Unlinking…' : 'Unlink'}
-                style={styles.unlinkButton}
-                onPress={() => confirmUnlink(row)}
-                testID={`exercise-link-unlink-${row.groupExerciseId}`}
-                variant="danger"
-              />
-            </UiSurface>
-          ))}
+          <Card>
+            {model.linked.map((row, index) => (
+              <ListRow
+                density="list"
+                divider={index > 0}
+                key={row.key}
+                meta={
+                  <ActionButton
+                    accessibilityLabel={`Unlink from ${row.groupExerciseName} in ${row.groupName}`}
+                    disabled={mutationPending}
+                    label={unlink.pending ? 'Unlinking…' : 'Unlink'}
+                    onPress={() => confirmUnlink(row)}
+                    testID={`exercise-link-unlink-${row.groupExerciseId}`}
+                    tone="danger"
+                    variant="text"
+                  />
+                }
+                testID={`exercise-link-linked-row-${row.groupExerciseId}`}>
+                <RowText
+                  groupName={row.groupName}
+                  lines={[row.statusLabel, row.loadModeNote]}
+                  name={row.groupExerciseName}
+                />
+              </ListRow>
+            ))}
+          </Card>
         </Section>
       ) : null}
 
@@ -217,58 +235,76 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
         )
       ) : (
         <>
-          <TextInput
-            allowFontScaling={false}
+          <SearchField
             accessibilityLabel="Search group exercises"
             autoCapitalize="none"
-            autoCorrect={false}
             onChangeText={setQuery}
             placeholder="Search group exercises…"
-            style={groupFormStyles.input}
             testID="exercise-link-search"
             value={query}
           />
           {model.suggested.length > 0 ? (
             <Section title="Suggested">
-              {model.suggested.map((row) => (
-                <AvailableRow key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} showGroup />
-              ))}
+              <Card>
+                {model.suggested.map((row, index) => (
+                  <AvailableRow divider={index > 0} key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} showGroup />
+                ))}
+              </Card>
             </Section>
           ) : null}
           {model.groups.length > 0 ? (
             <Section title="All group exercises">
               {model.groups.map((group) => (
                 <View key={group.groupId} style={styles.group}>
-                  <UiText variant="label">{group.groupName}</UiText>
-                  {group.rows.map((row) => (
-                    <AvailableRow key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} />
-                  ))}
+                  <Text allowFontScaling={false} style={styles.groupName}>{group.groupName}</Text>
+                  <Card>
+                    {group.rows.map((row, index) => (
+                      <AvailableRow divider={index > 0} key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} />
+                    ))}
+                  </Card>
                 </View>
               ))}
             </Section>
           ) : null}
           {offeredCount === 0 ? (
-            <UiText testID="exercise-link-empty" variant="bodyMuted">
+            <Text allowFontScaling={false} style={styles.muted} testID="exercise-link-empty">
               {(linking.catalogs?.length ?? 0) === 0
                 ? "You're not in any groups yet."
                 : query.trim().length > 0
                   ? 'No group exercises match.'
                   : 'No group exercises to link.'}
-            </UiText>
+            </Text>
           ) : null}
         </>
       )}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
-      <UiText accessibilityRole="header" style={styles.sectionHeader} variant="label">
+      <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
         {title}
-      </UiText>
+      </Text>
       {children}
+    </View>
+  );
+}
+
+/** A row's words: the name (· group), then any status lines in `ink-muted`. */
+function RowText({ name, groupName, lines }: { name: string; groupName?: string; lines: (string | null | undefined)[] }) {
+  return (
+    <View style={styles.rowText}>
+      <Text allowFontScaling={false} style={styles.name}>
+        {name}
+        {groupName ? <Text allowFontScaling={false} style={styles.nameGroup}> · {groupName}</Text> : null}
+      </Text>
+      {lines.filter(Boolean).map((line) => (
+        <Text allowFontScaling={false} key={line} style={styles.muted}>
+          {line}
+        </Text>
+      ))}
     </View>
   );
 }
@@ -278,62 +314,88 @@ function AvailableRow({
   pendingKey,
   onLink,
   showGroup = false,
+  divider,
 }: {
   row: LinkScreenAvailableRow;
   pendingKey: string | null;
   onLink: (row: LinkScreenAvailableRow) => Promise<void>;
   showGroup?: boolean;
+  divider: boolean;
 }) {
   const name = row.groupExercise.name;
   return (
-    <UiSurface style={styles.row} testID={`exercise-link-row-${row.groupExercise.group_exercise_id}`}>
-      <View style={styles.rowText}>
-        <UiText>
-          {name}
-          {showGroup ? <UiText variant="bodyMuted"> · {row.groupName}</UiText> : null}
-        </UiText>
-        {row.unavailableReason ? <UiText variant="bodyMuted">{row.unavailableReason}</UiText> : null}
-        {!row.unavailableReason && row.loadModeNote ? <UiText variant="bodyMuted">{row.loadModeNote}</UiText> : null}
-      </View>
-      {row.unavailableReason ? null : (
-        <UiButton
-          accessibilityLabel={`Link to ${name} in ${row.groupName}`}
-          disabled={pendingKey !== null}
-          label="Link"
-          onPress={() => void onLink(row)}
-          testID={`exercise-link-link-${row.groupExercise.group_exercise_id}`}
-          variant="secondary"
-        />
-      )}
-    </UiSurface>
+    <ListRow
+      density="list"
+      divider={divider}
+      meta={
+        row.unavailableReason ? undefined : (
+          <ActionButton
+            accessibilityLabel={`Link to ${name} in ${row.groupName}`}
+            disabled={pendingKey !== null}
+            label="Link"
+            onPress={() => void onLink(row)}
+            testID={`exercise-link-link-${row.groupExercise.group_exercise_id}`}
+            variant="outline"
+          />
+        )
+      }
+      testID={`exercise-link-row-${row.groupExercise.group_exercise_id}`}>
+      <RowText
+        groupName={showGroup ? row.groupName : undefined}
+        lines={[row.unavailableReason ?? row.loadModeNote]}
+        name={name}
+      />
+    </ListRow>
   );
 }
 
 const styles = StyleSheet.create({
+  // A whole-screen state sits in the page gutter.
+  stateScreen: {
+    padding: uiSpace.lg,
+  },
   section: {
     gap: uiSpace.sm,
   },
-  sectionHeader: {
-    color: uiColors.textSecondary,
+  microLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
   },
   group: {
     gap: uiSpace.xs,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.md,
-    padding: uiSpace.md,
+  groupName: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
   },
-  unlinkButton: { minHeight: 44 },
   rowText: {
-    flex: 1,
-    gap: uiSpace.xs,
+    paddingVertical: uiSpace.sm,
   },
-  successText: {
-    color: uiColors.textSuccess,
+  name: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
-  errorText: {
-    color: uiColors.actionDangerText,
+  nameGroup: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    color: uiRoles.inkMuted,
+  },
+  muted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
 });

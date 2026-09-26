@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
+import { StyleSheet, Text } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
-import { UiButton, UiSurface, UiText } from '@/components/ui';
+import { ActionButton, Card, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { validateExerciseCore, type ExerciseCore, type LoadInputMode } from '@/src/exercise-core';
 
-import { groupFormStyles } from './screen-styles';
 import { GroupWriteNotice } from './write-notice';
 
 type GroupExerciseFormProps = {
@@ -23,9 +23,10 @@ type GroupExerciseFormProps = {
 const EMPTY_CORE: ExerciseCore = { name: '', loadInputMode: 'total_load' };
 
 /**
- * The owner/admin group exercise form: the shared `ExerciseCoreFields`,
- * validated with `validateExerciseCore` before any request (the same rules as
- * the personal editor and the server).
+ * The owner/admin group exercise form: a `Card` holding the shared
+ * `ExerciseCoreFields`, validated with `validateExerciseCore` before any request
+ * (the same rules as the personal editor and the server). Its submit is the
+ * screen's one `accent`.
  */
 export function GroupExerciseForm({
   initialCore = EMPTY_CORE,
@@ -57,11 +58,11 @@ export function GroupExerciseForm({
   };
 
   return (
-    <UiSurface style={groupFormStyles.card} testID="group-exercise-form">
+    <Card style={styles.card} testID="group-exercise-form">
       {note ? (
-        <UiText testID="group-exercise-form-note" variant="bodyMuted">
+        <Text allowFontScaling={false} style={styles.note} testID="group-exercise-form-note">
           {note}
-        </UiText>
+        </Text>
       ) : null}
       <ExerciseCoreFields
         editable={!pending}
@@ -79,12 +80,27 @@ export function GroupExerciseForm({
         testIDPrefix="group-exercise-form"
       />
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
-      <UiButton
+      <ActionButton
         disabled={pending}
         label={pending ? pendingLabel : submitLabel}
         onPress={submit}
         testID="group-exercise-form-submit"
+        variant="primary"
       />
-    </UiSurface>
+    </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    padding: uiSpace.lg,
+    gap: uiSpace.md,
+  },
+  note: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+});

@@ -31,7 +31,7 @@ export { GroupDetailsForm } from './group-details-form';
 export { GroupMemberActionSheet } from './member-action-sheet';
 export { GroupMemberRow } from './member-row';
 export { GroupOfflineBanner } from './offline-banner';
-export { cardListItemStyles, groupFormStyles, groupScreenStyles } from './screen-styles';
+export { cardListItemStyles, groupScreenStyles } from './screen-styles';
 export { GroupsSignInRequired } from './sign-in-required';
 export { GroupStreamMembershipItem } from './stream-membership-item';
 export { GroupStreamRecordCard } from './stream-record-card';
