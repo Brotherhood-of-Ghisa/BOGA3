@@ -184,8 +184,9 @@ Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream
 | `groups-mine-list` | My groups: the action row over one card of rows |
 | `groups-members-list` | Members as owner: header card, two rows with role `Tag`s, the transfer note |
 | `groups-member-actions-sheet` | the member action sheet: `Make admin`, `Transfer ownership` and `Remove from group` in `danger`, no Cancel |
-| `groups-09-removed-member-not-found` | Members after the removal: the `success` notice, one row |
+| `groups-members-removed` | Members after the removal: the neutral notice with the `success` glyph, one row |
 
 Jest only (no flow reaches them): Join (the counterparty joins by script), the
 empty create form, Edit, a regenerated code's notice, and the offline and
-error states of each screen.
+error states of each screen. `groups-08` (the stream) and `groups-09` (a
+board) end the same flow but show no T13 screen.
