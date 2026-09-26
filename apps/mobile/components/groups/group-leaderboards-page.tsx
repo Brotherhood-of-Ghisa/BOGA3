@@ -71,7 +71,12 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
         <Text allowFontScaling={false} numberOfLines={1} style={styles.name} testID={`${testID}-name`}>
           {card.name}
         </Text>
-        {card.archived ? <Tag label="Archived" testID={`${testID}-archived`} /> : null}
+        {card.archived ? (
+          // The Tag sets its own `alignSelf: flex-start`; the wrapper centres it on the name.
+          <View>
+            <Tag label="Archived" testID={`${testID}-archived`} />
+          </View>
+        ) : null}
       </View>
       <Text allowFontScaling={false} style={styles.view} testID={`${testID}-view`}>
         {card.viewLabel}
