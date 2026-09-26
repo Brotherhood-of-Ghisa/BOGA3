@@ -19,7 +19,7 @@ merge a PR yourself unless asked.
   no iOS simulator, so most tasks cannot run their gates there.
 - **Plans are ephemeral and never referenced.** Code, tests, Maestro flows,
   migrations, specs and other docs never cite a plan path (`docs/plans/...`)
-  or a task/milestone ID (`M27-T03`, `T-20260926-01`). State the rule or
+  or a task/milestone ID (`M<n>-T<nn>`, `T-<YYYYMMDD>-<nn>`). State the rule or
   behaviour itself in the owning spec. Commit messages and PR bodies may cite
   them. `docs-check` fails on plan paths outside `docs/plans/**` and
   `docs/brainstorms/**`.
@@ -33,8 +33,10 @@ merge a PR yourself unless asked.
    Verify assumptions against the code and specs; don't write production code.
 2. Pick the shape with the user (`docs/plans/README.md`). For multi-PR work:
    - Milestone: `docs/plans/milestones/M<n>-<slug>.md` from
-     `docs/plans/templates/milestone-spec-template.md`. Next `<n>`:
-     `git log origin/main --format= --name-only -- docs/plans/milestones | grep -oE 'M[0-9]+' | sort -V | tail -1`, plus one.
+     `docs/plans/templates/milestone-spec-template.md`. `<n>` is one above the
+     highest milestone number in full history (`git fetch --unshallow` first if
+     shallow) and in open PRs:
+     `git log origin/main --format=%s --name-only | grep -oE '\bM[0-9]+\b' | sort -V | tail -1`.
    - One card per PR-sized task: `docs/plans/tasks/<task-id>.md` from
      `docs/plans/templates/task-card-template.md`. Each card says what is
      decided and what is left **open** for its session to design.
@@ -46,7 +48,7 @@ merge a PR yourself unless asked.
 ## Phase 2 — Execute one task
 
 1. **Open.** From the main checkout: `./boga worktree create <branch>` (branch
-   e.g. `m27-t03-effective-load`), then work in that path.
+   e.g. `m<n>-t<nn>-<slug>`), then work in that path.
 2. **Load and check freshness.** Read the card, its milestone, and the
    AGENTS.md load list for the areas touched. Check every card assumption
    against current `origin/main` (code, specs, merged sibling tasks). Report

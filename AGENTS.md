@@ -122,7 +122,7 @@ Durable decisions belong in `docs/specs/**`, and a PR updates the owning spec
 when it ships the decision.
 
 **Never reference a plan from code or docs**: no `docs/plans/...` path and no
-task/milestone ID (`M27-T03`, `T-20260926-01`) in code, tests, flows,
+task/milestone ID (`M<n>-T<nn>`, `T-<YYYYMMDD>-<nn>`) in code, tests, flows,
 migrations, specs, or other docs — state the rule itself in the owning spec.
 Commit messages and PR bodies may cite them. `docs-check` enforces the path half.
 

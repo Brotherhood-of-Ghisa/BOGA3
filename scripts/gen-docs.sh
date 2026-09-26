@@ -32,7 +32,7 @@ case "${MODE}" in
 esac
 
 REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" python3 - <<'PY'
-import json, os, re, statistics, sys
+import json, os, re, statistics, subprocess, sys
 
 root = os.environ["REPO_ROOT"]
 mode = os.environ["MODE"]
@@ -207,19 +207,23 @@ for fname in sorted(os.listdir(os.path.join(root, "docs/specs"))):
         if "**Owns:**" not in head:
             problems.append(f"docs/specs/{fname}: missing the '> **Owns:** … / **Not here:** … / **Load when:** …' header")
 
-# 4. plans are never referenced: no concrete docs/plans/<file>.md path (other
-#    than the README and templates) in any tracked or new file outside the
-#    working-notes trees. Placeholders like docs/plans/tasks/<task-id>.md pass.
-import subprocess
-PLAN_REF = re.compile(r"(?:docs/|\.\./)plans/((?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.md)")
-listed = subprocess.run(
-    ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-    capture_output=True, check=True).stdout.decode().split("\0")
+# 4. plans are never referenced: no concrete plan file path (other than the
+#    README and templates) in any tracked or new file outside the working-notes
+#    trees. Matches docs/plans/…, ../plans/…, ./plans/… and plans/… (relative
+#    from docs/); placeholders like docs/plans/tasks/<task-id>.md pass.
+PLAN_REF = re.compile(r"(?<![A-Za-z0-9_-])plans/((?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.[A-Za-z0-9]+)\b")
+try:
+    listed = subprocess.run(
+        ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        capture_output=True, check=True).stdout.decode().split("\0")
+except (OSError, subprocess.CalledProcessError) as exc:
+    listed = []
+    problems.append(f"plan-reference check needs a git work tree ({exc})")
 for rel in listed:
     if not rel or rel.startswith(("docs/plans/", "docs/brainstorms/")):
         continue
     path = os.path.join(root, rel)
-    if not os.path.isfile(path) or os.path.getsize(path) > 2_000_000:
+    if os.path.islink(path) or not os.path.isfile(path) or os.path.getsize(path) > 2_000_000:
         continue
     try:
         text = open(path, encoding="utf-8").read()
