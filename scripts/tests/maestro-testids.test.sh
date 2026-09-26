@@ -89,7 +89,10 @@ def splits(value):
 def is_prefix(value, depth=0):
     if any(p.match(value) for p in prefix_anchored):
         return True
-    return depth < 2 and any(any(r.match(t) for r in prefix_headless) and is_prefix(h, depth + 1)
+    # `${prefix}-metric-chip`: the rest carries text, so a head that is itself
+    # a prefix OR any produced id (e.g. a local `stats-${kind}-history`) counts
+    return depth < 2 and any(any(r.match(t) for r in prefix_headless)
+                             and (is_prefix(h, depth + 1) or resolves(h, depth + 1))
                              for h, t in splits(value))
 
 @functools.lru_cache(maxsize=None)
@@ -108,13 +111,20 @@ def resolves(value, depth=0):
 flows = sorted(glob.glob(os.path.join(mobile, ".maestro", "flows", "*.yaml")))
 if not flows:
     sys.exit(f"  ASSERT FAILED: no flows under {mobile}/.maestro/flows — the glob likely broke")
+# `assertNotVisible:` / `notVisible:` assert an element is GONE — its id need
+# not exist anywhere, so those selectors are exempt.
+NEGATED = re.compile(r'\b(?:assertNotVisible|notVisible):\s*\n\s*id:\s*"([^"]+)"')
 missing, checked = [], 0
 for flow in flows:
     with open(flow) as f:
-        for m in re.finditer(r'\bid:\s*"([^"]+)"', f.read()):
-            checked += 1
-            if not resolves(SLOT.sub("X", m.group(1))):
-                missing.append(f"{os.path.basename(flow)}: {m.group(1)}")
+        text = f.read()
+    negated = {m.start(1) for m in NEGATED.finditer(text)}
+    for m in re.finditer(r'\bid:\s*"([^"]+)"', text):
+        if m.start(1) in negated:
+            continue
+        checked += 1
+        if not resolves(SLOT.sub("X", m.group(1))):
+            missing.append(f"{os.path.basename(flow)}: {m.group(1)}")
 if missing:
     print("  flow ids with no matching testID in app source (renamed or removed?):", file=sys.stderr)
     for line in sorted(set(missing)):
@@ -163,6 +173,19 @@ make_tree "${TMP}/test-only"
 printf 'const x = "only-in-a-jest-suite";\n' >"${TMP}/test-only/app/__tests__/x.test.tsx"
 printf -- '- tapOn:\n    id: "only-in-a-jest-suite"\n' >>"${TMP}/test-only/.maestro/flows/a.yaml"
 expect_check fail "an id that exists only in a jest suite" "${TMP}/test-only"
+
+make_tree "${TMP}/negated"
+printf -- '- assertNotVisible:\n    id: "legacy-close-button"\n' >>"${TMP}/negated/.maestro/flows/a.yaml"
+expect_check pass "an assertNotVisible id that no longer exists" "${TMP}/negated"
+
+make_tree "${TMP}/local-prefix"
+cat >"${TMP}/local-prefix/components/sheet.tsx" <<'EOF2'
+const prefix = `stats-${kind}-history`;
+export const S = () => <Chips testIDPrefix={`${prefix}-metric-chip`} />;
+export const Chips = ({ testIDPrefix, o }) => <Chip testID={`${testIDPrefix}-${o.value}`} />;
+EOF2
+printf -- '- tapOn:\n    id: "stats-exercise-history-metric-chip-daily"\n' >>"${TMP}/local-prefix/.maestro/flows/a.yaml"
+expect_check pass "a join under a prefix built from a local template" "${TMP}/local-prefix"
 
 make_tree "${TMP}/flow-slot"
 printf -- '- tapOn:\n    id: "set-${output.n}-toggle"\n' >>"${TMP}/flow-slot/.maestro/flows/a.yaml"
