@@ -93,7 +93,8 @@ steps are even in lightness (L* 87 / 78 / 68 / 58) so each bucket reads as
 - Colour is never the only channel: counts and accessibility labels still say
   how much.
 - Marks on a `viz` cell are `ink`: today a 1px ring, selected a 2px border
-  (G2; built with the heatmaps in DLM-T09).
+  (G2; the heatmaps, DLM-T09). An empty `viz0` cell takes a `rule` hairline,
+  since `viz0` is only 1.18:1 against `surface`.
 
 Gated by `ui-design-tokens.test.ts`: the steps darken monotonically with
 ΔL* ≥ 6 between neighbours, `viz1` sits ≥ 10 L* below `surface`, `ink` on

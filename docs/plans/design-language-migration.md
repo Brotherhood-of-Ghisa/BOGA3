@@ -206,7 +206,7 @@ shippable.
 | T06 | Exercise list and the session picker — **shipped** (card deleted) | ~1,000 | `fast` + `frontend` |
 | T07 | Exercise catalogue and editor — **shipped** (card deleted) | ~1,400 | `fast` + `frontend` |
 | T08 | Progress: summary, controls, tables — **shipped** (card deleted) | ~1,300 | `fast` + `frontend` |
-| T09 | Progress: overlays, heatmaps, data-viz roles | ~1,200 | `fast` + `frontend` |
+| T09 | Progress: overlays, heatmaps, data-viz roles — **shipped** (card deleted) | ~1,200 | `fast` + `frontend` |
 | T10 | Exercise history and Sessions | ~1,300 | `fast` + `frontend` |
 | T11 | Groups tab: stream, record sheet, shell, state panels | ~1,500 | `fast` + `frontend` |
 | T12 | Leaderboards | ~700 | `fast` + `frontend` |

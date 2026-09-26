@@ -146,7 +146,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     (Archivo), body (`ink-muted`), one outline action and optional children;
     `fill` (centred in its space, the default) or inline. The session view's,
     exercise page's and View Session's non-content states; the catalogue's
-    and the exercise editor's loading and error (DLM-T07)
+    and the exercise editor's loading and error (DLM-T07); Progress's
+    loading, error and empty states (DLM-T08) and the history sheets' (inline,
+    DLM-T09)
   - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body with the page
     gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
     other `ScrollView` props through (refresh, keyboard insets). Used by the
@@ -162,12 +164,16 @@ Brief entrypoint inventory of the current reusable UI component set.
     picker's filter (DLM-T06), the Progress filter (DLM-T08) and the
     catalogue's filter (DLM-T07)
   - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
-    the selected segment solid `ink`; `layout` `fill` (equal width) or `inline`;
+    the selected segment solid `ink`; `layout` `fill` (equal width), `inline`,
+    or `fit` (across the row, label-sized segments sharing the rest: the
+    exercise history's four metrics, DLM-T09);
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`,
     Settings' date format (DLM-T04), the exercise list's Favourite/Name A–Z
     (`exercise-list-sort-*`), Progress's Time range and
-    Breakdown (DLM-T08), and `ExerciseCoreFields`' weight entry
+    Breakdown (DLM-T08) and its history sheets' Metric and View
+    (`stats-<kind>-history-metric-chip-*` / `-view-chip-*`, DLM-T09), and
+    `ExerciseCoreFields`' weight entry
     (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
     exercise form's pending state)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
@@ -334,12 +340,36 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
 
-10. `DailyHeatmap` / `WeeklyHeatmap`
-- Files: `apps/mobile/components/heatmaps/DailyHeatmap.tsx`, `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`
+10. `DailyHeatmap` / `WeeklyHeatmap`, and `HistorySheet`
+- Files: `apps/mobile/components/heatmaps/` (`DailyHeatmap.tsx`,
+  `WeeklyHeatmap.tsx`, `HeatmapLegend.tsx`, `heatmap-style.ts`,
+  `heatmap-metric.ts`, `heatmapData.ts`; `README.md`) and
+  `apps/mobile/components/stats/history-sheet.tsx`
 - Purpose:
-  - reusable daily-cell and weekly-bar views over the same `HeatmapData`, used by both muscle- and exercise-history overlays
-  - renders horizontally scrollable one-year history with token-backed zero/green/today/selected states and tappable accessible cells
-  - the Stats overlay integration keeps both views mounted, with the inactive view transparent, non-interactive, and accessibility-hidden, so toggling does not rebuild the chart tree
+  - `DailyHeatmap` / `WeeklyHeatmap` — daily-cell and weekly-bar views over one
+    `HeatmapData`, horizontally scrollable over the loaded history, in the
+    design language (DLM-T09): cells and bars on the `viz0`–`viz4` ramp
+    (`HEAT_RAMP`), an empty day `viz0` with a `rule` hairline; **today (or the
+    current week) a 1px `ink` ring, the selected cell a 2px `ink` border** plus
+    the selected state, and a filled `ink` `caret-down` over the selected week
+    (`<prefix>-heatmap-selected-marker`). The daily view's detail is a `Card`
+    with a Plex Mono value; gutter, axis and the Less…More `HeatmapLegend` are
+    `ink-faint` micro-labels. testIDs `<prefix>-heatmap`,
+    `-heatmap-cell-<dateKey | weekStartDateKey>`, `-heatmap-bar-<weekStartDateKey>`,
+    `-heatmap-day-detail` (`-date`, `-value`). Semantics: `ux-rules.md` §11
+  - `HistorySheet` — the Progress history of one exercise, muscle or muscle
+    family (DLM-T09-D2, which merged the two legacy overlays): a `Sheet` at
+    about three quarters of the screen, no close button (G5); eyebrow and name;
+    `Metric` and `View` `SegmentedControl`s under micro-labels; a `rule-soft`
+    week banner in Weekly; inline `StatePanel`s for loading, error and no
+    history; both heatmap views kept mounted, the inactive one transparent,
+    inert and hidden from accessibility. `kind` (`muscle` | `exercise`) names
+    the testIDs: `stats-<kind>-history` (the `Sheet`; `-backdrop`, labelled
+    `Dismiss <kind> history`), `-overlay` (the body), `-title`,
+    `-metric-chip-<metric>`, `-view-chip-<view>`, `-week-banner` (`-range`,
+    `-value`, `-placeholder`), `-loading`, `-error`, `-empty`, `-scroll`,
+    `-heatmap-panel-<view>`. Semantics: `ux-rules.md` §12. Target:
+    `design-targets/progress.md`
 
 11. Group components (M22)
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model

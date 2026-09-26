@@ -795,7 +795,7 @@ describe('StatsScreenShell', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11'));
     expect(onSelectMuscleHistoryWeek).toHaveBeenCalledWith(null); // deselect since it's already selected
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop'));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
 
@@ -1193,7 +1193,7 @@ describe('StatsRoute', () => {
       expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Weekly boom/);
     });
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop'));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
   });
 });
@@ -1572,18 +1572,19 @@ describe('StatsScreenShell — view mode toggle', () => {
       selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' },
       onDismissExerciseHistory,
     });
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop'));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
     expect(onDismissExerciseHistory).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onDismissExerciseHistory when close button is pressed', () => {
-    const onDismissExerciseHistory = jest.fn();
+  it('has no close button: the sheet is dismissed from its backdrop (G5)', () => {
     renderStatsScreenShell({
       selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' },
-      onDismissExerciseHistory,
     });
-    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
-    expect(onDismissExerciseHistory).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('stats-exercise-history')).toBeTruthy();
+    expect(
+      screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true })
+    ).toHaveProp('accessibilityLabel', 'Dismiss exercise history');
+    expect(screen.queryByTestId('stats-exercise-history-close', { includeHiddenElements: true })).toBeNull();
   });
 });
 
@@ -1744,7 +1745,7 @@ describe('StatsRoute — exercise heatmap integration', () => {
       expect(screen.getByTestId('stats-exercise-history-overlay')).toBeTruthy()
     );
 
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop'));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
   });
 

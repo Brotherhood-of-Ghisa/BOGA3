@@ -235,6 +235,10 @@ Responsibility split:
     reset what they need in-flow (`?reset=data`); a flow whose objective includes
     cold-install / permission / onboarding behaviour wants its own `full`-reset
     run through the singular runner. The caller owns `MAESTRO_RESET_STRATEGY`.
+    Each flow's copy sits at `<artifact-root>/<flow>/<flow>.yaml`, and
+    `.maestro/scripts/` is copied once to `<artifact-root>/scripts/`, so
+    `runScript` paths (`../scripts/*.js`) resolve as they do from the source
+    (DLM-T09; `stats-screen-ux` computes its heatmap date keys this way).
 - `maestro-ios-gates.sh`
   - additive combined entrypoint (`npm run test:e2e:ios:gates`): the smoke +
     data-runtime-smoke flow list and a `full` reset, handed to

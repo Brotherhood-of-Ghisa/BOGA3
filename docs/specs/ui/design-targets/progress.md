@@ -1,11 +1,12 @@
 # Accepted target — Progress (brief + data-viz palette)
 
-Target record per `../ai-design-policy.md`, for DLM-T08 of the design-language
-migration (DLM-T09 and DLM-T10 extend it). Chosen by the user on 2026-09-24
+Target record per `../ai-design-policy.md`, for DLM-T08 and DLM-T09 of the
+design-language migration (DLM-T10 extends it). Chosen by the user on 2026-09-24
 (plan decision G1 (c)): a brief for the tables and controls, plus a data-viz
 palette picked from on-device renders. **Palette accepted** by the user on
 2026-09-25 (`B2`). **Accepted** by the user in the DLM-T08 screen gallery on
-2026-09-25.
+2026-09-25; the history sheets and heatmaps **accepted** in the DLM-T09 gallery
+on 2026-09-26.
 
 ## Target
 
@@ -44,7 +45,26 @@ rule that comes with it: text on a `viz` ground is `ink`.
   (T08-D3); on it every text is `ink`.
 - Loading, error and empty states are `StatePanel`s inside a `Card`; the copy
   is unchanged.
-- The history overlays and heatmaps are unchanged here (DLM-T09).
+
+### History sheets and heatmaps (DLM-T09)
+
+- The two legacy overlays are one `HistorySheet` (`components/stats/`), a
+  `Sheet` over about three quarters of the screen with no close button: the
+  backdrop, Android back and the VoiceOver escape dismiss it (G5, T09-D1/D2).
+- Eyebrow micro-label and the name in Archivo 800; `Metric` and `View`
+  `SegmentedControl`s under micro-labels; in Weekly a `rule-soft` banner with
+  the week's range in Source Sans `ink-muted` and the value in Plex Mono `ink`.
+- Loading, error and no history are inline `StatePanel`s; the empty heatmap
+  still shows under the no-history panel.
+- Cells and bars are on `viz0`…`viz4`; an empty day is `viz0` with a `rule`
+  hairline. **Today (the current week) is a 1px `ink` ring; the selected day or
+  week a 2px `ink` border** with the selected state, and the selected week has a
+  filled `ink` caret above it (T09-D3).
+- Titles are Archivo 700; gutter, month axis, legend and the `12-wk avg` label
+  are Archivo micro-labels (`ink-faint`; the average label `ink-muted` on
+  `surface`, since it sits over bars). The average line is `ink-faint` dashes.
+- The day detail is a `Card`: a `Today` / weekday kicker, the date, a `viz`
+  swatch and `<metric>: <value>` in Plex Mono `ink`, or `Rest day`.
 
 ## States
 
@@ -58,12 +78,19 @@ Device: iPhone simulator at 390pt width, light.
 | `02-exercise-view-30-days` (`ios-ui-regression`) | 30 days |
 | `03-muscle-breakdown-7-days` (`ios-ui-regression`) | By Muscle: the family cards and failure shades |
 | `04-back-to-exercise-view` (`ios-ui-regression`) | back to By Exercise |
+| `05-exercise-heatmap-daily` (`ios-ui-regression`) | exercise history sheet, Daily, today selected |
+| `05a-heatmap-today-and-selected` (`ios-ui-regression`) | Daily with yesterday selected: today's ring beside the selected border |
+| `05b-exercise-heatmap-weekly`, `05c-exercise-heatmap-1rm` (`ios-ui-regression`) | Weekly, Volume then 1RM |
+| `06-muscle-heatmap-weekly`, `06b-muscle-heatmap-daily` (`ios-ui-regression`) | a single muscle's history (Chest), Weekly then Daily |
+| `06c-muscle-family-history` (`ios-ui-regression`) | a multi-muscle family's history (Legs, `Muscle Group History`) |
+| `07-overlay-dismissed` (`ios-ui-regression`) | the sheet dismissed from its backdrop, back on By Muscle |
 | `03-m26-progress` (`ios-smoke`) | Progress from the tab bar, no data |
 | `05-data-runtime-smoke-exercise-list` (`ios-data-smoke`) | a workout just logged through the session screens |
 
-Jest only (no flow reaches them): the loading and error states, a filtered
-list with no match, and the shade and delta colours
-(`app/__tests__/stats-screen.test.tsx`).
+Jest only (no flow reaches them): the loading and error states (the screen's
+and the history sheets'), a filtered list with no match, the shade and delta
+colours (`app/__tests__/stats-screen.test.tsx`), and the today and selected
+marks on every cell kind (`app/__tests__/heatmap-marks.test.tsx`).
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

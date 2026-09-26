@@ -2,20 +2,23 @@
 // No React / react-native imports, so they unit-test in isolation and are safe to
 // reuse from the aggregation adapter (heatmapData.ts) and the components.
 
-import { uiColors } from '@/components/ui/tokens';
+import { uiRoles } from '@/components/ui/tokens';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 export type { CalendarHeatmapMetric };
 
 export type CalendarHeatmapBucket = 0 | 1 | 2 | 3 | 4;
 
-/** Green volume ramp indexed by bucket level (0 = rest … 4 = max). Theme-driven. */
+/**
+ * The data-viz ramp indexed by bucket level (0 = rest … 4 = max): the `viz`
+ * roles of `design-language.md` §2.
+ */
 export const HEAT_RAMP = [
-  uiColors.heatmapNeutralBg,
-  uiColors.heatmapBucket1,
-  uiColors.heatmapBucket2,
-  uiColors.heatmapBucket3,
-  uiColors.heatmapBucket4,
+  uiRoles.viz0,
+  uiRoles.viz1,
+  uiRoles.viz2,
+  uiRoles.viz3,
+  uiRoles.viz4,
 ] as const;
 
 /** Structural subset of an effort row carrying the four selectable metrics. */
@@ -58,7 +61,7 @@ export const getMetricValue = (
  * makes the lightest session light and the heaviest dark.
  *
  * `minPositive`/`maxPositive` are the min/max over values > 0 in the window. The
- * lowest logged value maps to bucket 1 (light green, never grey); the highest to 4.
+ * lowest logged value maps to bucket 1 (the lightest step, never rest); the highest to 4.
  * When every logged value is identical (range collapses), any activity maps to 4.
  */
 export const getCalendarHeatmapBucket = (

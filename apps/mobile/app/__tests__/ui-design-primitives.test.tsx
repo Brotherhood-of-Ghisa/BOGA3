@@ -602,6 +602,13 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
   });
 
+  it('spans the row with label-sized segments that share the rest when fit', () => {
+    render(<SegmentedControl layout="fit" onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
+    expect(flatStyle(screen.getByTestId('view-last'))).toMatchObject({ flexGrow: 1 });
+    expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
+    expect(flatStyle(screen.getByTestId('view-row')).alignSelf).toBe('stretch');
+  });
+
   it('ignores presses and fades while disabled', () => {
     const onChange = jest.fn();
     render(<SegmentedControl disabled onChange={onChange} options={OPTIONS} testIDPrefix="view" value="records" />);

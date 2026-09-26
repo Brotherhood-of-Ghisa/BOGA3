@@ -9,8 +9,11 @@ export type SegmentedControlOption<TValue extends string | number> = {
 };
 
 // `fill`: equal-width segments across the row (a screen's selector). `inline`:
-// segments sized to their labels (a selector inside a card's header).
-export type SegmentedControlLayout = 'fill' | 'inline';
+// segments sized to their labels (a selector inside a card's header). `fit`:
+// across the row, each segment its label's width plus an equal share of the
+// rest, for a row whose longest label outgrows an equal share (the exercise
+// history's four metrics, DLM-T09).
+export type SegmentedControlLayout = 'fill' | 'inline' | 'fit';
 
 export type SegmentedControlProps<TValue extends string | number> = {
   options: readonly SegmentedControlOption<TValue>[];
@@ -41,11 +44,12 @@ export function SegmentedControl<TValue extends string | number>({
   style,
 }: SegmentedControlProps<TValue>) {
   const fill = layout === 'fill';
+  const fit = layout === 'fit';
   return (
     <View
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="tablist"
-      style={[styles.control, fill ? styles.controlFill : null, style]}
+      style={[styles.control, fill || fit ? styles.controlFill : null, style]}
       testID={`${testIDPrefix}-row`}>
       {options.map((option, index) => {
         const selected = option.value === value;
@@ -66,6 +70,7 @@ export function SegmentedControl<TValue extends string | number>({
             style={[
               styles.segment,
               fill ? styles.segmentFill : null,
+              fit ? styles.segmentFit : null,
               index > 0 ? styles.segmentDivider : null,
               selected ? styles.segmentSelected : null,
               disabled && selected ? styles.segmentSelectedDisabled : null,
@@ -103,6 +108,10 @@ const styles = StyleSheet.create({
   },
   segmentFill: {
     flex: 1,
+    alignItems: 'center',
+  },
+  segmentFit: {
+    flexGrow: 1,
     alignItems: 'center',
   },
   segmentDivider: {
