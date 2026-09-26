@@ -135,7 +135,7 @@ older-page footer.
 
 ## Group management (DLM-T13)
 
-**Pending** the user's acceptance in the DLM-T13 gallery.
+**Accepted** by the user in the DLM-T13 gallery on 2026-09-26.
 
 ### Brief
 
