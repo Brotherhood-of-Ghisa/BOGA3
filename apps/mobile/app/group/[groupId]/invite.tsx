@@ -1,16 +1,23 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Alert, Share, StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupLoadingState,
   GroupStateView,
   GroupWriteNotice,
   GroupsSignInRequired,
-  groupFormStyles,
   groupScreenStyles,
 } from '@/components/groups';
-import { UiButton, UiSurface, UiText, uiSpace, uiTypography } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  ScreenScroll,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildGroupInviteShareMessage,
@@ -35,6 +42,7 @@ const MEMBERS_CANNOT_INVITE = 'Only the owner and admins can see and share the i
  * The invite (groups contract §6.3, card flow 2): owner and admins only
  * (C7.4). The code is read online and never cached; Share uses React Native
  * core `Share.share`; Regenerate is confirmed because the old code stops working.
+ * The code is a Plex Mono figure (T13-D3); `Share invite` is the one `accent`.
  */
 export default function GroupInviteRoute() {
   const { isConfigured, user } = useAuth();
@@ -124,56 +132,89 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
   if (code) {
     codeArea = (
       <>
-        <UiText
+        <Text
+          allowFontScaling={false}
           accessibilityLabel={`Invite code ${code.split('').join(' ')}`}
           selectable
           style={styles.code}
           testID="group-invite-code">
           {code}
-        </UiText>
-        <UiText selectable testID="group-invite-link" variant="bodyMuted">
+        </Text>
+        <Text allowFontScaling={false} selectable style={styles.link} testID="group-invite-link">
           {groupInviteLink(code)}
-        </UiText>
+        </Text>
       </>
     );
   } else if (load.error) {
     codeArea = (
       <>
         <GroupWriteNotice message={describeGroupWriteError(load.error)} testID="group-invite-load-error" tone="error" />
-        <UiButton label="Retry" onPress={() => void loadCode()} testID="group-invite-retry" variant="secondary" />
+        <ActionButton label="Retry" onPress={() => void loadCode()} testID="group-invite-retry" variant="outline" />
       </>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={groupScreenStyles.content} style={groupScreenStyles.screen} testID="group-invite-screen">
-      <UiSurface style={groupFormStyles.card}>
-        <UiText variant="title">{groupName ? `Invite friends to ${groupName}` : 'Invite friends'}</UiText>
-        <UiText variant="bodyMuted">
+    <ScreenScroll testID="group-invite-screen">
+      <Card style={styles.card}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
+          {groupName ? `Invite friends to ${groupName}` : 'Invite friends'}
+        </Text>
+        <Text allowFontScaling={false} style={styles.body}>
           Anyone with this code can join. It works until you regenerate it.
-        </UiText>
+        </Text>
         {codeArea}
-      </UiSurface>
+      </Card>
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-invite-feedback" tone={feedback.tone} /> : null}
-      <UiButton disabled={!code} label="Share invite" onPress={() => void onShare()} testID="group-invite-share" />
-      <UiButton
+      <ActionButton disabled={!code} label="Share invite" onPress={() => void onShare()} testID="group-invite-share" variant="primary" />
+      <ActionButton
         disabled={!code || regenerate.pending}
         label={regenerate.pending ? 'Regenerating…' : 'Regenerate code'}
         onPress={confirmRegenerate}
         testID="group-invite-regenerate"
-        variant="danger"
+        tone="danger"
+        variant="outline"
       />
-    </ScrollView>
+    </ScreenScroll>
   );
 }
 
 const styles = StyleSheet.create({
+  card: {
+    padding: uiSpace.md,
+    gap: uiSpace.sm,
+  },
+  title: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  body: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  // A figure (T13-D3): Plex Mono 700, spaced so each character reads apart.
   code: {
-    fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }),
-    fontSize: uiTypography.size.xl * 2,
-    fontWeight: uiTypography.weight.bold,
+    paddingVertical: uiSpace.md,
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxl,
+    lineHeight: uiTypography.lineHeight.xxl,
     letterSpacing: uiSpace.xs,
     textAlign: 'center',
-    paddingVertical: uiSpace.md,
+    color: uiRoles.ink,
+  },
+  link: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    textAlign: 'center',
+    color: uiRoles.inkMuted,
   },
 });

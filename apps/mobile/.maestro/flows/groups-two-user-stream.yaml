@@ -152,6 +152,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-mine-list"
     timeout: 15000
+- takeScreenshot: "groups-mine-list"
 - openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
@@ -822,12 +823,14 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-members-list"
     timeout: 15000
+- takeScreenshot: "groups-members-list"
 - tapOn:
     id: "group-member-row-${output.groupsCounterpartyUserId}"
 - extendedWaitUntil:
     visible:
       id: "group-member-actions-sheet"
     timeout: 10000
+- takeScreenshot: "groups-member-actions-sheet"
 - tapOn:
     id: "group-member-action-remove"
 # The native confirmation Alert's destructive button.

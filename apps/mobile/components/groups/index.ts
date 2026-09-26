@@ -8,6 +8,7 @@ export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-ex
 export { GroupExerciseRow } from './group-exercise-row';
 export { GroupExercisesPage } from './group-exercises-page';
 export { GroupFilterChips } from './group-filter-chips';
+export { GroupHeaderCard } from './group-header-card';
 export { GroupLeaderboardsPage, GroupPodiumCard } from './group-leaderboards-page';
 export { GroupPagesFooter } from './group-pages-footer';
 export { PickerGroupSectionList, PickerGroupsToggle } from './picker-group-section';
@@ -30,7 +31,7 @@ export { GroupDetailsForm } from './group-details-form';
 export { GroupMemberActionSheet } from './member-action-sheet';
 export { GroupMemberRow } from './member-row';
 export { GroupOfflineBanner } from './offline-banner';
-export { groupFormStyles, groupScreenStyles } from './screen-styles';
+export { cardListItemStyles, groupFormStyles, groupScreenStyles } from './screen-styles';
 export { GroupsSignInRequired } from './sign-in-required';
 export { GroupStreamMembershipItem } from './stream-membership-item';
 export { GroupStreamRecordCard } from './stream-record-card';

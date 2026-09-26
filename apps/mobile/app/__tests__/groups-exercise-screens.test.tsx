@@ -11,7 +11,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, Modal, type AlertButton } from 'react-native';
+import { Alert, Modal, StyleSheet, type AlertButton, type ViewStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -75,6 +75,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
   createExerciseWithGroupLink: jest.fn(),
 }));
 
+import { uiColors, uiRoles } from '@/components/ui';
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import * as exerciseCatalogRepo from '@/src/data/exercise-catalog';
 import * as linksRepo from '@/src/data/exercise-group-links';
@@ -174,6 +175,18 @@ const openExercisesAs = async (role: GroupRole) => {
 
 const rowIds = () => screen.getAllByTestId(/^group-exercise-row-/).map((node) => node.props.testID as string);
 
+type TestNode = typeof screen.UNSAFE_root;
+
+/** Host views on a primary ground: the design-language `accent`, or the legacy primary button's. */
+const primaryGrounds = (): string[] =>
+  screen.UNSAFE_root
+    .findAll((node: TestNode) => typeof node.type === 'string')
+    .filter((node: TestNode) => {
+      const ground = (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor;
+      return ground === uiRoles.accent || ground === uiColors.actionPrimary;
+    })
+    .map((node: TestNode) => String(node.props.testID));
+
 const sheetActions = () =>
   within(screen.getByTestId('group-exercise-actions-sheet'))
     .queryAllByTestId(/^group-exercise-action-/)
@@ -205,6 +218,19 @@ describe('Group page (D10, D14)', () => {
     expect(screen.queryByTestId('group-screen-segment-row')).toBeNull();
     expect(api.getGroupStream).not.toHaveBeenCalled();
     expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
+  });
+
+  // G6, T13-D1: Invite is the one accent; Add exercise, in the list or the empty state, is an outline.
+  it.each<GroupRole>(['owner', 'admin', 'member'])('%s: at most one accent, and only Invite', async (role) => {
+    await openExercisesAs(role);
+    expect(primaryGrounds()).toEqual(role === 'member' ? [] : ['group-screen-invite-button']);
+  });
+
+  it('owner with no exercises: the empty state adds no second accent', async () => {
+    api.listGroupExercises.mockResolvedValue({ exercises: [] });
+    await openGroupAs('owner');
+    await screen.findByTestId('group-exercises-empty');
+    expect(primaryGrounds()).toEqual(['group-screen-invite-button']);
   });
 
   it('opens the Members screen from the header member count', async () => {
