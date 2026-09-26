@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { Icon, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Card, Icon, IconButton, ListRow, Sheet, uiRoles, uiSpace } from '@/components/ui';
 
-import { SessionSummaryLine } from './session-summary-line';
+import { formatDateTimeStamp, SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
 
 export type ActiveSessionRowProps = {
@@ -15,8 +15,9 @@ export type ActiveSessionRowProps = {
 };
 
 /**
- * Renders the active-session row (date/duration/gym summary plus resume/complete
- * actions) and owns its overflow menu modal (currently only a Delete action).
+ * The active session as a card: its summary (resume), a check (review and
+ * complete) and ⋮, which opens a sheet with Delete. Discarding an active
+ * session cannot be undone, so Delete asks first (T10-D4).
  */
 export function ActiveSessionRow({
   session,
@@ -26,156 +27,85 @@ export function ActiveSessionRow({
   onDelete,
 }: ActiveSessionRowProps) {
   const [menuVisible, setMenuVisible] = useState(false);
+  const closeMenu = () => setMenuVisible(false);
 
-  const handleDelete = () => {
-    setMenuVisible(false);
-    onDelete();
+  // The alert opens over the sheet; either answer closes both.
+  const confirmDelete = () => {
+    Alert.alert(
+      'Discard this workout?',
+      'The active session and its sets will be deleted. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: closeMenu },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => {
+            closeMenu();
+            onDelete();
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: closeMenu }
+    );
   };
 
   return (
     <>
-      <View
-        style={[styles.sessionRow, styles.activeSessionRow]}
-        testID={`active-session-row-${session.id}`}>
-        <Pressable
-          accessibilityLabel="Resume active session"
-          accessibilityRole="button"
-          onPress={onResume}
-          style={styles.sessionRowMainPressable}
-          testID="resume-active-session-button">
-          <SessionSummaryLine
-            session={session}
-            testIdPrefix={`session-summary-${session.id}`}
-            nowMs={nowMs}
-          />
-        </Pressable>
-
-        <View style={styles.sessionRowActions}>
+      <Card testID={`active-session-row-${session.id}`}>
+        <ListRow
+          density="list"
+          divider={false}
+          leading={<Icon color={uiRoles.ink} name="set-current" size="sm" />}
+          meta={
+            <IconButton
+              accessibilityLabel="Review and complete active session"
+              name="check"
+              onPress={onComplete}
+              testID="complete-active-session-button"
+            />
+          }
+          trailing={
+            <IconButton
+              accessibilityLabel="Open active session actions"
+              name="more-vertical"
+              onPress={() => setMenuVisible(true)}
+              tone="muted"
+              testID="active-session-menu-button"
+            />
+          }>
           <Pressable
-            accessibilityLabel="Review and complete active session"
+            accessibilityLabel="Resume active session"
             accessibilityRole="button"
-            onPress={onComplete}
-            style={[styles.iconActionButton, styles.completeButton]}
-            testID="complete-active-session-button">
-            <Icon color={uiColors.textSuccess} name="check" size="sm" />
+            onPress={onResume}
+            style={styles.summary}
+            testID="resume-active-session-button">
+            <SessionSummaryLine nowMs={nowMs} session={session} testIdPrefix={`session-summary-${session.id}`} />
           </Pressable>
+        </ListRow>
+      </Card>
 
-          <Pressable
-            accessibilityLabel="Open active session actions"
-            accessibilityRole="button"
-            onPress={() => setMenuVisible(true)}
-            style={[styles.iconActionButton, styles.menuButton]}
-            testID="active-session-menu-button">
-            <Icon color={uiColors.actionNeutralSubtleText} name="more-vertical" size="sm" />
-          </Pressable>
-        </View>
-      </View>
-
-      <Modal
-        animationType="fade"
-        transparent
-        visible={menuVisible}
-        onRequestClose={() => setMenuVisible(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Dismiss active session menu overlay"
-            onPress={() => setMenuVisible(false)}
-            style={styles.modalOverlay}
-            testID="active-session-menu-overlay"
+      <Sheet
+        dismissLabel="Dismiss active session actions"
+        onDismiss={closeMenu}
+        testID="active-session-menu"
+        title={formatDateTimeStamp(session.startedAt)}
+        visible={menuVisible}>
+        <View>
+          <ListRow
+            accessibilityLabel="Delete active session"
+            label="Delete"
+            onPress={confirmDelete}
+            testID="discard-active-session-button"
+            tone="danger"
           />
-          <View style={styles.modalPanel}>
-            <Pressable
-              accessibilityLabel="Delete active session"
-              accessibilityRole="button"
-              onPress={handleDelete}
-              style={[styles.modalActionButton, styles.modalDangerButton]}
-              testID="discard-active-session-button">
-              <Text allowFontScaling={false} style={styles.modalDangerButtonText}>Delete</Text>
-            </Pressable>
-          </View>
         </View>
-      </Modal>
+      </Sheet>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  sessionRow: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    paddingHorizontal: uiSpace.md,
+  summary: {
     paddingVertical: uiSpace.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  activeSessionRow: {
-    borderColor: uiColors.borderSuccess,
-    backgroundColor: uiColors.surfaceSuccess,
-  },
-  sessionRowMainPressable: {
-    flex: 1,
-    minWidth: 0,
-  },
-  sessionRowActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  iconActionButton: {
-    width: 28,
-    height: 28,
-    borderRadius: uiRadius.sm,
-    borderWidth: 1,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completeButton: {
-    backgroundColor: uiColors.surfaceSuccess,
-    borderColor: uiColors.borderSuccess,
-  },
-  menuButton: {
-    backgroundColor: uiColors.actionNeutralSubtleBg,
-    borderColor: uiColors.actionNeutralSubtleBorder,
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: uiSpace.xl,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  modalPanel: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  modalActionButton: {
-    borderRadius: uiRadius.md,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalDangerButton: {
-    backgroundColor: uiColors.actionDangerSubtleBg,
-    borderWidth: 1,
-    borderColor: uiColors.actionDangerSubtleBorder,
-  },
-  modalDangerButtonText: {
-    color: uiColors.actionDangerText,
-    fontWeight: '700',
   },
 });

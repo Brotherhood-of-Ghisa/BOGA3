@@ -234,6 +234,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     directly
   - a completed row pushes `/completed-session/<sessionId>`;
     its overflow Edit pushes `/session/<sessionId>` (transition 3)
+  - the row and active-session action menus are in-route `Sheet`s, not
+    navigation; the active `Delete` confirms before discarding (DLM-T10)
 
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
@@ -269,6 +271,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - period and tag chip changes reload the summary in place; the route does not update its URL query string when these change
   - missing/invalid `exerciseDefinitionId` shows the in-screen error state and does not crash
+  - the bests rows and each session card push `/completed-session/<sessionId>`
+    (transition 23); the period and tag controls push nothing (DLM-T10)
+  - opened from the exercise page, its arrow-only native back reads the exercise
+    page's stack title, `Exercise`, to assistive tech (Maestro taps it by that
+    text)
 
 12. `/groups` (M22)
 - File: `apps/mobile/app/(tabs)/groups.tsx`

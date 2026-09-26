@@ -379,10 +379,20 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - stack-based complete session list reached from the Stats Sessions card
 - Key states (high level):
-  - optional active-session row followed by completed-session history
+  - one `ScreenScroll` on `paper` (DLM-T10): an `Active` micro-label over the
+    active session's `Card` (the `set-current` glyph, its summary line, then
+    `check` and ⋮ `IconButton`s), then a `History` micro-label with the
+    `Show deleted` / `Hide deleted` text button (`checked`), and the completed
+    sessions as `ListRow`s in one `Card`, each with ⋮
   - one focus-aware automatic history load on first presentation and on each
     later focus reacquisition; filter and mutation refreshes remain explicit
-  - deleted-session visibility toggle and completed-session row actions
+  - a completed row's ⋮ opens a `Sheet` titled with its start stamp: `Edit`,
+    `Append`, `Delete` (`danger`, no confirm) or `Undelete`; a deleted row is
+    faded and carries a `Deleted` `Tag`
+  - the active ⋮ opens a `Sheet` with `Delete`, confirmed by an `Alert`
+    (`Cancel` / `Discard`, T10-D4)
+  - `StatePanel`s: `Loading sessions…`; `Could not load sessions` with `Retry`
+    (T10-D6); `No completed sessions`; `No sessions yet`
   - active Resume and review/complete affordances both open the session view
     so draft state and the shared cleanup rules remain authoritative
 - Key exits:
@@ -448,9 +458,13 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
 - Key states (high level):
-  - loading / error / detail
+  - one `ScreenScroll` on `paper` over `MainTabs` (DLM-T10; `ux-rules` §13.14–16)
+  - loading / error / detail, as `StatePanel`s in a `Card`
   - in-section empty state when no sessions match the active period/tag filter
-  - period chips (`7 / 30 / all`) and horizontal tag-filter chip strip
+  - a `Last 7 days` / `Last 30 days` / `All time` `SegmentedControl` and a
+    sideways-scrolling tag `ChipGroup` (`ux-rules` §10.2)
+  - a deleted exercise's `Notice`; the `All-time bests` card (`1RM`, `Top
+    weight`, figures in `record`); one View Session exercise card per session
   - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
 - Key exits:
   - `/completed-session/<sessionId>` from session card tap or from the all-time-best card rows

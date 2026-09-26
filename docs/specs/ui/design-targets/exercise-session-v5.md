@@ -54,6 +54,7 @@ ambiguous without them. Runtime comparison captures stay in the gitignored
 2. ~~`react-native-svg` and the three typefaces are not installed.~~
    **Resolved 2026-09-22:** both ship in the binary; the faces are embedded
    by the `expo-font` config plugin. See `../design-language.md` §3.
-3. The History page is stale relative to this target and is linked from the
-   accepted exercise page. **Accepted 2026-09-22:** the mismatch is carried
-   knowingly; History is not reworked as part of this build.
+3. ~~The History page is stale relative to this target and is linked from the
+   accepted exercise page.~~ **Resolved 2026-09-26 (DLM-T10):** exercise
+   history is in the design language, drawing each session with View Session's
+   exercise card (`progress.md`).

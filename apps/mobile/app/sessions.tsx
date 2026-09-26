@@ -1,7 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import {
   ActiveSessionRow,
@@ -12,7 +12,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { uiColors, uiSpace, uiTypography } from '@/components/ui';
+import { Screen, ScreenScroll, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
 import { appendCompletedSessionAsPlanned } from '@/src/data';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
@@ -130,11 +130,11 @@ export function SessionsScreen({
   };
 
   return (
-    <View style={styles.screen} testID="sessions-screen">
-      <View style={styles.pinnedTopRegion}>
+    <Screen testID="sessions-screen">
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID="completed-history-scroll">
         {activeSession ? (
-          <View style={styles.sectionBlock}>
-            <Text allowFontScaling={false} selectable style={styles.activeTitle}>
+          <>
+            <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
               Active
             </Text>
             <ActiveSessionRow
@@ -146,23 +146,26 @@ export function SessionsScreen({
                 void discardActiveSession();
               }}
             />
-          </View>
+          </>
         ) : null}
-      </View>
 
-      <HistoryList
-        sessions={completedSessions}
-        isLoading={isLoadingSessions}
-        loadErrorMessage={loadErrorMessage}
-        showDeletedSessions={showDeletedSessions}
-        onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
-        showGlobalEmptyState={showGlobalEmptyState}
-        onOpenCompletedSession={openCompletedSessionSummary}
-        onSetCompletedSessionDeleted={setCompletedSessionDeleted}
-        onEditCompletedSession={openCompletedSessionEdit}
-        onAppendCompletedSession={appendCompletedSession}
-      />
-    </View>
+        <HistoryList
+          sessions={completedSessions}
+          isLoading={isLoadingSessions}
+          loadErrorMessage={loadErrorMessage}
+          onRetryLoad={() => {
+            void reloadSessions();
+          }}
+          showDeletedSessions={showDeletedSessions}
+          onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
+          showGlobalEmptyState={showGlobalEmptyState}
+          onOpenCompletedSession={openCompletedSessionSummary}
+          onSetCompletedSessionDeleted={setCompletedSessionDeleted}
+          onEditCompletedSession={openCompletedSessionEdit}
+          onAppendCompletedSession={appendCompletedSession}
+        />
+      </ScreenScroll>
+    </Screen>
   );
 }
 
@@ -177,22 +180,13 @@ export default function SessionsRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: uiColors.surfacePage,
-    padding: uiSpace.lg,
-    gap: uiSpace.md,
-  },
-  pinnedTopRegion: {
-    gap: uiSpace.sm,
-    flexShrink: 0,
-  },
-  sectionBlock: {
-    gap: uiSpace.sm,
-  },
-  activeTitle: {
-    fontSize: uiTypography.size.xl,
+  microLabel: {
+    fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    color: uiColors.textPrimary,
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkFaint,
   },
 });

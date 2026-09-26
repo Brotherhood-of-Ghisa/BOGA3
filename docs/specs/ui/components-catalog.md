@@ -128,7 +128,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     `outline` (`ink` hairline) or `text` (caps label); `tone="danger"` recolours
     an outline or text button. Control radius, 44pt tall, Archivo caps label.
     Replaced the session view's `OutlineButton` and the Gyms screen's
-    `GymButton` (View Session was its third consumer)
+    `GymButton` (View Session was its third consumer). DLM-T10 added `checked`
+    for a text button that toggles a view (Sessions' `Show deleted`)
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
 6a. Design-language primitives for the remaining screens (DLM-T01, 2026-09-24)
@@ -183,7 +184,10 @@ Brief entrypoint inventory of the current reusable UI component set.
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
     labels. Logs' level filter (DLM-T04), the exercise list's `Show never-done` (`multi`, `exercise-list-visibility-*`),
     the catalogue's Show deleted control (`multi`), and the Groups tab's group
-    chips (`single`, `groups-stream-filter-*`, DLM-T11)
+    chips (`single`, `groups-stream-filter-*`, DLM-T11). DLM-T10 added a
+    per-option `faint` (a deleted tag) and `single` mode's `clearValue`
+    (pressing the selected chip selects the clear value: exercise history's
+    tag filter, where tapping the selected tag returns to `All tags`)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
     role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), the
     exercise list's `Deleted` (`faint`, DLM-T06), and a group record card's
@@ -338,13 +342,22 @@ Brief entrypoint inventory of the current reusable UI component set.
 8. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
-  - active-session row plus its overflow menu (resume / complete / delete) used
-    by session-list consumers
+  - the active session on `/sessions` as a `Card` (DLM-T10): a `ListRow` with
+    the `set-current` glyph and `SessionSummaryLine` (resume), then `check`
+    (review and complete) and ⋮ `IconButton`s
+  - ⋮ opens a `Sheet` with one `danger` `Delete`, which confirms in an `Alert`
+    before discarding (T10-D4)
 
 9. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
-  - completed-session history list with delete/undelete modal and deleted-visibility toggle, consumed by the `stats-history` History sub-view
+  - the completed-session history on `/sessions`, rendered inside its host's
+    scroll (DLM-T10): a `History` micro-label with the `Show deleted` / `Hide
+    deleted` text `ActionButton` (`checked`), the rows as `ListRow`s in one
+    `Card` (a deleted row faded, with a `Deleted` `Tag`), and `StatePanel`s for
+    loading, the load error (`Retry`) and the empties
+  - a row's ⋮ opens a `Sheet` titled with the session's start stamp: `Edit`,
+    `Append`, `Delete` (`danger`) or `Undelete`
 
 10. `DailyHeatmap` / `WeeklyHeatmap`, and `HistorySheet`
 - Files: `apps/mobile/components/heatmaps/` (`DailyHeatmap.tsx`,
@@ -488,13 +501,16 @@ Brief entrypoint inventory of the current reusable UI component set.
     `accessory` (the session view's chevron) or a 44pt `control` (View Session's
     ⋮), the set rows and the `record` band (`New 1RM record · <1RM>`). Given
     `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`
-    (or the caller's `rowTestID`), `-record`
+    (or the caller's `rowTestID`), `-record`. DLM-T10 added `nameFace="figure"`
+    (a date as the name, in Plex Mono) and a `summary` slot under the header
+    (exercise history's gym, tags and session `Stat`s)
   - `SessionFactsCard` — `Card` with an optional header slot, a finished
     session's `Start` / `End` read-only (the completed edit's field layout),
     one or more rows of stacked `Stat`s (a `text` fact takes the spare width)
     and an optional footer (the completion's muscle pills)
   - covered by `completed-session-detail-screen.test.tsx`,
-    `session-view-screen.test.tsx` and `completed-session-detail-model.test.ts`
+    `session-view-screen.test.tsx`, `completed-session-detail-model.test.ts`
+    and `exercise-history-screen.test.tsx`
 
 17. View Session (the completed-session detail)
 - Folder: `apps/mobile/components/view-session/` (route

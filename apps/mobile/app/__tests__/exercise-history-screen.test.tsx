@@ -3,7 +3,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import {
   default as ExerciseHistoryRoute,
   ExerciseHistoryScreenShell,
+  type ExerciseHistoryScreenShellProps,
 } from '../exercise-history';
+import { uiRoles } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
 
 jest.mock('@/src/data', () => ({
@@ -388,5 +390,76 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
     expect(screen.getByTestId('exercise-history-deleted-banner')).toHaveTextContent(
       /has been deleted/
     );
+  });
+});
+
+describe('ExerciseHistoryScreenShell — design language (DLM-T10)', () => {
+  const renderShell = (overrides: Partial<ExerciseHistoryScreenShellProps> = {}) =>
+    render(
+      <ExerciseHistoryScreenShell
+        summary={buildSummary()}
+        period={30}
+        appliedTagDefinitionId={null}
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onSelectMainTab={jest.fn()}
+        {...overrides}
+      />
+    );
+
+  it('draws the all-time bests in record, labelled 1RM, and opens their session', () => {
+    const onPressSession = jest.fn();
+    renderShell({ onPressSession });
+
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveTextContent('230.0');
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveStyle({ color: uiRoles.record });
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('185.0 × 8');
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveStyle({ color: uiRoles.record });
+    expect(screen.getByTestId('exercise-history-best-card')).toHaveTextContent(/1RM/);
+    expect(screen.queryByText(/Est\.? 1RM/)).toBeNull();
+
+    fireEvent.press(screen.getByTestId('exercise-history-best-est-1rm'));
+    expect(onPressSession).toHaveBeenCalledWith('session-newest');
+  });
+
+  it('shows a missing best as a dash that opens nothing', () => {
+    renderShell({ summary: buildSummary({ allTimeBest: { estimatedOneRepMax: null, topWeight: null } }) });
+
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveTextContent('—');
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveStyle({ color: uiRoles.inkFaint });
+  });
+
+  it("draws each session with View Session's set rows, warm-ups included", () => {
+    renderShell();
+
+    expect(screen.getByTestId('exercise-history-set-row-st-1-values')).toHaveTextContent('135.0 × 8');
+    expect(screen.getByTestId('exercise-history-set-row-st-1')).toHaveTextContent(/W-Up/);
+    expect(screen.getByTestId('exercise-history-set-row-st-2')).toHaveTextContent(/RIR 1/);
+    expect(screen.getByTestId('exercise-history-session-card-se-newest-count')).toHaveTextContent('2 sets');
+    expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/Westside Barbell Club/);
+    expect(screen.getByTestId('exercise-history-session-card-se-older')).toHaveTextContent(/No gym/);
+  });
+
+  it('selects the period in a segmented control', () => {
+    renderShell({ period: 'all' });
+
+    expect(screen.getByTestId('exercise-history-period-chip-all')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('exercise-history-period-chip-30')).toHaveProp('accessibilityState', { selected: false });
+  });
+
+  it('names a deleted tag in words on a faint chip, not in a warning hue', () => {
+    renderShell({
+      summary: buildSummary({
+        tagOptions: [
+          { tagDefinitionId: 'tag-old', name: 'Old grip', deletedAt: new Date('2026-04-01T00:00:00.000Z'), occurrenceCount: 1 },
+        ],
+      }),
+    });
+
+    expect(screen.getByTestId('exercise-history-tag-chip-tag-old')).toHaveTextContent('Old grip (deleted) · 1');
+    expect(screen.getByTestId('exercise-history-tag-chip-all')).toHaveProp('accessibilityState', { selected: true });
   });
 });

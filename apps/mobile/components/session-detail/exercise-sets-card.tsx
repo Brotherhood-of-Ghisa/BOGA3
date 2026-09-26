@@ -10,6 +10,9 @@ import { SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
   name: string;
+  // `figure`: the name is a figure (exercise history's completion stamp), set
+  // in Plex Mono like every other figure.
+  nameFace?: 'display' | 'figure';
   // The header's count: `2/3` on the session view, `3 sets` on View Session.
   count: string;
   // Faded when nothing is done yet.
@@ -17,6 +20,9 @@ type ExerciseSetsCardBaseProps = {
   rows: SessionViewSetRow[];
   // The record 1RM, formatted, when a set in this exercise is an all-time best.
   recordOneRepMax: string | null;
+  // Under the header, before the set rows (exercise history's gym, tags and
+  // session stats). It brings its own insets.
+  summary?: ReactNode;
   // An inline glyph after the count (the session view's chevron).
   accessory?: ReactNode;
   // A 44pt control closing the header (View Session's ⋮); it sits flush with
@@ -41,10 +47,12 @@ type ExerciseSetsCardProps = ExerciseSetsCardBaseProps &
 // view, View Session and the group session view all draw an exercise with it.
 export function ExerciseSetsCard({
   name,
+  nameFace = 'display',
   count,
   countMuted = false,
   rows,
   recordOneRepMax,
+  summary,
   accessory,
   control,
   testID,
@@ -55,7 +63,7 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={[styles.header, control ? styles.headerWithControl : null]}>
-        <Text allowFontScaling={false} numberOfLines={1} style={styles.name}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
           {name}
         </Text>
         <Text allowFontScaling={false} style={[styles.count, countMuted ? styles.countMuted : null]} testID={`${testID}-count`}>
@@ -64,6 +72,7 @@ export function ExerciseSetsCard({
         {accessory}
         {control}
       </View>
+      {summary}
       {rows.length > 0 ? (
         <View style={styles.rows}>
           {rows.map((row, index) => (
@@ -116,6 +125,10 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.lg,
     lineHeight: uiTypography.lineHeight.lg,
     color: uiRoles.ink,
+  },
+  nameFigure: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '600',
   },
   count: {
     fontFamily: uiFonts.figure.family,

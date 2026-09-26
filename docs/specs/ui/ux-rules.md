@@ -106,7 +106,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 1. Most secondary workflows in current screens use in-route modal/overlay UI state instead of route changes.
    - Examples:
-     - session list action menus
+     - the Sessions list's row and active-session action sheets
      - the exercise catalogue's management and row Actions sheets and the exercise editor
      - the session view's `Gym` sheet, ⋮ menu, exercise picker and the picker's inline exercise creation editor
 2. The exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`) is a tall design-language `Sheet` (DLM-T06): it lifts above the keyboard, the backdrop dismisses it, and it has no Cancel. `Manage` and `Add new` are `IconButton`s on the title's row; Sort and Show never-done stay below search. It hides itself while its inline editor or the group pick sheet is open, and returns when that closes.
@@ -119,6 +119,14 @@ Document app-specific UI semantics and guardrails for the current mobile app.
    - Changing the search text dismisses the preselection panel and returns to the filtered list without changing grouped-list expansion state.
    - The picker only adds; replacing an exercise is the exercise page's `Swap exercise` (§14a.5), which keeps the sets.
 6. Modal open/close is treated as state within the current route and should not be documented as a navigation transition.
+   - `/sessions` (DLM-T10): a completed row's ⋮ opens a `Sheet` titled with the
+     session's start stamp: `Edit`, `Append`, and `Delete` in `danger`, or
+     `Undelete` for a deleted session. Completed Delete does not confirm: it is
+     a soft delete, undone from the same sheet. The active session's ⋮ opens a
+     `Sheet` with one `Delete` in `danger`, which confirms in an `Alert`
+     (`Discard this workout?`, `Cancel` / destructive `Discard`) because
+     discarding an active session cannot be undone (T10-D4); `Cancel` keeps
+     the session. Neither sheet has a Cancel; the backdrop dismisses it.
 7. Dismiss overlays via backdrop press are common and expected when the flow is not destructive-final.
 
 ### 3. Screen layout and spacing conventions (current app behavior)
@@ -137,7 +145,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Pressable list rows commonly separate:
    - main row press target (open/edit primary action)
    - trailing kebab/icon action for secondary actions
-2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks (consumed by Progress/`stats-history` and session-list flows), and should be preserved during refactors unless behavior intentionally changes.
+2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks on `/sessions`, and should be preserved during refactors unless behavior intentionally changes. On `/sessions` the controls are 44pt `IconButton`s (`check`, ⋮); a deleted completed row is faded and carries a `Deleted` `Tag`, and the `Show deleted` / `Hide deleted` toggle is a text `ActionButton` exposing `checked` (T10-D5).
 3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
 4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
 5. `exercise-catalog` is titled `Exercises`. Its top row is Search, `+` (create, the one `accent` action) and ⋮ (management); Sort and Show never-done remain visible below search. Deleted visibility lives in the management sheet.
@@ -228,7 +236,7 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 1. Whole-screen loading/error states are used when route data cannot render meaningful content yet.
    - `exercise-catalog`: a `StatePanel` (loading or error) + More-selected bottom tabs remain visible
    - `completed-session/[sessionId]`: centered state variants on `paper`; the detail keeps its top bar's back, the completion its one safe exit
-2. In-section state panels are used inside the shared `HistoryList` (loading/error/empty) consumed by the `stats-history` History sub-view.
+2. In-section state panels (`StatePanel` in a `Card`) are used inside the shared `HistoryList` on `/sessions`: `Loading sessions…`, the load error titled `Could not load sessions` with an outline `Retry` that reloads through the same load as a focus refresh (T10-D6), `No completed sessions`, and `No sessions yet`. Exercise history uses the same recipe for `Loading exercise history…`, `Could not load history` and `No sessions in this view`.
 3. Inline helper/success/error text is used for form feedback and post-action feedback (a failed write on the completed-session detail). `exercise-catalog` reports an action's outcome as a `Notice` above the list: `Exercise created.` / `updated.` / `deleted.` / `restored.` with the `success` glyph, a failure in `danger`.
 4. State presentation style varies by screen today; refactors may unify visuals, but the semantic distinction (whole-screen vs in-section vs inline) should remain explicit.
 5. The profile route uses:
@@ -468,7 +476,12 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
 ### 10. Exercise-tag semantics
 
 1. Exercise tags are read-only in the app (tag editing was dropped 2026-09-23): there is no `#`, attach, create, rename, delete or manage UI. The synced tag tables and existing assignments stay.
-2. Exercise history offers the tags used on that exercise as filter chips (`All tags` plus one chip per tag with its session count; a deleted tag reads `(deleted)`).
+2. Exercise history offers the tags used on that exercise as filter chips: a
+   single-select `ChipGroup` on one line that scrolls sideways, `All tags` plus
+   one chip per tag as `<name> · <session count>`. Tapping the selected tag
+   returns to `All tags`. A deleted tag reads `<name> (deleted)` on a faint chip
+   (words, not a warning hue), and the same wording marks it as a `Tag` on a
+   session card (DLM-T10).
 
 ### 11. Calendar heatmap semantics
 
@@ -596,6 +609,27 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
 13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
+14. The `/exercise-history` route (opened from the exercise page's `History`)
+    is one `ScreenScroll` on `paper` over the `MainTabs` strip (Progress
+    selected), in the design language (DLM-T10): a `Last 7 days` / `Last 30
+    days` / `All time` `SegmentedControl` (default `Last 30 days`), the tag
+    chips (§10.2), then the content. A deleted exercise shows a `Notice` with the
+    `warning` glyph, `This exercise has been deleted. Historical data remains
+    available.`
+15. `All-time bests` is a `Card` of two `ListRow`s, `1RM` and `Top weight`, each
+    with its figure in bold Plex Mono `record` (brass: the all-time best, the
+    one superlative, T10-D2) over its date in Plex Mono `ink-muted`; a row
+    opens the session that holds it. A missing best is `—` in `ink-faint` and
+    opens nothing. The label is `1RM`, never `Est. 1RM` (G7).
+16. Each session in view is View Session's exercise card (`ExerciseSetsCard`,
+    T10-D1), a link to View Session: the header is the completion stamp
+    (`YYYY-MM-DD HH:mm`, Plex Mono) and `<n> sets`; under it the gym (`No gym`
+    when none), the session's tags as `Tag`s, and a row of stacked `Stat`s
+    (`1RM`, `Top set`, `Vol`, `W/sets`); then one `SetSummaryRow` per set,
+    `type · weight × reps · 1RM · VOL`. Warm-ups are shown like working sets,
+    named by their type column (`W-Up`); there is no set-number column. Figures
+    use the session view's formatters: weights with one decimal, 1RM with one,
+    volume a whole number, no unit suffix.
 
 ### 14. Group screens: freshness, pull-to-refresh, and the offline marker (M22)
 
