@@ -52,4 +52,14 @@ expect_pass "body via stdin" --body - "${DOC_PATHS[@]}" < "${FIX}/good.md"
 # must fail — proving strict catches the exact #125-#151 failure mode.
 expect_fail "good-for-docs body is NOT good for a sync change (strict)" --body "${FIX}/good.md" "${SYNC_PATHS[@]}" --strict
 
+# UI tiering: a component change requires frontend-ui (not the full gate); a
+# group screen change requires ios-groups-e2e, which only the full frontend
+# row (or its own row) covers.
+UI_PATHS=(--paths apps/mobile/components/Button.tsx)
+GROUP_PATHS=(--paths apps/mobile/app/group/join.tsx)
+expect_pass "UI change with frontend-ui ✅ passes strict" --body "${FIX}/ui-tier.md" "${UI_PATHS[@]}" --strict
+expect_fail "UI change with frontend ⛔ and no frontend-ui row fails strict" --body "${FIX}/good.md" "${UI_PATHS[@]}" --strict
+expect_fail "group change with only frontend-ui ✅ fails strict" --body "${FIX}/ui-tier.md" "${GROUP_PATHS[@]}" --strict
+expect_pass "group change covered by a ✅ full frontend row" --body "${FIX}/frontend-ran.md" "${GROUP_PATHS[@]}" --strict
+
 echo "  pr-check: all assertions passed"

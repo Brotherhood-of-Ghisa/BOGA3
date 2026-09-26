@@ -8,12 +8,35 @@
 # Columns (tab-separated): pattern	requires	rule
 #   pattern:  glob over repo-relative paths. `**` matches across `/`,
 #             `*` matches within one path segment.
-#   requires: comma-separated gate aliases (fast|backend|frontend) and/or lane
-#             names from scripts/lanes.tsv.
+#   requires: comma-separated gate aliases (fast|backend|frontend|frontend-ui)
+#             and/or lane names from scripts/lanes.tsv. A `-name` entry REMOVES
+#             that requirement for the paths this row matches (a narrower row
+#             carving an exception out of a broader one); it never affects
+#             other paths in the same change.
 #   rule:     short human name — this is what a ⛔ N/A justification cites.
-#   A changed path may match many rows; the requirement is the UNION.
-apps/mobile/app/**	fast,frontend	UI screens / routes
-apps/mobile/components/**	fast,frontend	UI components
+#   A changed path may match many rows; its requirement is the UNION of them
+#   minus their removals, and the change's requirement is the union over paths.
+#
+# UI tiering (spec 02, "Which gate for what you changed"): a screen/component
+# change runs `frontend-ui` — every simulator lane that needs no backend. The
+# Supabase-backed e2e lanes (ios-auth-profile, ios-sync-e2e, ios-groups-e2e)
+# run only for their own screens (rows below) and for the src/sync, src/auth,
+# src/groups, and migration rows; the full sweep (`boga sweep`, run before iOS
+# builds and on large PRs — test-for recommends it) runs everything.
+apps/mobile/app/**	fast,frontend-ui	UI screens / routes
+apps/mobile/components/**	fast,frontend-ui	UI components
+apps/mobile/app/__tests__/**	-frontend-ui	jest suites (fast gate; no simulator)
+apps/mobile/app/_layout.tsx	frontend	root layout: boot, auth route guard, sync gate (every lane boots through it)
+apps/mobile/app/maestro-harness.tsx	frontend	Maestro harness deep link (every lane drives it)
+apps/mobile/app/sign-in.tsx	ios-auth-profile	sign-in screen (auth-profile e2e)
+apps/mobile/app/profile.tsx	ios-auth-profile	profile screen (auth-profile e2e)
+apps/mobile/app/connected-agents.tsx	ios-auth-profile	connected agents screen (auth-profile e2e)
+apps/mobile/components/sync-status/**	ios-sync-e2e	sync-status surface (sync e2e)
+apps/mobile/app/group/**	-frontend-ui,ios-smoke,ios-groups-e2e	group screens (groups e2e + launch smoke)
+apps/mobile/app/group-session/**	-frontend-ui,ios-smoke,ios-groups-e2e	group session screens (groups e2e + launch smoke)
+apps/mobile/app/(tabs)/groups.tsx	-frontend-ui,ios-smoke,ios-groups-e2e	Groups tab (groups e2e + launch smoke)
+apps/mobile/app/exercise-link.tsx	-frontend-ui,ios-smoke,ios-groups-e2e	group exercise link screen (groups e2e + launch smoke)
+apps/mobile/components/groups/**	-frontend-ui,ios-smoke,ios-groups-e2e	group components (groups e2e + launch smoke)
 apps/mobile/app/__tests__/sync/**	fast,backend	sync tests (sync-infra lane covers them)
 apps/mobile/src/sync/**	fast,backend,ios-sync-e2e	sync runtime
 apps/mobile/src/auth/**	fast,backend,ios-sync-e2e	auth / session wiring
@@ -33,6 +56,20 @@ services/boga-mcp/**	fast,mcp-smoke	MCP protocol/API translation
 apps/mobile/scripts/maestro*	frontend,meta-tests	Maestro runtime / lane scripts (+ fixture-user rule)
 apps/mobile/scripts/ios-sim-boot.sh	frontend,meta-tests	simulator boot-wait (+ ios-sim-boot meta-test)
 apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
+apps/mobile/.maestro/flows/smoke-launch.yaml	-frontend,ios-smoke	single flow → the lane that runs it
+apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
+apps/mobile/.maestro/flows/stats-screen-ux.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
+apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
+apps/mobile/.maestro/flows/settings-dev-wipe-local.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
+apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
+apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
+apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
+apps/mobile/.maestro/flows/session-view-abandon.yaml	-frontend,ios-session-view	single flow → the lane that runs it
+apps/mobile/.maestro/flows/auth-profile-happy-path.yaml	-frontend,ios-auth-profile	single flow → the lane that runs it
+apps/mobile/.maestro/flows/sync-first-run-log-and-roundtrip.yaml	-frontend,ios-sync-e2e	single flow → the lane that runs it
+apps/mobile/.maestro/flows/groups-two-user-stream.yaml	-frontend,ios-groups-e2e	single flow → the lane that runs it
+apps/mobile/.maestro/flows/groups-link-exercise.yaml	-frontend,ios-groups-e2e	single flow → the lane that runs it
+apps/mobile/.maestro/scripts/groups-*	-frontend,ios-groups-e2e	groups flow helper scripts → the groups lane
 supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/migrations/*group*	ios-groups-e2e	group schema / RPCs (two-user e2e lane)
 supabase/scripts/groups-fixture-reset.sh	ios-groups-e2e	groups e2e fixture reset
@@ -50,6 +87,7 @@ scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs g
 scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/test-for.sh	meta-tests	trigger matcher
+scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
 scripts/pr-check.sh	meta-tests	PR Tests-table checker
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint

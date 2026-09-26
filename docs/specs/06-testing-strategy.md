@@ -104,7 +104,8 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 | Gate | Expands to (registry order) | Infrastructure | When to run |
 |---|---|---|---|
 | `./boga test fast` | `lint` + `typecheck` + `jest-full` + `docs-check` + `meta-tests` + `agent-auth-web` + `mcp-unit` + `backend-fast` | mobile/repository/consent/MCP lanes none; backend-fast local Supabase + Docker | Default local closeout fast gate. (`fast-frontend`, `fast-repo`, and `fast-backend` run the parts.) |
-| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-auth-profile` + `ios-sync-e2e` + `ios-groups-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile, sync-e2e, and groups-e2e additionally need local Supabase + Docker | Risk-triggered: UI/runtime/auth-profile/sync changes needing real-simulator evidence. |
+| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-auth-profile` + `ios-sync-e2e` + `ios-groups-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile, sync-e2e, and groups-e2e additionally need local Supabase + Docker | Risk-triggered: root layout / Maestro harness / Maestro runtime changes, and the full sweep (`./boga sweep`, run before iOS builds and on large PRs). |
+| `./boga test frontend-ui` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` (the `frontend` lanes whose infra is `ios`) | iOS simulator + Metro + Maestro dev-client; no Supabase | Any screen/component change (`app/**`, `components/**`); the Supabase-backed e2e lanes are added by their own area triggers (spec 02). |
 | `./boga test backend` | `auth-authz` → `groups-contract` → `groups-leaderboards` → `agent-api` → `sync-v2-schema` → `sync-push-contract` → `sync-pull-contract` → `dev-wipe-my-data` → `sync-drift` → `sync-v2-e2e` → `sync-infra` → `mcp-smoke` | local Supabase + Docker (`run-suite.sh` ensures `ensure-local-runtime-baseline.sh`; the smoke also starts the local MCP process) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures, or the MCP-to-API boundary. |
 
 > The slow gate runs are not always mandatory. "When to run" is governed by the
@@ -217,7 +218,10 @@ screenshots are the visual evidence.
 
 - `.github/workflows/ci.yml` runs one job (`frontend`) on every push and pull
   request to `main`.
-- It runs `docs-check` and `meta-tests`, installs the mobile workspace, runs
+- It runs `docs-check` and `meta-tests` (including `maestro-testids`: every
+  Maestro `id:` selector must still exist in app source, so a restyle that
+  renames an id a flow taps fails on the PR even when that flow's lane was not
+  required), installs the mobile workspace, runs
   mobile lint/typecheck/Jest, runs the locked `agent-auth-web` and `mcp-unit`
   wrappers in their workspaces, then runs the mobile open-handle guard. These
   are all infra-free lanes marked CI-enabled in the registry.
@@ -338,10 +342,12 @@ This document keeps only the cross-cutting policies below.
   real tab navigation (no teleport). Required smoke screenshots: `01-m26-today`
   … `05-m26-session-view-empty` (capture automated by the flow; stored under
   the canonical artifact root).
-- Require `./boga test frontend` when a change touches the committed
-  smoke/data-smoke flows, Maestro runtime scripts, the dev-client/runtime
-  handshake, harness setup behavior, or user-facing UI that needs fresh
-  real-simulator smoke evidence.
+- Require `./boga test frontend` when a change touches Maestro runtime
+  scripts, the dev-client/runtime handshake, the root layout, or harness setup
+  behavior. A screen/component change requires `./boga test frontend-ui` (plus
+  the e2e lane of its area); editing one committed flow requires only the lane
+  that runs it. The authoritative path → lane map is `scripts/triggers.tsv`
+  (`./boga test for`), summarized in spec 02.
 
 ## iOS simulator data smoke policy (Maestro)
 
