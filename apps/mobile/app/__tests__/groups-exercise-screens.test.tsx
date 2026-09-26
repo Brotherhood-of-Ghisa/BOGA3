@@ -75,7 +75,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
   createExerciseWithGroupLink: jest.fn(),
 }));
 
-import { uiColors, uiRoles } from '@/components/ui';
+import { uiRoles } from '@/components/ui';
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import * as exerciseCatalogRepo from '@/src/data/exercise-catalog';
 import * as linksRepo from '@/src/data/exercise-group-links';
@@ -177,13 +177,13 @@ const rowIds = () => screen.getAllByTestId(/^group-exercise-row-/).map((node) =>
 
 type TestNode = typeof screen.UNSAFE_root;
 
-/** Host views on a primary ground: the design-language `accent`, or the legacy primary button's. */
+/** Host views on a primary ground (`accent`). */
 const primaryGrounds = (): string[] =>
   screen.UNSAFE_root
     .findAll((node: TestNode) => typeof node.type === 'string')
     .filter((node: TestNode) => {
       const ground = (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor;
-      return ground === uiRoles.accent || ground === uiColors.actionPrimary;
+      return ground === uiRoles.accent;
     })
     .map((node: TestNode) => String(node.props.testID));
 

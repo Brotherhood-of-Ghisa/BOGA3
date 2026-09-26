@@ -1,11 +1,10 @@
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
 import * as tokens from '@/components/ui/tokens';
 
-// The design-language token rules that stay true for good
-// (`docs/specs/ui/design-language.md` §2–§4, `ux-rules.md` §9a): the type
-// scale, the colour roles, the geometry, the embedded faces, and `record`'s
-// distinctness from `accent` and its contrast floor. The redesign's temporary
-// "additive only" snapshots of the legacy scales were retired with it (step 7).
+// The token rules that stay true for good (`docs/specs/ui/design-language.md`
+// §2–§4, `ux-rules.md` §9a): the type scale, the colour roles, the geometry,
+// the embedded faces, `record`'s distinctness from `accent` and its contrast
+// floor, and the one vocabulary (the retired scales never come back).
 
 describe('design-language tokens', () => {
   it('has eight type rungs, `xxs` 10 the smallest, each with a line-height', () => {
@@ -52,9 +51,7 @@ describe('design-language tokens', () => {
     );
   });
 
-  it('carries the design-language geometry of §4 as its own vocabulary', () => {
-    // Kept beside `uiRadius` / `uiSpace` rather than in them: the legacy scales
-    // still serve every screen not yet in the design language.
+  it('carries the geometry of §4', () => {
     expect(uiGeometry).toEqual({
       radius: { card: 6, sheet: 16, control: 4, pill: 999 },
       tapTarget: 44,
@@ -65,10 +62,17 @@ describe('design-language tokens', () => {
     });
   });
 
-  it('has no elevation scale: depth is a hairline and a ground change (§4)', () => {
-    // `uiElevation` was retired 2026-09-24 with no user; shadows do not return.
-    expect(Object.keys(tokens)).not.toContain('uiElevation');
-    expect(Object.keys(tokens.uiTokens)).not.toContain('elevation');
+  it('exports one vocabulary: the retired scales stay gone', () => {
+    // `uiColors` and `uiRadius` were retired 2026-09-26 (DLM-T15), `uiElevation`
+    // 2026-09-24: depth is a hairline and a ground change, never a shadow (§4).
+    // `scripts/check-ui-guardrails.js` (`legacyVocabulary`) blocks their use.
+    const exported = Object.keys(tokens);
+    for (const retired of ['uiColors', 'uiRadius', 'uiElevation', 'uiTokens']) {
+      expect(exported).not.toContain(retired);
+    }
+    expect(exported.sort()).toEqual(
+      ['uiBorder', 'uiFonts', 'uiGeometry', 'uiIconSize', 'uiRoles', 'uiSpace', 'uiTypography'].sort(),
+    );
   });
 
   it('dims a sheet backdrop with ink, not a neutral black', () => {

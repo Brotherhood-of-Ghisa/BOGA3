@@ -7,13 +7,12 @@
 > `components-catalog.md`; design-source policy → `ai-design-policy.md`.
 > **Load when:** building or reviewing any screen.
 
-**Status: `Current behavior` for the screens that use it; the direction for
-the rest.** Accepted 2026-09-21. The session view, exercise page, Gyms screen,
-View Session (detail and completion) and the group session view are built in
-it (`uiRoles` / `uiFonts` / `uiGeometry` and the primitives in
-`components-catalog.md`). Every other screen still uses the legacy scales in
-`apps/mobile/components/ui/tokens.ts` (`uiColors`, `uiRadius`) and the semantics
-in `ux-rules.md`; moving them is an app-wide migration, screen by screen.
+**Status: `Current behavior`** for the whole app. Accepted 2026-09-21; every
+screen was moved onto it by 2026-09-26. It is the app's one styling vocabulary:
+the tokens in `apps/mobile/components/ui/tokens.ts` (`uiRoles`, `uiFonts`,
+`uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`) and the
+primitives in `components-catalog.md`. The retired legacy vocabulary is blocked
+by a guardrail (`ux-rules.md` §9a).
 
 First accepted target: `design-targets/exercise-session-v5.md`.
 
@@ -124,8 +123,7 @@ A screen names a face as `{ fontFamily, fontWeight }` from `uiFonts`
 (`apps/mobile/components/ui/tokens.ts`) — the same pair on iOS and Android,
 because iOS picks among an embedded family by weight and the plugin registers
 an Android XML font family under the same name. Only the weights in the table
-are embedded; any other weight lands on the nearest one that is. Screens not
-yet in the design language still render in the system font.
+are embedded; any other weight lands on the nearest one that is.
 
 **Web gets system fonts.** Config-plugin embedding is iOS/Android only, so
 `expo start --web` renders every face in the browser's fallback. That is the
@@ -169,7 +167,7 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 ## 4. Surfaces
 
 - **No shadows.** Depth is a hairline plus a ground-colour change, never an
-  elevation ramp. The legacy `uiElevation` was deleted (2026-09-24) unused.
+  elevation ramp; there is no elevation token.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
   and a 38×4 `rule-strong` handle. **Tapping outside dismisses; sheets carry no
@@ -186,11 +184,8 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
   Effort). The logger's other widths derive from these: Reps is one field
   height wide, Effort two tap targets, the tick one tap target. A **pill
   radius** (`radius.pill`, 999) was added 2026-09-24 for handles, tags and
-  chips, replacing the legacy `uiRadius.full` on these surfaces. It sits beside the legacy `uiRadius` /
-  `uiSpace` rather than in them — 6 beside 8 would be two radii with no nameable
-  difference (`ux-rules.md` §9a.5) — so the legacy scales can be retired
-  wholesale once no screen uses them. Spacing the target draws off-scale snaps to `uiSpace`
-  (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
+  chips. `uiSpace` is the one spacing scale: spacing the target draws off-scale
+  snaps to it (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
 - The primitives implementing this are `Card`, `Stat`, `ListRow`, `Sheet`,
   `ActionButton`, `IconButton`, `StatePanel`, `Screen` / `ScreenScroll`,
   `FormField`, `SearchField`, `SegmentedControl`, `ChipGroup`, `Tag` and

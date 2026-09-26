@@ -11,11 +11,15 @@ type ScanResult = {
 };
 
 const {
+  findLegacyVocabularyViolations,
   findRawColorLiteralViolations,
   findRatchetRuleViolations,
   evaluateRatchet,
   updateConfigBudgets,
 } = guardrailScript as {
+  findLegacyVocabularyViolations: (options?: { rootDir?: string }) => ScanResult & {
+    filesScanned: number;
+  };
   findRawColorLiteralViolations: (options?: {
     rootDir?: string;
     includeAllowlisted?: boolean;
@@ -123,6 +127,75 @@ describe('UI guardrail script', () => {
   });
 });
 
+describe('UI guardrail legacy vocabulary rule', () => {
+  const retired = [
+    'uiColors',
+    'uiRadius',
+    'uiElevation',
+    'UiText',
+    'UiSurface',
+    'UiButton',
+    'SegmentedChips',
+    'UiColorToken',
+    'UiRadiusToken',
+    'UiElevationToken',
+    'UiTextVariant',
+    'UiSurfaceVariant',
+    'UiButtonVariant',
+  ];
+
+  it.each(['app', 'components', 'src'])('flags every retired name in .ts and .tsx under %s/', (root) => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-legacy-'));
+
+    retired.forEach((name, index) => {
+      const extension = index % 2 === 0 ? 'ts' : 'tsx';
+      writeFile(tempRoot, `${root}/nested/uses-${name}.${extension}`, `export const x = ${name};\n`);
+    });
+    writeFile(
+      tempRoot,
+      `${root}/aggregate.tsx`,
+      `const a = uiTokens.colors.ink;\nconst b = uiTokens.radius.md;\nconst c = uiTokens.elevation.card;\n`
+    );
+
+    const result = findLegacyVocabularyViolations({ rootDir: tempRoot });
+
+    expect(literalsOf(result).sort()).toEqual(
+      [...retired, 'uiTokens.colors', 'uiTokens.radius', 'uiTokens.elevation'].sort()
+    );
+    // Both extensions are scanned, not just one.
+    expect(new Set(result.blockingViolations.map((v) => path.extname(v.file)))).toEqual(
+      new Set(['.ts', '.tsx'])
+    );
+  });
+
+  it('ignores tests, snapshots and a retired name inside a longer identifier', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-legacy-'));
+
+    writeFile(tempRoot, 'app/__tests__/screen.test.tsx', `import { uiColors } from '@/components/ui';\n`);
+    writeFile(tempRoot, 'src/sync/gate.test.ts', `const t = UiText;\n`);
+    writeFile(tempRoot, 'components/card.spec.tsx', `const t = UiSurface;\n`);
+    writeFile(tempRoot, 'components/__snapshots__/card.tsx', `const t = UiButton;\n`);
+    writeFile(
+      tempRoot,
+      'components/helpers.ts',
+      `export const myUiColorsHelper = 1;\nexport const uiRadiusLike = 2;\nexport type NotUiTextVariantX = 3;\nexport const roles = uiTokens.roles;\n`
+    );
+
+    const result = findLegacyVocabularyViolations({ rootDir: tempRoot });
+
+    expect(result.filesScanned).toBe(1);
+    expect(literalsOf(result)).toEqual([]);
+  });
+
+  it('scans nothing outside app/, components/ and src/', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-legacy-'));
+
+    writeFile(tempRoot, 'scripts/tool.ts', `const t = uiColors;\n`);
+
+    expect(literalsOf(findLegacyVocabularyViolations({ rootDir: tempRoot }))).toEqual([]);
+  });
+});
+
 describe('UI guardrail ratchet rules', () => {
   it('flags raw fontSize literals and ignores test files', () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-type-'));
@@ -168,7 +241,7 @@ describe('UI guardrail ratchet rules', () => {
     writeFile(
       tempRoot,
       'components/card.tsx',
-      `const styles = {\n  card: { borderRadius: 12 },\n  pill: { borderRadius: 999 },\n  flat: { borderRadius: 0 },\n  token: { borderRadius: uiRadius.md },\n};\nexport default styles;\n`
+      `const styles = {\n  card: { borderRadius: 12 },\n  pill: { borderRadius: 999 },\n  flat: { borderRadius: 0 },\n  token: { borderRadius: uiGeometry.radius.card },\n};\nexport default styles;\n`
     );
 
     const result = findRatchetRuleViolations({ ruleId: 'rawRadius', rootDir: tempRoot });

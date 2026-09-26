@@ -24,8 +24,9 @@ Scope boundary:
   are required, which command wrappers are canonical, where evidence is expected).
 - `docs/specs/12-worktree-config-and-isolation.md` owns the worktree slot model,
   port derivation, and runtime isolation.
-- Durations are owned by the measured per-run records under
-  `docs/testing/timings/records/` (written automatically by the gate wrappers).
+- Durations are owned by the measured per-run records in each machine's timing
+  store, `~/.config/boga/timings/records/` (written automatically by every
+  `./boga test` lane run; not in git).
   Read them with `./scripts/test-timings.sh` (median + a 3× "investigate above
   this" ceiling per lane); interpretation guide:
   `docs/testing/local-test-timings.md`. Cite the reader or re-measure; do not

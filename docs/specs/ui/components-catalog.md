@@ -36,58 +36,32 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared building blocks originally extracted from the retired session-list
     screen (summary line, active-session row, history list, data hook); now
     consumed by Progress/`stats-history`, Today, and session-list flows
-- `apps/mobile/components/muscle-analytics/`
-  - shared muscle analytics UI components for Stats/History surfaces
+- `apps/mobile/components/heatmaps/` and `apps/mobile/components/stats/`
+  - Progress's calendar heatmaps and its history sheet (`DailyHeatmap` /
+    `WeeklyHeatmap`, and `HistorySheet` below)
 
 ## Current component set (authoritative)
 
 ### Tokens and primitive exports
 
-1. `uiTokens` (and token groups)
+1. Tokens
 - File: `apps/mobile/components/ui/tokens.ts`
 - Purpose:
-  - single source of truth for shared UI token values (colors, spacing, radius, typography, border)
-  - includes the shared semantic/status/overlay color palette used by current route screens after the M8 convergence refactor (Task `T-20260226-06`)
-  - includes token-backed green family and warm individual-muscle background palettes for Stats / History failure intensity; each row selects one uniform shade from its palette
-  - carries the collapsed scales the UI guardrail enforces (8 type sizes with a
-    matching `lineHeight` per size, 6 spacing steps, 3 radii); values and
-    rationale: `docs/specs/ui/ux-rules.md` §9a. (`uiElevation` was deleted
-    2026-09-24 with no user.)
-  - also carries the design-language vocabularies, adopted so far by the exercise
-    page, the session view, the Gyms screen and View Session: `uiRoles` (colour roles), `uiFonts` (the three embedded typefaces
-    and their shipped weights) and `uiGeometry` (card / sheet / control / pill radii,
-    the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
-    labelled-field height, micro-label tracking); rationale:
-    `docs/specs/ui/design-language.md` §2–§4
-  - `uiIconSize` (`xs` 12 / `sm` 16 / `md` 20 / `lg` 24), the icon edge lengths
-    `Icon` takes
+  - the app's one styling vocabulary: `uiRoles` (colour roles, including the
+    `viz0`…`viz4` data-visualisation ramp), `uiFonts` (the three embedded
+    typefaces and their shipped weights), `uiGeometry` (card / sheet / control /
+    pill radii, the 44pt tap target, the 38pt metric column, the sheet handle,
+    the 50pt labelled-field height, micro-label tracking), `uiSpace` (6 spacing
+    steps), `uiTypography` (8 type sizes, a `lineHeight` per size, weights),
+    `uiIconSize` (`xs` 12 / `sm` 16 / `md` 20 / `lg` 24, the icon edge lengths
+    `Icon` takes) and `uiBorder`; values and rationale:
+    `docs/specs/ui/design-language.md` §2–§4, `docs/specs/ui/ux-rules.md` §9a
+  - there is no elevation token and no second palette: the legacy vocabulary
+    (`uiColors`, `uiRadius`, `uiElevation`, `UiText`, `UiSurface`, `UiButton`,
+    `SegmentedChips`) was deleted 2026-09-26 and the `legacyVocabulary`
+    guardrail blocks its return (`ux-rules.md` §9)
 
-2. `UiText`
-- File: `apps/mobile/components/ui/text.tsx`
-- Purpose:
-  - shared text primitive for semantic text roles used across reusable UI components
-  - enforces fixed font sizes, including when callers spread props; app-wide
-    text/input policy: `ux-rules.md` §9a
-
-3. `UiSurface`
-- File: `apps/mobile/components/ui/surface.tsx`
-- Purpose:
-  - shared surface/card/panel wrapper for bordered rounded containers
-
-4. `UiButton`
-- File: `apps/mobile/components/ui/button.tsx`
-- Purpose:
-  - shared semantic button primitive (including tab-style usage for top-level navigation)
-
-5. `SegmentedChips`
-- File: `apps/mobile/components/ui/segmented-chips.tsx`
-- Purpose:
-  - shared segmented choice row whose default `pills` presentation preserves
-    existing callers
-  - exposes an opt-in joined, equal-width variant used by the Stats / History
-    `Breakdown` control so both choices remain visibly grouped and accessible
-
-6. Design-language primitives: `Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`
+2. Design-language primitives: `Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`
 - Files: `apps/mobile/components/ui/card.tsx`, `stat.tsx`, `list-row.tsx`, `sheet.tsx`, `action-button.tsx`
 - Purpose:
   - the building blocks of the exercise page and session view, drawn from
@@ -139,11 +113,11 @@ Brief entrypoint inventory of the current reusable UI component set.
     for a text button that toggles a view (Sessions' `Show deleted`)
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
-6a. Design-language primitives for the remaining screens (DLM-T01, 2026-09-24)
+3. Design-language primitives, second set (DLM-T01, 2026-09-24)
 - Files: `apps/mobile/components/ui/icon-button.tsx`, `state-panel.tsx`,
   `screen.tsx`, `form-field.tsx`, `search-field.tsx`, `segmented-control.tsx`,
   `chip-group.tsx`, `tag.tsx`, `notice.tsx`
-- Purpose: what the screens still on the legacy vocabulary need to move over;
+- Purpose: the rest of the primitive set every screen is built from;
   each has two or more consumers. `uiRoles` / `uiFonts` / `uiGeometry` only
   - `IconButton` — a labelled 44pt icon-only control; `tone` `default` (`ink`),
     `muted`, `danger`, or `accent` (a filled square: the screen's one primary as
@@ -178,7 +152,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     or `fit` (across the row, label-sized segments sharing the rest: the
     exercise history's four metrics, DLM-T09);
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
-    testIDs of the legacy `SegmentedChips`. The records panel's `Records` | `Last`,
+    testIDs the retired `SegmentedChips` used. The records panel's `Records` | `Last`,
     Settings' date format (DLM-T04), the exercise list's Favourite/Name A–Z
     (`exercise-list-sort-*`), Progress's Time range and
     Breakdown (DLM-T08) and its history sheets' Metric and View
@@ -218,7 +192,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     More and Settings destinations)
   - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
 
-7. `Icon`
+4. `Icon`
 - Files: `apps/mobile/components/ui/icon.tsx`, `icon-glyphs.ts` (geometry),
   `LICENSE.lucide`
 - Purpose:
@@ -249,7 +223,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `app/__tests__/ui-icon.test.tsx` fails if a retired glyph comes back
     anywhere in `app/`, `components/` or `src/` (no file is exempt)
 
-8. `ui` barrel exports
+5. `ui` barrel exports
 - File: `apps/mobile/components/ui/index.ts`
 - Purpose:
   - single import entrypoint for current tokens and UI primitives
@@ -597,26 +571,13 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ## Pending / planned (not current components)
 
-Audit-approved candidates (the M8 UI pattern audit, deleted 2026-06-10; in git
-history), revisited 2026-09-24 when the exercise/session redesign closed. Build
-one only when a screen being moved to the design language asks for it, in the
-design-language vocabulary (`uiRoles` / `uiFonts` / `uiGeometry`):
-
-- `IconActionButton` → built as `IconButton`; `EmptyState` / state panels →
-  `StatePanel`; `ScreenContainer` / `ScreenScrollContainer` → `Screen` /
-  `ScreenScroll`; `FormField` → `FormField` (DLM-T01, 2026-09-24). The group
-  state panels (`components/groups/`) wrap `StatePanel` (DLM-T11).
-- Covered, no longer pending: `ModalSurface` / `ModalBackdrop` → `Sheet`;
-  `PressableRowCard` → `Card` with `onPress`, or `ListRow` with `onPress`.
-
-## Refactor convergence notes (Task `T-20260226-06`)
-
-1. Current user-facing route screens now consume `uiTokens.colors` for route-level screen styles (including modal scrims and status surfaces) instead of screen-local raw color literals.
-2. The later M26 navigation cutover replaced the retired `TopLevelTabs` with
-   `MainTabs`; current shared primitives/components (`UiButton`, `UiText`,
-   `UiSurface`, `MainTabs`, `BottomTray`) remain the
-   canonical reuse surface.
-3. Some repeated button/row/modal patterns remain route-local one-offs to avoid behavioral churn; they stay tracked as candidate primitives in the pending list above.
+None. The M8 audit's candidate primitives (audit deleted 2026-06-10; in git
+history) all shipped in the design language: `IconActionButton` → `IconButton`,
+`EmptyState` / state panels → `StatePanel`, `ScreenContainer` /
+`ScreenScrollContainer` → `Screen` / `ScreenScroll`, `FormField` → `FormField`,
+`ModalSurface` / `ModalBackdrop` → `Sheet`, `PressableRowCard` → `Card` or
+`ListRow` with `onPress`. A new primitive is built when a screen asks for it,
+from the tokens in entry 1.
 
 ## Maintenance rule
 

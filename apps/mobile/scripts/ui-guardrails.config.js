@@ -1,12 +1,20 @@
 // Configuration for scripts/check-ui-guardrails.js.
 //
-// Two kinds of rule:
+// Three kinds of rule:
 //
 // 1. `rawColorLiteralRule` — already at zero. Any raw hex / rgb(a) in
 //    `app/**` or `components/**` blocks on sight. `allowlistedFiles` is the
 //    escape hatch and is meant to stay empty.
 //
-// 2. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /
+// 2. `legacyVocabularyRule` — the styling vocabulary retired by the design-
+//    language migration (2026-09-26). Any of `identifiers` (as a whole word),
+//    or `uiTokens.colors|radius|elevation`, in `app/**`, `components/**` or
+//    `src/**` (`.ts` and `.tsx`, tests excluded) blocks on sight. There is no
+//    budget and no allowlist; the list only ever grows. The replacements are
+//    `uiRoles`, `uiGeometry.radius` and the `@/components/ui` primitives
+//    (`docs/specs/ui/ux-rules.md` §9a).
+//
+// 3. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /
 //    130 and have reached 0, so in practice all four rules are now
 //    zero-tolerance. The mechanism stays: the check fails when a change puts
 //    the count OVER budget, and equally when it drops UNDER budget without
@@ -25,6 +33,24 @@
 module.exports = {
   rawColorLiteralRule: {
     allowlistedFiles: [],
+  },
+
+  legacyVocabularyRule: {
+    identifiers: [
+      'uiColors',
+      'uiRadius',
+      'uiElevation',
+      'UiText',
+      'UiSurface',
+      'UiButton',
+      'SegmentedChips',
+      'UiColorToken',
+      'UiRadiusToken',
+      'UiElevationToken',
+      'UiTextVariant',
+      'UiSurfaceVariant',
+      'UiButtonVariant',
+    ],
   },
 
   ratchetRules: {

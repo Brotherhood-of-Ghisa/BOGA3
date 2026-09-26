@@ -14,9 +14,10 @@ place each under `docs/specs/**`, routed from here.
    not a skip.
 
 2. **Never state a test duration you didn't measure.** Run `./boga timings` —
-   it aggregates the measured per-run records the gates write automatically
-   (`docs/testing/timings/records/`). If a lane has no data, run it; the gate
-   records it. Estimating a duration is an error.
+   it aggregates the measured per-run records every `./boga test` lane run
+   writes automatically to this machine's store (`~/.config/boga/timings/`,
+   shared by all worktrees). If a lane has no data, run it; the gate records
+   it. Estimating a duration is an error.
 
 3. **Run the gates for what you changed, to green, before opening the PR.**
    `./boga` is the single entrypoint (runnable from anywhere in the repo;
