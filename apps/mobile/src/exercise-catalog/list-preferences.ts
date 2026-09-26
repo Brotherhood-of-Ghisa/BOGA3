@@ -5,11 +5,14 @@ import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   type ExerciseDateFormat,
   type ExerciseListPreferences,
+  type PastRecordsGymScope,
 } from './list-model';
 
 // Retain the key so existing Recents preferences can migrate in place.
 const STORAGE_KEY = 'boga3.exerciseListPreferences.v1';
 const dateFormatValues = new Set<ExerciseDateFormat>(['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD']);
+const pastRecordsGymScopeValues = new Set<PastRecordsGymScope>(['all', 'current-gym']);
+
 const listeners = new Set<() => void>();
 let snapshot = DEFAULT_EXERCISE_LIST_PREFERENCES;
 let didLoad = false;
@@ -26,7 +29,13 @@ const normalize = (value: Record<string, unknown>): ExerciseListPreferences => (
   dateFormat: dateFormatValues.has(value.dateFormat as ExerciseDateFormat)
     ? value.dateFormat as ExerciseDateFormat
     : DEFAULT_EXERCISE_LIST_PREFERENCES.dateFormat,
+  pastRecordsGymScope: normalizePastRecordsGymScope(value.pastRecordsGymScope),
 });
+
+const normalizePastRecordsGymScope = (value: unknown): PastRecordsGymScope =>
+  pastRecordsGymScopeValues.has(value as PastRecordsGymScope)
+    ? (value as PastRecordsGymScope)
+    : DEFAULT_EXERCISE_LIST_PREFERENCES.pastRecordsGymScope;
 
 const parsePreferences = (stored: string | null): ExerciseListPreferences => {
   try {

@@ -12,6 +12,15 @@ jest.mock('@/src/data', () => ({
   loadExercisePerformanceHistory: jest.fn(),
 }));
 
+const mockUseExerciseListPreferences = jest.fn(() => [
+  { pastRecordsGymScope: 'all', dateFormat: 'DD-MM-YYYY' },
+  jest.fn(),
+]);
+
+jest.mock('@/src/exercise-catalog/list-preferences', () => ({
+  useExerciseListPreferences: () => mockUseExerciseListPreferences(),
+}));
+
 jest.mock('expo-router', () => {
   const mockPush = jest.fn();
   const mockReplace = jest.fn();
@@ -51,6 +60,7 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
   exerciseDeletedAt: null,
   period: 30,
   appliedTagDefinitionId: null,
+  appliedGymId: null,
   tagOptions: [
     {
       tagDefinitionId: 'tag-westside',
@@ -62,6 +72,18 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
       tagDefinitionId: 'tag-wide',
       name: 'Wide grip',
       deletedAt: null,
+      occurrenceCount: 1,
+    },
+  ],
+  gymOptions: [
+    {
+      gymId: 'gym-westside',
+      name: 'Westside Barbell Club',
+      occurrenceCount: 1,
+    },
+    {
+      gymId: 'gym-downtown',
+      name: 'Downtown Iron Temple',
       occurrenceCount: 1,
     },
   ],
@@ -114,6 +136,10 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
 
 beforeEach(() => {
   mockLoad.mockReset();
+  mockUseExerciseListPreferences.mockReturnValue([
+    { pastRecordsGymScope: 'all', dateFormat: 'DD-MM-YYYY' },
+    jest.fn(),
+  ]);
   expoRouterMock.__mockPush.mockReset();
   expoRouterMock.__setSearchParams({ exerciseDefinitionId: 'ex-bench' });
 });
@@ -125,6 +151,7 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId={null}
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -148,6 +175,7 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId={null}
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={onSelectPeriod}
@@ -170,6 +198,7 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId="tag-westside"
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -198,6 +227,7 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary({ sessions: [] })}
         period={7}
         appliedTagDefinitionId="tag-westside"
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -212,12 +242,34 @@ describe('ExerciseHistoryScreenShell', () => {
     );
   });
 
+  it('renders empty state message tailored for gym filter when gym filter is active', () => {
+    render(
+      <ExerciseHistoryScreenShell
+        summary={buildSummary({ sessions: [] })}
+        period={7}
+        appliedTagDefinitionId={null}
+        appliedGymId="gym-westside"
+        isLoading={false}
+        errorMessage={null}
+        onSelectPeriod={jest.fn()}
+        onSelectTag={jest.fn()}
+        onPressSession={jest.fn()}
+        onSelectMainTab={jest.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('exercise-history-empty-state')).toHaveTextContent(
+      /this gym/
+    );
+  });
+
   it('renders the error state when errorMessage is set', () => {
     render(
       <ExerciseHistoryScreenShell
         summary={null}
         period={30}
         appliedTagDefinitionId={null}
+        appliedGymId={null}
         isLoading={false}
         errorMessage="Boom"
         onSelectPeriod={jest.fn()}
@@ -237,6 +289,7 @@ describe('ExerciseHistoryScreenShell', () => {
         summary={buildSummary()}
         period={30}
         appliedTagDefinitionId={null}
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -268,6 +321,7 @@ describe('ExerciseHistoryRoute', () => {
         exerciseDefinitionId: 'ex-bench',
         period: 30,
         tagDefinitionId: null,
+        gymId: null,
       });
     });
 
@@ -278,6 +332,34 @@ describe('ExerciseHistoryRoute', () => {
         exerciseDefinitionId: 'ex-bench',
         period: 7,
         tagDefinitionId: null,
+        gymId: null,
+      });
+    });
+  });
+
+  it('pre-filters by currentGymId when pastRecordsGymScope preference is current-gym', async () => {
+    mockUseExerciseListPreferences.mockReturnValue([
+      { pastRecordsGymScope: 'current-gym', dateFormat: 'DD-MM-YYYY' },
+      jest.fn(),
+    ]);
+    expoRouterMock.__setSearchParams({
+      exerciseDefinitionId: 'ex-bench',
+      currentGymId: 'gym-downtown',
+    });
+    mockLoad.mockResolvedValueOnce(buildSummary({ appliedGymId: 'gym-downtown' }));
+
+    render(<ExerciseHistoryRoute />);
+
+    await act(async () => {
+      expoRouterMock.__triggerFocus();
+    });
+
+    await waitFor(() => {
+      expect(mockLoad).toHaveBeenCalledWith({
+        exerciseDefinitionId: 'ex-bench',
+        period: 30,
+        tagDefinitionId: null,
+        gymId: 'gym-downtown',
       });
     });
   });
@@ -360,6 +442,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         summary={summary}
         period={30}
         appliedTagDefinitionId={null}
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}
@@ -378,6 +461,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
         summary={buildSummary({ exerciseDeletedAt: new Date('2026-05-01T00:00:00.000Z') })}
         period={30}
         appliedTagDefinitionId={null}
+        appliedGymId={null}
         isLoading={false}
         errorMessage={null}
         onSelectPeriod={jest.fn()}

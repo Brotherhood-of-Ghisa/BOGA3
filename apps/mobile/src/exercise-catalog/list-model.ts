@@ -10,17 +10,21 @@ import { filterIndexedExerciseCatalogExercises, type IndexedExerciseCatalogExerc
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 
+export type PastRecordsGymScope = 'all' | 'current-gym';
+
 export type ExerciseListPreferences = {
   sort: ExerciseListSort;
   showNeverDone: boolean;
   // Used by the exercise detail records panel, independently of browser dates.
   dateFormat: ExerciseDateFormat;
+  pastRecordsGymScope: PastRecordsGymScope;
 };
 
 export const DEFAULT_EXERCISE_LIST_PREFERENCES: ExerciseListPreferences = {
   sort: 'favourite',
   showNeverDone: true,
   dateFormat: 'DD-MM-YYYY',
+  pastRecordsGymScope: 'all',
 };
 
 export const EXERCISE_LIST_FAMILY_ORDER = [

@@ -137,6 +137,7 @@ export {
   createExerciseHistoryRepository,
   loadExercisePerformanceHistory,
   type ExerciseHistoryBest,
+  type ExerciseHistoryGymOption,
   type ExerciseHistoryPeriod,
   type ExerciseHistorySessionEntry,
   type ExerciseHistorySetEntry,
