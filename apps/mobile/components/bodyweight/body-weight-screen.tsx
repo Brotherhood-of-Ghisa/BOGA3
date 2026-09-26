@@ -1,11 +1,12 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { ActionButton, Card, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat, uiRoles } from '@/components/ui';
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
+import { SessionWeightBackfillSheet } from './backfill-sheet';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
 
@@ -15,7 +16,14 @@ export function BodyWeightScreen() {
   const [error, setError] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorVisible, setEditorVisible] = useState(false);
+  const [backfillVisible, setBackfillVisible] = useState(false);
+  const readingAfterBackfill = useRef(false);
   const openEditor = (value: Editor) => { setEditor(value); setEditorVisible(true); };
+  const finishBackfillDismissal = () => {
+    if (!readingAfterBackfill.current) return;
+    readingAfterBackfill.current = false;
+    openEditor({ reading: null, measuredAt: new Date() });
+  };
   const [feedback, setFeedback] = useState<string | null>(null);
   const generation = useRef(0);
   const load = useCallback(async () => {
@@ -50,6 +58,8 @@ export function BodyWeightScreen() {
           </View></Card>
           <ActionButton label="Add reading" variant="primary" testID="body-weight-add"
             onPress={() => openEditor({ reading: null, measuredAt: new Date() })} />
+          <ActionButton label="Fill missing session weights" variant="outline" testID="body-weight-backfill"
+            onPress={() => setBackfillVisible(true)} />
           <View style={styles.section}>
             <Text allowFontScaling={false} accessibilityRole="header" style={styles.label}>Weight history</Text>
             {readings.length === 0 ? <Text allowFontScaling={false} style={styles.body} testID="body-weight-empty">
@@ -66,6 +76,15 @@ export function BodyWeightScreen() {
           </View>
         </>}
     </ScreenScroll>
+    <SessionWeightBackfillSheet visible={backfillVisible} onDismiss={() => setBackfillVisible(false)}
+      onAfterDismiss={finishBackfillDismissal}
+      onAddReading={() => {
+        readingAfterBackfill.current = true;
+        setBackfillVisible(false);
+        // iOS cannot present the next Modal while its predecessor is dismissing.
+        // Other platforms have no native onDismiss completion event.
+        if (Platform.OS !== 'ios') finishBackfillDismissal();
+      }} />
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}
       initial={editor.reading ?? { weightValue: '', weightUnit: current?.weightUnit ?? 'kg' }} measuredAt={editor.measuredAt}

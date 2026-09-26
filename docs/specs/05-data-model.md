@@ -27,8 +27,11 @@ Their paired SQLite/server schema and sync transport are implemented. Reading
 entry/history and explicit session correction use the local repository; new
 sessions freeze context in their creation transaction. Personal exercise setup,
 explicit actual/planned load meaning and transactional legacy review use these
-same fields. Backfill and broader calculation-consumer activation are separate
-rollout work. The import contract defines v2 preservation of readings, frozen
+same fields. Explicit historical fill uses one revalidated local transaction
+over still-missing completed sessions, preserving existing tuples; source
+selection, repeat behavior and provenance follow the bodyweight contract §4.
+It creates ordinary dirty session writes, with no new schema or background
+refresh. Broader calculation-consumer activation remains separate rollout work. The import contract defines v2 preservation of readings, frozen
 context and load meaning; v1 writes omit new fields rather than clearing them.
 
 1. Mobile local data layer (`SQLite` via Drizzle)

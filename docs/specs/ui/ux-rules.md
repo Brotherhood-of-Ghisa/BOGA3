@@ -38,8 +38,27 @@ correction opens a sheet explaining personal/group score and certification
 impact and saves a manual session-only tuple. Settings readings stay unchanged.
 Deleted sessions expose the fact without a correction action.
 
-The visual target is `design-targets/bodyweight.md`. Historical fill and
-load-dependent consumer adoption are separate M27 tasks, not implied by entry.
+The visual target is `design-targets/bodyweight.md`. Load-dependent consumer
+adoption is separate from entry and explicit historical fill.
+
+### Historical session weight fill (M27-T06)
+
+Settings → Body weight → Fill missing session weights opens a scrollable sheet.
+From/Through are optional local calendar dates; Through includes that whole day.
+Applying a changed range reloads eligible completed sessions and selects them
+by default. Already-filled or malformed nonempty snapshots are excluded;
+metadata awaiting sync and unusable readings explain why selection is blocked.
+
+Preview shows the selected count, estimated count and each session's source
+weight/date. The earliest later reading is explicitly labelled estimated.
+Cancel writes nothing. Apply rechecks current inputs in one transaction and
+shows filled/skipped counts; concurrent saved overrides are never overwritten.
+Stale inputs preserve the failed preview and offer Refresh. Busy writes block
+duplicate submission and dismissal. No source offers Add reading or an
+individual session correction; on iOS the new editor opens only after the fill
+sheet's native dismissal completes. Existing/estimated session weights can be
+corrected from their own detail, with personal/group recalculation and affected
+certification consequences explained.
 
 ### Bodyweight exercise setup and load review (M27-T05)
 

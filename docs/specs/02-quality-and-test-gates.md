@@ -20,9 +20,11 @@ don't restate it here.
 ./boga doctor          # verify THIS machine can run every lane
 ```
 
-The `ios-bodyweight` lane runs both the reading/session snapshot flow and the
-exercise setup/logging/legacy-load review flow. Both are part of `frontend`;
-small and large phone runs provide the form-layout evidence.
+The `ios-bodyweight` lane runs reading/session snapshots, exercise setup and
+logging/legacy-load review, and explicit historical fill. All three flows are
+part of `frontend`; small and large phone runs provide form-layout evidence.
+Historical fill covers date/selection preview, cancellation, fallback provenance,
+repeat, restart, later readings, explicit correction and no-source entry.
 
 Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
 the canonical lane names everywhere: this doc, the timing records, `boga`).

@@ -145,7 +145,9 @@ readings, dirty/monotonic writes and post-commit sync nudges. New-session
 `saveDraftGraph` captures the tuple inside its creation transaction; ordinary
 updates leave it alone. Intentional correction writes the whole manual tuple
 and marks metadata known. UI consumers validate the complete tuple and show
-unknown for malformed context. Historical fill below remains T06 work.
+unknown for malformed context. Historical fill uses the pure planner in
+`src/bodyweight/backfill.ts` and atomic repository in
+`src/data/bodyweight-backfill.ts`.
 
 Settings shows latest nondeleted reading at/before now, with value/unit/date;
 history includes all readings. Equal dates resolve by ascending id (for both
@@ -168,9 +170,20 @@ ids/values/units/dates/versions. In one local transaction re-read those inputs
 and membership of the relevant reading timeline before writing. A changed
 preview requires refresh; an already-filled/deleted session is skipped and
 reported, never overwritten. Apply only still-missing snapshots with ordinary
-dirty session updates. Batched applications commit per batch and retry only
-remaining missing rows. Repeat is a no-op. This is local revalidation, not a
-global compare-and-set: ordinary cross-device row LWW still applies.
+dirty session updates. The implementation applies the selection in one atomic
+transaction; a failed write rolls back the entire selection. Repeat is a no-op,
+even after later readings. This is local revalidation, not a global
+compare-and-set: ordinary cross-device row LWW still applies.
+
+Missing means all four snapshot fields are null; malformed nonempty tuples are
+never replaced. Sessions awaiting metadata hydration are blocked. Preview
+fingerprints cover live readings and missing completed-session membership,
+ignoring only transport dirty acknowledgements. An unselected missing-session
+change also requires refresh; concurrently filled/deleted selected sessions are
+skipped. The commit recomputes sources from fresh rows, never trusting rendered
+snapshot values. Same-time IDs use SQLite BINARY/code-point ordering. Source
+measurement IDs remain provenance with no foreign key; restoration can apply
+sessions before readings and source deletion cannot erase a saved snapshot.
 
 ## 5. Legacy review and canonical identity
 

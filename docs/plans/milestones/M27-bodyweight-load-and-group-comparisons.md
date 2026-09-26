@@ -283,7 +283,7 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | in_progress |
 | [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | in_progress |
 | [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | in_progress |
-| [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | planned |
+| [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | in_progress |
 | [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | planned |
 | [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | planned |
 | [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | planned |
@@ -369,10 +369,14 @@ is complete merely because a downstream closeout card lists its tests.
   `/tmp/boga-m27-load-resume-<lane>.log`. The UI-regression visibility timeout
   passed unchanged on repeat; no lane was waived. `./boga timings` and
   `./boga test for` ran. No implementation PR opened.
-- T06 historical-fill planner, atomic repository, UI and tests are drafted
-  separately, awaiting integration after T05 frontend closeout. T07 analytics
-  and calculator draft has typecheck evidence only; neither draft is claimed
-  tested or shipped.
+- T06 historical-fill planner, atomic repository, UI, fixture and tests are
+  integrated. Fast passed (173 suites / 2,067 tests), the final fast-frontend
+  rerun passed, and all backend and meta-test lanes passed. Logs:
+  `/tmp/boga-m27-backfill-fast-final.log`,
+  `/tmp/boga-m27-backfill-fast-frontend-final.log`,
+  `/tmp/boga-m27-backfill-backend.log`. Full frontend and three-size device
+  checks remain pending. T07 analytics/calculator remains a separate draft
+  with typecheck evidence only; neither task is claimed shipped.
 
 ## Milestone acceptance
 

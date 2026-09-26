@@ -10,6 +10,8 @@ export type SheetProps = {
   // escape gesture. There is
   // no Cancel button: tapping outside is the dismissal (`design-language.md` §4).
   onDismiss: () => void;
+  // iOS native dismissal completion; use when presenting a subsequent sheet.
+  onAfterDismiss?: () => void;
   // Accessibility label of the backdrop, e.g. `Dismiss options`.
   dismissLabel: string;
   title?: string;
@@ -35,6 +37,7 @@ export type SheetProps = {
 export function Sheet({
   visible,
   onDismiss,
+  onAfterDismiss,
   dismissLabel,
   title,
   headerLeading,
@@ -87,7 +90,7 @@ export function Sheet({
   );
 
   return (
-    <Modal animationType="fade" onRequestClose={onDismiss} transparent visible={visible}>
+    <Modal animationType="fade" onRequestClose={onDismiss} onDismiss={onAfterDismiss} transparent visible={visible}>
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

@@ -511,6 +511,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the Training `Body weight` row (`router.push`); header Back returns
    - session snapshot corrections are sheets on the owning session route,
      with no navigation to or mutation of Settings readings
+   - historical fill is an in-route sheet on `/body-weight`; Cancel returns
+     without writes. Its no-source Add reading waits for iOS native dismissal,
+     then opens the reading editor on this same screen; it creates no route.
 
 Note:
 

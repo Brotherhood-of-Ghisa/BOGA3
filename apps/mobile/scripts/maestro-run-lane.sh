@@ -101,9 +101,10 @@ case "$lane" in
   bodyweight)
     MAESTRO_RESET_STRATEGY=data \
     "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
-      --session "Bodyweight entry and logging" \
+      --session "Bodyweight entry, logging and historical fill" \
       --scenario "Bodyweight entry and snapshots" --flow "$APP_DIR/.maestro/flows/bodyweight-entry.yaml" \
-      --scenario "Bodyweight setup, review and logging" --flow "$APP_DIR/.maestro/flows/bodyweight-logging.yaml"
+      --scenario "Bodyweight setup, review and logging" --flow "$APP_DIR/.maestro/flows/bodyweight-logging.yaml" \
+      --scenario "Historical session weight backfill" --flow "$APP_DIR/.maestro/flows/bodyweight-backfill.yaml"
     ;;
 
   # The exercise page (exercise/session redesign step 4): its own fixture,

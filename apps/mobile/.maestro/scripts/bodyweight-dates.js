@@ -8,3 +8,7 @@ function stamp(date) {
 var now = new Date();
 output.bodyweightPast = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 10, 0));
 output.bodyweightFuture = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 10, 0));
+
+// The backfill fixture's middle workout is 11 days before its run.
+output.bodyweightFillFrom = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 12, 12, 0)).slice(0, 10);
+output.bodyweightFillThrough = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 10, 12, 0)).slice(0, 10);

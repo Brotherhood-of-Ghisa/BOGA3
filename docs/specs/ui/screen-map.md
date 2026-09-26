@@ -681,7 +681,12 @@ Brief entrypoint map of the current mobile screens.
 - Native back returns to Settings. History orders by measurement time, then id,
   not last edit. Session detail/edit shows the frozen kg and source date through
   `SessionBodyWeight`; its correction sheet changes only that session. Deleted
-  session detail is read-only. Historical filling remains M27-T06 work.
+  session detail is read-only.
+- Fill missing session weights opens an in-route sheet: optional From/Through
+  dates, default eligible selection, source/estimate preview, atomic Apply and
+  filled/skipped result. Cancel writes nothing; stale inputs require refresh.
+  No reading offers entry after the fill sheet dismisses. Existing snapshots
+  remain unchanged, including on repeat; later source edits never rerun fill.
 
 ## Route shell (not a user-facing screen)
 

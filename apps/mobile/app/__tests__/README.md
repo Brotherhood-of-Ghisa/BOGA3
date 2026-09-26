@@ -87,3 +87,17 @@
   (`uiColors`, `uiSpace`, `uiRadius`, `uiBorder`, `uiElevation`) were retired
   with the redesign's close-out: the legacy scales may now change as screens
   move to the design language.
+
+
+## Historical bodyweight fill coverage (M27)
+
+`bodyweight-backfill.test.ts` must retain pure prior/earliest-later selection,
+local calendar bounds, SQLite-compatible same-time ID ties, unknown/invalid
+context, stale reading/session membership, explicit-override preservation,
+selected soft/hard deletion, repeat no-ops and transaction rollback/retry.
+Its real serializer/pull restoration case keeps source IDs as provenance and
+proves later source deletion and ordinary row LWW cannot refresh a frozen tuple.
+`bodyweight-backfill-ui.test.tsx` covers nonwriting preview/cancel, stale refresh,
+busy/dismiss guards and waiting for native iOS dismissal before Add reading.
+Device behavior belongs to the third flow in `ios-bodyweight`, including small
+and large phone evidence; these unit tests do not replace that gate.

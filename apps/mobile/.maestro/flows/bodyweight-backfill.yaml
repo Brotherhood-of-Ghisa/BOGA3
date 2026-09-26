@@ -1,0 +1,666 @@
+appId: com.dinoderek.mobile
+---
+# M27: explicit backfill, estimates, cancellation, retry and frozen results.
+- runScript: ../scripts/bodyweight-dates.js
+- openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-backfill&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- openLink: "boga3://body-weight"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-backfill"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-backfill"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_before"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "bodyweight-backfill-select-maestro_bwf_before"
+- assertNotVisible:
+    id: "bodyweight-backfill-select-maestro_bwf_filled"
+- takeScreenshot: "BWF00-missing-session-selection"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-from"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-from"
+- inputText: "2026-99-99"
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-range"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-range"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill-error"
+    timeout: 30000
+- takeScreenshot: "BWF01-invalid-range"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-from"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-from"
+- eraseText
+- pressKey: Enter
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-range"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-range"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_before"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+# A real inclusive calendar range selects only the middle workout.
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-from"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-from"
+- eraseText: 100
+- inputText: "${output.bodyweightFillFrom}"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-through"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-through"
+- eraseText: 100
+- inputText: "${output.bodyweightFillThrough}"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-range"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-range"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_between"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible: "1 selected"
+- takeScreenshot: "BWF01b-valid-date-range"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-from"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-from"
+- eraseText: 100
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-through"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-through"
+- eraseText: 100
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-range"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-range"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_before"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-preview"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill-count"
+    timeout: 30000
+- assertVisible: "3 sessions · 1 estimated"
+- takeScreenshot: "BWF02-mixed-source-preview"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-cancel"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "bodyweight-backfill"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-backfill"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-backfill"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_after"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_after"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-select-maestro_bwf_after"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-preview"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill-count"
+    timeout: 30000
+- assertVisible: "2 sessions · 1 estimated"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-apply"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-apply"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill-result"
+    timeout: 30000
+- takeScreenshot: "BWF03-partial-selection-result"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-done"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "bodyweight-backfill"
+    timeout: 10000
+# A cold launch must retain the applied snapshot and estimated provenance.
+- stopApp
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- extendedWaitUntil:
+    visible:
+      id: "today-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible: "(Loading from Metro|Downloading|Bundling).*"
+    timeout: 30000
+- openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_bwf_before"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-body-weight"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 80 kg, Estimated from.*"
+- takeScreenshot: "BWF04-estimated-history"
+- openLink: "boga3://body-weight"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-backfill"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-backfill"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_after"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "bodyweight-backfill-select-maestro_bwf_after"
+- assertNotVisible:
+    id: "bodyweight-backfill-select-maestro_bwf_before"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-preview"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-apply"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-apply"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill-result"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-done"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-done"
+- extendedWaitUntil:
+    notVisible:
+      id: "bodyweight-backfill"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-backfill"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-backfill"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-empty"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BWF05-repeat-has-no-missing-sessions"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-cancel"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "bodyweight-backfill"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-add"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-add"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-value"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-value"
+- inputText: "83"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 10000
+- openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_bwf_before"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-body-weight"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 80 kg, Estimated from.*"
+- scrollUntilVisible:
+    element:
+      id: "session-body-weight"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "session-body-weight"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-value"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-value"
+- eraseText
+- inputText: "79"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "session-body-weight"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 79 kg, Set manually for this session"
+- takeScreenshot: "BWF06-explicit-history-correction"
+- openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_bwf_filled"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "session-body-weight"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 77 kg, Set manually for this session"
+- takeScreenshot: "BWF07-original-override-preserved"
+- openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-backfill-empty&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- openLink: "boga3://body-weight"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-backfill"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-backfill"
+- extendedWaitUntil:
+    visible:
+      id: "bodyweight-backfill"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-no-readings"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: "bodyweight-backfill-no-readings"
+- takeScreenshot: "BWF08-no-source-readings"
+- tapOn: "Add reading"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-value"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-value"
+- inputText: "80"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "body-weight-backfill"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-backfill"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-select-maestro_bwf_before"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BWF09-new-reading-enables-preview"
+- scrollUntilVisible:
+    element:
+      id: "bodyweight-backfill-cancel"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "bodyweight-backfill-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "bodyweight-backfill"
+    timeout: 10000
+- openLink: "boga3://maestro-harness?reset=data&fixture=none&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000

@@ -585,6 +585,22 @@ Brief entrypoint inventory of the current reusable UI component set.
   `bodyweight-entry.test.ts`, `bodyweight-screen.test.tsx` and the bodyweight
   flow in `ios-bodyweight`.
 
+### Historical weight fill controls (M27-T06)
+
+- `SessionWeightBackfillSheet` composes `Sheet`, `FormField`, `Card`/`ListRow`,
+  `Notice` and action controls. It owns range/selection, source preview,
+  applying/result and stale-refresh states. Pending writes guard dismissal and
+  duplicate submission; cancellation never calls the apply repository.
+- The containing scroll view uses handled keyboard taps and on-drag dismissal.
+  Source descriptions wrap; estimated provenance retains the reading's date.
+- `Sheet.onAfterDismiss` optionally receives iOS native dismissal completion,
+  distinct from the request callback `onDismiss`. The no-source reading editor
+  waits for it, avoiding overlapping native modal presentations; other platforms
+  replace immediately because they do not emit that iOS event.
+- `bodyweight-backfill.test.ts` covers planner/transaction/sync restoration;
+  `bodyweight-backfill-ui.test.tsx` covers selection, stale/retry, busy guards and
+  the native-dismissal handoff. `bodyweight-backfill.yaml` provides device proof.
+
 ### Bodyweight load controls (M27-T05)
 
 - `ExerciseCoreFields.loadRules` is optional so conventional group callers can

@@ -1,7 +1,7 @@
 ---
 task_id: M27-T06-Backfill_and_correct_historical_session_weight
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/bodyweight-load-cont
 
 # M27-T06 — Backfill and correct historical session weight
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T04, M27-T05.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D3–D6, D9, D10.
@@ -69,3 +69,19 @@ retry, re-run and sync/restore. Run `./boga test fast`, `./boga test backend`,
 `./boga test frontend` plus actual-diff requirements from `./boga test for`.
 Graduate backfill/UX rules, attach evidence, mark the milestone entry complete
 and delete this card when shipped.
+
+
+## Local implementation checkpoint
+
+The planner, atomic repository, range/selection preview and native reading-entry
+handoff are implemented. The fixture and third `ios-bodyweight` flow are wired.
+Full `./boga test fast` passed (173 suites / 2,067 tests); the final
+`fast-frontend` rerun and all 11 meta-test files passed. All backend lanes passed,
+including real sync round trips and schema drift. Logs:
+`/tmp/boga-m27-backfill-fast-final.log`,
+`/tmp/boga-m27-backfill-fast-frontend-final.log`,
+`/tmp/boga-m27-backfill-meta-tests.log`,
+`/tmp/boga-m27-backfill-backend.log`.
+
+Three-size bodyweight captures and the full frontend gate are pending. No
+device verification or shipping completion is claimed yet.
