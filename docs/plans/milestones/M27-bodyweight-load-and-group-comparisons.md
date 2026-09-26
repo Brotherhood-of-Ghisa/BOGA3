@@ -294,7 +294,7 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 Dependencies describe delivery order, not a request to spawn agents. No task
 is complete merely because a downstream closeout card lists its tests.
 
-### Execution checkpoint (2026-09-26)
+### Execution checkpoint (through 2026-09-27)
 
 - Worktree: `codex/m27-bodyweight`, based on `a34708c0` (latest `origin/main`
   when work started); isolated slot 1. `./boga doctor` passed.
@@ -359,8 +359,20 @@ is complete merely because a downstream closeout card lists its tests.
   the test Simulator app plus erasing only this task's disposable simulator
   data restored space. No assertion was weakened. `./boga timings` and
   `./boga test for` ran. No implementation PR opened.
-- Next implementation: T05 exercise setup, explicit added/assisted logging and
-  review of ambiguous legacy loads.
+- T05 setup/logging/review/import implementation is committed at `e2bc65ba`.
+  Fast passed (171 suites / 2,043 tests), backend and handles passed. Bodyweight
+  entry plus logging passed on all three phone sizes; final default evidence:
+  `apps/mobile/artifacts/maestro/M27-load-frontend-resume/20260927-001636-38972/`.
+  The T05 card records the small/large captures and visual review. Every frontend
+  lane passed, including auth/profile, UI/server sync and both group flows.
+  Logs: `/tmp/boga-m27-load-frontend-fit.log` and
+  `/tmp/boga-m27-load-resume-<lane>.log`. The UI-regression visibility timeout
+  passed unchanged on repeat; no lane was waived. `./boga timings` and
+  `./boga test for` ran. No implementation PR opened.
+- T06 historical-fill planner, atomic repository, UI and tests are drafted
+  separately, awaiting integration after T05 frontend closeout. T07 analytics
+  and calculator draft has typecheck evidence only; neither draft is claimed
+  tested or shipped.
 
 ## Milestone acceptance
 

@@ -96,5 +96,31 @@ the flow waits for scrolling to settle and asserts selected review options.
 Restart opens the dev-client URL once from a stopped app. Redundant launch/open
 and immediate optional dialog probes caused observed native/AX failures.
 
-Larger phone proof and the full frontend aggregate are still pending.
-This checkpoint does not claim broad analytics adoption; that remains T07.
+The 440×956pt phone passed both flows on the same source:
+`/tmp/boga-m27-load-large-fit.log`, captures in
+`apps/mobile/artifacts/maestro/M27-load-large/20260926-234538-27299/`.
+BWL02 and BWL09 were inspected: review descriptions and the missing-weight
+message remain readable, with no clipped controls.
+
+The final default-device repeat passed at `e2bc65ba`:
+`/tmp/boga-m27-load-resume-ios-bodyweight.log`, captures in
+`apps/mobile/artifacts/maestro/M27-load-frontend-resume/20260927-001636-38972/`.
+BWL02/BWL07/BWL09 were compared with the native brief: the reviewed meanings,
+explicit unavailable metrics and all three mode labels are readable. Historical
+records still use their pre-T07 projection at this checkpoint; broad analytics
+adoption is the next personal-metrics task.
+
+Every frontend lane passed at `e2bc65ba`. Smoke and data-smoke passed in
+`/tmp/boga-m27-load-frontend-fit.log`; UI-regression, exercise-page, session-view,
+bodyweight and auth-profile passed in `/tmp/boga-m27-load-resume-<lane>.log`.
+The session-completion visibility timeout passed on repeat without an assertion
+or app-code change; its failed capture and hierarchy both contained the card.
+UI/server sync and both group flows passed in their corresponding resume logs.
+Group captures are under `M27-load-frontend-resume/20260927-002744-46246/`
+and `20260927-003134-47771/`. `./boga timings` and `./boga test for` ran;
+outputs are `/tmp/boga-m27-load-timings-final.log` and
+`/tmp/boga-m27-load-test-for-final.log`. No lane was waived and no PR opened.
+Completed simulator system logs were losslessly
+compressed, with checked SHA-256 hashes recorded in
+`apps/mobile/artifacts/maestro/M27-compressed-simulator-logs.json`;
+screenshots and active-run logs remain in place.
