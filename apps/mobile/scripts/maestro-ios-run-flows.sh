@@ -142,6 +142,14 @@ run_one_flow() {
   mkdir -p "$output_dir" "$debug_dir"
 
   maestro_prepare_flow_copy "$flow_source" "$flow_file" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
+  # Maestro resolves a flow's `runScript` files relative to the flow, so the
+  # copy's `../scripts/*.js` must exist beside the copy's directory, as it does
+  # beside .maestro/flows/ (same as maestro-ios-run-flow.sh).
+  local flow_scripts_dir
+  flow_scripts_dir="$(dirname -- "$flow_source")/../scripts"
+  if [[ -d "$flow_scripts_dir" && ! -d "$MAESTRO_ARTIFACT_ROOT/scripts" ]]; then
+    cp -R "$flow_scripts_dir" "$MAESTRO_ARTIFACT_ROOT/scripts"
+  fi
 
   echo "[maestro-ios-run-flows] >>> ${scenario} (${slug})"
   maestro_env_flags=()

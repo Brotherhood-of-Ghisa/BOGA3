@@ -6,9 +6,11 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { uiColors, uiRadius, uiSpace, uiTypography } from '@/components/ui';
+import { Card, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
+import { HEAT_MARK, heatmapStyles } from './heatmap-style';
+import { HeatmapLegend } from './HeatmapLegend';
 import type { DayCell, HeatmapData } from './heatmapData';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -23,7 +25,6 @@ interface Props {
   metricLabel: string;
   /** Formats a single day's metric value for the detail card. */
   formatValue: (value: number) => string;
-  accent?: string;
   legendLabel?: string;
 }
 
@@ -32,12 +33,20 @@ const formatDayTitle = (dateKey: string): string => {
   return `${MONTHS[month - 1]} ${day}, ${year}`;
 };
 
+// Today is a 1px `ink` ring and the selected day a 2px `ink` border, so the two
+// never look alike (DLM-T09-D3); an empty day keeps a `rule` hairline.
+const cellBorder = (day: DayCell, selected: boolean) => {
+  if (selected) return { borderWidth: HEAT_MARK.selectedWidth, borderColor: HEAT_MARK.color };
+  if (day.isToday) return { borderWidth: HEAT_MARK.todayWidth, borderColor: HEAT_MARK.color };
+  if (day.level === 0) return { borderWidth: StyleSheet.hairlineWidth, ...heatmapStyles.restCell };
+  return null;
+};
+
 export function DailyHeatmap({
   data,
   testIDPrefix,
   metricLabel,
   formatValue,
-  accent = uiColors.actionPrimary,
   legendLabel = 'Volume per day',
 }: Props) {
   const [gridW, setGridW] = useState(0);
@@ -91,10 +100,10 @@ export function DailyHeatmap({
   const onLayout = (e: LayoutChangeEvent) => setGridW(e.nativeEvent.layout.width);
 
   return (
-    <View style={styles.wrap} testID={heatmapTestID}>
-      <View style={styles.headerRow}>
-        <Text allowFontScaling={false} style={styles.h1}>Last 12 months</Text>
-        <Text allowFontScaling={false} style={styles.muted}>each square = one day</Text>
+    <View style={heatmapStyles.wrap} testID={heatmapTestID}>
+      <View style={heatmapStyles.headerRow}>
+        <Text allowFontScaling={false} style={heatmapStyles.title}>Last 12 months</Text>
+        <Text allowFontScaling={false} style={heatmapStyles.caption}>each square = one day</Text>
       </View>
 
       {/* fixed weekday column + horizontally scrollable (month axis + grid) */}
@@ -103,7 +112,10 @@ export function DailyHeatmap({
           {/* spacer aligns the weekday labels with the grid rows (below the month axis) */}
           <View style={{ height: AXIS_H }} />
           {['M', '', 'W', '', 'F', '', ''].map((w, r) => (
-            <Text allowFontScaling={false} key={r} style={[styles.wd, { height: rowH, lineHeight: rowH }]}>
+            <Text
+              allowFontScaling={false}
+              key={r}
+              style={[heatmapStyles.legendText, styles.weekday, { height: rowH, lineHeight: rowH }]}>
               {w}
             </Text>
           ))}
@@ -124,7 +136,7 @@ export function DailyHeatmap({
                     allowFontScaling={false}
                     key={i}
                     numberOfLines={1}
-                    style={[styles.axisLabel, { left: i * colW }]}>
+                    style={[heatmapStyles.legendText, styles.axisLabel, { left: i * colW }]}>
                     {m}
                   </Text>
                 ) : null
@@ -152,21 +164,16 @@ export function DailyHeatmap({
                         accessibilityState={{ selected }}
                         onPress={() => setPickedDateKey(d.dateKey)}
                         testID={`${heatmapTestID}-cell-${d.dateKey}`}
-                        style={{
-                          width: cell,
-                          height: cell,
-                          marginBottom: r < 6 ? GAP : 0,
-                          borderRadius: uiRadius.sm,
-                          backgroundColor: HEAT_RAMP[d.level],
-                          borderWidth: d.isToday || selected ? 1.6 : StyleSheet.hairlineWidth,
-                          borderColor: d.isToday
-                            ? accent
-                            : selected
-                              ? uiColors.heatmapSelectedBorder
-                              : d.level === 0
-                                ? uiColors.heatmapNeutralBorder
-                                : 'transparent',
-                        }}
+                        style={[
+                          styles.cell,
+                          {
+                            width: cell,
+                            height: cell,
+                            marginBottom: r < 6 ? GAP : 0,
+                            backgroundColor: HEAT_RAMP[d.level],
+                          },
+                          cellBorder(d, selected),
+                        ]}
                       />
                     );
                   })}
@@ -179,8 +186,8 @@ export function DailyHeatmap({
 
       {/* selected-day detail */}
       {selectedDay ? (
-        <View style={styles.detail} testID={`${heatmapTestID}-day-detail`}>
-          <View>
+        <Card style={styles.detail} testID={`${heatmapTestID}-day-detail`}>
+          <View style={styles.detailLeft}>
             <Text allowFontScaling={false} style={styles.kicker}>
               {selectedDay.isToday ? 'Today' : DOW[selectedDay.dow]}
             </Text>
@@ -190,108 +197,84 @@ export function DailyHeatmap({
           </View>
           <View style={styles.detailRight}>
             <View
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: uiRadius.sm,
-                backgroundColor: HEAT_RAMP[selectedDay.level],
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: uiColors.heatmapNeutralBorder,
-              }}
-            />
-            <Text
-              allowFontScaling={false}
               style={[
-                styles.detailVal,
-                { color: selectedDay.level ? uiColors.textPrimary : uiColors.textMuted },
+                styles.swatch,
+                { backgroundColor: HEAT_RAMP[selectedDay.level] },
+                selectedDay.level === 0 ? heatmapStyles.restCell : null,
               ]}
-              testID={`${heatmapTestID}-day-detail-value`}>
-              {selectedDay.level
-                ? `${metricLabel}: ${formatValue(selectedDay.value)}`
-                : 'Rest day'}
+            />
+            <Text allowFontScaling={false} style={styles.detailLabel} testID={`${heatmapTestID}-day-detail-value`}>
+              {selectedDay.level ? (
+                <>
+                  {metricLabel}: <Text allowFontScaling={false} style={styles.detailFigure}>{formatValue(selectedDay.value)}</Text>
+                </>
+              ) : (
+                'Rest day'
+              )}
             </Text>
           </View>
-        </View>
+        </Card>
       ) : null}
 
-      {/* legend */}
-      <View style={styles.legend}>
-        <Text allowFontScaling={false} style={styles.muted}>{legendLabel}</Text>
-        <View style={styles.legendRamp}>
-          <Text allowFontScaling={false} style={styles.muted}>Less</Text>
-          {HEAT_RAMP.map((color, i) => (
-            <View
-              key={i}
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: uiRadius.sm,
-                backgroundColor: color,
-                borderWidth: i === 0 ? StyleSheet.hairlineWidth : 0,
-                borderColor: uiColors.heatmapNeutralBorder,
-              }}
-            />
-          ))}
-          <Text allowFontScaling={false} style={styles.muted}>More</Text>
-        </View>
-      </View>
+      <HeatmapLegend label={legendLabel} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: uiSpace.lg,
-  },
-  h1: { fontSize: uiTypography.size.base, fontWeight: '600', color: uiColors.textPrimary },
-  muted: { fontSize: uiTypography.size.sm, color: uiColors.textMuted },
   body: { flexDirection: 'row' },
   scroll: { flex: 1 },
+  weekday: { textAlign: 'center' },
   axis: { height: 18, position: 'relative' },
-  axisLabel: {
-    position: 'absolute',
-    top: 0,
-    width: 32,
-    fontSize: uiTypography.size.xs,
-    lineHeight: 14,
-    color: uiColors.textMuted,
-    fontWeight: '500',
-  },
+  axisLabel: { position: 'absolute', top: 0, width: 32 },
   grid: { flexDirection: 'row' },
-  wd: { fontSize: uiTypography.size.xs, color: uiColors.textMuted, textAlign: 'center' },
+  cell: { borderRadius: uiGeometry.radius.control },
   detail: {
     marginTop: uiSpace.lg,
-    backgroundColor: uiColors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    borderRadius: uiRadius.md,
     paddingVertical: uiSpace.md,
     paddingHorizontal: uiSpace.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: uiSpace.md,
   },
+  detailLeft: { gap: uiSpace.xs },
   kicker: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '600',
-    color: uiColors.textMuted,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    color: uiRoles.inkMuted,
   },
-  detailTitle: { fontSize: uiTypography.size.base, fontWeight: '600', color: uiColors.textPrimary, marginTop: uiSpace.xs },
+  detailTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
   detailRight: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
-  detailVal: { fontSize: uiTypography.size.base, fontWeight: '600' },
-  legend: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: uiSpace.lg,
+  swatch: {
+    width: 14,
+    height: 14,
+    borderRadius: uiGeometry.radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
   },
-  legendRamp: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
+  detailLabel: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  detailFigure: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '600',
+    color: uiRoles.ink,
+  },
 });
 
 export default DailyHeatmap;

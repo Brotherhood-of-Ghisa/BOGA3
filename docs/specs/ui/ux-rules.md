@@ -472,34 +472,69 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
 
 ### 11. Calendar heatmap semantics
 
-1. Muscle analytics calendar heatmaps render local dates in Monday-start weeks with visible column labels `Mon Tue Wed Thu Fri Sat Sun`.
-2. The reusable heatmap component renders latest weeks first and uses 8 visible week rows by default; parent overlays may provide additional loaded history without changing bucket thresholds while the user scrolls that loaded window.
-3. Zero-effort dates remain visible, neutral, tappable, and accessible.
-4. Positive effort dates use stable green buckets derived from the shared selected-muscle daily effort totals.
-5. Today's date uses a light-blue treatment that remains distinct from green effort intensity and selected-date styling.
-6. Selected cells expose selected accessibility state and remain the parent surface's hook for any out-of-component detail panel.
+The two views of `components/heatmaps/` (`DailyHeatmap`, `WeeklyHeatmap`), both
+on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
+`HeatmapData` (DLM-T09).
 
-### 12. Stats muscle-history overlay semantics
+1. Dates are local, in Monday-start weeks. The daily grid has seven weekday rows
+   labelled `M`, `W` and `F` in a fixed gutter, and one column per week under a
+   month axis; gutter, axis and legend are Archivo micro-labels in `ink-faint`.
+2. The daily grid spans all loaded history (at least 52 weeks), sized so about
+   13 week columns fill the width, and opens scrolled to its right edge, where
+   today is; older weeks are reached by scrolling left. The weekly view is one
+   bar per week over the same span, bar height and colour both scaled to the
+   window's logged range, with a dashed `ink-faint` 12-week average once at
+   least 6 of the last 12 weeks logged training.
+3. Buckets are min–max over the window's positive values: the lightest logged
+   day is `viz1`, the heaviest `viz4`. Zero-effort days are `viz0` with a `rule`
+   hairline, and stay visible, tappable and accessible.
+4. The ramp says only "more". Colour is never the only channel: the day detail
+   and the week banner state the value.
+5. **Today and selected are distinct marks** (DLM-T09-D3). Today (the current
+   week in the weekly view) is a 1px `ink` ring; the selected day or week is a
+   2px `ink` border and exposes the selected accessibility state. The selected
+   week also gets a filled `ink` `caret-down` above its bar.
+6. The daily view owns its selection: it starts on today, and a tap selects that
+   day and shows its detail `Card` (a `Today` or weekday kicker, the date, a
+   `viz` swatch and `<metric>: <value>` in Plex Mono, or `Rest day`). The weekly
+   view's selection is lifted to its host (a tap selects a week, a second tap
+   clears it), which shows the week banner (§12.5).
 
-1. In `Stats / History`, expanded muscle rows are actionable rows that open the selected muscle's history overlay.
-2. A collapsed single-muscle family header is actionable for its underlying muscle group; multi-muscle family headers remain non-actionable section headers.
-3. The muscle-history overlay is in-route UI state, not route navigation. It occupies roughly three quarters of the screen height, uses the overlay scrim token, and dismisses via backdrop or close control.
-4. Overlay loading, error, no-history, populated, selected positive-effort date, and selected zero-effort date states render inside the overlay and preserve backdrop dismissal.
-5. A selected positive-effort date shows the selected local date, selected muscle group, effort score, heatmap bucket, session/set counts, contributing exercises, and compact contributing set rows derived from the same shared selected-muscle daily effort contributions that power the heatmap cell.
-6. A selected zero-effort date remains selectable and shows the selected local date, selected muscle group, effort `0`, bucket `0`, and a clear no-training empty state for that muscle/date.
-7. Selected-day set rows are explanatory only: they show concise raw set values plus weighted effort, preserve existing warm-up exclusion/invalid-set zero-effort semantics from the shared analytics helper, and do not duplicate completed-session detail navigation or editing affordances.
-8. Certification markers are not rendered in the muscle-history overlay unless a real certification data source exists; v1 does not invent certification state.
-9. Dismissing the overlay clears only transient selected-muscle/date UI state and does not mutate sessions, exercises, tags, sync data, or durable preferences.
-10. The overlay renders `Volume` and `W/sets` metric chips, defaults to
-    `Volume`, and uses the selected metric for both weekly and daily heatmap
-    values and detail. Muscle volume is the per-side, role-weighted aggregate
-    across the selected muscle IDs; estimated 1RM and top weight remain
-    unavailable for muscle-level history.
-11. The v1 overlay loads a capped one-year local completed-session history window for the selected muscle.
-12. Daily and weekly heatmap trees stay mounted while an overlay is open. The
-    inactive tree is transparent, non-interactive, and hidden from
-    accessibility, so switching views reuses the already-laid-out chart and
-    preserves its local selection/scroll state instead of drawing it again.
+### 12. Stats history sheet semantics
+
+1. In `Stats / History`, By Muscle: a nested muscle row and a collapsed
+   single-muscle family header open that muscle's history (`Muscle History`); a
+   multi-muscle family header opens the history of all its muscles together
+   (`Muscle Group History`). By Exercise: a table row opens the exercise's
+   history (`Exercise History`).
+2. The history is one `HistorySheet` (`components/stats/history-sheet.tsx`,
+   DLM-T09-D2), a design-language `Sheet` (G5): in-route state, not navigation;
+   about three quarters of the screen over the `scrim`; modal to assistive tech.
+   The backdrop, Android back and the VoiceOver escape dismiss it; there is no
+   close button.
+3. Under the eyebrow and the name, a `Metric` and a `View` `SegmentedControl`,
+   each under a micro-label. Muscle history offers `Volume` and `W/sets`;
+   exercise history adds `1RM` and `Top weight`. Both default to `Volume` and
+   `Weekly`, and the selected metric drives both views.
+4. Loading, error and no-history are inline `StatePanel`s in the sheet's scroll
+   body, with their copy unchanged; under the no-history panel the empty heatmap
+   still renders.
+5. In `Weekly` a `rule-soft` band sits above the chart: `Tap a week to see
+   details`, or the selected week's range (Source Sans `ink-muted`) and
+   `<metric>: <value>` with the value in Plex Mono `ink`. `Daily` has no band;
+   its day detail is inside the chart (§11.6).
+6. Values follow `design-language.md` §6: full integers, never `2.5k`; a missing
+   1RM or top weight is `—`.
+7. Muscle volume is the per-side, role-weighted aggregate across the selected
+   muscle IDs; 1RM and top weight are exercise-level and not offered for muscles.
+8. The sheet loads a capped one-year window of completed-session history for
+   its target.
+9. Daily and weekly trees stay mounted while a sheet is open. The inactive tree
+   is transparent, non-interactive, and hidden from accessibility, so switching
+   views reuses the already-laid-out chart and preserves its local selection and
+   scroll state instead of drawing it again.
+10. Dismissing clears only the transient target, week and loaded history; the
+    screen's controls, sort and search stay as they were, and nothing is written.
 
 ### 13. Stats exercise/muscle history semantics
 
@@ -546,15 +581,18 @@ primitives (`components-catalog.md` 6 and 6a) and those screens.
    Sort choice is volatile but survives time-range, search, and Breakdown
    changes for the mounted screen, while each new metric result is sorted again
    synchronously without data queries or mutation.
-6. Tapping an exercise row in per-exercise mode opens an in-route `ExerciseHistoryOverlay` — the same overlay card structure as the muscle-history overlay (occupies ~75% screen height, backdrop-dismissible).
-7. The `ExerciseHistoryOverlay` renders the reusable daily/weekly heatmaps over a 365-day window for the selected exercise. It keeps the four metric chips (Volume / W/sets / 1RM / Top weight) plus the week-selection banner; unlike muscle-history, it remains a multi-metric exercise-specific view.
+6. Tapping an exercise row in per-exercise mode opens the exercise's history
+   sheet (§12): the same `HistorySheet` as muscle history.
+7. The exercise sheet renders the daily and weekly heatmaps over a 365-day
+   window with all four metrics (`Volume` / `W/sets` / `1RM` / `Top weight`) and
+   the week banner.
 8. Both controls use the design-language `SegmentedControl` (selected segment
    solid `ink`); neither is styled locally, and there are no raw colour
    literals. Summary deltas keep their sign (`+`, `−`, `±0`) in Plex Mono
    `ink-muted`, with `new` in `ink`; they carry no green or red (G3). Volumes
    and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
-9. Dismissing the exercise overlay returns to the exercise list in per-exercise mode. It clears only transient selected-exercise/week UI state and does not mutate any data.
-10. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from the muscle-history overlay where volume is role-weighted.
+9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
+10. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from muscle history, where volume is role-weighted.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
 13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.

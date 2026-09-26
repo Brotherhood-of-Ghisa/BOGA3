@@ -2,7 +2,6 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -10,7 +9,13 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import {
+  EXERCISE_HISTORY_METRIC_OPTIONS,
+  HistorySheet,
+  MUSCLE_HISTORY_METRIC_OPTIONS,
+  type HeatmapView,
+  type MuscleHistoryMetric,
+} from '@/components/stats/history-sheet';
 import {
   Card,
   Icon,
@@ -18,14 +23,11 @@ import {
   Screen,
   ScreenScroll,
   SearchField,
-  SegmentedChips,
   SegmentedControl,
   Stat,
   StatePanel,
-  uiColors,
   uiFonts,
   uiGeometry,
-  uiRadius,
   uiRoles,
   uiSpace,
   uiTypography,
@@ -129,10 +131,6 @@ export const resolveStatsInitialPeriod = (
 export const resolveStatsInitialBreakdown = (
   value: string | string[] | undefined
 ): StatsViewMode => (firstRouteParam(value) === 'muscle' ? 'muscle' : 'exercise');
-export type MuscleHistoryMetric = Extract<
-  CalendarHeatmapMetric,
-  'totalVolume' | 'workingSetCount'
->;
 
 type DisplayMuscleFamily = {
   family: StatsMuscleFamilyPerformance;
@@ -620,37 +618,45 @@ export function StatsScreenShell({
       </ScreenScroll>
 
       {selectedMuscle ? (
-        <MuscleHistoryOverlay
-          muscle={selectedMuscle}
-          weeklyEffort={muscleHistoryWeeklyEffort}
+        <HistorySheet
           dailyMetrics={muscleHistoryDailyMetrics}
-          isLoading={isMuscleHistoryLoading}
           errorMessage={muscleHistoryErrorMessage}
-          selectedWeekKey={selectedMuscleHistoryWeekKey}
+          eyebrow={selectedMuscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
+          isLoading={isMuscleHistoryLoading}
+          kind="muscle"
           metric={muscleHistoryMetric}
-          view={muscleHistoryView}
+          metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
+          onDismiss={onDismissMuscleHistory}
           onSelectMetric={onSelectMuscleHistoryMetric}
           onSelectView={onSelectMuscleHistoryView}
-          onDismiss={onDismissMuscleHistory}
           onSelectWeek={onSelectMuscleHistoryWeek}
+          selectedWeekKey={selectedMuscleHistoryWeekKey}
+          title={selectedMuscle.displayName}
           todayDateKey={historyTodayDateKey}
+          view={muscleHistoryView}
+          weeklyEffort={muscleHistoryWeeklyEffort}
+          windowDays={MUSCLE_HISTORY_WINDOW_DAYS}
         />
       ) : null}
       {selectedExercise ? (
-        <ExerciseHistoryOverlay
-          exercise={selectedExercise}
-          weeklyEffort={exerciseHistoryWeeklyEffort}
+        <HistorySheet
           dailyMetrics={exerciseHistoryDailyMetrics}
-          isLoading={isExerciseHistoryLoading}
           errorMessage={exerciseHistoryErrorMessage}
-          selectedWeekKey={selectedExerciseHistoryWeekKey}
+          eyebrow="Exercise History"
+          isLoading={isExerciseHistoryLoading}
+          kind="exercise"
           metric={exerciseHistoryMetric}
-          view={exerciseHistoryView}
+          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
+          onDismiss={onDismissExerciseHistory}
           onSelectMetric={onSelectExerciseHistoryMetric}
           onSelectView={onSelectExerciseHistoryView}
-          onDismiss={onDismissExerciseHistory}
           onSelectWeek={onSelectExerciseHistoryWeek}
+          selectedWeekKey={selectedExerciseHistoryWeekKey}
+          title={selectedExercise.displayName}
           todayDateKey={historyTodayDateKey}
+          view={exerciseHistoryView}
+          weeklyEffort={exerciseHistoryWeeklyEffort}
+          windowDays={EXERCISE_HISTORY_WINDOW_DAYS}
         />
       ) : null}
     </Screen>
@@ -929,323 +935,6 @@ const toFamilyHistoryTarget = (family: StatsMuscleFamilyPerformance): MuscleHist
   familyName: family.familyName,
 });
 
-const EXERCISE_HISTORY_METRIC_OPTIONS: readonly { value: CalendarHeatmapMetric; label: string }[] = [
-  { value: 'totalVolume', label: 'Volume' },
-  { value: 'workingSetCount', label: 'W/sets' },
-  { value: 'estimatedRM1', label: '1RM' },
-  { value: 'highestWeight', label: 'Top weight' },
-];
-
-const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
-  totalVolume: 'Volume',
-  workingSetCount: 'W/sets',
-  estimatedRM1: '1RM',
-  highestWeight: 'Top weight',
-};
-
-const MUSCLE_HISTORY_METRIC_OPTIONS: readonly { value: MuscleHistoryMetric; label: string }[] = [
-  { value: 'totalVolume', label: METRIC_LABELS.totalVolume },
-  { value: 'workingSetCount', label: METRIC_LABELS.workingSetCount },
-];
-
-export type HeatmapView = 'weekly' | 'daily';
-
-const HEATMAP_VIEW_OPTIONS: readonly { value: HeatmapView; label: string }[] = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'daily', label: 'Daily' },
-];
-
-const MS_PER_DAY_BANNER = 24 * 60 * 60 * 1000;
-
-const formatWeekDateRange = (weekStartDateKey: string): string => {
-  const [y, m, d] = weekStartDateKey.split('-').map(Number);
-  const start = new Date(Date.UTC(y, m - 1, d));
-  const end = new Date(start.getTime() + 6 * MS_PER_DAY_BANNER);
-  const fmt = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  const startStr = fmt.format(start);
-  const endStr = fmt.format(end);
-  return `${startStr} – ${endStr}`;
-};
-
-const formatMetricValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
-  switch (metric) {
-    case 'totalVolume': return formatTotalWeight(week.totalVolume);
-    case 'workingSetCount': return String(week.workingSetCount);
-    case 'estimatedRM1': return week.estimatedRM1 !== null ? formatTotalWeight(week.estimatedRM1) : '—';
-    case 'highestWeight': return week.highestWeight !== null ? formatTotalWeight(week.highestWeight) : '—';
-  }
-};
-
-// Formats a single value for the chosen metric (working sets is a raw count;
-// the rest are weights). Used by the daily heatmap's per-day detail card.
-const formatMetricNumber = (value: number, metric: CalendarHeatmapMetric): string =>
-  metric === 'workingSetCount' ? String(value) : formatTotalWeight(value);
-
-function WeekSelectionBanner({
-  weeklyEffort,
-  selectedWeekKey,
-  metric,
-}: {
-  weeklyEffort: SelectedMuscleWeeklyEffort[];
-  selectedWeekKey: string | null;
-  metric: CalendarHeatmapMetric;
-}) {
-  const week =
-    selectedWeekKey !== null
-      ? (weeklyEffort.find((w) => w.weekStartDateKey === selectedWeekKey) ?? null)
-      : null;
-  const dateRange = selectedWeekKey !== null ? formatWeekDateRange(selectedWeekKey) : null;
-  const value = week !== null ? formatMetricValue(week, metric) : null;
-
-  return (
-    <View style={overlayStyles.weekBanner} testID="stats-muscle-history-week-banner">
-      {dateRange !== null ? (
-        <>
-          <Text allowFontScaling={false} style={overlayStyles.weekBannerRange} testID="stats-muscle-history-week-banner-range">
-            {dateRange}
-          </Text>
-          <Text allowFontScaling={false} style={overlayStyles.weekBannerValue} testID="stats-muscle-history-week-banner-value">
-            {METRIC_LABELS[metric]}: {value ?? '—'}
-          </Text>
-        </>
-      ) : (
-        <Text allowFontScaling={false} style={overlayStyles.weekBannerPlaceholder} testID="stats-muscle-history-week-banner-placeholder">
-          Tap a week to see details
-        </Text>
-      )}
-    </View>
-  );
-}
-
-function HistoryHeatmap({
-  dailyMetrics,
-  metric,
-  view,
-  selectedWeekKey,
-  onSelectWeek,
-  testIDPrefix,
-  todayDateKey,
-}: {
-  dailyMetrics: DailyEffortMetrics[];
-  metric: CalendarHeatmapMetric;
-  view: HeatmapView;
-  selectedWeekKey: string | null;
-  onSelectWeek: (weekKey: string | null) => void;
-  testIDPrefix: string;
-  todayDateKey?: string;
-}) {
-  // Both views span the full available history and scroll horizontally.
-  const data = useMemo(
-    () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: 'all' }),
-    [dailyMetrics, metric, todayDateKey]
-  );
-  const formatDailyValue = useCallback(
-    (value: number) => formatMetricNumber(value, metric),
-    [metric]
-  );
-  const dailyHeatmap = useMemo(
-    () => (
-      <DailyHeatmap
-        data={data}
-        testIDPrefix={testIDPrefix}
-        metricLabel={METRIC_LABELS[metric]}
-        formatValue={formatDailyValue}
-        legendLabel={`${METRIC_LABELS[metric]} per day`}
-      />
-    ),
-    [data, formatDailyValue, metric, testIDPrefix]
-  );
-  const weeklyHeatmap = useMemo(
-    () => (
-      <WeeklyHeatmap
-        data={data}
-        selectedWeekKey={selectedWeekKey}
-        onSelectWeek={onSelectWeek}
-        testIDPrefix={testIDPrefix}
-      />
-    ),
-    [data, onSelectWeek, selectedWeekKey, testIDPrefix]
-  );
-  const dailyVisible = view === 'daily';
-
-  return (
-    <View style={overlayStyles.heatmapTransition}>
-      <View
-        accessibilityElementsHidden={!dailyVisible}
-        importantForAccessibility={dailyVisible ? 'auto' : 'no-hide-descendants'}
-        pointerEvents={dailyVisible ? 'auto' : 'none'}
-        style={[
-          overlayStyles.heatmapLayer,
-          dailyVisible ? overlayStyles.heatmapLayerActive : overlayStyles.heatmapLayerInactive,
-        ]}
-        testID={`${testIDPrefix}-heatmap-panel-daily`}>
-        {dailyHeatmap}
-      </View>
-      <View
-        accessibilityElementsHidden={dailyVisible}
-        importantForAccessibility={dailyVisible ? 'no-hide-descendants' : 'auto'}
-        pointerEvents={dailyVisible ? 'none' : 'auto'}
-        style={[
-          overlayStyles.heatmapLayer,
-          dailyVisible ? overlayStyles.heatmapLayerInactive : overlayStyles.heatmapLayerActive,
-        ]}
-        testID={`${testIDPrefix}-heatmap-panel-weekly`}>
-        {weeklyHeatmap}
-      </View>
-    </View>
-  );
-}
-
-function MuscleHistoryOverlay({
-  muscle,
-  weeklyEffort,
-  dailyMetrics,
-  isLoading,
-  errorMessage,
-  selectedWeekKey,
-  metric,
-  view,
-  onSelectMetric,
-  onSelectView,
-  onDismiss,
-  onSelectWeek,
-  todayDateKey,
-}: {
-  muscle: MuscleHistoryTarget;
-  weeklyEffort: SelectedMuscleWeeklyEffort[];
-  dailyMetrics: DailyEffortMetrics[];
-  isLoading: boolean;
-  errorMessage: string | null;
-  selectedWeekKey: string | null;
-  metric: MuscleHistoryMetric;
-  view: HeatmapView;
-  onSelectMetric: (metric: MuscleHistoryMetric) => void;
-  onSelectView: (view: HeatmapView) => void;
-  onDismiss: () => void;
-  onSelectWeek: (weekKey: string | null) => void;
-  todayDateKey?: string;
-}) {
-  return (
-    <View style={overlayStyles.overlayRoot} testID="stats-muscle-history-overlay">
-      <Pressable
-        accessibilityLabel="Dismiss muscle history"
-        accessibilityRole="button"
-        onPress={onDismiss}
-        style={overlayStyles.overlayBackdrop}
-        testID="stats-muscle-history-backdrop"
-      />
-      <View style={overlayStyles.overlayCard}>
-        <View style={overlayStyles.overlayHeader}>
-          <View style={overlayStyles.overlayTitleGroup}>
-            <Text allowFontScaling={false} style={overlayStyles.overlayEyebrow}>
-              {muscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
-            </Text>
-            <Text
-              allowFontScaling={false}
-              adjustsFontSizeToFit
-              ellipsizeMode="clip"
-              minimumFontScale={0.82}
-              numberOfLines={2}
-              style={overlayStyles.overlayTitle}
-              testID="stats-muscle-history-title">
-              {muscle.displayName}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityLabel="Close muscle history"
-            accessibilityRole="button"
-            onPress={onDismiss}
-            style={({ pressed }) => [
-              overlayStyles.overlayCloseButton,
-              pressed && overlayStyles.actionableRowPressed,
-            ]}
-            testID="stats-muscle-history-close">
-            <Icon color={uiColors.actionNeutralSubtleText} name="x" size="sm" />
-          </Pressable>
-        </View>
-
-        <View style={overlayStyles.overlayMetricSelector}>
-          <SegmentedChips
-            accessibilityLabel="Select effort metric"
-            options={MUSCLE_HISTORY_METRIC_OPTIONS}
-            value={metric}
-            onChange={onSelectMetric}
-            testIDPrefix="stats-muscle-history-metric-chip"
-            compact
-          />
-        </View>
-
-        <View style={overlayStyles.overlayViewSelector}>
-          <SegmentedChips
-            accessibilityLabel="Select heatmap view"
-            options={HEATMAP_VIEW_OPTIONS}
-            value={view}
-            onChange={onSelectView}
-            testIDPrefix="stats-muscle-history-view-chip"
-            compact
-          />
-        </View>
-
-        {view === 'weekly' ? (
-          <WeekSelectionBanner
-            weeklyEffort={weeklyEffort}
-            selectedWeekKey={selectedWeekKey}
-            metric={metric}
-          />
-        ) : null}
-
-        <ScrollView
-          contentContainerStyle={overlayStyles.overlayContent}
-          showsVerticalScrollIndicator={false}
-          testID="stats-muscle-history-scroll">
-          {isLoading ? (
-            <View style={overlayStyles.overlayStatePanel} testID="stats-muscle-history-loading">
-              <Text allowFontScaling={false} style={overlayStyles.stateBody}>Loading {muscle.displayName} history...</Text>
-            </View>
-          ) : null}
-
-          {!isLoading && errorMessage ? (
-            <View style={overlayStyles.overlayStatePanel} testID="stats-muscle-history-error">
-              <Text allowFontScaling={false} style={overlayStyles.stateTitle}>Could not load muscle history</Text>
-              <Text allowFontScaling={false} style={overlayStyles.stateBody}>{errorMessage}</Text>
-            </View>
-          ) : null}
-
-          {!isLoading && !errorMessage ? (
-            <>
-              {weeklyEffort.length === 0 ? (
-                <View style={overlayStyles.overlayStatePanel} testID="stats-muscle-history-empty">
-                  <Text allowFontScaling={false} style={overlayStyles.stateTitle}>No history yet</Text>
-                  <Text allowFontScaling={false} style={overlayStyles.stateBody}>
-                    No {muscle.displayName} training was found in the last{' '}
-                    {MUSCLE_HISTORY_WINDOW_DAYS} days.
-                  </Text>
-                </View>
-              ) : null}
-
-              <HistoryHeatmap
-                dailyMetrics={dailyMetrics}
-                metric={metric}
-                view={view}
-                selectedWeekKey={selectedWeekKey}
-                onSelectWeek={onSelectWeek}
-                testIDPrefix="stats-muscle-history"
-                todayDateKey={todayDateKey}
-              />
-            </>
-          ) : null}
-        </ScrollView>
-      </View>
-    </View>
-  );
-}
-
-
 function ExerciseListView({
   items,
   onPressExercise,
@@ -1434,148 +1123,6 @@ function ExerciseSortHeaderCell({
         />
       </View>
     </Pressable>
-  );
-}
-
-function ExerciseHistoryOverlay({
-  exercise,
-  weeklyEffort,
-  dailyMetrics,
-  isLoading,
-  errorMessage,
-  selectedWeekKey,
-  metric,
-  view,
-  onSelectMetric,
-  onSelectView,
-  onDismiss,
-  onSelectWeek,
-  todayDateKey,
-}: {
-  exercise: ExerciseHeatmapTarget;
-  weeklyEffort: SelectedExerciseWeeklyEffort[];
-  dailyMetrics: DailyEffortMetrics[];
-  isLoading: boolean;
-  errorMessage: string | null;
-  selectedWeekKey: string | null;
-  metric: CalendarHeatmapMetric;
-  view: HeatmapView;
-  onSelectMetric: (metric: CalendarHeatmapMetric) => void;
-  onSelectView: (view: HeatmapView) => void;
-  onDismiss: () => void;
-  onSelectWeek: (weekKey: string | null) => void;
-  todayDateKey?: string;
-}) {
-  return (
-    <View style={overlayStyles.overlayRoot} testID="stats-exercise-history-overlay">
-      <Pressable
-        accessibilityLabel="Dismiss exercise history"
-        accessibilityRole="button"
-        onPress={onDismiss}
-        style={overlayStyles.overlayBackdrop}
-        testID="stats-exercise-history-backdrop"
-      />
-      <View style={overlayStyles.overlayCard}>
-        <View style={overlayStyles.overlayHeader}>
-          <View style={overlayStyles.overlayTitleGroup}>
-            <Text allowFontScaling={false} style={overlayStyles.overlayEyebrow}>Exercise History</Text>
-            <Text
-              allowFontScaling={false}
-              adjustsFontSizeToFit
-              ellipsizeMode="clip"
-              minimumFontScale={0.82}
-              numberOfLines={2}
-              style={overlayStyles.overlayTitle}
-              testID="stats-exercise-history-title">
-              {exercise.displayName}
-            </Text>
-          </View>
-          <Pressable
-            accessibilityLabel="Close exercise history"
-            accessibilityRole="button"
-            onPress={onDismiss}
-            style={({ pressed }) => [
-              overlayStyles.overlayCloseButton,
-              pressed && overlayStyles.actionableRowPressed,
-            ]}
-            testID="stats-exercise-history-close">
-            <Icon color={uiColors.actionNeutralSubtleText} name="x" size="sm" />
-          </Pressable>
-        </View>
-
-        <View style={overlayStyles.overlayMetricSelector}>
-          <SegmentedChips
-            accessibilityLabel="Select effort metric"
-            options={EXERCISE_HISTORY_METRIC_OPTIONS}
-            value={metric}
-            onChange={onSelectMetric}
-            testIDPrefix="stats-exercise-history-metric-chip"
-            compact
-          />
-        </View>
-
-        <View style={overlayStyles.overlayViewSelector}>
-          <SegmentedChips
-            accessibilityLabel="Select heatmap view"
-            options={HEATMAP_VIEW_OPTIONS}
-            value={view}
-            onChange={onSelectView}
-            testIDPrefix="stats-exercise-history-view-chip"
-            compact
-          />
-        </View>
-
-        {view === 'weekly' ? (
-          <WeekSelectionBanner
-            weeklyEffort={weeklyEffort}
-            selectedWeekKey={selectedWeekKey}
-            metric={metric}
-          />
-        ) : null}
-
-        <ScrollView
-          contentContainerStyle={overlayStyles.overlayContent}
-          showsVerticalScrollIndicator={false}
-          testID="stats-exercise-history-scroll">
-          {isLoading ? (
-            <View style={overlayStyles.overlayStatePanel} testID="stats-exercise-history-loading">
-              <Text allowFontScaling={false} style={overlayStyles.stateBody}>Loading {exercise.displayName} history...</Text>
-            </View>
-          ) : null}
-
-          {!isLoading && errorMessage ? (
-            <View style={overlayStyles.overlayStatePanel} testID="stats-exercise-history-error">
-              <Text allowFontScaling={false} style={overlayStyles.stateTitle}>Could not load exercise history</Text>
-              <Text allowFontScaling={false} style={overlayStyles.stateBody}>{errorMessage}</Text>
-            </View>
-          ) : null}
-
-          {!isLoading && !errorMessage ? (
-            <>
-              {weeklyEffort.length === 0 ? (
-                <View style={overlayStyles.overlayStatePanel} testID="stats-exercise-history-empty">
-                  <Text allowFontScaling={false} style={overlayStyles.stateTitle}>No history yet</Text>
-                  <Text allowFontScaling={false} style={overlayStyles.stateBody}>
-                    No {exercise.displayName} training was found in the last{' '}
-                    {EXERCISE_HISTORY_WINDOW_DAYS} days.
-                  </Text>
-                </View>
-              ) : null}
-
-              <HistoryHeatmap
-                dailyMetrics={dailyMetrics}
-                metric={metric}
-                view={view}
-                selectedWeekKey={selectedWeekKey}
-                onSelectWeek={onSelectWeek}
-                testIDPrefix="stats-exercise-history"
-                todayDateKey={todayDateKey}
-              />
-            </>
-          ) : null}
-        </ScrollView>
-      </View>
-    </View>
   );
 }
 
@@ -2017,143 +1564,5 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.ink,
     textAlign: 'right',
-  },
-});
-
-// The history overlays and their heatmaps: legacy until DLM-T09 restyles them.
-const overlayStyles = StyleSheet.create({
-  heatmapTransition: {
-    position: 'relative',
-  },
-  heatmapLayer: {
-    left: 0,
-    right: 0,
-    top: 0,
-  },
-  heatmapLayerActive: {
-    position: 'relative',
-    opacity: 1,
-    zIndex: 1,
-  },
-  heatmapLayerInactive: {
-    position: 'absolute',
-    opacity: 0,
-    zIndex: 0,
-  },
-  actionableRowPressed: {
-    opacity: 0.7,
-  },
-  stateTitle: {
-    fontSize: uiTypography.size.base,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  stateBody: {
-    fontSize: uiTypography.size.md,
-    color: uiColors.textSecondary,
-  },
-  overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    padding: uiSpace.lg,
-  },
-  overlayBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: uiColors.overlayScrim,
-  },
-  overlayCard: {
-    height: '75%',
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceDefault,
-    overflow: 'hidden',
-  },
-  overlayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.md,
-    gap: uiSpace.md,
-  },
-  overlayTitleGroup: {
-    flexShrink: 1,
-    minWidth: 0,
-    gap: uiSpace.xs,
-  },
-  overlayEyebrow: {
-    fontSize: uiTypography.size.xs,
-    fontWeight: '700',
-    color: uiColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  overlayTitle: {
-    fontSize: uiTypography.size.xl,
-    fontWeight: '700',
-    color: uiColors.textPrimary,
-  },
-  overlayCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.actionNeutralSubtleBorder,
-    backgroundColor: uiColors.actionNeutralSubtleBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  overlayMetricSelector: {
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.md,
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
-  },
-  overlayViewSelector: {
-    paddingHorizontal: uiSpace.lg,
-    paddingTop: uiSpace.md,
-    paddingBottom: uiSpace.md,
-  },
-  weekBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceMuted,
-    gap: uiSpace.sm,
-  },
-  weekBannerRange: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '600',
-    color: uiColors.textPrimary,
-    flexShrink: 1,
-  },
-  weekBannerValue: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '700',
-    color: uiColors.actionPrimary,
-  },
-  weekBannerPlaceholder: {
-    fontSize: uiTypography.size.sm,
-    fontWeight: '500',
-    color: uiColors.textSecondary,
-  },
-  overlayContent: {
-    padding: uiSpace.lg,
-    gap: uiSpace.lg,
-  },
-  overlayStatePanel: {
-    borderRadius: uiRadius.md,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfaceInfo,
-    padding: uiSpace.md,
-    gap: uiSpace.sm,
   },
 });

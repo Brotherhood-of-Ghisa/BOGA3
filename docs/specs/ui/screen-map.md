@@ -84,7 +84,7 @@ Brief entrypoint map of the current mobile screens.
   - exactly the existing `/stats-history` loading, error, empty, dashboard,
     exercise/muscle breakdown, and daily/weekly heat-map states
 - Key exits:
-  - existing Sessions drill-down and in-route exercise/muscle history overlays
+  - existing Sessions drill-down and the exercise/muscle history sheets
   - `/stats-history` remains available as the preserved legacy path and selects
     Progress in the shared navigation
 
@@ -149,7 +149,7 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - preserved Progress-owned path whose merged Stats / History surface switches
     between per-exercise and per-muscle summaries while preserving the Sessions
-    drill-down and in-route history overlays
+    drill-down and the history sheets
 - Query params:
   - `period` (optional; `7` or `30`; absent/invalid values default to `7`)
   - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
@@ -166,7 +166,7 @@ Brief entrypoint map of the current mobile screens.
     `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
     the working-set count in parentheses, use `—` for unavailable 1RM, allow
     exercise names to wrap without truncation, retain complete accessibility
-    wording, and open an in-route exercise-history overlay as one whole-row
+    wording, and open the exercise's history sheet as one whole-row
     action. Only exercises with at least one valid performed set in the selected
     7-/30-day window appear.
   - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
@@ -180,18 +180,16 @@ Brief entrypoint map of the current mobile screens.
     survives time-range, search, and Breakdown changes.
   - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
   - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
-  - actionable muscle rows in Stats summary; expanded muscle rows and collapsed single-muscle family headers open an in-route muscle-history overlay
-  - muscle-history overlay states for loading, error, no-history, populated heatmap with selectable `Volume` / `W/sets` metrics, selected positive-effort date with contributing exercise/set detail, and selected zero-effort date empty detail; daily and weekly charts stay warm-mounted so switching is immediate and preserves chart-local state
-  - **By Exercise mode** (M17): the view-mode chip switches the body to the sortable exercise table; tapping an exercise data row opens an in-route `ExerciseHistoryOverlay`
-  - exercise-history overlay states: loading, error, no-history, populated daily/weekly heatmaps (365-day window), metric chip selection (Volume / W/sets / 1RM / Top weight), week-selection banner
+  - in By Muscle, a nested muscle row and a collapsed single-muscle family header open that muscle's history; a multi-muscle family header opens the whole family's (`Muscle Group History`)
+  - in By Exercise, a table row opens the exercise's history
+  - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `W/sets`, plus `1RM` / `Top weight` for an exercise) and `View` (`Weekly` / `Daily`) `SegmentedControl`s, the week banner in Weekly, and the 365-day daily or weekly heatmap; loading, error and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so switching is immediate and keeps each view's selection and scroll
 - Notes:
   - preserved tab-group route with `headerShown: false`; its exact existing UI
     is also exposed canonically at `/progress`. `BottomTray` composes
     `MainTabs`, maps this route to Progress, and is supplied via the `tabBar`
     prop in `(tabs)/_layout.tsx`.
-  - the screen body is in the design language (DLM-T08); the history overlays
-    and heatmaps are not yet (DLM-T09). Design target:
-    `design-targets/progress.md`
+  - the screen body (DLM-T08) and the history sheets and heatmaps (DLM-T09)
+    are in the design language. Design target: `design-targets/progress.md`
 
 4b. `/session/[sessionId]` (session view)
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in

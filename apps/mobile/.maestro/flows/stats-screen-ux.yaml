@@ -11,9 +11,11 @@ appId: com.dinoderek.mobile
 # calendar date / a removed testID (see the PR that added this lane).
 #
 # NO hard-coded calendar dates. The heatmap cell ids are
-# "<prefix>-heatmap-cell-<weekStartDateKey>", so tapping one pins the flow to the
-# day it was written — that is exactly what rotted the two deleted flows. The
-# week-selection banner is asserted in its unselected (placeholder) form instead.
+# "<prefix>-heatmap-cell-<dateKey>", so a literal date pins the flow to the day
+# it was written — that is exactly what rotted the two deleted flows. The one
+# cell tap (05a) takes today's and yesterday's keys from
+# ../scripts/heatmap-date-keys.js, computed at run time; the week-selection
+# banner is asserted in its unselected (placeholder) form.
 #
 # Expected counts come from src/maestro/exercise-block-history-fixture.ts, whose
 # sessions are seeded relative to now (daysAgo), so they hold on any run date.
@@ -203,9 +205,12 @@ appId: com.dinoderek.mobile
     id: "stats-exercise-row-seed_barbell_back_squat"
 - extendedWaitUntil:
     visible:
-      id: "stats-exercise-history-close"
+      id: "stats-exercise-history-title"
     timeout: 15000
 - assertVisible: "Weekly training load"
+# A Sheet, dismissed from its backdrop: the legacy close button is gone.
+- assertNotVisible:
+    id: "stats-exercise-history-close"
 # The exercise overlay exposes all four entered-load metrics.
 - assertVisible:
     id: "stats-exercise-history-metric-chip-totalVolume"
@@ -225,6 +230,20 @@ appId: com.dinoderek.mobile
     visible: "Last 12 months"
     timeout: 3000
 - takeScreenshot: "05-exercise-heatmap-daily"
+# --- 05a: today and the selected day are marked differently (DLM-T09-D3) ---
+# Today is selected by default. Tapping yesterday moves the selection; today
+# keeps its ring but loses the selected state. The keys come from the script,
+# computed at run time, so no calendar date is pinned (see the header).
+- runScript: ../scripts/heatmap-date-keys.js
+- tapOn:
+    id: "stats-exercise-history-heatmap-cell-${output.yesterdayDateKey}"
+- assertVisible:
+    id: "stats-exercise-history-heatmap-cell-${output.yesterdayDateKey}"
+    selected: true
+- assertVisible:
+    id: "stats-exercise-history-heatmap-cell-${output.todayDateKey}"
+    selected: false
+- takeScreenshot: "05a-heatmap-today-and-selected"
 - tapOn:
     id: "stats-exercise-history-view-chip-weekly"
 - extendedWaitUntil:
@@ -237,11 +256,14 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-history-heatmap"
 - takeScreenshot: "05c-exercise-heatmap-1rm"
+# The history sheet has no close button (G5): tap the dimmed page above it.
+# The sheet is modal to VoiceOver, which hides its backdrop from the
+# accessibility tree Maestro reads, so tap a point instead of the backdrop id.
 - tapOn:
-    id: "stats-exercise-history-close"
+    point: "50%,10%"
 - extendedWaitUntil:
     notVisible:
-      id: "stats-exercise-history-close"
+      id: "stats-exercise-history-title"
     timeout: 5000
 
 # --- 06: Muscle history overlay — the muscle-level metric inventory ---
@@ -261,7 +283,7 @@ appId: com.dinoderek.mobile
     id: "stats-family-header-button-chest"
 - extendedWaitUntil:
     visible:
-      id: "stats-muscle-history-close"
+      id: "stats-muscle-history-title"
     timeout: 15000
 - assertVisible: "Weekly training load"
 # Muscle history deliberately exposes ONLY the two muscle-level metrics: 1RM and
@@ -297,20 +319,45 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: "Weekly training load"
     timeout: 3000
+# The history sheet has no close button (G5): tap the dimmed page above it.
+# The sheet is modal to VoiceOver, which hides its backdrop from the
+# accessibility tree Maestro reads, so tap a point instead of the backdrop id.
 - tapOn:
-    id: "stats-muscle-history-close"
+    point: "50%,10%"
 - extendedWaitUntil:
     notVisible:
-      id: "stats-muscle-history-close"
+      id: "stats-muscle-history-title"
     timeout: 5000
 
-# NOT covered here: tapping a MULTI-muscle family header
-# ("stats-family-header-<slug>", the toFamilyHistoryTarget branch). Until DLM-T08
-# it could not be driven: the controls and summary sat on top of a nested scroll
-# and hid the row from the tap. The screen is now one scroll, so that cause is
-# gone; the step belongs with the overlay's restyle (DLM-T09). Jest covers the
-# branch today. The single-muscle branch (toMuscleHistoryTarget) is covered
-# above via the collapsed Chest header.
+# --- 06c: a MULTI-muscle family header opens the family's history ---
+# ("stats-family-header-<slug>", the toFamilyHistoryTarget branch; the collapsed
+# single-muscle Chest header above is the toMuscleHistoryTarget branch.) Legs
+# holds several muscles, so the sheet covers the whole family.
+- scrollUntilVisible:
+    element:
+      id: "stats-family-header-legs"
+    direction: DOWN
+    visibilityPercentage: 100
+    centerElement: true
+- tapOn:
+    id: "stats-family-header-legs"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-history-title"
+    timeout: 15000
+- assertVisible:
+    id: "stats-muscle-history-title"
+    text: "Legs"
+- takeScreenshot: "06c-muscle-family-history"
+# The history sheet has no close button (G5): tap the dimmed page above it.
+# The sheet is modal to VoiceOver, which hides its backdrop from the
+# accessibility tree Maestro reads, so tap a point instead of the backdrop id.
+- tapOn:
+    point: "50%,10%"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-muscle-history-title"
+    timeout: 5000
 
 # --- 07: Overlay dismissed, back to the muscle view ---
 - assertVisible:
