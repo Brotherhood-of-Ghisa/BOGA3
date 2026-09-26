@@ -4,7 +4,6 @@ export {
   type ActionButtonTone,
   type ActionButtonVariant,
 } from '@/components/ui/action-button';
-export { UiButton, type UiButtonVariant } from '@/components/ui/button';
 export { Card } from '@/components/ui/card';
 export {
   ChipGroup,
@@ -20,11 +19,6 @@ export {
   type ListRowProps,
   type ListRowTone,
 } from '@/components/ui/list-row';
-export {
-  SegmentedChips,
-  type SegmentedChipOption,
-  type SegmentedChipsProps,
-} from '@/components/ui/segmented-chips';
 export { Notice, type NoticeProps, type NoticeTone } from '@/components/ui/notice';
 export { PageHeader, SectionHeader } from '@/components/ui/page-header';
 export { Screen, ScreenScroll, type ScreenGutter } from '@/components/ui/screen';
@@ -52,24 +46,17 @@ export {
   type StatePanelKind,
   type StatePanelProps,
 } from '@/components/ui/state-panel';
-export { UiSurface, type UiSurfaceVariant } from '@/components/ui/surface';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
-export { UiText, type UiTextVariant } from '@/components/ui/text';
 export {
   uiBorder,
-  uiColors,
   uiFonts,
   uiGeometry,
   uiIconSize,
-  uiRadius,
   uiRoles,
   uiSpace,
-  uiTokens,
   uiTypography,
-  type UiColorToken,
   type UiFontToken,
   type UiIconSizeToken,
-  type UiRadiusToken,
   type UiRoleToken,
   type UiSpaceToken,
 } from '@/components/ui/tokens';
