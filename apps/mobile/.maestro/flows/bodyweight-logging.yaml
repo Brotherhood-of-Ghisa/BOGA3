@@ -687,11 +687,10 @@ appId: com.dinoderek.mobile
     timeout: 4000
 - stopApp
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-# XCTest can briefly invalidate its accessibility root after a process restart.
-# HTTP 500 returns before extendedWaitUntil's deadline; allow the native tree
-# to recover across five bounded retries. Persisted-data assertions follow.
+# Retry only the read-only readiness assertion; persisted-data checks follow.
+# Native driver errors still abort the flow. Maestro caps maxRetries at three.
 - retry:
-    maxRetries: 5
+    maxRetries: 3
     commands:
       - waitForAnimationToEnd:
           timeout: 4000

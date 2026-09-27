@@ -85,11 +85,12 @@ has been waived.
 Baseline two-user proof covers ranking reversal, estimated/missing weight,
 100%→70% rules publication, preserved attestation, correction invalidation,
 legacy unlink/relink, former-member read-only details and removed-member denial.
-Fresh three-size layouts, cached-board outage and failed-publication evidence
-remain open. The sync flow now checks two frozen weights across a local wipe
-and real bootstrap; its fresh native run passed, including restored readings
+Group layouts passed at 375×667pt, 402×874pt and 440×956pt.
+Actual local API-gateway outages at all three sizes verify cached boards,
+retained failed-publication input and unchanged server rules revisions. The sync
+flow now checks two frozen weights across a local wipe and real bootstrap; its fresh native run passed, including restored readings
 and both original snapshot values/provenance.
 
 `RUNBOOK.md` contains the exact server-first migration/function order, hosted
-acceptance and forward-repair boundaries. No PR, hosted deployment or client
-activation has occurred; do not retire this card until its work ships.
+acceptance and forward-repair boundaries. Hosted deployment and client
+activation remain pending; do not retire this card until its work ships.

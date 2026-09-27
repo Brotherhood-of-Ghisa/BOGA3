@@ -299,8 +299,8 @@ is complete merely because a downstream closeout card lists its tests.
 This replaces the earlier chronological checkpoints; git history retains them.
 T01–T11 are implemented in `codex/m27-bodyweight`, isolated slot 1. The branch
 integrates `origin/main` at `8b5c47c1`; app/server source is `b636f234`.
-The task cards remain open until shipment. No PR, hosted deployment or client
-activation has occurred.
+The task cards remain open until shipment. Hosted deployment and client
+activation have not occurred; the implementation is being prepared for review.
 
 | Acceptance | Current evidence |
 | --- | --- |
@@ -313,23 +313,35 @@ activation has occurred.
 | Native auth and two-user groups | Auth and both groups flows green on integrated source; `M27-review-viewport/20260927-114553-6692`, `20260927-115139-11377`, `20260927-115956-13621`; same resumed frontend log |
 | Native wipe/sign-in with two frozen weights | Green: real editor saves 80/82 kg and two workouts; real sync/bootstrap restores both frozen snapshots, provenance and private readings; `M27-review-viewport/20260927-114819-8825` |
 | Baseline real API outage | Green: cached board, former-member read-only details, failed publication/retained input and unchanged server revision; `M27-network-baseline/20260927-120516-16517`, `/tmp/boga-m27-network-baseline.log` |
-| Small/large group and personal UI | Fresh groups → outage → bodyweight matrix is running; `/tmp/boga-m27-size-matrix.log` |
+| Small group UI and real API outage | Both groups flows green in `M27-merged-small/20260927-121530-37307` / `20260927-122152-39234`; actual gateway outage green in `M27-network-small/20260927-122313-40437` |
+| Small personal UI | Backfill green in `M27-merged-small/20260927-123024-51355`; logging/analytics green in `M27-small-editor/20260927-124806-63030`. Fresh entry and settled invalid-percentage capture verified in `M27-small-final/20260927-134013-94101`; complete logging green in `M27-small-logging-recovery/20260927-135422-98663` |
+| Large groups and real API outage | Both groups flows green in `M27-merged-large/20260927-125834-66605` / `20260927-130700-68964`; actual gateway outage green with unchanged SQL revision in `M27-network-large/20260927-130833-70173` |
+| Large personal UI | Logging/backfill/analytics green in `M27-large-bodyweight-final/20260927-131619-80994`; entry green in `M27-large-entry-final/20260927-133637-90619`. Reviewed future-date feedback, snapshots, coefficient error, legacy review, backfill and analytics |
 | Hosted rollout | Server-first migration/function/smoke/activation procedure prepared in RUNBOOK; not executed |
 
 Native artifact paths above are relative to `apps/mobile/artifacts/maestro/`.
 Selected captures have adjacent `visual-review.md` records. Failed aggregate
 attempts remain failed; only their individually completed lanes are listed as
 passes. No assertion or required lane was waived. Latest flow metadata check:
-`/tmp/boga-m27-review-visibility-meta.log` (14 files).
+`/tmp/boga-m27-final-meta.log` (14 files). Final docs check:
+`/tmp/boga-m27-closeout-docs-check.log`.
 
 `./boga test for` confirms the required fast/backend/frontend union. Timing
 records were imported into the machine store and verified byte-for-byte before
 removal from the branch, matching current spec 02; `./boga timings` reads them.
 All required frontend constituent lanes are now green across the aggregate and
-resumed runs, on unchanged app source `b636f234`. Remaining work: compare dense
-states and repeat outage/error proof on the small/large phones, validate the
-PR gate table, then perform
-authorised hosted smoke before client activation. Do not retire the plan early.
+resumed runs, on unchanged app source `b636f234`. All three phone sizes have
+completed personal and group flows plus actual gateway-outage verification.
+Selected stills were reviewed against the repo-native target, including the
+settled small-phone validation error. The final small logging run passed after
+two retained XCTest `kAXErrorInvalidUIElement` restart failures. The readiness
+retry is normalized to Maestro 2.5.1's effective maximum of three; it does not
+catch or waive native HTTP errors, and all persistence assertions remain.
+
+Remaining work: PR review, hosted migration/function rollout and deployed smoke,
+then client activation. The intended release channel and deployed MCP/consent
+URLs still need to be supplied. No hosted mutation or client activation is
+claimed by these local results. Do not retire the plan early.
 
 ## Milestone acceptance
 

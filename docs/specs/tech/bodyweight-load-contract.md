@@ -1,6 +1,6 @@
 # Bodyweight Load Contract (M27)
 
-> **Status: implemented in the release branch; final native acceptance and hosted rollout pending.**
+> **Status: implemented and locally verified in the release branch; hosted rollout pending.**
 > This contract does not claim that the hosted feature is enabled.
 > Owns bodyweight load meaning, snapshots, completeness and group dependencies.
 > Storage/wire mechanics remain in [05](../05-data-model.md) and
@@ -278,8 +278,8 @@ versioned RPC readers, metric attestations and typed client are implemented in
 `20260927073000_m27_group_metrics.sql` and the existing Edge worker. Their
 compatibility and publication boundary is specified in the groups contract §11.
 Backend integration gates pass. Group editors, metric boards/history and board/stream
-certification are integrated; native visual/interaction proof and hosted rollout
-remain in progress.
+certification have passed native interaction and rendered comparisons at three
+phone sizes, including actual local API outages. Hosted rollout remains pending.
 
 | Metric key | Unit | Eligibility / default |
 | --- | --- | --- |

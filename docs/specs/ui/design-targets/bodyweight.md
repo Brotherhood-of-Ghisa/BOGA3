@@ -1,10 +1,12 @@
 # Bodyweight entry and comparison — implementation target (M27)
 
-**Status: repo-native brief for planned behavior.** The user requested the M27
-milestone on 2026-09-26. That authorizes its behavioral scope; it does not imply
-visual acceptance of screens that have not been rendered. Existing accepted
-targets below govern their visual language. New-state captures and comparisons
-are required before the corresponding UI work is complete.
+**Status: implemented and rendered locally at three phone sizes.** The user
+requested the M27 milestone on 2026-09-26. Existing accepted targets below
+govern the visual language. Native captures have been compared with those
+recipes at 375×667pt, 402×874pt and 440×956pt, including forms, legacy review,
+backfill, loading estimates, metric boards and actual API-outage states. These
+are implementation verification records, not a claim of new human design approval
+or hosted release.
 
 ## Target and authority
 
@@ -90,6 +92,28 @@ preview lists and boards. Record actual device/viewport, screenshot paths and
 material deviations in the PR. Keep runtime comparisons under the gitignored
 Maestro artifact tree. Reference captures are the only selected stills committed
 here; no speculative M27 mockup is treated as evidence.
+
+## Rendered implementation comparisons
+
+App/server source: `b636f234` (integrates `origin/main` at `8b5c47c1`). Later
+commits adjust Maestro gestures and documentation without changing runtime
+behavior. Captures and `visual-review.md` comparisons remain under
+`apps/mobile/artifacts/maestro/`, as required above.
+
+| Layout | Personal forms, review, backfill and analytics | Group boards and actual API outage |
+| --- | --- | --- |
+| Small, 375×667pt | `M27-merged-small/20260927-123024-51355`, `M27-small-editor/20260927-124806-63030`, `M27-small-final/20260927-134013-94101`, `M27-small-logging-recovery/20260927-135422-98663` | `M27-merged-small/20260927-121530-37307`, `20260927-122152-39234`; `M27-network-small/20260927-122313-40437` |
+| Baseline, 402×874pt | `M27-review-viewport/20260927-112539-413` | `M27-review-viewport/20260927-115139-11377`, `20260927-115956-13621`; `M27-network-baseline/20260927-120516-16517` |
+| Large, 440×956pt | `M27-large-bodyweight-final/20260927-131619-80994`, `M27-large-entry-final/20260927-133637-90619` | `M27-merged-large/20260927-125834-66605`, `20260927-130700-68964`; `M27-network-large/20260927-130833-70173` |
+
+The comparisons record source/provenance labels, explicit missing or partial
+coverage, independently reviewed actual/planned loads, unit-aware estimates,
+relative/absolute ranking reversal, rules revision and attestation changes.
+Outage captures use the real isolated API gateway and verify that a failed
+publication retains input without changing the server revision. Small and
+large invalid-coefficient captures show the entered 101, its 0%–100% error and
+the fixed Save control. Failed attempts remain in their artifact roots and are
+not counted as successful flows; transition frames are not layout evidence.
 
 ## Resolved conflicts with earlier targets
 
