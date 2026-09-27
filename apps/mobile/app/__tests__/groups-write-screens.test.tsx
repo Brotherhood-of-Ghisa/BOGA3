@@ -52,11 +52,14 @@ jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
 jest.mock('@/src/auth/profile', () => ({ loadUserProfile: jest.fn(), saveUsername: jest.fn() }));
 
-jest.mock('@/src/groups/api', () => ({
+jest.mock('@/src/groups/api', () => {
+  const streamRead = jest.fn();
+  return {
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
-  getGroupStream: jest.fn(),
+  getGroupStream: streamRead,
+  getGroupMetricStream: streamRead,
   createGroup: jest.fn(),
   updateGroup: jest.fn(),
   getGroupInviteCode: jest.fn(),
@@ -67,7 +70,8 @@ jest.mock('@/src/groups/api', () => ({
   removeGroupMember: jest.fn(),
   setGroupMemberRole: jest.fn(),
   transferGroupOwnership: jest.fn(),
-}));
+  };
+});
 
 import * as profileApi from '@/src/auth/profile';
 import {

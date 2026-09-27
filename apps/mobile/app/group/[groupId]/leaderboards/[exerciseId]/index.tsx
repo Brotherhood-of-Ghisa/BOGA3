@@ -1,3 +1,5 @@
+import { GroupComparisonBoundary } from '@/components/groups/group-comparison-boundary';
+import { GroupMetricBoard } from '@/components/groups/group-metric-board';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -86,15 +88,17 @@ export default function GroupBoardRoute() {
       </View>
     );
   }
-  return (
-    <GroupBoardContent
+  return <GroupComparisonBoundary userId={user.id} groupId={groupId} exerciseId={exerciseId}
+    legacy={<GroupBoardContent
       exerciseId={exerciseId}
       groupId={groupId}
       initialMetric={parseBoardMetricParam(params.metric)}
       initialScope={parseBoardScopeParam(params.scope)}
       userId={user.id}
-    />
-  );
+    />}>
+    {exercise => <GroupMetricBoard userId={user.id} groupId={groupId} exercise={exercise}
+      initialMetric={firstParam(params.metric)} initialScope={parseBoardScopeParam(params.scope)} />}
+  </GroupComparisonBoundary>;
 }
 
 type GroupBoardContentProps = {

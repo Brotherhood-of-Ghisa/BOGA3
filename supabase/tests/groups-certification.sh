@@ -467,7 +467,7 @@ check_args "certify returns the pinned certification" --arg c "${CERTIFIER_UID}"
                                    "group_exercise_id","group_id","member","pinned","session_id","set_id"]
    and .certification.member.user_id == $r and .certification.certified_by.user_id == $c
    and .certification.set_id == $s and .certification.end_reason == null and .certification.ended_by == null
-   and .certification.pinned == {weight_value: "95", reps_value: "1", performance_status: null,
+   and .certification.pinned == {weight_value: "95", weight_unit: "kg", external_load_mode: "added", reps_value: "1", performance_status: null,
                                  weight_kg: 95, reps: 1, e1rm_kg: .certification.pinned.e1rm_kg}
    and (.certification.pinned.e1rm_kg | type) == "number"'
 R1_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
@@ -735,7 +735,7 @@ expect_centry R weight "194@r3" "a load-mode change rescales the certified value
 run_psql "delete from app_public.group_board_entries
            where group_exercise_id = '${GX}' and member_user_id = '${RIVAL_UID}' and certified;" >/dev/null
 mark
-expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(2, 1000) >= 1;" "t"
+expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(3, 1000) >= 1;" "t"
 drain "rules"
 expect_centry R weight "194@r3" "the rules recompute restores Certified entries"
 [[ "$(active_certs r3)" == "1" ]] || fail "a rules recompute voids nothing that still matches"

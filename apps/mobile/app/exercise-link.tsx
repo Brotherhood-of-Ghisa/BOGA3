@@ -1,3 +1,4 @@
+import { describeGroupLinkIncompatibility } from '@/src/groups/link-view-model';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -118,6 +119,11 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   }
 
   const link = async (row: LinkScreenAvailableRow) => {
+    const incompatible = row.unavailableReason ?? describeGroupLinkIncompatibility(exercise, row.groupExercise);
+    if (incompatible) {
+      setNotice({ tone: 'error', text: incompatible });
+      return;
+    }
     setPendingKey(row.key);
     setNotice(null);
     try {

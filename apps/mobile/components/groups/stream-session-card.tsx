@@ -21,7 +21,7 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
 
   return (
     <Card
-      accessibilityLabel={[card.memberName, card.statusLabel, context, card.recordsLabel].filter(Boolean).join(', ')}
+      accessibilityLabel={[card.memberName, card.statusLabel, context, card.setsLabel, card.volumeLabel, card.exercisesLabel, card.metricsNote, card.recordsLabel].filter(Boolean).join(', ')}
       onPress={() => onPress(card)}
       style={styles.card}
       testID={testID}>
@@ -44,6 +44,9 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
       </Text>
       <Text allowFontScaling={false} style={styles.metrics} testID={`${testID}-metrics`}>
         {`${card.setsLabel} · ${card.volumeLabel} · ${card.exercisesLabel}`}
+      </Text>
+      <Text allowFontScaling={false} style={styles.muted} testID={`${testID}-metrics-note`}>
+        {card.metricsNote}
       </Text>
       {card.recordsLabel ? (
         <View style={styles.records}>

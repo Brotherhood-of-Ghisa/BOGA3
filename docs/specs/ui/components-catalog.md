@@ -694,3 +694,17 @@ The bodyweight logger’s fixed-height amount field uses `Added · kg/lb` or
 `Assist · kg/lb` so the legend stays on one line at 375pt. Its accessibility
 label spells out added weight or assistance and the selected unit. The mode
 selector retains the full accessible meaning; labels never crowd the number.
+
+
+### Versioned group comparisons (M27; native acceptance pending)
+
+- `GroupComparisonForm` composes the shared exercise fields, default metric,
+  revision preview and retained stale-edit state.
+- `GroupComparisonBoundary` resolves direct links using the versioned catalogue.
+- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` reuse
+  group paging/state recipes, unit-aware rows, revision history and input-pinned
+  certification. Legacy board components remain for original comparisons.
+- `GroupMetricStreamCard` preserves the recorded metric/unit/revision and gives
+  rules, voids and link changes their own explanatory text.
+- `metric-view-model.ts` owns metric labels, saved-B provenance, raw performance,
+  accessibility summaries and mixed legacy/metric podium formatting.

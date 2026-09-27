@@ -714,6 +714,20 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 13. Full boards and their history are online-only reads, each drawn as one `Card` of rows (the board's under its `Weight` | `1RM` and `Certified` | `All` `SegmentedControl`s and a `History` text button): never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail `Sheet` (08 pattern 11), titled with the lifter and the exercise, with no Close: the backdrop dismisses it. Its figures (the set, the 1RM) are `record` Plex Mono `Stat`s; `Certify` is its one `accent`, `Remove my certification` / `Cancel certification` are `danger` rows, and `View full session` is a row with a chevron. `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
 
+#### Versioned group comparisons (M27)
+
+For metric comparisons, the above kg-only presentation rules are superseded by
+explicit Reps, Relative ×BW and Absolute kg labels. The declared default opens
+on Certified; switching the metric is local presentation. A rebuilding revision
+shows no old rows. Rule changes have a separate explanation, not a performed PR.
+Owners/admins review coefficient, movement/loading standard and external input
+convention before applying a revision. Linking preserves personal settings and
+explains incompatible variants. The record sheet exposes raw units/mode, saved
+session B/provenance, group rules and the dependencies that certification pins.
+Prior revisions and original kg-only retirement scores are read-only history.
+Full boards/history remain online reads; catalogue, podium and stream caches
+use their versioned keys. Native acceptance of this M27 extension is in progress.
+
 ### 14a. Exercise page
 
 The page lives at

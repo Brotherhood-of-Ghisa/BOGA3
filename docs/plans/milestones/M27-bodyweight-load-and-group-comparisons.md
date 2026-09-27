@@ -387,6 +387,17 @@ is complete merely because a downstream closeout card lists its tests.
   `/tmp/boga-m27-analytics-fast-rerun.log`, `/tmp/boga-m27-analytics-backend.log`.
   Neither task is claimed shipped.
 
+- T08/T09 server integration is now implemented: versioned rules/publication,
+  metric attestations, legacy compatibility, readers and strict mobile decoders.
+  Full backend passed with real SQL-to-client vectors and failure injection;
+  log `/tmp/boga-m27-group-integration-backend-3.log`.
+- T10 editor, catalogue/linking, podiums, boards, historical revisions, board
+  certification and metric stream rendering are integrated. Full fast passed
+  (184 mobile suites / 2,214 tests), including backend fast and metadata/consent/
+  MCP checks; log `/tmp/boga-m27-comparison-ui-fast-2.log`. Stream certification
+  parity, native visual proof and final frontend/two-user acceptance remain.
+  Timings and required-gate rules ran. These changes are not shipped.
+
 ## Milestone acceptance
 
 1. Settings weight saved offline populates every subsequently started session;

@@ -31,7 +31,9 @@ import {
   type GroupRole,
   type LinkableExercise,
 } from '@/src/groups';
-import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
+import { buildAddAsNewPrefill, requireAddAsNewCompatibility } from '@/src/groups/add-as-new';
+import { isGroupMetricExerciseWire } from '@/src/groups/metric-wire-guards';
+import { describeGroupRules } from '@/src/groups/metric-view-model';
 import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
 import { useExerciseUnlink, type ExerciseUnlinkTarget } from '@/src/groups/use-exercise-unlink';
 
@@ -183,6 +185,7 @@ export function GroupExercisesPage({
     if (!target) {
       throw new Error('No group exercise selected.');
     }
+    requireAddAsNewCompatibility(input, target);
     const { exercise } = await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id });
     return exercise;
   };
@@ -269,7 +272,7 @@ export function GroupExercisesPage({
         actionTestIDPrefix="group-exercise-action"
         actions={sheetActions.map((action) => ({
           key: action,
-          label: GROUP_EXERCISE_ACTION_LABELS[action],
+          label: action === 'rename' && isGroupMetricExerciseWire(sheetExercise) ? 'Edit comparison' : GROUP_EXERCISE_ACTION_LABELS[action],
           destructive: action === 'archive',
         }))}
         dismissLabel="Dismiss exercise actions"
@@ -279,7 +282,7 @@ export function GroupExercisesPage({
           sheetExercise
             ? sheetExercise.archived_at_ms !== null
               ? 'Archived'
-              : LOAD_INPUT_MODE_LABELS[sheetExercise.load_input_mode]
+              : isGroupMetricExerciseWire(sheetExercise) ? describeGroupRules(sheetExercise) : LOAD_INPUT_MODE_LABELS[sheetExercise.load_input_mode]
             : undefined
         }
         testIDPrefix="group-exercise-actions"

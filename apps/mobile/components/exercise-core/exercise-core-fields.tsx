@@ -14,6 +14,7 @@ export type ExerciseLoadFieldsValue = {
 type ExerciseCoreFieldsProps = {
   loadRules?: {
     value: ExerciseLoadFieldsValue;
+    scope?: 'personal' | 'group';
     onChange: (value: ExerciseLoadFieldsValue) => void;
     error?: string | null;
     metadataKnown?: boolean;
@@ -84,7 +85,9 @@ export function ExerciseCoreFields({
           value={loadInputMode}
         />
         <Text allowFontScaling={false} style={styles.helperText}>
-          Choose whether the weight you enter is shared across both sides or already represents one side.
+          {loadRules?.scope === 'group'
+            ? 'Declare total or per-side external weight for this comparison. Body weight is always counted once.'
+            : 'Choose whether the weight you enter is shared across both sides or already represents one side.'}
         </Text>
       </View>
       {loadRules ? (
@@ -123,7 +126,9 @@ export function ExerciseCoreFields({
             </>
           ) : null}
           <Text allowFontScaling={false} style={styles.helperText}>
-            Changes recalculate personal history using each session’s saved weight. Group rules stay unchanged. Old loads require review before bodyweight calculations can use them.
+            {loadRules.scope === 'group'
+              ? 'These rules score shared performances for this group. Personal exercise settings are independent. Different movements need different group exercises.'
+              : 'Changes recalculate personal history using each session’s saved weight. Group rules stay unchanged. Old loads require review before bodyweight calculations can use them.'}
           </Text>
           {loadRules.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
             style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{loadRules.error}</Text> : null}

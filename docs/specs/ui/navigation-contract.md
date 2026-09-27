@@ -542,6 +542,18 @@ Note:
 - `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
 - M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx`
 
+## Versioned comparison navigation (M27)
+
+The existing group board route resolves the comparison through the versioned
+catalogue before choosing legacy Weight/1RM or metric-aware presentation.
+`metric` accepts `bodyweight_reps`, `relative_strength`, `absolute_strength` for
+bodyweight comparisons; conventional comparisons retain `weight` / `e1rm`.
+An omitted metric uses the group's declared default. `scope` remains
+`certified` / `all`. History additionally accepts a positive `revision`, and
+its revision selector keeps original kg-only entries distinct from later rules.
+Event history links carry the recorded revision rather than reinterpreting an
+old value under the current rule. Board rows open the metric record sheet.
+
 ## Documentation boundary
 
 - Keep this doc concise and contract-oriented.

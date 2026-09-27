@@ -56,6 +56,16 @@ This is the shortest operational summary. Use the "Further reading" section when
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
   - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
 
+## Versioned group projections (M27)
+
+Versioned group RPCs retain rules 15–19, with metric-specific certifications
+and expected revision/performance checks described in
+[`groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).
+Group rules, score projections and queues have no direct client privileges.
+Shared-session context exposes the saved tuple, never the owner's reading
+timeline. Worker-only claim/prepare/publish/fail RPCs require service-role access;
+the public Edge endpoint still requires its Vault-held secret.
+
 ## Read-only coaching projections (M27)
 
 `agent-api` batches owner-filtered exercise rules, saved session-weight tuples

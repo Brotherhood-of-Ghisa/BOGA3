@@ -82,3 +82,21 @@ The calculator’s source loader reads completed eligible history; its target
 inputs and results are transient. Rule/session corrections and explicit legacy
 review refresh dependent reads on save/focus. Group score authority remains
 separate and is governed by `tech/groups-contract.md`.
+
+## Versioned group projection boundary (M27)
+
+Generic comparisons prepare a complete raw shared-performance graph and score
+it with `src/groups/metric-evaluation.ts` / `performance-score.ts` in the existing
+Edge worker. A separate whole-comparison queue fences generation, lease and
+source hash; SQL publishes all current members under one rules revision in a
+single transaction. It stores values with explicit metric/unit/revision and
+reuses `group_events` for records and rules-change history. Legacy comparisons
+keep the M25 engine until an explicit calculation edit retires their kg-only
+revision. Calculation revisions and metric-specific observation attestations
+are separate; changing group rules cannot silently broaden an old attestation.
+
+Shared-session cards use the member's personal effective-load context, while
+rankings use group rules. Both consume frozen session weight, never a current
+reading lookup. Server migration and typed mobile boundaries are implemented;
+group UI and hosted rollout remain in progress. The owning contract is
+[`tech/groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).

@@ -1,13 +1,13 @@
+import { buildGroupMetricPodiums } from '@/src/groups/metric-view-model';
+import type { GroupMetricPodiumWire } from '@/src/groups/metric-wire';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import {
-  buildPodiumCards,
   groupBoardPath,
   type GroupApiError,
-  type GroupBoardPodiumsResult,
   type GroupResourceState,
   type PodiumCardViewModel,
 } from '@/src/groups';
@@ -18,7 +18,7 @@ type GroupLeaderboardsPageProps = {
   groupId: string;
   userId: string;
   /** `group_board_podiums` through `useGroupResource` (`boards:<groupId>`), owned by the group screen. */
-  boards: GroupResourceState<GroupBoardPodiumsResult>;
+  boards: GroupResourceState<GroupMetricPodiumWire>;
   offline: boolean;
   error: GroupApiError | null;
   onRetry: () => void;
@@ -31,7 +31,7 @@ type GroupLeaderboardsPageProps = {
  */
 export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error, onRetry }: GroupLeaderboardsPageProps) {
   const router = useRouter();
-  const cards = useMemo(() => (boards.data ? buildPodiumCards(boards.data, userId) : null), [boards.data, userId]);
+  const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId) : null), [boards.data, userId]);
 
   if (!cards) {
     return <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-leaderboards" />;

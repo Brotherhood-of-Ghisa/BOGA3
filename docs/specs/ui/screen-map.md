@@ -745,3 +745,19 @@ transient added/assistance estimate. Loading, retry, no-source, invalid input,
 source provenance and one-rep/high-rep states use existing UI primitives.
 Exercise history, Stats/heatmaps and session/share projections use the same
 effective-load boundary and expose incomplete volume.
+
+
+## M27 group comparison extension (native acceptance in progress)
+
+The group exercise routes now include bodyweight contribution, declared movement
+and loading method, and default ranking. Calculation edits require review and
+an expected revision; stale forms retain edits until explicit reload. New local
+exercises can copy reviewed group rules; linking existing exercises never
+changes their personal metadata.
+
+The existing board/history routes select their implementation from the versioned
+catalogue. Metric boards carry reps/×BW/kg, Certified/All, rebuilding and archived
+states. Record details show raw load, saved B/provenance and attestation coverage.
+History selects a revision and its events or scores, preserving legacy retirement
+rows. Podiums and group activity use versioned cache payloads. T10's task card
+records outstanding native and stream-certification acceptance.

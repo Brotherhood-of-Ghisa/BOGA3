@@ -76,3 +76,21 @@ OAuth/MCP smoke. Logs: `/tmp/boga-m27-group-score-verified-fast.log` and
 `/tmp/boga-m27-group-score-verified-backend.log`. `./boga timings` and
 `./boga test for` ran. Device gates remain in progress. No new server RPC,
 publisher, certification behavior or group UI is claimed shipped.
+
+
+### Integrated backend checkpoint (2026-09-27)
+
+The migration, Deno evaluator, atomic versioned publication, legacy compatibility,
+metric-specific certification, readers and client decoders are integrated.
+`./boga test backend` passed in full with the expanded `groups-bodyweight.sh`
+body, including actual SQL responses decoded by the mobile guards, paged mixed
+streams, UTF-16 validation, role/privacy checks, generation/lease fencing,
+rollback/retry, legacy activation, archived/former entries and correction pins.
+Evidence: `/tmp/boga-m27-group-integration-backend-3.log`.
+The earlier fast run passed before UI integration; the later full fast gate
+passed with 184 mobile suites / 2,214 tests at this working checkpoint:
+`/tmp/boga-m27-comparison-ui-fast-2.log`. Timings and trigger rules ran.
+
+T10 rendering, metric stream certification controls and new two-user device
+proof remain in progress. Hosted rollout and final frontend acceptance are
+pending; neither task is shipped.

@@ -1,3 +1,5 @@
+import { isMetricStreamEvent } from '@/src/groups/metric-wire';
+import { GroupMetricStreamCard } from './group-metric-stream-card';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { FlatList, RefreshControl, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -75,8 +77,8 @@ export function GroupStreamList({
   const [sheetSnapshot, setSheetSnapshot] = useState<{ itemKey: string; detail: RecordSetDetail } | null>(null);
   const sheetDetail = useMemo(() => {
     if (!sheetSnapshot) return null;
-    const live = stream.items.find((item) => item.kind === 'record' && item.key === sheetSnapshot.itemKey);
-    return live && live.kind === 'record' ? recordSetFromStreamRecord(live) : sheetSnapshot.detail;
+    const live = stream.items.find((item) => !isMetricStreamEvent(item) && item.kind === 'record' && item.key === sheetSnapshot.itemKey);
+    return live && !isMetricStreamEvent(live) && live.kind === 'record' ? recordSetFromStreamRecord(live) : sheetSnapshot.detail;
   }, [sheetSnapshot, stream.items]);
 
   // Show the write's result until the stream agrees with it. A read already in
@@ -86,9 +88,9 @@ export function GroupStreamList({
   useEffect(() => {
     if (!written) return;
     const live = stream.items.find(
-      (item) => item.kind === 'record' && recordSetKey(recordSetFromStreamRecord(item)) === written.setKey,
+      (item) => !isMetricStreamEvent(item) && item.kind === 'record' && recordSetKey(recordSetFromStreamRecord(item)) === written.setKey,
     );
-    const liveCertification = live && live.kind === 'record' ? (live.certified ? live.certification : null) : undefined;
+    const liveCertification = live && !isMetricStreamEvent(live) && live.kind === 'record' ? (live.certified ? live.certification : null) : undefined;
     if (writtenCertificationSettled(written, liveCertification)) clearWritten();
   }, [stream.items, written, clearWritten]);
 
@@ -130,6 +132,8 @@ export function GroupStreamList({
 
   const renderItem = ({ item }: { item: StreamItemViewModel }) => {
     switch (item.kind) {
+      case 'metric_event':
+        return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames} />;
       case 'session':
         return <GroupStreamSessionCard card={item} onPress={onPressSession} showGroupNames={showGroupNames} />;
       case 'membership':

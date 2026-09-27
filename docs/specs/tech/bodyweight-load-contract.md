@@ -270,11 +270,13 @@ Reimport is not a legacy conversion workflow. See the owning
 rules/scoring boundary. They accept raw external units/mode, the complete saved
 session tuple and source distribution/standards; the personal coefficient is not
 an input. Invalid B withholds strength while eligible unweighted reps survive.
-The proposed v2 wire separates missing/invalid B, values/units and rules revision.
+The v2 wire separates missing/invalid B, values/units and rules revision.
 A source's current counting eligibility is separate from its valid performance,
-so unlinking need not falsify a historical observation. These modules are not yet
-connected to the database publisher, group RPC readers or screens. The revision,
-queue, certification and migration requirements below remain integration work.
+so unlinking need not falsify a historical observation. The database publisher,
+versioned RPC readers, metric attestations and typed client are implemented in
+`20260927073000_m27_group_metrics.sql` and the existing Edge worker. Their
+compatibility and publication boundary is specified in the groups contract §11.
+Backend integration proof, group screens and hosted rollout remain in progress.
 
 | Metric key | Unit | Eligibility / default |
 | --- | --- | --- |

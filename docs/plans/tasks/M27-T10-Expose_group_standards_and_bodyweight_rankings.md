@@ -1,7 +1,7 @@
 ---
 task_id: M27-T10-Expose_group_standards_and_bodyweight_rankings
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "frontend|cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/ui/ux-rules.md, do
 
 # M27-T10 — Expose group standards and bodyweight rankings
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T07, M27-T09.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D7–D9.
@@ -70,3 +70,21 @@ group coefficient authority, backfill and correction invalidation. Run
 `ios-groups-e2e` is included and resolve additional diff requirements with
 `./boga test for`. Graduate UX/group contracts, attach evidence, mark the
 milestone entry complete and delete this card when shipped.
+
+
+## Execution checkpoint (2026-09-27)
+
+Integrated the reviewed group rule form with revision-bound preview and stale
+edit preservation; versioned catalogue/archive calls; compatibility explanations
+and guarded Add as new; metric podiums, full boards, revision history and frozen
+legacy scores; saved-B/provenance record details and metric-specific board
+certification. Groups and Today now read the v2 stream and preserve units and
+original rule revisions in event presentation. Personal shared-session metrics
+remain explicitly personal and show incomplete volume.
+
+Full fast passed: 184 suites / 2,214 mobile tests, plus backend fast, metadata,
+consent and MCP checks. Log: `/tmp/boga-m27-comparison-ui-fast-2.log`.
+Full backend passed: `/tmp/boga-m27-group-integration-backend-3.log`.
+Remaining: stream record certification parity, native rendering/interaction
+checks against the accepted target at all three sizes, dedicated two-user M27
+vectors and the full frontend gate. No rendered-completion or shipment claim.

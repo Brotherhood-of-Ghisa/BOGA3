@@ -2,7 +2,7 @@
 // Field names are the server's snake_case JSON keys, unchanged: these types
 // describe payloads exactly as they arrive and are cached.
 
-import type { LoadInputMode } from '@/src/exercise-core';
+import type { LoadInputMode } from '../exercise-core/index.ts';
 
 export type GroupRole = 'owner' | 'admin' | 'member';
 
@@ -35,7 +35,17 @@ export type GroupMemberRef = {
 
 export type GroupSessionStatus = 'active' | 'completed';
 
-export type StreamSessionItem = {
+/** Frozen shared-session context. Missing revision denotes an older entered-load payload. */
+export type GroupSessionLoadContext = {
+  metric_scope?: 'personal';
+  metric_revision?: 'effective_load_v1';
+  body_weight_kg?: number | null;
+  body_weight_source?: string | null;
+  body_weight_measurement_id?: string | null;
+  body_weight_measured_at_ms?: number | null;
+};
+
+export type StreamSessionItem = GroupSessionLoadContext & {
   kind: 'session';
   /** `<member_user_id>:<session_id>` */
   key: string;
@@ -162,12 +172,19 @@ export type GroupSessionSet = {
   set_id: string;
   order_index: number;
   weight_value: string;
+  weight_unit?: string | null;
+  external_load_mode?: string | null;
   reps_value: string;
   set_type: string | null;
   performance_status: string | null;
 };
 
 export type GroupSessionExercise = {
+  exercise_definition_id?: string | null;
+  load_input_mode?: string | null;
+  bodyweight_coefficient?: number | null;
+  movement_standard?: string | null;
+  loading_method?: string | null;
   session_exercise_id: string;
   /** The member's own exercise name (`session_exercises.name`). */
   name: string;
@@ -177,7 +194,7 @@ export type GroupSessionExercise = {
   sets: GroupSessionSet[];
 };
 
-export type GroupSessionDetail = {
+export type GroupSessionDetail = GroupSessionLoadContext & {
   member: GroupMemberRef;
   session_id: string;
   gym_name: string | null;

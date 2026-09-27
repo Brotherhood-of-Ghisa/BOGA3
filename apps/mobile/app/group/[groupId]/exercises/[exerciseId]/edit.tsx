@@ -3,7 +3,6 @@ import { useCallback } from 'react';
 import { ScrollView } from 'react-native';
 
 import {
-  GroupExerciseForm,
   GroupLostAccessState,
   GroupMissingDataState,
   GroupStateView,
@@ -12,19 +11,18 @@ import {
   pickInlineError,
 } from '@/components/groups';
 import { useAuth } from '@/src/auth';
-import type { ExerciseCore } from '@/src/exercise-core';
+import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
+import type { GroupExerciseRules } from '@/src/groups/metric-contract';
+import type { GroupMetricExerciseListWire } from '@/src/groups/metric-wire';
+import { listGroupComparisons, updateGroupComparison } from '@/src/groups/api';
 import {
   canManageGroup,
   describeGroupExerciseWriteError,
   getGroup,
   groupCacheKeys,
-  groupExerciseCore,
-  listGroupExercises,
-  updateGroupExercise,
   useGroupAction,
   useGroupResource,
   useMountedRef,
-  type GroupExerciseListResult,
   type GroupGetResult,
 } from '@/src/groups';
 
@@ -59,18 +57,19 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
     fetcher: groupFetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const exercisesFetcher = useCallback(() => listGroupExercises(groupId), [groupId]);
-  const exercises = useGroupResource<GroupExerciseListResult>({
+  const exercisesFetcher = useCallback(() => listGroupComparisons(groupId), [groupId]);
+  const exercises = useGroupResource<GroupMetricExerciseListWire>({
     userId,
     cacheKey: groupCacheKeys.groupExercises(groupId),
     fetcher: exercisesFetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const update = useGroupAction((core: ExerciseCore) => updateGroupExercise(groupId, exerciseId, core));
+  const update = useGroupAction((core: GroupExerciseRules, revision: number) => updateGroupComparison(groupId, exerciseId, revision, core));
   const mounted = useMountedRef();
 
-  const onSubmit = async (core: ExerciseCore) => {
-    const result = await update.run(core);
+  const onSubmit = async (core: GroupExerciseRules, revision: number | null) => {
+    if (revision === null) return;
+    const result = await update.run(core, revision);
     // Back during a slow save already left this screen: going back again would pop the group screen.
     if (!mounted.current) return;
     if (result.ok) {
@@ -78,7 +77,7 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
       router.back();
       return;
     }
-    if (result.error.code === 'FORBIDDEN' || result.error.code === 'NOT_FOUND' || result.error.code === 'VALIDATION') {
+    if (result.error.code === 'FORBIDDEN' || result.error.code === 'NOT_FOUND' || result.error.code === 'VALIDATION' || result.error.code === 'CONFLICT') {
       void group.refresh();
       void exercises.refresh();
     }
@@ -121,10 +120,10 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
     );
   } else {
     body = (
-      <GroupExerciseForm
+      <GroupComparisonForm
         errorMessage={update.error ? describeGroupExerciseWriteError(update.error) : null}
-        initialCore={groupExerciseCore(exercise)}
-        onSubmit={(core) => void onSubmit(core)}
+        existing={exercise}
+        onSubmit={(core, revision) => void onSubmit(core, revision)}
         pending={update.pending}
         pendingLabel="Saving…"
         submitLabel="Save changes"

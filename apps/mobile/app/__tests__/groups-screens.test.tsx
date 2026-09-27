@@ -41,15 +41,19 @@ jest.mock('expo-router', () => ({
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
-jest.mock('@/src/groups/api', () => ({
+jest.mock('@/src/groups/api', () => {
+  const streamRead = jest.fn();
+  return {
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
-  getGroupStream: jest.fn(),
+  getGroupStream: streamRead,
+  getGroupMetricStream: streamRead,
   getGroupSessionDetail: jest.fn(),
   listGroupExercises: jest.fn(),
-  getGroupBoardPodiums: jest.fn(),
-}));
+  getGroupMetricPodiums: jest.fn(),
+  };
+});
 
 import { MainTabs } from '@/components/navigation/main-tabs';
 import {
@@ -218,8 +222,8 @@ beforeEach(() => {
   api.getGroupStream.mockResolvedValue(page([]));
   api.getGroup.mockResolvedValue(GROUP_A_DETAIL);
   api.getGroupSessionDetail.mockResolvedValue(sessionDetail());
-  api.listGroupExercises.mockResolvedValue({ exercises: [] } as unknown as Awaited<ReturnType<typeof api.listGroupExercises>>);
-  api.getGroupBoardPodiums.mockResolvedValue({ exercises: [] } as unknown as Awaited<ReturnType<typeof api.getGroupBoardPodiums>>);
+  api.listGroupExercises.mockResolvedValue({ contract_version: 2, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listGroupExercises>>);
+  api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 2, exercises: [] } as unknown as Awaited<ReturnType<typeof api.getGroupMetricPodiums>>);
 });
 
 afterEach(() => {
@@ -356,11 +360,11 @@ describe('Groups tab', () => {
   it("switches to the selected group's leaderboards", async () => {
     render(<GroupsTabRoute />);
     await screen.findByTestId('groups-segment-leaderboards');
-    expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
+    expect(api.getGroupMetricPodiums).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
     expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
-    expect(api.getGroupBoardPodiums).toHaveBeenCalledWith('group-a');
+    expect(api.getGroupMetricPodiums).toHaveBeenCalledWith('group-a');
   });
 
   it('pull-to-refresh refetches My groups and the stream', async () => {

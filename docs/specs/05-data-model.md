@@ -265,6 +265,19 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   only by the certification RPCs and the group evaluator
   (`docs/specs/tech/groups-contract.md` §2.12).
 
+- **Implemented (M27, `supabase/migrations/20260927073000_m27_group_metrics.sql`):**
+  versioned group rules and publication metadata extend `group_exercises`.
+  `group_rule_revisions`, `group_metric_eval_queue`, `group_metric_set_scores`,
+  `group_metric_board_entries`, `group_metric_board_state` and
+  `group_metric_certifications` retain the same server-only group posture.
+  Scores carry metric, unit and revision; certifications cover one observed
+  metric's dependencies. `group_events` holds both explicit legacy and v2 event
+  contracts. Sync impact decision: `out of sync scope`; there are no new
+  owner-private entities, source-table foreign keys or sync-envelope changes.
+  See [`tech/groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27)
+  for coherent publication and legacy retirement. Local verification and
+  hosted rollout are tracked separately from this schema description.
+
 ## Ownership and identity invariants
 
 1. User-owned backend rows are auth-scoped and backend-enforced (`RLS`/constraints).

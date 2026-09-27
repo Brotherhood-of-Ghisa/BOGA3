@@ -143,3 +143,20 @@ assistance, missing/invalid B and historical-estimate provenance. Preserve the
 separate source counting flag, duplicate/missing-pin refusal and explicit invalid
 weight payloads. These pure tests do not replace backend queue/publication,
 certification, legacy-reader or two-user device proofs.
+
+`groups-metric-api.test.ts` checks the v2 RPC request/response boundary:
+metric/unit/revision and requested-scope coherence, malformed known stream
+items, future-kind pagination, rebuilding emptiness and attestation dependency
+coverage. Cache tests retain upgrade eviction of both old and versioned keys.
+`groups-session-metrics.test.ts` separately proves the personal shared-session
+projection, raw units/modes, incomplete volume, strict performed status and
+malformed frozen-snapshot handling. Never substitute that personal coefficient
+for the target group's coefficient in ranking tests.
+
+`groups-comparison-form.test.tsx` covers review/stale-edit behavior.
+`groups-metric-screens.test.tsx` runs the real cache/paging hooks around mocked
+RPCs for unit/scope switching, rebuilding, missing/estimated B, revision history,
+self/former/archive restrictions, stale certification refusal and offline stream
+reopen. Linking tests preserve personal coefficient independence and reject
+incompatible reviewed new-exercise inputs. These tests do not replace three-size
+render comparisons or two-user Maestro proof.

@@ -1,23 +1,24 @@
-// The one implementation of the group set rules, shared by the viewing device
-// (`session-metrics.ts`, groups contract §5) and the `group-eval` Edge Function
-// (§2.9), which loads this file from Deno by relative path. So: no `@/` alias,
-// and every import names its `.ts` file (tsconfig `allowImportingTsExtensions`).
-// The imported modules import nothing themselves.
+// Conventional external-load facts consumed by the legacy group evaluator.
+// Bodyweight comparisons use performance-score.ts; shared personal session
+// summaries use the same effective-load kernel with their own saved context.
+// Deno imports stay relative and explicitly name their .ts files.
 
 import { estimateOneRepMax, parseCalculationSet } from '../exercise-calculations/index.ts';
+import { resolveEffectiveLoad } from '../exercise-calculations/effective-load.ts';
 import {
   canonicalizeWeightForReps,
   isConfirmedPerformedSet,
-  normalizeSessionSetPerformanceStatus,
 } from '../session-recorder/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
-export const GROUP_EVAL_RULES_VERSION = 1;
+export const GROUP_EVAL_RULES_VERSION = 2;
 
 export type GroupRawSetValues = {
   weight_value: string;
   reps_value: string;
   performance_status: string | null;
+  weight_unit?: string;
+  external_load_mode?: string | null;
 };
 
 export type GroupParsedSet = { weightKg: number; reps: number };
@@ -28,7 +29,8 @@ export type GroupParsedSet = { weightKg: number; reps: number };
  * recorder's input cannot produce (for example `1e3`) is not performed.
  */
 export const parseGroupPerformedSet = (set: GroupRawSetValues): GroupParsedSet | null => {
-  const performanceStatus = normalizeSessionSetPerformanceStatus(set.performance_status);
+  if (set.performance_status !== null) return null;
+  const performanceStatus = null;
   if (!isConfirmedPerformedSet({ weight: set.weight_value, reps: set.reps_value, performanceStatus })) {
     return null;
   }
@@ -36,7 +38,11 @@ export const parseGroupPerformedSet = (set: GroupRawSetValues): GroupParsedSet |
     weightValue: canonicalizeWeightForReps(set.weight_value, set.reps_value),
     repsValue: set.reps_value,
   });
-  return parsed === null ? null : { weightKg: parsed.weight, reps: parsed.reps };
+  if (parsed === null) return null;
+  const load = resolveEffectiveLoad({ weightValue: canonicalizeWeightForReps(set.weight_value, set.reps_value),
+    weightUnit: set.weight_unit, externalLoadMode: set.external_load_mode,
+    bodyweightCoefficient: 0, loadInputMode: 'total_load' });
+  return load.status === 'known' ? { weightKg: load.enteredWeightKg, reps: parsed.reps } : null;
 };
 
 /** One raw set row as `group_eval_session_rows` returns it. */
