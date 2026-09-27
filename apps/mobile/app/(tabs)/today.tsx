@@ -1,7 +1,6 @@
 import type { CurrentGroupStreamItem as StreamItem } from '@/src/groups/metric-wire';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
-import { useIsFocused } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 

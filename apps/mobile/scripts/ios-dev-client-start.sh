@@ -42,7 +42,11 @@ trap cleanup EXIT INT TERM
 
 echo "[ios-dev-client-start] starting Expo on port $EXPO_DEV_SERVER_PORT"
 cd "$APP_DIR"
-CI=1 npx expo start --dev-client --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" &
+# Expo 57's `--host localhost` advertises 127.0.0.1 in its manifest but listens on
+# whatever Node resolves `localhost` to first, which on macOS is IPv6 [::1]; the
+# dev client then cannot fetch the bundle. ipv4first makes that listen bind
+# 127.0.0.1, matching the manifest and the probes below.
+CI=1 NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--dns-result-order=ipv4first" npx expo start --dev-client --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" &
 EXPO_PID=$!
 
 if ! maestro_wait_for_metro_status "$EXPO_DEV_SERVER_PORT" "${EXPO_START_WAIT_SECONDS:-30}"; then

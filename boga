@@ -286,7 +286,7 @@ cmd_doctor() {
   check "gh authenticated (worktree release / pr wait)" gh auth status
   check "iOS simulators (Maestro lanes)" xcrun simctl list devices available
   check "maestro CLI (Maestro lanes)" maestro --version
-  check "xcodebuild (dev-client build)" xcodebuild -version
+  check "xcodebuild >= ${BOGA_XCODE_MIN_VERSION} (dev-client build; the Expo SDK's minimum)" boga_xcode_at_least_min
   check "node" node --version
   check "jq (worktree tooling)" jq --version
   if [[ -x "${REPO_ROOT}/scripts/worktree-doctor.sh" ]]; then

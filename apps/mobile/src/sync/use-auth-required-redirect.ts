@@ -10,17 +10,11 @@
 //      server and got back "no signed-in user" means the stored session is gone
 //      or invalid even if the local snapshot has not caught up yet.
 //
-// Both the route-layer auth guard and the first-sync gate consume this so the
-// "treat a missing session as a route-to-sign-in, not a generic error" rule
+// The root route access (`src/navigation/root-route-access.ts`) consumes this so
+// the "treat a missing session as a route-to-sign-in, not a generic error" rule
 // lives in exactly one place.
 
-import { useSyncExternalStore } from 'react';
-
 import type { AuthSnapshot } from '@/src/auth';
-import {
-  getAuthRequiredSignal,
-  subscribeToAuthRequiredSignal,
-} from '@/src/sync/auth-required-signal';
 
 /** The minimal auth-snapshot shape this decision reads. */
 export type AuthGateSnapshot = Pick<AuthSnapshot, 'isConfigured' | 'session'>;
@@ -49,20 +43,4 @@ export const selectShouldRouteToSignIn = (
     return true;
   }
   return authRequiredSignal;
-};
-
-/**
- * React hook wrapping {@link selectShouldRouteToSignIn}. Subscribes to the sync
- * cycle's auth-required signal so a session that silently expires mid-use (the
- * snapshot still holds a stale session, but a cycle just learned otherwise)
- * re-routes the user without waiting for the auth listener to fire.
- */
-export const useShouldRouteToSignIn = (snapshot: AuthGateSnapshot): boolean => {
-  const authRequiredSignal = useSyncExternalStore(
-    subscribeToAuthRequiredSignal,
-    getAuthRequiredSignal,
-    getAuthRequiredSignal,
-  );
-
-  return selectShouldRouteToSignIn(snapshot, authRequiredSignal);
 };

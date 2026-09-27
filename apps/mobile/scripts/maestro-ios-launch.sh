@@ -63,8 +63,12 @@ fi
 # listener. `npx expo` inserts npm/sh wrapper processes; stopping only that
 # recorded wrapper can orphan Metro and leave this slot's port occupied for the
 # next frontend lane.
+# Expo 57's `--host localhost` advertises 127.0.0.1 in its manifest but listens on
+# whatever Node resolves `localhost` to first, which on macOS is IPv6 [::1]; the
+# dev client then cannot fetch the bundle. ipv4first makes that listen bind
+# 127.0.0.1, matching the manifest and the probes below.
 # shellcheck disable=SC2086
-CI=1 "$APP_DIR/node_modules/.bin/expo" start --dev-client $maestro_clear_flag --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" >"$EXPO_LOG_FILE" 2>&1 &
+CI=1 NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--dns-result-order=ipv4first" "$APP_DIR/node_modules/.bin/expo" start --dev-client $maestro_clear_flag --host localhost --scheme "$SCHEME" --port "$EXPO_DEV_SERVER_PORT" >"$EXPO_LOG_FILE" 2>&1 &
 EXPO_PID=$!
 maestro_write_runtime_env "$RUNTIME_ENV_FILE"
 
@@ -92,6 +96,9 @@ maestro_preauthorize_url_schemes "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE
 # previous grant, so the alert reappears every cold run without this pre-auth.
 # Granting here makes the dialog never render. Best-effort: never fails the launch.
 maestro_preauthorize_location "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
+
+# Keep expo-dev-menu's onboarding sheet and floating button off the RN root.
+maestro_seed_dev_menu_preferences "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
 
 xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true

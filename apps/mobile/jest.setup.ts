@@ -11,13 +11,22 @@ afterEach(() => {
   cleanup();
 });
 
+// Worklets 0.10 installs its native runtime on import; Jest has none, so any suite
+// that loads reanimated (the root layout does) uses the library's own mock.
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const { View } = require('react-native');
   const passthrough = ({ children }: { children?: unknown }) => children;
   const viewWrap = ({ children, ...props }: { children?: unknown }) =>
     React.createElement(View, props, children);
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  const frame = { x: 0, y: 0, width: 0, height: 0 };
   return {
+    // expo-router's Stack reads these through `use()` (SafeAreaProviderCompat).
+    SafeAreaInsetsContext: React.createContext(insets),
+    SafeAreaFrameContext: React.createContext(frame),
     SafeAreaProvider: passthrough,
     SafeAreaConsumer: ({ children }: { children: (insets: object) => unknown }) =>
       children({ top: 0, right: 0, bottom: 0, left: 0 }),
