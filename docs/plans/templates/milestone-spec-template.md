@@ -3,7 +3,7 @@
 <!--
 Starter for a milestone (docs/plans/README.md). Drop any section that doesn't
 help. Planned and executed with the task protocol
-(.claude/skills/task-protocol). Delete this file and its task cards when the
+(docs/plans/README.md). Delete this file and its task cards when the
 work ships; durable decisions move into docs/specs/** in the PRs that ship
 them, and evidence lives in the PRs.
 -->
