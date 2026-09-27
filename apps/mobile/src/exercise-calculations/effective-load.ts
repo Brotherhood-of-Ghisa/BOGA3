@@ -267,9 +267,15 @@ export const estimateExternalLoad = (input: LoadContext & {
     ? input.estimatedOneRepMaxKg : inverse;
   const externalFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
   // Conventional estimates are already in entered-load space.
-  const totalExternalAdjustmentKg = c === 0
+  const rawExternalAdjustmentKg = c === 0
     ? predictedResistanceKg * externalFactor
     : predictedResistanceKg - c * (input.bodyWeightKg as number);
+  // Forward/inverse floating-point cancellation must not turn a bodyweight-only
+  // round-trip into microscopic assistance. This is machine-precision cleanup,
+  // not display or plate rounding; meaningful positive/negative loads survive.
+  const cancellationTolerance = 2 * Number.EPSILON * Math.max(predictedResistanceKg, c * (input.bodyWeightKg ?? 0));
+  const totalExternalAdjustmentKg = c > 0 && Math.abs(rawExternalAdjustmentKg) <= cancellationTolerance
+    ? 0 : rawExternalAdjustmentKg;
   const enteredAmount = Math.abs(totalExternalAdjustmentKg) / externalFactor /
     (input.weightUnit === 'lb' ? KG_PER_LB : 1);
   if (![totalExternalAdjustmentKg, enteredAmount].every(Number.isFinite)) return invalid('numeric_overflow');

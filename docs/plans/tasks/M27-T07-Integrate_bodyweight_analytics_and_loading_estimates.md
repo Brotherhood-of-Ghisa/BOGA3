@@ -105,3 +105,15 @@ labels. Full fast passed again (178 suites / 2,114 mobile tests), including
 repository, consent and MCP checks: `/tmp/boga-m27-analytics-fast-labels.log`.
 Fresh three-size/native verification is pending. Initial
 evidence: `M27-analytics-small/20260927-020406-61533/`, BWL04/BWL06.
+
+The next small-phone run at `be6db03` passed entry, logging and backfill,
+and confirmed the compact logger labels. Analytics reached all calculator
+scenarios through source selection, then failed the bodyweight-only zero
+projection: inverse cancellation displayed `Assistance 0.00`. Screenshot
+review also caught a stale reading hint after manually editing target B.
+The kernel now normalizes only machine-precision cancellation to zero; vectors
+retain genuinely small assistance. Target edits update their explanation.
+Full fast passed with 178 suites / 2,119 mobile tests, plus all other fast lanes:
+`/tmp/boga-m27-analytics-fast-projection-fix.log`. Required backend and native
+reruns are pending. Failed-run evidence is
+`M27-analytics-small-final/20260927-021437-72662/bodyweight-analytics/`.

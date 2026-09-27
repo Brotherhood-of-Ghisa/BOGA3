@@ -86,7 +86,9 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
           <FormField label="Target reps" value={reps} keyboardType="number-pad" testID="loading-estimate-reps"
             onChangeText={value => { setReps(value); clearResult(); }} />
           {bodyweight ? <FormField label="Target body weight (kg)" value={bodyWeight} keyboardType="decimal-pad" hint={weightHint}
-            testID="loading-estimate-bodyweight" onChangeText={value => { setBodyWeight(value); clearResult(); }} /> : null}
+            testID="loading-estimate-bodyweight" onChangeText={value => {
+              setBodyWeight(value); setWeightHint('Using your entered target weight. Saved performances stay unchanged.'); clearResult();
+            }} /> : null}
           {bodyweight && currentReadingInvalid ? <Notice message="Your current reading needs review in Settings. Enter a target weight here to continue." testID="loading-estimate-invalid-reading" /> : null}
           {bodyweight && currentReading ? <ActionButton
             label={`Use current reading · ${currentReading.weightKg} kg`}

@@ -32,10 +32,13 @@ it('projects positive added load and assistance from the frozen source, clearing
   fireEvent.press(screen.getByTestId('loading-estimate-current-reading'));
   expect(screen.queryByTestId('loading-estimate-result')).toBeNull();
   expect(screen.getByTestId('loading-estimate-bodyweight').props.value).toBe('90');
+  expect(screen.getByText(/Using your reading on/)).toBeTruthy();
   expect(screen.getByText(/Estimated from/)).toBeTruthy();
   fireEvent.press(screen.getByTestId('loading-estimate-calculate'));
   expect(screen.getByLabelText('Added load · kg 10.00')).toBeTruthy();
   fireEvent.changeText(screen.getByTestId('loading-estimate-bodyweight'), '110');
+  expect(screen.queryByText(/Using your reading on/)).toBeNull();
+  expect(screen.getByText('Using your entered target weight. Saved performances stay unchanged.')).toBeTruthy();
   expect(screen.queryByTestId('loading-estimate-result')).toBeNull();
   fireEvent.press(screen.getByTestId('loading-estimate-calculate'));
   expect(screen.getByLabelText('Assistance · kg 10.00')).toBeTruthy();

@@ -256,6 +256,8 @@ appId: com.dinoderek.mobile
     timeout: 4000
 - assertVisible:
     text: "Assistance · lb 22.05"
+- assertVisible:
+    text: "Using your entered target weight. Saved performances stay unchanged."
 - takeScreenshot: "BWA06-unit-conversion"
 - scrollUntilVisible:
     element:
@@ -427,6 +429,7 @@ appId: com.dinoderek.mobile
     timeout: 4000
 - assertVisible:
     text: "Added load · kg 0.00"
+- takeScreenshot: "BWA09b-bodyweight-only-round-trip"
 - scrollUntilVisible:
     element:
       id: "loading-estimate-done"

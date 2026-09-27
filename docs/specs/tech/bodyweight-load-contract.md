@@ -363,6 +363,11 @@ provide a target. Each selectable source retains historical B and provenance.
 Target edits clear old answers. Dismissed reads cannot update a later opening.
 The one-rep capacity convention is explained; high-rep estimates are labelled.
 Two-decimal display is separate from raw results and does not imply plate rounding.
+Forward/inverse cancellation within two machine epsilons of the resistance scale
+normalizes to zero external adjustment. An unchanged bodyweight-only performance
+therefore stays unweighted instead of displaying microscopic assistance. Larger
+positive and negative adjustments retain full precision. Manually editing target
+B replaces the reading/prefill hint with an explicit entered-target explanation.
 
 Explicit B corrections reload detail graphs and insights. Definition edits and
 legacy conversion refresh records/history on save or focus. New readings leave

@@ -175,6 +175,24 @@ describe('strength ordering and projections', () => {
       .toMatchObject({ status: 'known', resistanceKg: 60 });
   });
 
+  it.each([2, 5, 8, 15, 50])('keeps a bodyweight-only round-trip at zero at %i reps', targetReps => {
+    for (const bodyWeightKg of [60, 80, 82.7]) {
+      for (const bodyweightCoefficient of [0.7, 1]) {
+        for (const weightUnit of ['kg', 'lb'] as const) {
+          const estimatedOneRepMaxKg = estimateOneRepMax(bodyWeightKg * bodyweightCoefficient, targetReps)!;
+          const input = { ...pullUp, bodyWeightKg, bodyweightCoefficient, targetReps,
+            estimatedOneRepMaxKg, weightUnit, oneRepConvention: 'capacity' as const };
+          expect(estimateExternalLoad(input)).toMatchObject({ status: 'known',
+            externalLoadMode: 'added', totalExternalAdjustmentKg: 0, enteredAmount: 0 });
+          const slightAssistance = estimateExternalLoad({ ...input, bodyWeightKg: bodyWeightKg + 1e-8 });
+          expect(slightAssistance).toMatchObject({ status: 'known', externalLoadMode: 'assistance' });
+          if (slightAssistance.status !== 'known') throw new Error('Expected finite projection');
+          expect(slightAssistance.enteredAmount).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
   it('rejects invalid projection input and missing target B', () => {
     const input = { ...pullUp, weightUnit: 'kg' as const, oneRepConvention: 'capacity' as const,
       targetReps: 5, estimatedOneRepMaxKg: 100 };
