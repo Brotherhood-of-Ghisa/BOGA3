@@ -16,18 +16,6 @@ appId: com.dinoderek.mobile
 
 # Reset the local data layer to a known clean state and land on the tabbed shell.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
-# The dev-client "Open in <App>?" URL-scheme trust dialog and expo-dev-client's
-# developer-menu onboarding sheet can appear on top of the freshly-loaded app;
-# dismiss them. Each tap is an optional no-op when its target is absent.
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
@@ -47,6 +35,8 @@ appId: com.dinoderek.mobile
           visible:
             id: "more-screen"
           timeout: 15000
+# Keeps centerElement although the row ends the list and never centres: left
+# where it first shows, it rests over the minimised tab bar and the tap misses.
 - scrollUntilVisible:
     element:
       id: "more-settings-row"
@@ -129,15 +119,6 @@ appId: com.dinoderek.mobile
 # screen must still render against the fresh local store (a broken re-bootstrap
 # would leave the app unable to reach a data screen here).
 - openLink: "boga3://maestro-harness?teleport=session-list"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"

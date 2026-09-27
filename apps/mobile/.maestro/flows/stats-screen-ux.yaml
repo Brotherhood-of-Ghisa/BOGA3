@@ -28,18 +28,6 @@ appId: com.dinoderek.mobile
 
 # --- 00: empty state, before any data is seeded ---
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
-# The dev-client "Open in <App>?" trust dialog and expo-dev-client's developer-menu
-# onboarding sheet can sit on top of the freshly-loaded app; each tap is an
-# optional no-op when its target is absent.
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "stats-history-screen"
@@ -52,18 +40,12 @@ appId: com.dinoderek.mobile
 
 # --- Seed exercise history data and land back on Stats/History ---
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=session-list"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
+# Wait for the seeded list, not the screen: the empty-state screen above is
+# already `stats-history-screen`, so that wait would pass before the harness
+# has seeded and navigated (spec 06 rule 4).
 - extendedWaitUntil:
     visible:
-      id: "stats-history-screen"
+      id: "stats-exercise-list"
     timeout: 30000
 
 # --- 01: Exercise view is shown by default ---
@@ -184,12 +166,13 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "03-muscle-breakdown-7-days"
 
 # --- 04: Back to the exercise view; the seeded row is listed ---
+# No centerElement: this target starts its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "stats-view-mode-chip-exercise"
     direction: UP
     visibilityPercentage: 100
-    centerElement: true
 - tapOn:
     id: "stats-view-mode-chip-exercise"
 - extendedWaitUntil:

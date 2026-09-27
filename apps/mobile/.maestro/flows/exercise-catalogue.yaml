@@ -29,15 +29,6 @@ appId: com.dinoderek.mobile
           visible: { id: "today-screen" }
           timeout: 30000
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "exercise-catalog-title"
@@ -144,11 +135,12 @@ appId: com.dinoderek.mobile
     start: "50%,40%"
     end: "50%,25%"
     duration: 500
+# No centerElement: this target ends its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "exercise-editor-secondary-muscle-trigger"
     direction: DOWN
-    centerElement: true
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 4000

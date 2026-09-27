@@ -186,8 +186,10 @@ maestro_development_client_url() {
 #
 # Verified on iPhone 17 Pro / iOS 26.2: after seeding these, opening BOTH
 # `exp+boga3://...` and `boga3://...` surfaces zero trust dialogs and the RN root
-# mounts directly. Best-effort: a write failure is logged and never fails the
-# gate — the warm-up's coordinate/text dialog dismissal still backstops it.
+# mounts directly. A failed write fails the launch: no flow taps the dialog
+# away (an optional tap on an absent "Open" cost ~7s per deep link), so an
+# unauthorized scheme would otherwise surface later as an unrelated assertion
+# timeout behind the dialog.
 maestro_preauthorize_url_schemes() {
   local udid="$1"
   local bundle_id="$2"
@@ -197,9 +199,9 @@ maestro_preauthorize_url_schemes() {
   local dev_client_scheme
   local s
 
-  [[ -n "$udid" ]] || { echo "[maestro] preauthorize: missing simulator UDID (skipping)"; return 0; }
-  [[ -n "$bundle_id" ]] || { echo "[maestro] preauthorize: missing bundle id (skipping)"; return 0; }
-  [[ -n "$scheme" ]] || { echo "[maestro] preauthorize: missing app scheme (skipping)"; return 0; }
+  [[ -n "$udid" ]] || maestro_fail "[maestro] preauthorize: missing simulator UDID"
+  [[ -n "$bundle_id" ]] || maestro_fail "[maestro] preauthorize: missing bundle id"
+  [[ -n "$scheme" ]] || maestro_fail "[maestro] preauthorize: missing app scheme"
 
   if [[ "$scheme" == exp+* ]]; then
     dev_client_scheme="$scheme"
@@ -214,7 +216,7 @@ maestro_preauthorize_url_schemes() {
     if xcrun simctl spawn "$udid" defaults write "$approval_domain" "${caller}-->${s}" -string "$bundle_id" >/dev/null 2>&1; then
       echo "[maestro]   authorized scheme '$s' -> $bundle_id"
     else
-      echo "[maestro]   could not pre-authorize scheme '$s' (best-effort; warm-up dialog dismissal will backstop)"
+      maestro_fail "[maestro] could not pre-authorize scheme '$s' on $udid: the 'Open in \"<App>\"?' dialog would block every deep link"
     fi
   done
 }
