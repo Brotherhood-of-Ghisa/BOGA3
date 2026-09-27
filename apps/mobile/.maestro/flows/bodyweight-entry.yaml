@@ -193,6 +193,96 @@ appId: com.dinoderek.mobile
     id: "session-body-weight"
     text: ".*Reading from ${output.bodyweightPast}"
 - takeScreenshot: "BW05-session-context"
+# Edit both the source value and its date through the real history form. The
+# existing session must refresh its derived fact without any session write.
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible: { id: "body-weight-screen" }
+    timeout: 30000
+- tapOn: { text: "Edit 80 kg, .*" }
+- extendedWaitUntil:
+    visible: { id: "weight-entry-value" }
+    timeout: 10000
+- tapOn: { id: "weight-entry-value" }
+- eraseText
+- inputText: "81"
+- tapOn: { text: "(?i)body weight \\((kg|lb)\\)" }
+- waitForAnimationToEnd: { timeout: 4000 }
+- scrollUntilVisible:
+    element: { id: "weight-entry-date" }
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn: { id: "weight-entry-date" }
+- eraseText
+- inputText: "${output.bodyweightRevised}"
+- pressKey: Enter
+- waitForAnimationToEnd: { timeout: 4000 }
+- scrollUntilVisible:
+    element: { id: "weight-entry-save" }
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- takeScreenshot: "BW05b-edited-reading-form"
+- tapOn: { id: "weight-entry-save" }
+- extendedWaitUntil:
+    notVisible: { id: "weight-entry-sheet" }
+    timeout: 10000
+- openLink: "boga3://train"
+- extendedWaitUntil:
+    visible: { id: "train-resume-session-button" }
+    timeout: 30000
+- tapOn: { id: "train-resume-session-button" }
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+      text: "Session body weight, 81 kg, .*Reading from ${output.bodyweightRevised}"
+    timeout: 30000
+- takeScreenshot: "BW05c-edited-source-context"
+# Restore the earlier reading through the same form for the later-reading and
+# deletion checks below; editing an existing row must not create duplicates.
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible: { id: "body-weight-screen" }
+    timeout: 30000
+- tapOn: { text: "Edit 81 kg, .*" }
+- extendedWaitUntil:
+    visible: { id: "weight-entry-value" }
+    timeout: 10000
+- tapOn: { id: "weight-entry-value" }
+- eraseText
+- inputText: "80"
+- tapOn: { text: "(?i)body weight \\((kg|lb)\\)" }
+- waitForAnimationToEnd: { timeout: 4000 }
+- scrollUntilVisible:
+    element: { id: "weight-entry-date" }
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn: { id: "weight-entry-date" }
+- eraseText
+- inputText: "${output.bodyweightPast}"
+- pressKey: Enter
+- waitForAnimationToEnd: { timeout: 4000 }
+- scrollUntilVisible:
+    element: { id: "weight-entry-save" }
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn: { id: "weight-entry-save" }
+- extendedWaitUntil:
+    notVisible: { id: "weight-entry-sheet" }
+    timeout: 10000
+- openLink: "boga3://train"
+- extendedWaitUntil:
+    visible: { id: "train-resume-session-button" }
+    timeout: 30000
+- tapOn: { id: "train-resume-session-button" }
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+      text: "Session body weight, 80 kg, .*Reading from ${output.bodyweightPast}"
+    timeout: 30000
 - tapOn:
     id: "top-level-tab-more"
 - extendedWaitUntil:

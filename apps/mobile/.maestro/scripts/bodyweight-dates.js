@@ -7,6 +7,7 @@ function stamp(date) {
 }
 var now = new Date();
 output.bodyweightPast = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 10, 0));
+output.bodyweightRevised = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 11, 0));
 output.bodyweightFuture = stamp(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7, 10, 0));
 
 output.bodyweightWeightedDate = stamp(new Date(now.getTime() - 3 * 86400000)).slice(0, 10);

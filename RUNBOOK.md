@@ -818,7 +818,12 @@ Never reset the hosted database for this cutover.
 1. **Distribute compatibility first.** Commit `11509384` contains only the
    update-required client support and its tests. It keeps the old schema and
    old sync protocol. From a clean release worktree at that commit, run the
-   required gates and build/submit the store profile:
+   required gates and build/submit the store profile. The commands below use
+   `prod` (`com.phano.boga3`). If the installed TestFlight fleet uses `preview`
+   (`com.phano.boga3.dev`), use `--profile preview` in **both** build and submit
+   commands, for **both** releases. Confirm that profile's EAS environment points
+   at the same hosted project selected in step 2; distributing another bundle
+   cannot update the installed fleet.
 
    ```bash
    ./boga worktree create --from 11509384 codex/bodyweight-compat-release
