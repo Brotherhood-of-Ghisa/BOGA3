@@ -97,3 +97,14 @@ acknowledgement, within the PostgreSQL/ISO 1 ms rounding difference, and also
 asserts the lower bound. All ten sync e2e tests then passed in
 `/tmp/boga-m27-offline-sync-v2-e2e-verified.log`, including synthetic drift and
 as-built zero-error/zero-warning recovery. `./boga doctor` passed.
+
+All backend lanes are now green for the coaching/offline integration. Auth,
+group contract/evaluator/board/certification lanes passed in
+`/tmp/boga-m27-coaching-offline-backend.log`; the corrected API lane passed in
+`/tmp/boga-m27-coaching-agent-api-fix.log`. Schema, push, pull, wipe and drift
+passed in `/tmp/boga-m27-offline-<lane>-final.log`; sync e2e, real sync (six
+suites / 15 tests) and the real four-tool OAuth MCP smoke passed in
+`/tmp/boga-m27-offline-<lane>-verified.log`. MCP smoke checks B80 +20×8 = 800
+through the actual API, preserving 20 raw and 100 effective load. Timings and
+trigger rules: `/tmp/boga-m27-coaching-offline-{timings,test-for}.log`. No PR or
+deployment has occurred; native integration verification is running separately.

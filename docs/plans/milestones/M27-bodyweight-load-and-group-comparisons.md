@@ -433,7 +433,9 @@ cards when shipped, marking their task-table entries completed.
   owner-filtered rules, frozen session weight and raw unit/mode through the
   shared mobile boundary. Additive metric semantics preserve external kg fields
   and expose effective resistance, provenance and completeness. MCP remains a
-  four-tool protocol adapter. Runtime parity, real OAuth smoke and full fast/
-  backend gates are pending; mobile code stays fixed for T07 device verification.
+  four-tool protocol adapter. Runtime API parity, real OAuth MCP smoke and every fast/backend lane have
+  passed locally. The T11 card links aggregate and resumed lane evidence.
+  Mobile source at `5f9e3f6` includes the offline-upgrade review follow-up;
+  small/large/full-frontend verification is running before further mobile edits.
   [T11](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md)
   tracks proof and compatible response evolution.

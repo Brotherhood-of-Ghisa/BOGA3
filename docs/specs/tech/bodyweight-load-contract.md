@@ -383,7 +383,7 @@ legacy conversion refresh records/history on save or focus. New readings leave
 old projections unchanged. Shared-session, group and coaching consumers require
 their own corresponding integration; this section does not claim their rollout.
 
-## 9. Coaching integration (local implementation; verification pending)
+## 9. Coaching integration (locally verified; hosted rollout pending)
 
 `supabase/functions/agent-api/training-metrics.ts` adapts owner-filtered wire
 rows to the same analytics and full-snapshot validation boundary used by mobile.
@@ -398,5 +398,6 @@ basis, session provenance and explicit volume coverage. Incomplete or truncated
 totals are null; records exclude incomplete session volume. MCP passes both
 structured and text JSON through without recalculating or acquiring database
 access. The [API contract](../../../supabase/functions/agent-api/README.md#effective-load-response-evolution)
-owns response shapes and compatibility details. T11 gates and T12 hosted
-verification remain required before declaring this consumer complete.
+owns response shapes and compatibility details. Fast, backend contract parity
+and real OAuth MCP smoke passed locally; T12 still owns hosted rollout and
+deployed verification.
