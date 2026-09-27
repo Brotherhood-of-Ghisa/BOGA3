@@ -309,9 +309,9 @@ activation has occurred.
 | Handle teardown | Green, 183 suites / 2,243 tests; `/tmp/boga-m27-merged-handles.log` |
 | Native smoke, data and UI regression | Green on integrated source; `/tmp/boga-m27-merged-frontend.log` |
 | Native exercise and session flows | Green after fixing safe-area dismissal and keyboard-obscured Add taps; `/tmp/boga-m27-merged-native-final.log` |
-| Native bodyweight entry, logging and backfill | Green in `M27-review-viewport/20260927-112539-413`; analytics and subsequent lanes are still running |
-| Native two-user groups | Earlier baseline passed the full M27 sequence in `M27-long-stream/20260927-102333-82851`; fresh integrated-source run remains pending |
-| Native reinstall with two frozen weights | Flow now saves 80/82 kg readings and two sessions, wipes/signs in, then checks both restored snapshots/readings; fresh native verification pending |
+| Native bodyweight entry, logging, backfill and analytics | All four green in `M27-review-viewport/20260927-112539-413`; `/tmp/boga-m27-review-viewport-frontend.log` |
+| Native auth and two-user groups | Auth and both groups flows green on integrated source; `M27-review-viewport/20260927-114553-6692`, `20260927-115139-11377`, `20260927-115956-13621`; same resumed frontend log |
+| Native wipe/sign-in with two frozen weights | Green: real editor saves 80/82 kg and two workouts; real sync/bootstrap restores both frozen snapshots, provenance and private readings; `M27-review-viewport/20260927-114819-8825` |
 | Small/large and offline group UI | Earlier personal captures predate the merged Sheet; fresh bodyweight/groups runs and actual gateway-outage captures remain pending |
 | Hosted rollout | Server-first migration/function/smoke/activation procedure prepared in RUNBOOK; not executed |
 
@@ -324,8 +324,10 @@ passes. No assertion or required lane was waived. Latest flow metadata check:
 `./boga test for` confirms the required fast/backend/frontend union. Timing
 records were imported into the machine store and verified byte-for-byte before
 removal from the branch, matching current spec 02; `./boga timings` reads them.
-Remaining work: complete native lanes, compare dense states on all three phone
-sizes, finish real outage/error proof, validate the PR gate table, then perform
+All required frontend constituent lanes are now green across the aggregate and
+resumed runs, on unchanged app source `b636f234`. Remaining work: compare dense
+states on the small/large phones, finish real outage/error proof, validate the
+PR gate table, then perform
 authorised hosted smoke before client activation. Do not retire the plan early.
 
 ## Milestone acceptance

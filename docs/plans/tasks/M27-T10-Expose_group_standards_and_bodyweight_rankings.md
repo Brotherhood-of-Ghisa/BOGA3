@@ -78,15 +78,17 @@ Implementation is integrated with `origin/main` at `8b5c47c1`; app/server source
 is `b636f234`. The milestone's [current acceptance table](../milestones/M27-bodyweight-load-and-group-comparisons.md#current-execution-checkpoint-2026-09-27)
 owns the latest gate results and remaining work, replacing earlier partial-run
 checkpoints here. Full fast (183 suites / 2,243 tests), backend and handles are
-green. Native constituent lanes are being completed on this integrated source;
-failed aggregates are not counted as passes. No assertion has been waived.
+green. Every required baseline frontend constituent lane is now green on this
+integrated source; failed aggregates are not counted as passes. No assertion
+has been waived.
 
 Baseline two-user proof covers ranking reversal, estimated/missing weight,
 100%→70% rules publication, preserved attestation, correction invalidation,
 legacy unlink/relink, former-member read-only details and removed-member denial.
 Fresh three-size layouts, cached-board outage and failed-publication evidence
 remain open. The sync flow now checks two frozen weights across a local wipe
-and real bootstrap; its fresh native result is pending.
+and real bootstrap; its fresh native run passed, including restored readings
+and both original snapshot values/provenance.
 
 `RUNBOOK.md` contains the exact server-first migration/function order, hosted
 acceptance and forward-repair boundaries. No PR, hosted deployment or client
