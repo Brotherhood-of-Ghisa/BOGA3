@@ -16,16 +16,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 
 - Router system: `expo-router` (file-based routes in `apps/mobile/app/`)
 - Root stack/layout: `apps/mobile/app/_layout.tsx`
-- A route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`) wraps the whole navigator inside the root layout. It runs before any screen paints and decides whether the user may proceed:
-  - while the session restore is in flight, it renders a neutral loading view (no flash of the sign-in screen or a data screen);
-  - when auth is configured and there is no session — or a sync cycle reported "no signed-in user" — it redirects to `/sign-in`, so a configured-but-signed-out launch never reaches a data screen;
-  - when auth is unconfigured (no working credential path), it stands aside so local-only tracker routes remain available; the `/sign-in` route still shows the disabled credential path when opened directly;
-  - `/sign-in` is exempt so the redirect cannot loop, and `/maestro-harness` is exempt so infra-free Maestro lanes can run the harness action before teleporting; the harness route still self-gates to development/test runtime contexts.
-- A first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`) wraps the navigator immediately **below** the auth guard, so it only applies to a signed-in user. It keys on the persisted `sync_runtime_state.bootstrap_completed_at` flag:
-  - while the flag is null for a signed-in user, it renders a full-screen "Setting up your data…" block (a phase label plus an advancing activity/progress indicator; an offline message instead of an indefinite spinner when the device is offline) in place of the navigator — no data screen is reachable until the first sync cycle drains;
-  - once the flag is set, it renders the navigator through and the normal routes paint;
-  - on a non-`AUTH_REQUIRED` cycle error it shows the error message and a single Retry that fires exactly one cycle; when the latest cycle outcome is `AUTH_REQUIRED` it redirects to `/sign-in` and renders no Retry;
-  - it stands aside (renders through) when there is no session or auth is unconfigured, so an unconfigured/local build is never trapped behind a block nothing will lift; the `/sign-in` and `/maestro-harness` routes are exempt so redirects and harness setup cannot loop.
+- Root route access is enforced by the navigator itself. The root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under exactly one `Stack.Protected` group per access level, and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one level at a time:
+  - `sign-in` — auth is configured and there is no session, or a sync cycle reported "no signed-in user": only `/sign-in` exists, so a configured-but-signed-out launch never reaches a data screen;
+  - `sync-setup` — a signed-in user whose first sync has not drained (`sync_runtime_state.bootstrap_completed_at` is null): only the first-sync block `/sync-setup` exists (a phase label plus an advancing activity/progress indicator; an offline message instead of an indefinite spinner when the device is offline; on a non-`AUTH_REQUIRED` cycle error, the message and a single Retry that fires exactly one cycle);
+  - `app` — everything else, including an unconfigured build (no working credential path), where no session or first sync can ever exist; `/sign-in` stays reachable there to show the disabled credential path when opened directly.
+- When the level changes, the routes of the old level leave the stack and the router lands on the first route still declared: `/sign-in`, `/sync-setup`, or `index` (which redirects to `/today`). A deep link to a route of another level lands the same way.
+- The navigator is never unmounted or swapped out to gate access: on expo-router 57, unmounting it reverts the route, so a gate that renders a `<Redirect>` or a block in its place loops ("Maximum update depth exceeded"). The only thing rendered instead of the navigator is the restore guard's neutral loading view (`apps/mobile/components/navigation/auth-route-guard.tsx`), before the navigator first mounts, while the session restore is in flight.
+- Every root route file must be declared in the root stack: Expo Router appends an undeclared one outside every `Stack.Protected` group (`app/__tests__/root-stack-routes.test.ts` fails on one).
+- `/maestro-harness` (dev/test self-gated) is declared last and exists at every level except `sign-in`: it is what lifts the first-sync block in tests, and it must never be where the router lands.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/stats-history` resolves to `app/(tabs)/stats-history.tsx`).
 - Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior (except `completed-session/[sessionId]`, which draws its own top bar).
 - Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
@@ -433,14 +431,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - in-place auth-state rerender on sign-in/sign-out; no route replacement
 23. `/exercise-history` -> `/completed-session/<sessionId>`
    - session card tap or all-time-best row tap
-24. (any guarded route) -> `/sign-in`
-   - route-layer auth-guard redirect on a configured-but-no-session launch, or when a sync cycle reports "no signed-in user" (`<Redirect />`)
-25. `/sign-in` -> `/`
-   - successful sign-in: the guard stops redirecting and the app proceeds to the normal route; an already-signed-in render of `/sign-in` also redirects to `/`
-26. (any signed-in route) -> first-sync block
-   - the first-sync gate (below the auth guard) renders a full-screen "Setting up your data…" block in place of the navigator while `sync_runtime_state.bootstrap_completed_at` is null for a signed-in user; this is render-substitution, not a route replacement (the URL is unchanged), and it dismisses in place once the flag is set
-27. first-sync block -> `/sign-in`
-   - when the latest sync cycle outcome is `AUTH_REQUIRED`, the gate redirects to `/sign-in` (no Retry); the `/sign-in` route is exempt from the block so the redirect cannot loop
+24. (any app route) -> `/sign-in`
+   - a configured-but-no-session launch or sign-out, or a sync cycle reporting "no signed-in user": the root stack switches to `sign-in` access and the router lands on `/sign-in`
+25. `/sign-in` -> `/sync-setup` or `/`
+   - successful sign-in: the root stack removes `/sign-in`; the router lands on `/sync-setup` until the first sync drains, else on `index` (-> `/today`)
+26. `/sync-setup` -> `/`
+   - the first sync drains (`sync_runtime_state.bootstrap_completed_at` set): the root stack removes `/sync-setup` and the router lands on `index` (-> `/today`)
+27. `/sync-setup` -> `/sign-in`
+   - the latest sync cycle outcome is `AUTH_REQUIRED`: `sign-in` access, no Retry
 28. `/groups` -> `/group/mine`
    - `My groups` header action
 29. `/group/mine` -> `/group/<groupId>`

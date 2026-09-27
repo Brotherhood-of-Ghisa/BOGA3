@@ -6,19 +6,15 @@ jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+// Leaving sign-in once the user may use the app is the root stack's job
+// (root-stack-routing.test.tsx), not this screen's.
 jest.mock('expo-router', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
-  const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
   const Stack = () => null;
   Stack.displayName = 'MockStack';
   const StackScreen = () => null;
   StackScreen.displayName = 'MockStackScreen';
   Stack.Screen = StackScreen;
-  const Redirect = ({ href }: { href: string }) =>
-    React.createElement(Text, { testID: 'sign-in-redirect' }, href);
-  Redirect.displayName = 'MockRedirect';
   return {
-    Redirect,
     Stack,
   };
 });
@@ -134,15 +130,6 @@ describe('SignInScreen', () => {
     expect(
       screen.getByText('Supabase mobile auth is not configured. Missing EXPO_PUBLIC_SUPABASE_URL.'),
     ).toBeTruthy();
-    expect(screen.queryByTestId('sign-in-card')).toBeNull();
-  });
-
-  it('redirects away when a session already exists', () => {
-    mockUseAuth.mockReturnValue(createAuthValue({ session: { user: { id: 'user-1' } } }));
-
-    render(<SignInScreen />);
-
-    expect(screen.getByTestId('sign-in-redirect').props.children).toBe('/');
     expect(screen.queryByTestId('sign-in-card')).toBeNull();
   });
 });

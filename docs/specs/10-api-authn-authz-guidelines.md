@@ -85,12 +85,12 @@ flowchart TD
   auth_boot --> config{Supabase mobile env configured?}
 
   config -- No --> missing_env[Auth snapshot: ready, no session, disabledReason]
-  missing_env --> guard_no_env[Route guard sees no session]
+  missing_env --> guard_no_env[Root stack: app access, sign-in still reachable]
   guard_no_env --> sign_in_disabled[/sign-in: show sign-in unavailable + missing env]
 
   config -- Yes --> restore[Supabase auth.getSession from persisted auth storage]
   restore --> restoring{Restore in flight?}
-  restoring -- Yes --> loading[Route guard shows neutral Loading state]
+  restoring -- Yes --> loading[Restore guard shows neutral Loading state]
   loading --> restore
   restoring -- No --> session{Restored session?}
 
@@ -125,8 +125,9 @@ flowchart TD
 
 - `apps/mobile/src/auth/supabase.ts` owns mobile Supabase client config and persisted-session options.
 - `apps/mobile/src/auth/service.ts` owns bootstrapping/restoring the Supabase Auth session and publishing the shared auth snapshot.
-- `apps/mobile/src/sync/use-auth-required-redirect.ts` owns the pure "should route to sign-in?" selector shared by the route guard and sync gate.
-- `apps/mobile/components/navigation/auth-route-guard.tsx` owns the top-level redirect/loading decision before app screens render.
+- `apps/mobile/src/sync/use-auth-required-redirect.ts` owns the pure "should route to sign-in?" selector.
+- `apps/mobile/src/navigation/root-route-access.ts` owns the root access level (`sign-in` / `sync-setup` / `app`) built on it, and `apps/mobile/components/navigation/root-stack.tsx` enforces it with one `Stack.Protected` group per level (`docs/specs/ui/navigation-contract.md` "Router baseline").
+- `apps/mobile/components/navigation/auth-route-guard.tsx` owns the neutral loading view while the session restore is in flight.
 - `apps/mobile/app/sign-in.tsx` owns credential entry, inline auth errors, and the missing-auth-config disabled state.
 
 ## Local development / test expectations

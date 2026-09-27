@@ -1,41 +1,21 @@
-import { Redirect, usePathname } from 'expo-router';
 import type { PropsWithChildren } from 'react';
 import { Screen } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
 import { useAuth } from '@/src/auth';
-import { SIGN_IN_ROUTE, isMaestroHarnessRoutePathname, isSignInRoutePathname } from '@/src/navigation/routes';
-import { useShouldRouteToSignIn } from '@/src/sync/use-auth-required-redirect';
 
 /**
- * Route-layer auth gate. Wraps the whole navigator so it decides, before any
- * data screen paints, whether the user may proceed:
+ * Holds the root navigator until the session restore resolves, showing a neutral
+ * loading view. It does NOT flash the sign-in screen or a data screen: either
+ * could be wrong the moment auth resolves. Restore runs once, at boot, before the
+ * navigator first mounts, so this never unmounts a live navigator.
  *
- *   - While the session restore is in flight (`restoring`), it renders a neutral
- *     loading view. It does NOT flash the sign-in screen or a data screen — the
- *     decision is deferred until auth resolves.
- *   - Once resolved, if the app needs a session (auth configured + no session,
- *     or a sync cycle reported "no signed-in user"), it redirects to the sign-in
- *     route. A configured-but-signed-out launch therefore never reaches a data
- *     screen.
- *   - Otherwise it renders its children untouched. An unconfigured auth client
- *     remains a local-only tracker build; the sign-in route still shows the
- *     disabled credential path when opened directly.
- *
- * The sign-in route itself is exempt: the guard renders it through rather than
- * redirecting to it, so the redirect cannot loop. The Maestro harness route is
- * also exempt so infra-free device test lanes can run their local-data setup
- * links before teleporting; the harness screen still self-gates to dev/test
- * runtime contexts.
+ * Which routes a user may reach afterwards (sign-in, the first-sync block, or the
+ * app) is decided by the root stack's `Stack.Protected` groups
+ * (`components/navigation/root-stack.tsx`), not here.
  */
 export function AuthRouteGuard({ children }: PropsWithChildren) {
-  const { isConfigured, session, status } = useAuth();
-  const pathname = usePathname();
+  const { status } = useAuth();
 
-  const shouldRouteToSignIn = useShouldRouteToSignIn({ isConfigured, session });
-
-  // The session restore has not finished. Show a neutral placeholder rather than
-  // committing to either the sign-in screen or a data screen — either choice
-  // could be wrong and would flash the moment auth resolves.
   if (status === 'restoring') {
     return (
       <Screen>
@@ -44,13 +24,5 @@ export function AuthRouteGuard({ children }: PropsWithChildren) {
     );
   }
 
-  const isOnSignInRoute = isSignInRoutePathname(pathname);
-  const isOnMaestroHarnessRoute = isMaestroHarnessRoutePathname(pathname);
-
-  if (shouldRouteToSignIn && !isOnSignInRoute && !isOnMaestroHarnessRoute) {
-    return <Redirect href={SIGN_IN_ROUTE} />;
-  }
-
   return <>{children}</>;
 }
-

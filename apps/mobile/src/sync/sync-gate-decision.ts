@@ -8,10 +8,9 @@
 //   1. The gate only applies to a user the app holds a working session for. When
 //      auth is unconfigured (no working credential path) or there is no session
 //      yet, there is no first sync that will ever set the flag, so the gate
-//      stands aside and the app renders its normal routes. (The route-layer auth
-//      guard already redirects a configured-but-signed-out launch to sign-in
-//      before this gate is reached; an unconfigured local/dev build falls
-//      through both.)
+//      stands aside and the app renders its normal routes. (Root route access
+//      sends a configured-but-signed-out user to sign-in before this applies; an
+//      unconfigured local/dev build gets the app.)
 //   2. Once the device holds its restored data (`bootstrapCompletedAt` set), the
 //      gate is done — the app renders its normal routes.
 //   3. While the gate is up and the latest cycle ended "no signed-in user", the

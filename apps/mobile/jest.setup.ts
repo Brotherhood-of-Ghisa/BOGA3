@@ -21,7 +21,12 @@ jest.mock('react-native-safe-area-context', () => {
   const passthrough = ({ children }: { children?: unknown }) => children;
   const viewWrap = ({ children, ...props }: { children?: unknown }) =>
     React.createElement(View, props, children);
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  const frame = { x: 0, y: 0, width: 0, height: 0 };
   return {
+    // expo-router's Stack reads these through `use()` (SafeAreaProviderCompat).
+    SafeAreaInsetsContext: React.createContext(insets),
+    SafeAreaFrameContext: React.createContext(frame),
     SafeAreaProvider: passthrough,
     SafeAreaConsumer: ({ children }: { children: (insets: object) => unknown }) =>
       children({ top: 0, right: 0, bottom: 0, left: 0 }),
