@@ -89,3 +89,11 @@ fixture now sets that identity and keeps ownership triggers enabled. The full
 fast aggregate also passed, including five MCP tests and build, at `5f9e3f6`
 (`/tmp/boga-m27-offline-fast-final.log`). Remaining backend lanes/MCP smoke run
 sequentially before native verification; no full backend completion claimed yet.
+
+The remaining schema/push/pull/wipe/drift lanes passed. Sync e2e initially
+exposed the second host-clock clamp assertion (Docker measured 24 ms ahead);
+like the existing push-contract check it now compares to the server transaction
+acknowledgement, within the PostgreSQL/ISO 1 ms rounding difference, and also
+asserts the lower bound. All ten sync e2e tests then passed in
+`/tmp/boga-m27-offline-sync-v2-e2e-verified.log`, including synthetic drift and
+as-built zero-error/zero-warning recovery. `./boga doctor` passed.
