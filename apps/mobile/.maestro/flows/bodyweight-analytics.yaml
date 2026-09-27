@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# M27 T07: real projections from frozen history and explicit session correction.
+# Real projections from frozen history and explicit session correction.
 - openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-analytics&teleport=exercise-page&sessionId=maestro_bwa_active&sessionExerciseId=maestro_bwa_active_pull"
 - extendedWaitUntil:
     visible:
@@ -679,8 +679,9 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
-- hideKeyboard:
-    optional: true
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "exercise-editor-bodyweight-percentage"
@@ -693,10 +694,11 @@ appId: com.dinoderek.mobile
     id: "exercise-editor-bodyweight-percentage"
 - eraseText: 100
 - inputText: "70"
-- swipe:
-    start: "50%,40%"
-    end: "50%,25%"
-    duration: 500
+- assertVisible:
+    id: "exercise-editor-bodyweight-percentage"
+    text: "70"
+- tapOn:
+    text: "(?i)bodyweight contribution \\(%\\)"
 - waitForAnimationToEnd:
     timeout: 4000
 - tapOn: "Save exercise definition"

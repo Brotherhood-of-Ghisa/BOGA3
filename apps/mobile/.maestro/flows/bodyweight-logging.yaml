@@ -298,7 +298,7 @@ appId: com.dinoderek.mobile
     text: "Vol 800"
 - takeScreenshot: "BWO05-reloaded-reviewed-load"
 
-# M27 T05: real editing/review, explicit positive external loads and persisted modes.
+# Real editing/review, explicit positive external loads and persisted modes.
 # Uses a deliberately ambiguous historical fixture; no operation preconverts it.
 - openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-load&teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
 - tapOn:
@@ -328,8 +328,9 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-editor-name-input"
     timeout: 30000
-- hideKeyboard:
-    optional: true
+# The name autofocuses. Return reliably dismisses this text keyboard on iOS;
+# hideKeyboard can leave it over the percentage field on the smallest phone.
+- pressKey: Enter
 - waitForAnimationToEnd:
     timeout: 4000
 - scrollUntilVisible:
@@ -344,9 +345,24 @@ appId: com.dinoderek.mobile
     id: "exercise-editor-bodyweight-percentage"
 - eraseText: 100
 - inputText: "101"
-- hideKeyboard:
-    optional: true
+- assertVisible:
+    id: "exercise-editor-bodyweight-percentage"
+    text: "101"
+# Tap the field's non-interactive label to dismiss the decimal pad inside
+# this scroll view. A screen-relative swipe can start on the sheet backdrop.
+- tapOn:
+    text: "(?i)bodyweight contribution \\(%\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    id: "exercise-editor"
 - tapOn: "Save exercise definition"
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-bodyweight-error"
+    direction: DOWN
+    centerElement: false
+    timeout: 20000
 - extendedWaitUntil:
     visible:
       id: "exercise-editor-bodyweight-error"
@@ -364,12 +380,11 @@ appId: com.dinoderek.mobile
     id: "exercise-editor-bodyweight-percentage"
 - eraseText: 100
 - inputText: "100"
-# iOS decimal-pad has no Return key. Drag the form to dismiss it before
-# querying the next field; offscreen AX bounds can overlap the keyboard.
-- swipe:
-    start: "50%,40%"
-    end: "50%,25%"
-    duration: 500
+- assertVisible:
+    id: "exercise-editor-bodyweight-percentage"
+    text: "100"
+- tapOn:
+    text: "(?i)bodyweight contribution \\(%\\)"
 - waitForAnimationToEnd:
     timeout: 4000
 - scrollUntilVisible:
