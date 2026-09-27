@@ -159,10 +159,20 @@ afterEach(() => {
   fixture.close();
 });
 
+/** Drain the screen's reads inside act. Every RPC and cache read here resolves in
+ * microtasks, so act's drain covers the whole My groups → stream list mount →
+ * stream read chain, however long it takes. The file's first Groups mount loads
+ * the list/header module graph (seconds on a cold transform cache), which a
+ * findBy would race against its wall clock. A read that never settles leaves
+ * the state missing and the next getBy fails loud. */
+const settleReads = () => act(async () => {});
+
 describe('Groups tab and My groups actions', () => {
   it('keeps Join / Create off the Groups screen and on My groups', async () => {
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-stream-empty', {}, { timeout: 5_000 });
+    await settleReads();
+    expect(api.getGroupStream).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('groups-stream-empty')).toBeTruthy();
     expect(screen.queryByTestId('groups-create-button')).toBeNull();
     expect(screen.queryByTestId('groups-join-button')).toBeNull();
 
