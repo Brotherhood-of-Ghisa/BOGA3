@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
-import { exerciseDefinitions, exerciseSets } from '@/src/data/schema';
+import { exerciseSets } from '@/src/data/schema';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { correctSessionBodyWeight } from '@/src/data/bodyweight';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -34,9 +34,12 @@ export const seedBodyweightLoadFixture = async (now = new Date(), missingBodyWei
  * set tuple is hydrated or reviewed. Real SQL migration proof lives in Jest. */
 export const seedBodyweightOfflineReviewFixture = async (): Promise<void> => {
   await seedBodyweightLoadFixture();
+  // Use the same explicit configuration path as the editor so its catalogue
+  // cache observes the new rules before the exercise page opens.
+  await saveExerciseCatalogExercise({ id: 'maestro_bw_pull', name: 'Bodyweight Pull-Up', loadInputMode: 'total_load',
+    loadRules: { bodyweightCoefficient: 1, movementStandard: 'Strict pull-up', loadingMethod: 'Belt' },
+    mappings: [{ muscleGroupId: 'back_lats', weight: 1, role: 'primary' }] });
   const db = await bootstrapLocalDataLayer();
-  db.update(exerciseDefinitions).set({ bodyweightCoefficient: 1, movementStandard: 'Strict pull-up',
-    loadingMethod: 'Belt' }).where(eq(exerciseDefinitions.id, 'maestro_bw_pull')).run();
   db.update(exerciseSets).set({ weightValue: '100', repsValue: '8', weightUnit: 'kg', externalLoadMode: null,
     plannedWeightValue: '60', plannedRepsValue: '10', plannedWeightUnit: null, plannedExternalLoadMode: null,
     localBodyweightMetadataKnown: false, performanceStatus: 'unperformed' })

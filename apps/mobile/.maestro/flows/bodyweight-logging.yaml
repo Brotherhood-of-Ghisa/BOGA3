@@ -6,6 +6,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-page"
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 10000
 - waitForAnimationToEnd:
     timeout: 4000
 - scrollUntilVisible:
