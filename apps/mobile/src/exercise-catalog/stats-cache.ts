@@ -172,9 +172,11 @@ export const useExerciseCatalogStats = (
     void ensureExerciseCatalogStatsLoaded();
   }, []);
 
+  // Measured to when the history loaded. Before that there is no history, and
+  // an empty history aggregates to nothing whatever the date.
   const stats = useMemo(
     () =>
-      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt || Date.now())),
+      aggregateExerciseCatalogStats(current.rawHistory ?? EMPTY_RAW_HISTORY, period, new Date(current.loadedAt)),
     [current.rawHistory, current.loadedAt, period]
   );
 

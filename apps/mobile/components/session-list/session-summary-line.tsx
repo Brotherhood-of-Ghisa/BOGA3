@@ -28,16 +28,18 @@ export function formatLocationLabel(gymName: string | null): string | null {
 export type SessionSummaryLineProps = {
   session: SessionListItem;
   testIdPrefix: string;
+  // What an active session's elapsed time is measured to; without it an
+  // active session shows its stored duration.
   nowMs?: number;
 };
 
 export function SessionSummaryLine({
   session,
   testIdPrefix,
-  nowMs = Date.now(),
+  nowMs,
 }: SessionSummaryLineProps) {
   const durationLabel =
-    session.status === 'active'
+    session.status === 'active' && nowMs !== undefined
       ? formatCompactDuration(
           Math.max(0, Math.floor((nowMs - new Date(session.startedAt).getTime()) / 1000))
         )

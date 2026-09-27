@@ -49,11 +49,19 @@ export function LegacyLoadReviewContent({ exerciseId, visible, onDismiss, onAppl
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
 
+  // Opening, or Refresh, starts a fresh review, reset in the render that asks for it.
+  const reviewKey = visible ? JSON.stringify([exerciseId, refresh]) : null;
+  const [shownReviewKey, setShownReviewKey] = useState<string | null>(null);
+  if (reviewKey !== shownReviewKey) {
+    setShownReviewKey(reviewKey);
+    if (reviewKey !== null) {
+      setInventory(null); setPreview(null); setSelected([]); setError(null); setResult(null);
+      setUnit(''); setMeaning(null); setChoices({});
+    }
+  }
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    setInventory(null); setPreview(null); setSelected([]); setError(null); setResult(null);
-    setUnit(''); setMeaning(null); setChoices({});
     void listLegacyLoads(exerciseId).then(data => { if (!cancelled) setInventory(data); })
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load old sets.'); });
     return () => { cancelled = true; };

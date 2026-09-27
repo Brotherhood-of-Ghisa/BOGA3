@@ -33,18 +33,6 @@ module.exports = defineConfig([
     },
   },
   {
-    // eslint-plugin-react-hooks 7 (eslint-config-expo 57) reports every place the
-    // React Compiler bails out of optimizing. Bailed-out code still runs as written,
-    // so these are warnings until the flagged hooks are reworked.
-    rules: {
-      'react-hooks/refs': 'warn',
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/purity': 'warn',
-      'react-hooks/immutability': 'warn',
-      'react-hooks/preserve-manual-memoization': 'warn',
-    },
-  },
-  {
     // Node CLI scripts (CommonJS).
     files: ['scripts/**/*.js'],
     languageOptions: { globals: globals.node },

@@ -83,6 +83,9 @@ export type UseSessionListDataResult = {
   setSessions: React.Dispatch<React.SetStateAction<SessionListItem[]>>;
   isLoadingSessions: boolean;
   loadErrorMessage: string | null;
+  // Epoch-ms the sessions were last loaded: an active session's elapsed time
+  // is measured to it.
+  loadedAtMs: number;
   reloadSessions: () => Promise<void>;
 };
 
@@ -99,11 +102,15 @@ export function useSessionListData({
     Boolean(dataClient && isFocused)
   );
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+  const [loadedAtMs, setLoadedAtMs] = useState(() => Date.now());
   const requestGenerationRef = useRef(0);
   const isMountedRef = useRef(true);
   const showDeletedSessionsRef = useRef(showDeletedSessions);
 
-  showDeletedSessionsRef.current = showDeletedSessions;
+  // Declared before the load effect below, so a toggle's reload reads the new value.
+  useEffect(() => {
+    showDeletedSessionsRef.current = showDeletedSessions;
+  }, [showDeletedSessions]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -113,56 +120,80 @@ export function useSessionListData({
     };
   }, []);
 
-  const reloadSessions = useCallback(async () => {
+  // Fetches and applies the sessions; the caller has already shown loading.
+  const fetchSessions = useCallback((): Promise<void> => {
     if (!dataClient) {
-      return;
+      return Promise.resolve();
     }
 
     const requestGeneration = requestGenerationRef.current + 1;
     requestGenerationRef.current = requestGeneration;
+    const isCurrent = () =>
+      isMountedRef.current && requestGenerationRef.current === requestGeneration;
 
+    return dataClient
+      .loadSessions({ showDeletedSessions: showDeletedSessionsRef.current })
+      .then(
+        (loadedSessions) => {
+          if (!isCurrent()) return;
+          setLoadedAtMs(Date.now());
+          setSessions(loadedSessions);
+        },
+        (error: unknown) => {
+          if (!isCurrent()) return;
+          setLoadErrorMessage(error instanceof Error ? error.message : 'Unable to load sessions');
+        }
+      )
+      .finally(() => {
+        if (isCurrent()) {
+          setIsLoadingSessions(false);
+        }
+      });
+  }, [dataClient]);
+
+  const reloadSessions = useCallback(async () => {
+    if (!dataClient) {
+      return;
+    }
     if (isMountedRef.current) {
       setIsLoadingSessions(true);
       setLoadErrorMessage(null);
     }
+    await fetchSessions();
+  }, [dataClient, fetchSessions]);
 
-    try {
-      const loadedSessions = await dataClient.loadSessions({
-        showDeletedSessions: showDeletedSessionsRef.current,
-      });
-      if (!isMountedRef.current || requestGenerationRef.current !== requestGeneration) {
-        return;
-      }
-      setSessions(loadedSessions);
-    } catch (error) {
-      if (!isMountedRef.current || requestGenerationRef.current !== requestGeneration) {
-        return;
-      }
-      setLoadErrorMessage(error instanceof Error ? error.message : 'Unable to load sessions');
-    } finally {
-      if (isMountedRef.current && requestGenerationRef.current === requestGeneration) {
-        setIsLoadingSessions(false);
-      }
+  // Focusing, or changing what is listed, starts a load: show it in this render.
+  const [loadInputs, setLoadInputs] = useState({ dataClient, isFocused, showDeletedSessions });
+  if (
+    loadInputs.dataClient !== dataClient ||
+    loadInputs.isFocused !== isFocused ||
+    loadInputs.showDeletedSessions !== showDeletedSessions
+  ) {
+    setLoadInputs({ dataClient, isFocused, showDeletedSessions });
+    if (dataClient && isFocused) {
+      setIsLoadingSessions(true);
+      setLoadErrorMessage(null);
     }
-  }, [dataClient]);
+  }
 
   useEffect(() => {
     if (!dataClient || !isFocused) {
       return;
     }
 
-    void reloadSessions();
+    void fetchSessions();
 
     return () => {
       requestGenerationRef.current += 1;
     };
-  }, [dataClient, isFocused, reloadSessions, showDeletedSessions]);
+  }, [dataClient, fetchSessions, isFocused, showDeletedSessions]);
 
   return {
     sessions,
     setSessions,
     isLoadingSessions,
     loadErrorMessage,
+    loadedAtMs,
     reloadSessions,
   };
 }

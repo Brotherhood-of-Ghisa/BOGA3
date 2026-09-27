@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { ActionButton, Card, FormField, Icon, ListRow, Notice, Sheet, StatePanel, uiRoles } from '@/components/ui';
-import { parseBackfillRange } from '@/src/bodyweight/backfill';
+import { parseBackfillRange, type BackfillRange } from '@/src/bodyweight/backfill';
 import { sessionWeightSourceLabel } from '@/src/bodyweight/weight-entry';
 import { applySessionWeightBackfill, loadSessionWeightBackfill, previewSessionWeightBackfill,
   type SessionWeightBackfillInventory, type SessionWeightBackfillPreview } from '@/src/data/bodyweight-backfill';
@@ -24,30 +24,47 @@ export function SessionWeightBackfillSheet({ visible, onDismiss, onAfterDismiss,
   const busyRef = useRef(false);
   const generation = useRef(0);
   const scroll = useRef<ScrollView>(null);
-  const load = useCallback(async (start: string, end: string) => {
-    const current = ++generation.current;
-    setError(null); setPreview(null); setResult(null);
-    try {
-      const range = parseBackfillRange(start, end);
-      setInventory(null);
-      const next = await loadSessionWeightBackfill(range);
+  // Loads the sessions in `range` for request `current`; stale answers are dropped.
+  const fetchInventory = useCallback((range: BackfillRange, current: number) =>
+    loadSessionWeightBackfill(range).then(next => {
       if (current !== generation.current) return;
       setInventory(next); setRangeChanged(false);
       setSelected(next.rows.filter(row => row.status === 'ready').map(row => row.sessionId));
-    } catch (cause) {
+    }, cause => {
       if (current === generation.current) {
         setError(cause instanceof Error ? cause.message : 'Could not load sessions.');
         scroll.current?.scrollTo({ y: 0, animated: false });
       }
+    }), []);
+  const load = (start: string, end: string) => {
+    const current = ++generation.current;
+    setError(null); setPreview(null); setResult(null);
+    let range: BackfillRange;
+    try {
+      range = parseBackfillRange(start, end);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not load sessions.');
+      scroll.current?.scrollTo({ y: 0, animated: false });
+      return;
     }
-  }, []);
+    setInventory(null);
+    void fetchInventory(range, current);
+  };
+  // Opening starts from an empty range, reset in the render that opens.
+  const [shownVisible, setShownVisible] = useState(false);
+  if (visible !== shownVisible) {
+    setShownVisible(visible);
+    if (visible) {
+      setFrom(''); setThrough(''); setRangeChanged(false); setInventory(null);
+      setError(null); setPreview(null); setResult(null);
+    }
+  }
   useEffect(() => {
     if (!visible) return;
-    setFrom(''); setThrough(''); setRangeChanged(false); setInventory(null);
     scroll.current?.scrollTo({ y: 0, animated: false });
-    void load('', '');
+    void fetchInventory(parseBackfillRange('', ''), ++generation.current);
     return () => { generation.current += 1; };
-  }, [load, visible]);
+  }, [fetchInventory, visible]);
 
   const prepare = () => {
     if (!inventory) return;
@@ -104,7 +121,7 @@ export function SessionWeightBackfillSheet({ visible, onDismiss, onAfterDismiss,
           testID="bodyweight-backfill-through" accessibilityLabel="Fill session weights through date"
           onChangeText={value => { setThrough(value); setRangeChanged(true); }} />
         <ActionButton label="Apply date range" variant="outline" testID="bodyweight-backfill-range"
-          onPress={() => { void load(from, through); }} />
+          onPress={() => load(from, through)} />
         {!inventory && !error ? <StatePanel kind="loading" body="Loading missing session weights…" /> : null}
         {inventory && !inventory.hasReadings ? <StatePanel title="Add a reading first" body="A reading is needed to preview weights. You can also set an individual session weight from its detail screen."
           testID="bodyweight-backfill-no-readings" action={{ label: 'Add reading', onPress: onAddReading }} /> : null}
@@ -125,7 +142,7 @@ export function SessionWeightBackfillSheet({ visible, onDismiss, onAfterDismiss,
         </> : null}
       </>}
       {!busy && !result ? <ActionButton label="Refresh preview" variant="outline" testID="bodyweight-backfill-refresh"
-        onPress={() => { void load(from, through); }} /> : null}
+        onPress={() => load(from, through)} /> : null}
       {!busy && !result ? <ActionButton label="Cancel" variant="outline" testID="bodyweight-backfill-cancel" onPress={onDismiss} /> : null}
     </ScrollView>
   </Sheet>;

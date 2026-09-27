@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
@@ -43,12 +43,12 @@ export function GroupExerciseForm({
   // Until the user edits, follow the prefill: a fresher server read that lands
   // after the cached render replaces it, so Save never sends stale fields.
   const [dirty, setDirty] = useState(false);
-  useEffect(() => {
-    if (!dirty) {
-      setName(initialCore.name);
-      setLoadInputMode(initialCore.loadInputMode);
-    }
-  }, [dirty, initialCore.name, initialCore.loadInputMode]);
+  const [followed, setFollowed] = useState({ name: initialCore.name, loadInputMode: initialCore.loadInputMode });
+  if (!dirty && (followed.name !== initialCore.name || followed.loadInputMode !== initialCore.loadInputMode)) {
+    setFollowed({ name: initialCore.name, loadInputMode: initialCore.loadInputMode });
+    setName(initialCore.name);
+    setLoadInputMode(initialCore.loadInputMode);
+  }
   const validation = validateExerciseCore({ name, loadInputMode });
   const nameError = showErrors && !validation.ok && validation.issue === 'name_required' ? validation.message : null;
 

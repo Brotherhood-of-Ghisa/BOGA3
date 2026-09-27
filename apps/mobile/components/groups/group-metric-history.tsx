@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
 import { ChipGroup, SegmentedControl } from '@/components/ui';
@@ -47,11 +47,15 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : rules.default_metric;
   const [scope, setScope] = useState(initialScope);
   const [view, setView] = useState<'events' | 'scores'>('events');
-  useEffect(() => {
+  // A requested view (a reused route, or a param change) replaces the local picks in the render that sees it.
+  const requestKey = JSON.stringify([exerciseId, exercise.rules_revision, initialRevision, initialMetric, initialScope]);
+  const [shownRequestKey, setShownRequestKey] = useState(requestKey);
+  if (shownRequestKey !== requestKey) {
+    setShownRequestKey(requestKey);
     setPickedRevision(initialRevision ?? exercise.rules_revision);
     setPickedMetric(isGroupMetric(initialMetric) ? initialMetric : null);
     setScope(initialScope);
-  }, [exerciseId, exercise.rules_revision, initialRevision, initialMetric, initialScope]);
+  }
   const selectView = (nextMetric: GroupMetric, nextScope: GroupBoardScope, nextRevision: number) => {
     setPickedMetric(nextMetric);
     setScope(nextScope);

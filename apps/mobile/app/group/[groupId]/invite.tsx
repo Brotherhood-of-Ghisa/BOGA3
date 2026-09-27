@@ -75,10 +75,13 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
   const allowed = role === null || canManageGroup(role);
 
   const runLoad = load.run;
-  const loadCode = useCallback(async () => {
-    const result = await runLoad(groupId);
-    if (result.ok) setCode(result.value.code);
-  }, [groupId, runLoad]);
+  const loadCode = useCallback(
+    () =>
+      runLoad(groupId).then((result) => {
+        if (result.ok) setCode(result.value.code);
+      }),
+    [groupId, runLoad],
+  );
 
   useEffect(() => {
     if (allowed) void loadCode();

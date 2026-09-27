@@ -37,32 +37,44 @@ export default function ConnectedAgentsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [revokingClientId, setRevokingClientId] = useState<string | null>(null);
 
-  const loadAgents = async () => {
+  // Fetches and applies the agents; the caller has already shown loading.
+  const fetchAgents = () =>
+    listConnectedAgents()
+      .then(setAgents, (loadError: unknown) => {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Unable to load connected agents right now.',
+        );
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+
+  const loadAgents = () => {
     setIsLoading(true);
     setError(null);
-    try {
-      setAgents(await listConnectedAgents());
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : 'Unable to load connected agents right now.',
-      );
-    } finally {
-      setIsLoading(false);
-    }
+    return fetchAgents();
   };
 
-  useEffect(() => {
-    if (!user) {
+  // A session change reloads this data boundary through its user ID: shown
+  // in the render that sees it, fetched by the effect below.
+  const userId = user?.id ?? null;
+  const [shownUserId, setShownUserId] = useState<string | null | undefined>(undefined);
+  if (shownUserId !== userId) {
+    setShownUserId(userId);
+    if (userId) {
+      setIsLoading(true);
+    } else {
       setAgents([]);
-      setError(null);
-      return;
     }
-    void loadAgents();
-    // A session change remounts this data boundary through its user ID.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    setError(null);
+  }
+
+  useEffect(() => {
+    if (!userId) return;
+    void fetchAgents();
+  }, [userId]);
 
   const revoke = async (agent: ConnectedAgent) => {
     setRevokingClientId(agent.clientId);
