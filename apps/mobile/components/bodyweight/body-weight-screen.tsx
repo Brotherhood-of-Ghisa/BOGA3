@@ -13,6 +13,7 @@ import { weightStyles as styles } from './styles';
 type Editor = { reading: BodyWeightMeasurement | null; measuredAt: Date };
 export function BodyWeightScreen() {
   const [readings, setReadings] = useState<BodyWeightMeasurement[] | null>(null);
+  const [loadedAtMs, setLoadedAtMs] = useState(0);
   const [error, setError] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorVisible, setEditorVisible] = useState(false);
@@ -23,7 +24,10 @@ export function BodyWeightScreen() {
   const load = useCallback(async () => {
     const current = ++generation.current;
     setError(false);
-    try { const rows = await listBodyWeightReadings(); if (current === generation.current) setReadings(rows); }
+    try {
+      const rows = await listBodyWeightReadings();
+      if (current === generation.current) { setReadings(rows); setLoadedAtMs(Date.now()); }
+    }
     catch { if (current === generation.current) setError(true); }
   }, []);
   useFocusEffect(useCallback(() => {
@@ -31,7 +35,7 @@ export function BodyWeightScreen() {
     return () => { generation.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
   }, [load, datedWeightRevision]));
-  const current = readings?.find(row => row.measuredAt.getTime() <= Date.now());
+  const current = readings?.find(row => row.measuredAt.getTime() <= loadedAtMs);
   const currentValid = current && isValidBodyWeightReading(current);
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">

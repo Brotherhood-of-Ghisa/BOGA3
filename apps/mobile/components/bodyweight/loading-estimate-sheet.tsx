@@ -29,10 +29,10 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
   const [weightHint, setWeightHint] = useState('');
   const [currentReading, setCurrentReading] = useState<{ weightKg: number; measuredAt: Date } | null>(null);
   const [currentReadingInvalid, setCurrentReadingInvalid] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [result, setResult] = useState<Projection | null>(null);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const initializedExercise = useRef<string | null>(null);
   const targetWeightEdited = useRef(false);
@@ -40,22 +40,29 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
   const bodyweight = context.bodyweightCoefficient > 0;
   useEffect(() => { scroll.current?.scrollTo({ y: 0, animated: false }); }, [visible, choosingSource]);
   // Opening, a new target, or Try again starts a fresh load, reset in the render that asks for it.
-  const loadKey = visible && exerciseId
+  const formKey = visible && exerciseId
     ? JSON.stringify([exerciseId, context.bodyweightCoefficient, context.loadInputMode, context.bodyWeightKg, retry])
     : null;
-  const [shownLoadKey, setShownLoadKey] = useState<string | null>(null);
-  if (loadKey !== shownLoadKey) {
-    setShownLoadKey(loadKey);
-    if (loadKey !== null) {
-      setLoading(true); setLoadError(null); setInputError(null); setResult(null); setChoosingSource(false); setUnit('kg');
+  const requestKey = formKey === null ? null : JSON.stringify([formKey, datedWeightRevision]);
+  const [shownFormKey, setShownFormKey] = useState<string | null>(null);
+  if (formKey !== shownFormKey) {
+    setShownFormKey(formKey);
+    if (formKey !== null) {
+      setLoadError(null); setInputError(null); setResult(null); setChoosingSource(false); setUnit('kg');
     }
   }
+  const [shownRequestKey, setShownRequestKey] = useState<string | null>(null);
+  if (requestKey !== shownRequestKey) {
+    setShownRequestKey(requestKey);
+    if (requestKey !== null) { setLoadError(null); setResult(null); }
+  }
+  const loading = requestKey !== null && requestKey !== loadedRequestKey;
   useEffect(() => {
     if (!visible || !exerciseId) { initializedExercise.current = null; return; }
     const initialize = initializedExercise.current !== exerciseId;
+    const currentRequestKey = JSON.stringify([JSON.stringify([exerciseId, context.bodyweightCoefficient, context.loadInputMode, context.bodyWeightKg, retry]), datedWeightRevision]);
     let cancelled = false;
-    setLoading(true); setLoadError(null); setResult(null);
-    if (initialize) { setInputError(null); setChoosingSource(false); setUnit('kg'); targetWeightEdited.current = false; }
+    if (initialize) targetWeightEdited.current = false;
     void Promise.all([loadExercisePerformanceHistory({ exerciseDefinitionId: exerciseId, period: 'all' }), readCurrentBodyWeight()])
       .then(([history, current]) => {
         if (cancelled) return;
@@ -67,14 +74,19 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
         const validCurrent = current !== null && isValidBodyWeightReading(current);
         setCurrentReading(validCurrent ? current : null);
         setCurrentReadingInvalid(current !== null && !validCurrent);
+        setLoadedRequestKey(currentRequestKey);
         const targetHasWeight = context.bodyWeightKg != null && Number.isFinite(context.bodyWeightKg) && context.bodyWeightKg > 0;
         if (!targetWeightEdited.current) {
         setBodyWeight(targetHasWeight ? String(context.bodyWeightKg) : '');
         setWeightHint(targetHasWeight ? 'Prefilled from this session’s dated body weight. Edit for a different target.'
           : 'Enter a target body weight or choose a current reading. Saved performances stay unchanged.');
         }
-      }).catch(cause => { if (!cancelled) setLoadError(cause instanceof Error ? cause.message : 'Could not load source performances.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      }).catch(cause => {
+        if (!cancelled) {
+          setLoadError(cause instanceof Error ? cause.message : 'Could not load source performances.');
+          setLoadedRequestKey(currentRequestKey);
+        }
+      });
     return () => { cancelled = true; };
   }, [visible, exerciseId, context.bodyweightCoefficient, context.loadInputMode, context.bodyWeightKg, retry, datedWeightRevision]);
   const clearResult = () => { setResult(null); setInputError(null); };
@@ -88,7 +100,7 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
     onDismiss={onDismiss} dismissLabel="Dismiss loading estimate" testID="loading-estimate-sheet">
     <ScrollView ref={scroll} style={{ maxHeight: height * 0.8, flexGrow: 0 }} contentContainerStyle={styles.form}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="loading-estimate-scroll">
-      {loading && initializedExercise.current !== exerciseId ? <StatePanel kind="loading" body="Loading performed sets…" /> : loadError ? <StatePanel kind="error" body={loadError}
+      {loading ? <StatePanel kind="loading" body="Loading performed sets…" /> : loadError ? <StatePanel kind="error" body={loadError}
         action={{ label: 'Try again', onPress: () => setRetry(value => value + 1) }} /> : sources.length === 0 ?
         <StatePanel title="No usable source performance" body="A completed, performed set with a known load is needed. For bodyweight exercises, add a reading on or before that session first." testID="loading-estimate-empty" /> :
         choosingSource ? <>

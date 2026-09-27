@@ -1329,8 +1329,11 @@ export default function StatsRoute() {
   useEffect(() => {
     if (observedWeightRevision.current === datedWeightRevision) return;
     observedWeightRevision.current = datedWeightRevision;
-    if (selectedMuscle) void handlePressMuscleHistory(selectedMuscle);
-    if (selectedExercise) void handlePressExerciseHistory(selectedExercise);
+    const refresh = setTimeout(() => {
+      if (selectedMuscle) void handlePressMuscleHistory(selectedMuscle);
+      if (selectedExercise) void handlePressExerciseHistory(selectedExercise);
+    }, 0);
+    return () => clearTimeout(refresh);
   }, [datedWeightRevision, selectedMuscle, selectedExercise, handlePressMuscleHistory, handlePressExerciseHistory]);
 
   const handleDismissExerciseHistory = useCallback(() => {
