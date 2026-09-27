@@ -74,5 +74,9 @@ complete and delete this card when shipped.
 
 Pure metric/rule validation, explicit link compatibility and the proposed v2 unit/revision-aware wire types are integrated. Server schema/RPC compatibility, versioned publication, history and cache integration remain pending.
 
-Actual fast/backend/device gates are being run; TypeScript draft checks alone
-are not gate evidence. No new server RPC or group UI behavior is claimed shipped.
+Full fast and backend gates passed at `19fc54d`: 181 mobile suites / 2,150
+mobile tests, all backend contracts, 6 real-sync suites / 15 tests and real
+OAuth/MCP smoke. Logs: `/tmp/boga-m27-group-score-verified-fast.log` and
+`/tmp/boga-m27-group-score-verified-backend.log`. `./boga timings` and
+`./boga test for` ran. Device gates remain in progress. No new server RPC,
+publisher, certification behavior or group UI is claimed shipped.

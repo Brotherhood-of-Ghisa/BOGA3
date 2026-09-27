@@ -450,3 +450,13 @@ cards when shipped, marking their task-table entries completed.
   fresh three-size/full-frontend verification is pending. T08/T09 pure scoring
   and graph/metric contracts are now integrated for actual gate validation;
   server publication, certification and group UI are still unfinished.
+
+- **Group scorer gate checkpoint:** full fast and backend passed at `19fc54d`
+  (181 mobile suites / 2,150 tests; real sync 6 suites / 15 tests; all API,
+  group and MCP lanes). Logs: `/tmp/boga-m27-group-score-verified-{fast,backend}.log`.
+  An earlier fast attempt launched Node ABI 137 against an ABI 141 SQLite addon;
+  doctor passed, and pinning the local runner to the installed Node 25.9.0 / ABI
+  141 restored the matching runtime. No addon or dependency source was changed.
+  `/tmp/boga-m27-group-score-jest-probe.log` retains the diagnostic green run.
+  Small, large and full frontend runs are continuing with the fixture fix;
+  database rule publication and certification remain pending implementation.
