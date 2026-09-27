@@ -284,7 +284,7 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | in_progress |
 | [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | in_progress |
 | [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | in_progress |
-| [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | planned |
+| [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | in_progress |
 | [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | planned |
 | [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | planned |
 | [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | planned |
@@ -381,8 +381,11 @@ is complete merely because a downstream closeout card lists its tests.
   UI/server sync and both group flows. Final log:
   `/tmp/boga-m27-backfill-frontend-final.log`. Timings, trigger rules and docs
   checks ran; no gate was waived.
-  T07 analytics/calculator remains a separate draft with typecheck evidence
-  only; neither task is claimed shipped.
+  T07 analytics/calculator is integrated. Full fast passed (178 suites / 2,114
+  mobile tests), and full backend passed (including real sync and MCP smoke).
+  Device gates and visual proof remain pending. Logs:
+  `/tmp/boga-m27-analytics-fast-rerun.log`, `/tmp/boga-m27-analytics-backend.log`.
+  Neither task is claimed shipped.
 
 ## Milestone acceptance
 

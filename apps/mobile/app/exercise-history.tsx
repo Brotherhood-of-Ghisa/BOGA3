@@ -1,3 +1,5 @@
+import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
+import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -36,7 +38,6 @@ import {
   EMPTY_FIGURE,
   formatOneRepMaxFigure,
   formatSetRow,
-  formatVolumeFigure,
   formatWeightFigure,
 } from '@/src/session-recorder/session-view-model';
 
@@ -80,7 +81,6 @@ const formatTopSet = (set: { weight: number; reps: number } | null) =>
 const formatOneRepMax = (value: number | null) =>
   value === null ? EMPTY_FIGURE : formatOneRepMaxFigure(value);
 
-const formatVolume = (value: number) => (value > 0 ? formatVolumeFigure(value) : EMPTY_FIGURE);
 
 // `ux-rules` §10.2: a deleted tag still filters, and says so in words.
 const formatTagName = (tag: ExerciseHistoryTagOption) =>
@@ -188,7 +188,7 @@ export function ExerciseHistoryScreenShell({
               />
             ) : null}
 
-            <BestCard best={summary.allTimeBest} onPressSession={onPressSession} />
+            <BestCard bodyweight={(summary.bodyweightCoefficient ?? 0) > 0} best={summary.allTimeBest} onPressSession={onPressSession} />
 
             {summary.sessions.length === 0 ? (
               <Card>
@@ -225,9 +225,11 @@ export function ExerciseHistoryScreenShell({
 // The exercise's all-time bests: two rows that open the session holding each.
 // The figures are in `record`, the one superlative (T10-D2).
 function BestCard({
+  bodyweight,
   best,
   onPressSession,
 }: {
+  bodyweight: boolean;
   best: ExerciseHistorySummary['allTimeBest'];
   onPressSession: (sessionId: string) => void;
 }) {
@@ -239,14 +241,14 @@ function BestCard({
       <BestRow
         date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
         divider={false}
-        label="1RM"
+        label={bodyweight ? "Total 1RM" : "1RM"}
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
         testID="exercise-history-best-est-1rm"
         value={formatOneRepMax(oneRm?.value ?? null)}
       />
       <BestRow
         date={topWeight ? formatSessionDate(topWeight.completedAt) : null}
-        label="Top weight"
+        label={bodyweight ? "Top added" : "Top weight"}
         onPress={topWeight ? () => onPressSession(topWeight.sessionId) : undefined}
         testID="exercise-history-best-top-weight"
         value={formatTopSet(topWeight)}
@@ -315,7 +317,10 @@ function SessionCard({
   const rows = entry.sets.map((set) =>
     formatSetRow({
       id: set.setId,
-      weight: parseSetWeight(set.weightValue),
+      weight: parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)),
+      weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
+      loadContext: entry.loadContext,
       reps: parseSetReps(set.repsValue),
       setType: set.setType,
       done: true,
@@ -345,11 +350,16 @@ function SessionCard({
             </View>
           ) : null}
           <View style={styles.stats}>
-            <Stat label="1RM" rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
-            <Stat label="Top set" rank="secondary" value={formatTopSet(entry.topWeightSet)} />
-            <Stat label="Vol" rank="secondary" value={formatVolume(entry.totalVolume)} />
+            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Total 1RM" : "1RM"} rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
+            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Top added" : "Top set"} rank="secondary" value={formatTopSet(entry.topWeightSet)} />
+            <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
+              rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />
             <Stat label="W/sets" rank="secondary" value={String(entry.workingSetCount)} />
           </View>
+          {entry.totalVolume === null ? <Text allowFontScaling={false} style={styles.gym}
+            testID={`exercise-history-coverage-${entry.sessionExerciseId}`}>
+            {`Volume ${formatVolumeWithCoverage(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)}`}
+          </Text> : null}
         </View>
       }
       testID={`exercise-history-session-card-${entry.sessionExerciseId}`}

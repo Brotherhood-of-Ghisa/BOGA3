@@ -101,3 +101,24 @@ proves later source deletion and ordinary row LWW cannot refresh a frozen tuple.
 busy/dismiss guards and waiting for native iOS dismissal before Add reading.
 Device behavior belongs to the third flow in `ios-bodyweight`, including small
 and large phone evidence; these unit tests do not replace that gate.
+
+
+## Personal bodyweight analytics coverage (M27)
+
+`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/assisted, unit,
+coefficient/per-side, missing/invalid/legacy and hydration vectors through the
+logger, rows, records, exercise/muscle/catalogue/weekly projections and session
+models. Retain aggregate overflow and independent zero/count distinctions.
+`bodyweight-analytics-data.test.ts` uses real migrated SQLite to prove repository
+context parity (including positive B with malformed provenance), frozen
+historical B after a new reading and refresh after
+explicit B/coefficient/mode changes. Formatter tests cover incomplete totals
+and nonfinite percentage output. Existing History/Stats/heatmap tests retain
+coverage and raw-versus-total labels.
+
+`bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
+B, explicit current reading, positive assistance/lb, validation, one-rep/high-rep
+notes, retry, dismissed reads and invalid restored reading context. Numerical
+forward/inverse vectors remain in the kernel tests. Device evidence belongs to
+the fourth ios-bodyweight flow on all three phone sizes, plus the full frontend
+gate; unit/typecheck success never substitutes for rendered evidence.

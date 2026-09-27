@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
 
@@ -17,13 +18,14 @@ export type LoadExerciseHistory = typeof loadExercisePerformanceHistory;
 export const useExerciseRecords = (
   exerciseDefinitionId: string | null,
   load: LoadExerciseHistory = loadExercisePerformanceHistory,
-  excludeSessionId: string | null = null
+  excludeSessionId: string | null = null,
+  refreshKey: string | number = 0
 ): ExerciseRecordsState => {
   const [state, setState] = useState<ExerciseRecordsState>({
     status: 'loading',
   });
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!exerciseDefinitionId) return;
     let cancelled = false;
     setState({ status: 'loading' });
@@ -43,7 +45,9 @@ export const useExerciseRecords = (
     return () => {
       cancelled = true;
     };
-  }, [excludeSessionId, exerciseDefinitionId, load]);
+  // The explicit revision invalidates history after a saved-weight or load review.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [excludeSessionId, exerciseDefinitionId, load, refreshKey]));
 
   return state;
 };

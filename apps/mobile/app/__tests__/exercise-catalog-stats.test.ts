@@ -265,7 +265,7 @@ describe('Favourite and all-time browser history', () => {
         ...['block1', 'block1', 'block2', 'block3'].map((sessionExerciseId) => ({ sessionExerciseId, weightValue: '20', repsValue: '8', setType: 'warm_up' })),
         { sessionExerciseId: 'invalid', weightValue: '-1', repsValue: '8', setType: null },
         { sessionExerciseId: 'invalid', weightValue: '1e3', repsValue: '8', setType: null },
-        { sessionExerciseId: 'invalid', weightValue: '', repsValue: '8', setType: null },
+        { sessionExerciseId: 'invalid', weightValue: '', repsValue: '', setType: null },
         { sessionExerciseId: 'invalid', weightValue: '20', repsValue: '0', setType: null },
         { sessionExerciseId: 'invalid', weightValue: '20', repsValue: '1.5', setType: null },
         { sessionExerciseId: 'invalid', weightValue: '20', repsValue: '8', setType: null, performanceStatus: 'unperformed' },

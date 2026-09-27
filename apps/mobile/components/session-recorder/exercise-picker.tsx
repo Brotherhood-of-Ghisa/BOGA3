@@ -1,3 +1,4 @@
+import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
@@ -391,9 +392,12 @@ export function ExercisePicker({
                             key={set.setId}
                             row={formatSetRow({
                               id: set.setId,
-                              weight: parseSetWeight(set.weightValue),
+                              weight: parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)),
                               reps: parseSetReps(set.repsValue),
                               setType: set.setType,
+                              loadContext: preselection.suggestion?.loadContext,
+                              weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
+                              localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
                               done: false,
                             })}
                             testID={`exercise-picker-plan-set-row-${index + 1}`}

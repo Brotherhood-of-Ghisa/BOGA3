@@ -1,14 +1,10 @@
+import { enteredAddedWeightKg, exerciseLoadContext } from '@/src/exercise-calculations/analytics';
 import { calculateEffectiveSetMetrics, type LoadContext } from '@/src/exercise-calculations/effective-load';
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
-import {
-  computeSetVolume,
-  estimateOneRepMax,
-  parseSetReps,
-  parseSetWeight,
-} from '@/src/exercise-calculations';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 
-import { canonicalizeSetValues, hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
+import { canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
  * Pure rules of the exercise page (`docs/specs/ui/ux-rules.md` §14a). The
@@ -118,21 +114,14 @@ export type LoggerValues = {
 };
 
 const metricsOf = (weightValue: string, repsValue: string, context?: LoadContext, metadata?: Pick<LoggerValues, 'weightUnit' | 'externalLoadMode'>) => {
+  weightValue = canonicalizeWeightForReps(weightValue, repsValue);
   const weight = parseSetWeight(weightValue);
   const reps = parseSetReps(repsValue);
   if (weight === null || reps === null) {
     return { weight, reps, oneRepMax: null, volume: null };
   }
-  if (context) {
-    const resolved = calculateEffectiveSetMetrics({ ...context, ...metadata, weightValue, repsValue, performanceStatus: null });
-    return { weight, reps, oneRepMax: resolved.estimatedOneRepMaxKg, volume: resolved.volumeKgReps };
-  }
-  return {
-    weight,
-    reps,
-    oneRepMax: estimateOneRepMax(weight, reps),
-    volume: computeSetVolume(weight, reps),
-  };
+  const resolved = calculateEffectiveSetMetrics({ ...(context ?? exerciseLoadContext()), ...metadata, weightValue, repsValue, performanceStatus: null });
+  return { weight, reps, oneRepMax: resolved.estimatedOneRepMaxKg, volume: resolved.volumeKgReps };
 };
 
 export const previewMetrics = (weightValue: string, repsValue: string, context?: LoadContext, metadata?: Pick<LoggerValues, 'weightUnit' | 'externalLoadMode'>) => {
@@ -168,7 +157,7 @@ export const buildSetRows = (
       externalLoadMode: values.externalLoadMode,
       bodyweight: (context?.bodyweightCoefficient ?? 0) > 0,
       ...metrics,
-      weightRecord: performed && beats(metrics.weight, baseline?.weight ?? null),
+      weightRecord: performed && (context?.bodyweightCoefficient ?? 0) === 0 && beats(enteredAddedWeightKg(values, context ?? exerciseLoadContext()), baseline?.weight ?? null),
       oneRepMaxRecord: performed && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
     };
   });

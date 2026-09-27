@@ -1,11 +1,10 @@
 import type { ExerciseHistorySessionEntry } from '@/src/data/exercise-history';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
-import {
-  computeSetVolume,
-  estimateOneRepMax,
-  parseSetReps,
-  parseSetWeight,
-} from '@/src/exercise-calculations';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredAddedWeightKg, exerciseLoadContext, formatEnteredLoad } from '@/src/exercise-calculations/analytics';
+import { isWeightUnit, weightToKg } from '@/src/exercise-calculations/effective-load';
+
+import { canonicalizeWeightForReps } from './set-semantics';
 
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 
@@ -23,7 +22,11 @@ export type RecordSet = {
   weight: number;
   reps: number;
   oneRepMax: number | null;
-  volume: number;
+  volume: number | null;
+  addedWeightKg?: number | null;
+  loadLabel?: string;
+  effectiveResistanceKg?: number | null;
+  bodyWeightKg?: number | null;
 };
 
 export type ExerciseRecords = {
@@ -32,6 +35,9 @@ export type ExerciseRecords = {
     completedAt: Date;
     weight: number;
     reps: number;
+    loadLabel?: string;
+    effectiveResistanceKg?: number | null;
+    bodyWeightKg?: number | null;
   } | null;
   maxWeight: { weight: number; reps: number; completedAt: Date } | null;
   volume: { value: number; completedAt: Date; setCount: number } | null;
@@ -40,8 +46,10 @@ export type ExerciseRecords = {
 export type LastSession = {
   completedAt: Date;
   oneRepMax: number | null;
-  volume: number;
+  volume: number | null;
   sets: RecordSet[];
+  knownVolume?: number | null;
+  volumeComplete?: boolean;
 };
 
 export type ExerciseRecordsSummary = {
@@ -55,16 +63,24 @@ type SessionBlock = {
   sets: RecordSet[];
 };
 
-const toRecordSet = (set: ExerciseHistorySessionEntry['sets'][number]): RecordSet | null => {
-  const weight = parseSetWeight(set.weightValue);
+const toRecordSet = (set: ExerciseHistorySessionEntry['sets'][number], entry: ExerciseHistorySessionEntry): RecordSet | null => {
+  const rawWeight = parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue));
   const reps = parseSetReps(set.repsValue);
-  if (weight === null || reps === null) return null;
+  if (rawWeight === null || reps === null) return null;
+  const context = entry.loadContext ?? exerciseLoadContext();
+  const metric = calculateAnalyticsSetMetrics({ ...set, ...context });
+  const unit = set.weightUnit ?? 'kg';
+  const weight = isWeightUnit(unit) ? weightToKg(rawWeight, unit) : null;
   return {
     setType: set.setType,
-    weight,
+    weight: weight ?? rawWeight,
     reps,
-    oneRepMax: estimateOneRepMax(weight, reps),
-    volume: computeSetVolume(weight, reps),
+    oneRepMax: metric.estimatedOneRepMaxKg,
+    volume: metric.volumeKgReps,
+    addedWeightKg: enteredAddedWeightKg(set, context),
+    loadLabel: formatEnteredLoad(rawWeight, context, set.externalLoadMode, set.weightUnit),
+    effectiveResistanceKg: metric.eligible && metric.load.status === 'known' ? metric.load.resistanceKg : null,
+    bodyWeightKg: context.bodyweightCoefficient > 0 ? context.bodyWeightKg : null,
   };
 };
 
@@ -79,7 +95,7 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
       sets: [],
     };
     for (const set of entry.sets) {
-      const recordSet = toRecordSet(set);
+      const recordSet = toRecordSet(set, entry);
       if (recordSet) block.sets.push(recordSet);
     }
     blocks.set(entry.sessionId, block);
@@ -89,7 +105,11 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
     .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime());
 };
 
-const sumVolume = (sets: RecordSet[]) => sets.reduce((total, set) => total + set.volume, 0);
+const sumVolume = (sets: RecordSet[]): number | null => {
+  if (sets.some(set => set.volume === null)) return null;
+  const total = sets.reduce((sum, set) => sum + (set.volume ?? 0), 0);
+  return Number.isFinite(total) ? total : null;
+};
 
 const bestOneRepMax = (sets: RecordSet[]) =>
   sets.reduce<number | null>(
@@ -115,19 +135,22 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
           completedAt: block.completedAt,
           weight: set.weight,
           reps: set.reps,
+          loadLabel: set.loadLabel,
+          effectiveResistanceKg: set.effectiveResistanceKg,
+          bodyWeightKg: set.bodyWeightKg,
         };
       }
       const max = records.maxWeight;
-      if (max === null || set.weight > max.weight || (set.weight === max.weight && set.reps > max.reps)) {
+      if (set.addedWeightKg != null && (max === null || set.addedWeightKg > max.weight || (set.addedWeightKg === max.weight && set.reps > max.reps))) {
         records.maxWeight = {
-          weight: set.weight,
+          weight: set.addedWeightKg,
           reps: set.reps,
           completedAt: block.completedAt,
         };
       }
     }
     const volume = sumVolume(block.sets);
-    if (records.volume === null || volume > records.volume.value) {
+    if (volume !== null && (records.volume === null || volume > records.volume.value)) {
       records.volume = {
         value: volume,
         completedAt: block.completedAt,
@@ -144,6 +167,8 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
           completedAt: newest.completedAt,
           oneRepMax: bestOneRepMax(newest.sets),
           volume: sumVolume(newest.sets),
+          knownVolume: newest.sets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
+          volumeComplete: sumVolume(newest.sets) !== null,
           sets: newest.sets,
         }
       : null,

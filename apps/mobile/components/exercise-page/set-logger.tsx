@@ -83,7 +83,7 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
       <View style={styles.header}>
         <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
         <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
-          {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
+          {`${bodyweight ? 'Total 1RM' : '1RM'} ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
         </Text>
       </View>
       {onChangeLoad ? (

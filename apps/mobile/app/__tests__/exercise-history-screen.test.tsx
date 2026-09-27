@@ -463,3 +463,20 @@ describe('ExerciseHistoryScreenShell — design language (DLM-T10)', () => {
     expect(screen.getByTestId('exercise-history-tag-chip-all')).toHaveProp('accessibilityState', { selected: true });
   });
 });
+
+
+it('labels bodyweight total strength and withholds row metrics awaiting set hydration', () => {
+  const summary = buildSummary({ bodyweightCoefficient: 1 });
+  summary.sessions = [{ ...summary.sessions[0],
+    loadContext: { bodyweightCoefficient: 1, loadInputMode: 'total_load', bodyWeightKg: 80 },
+    totalVolume: null, estimatedOneRepMax: null, topWeightSet: null,
+    sets: [{ ...summary.sessions[0].sets[0], weightValue: '20', weightUnit: 'kg', externalLoadMode: 'added', localBodyweightMetadataKnown: false }],
+  }];
+  summary.allTimeBest = { estimatedOneRepMax: null, topWeight: null };
+  render(<ExerciseHistoryScreenShell summary={summary} period={30} appliedTagDefinitionId={null}
+    isLoading={false} errorMessage={null} onSelectPeriod={jest.fn()} onSelectTag={jest.fn()}
+    onPressSession={jest.fn()} onSelectMainTab={jest.fn()} />);
+  expect(screen.getByTestId('exercise-history-best-est-1rm').props.accessibilityLabel).toBe('Total 1RM —');
+  expect(screen.getByTestId('exercise-history-set-row-st-1-1rm')).toHaveTextContent(/Total 1RM.*—/);
+  expect(screen.getByTestId('exercise-history-set-row-st-1-vol')).toHaveTextContent(/Vol.*—/);
+});

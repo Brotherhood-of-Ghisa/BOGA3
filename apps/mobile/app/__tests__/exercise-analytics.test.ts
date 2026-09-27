@@ -253,7 +253,10 @@ describe('aggregateExerciseDailyEffort', () => {
     ];
     const daily = aggregateExerciseDailyEffort(sessions, TZ);
     const weekly = aggregateExerciseWeeklyEffort(sessions, TZ);
-    const dailySum = daily.reduce((sum, d) => sum + d.totalVolume, 0);
+    const dailySum = daily.reduce((sum, d) => {
+      if (d.totalVolume === null) throw new Error('Expected complete conventional volume');
+      return sum + d.totalVolume;
+    }, 0);
     expect(weekly).toHaveLength(1);
     expect(weekly[0].totalVolume).toBe(dailySum);
   });

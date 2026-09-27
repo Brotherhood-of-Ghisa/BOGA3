@@ -58,8 +58,9 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         <View>
           <Stat
             emphasis={row.oneRepMaxRecord ? 'record' : 'none'}
-            label="1RM"
-            layout="inline"
+            label={row.bodyweight ? "Total 1RM" : "1RM"}
+            layout={row.bodyweight ? "stacked" : "inline"}
+            rank={row.bodyweight ? "secondary" : "primary"}
             state={statState}
             testID={`exercise-set-${row.number}-1rm`}
             value={row.oneRepMax !== null ? formatOneRepMax(row.oneRepMax) : DASH}

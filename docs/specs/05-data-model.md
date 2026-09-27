@@ -351,23 +351,29 @@ section states only the data-model-level invariants.
    migration or wire-envelope change.
 8. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
 9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
-10. Muscle volume is recomputed per side from current exercise metadata. Each
-   valid set starts with entered volume (`weight × reps`), halves that base for
-   `total_load`, preserves it for `per_side_load`, then multiplies by the
-   mapping role factor: `1` for primary and `0.5` for secondary. Persisted
+10. Muscle volume is recomputed per side from current exercise metadata and
+   the saved session weight via `tech/bodyweight-load-contract.md` §2. Conventional
+   sets retain entered volume, halved for `total_load` and preserved for
+   `per_side_load`. Bodyweight sets resolve total effective resistance first,
+   then halve its volume. Apply the mapping role factor afterwards: `1` for
+   primary and `0.5` for secondary. Persisted
    `exercise_muscle_mappings.weight` does not alter this calculation; null-role
    and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
-   sides were performed in v1. Exercise history, records, highest weight, and
-   estimated 1RM remain based on the entered scalar and do not use per-side
-   normalization or muscle-role factors. Live and completion personal-record
+   sides were performed in v1. Exercise history and records use effective
+   resistance for bodyweight volume and total 1RM, with no muscle-role factor.
+   Conventional exercises retain entered-scalar semantics. Top added weight
+   normalizes external units to kg and excludes assistance/unresolved meaning;
+   it never substitutes total resistance for the entered external amount. Live and completion personal-record
    presentation resolves its exercise name from the current linked
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row.
    Completed-session exercise-volume comparisons remain a read-time projection,
-   not persisted data. They sum entered `weight × reps` across valid confirmed
+   not persisted data. They sum effective load × reps across valid confirmed
    sets (including warm-ups), combine repeated blocks by linked exercise
-   definition, and compare only with earlier completed, nondeleted sessions for
-   that definition. P5, median, and P95 use linear interpolation over the prior
+   definition, and compare only complete totals from earlier completed,
+   nondeleted sessions for that definition. Missing/invalid load preserves
+   independent rep/set counts and an explicitly incomplete known subtotal;
+   overflow is unavailable, never Infinity or a complete zero. P5, median, and P95 use linear interpolation over the prior
    per-session totals; unlinked legacy rows stay isolated and report no history.
    The generated session-share PNG and its temporary file URI are likewise not
    database or sync entities.

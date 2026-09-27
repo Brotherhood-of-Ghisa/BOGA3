@@ -672,3 +672,20 @@ design-language vocabulary (`uiRoles` / `uiFonts` / `uiGeometry`):
 ## Maintenance rule
 
 If a task adds/removes/renames reusable UI components or changes their role, update this doc in the same session.
+
+### Personal load projections and calculator (M27-T07)
+
+- `LoadingEstimateSheet`: stable `Sheet`, scrollable `FormField`s, unit segments,
+  source `ListRow`s, `Stat` result and validation/convention `Notice`s. Target
+  changes clear results and source selection returns the scroll position to top.
+- `SetSummaryRow`: bodyweight rows separate raw context and Total 1RM/volume so
+  coefficient, units and assistance do not squeeze a conventional-width row.
+- `RecordsPanel`: Top added / Total 1RM, historical B/effective resistance and
+  explicitly incomplete previous-session volume. Loading estimate is a text
+  action beside the existing history entry.
+- Stats and `HistorySheet`: named total strength/top added, coverage notes and
+  missing-metric heatmap states; no complete total or comparison from a subtotal.
+- Coverage: `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
+  `bodyweight-analytics-formatting.test.ts`, `bodyweight-loading-estimate-ui.test.tsx`
+  and existing screen tests. `bodyweight-analytics.yaml` extends ios-bodyweight
+  with records/history/calculator/correction/Stats/share device evidence.

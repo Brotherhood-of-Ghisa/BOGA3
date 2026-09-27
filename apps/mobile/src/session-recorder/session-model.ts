@@ -1,3 +1,4 @@
+import { sessionBodyWeightForCalculation, type SessionWeightContext } from '@/src/bodyweight/snapshot';
 import type { Session, SessionExercise, SessionSet } from '@/components/session-recorder/types';
 import type { ExerciseBlockHistorySuggestedSet, SessionDraftSnapshot } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
@@ -67,16 +68,18 @@ export function parseSessionDateTime(dateTime: string): Date | null {
 
 // Reads an active draft or a completed session graph alike.
 export function mapDraftSnapshotToSession(
-  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'>
+  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'> & SessionWeightContext
 ): Session {
   return {
     dateTime: formatCurrentDateTime(snapshot.startedAt),
+    bodyWeightKg: snapshot.bodyWeightKg === undefined ? undefined : sessionBodyWeightForCalculation(snapshot),
     locationId: snapshot.gymId,
     exercises: snapshot.exercises.map((exercise) => ({
       id: exercise.id,
       exerciseDefinitionId: exercise.exerciseDefinitionId,
       name: exercise.name,
       machineName: exercise.machineName ?? '',
+      loadContext: exercise.loadContext,
       sets: exercise.sets.map((set) => ({
         id: set.id,
         reps: set.repsValue,
@@ -531,6 +534,7 @@ export const toSessionInsightExercises = (
   session.exercises.map((exercise, exerciseIndex) => ({
     id: exercise.id,
     orderIndex: exerciseIndex,
+    loadContext: exercise.loadContext,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     exerciseName:
       currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
@@ -538,6 +542,7 @@ export const toSessionInsightExercises = (
       id: set.id,
       orderIndex: setIndex,
       weightValue: set.weight,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
       repsValue: set.reps,
       setType: set.setType,
       performanceStatus: set.performanceStatus,

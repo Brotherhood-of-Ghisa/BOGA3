@@ -38,8 +38,8 @@ correction opens a sheet explaining personal/group score and certification
 impact and saves a manual session-only tuple. Settings readings stay unchanged.
 Deleted sessions expose the fact without a correction action.
 
-The visual target is `design-targets/bodyweight.md`. Load-dependent consumer
-adoption is separate from entry and explicit historical fill.
+The visual target is `design-targets/bodyweight.md`. Personal load-dependent projections follow the analytics rules below;
+group/coaching adoption has its own gates.
 
 ### Historical session weight fill (M27-T06)
 
@@ -333,8 +333,8 @@ status is preserved even when the reviewed row has usable values.
 3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
 4. The summary card shows `Start` and `End` as `YYYY-MM-DD HH:mm` (the layout of
    the completed edit's fields, read-only), then `Duration`, `Gym`, `Sets` and
-   `Volume` (the confirmed sets with valid values, and their entered-load
-   volume, no thousands separator). Below it, `Summary | Sets` defaults to
+   `Volume` (the confirmed sets with valid values, and their effective-load
+   volume with explicit incomplete coverage, no thousands separator). Below it, `Summary | Sets` defaults to
    Summary for every historical entry. Switching stays in place and retains the
    chart grouping; Edit → Done retains both selections while reloading facts,
    sets and insights. A different session starts at Summary / By exercise.
@@ -626,7 +626,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 3. In per-exercise mode, exercises with at least one valid performed set in the
    selected 7-/30-day window render in one compact, viewport-fitting table with
    shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
-   row shows `<valid performed sets> (<working sets>)`, raw exercise volume, and
+   row shows `<valid performed sets> (<working sets>)`, effective exercise volume, and
    estimated 1RM; unavailable 1RM values render as `—`. Exercise names receive
    the remaining flexible width and wrap to their full value rather than being
    capped at an assumed line count.
@@ -668,7 +668,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    `ink-muted`, with `new` in `ink`; they carry no green or red (G3). Volumes
    and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
-10. Volume for exercise analytics is raw `weight × reps` (no muscle-role weighting). This differs from muscle history, where volume is role-weighted.
+10. Exercise analytics uses resolved effective load × reps (conventional lifts retain entered-load semantics), with explicit incomplete coverage and no muscle-role weighting. Muscle history applies the shared per-side and role factors afterwards.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
 13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
@@ -794,7 +794,7 @@ unchanged. What differs is presentation:
    (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
    (§7.7).
 5. The summary counts only confirmed performed sets (warm-ups included) and
-   their entered-load volume; Time is elapsed since the session's start.
+   their effective-load volume with explicit incomplete coverage; Time is elapsed since the session's start.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is
    the way back out, and returns to the tab rather than stacking it.
 7. **A completed session is edited here**. The top bar reads
@@ -823,3 +823,37 @@ unchanged. What differs is presentation:
 1. Additional primitive extraction (for example state panels, modal surfaces, row cards, form fields) remains pending to reduce route-local style duplication beyond the token convergence completed in Task `T-20260226-06`.
 2. Additional primitives from the audit (for example `ScreenContainer`, `EmptyState`, `ModalSurface`) are candidates, not current required APIs.
 3. Temporary raw-color guardrail allowlist entries remain available only for future exceptional migrations; current route-screen exceptions were cleared in Task `T-20260226-06`.
+
+### Personal bodyweight analytics and loading estimates (M27-T07)
+
+Bodyweight strength figures read Total 1RM and top external records read Top
+added. Set rows retain added/assisted/unquantified meaning, source units and
+coefficient/per-side context. Historical B determines historical strength.
+Record details show saved B and effective resistance; assistance is never a
+Top added record. Conventional labels and arithmetic remain unchanged.
+
+Volume subtotals explicitly say incomplete; wholly unavailable metrics show an
+em dash. Counts remain usable. Stats tables put the coverage note outside the
+narrow numeric cell. Missing heatmap values have a distinct marker/legend and
+do not become rest days or complete-volume baselines. Read errors preserve
+retry routes and do not fabricate records.
+
+Exercise records → Loading estimate opens a scrollable sheet. The strongest
+eligible completed set is selected initially; Choose another performance shows
+raw load, date, source B/provenance and total 1RM. Target reps must be a positive
+whole number; target B is positive kg. Saved target-session B is prefilled;
+Use current reading is explicit and shows its date. The result is positive
+added load or positive assistance in kg/lb, with effective total and estimate
+wording. Inputs clear old results, one-rep/high-rep conventions are explained,
+and Done/dismiss changes no history. No source explains review/session-weight
+requirements; read failures can retry and invalid inputs remain editable.
+
+After an explicit correction, backfill or personal coefficient/legacy review,
+reopening affected projections recomputes their values. These are derived
+views, never persisted awards. Bodyweight share previews keep the same total
+1RM/raw external distinction as the completed session.
+
+Session summary rows keep incomplete volume figures compact: label a known
+subtotal `Known vol` and put its known/eligible set count in a full-width note
+below the facts. Entirely unavailable or overflowed volume is `—` with the
+reason below; coverage words never occupy the headline numeric slot.

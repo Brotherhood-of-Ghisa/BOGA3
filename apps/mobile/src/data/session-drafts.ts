@@ -1,9 +1,11 @@
+import { exerciseLoadContext } from '@/src/exercise-calculations/analytics';
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { captureSessionWeight } from './bodyweight';
-import { exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
@@ -90,6 +92,7 @@ export type SessionDraftSetSnapshot = SessionSetLoadMetadata & {
 };
 
 export type SessionDraftExerciseSnapshot = {
+  loadContext?: LoadContext;
   id: string;
   exerciseDefinitionId: string;
   name: string;
@@ -202,6 +205,7 @@ type StoredDraftSetRecord = SessionSetLoadMetadata & {
 };
 
 type StoredDraftExerciseRecord = {
+  loadContext?: LoadContext;
   id: string;
   sessionId: string;
   exerciseDefinitionId: string;
@@ -355,6 +359,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName,
+    loadContext: exercise.loadContext,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -396,6 +401,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName,
+    loadContext: exercise.loadContext,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -436,6 +442,10 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
     .orderBy(asc(sessionExercises.orderIndex))
     .all();
 
+  const definitionIds = [...new Set(exerciseRows.map(row => row.exerciseDefinitionId).filter((id): id is string => id !== null))];
+  const definitions = definitionIds.length ? database.select().from(exerciseDefinitions)
+    .where(inArray(exerciseDefinitions.id, definitionIds)).all() : [];
+  const definitionById = new Map(definitions.map(row => [row.id, row]));
   const exerciseIds = exerciseRows.map((exercise) => exercise.id);
   const setRows =
     exerciseIds.length > 0
@@ -493,6 +503,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
+        loadContext: exerciseLoadContext(definitionById.get(exercise.exerciseDefinitionId), sessionRow),
         sets: setsByExerciseId.get(exercise.id) ?? [],
       };
     }),

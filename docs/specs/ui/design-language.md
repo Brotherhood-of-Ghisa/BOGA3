@@ -215,8 +215,12 @@ additionally render faded (§6).
 
 ## 6. Presenting data
 
-- **`1RM` everywhere**, never `e1RM`. Computed by `estimateOneRepMax` (Wathan)
-  in `apps/mobile/src/exercise-calculations/index.ts`.
+- **`1RM` for conventional exercises; `Total 1RM` for bodyweight resistance**,
+  never `e1RM`. Wathan uses the resolved effective load. Bodyweight raw-load
+  labels retain `BW +` / `BW −`, entered units and any per-side qualifier;
+  the coefficient is explicit when it differs from 100%. Missing metrics use
+  `—`, with incomplete volume identified in readable supporting text. Long
+  context wraps or gets a separate line instead of shrinking numeric figures.
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column (decided for Progress, DLM-T08-D2).

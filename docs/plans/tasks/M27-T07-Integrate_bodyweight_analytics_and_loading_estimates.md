@@ -1,7 +1,7 @@
 ---
 task_id: M27-T07-Integrate_bodyweight_analytics_and_loading_estimates
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/00-product.md, docs/specs/03-technical-architecture.md
 
 # M27-T07 — Integrate bodyweight analytics and loading estimates
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T03, M27-T04, M27-T05, M27-T06.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D1–D6.
@@ -72,3 +72,26 @@ any additional actual-diff lanes with `./boga test for`.
 Update entered-volume/1RM specs where semantics intentionally change, and stale
 formula references. Attach evidence, mark the milestone entry complete and
 delete this card when shipped.
+
+
+## Local implementation checkpoint
+
+The personal calculation adapters, records/history/Stats coverage, heatmaps,
+raw external-load labels and loading calculator are integrated. Shared context
+uses frozen session weight with validated provenance and current personal
+exercise rules; unknown upgrade metadata stays unavailable. Cross-surface DB
+and pure parity tests, calculator UI cases and a fourth `ios-bodyweight` flow
+are added. Compact summary figures carry separate incomplete-coverage text.
+
+Actual lint/typecheck and all 178 mobile suites (2,114 tests) passed. The
+initial run exposed older blank-as-invalid assertions; confirmed blank load
+now consistently means zero with valid reps, with negative/invalid and
+unperformed coverage retained. Total 1RM and coverage-shape assertions were
+updated. Full `./boga test fast` passed, including backend smoke, repository
+checks, consent web and MCP unit/build checks. Full backend passed, including
+all 6 sync suites / 15 tests, clean as-built drift, group evaluation contracts
+and MCP smoke. Frontend and three-size visual verification remain pending. Logs:
+`/tmp/boga-m27-analytics-fast-rerun.log`, `/tmp/boga-m27-analytics-backend.log`.
+No shipping completion is claimed. The pre-upgrade offline metadata review gap remains an explicit
+integration follow-up: do not resolve unknown actual/planned fields using
+migration defaults or infer server absence from a missing bootstrap marker.

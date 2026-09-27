@@ -45,10 +45,10 @@ describe('getCalendarHeatmapBucket', () => {
 });
 
 describe('getMetricValue', () => {
-  it('treats non-positive volume / working-set count as no data', () => {
-    expect(getMetricValue(source({ totalVolume: 0 }), 'totalVolume')).toBeNull();
+  it('preserves known zero volume and working-set counts', () => {
+    expect(getMetricValue(source({ totalVolume: 0 }), 'totalVolume')).toBe(0);
     expect(getMetricValue(source({ totalVolume: 120 }), 'totalVolume')).toBe(120);
-    expect(getMetricValue(source({ workingSetCount: 0 }), 'workingSetCount')).toBeNull();
+    expect(getMetricValue(source({ workingSetCount: 0 }), 'workingSetCount')).toBe(0);
     expect(getMetricValue(source({ workingSetCount: 3 }), 'workingSetCount')).toBe(3);
   });
 
@@ -125,4 +125,14 @@ describe('buildHeatmapData', () => {
     expect(data.daily.every((d) => d.level === 0 && d.value === 0)).toBe(true);
     expect(data.weekly.every((w) => w.level === 0 && w.value === 0 && w.sessions === 0)).toBe(true);
   });
+});
+
+
+it('distinguishes a warm-up-only day with zero working sets from missing load and rest', () => {
+  const day = { dateKey: '2026-06-04', totalVolume: null, knownVolume: 0, workingSetCount: 0, estimatedRM1: null, highestWeight: null };
+  const counts = buildHeatmapData([day], 'workingSetCount', { todayDateKey: '2026-06-05' });
+  expect(counts.daily.find(row => row.dateKey === day.dateKey)).toMatchObject({ value: 0, hasTraining: true, unavailable: false });
+  expect(counts.daily.find(row => row.dateKey === '2026-06-05')).toMatchObject({ value: 0, hasTraining: false, unavailable: false });
+  const volume = buildHeatmapData([day], 'totalVolume', { todayDateKey: '2026-06-05' });
+  expect(volume.daily.find(row => row.dateKey === day.dateKey)).toMatchObject({ hasTraining: true, unavailable: true });
 });

@@ -11,7 +11,8 @@ const bench = {
   sets: [
     { id: 'b1', weight: '60', reps: '10', setType: 'warm_up' },
     { id: 'b2', weight: '100', reps: '5', setType: 'rir_1' },
-    { id: 'b-invalid', weight: '', reps: '5', setType: 'rir_1' },
+    { id: 'b-zero', weight: '', reps: '5', setType: 'rir_1' },
+    { id: 'b-invalid', weight: '-1', reps: '5', setType: 'rir_1' },
     { id: 'b-skipped', weight: '140', reps: '5', setType: 'rir_0', performanceStatus: 'unperformed' as const },
   ],
 };
@@ -28,9 +29,10 @@ describe('buildCompletedSessionDetailModel', () => {
     const model = buildCompletedSessionDetailModel([bench, legacy], new Map());
 
     expect(model.cards.map((card) => card.id)).toEqual(['bench', 'legacy']);
-    expect(model.cards[0].setCount).toBe(2);
-    expect(model.cards[0].rows.map((row) => row.id)).toEqual(['b1', 'b2']);
-    expect(model.performedSetCount).toBe(3);
+    expect(model.cards[0].setCount).toBe(3);
+    expect(model.cards[0].rows.map((row) => row.id)).toEqual(['b1', 'b2', 'b-zero']);
+    expect(model.cards[0].rows[2]).toMatchObject({ weightReps: '0.0 × 5', volume: '0', oneRepMax: '—' });
+    expect(model.performedSetCount).toBe(4);
     // 60×10 + 100×5 + 82.5×8, rounded, no separator.
     expect(model.volume).toBe('1760');
   });
@@ -47,7 +49,7 @@ describe('buildCompletedSessionDetailModel', () => {
 
   it('leaves out an exercise with no confirmed valid set', () => {
     const model = buildCompletedSessionDetailModel(
-      [{ ...bench, sets: [bench.sets[2], bench.sets[3]] }],
+      [{ ...bench, sets: [bench.sets[3], bench.sets[4]] }],
       new Map()
     );
 

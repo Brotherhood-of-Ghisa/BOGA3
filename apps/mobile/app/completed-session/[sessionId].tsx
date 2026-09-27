@@ -1,3 +1,4 @@
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,7 +31,7 @@ import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 import { loadHistoricalBestsExcluding } from '@/src/session-recorder/historical-bests';
-import {
+import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
@@ -55,12 +56,15 @@ export type CompletedSessionDetailSet = {
   reps: string;
   setType: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
 };
 
 export type CompletedSessionDetailExercise = {
   id: string;
   exerciseDefinitionId?: string | null;
   name: string;
+  loadContext?: LoadContext;
   sets: CompletedSessionDetailSet[];
 };
 
@@ -136,7 +140,7 @@ const getCompletedPerformedSets = (
     (set) =>
       isConfirmedPerformedSet(set) &&
       parseCalculationSet({
-        weightValue: set.weight,
+        weightValue: canonicalizeWeightForReps(set.weight, set.reps),
         repsValue: set.reps,
         setType: set.setType,
       }) !== null
@@ -215,9 +219,11 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
           id: exercise.id,
           exerciseDefinitionId: exercise.exerciseDefinitionId,
           name: exercise.name,
+          loadContext: exercise.loadContext,
           sets: exercise.sets.map((set) => ({
             id: set.id,
             weight: set.weightValue,
+            localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
             reps: set.repsValue,
             setType: normalizeSessionSetType(set.setType),
             performanceStatus: set.performanceStatus,
@@ -415,15 +421,18 @@ export function CompletedSessionDetailScreenShell({
     return summarizeCurrentSessionMuscleLoad({
       sessionId: session.id,
       sessionAt: new Date(session.completedAt),
+      bodyWeightKg: session.localBodyweightMetadataKnown === false ? null : session.bodyWeightKg,
       exercises: session.exercises.map((exercise, exerciseIndex) => ({
         id: exercise.id,
         orderIndex: exerciseIndex,
         exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
         exerciseName: exercise.name,
+        loadContext: exercise.loadContext,
         sets: exercise.sets.map((set, setIndex) => ({
           id: set.id,
           orderIndex: setIndex,
           weightValue: set.weight,
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
           repsValue: set.reps,
           setType: set.setType,
           performanceStatus: set.performanceStatus,
@@ -432,6 +441,7 @@ export function CompletedSessionDetailScreenShell({
       exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
         id: exercise.id,
         loadInputMode: exercise.loadInputMode ?? 'total_load',
+        bodyweightCoefficient: exercise.bodyweightCoefficient, localBodyweightMetadataKnown: exercise.localBodyweightMetadataKnown,
       })),
       muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
         exercise.mappings.map((mapping) => ({
@@ -458,10 +468,12 @@ export function CompletedSessionDetailScreenShell({
           orderIndex: exerciseIndex,
           exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
           exerciseName: exercise.name,
+        loadContext: exercise.loadContext,
           sets: exercise.sets.map((set, setIndex) => ({
             id: set.id,
             orderIndex: setIndex,
             weightValue: set.weight,
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
             repsValue: set.reps,
             setType: set.setType,
             performanceStatus: set.performanceStatus,

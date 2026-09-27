@@ -21,10 +21,13 @@ don't restate it here.
 ```
 
 The `ios-bodyweight` lane runs reading/session snapshots, exercise setup and
-logging/legacy-load review, and explicit historical fill. All three flows are
+logging/legacy-load review, explicit historical fill, and personal analytics /
+loading estimates. All four flows are
 part of `frontend`; small and large phone runs provide form-layout evidence.
 Historical fill covers date/selection preview, cancellation, fallback provenance,
 repeat, restart, later readings, explicit correction and no-source entry.
+Analytics covers total records/history, explicit target/current B, assistance /
+units, missing/invalid source, corrections, Stats/heatmaps and share previews.
 
 Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
 the canonical lane names everywhere: this doc, the timing records, `boga`).

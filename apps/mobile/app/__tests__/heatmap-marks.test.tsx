@@ -112,3 +112,36 @@ describe('WeeklyHeatmap marks', () => {
     expect(screen.getByTestId(`${PREFIX}-heatmap-selected-marker`)).toBeTruthy();
   });
 });
+
+
+describe('Bodyweight heatmap coverage', () => {
+  it('distinguishes zero-load training, unknown load and rest in daily details', () => {
+    const coverage = buildHeatmapData([
+      day('2026-05-11', 0),
+      { ...day('2026-05-12', 0), totalVolume: null, knownVolume: 0 },
+    ], 'totalVolume', { todayDateKey: TODAY });
+    render(<DailyHeatmap data={coverage} formatValue={String} metricLabel="Volume" testIDPrefix={PREFIX} />);
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityLabel', '2026-05-11, Volume 0');
+    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`));
+    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Volume: 0');
+    expect(style(`${PREFIX}-heatmap-cell-2026-05-12`).borderStyle).toBe('dashed');
+    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`));
+    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Volume: Unavailable');
+    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`));
+    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Rest day');
+  });
+
+  it.each([
+    [[0, 0, 0, 0, 100, 200], 50],
+    [[0, 0, 0, 0, 0, 0], 0],
+  ])('keeps the average inside the chart when training includes zero', (values, average) => {
+    const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
+    const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
+    render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} />);
+    const marker = screen.getByTestId(`${PREFIX}-heatmap-average`);
+    expect(marker).toHaveProp('accessibilityLabel', `12-week average ${average}`);
+    const top = StyleSheet.flatten(marker.props.style).top;
+    expect(top).toBeGreaterThanOrEqual(0);
+    expect(top).toBeLessThanOrEqual(78);
+  });
+});

@@ -28,12 +28,12 @@ beforeEach(() => { jest.clearAllMocks(); data.listLegacyLoads.mockResolvedValue(
 
 it('shows total resistance while added/assisted input stays positive and explicitly unit-labelled', () => {
   const view = render(<SetLogger {...props} />);
-  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('1RM 127.7 · VOL 800');
+  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM 127.7 · VOL 800');
   expect(screen.getByText('Added weight · kg')).toBeTruthy();
   fireEvent.press(screen.getByTestId('exercise-set-load-mode-assistance'));
   expect(props.onChangeLoad).toHaveBeenCalledWith({ externalLoadMode: 'assistance' });
   view.rerender(<SetLogger {...props} externalLoadMode="assistance" />);
-  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('1RM 76.6 · VOL 480');
+  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM 76.6 · VOL 480');
   expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('20');
   fireEvent.press(screen.getByTestId('exercise-set-unit-lb'));
   expect(props.onChangeLoad).toHaveBeenCalledWith({ weightUnit: 'lb' });
@@ -42,12 +42,12 @@ it('shows total resistance while added/assisted input stays positive and explici
 it('permits confirmed reps with missing B or unquantified assistance without showing a fake load score', () => {
   const view = render(<SetLogger {...props} loadContext={{ ...context, bodyWeightKg: null }} />);
   expect(screen.getByText('Unavailable · session weight missing.')).toBeTruthy();
-  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('1RM — · VOL —');
+  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM — · VOL —');
   fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
   expect(props.onCommit).toHaveBeenCalledTimes(1);
   view.rerender(<SetLogger {...props} weightValue="" externalLoadMode="unquantified_assistance" />);
   expect(screen.getByTestId('exercise-set-logger-weight').props.editable).toBe(false);
-  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('1RM — · VOL —');
+  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM — · VOL —');
   fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
   expect(props.onCommit).toHaveBeenCalledTimes(2);
 });

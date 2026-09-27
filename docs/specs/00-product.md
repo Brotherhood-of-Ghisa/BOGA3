@@ -29,7 +29,7 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
 - Decision: Current-session feedback keeps exercise PRs, exercise-volume context, and session muscle load as separate, derived signals.
 - Notes:
   - a PR belongs to the exercise that produced it and requires a strict estimated-1RM improvement over prior eligible completed history; a first performance without a baseline is not a PR,
-  - after submission, each performed exercise compares the session's raw entered volume with the median and fifth-to-ninety-fifth-percentile range of eligible earlier completed sessions,
+  - after submission, each performed exercise compares the session's effective-load volume with the median and fifth-to-ninety-fifth-percentile range of eligible earlier completed sessions,
   - muscle load is a session-wide summary using the same current-metadata, per-side, role-weighted semantics as history analytics,
   - successful submission opens a one-time completion presentation on the existing completed-session route; the presentation is not a persisted award or a historical-detail mode,
   - the share action previews and generates a session-summary PNG containing all PRs and exercise comparisons, then opens the platform share sheet; the app does not upload media, publish directly, include private gym/location data, or store a share record.
@@ -47,5 +47,15 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
   before bodyweight scoring; total-to-external conversion is previewed using
   each session's saved context. Missing context does not prevent logging reps.
 - The complete calculation and rollout boundary is owned by
-  `tech/bodyweight-load-contract.md`; broader analytics/group adoption is
-  tracked separately from the setup/logger implementation.
+  `tech/bodyweight-load-contract.md`. Personal analytics uses effective load
+  consistently across logging, session summaries, history, records and share
+  previews. Missing load context preserves independent set/rep counts and marks
+  volume incomplete; incomplete totals cannot be complete comparison baselines.
+  Group/coaching adoption and production activation have separate rollout gates.
+
+- Date: `2026-09-27`
+- Decision: Personal bodyweight records compare estimated total resistance using
+  each performance’s saved session weight. Top added load remains external load.
+  Loading estimates use a selected historical performance and an explicit target
+  weight/repetition count; choosing a newer reading changes only the projection.
+  A negative adjustment means positive assistance, never negative plates.

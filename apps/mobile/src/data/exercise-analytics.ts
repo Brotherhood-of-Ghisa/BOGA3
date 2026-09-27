@@ -1,19 +1,12 @@
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
-import {
-  estimateOneRepMax,
-  parseSetReps,
-  parseSetWeight,
-} from '@/src/exercise-calculations';
-import {
-  isConfirmedPerformedSet,
-  normalizeSessionSetPerformanceStatus,
-  type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+import { addFiniteVolume, exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
-import { exerciseSets, sessionExercises, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions } from './schema';
 import { isWorkingSessionSetType } from './set-types';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
@@ -24,10 +17,13 @@ type ExerciseRawSet = {
   weightValue: string;
   repsValue: string;
   performanceStatus?: SessionSetPerformanceStatus;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
 };
 
 export type ExerciseRawSession = {
   completedAt: Date;
+  loadContext?: LoadContext;
   sets: ExerciseRawSet[];
 };
 
@@ -66,7 +62,8 @@ const startOfMondayWeek = (date: Date): Date => {
 };
 
 type DayAccumulator = {
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume: number | null;
   workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
@@ -75,7 +72,8 @@ type DayAccumulator = {
 type WeekAccumulator = {
   weekStartDateKey: string;
   monthKey: string;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume: number | null;
   workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
@@ -91,52 +89,27 @@ export const aggregateExerciseDailyEffort = (
     const dateKey = formatLocalDateKey(session.completedAt, timeZone);
     const day: DayAccumulator = dayMap.get(dateKey) ?? {
       totalVolume: 0,
+      knownVolume: 0,
       workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
     };
-    let hasConfirmedSet = false;
-
-    for (const set of session.sets) {
-      if (
-        !isConfirmedPerformedSet({
-          reps: set.repsValue,
-          weight: set.weightValue,
-          performanceStatus: set.performanceStatus,
-        })
-      ) {
-        continue;
-      }
-      hasConfirmedSet = true;
-
-      const weight = parseSetWeight(set.weightValue);
-      const reps = parseSetReps(set.repsValue);
-      if (weight === null || reps === null) continue;
-
-      day.totalVolume += weight * reps;
-
-      if (isWorkingSessionSetType(set.setType)) {
-        day.workingSetCount += 1;
-      }
-
-      day.highestWeight =
-        day.highestWeight === null ? weight : Math.max(day.highestWeight, weight);
-
-      const rm1 = estimateOneRepMax(weight, reps);
-      if (rm1 !== null) {
-        day.bestRM1 = day.bestRM1 === null ? rm1 : Math.max(day.bestRM1, rm1);
-      }
-    }
-
-    if (hasConfirmedSet) {
-      dayMap.set(dateKey, day);
-    }
+    const summary = summarizeExerciseLoad(session.sets, session.loadContext ?? exerciseLoadContext());
+    if (summary.volumeCoverage.eligibleSetCount === 0) continue;
+    day.knownVolume = addFiniteVolume(day.knownVolume, summary.volumeCoverage.knownVolumeKgReps);
+    day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeCoverage.totalVolumeKgReps);
+    summary.metrics.forEach((metric, index) => {
+      if (metric.eligible && isWorkingSessionSetType(session.sets[index].setType)) day.workingSetCount++;
+    });
+    if (summary.topWeightSet !== null) day.highestWeight = Math.max(day.highestWeight ?? 0, summary.topWeightSet.weight);
+    if (summary.estimatedOneRepMax !== null) day.bestRM1 = Math.max(day.bestRM1 ?? 0, summary.estimatedOneRepMax);
+    dayMap.set(dateKey, day);
   }
 
   return Array.from(dayMap.entries())
     .map(([dateKey, day]) => ({
       dateKey,
-      totalVolume: day.totalVolume,
+      totalVolume: day.totalVolume, knownVolume: day.knownVolume,
       workingSetCount: day.workingSetCount,
       estimatedRM1: day.bestRM1,
       highestWeight: day.highestWeight,
@@ -161,12 +134,14 @@ export const aggregateExerciseWeeklyEffort = (
       weekStartDateKey,
       monthKey,
       totalVolume: 0,
+      knownVolume: 0,
       workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
     };
 
-    acc.totalVolume += day.totalVolume;
+    acc.knownVolume = addFiniteVolume(acc.knownVolume, day.knownVolume === undefined ? day.totalVolume : day.knownVolume);
+    acc.totalVolume = addFiniteVolume(acc.totalVolume, day.totalVolume);
     acc.workingSetCount += day.workingSetCount;
 
     if (day.highestWeight !== null) {
@@ -201,7 +176,7 @@ export const aggregateExerciseWeeklyEffort = (
       weekStartDateKey: week.weekStartDateKey,
       monthKey: week.monthKey,
       weekOfMonth,
-      totalVolume: week.totalVolume,
+      totalVolume: week.totalVolume, knownVolume: week.knownVolume,
       workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,
@@ -226,7 +201,7 @@ const loadExerciseRawSessions = async (
   const database = await bootstrapLocalDataLayer();
 
   const sessionRows = database
-    .select({ id: sessions.id, completedAt: sessions.completedAt })
+    .select({ id: sessions.id, completedAt: sessions.completedAt, localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt })
     .from(sessions)
     .where(
       and(
@@ -239,11 +214,14 @@ const loadExerciseRawSessions = async (
     .all();
 
   const sessionCompletedRows = sessionRows.filter(
-    (row): row is { id: string; completedAt: Date } => row.completedAt !== null
+    (row): row is typeof row & { completedAt: Date } => row.completedAt !== null
   );
 
   const sessionIds = sessionCompletedRows.map((row) => row.id);
   if (sessionIds.length === 0) return [];
+
+  const definition = database.select().from(exerciseDefinitions)
+    .where(eq(exerciseDefinitions.id, options.exerciseDefinitionId)).get();
 
   const sessionExerciseRows = database
     .select({ id: sessionExercises.id, sessionId: sessionExercises.sessionId })
@@ -265,6 +243,7 @@ const loadExerciseRawSessions = async (
       sessionExerciseId: exerciseSets.sessionExerciseId,
       setType: exerciseSets.setType,
       weightValue: exerciseSets.weightValue,
+      localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
       repsValue: exerciseSets.repsValue,
       performanceStatus: exerciseSets.performanceStatus,
     })
@@ -277,8 +256,8 @@ const loadExerciseRawSessions = async (
     )
     .all();
 
-  const completedAtBySessionId = new Map(
-    sessionCompletedRows.map((row) => [row.id, row.completedAt])
+  const sessionById = new Map(
+    sessionCompletedRows.map((row) => [row.id, row])
   );
   const sessionIdByExerciseId = new Map(
     sessionExerciseRows.map((row) => [row.id, row.sessionId])
@@ -290,6 +269,7 @@ const loadExerciseRawSessions = async (
     existing.push({
       setType: set.setType ?? null,
       weightValue: set.weightValue,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
       repsValue: set.repsValue,
       performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
     });
@@ -300,10 +280,11 @@ const loadExerciseRawSessions = async (
   for (const seRow of sessionExerciseRows) {
     const sessionId = sessionIdByExerciseId.get(seRow.id);
     if (!sessionId) continue;
-    const completedAt = completedAtBySessionId.get(sessionId);
-    if (!completedAt) continue;
+    const session = sessionById.get(sessionId);
+    if (!session) continue;
     rawSessions.push({
-      completedAt,
+      completedAt: session.completedAt,
+      loadContext: exerciseLoadContext(definition, session),
       sets: setsByExerciseId.get(seRow.id) ?? [],
     });
   }

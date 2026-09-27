@@ -324,3 +324,47 @@ Authorized group reads reveal only needed shared session context, never
 reading history, owner-private gym coordinates or unrelated measurements.
 Coaching remains owner-scoped and read-only, with unit/completeness parity.
 No evaluation/notification failure may roll back personal sync.
+
+## 8. Personal consumer integration and refresh
+
+The personal adapter `src/exercise-calculations/analytics.ts` preserves metadata
+hydration flags and raw units/mode, and delegates to the kernel in §2. The
+following readers supply current exercise rules plus each saved session’s B:
+
+| Projection | Owning readers / adapters |
+| --- | --- |
+| Session graph and live/detail rows | `data/session-drafts.ts`, `session-recorder/session-model.ts`, `session-view-model.ts`, `completed-session-detail-model.ts`, `exercise-page-model.ts` |
+| Exercise history, suggestions and records | `data/exercise-history.ts`, `data/exercise-block-history.ts`, `session-recorder/exercise-records.ts` |
+| Stats and heatmaps | `data/exercise-analytics.ts`, `data/exercise-catalog-stats.ts`, `data/muscle-analytics.ts`, `data/stats.ts` |
+| Completion, comparisons and share content | `session-insights/repository.ts`, `session-insights/calculations.ts` |
+| Loading calculator | `bodyweight/loading-estimate.ts`, `components/bodyweight/loading-estimate-sheet.tsx` |
+
+Readers batch metadata once per graph, including the full saved-weight
+provenance tuple. `bodyweight/snapshot.ts` rejects malformed stored tuples even
+when their numeric B is positive; all personal projections then withhold the
+dependent metrics consistently with the session editor. Pure calculation inputs
+may supply an already-validated numeric B. Optional legacy conventional callers keep
+c=0 defaults; an explicit `localBodyweightMetadataKnown=false` never uses that
+default as evidence. Units normalize only for arithmetic. Blank entered mass
+with valid reps follows the existing canonical-zero rule; confirmation remains
+independent. Assistance/unresolved rows cannot set a Top added record.
+
+Unknown dependent metrics render unavailable, and known volume subtotals are
+labelled incomplete. Entirely unknown volume is not zero. Aggregates propagate
+overflow as null; later known rows cannot reset it. Heatmaps distinguish missing
+metrics from rest and known zero, and exclude incomplete volume from ranges,
+weekly averages and comparison baselines. Comparison cards report the count
+of prior sessions excluded for incomplete volume. Working-set/repetition counts
+survive, including a known zero on warm-up-only days.
+
+The calculator defaults to the target session B. A current reading is used only
+through an explicit action, with its date; an invalid restored reading cannot
+provide a target. Each selectable source retains historical B and provenance.
+Target edits clear old answers. Dismissed reads cannot update a later opening.
+The one-rep capacity convention is explained; high-rep estimates are labelled.
+Two-decimal display is separate from raw results and does not imply plate rounding.
+
+Explicit B corrections reload detail graphs and insights. Definition edits and
+legacy conversion refresh records/history on save or focus. New readings leave
+old projections unchanged. Shared-session, group and coaching consumers require
+their own corresponding integration; this section does not claim their rollout.

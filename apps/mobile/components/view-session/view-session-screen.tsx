@@ -91,8 +91,9 @@ export function ViewSessionScreen({
               testID: 'completed-session-detail-gym',
             },
             { label: 'Sets', value: String(model.performedSetCount), testID: 'completed-session-detail-sets' },
-            { label: 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
+            { label: model.volumeNote && model.volume !== '—' ? 'Known vol' : 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
           ]}
+          note={model.volumeNote}
           testID="completed-session-detail-summary"
           times={{ start: summary.start, end: summary.end, testID: 'completed-session-detail-times' }}
         />

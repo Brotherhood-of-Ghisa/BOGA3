@@ -735,3 +735,13 @@ units, effective-load context and the session-only weight correction control.
 or from its exercise options/logger. It selects actual/planned originals,
 requires a source unit and interpretation, previews, then applies or leaves them
 unresolved. These are overlays on existing routes, not additional destinations.
+
+### Personal loading estimate overlay
+
+Exercise page → records → Loading estimate uses
+`components/bodyweight/loading-estimate-sheet.tsx`. Source selection stays inside
+the same sheet. Target reps, saved/explicit current B and output unit produce a
+transient added/assistance estimate. Loading, retry, no-source, invalid input,
+source provenance and one-rep/high-rep states use existing UI primitives.
+Exercise history, Stats/heatmaps and session/share projections use the same
+effective-load boundary and expose incomplete volume.

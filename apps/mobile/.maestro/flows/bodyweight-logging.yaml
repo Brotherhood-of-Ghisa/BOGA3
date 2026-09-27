@@ -233,8 +233,21 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertVisible:
     id: "exercise-set-logger-preview"
-    text: "1RM 102.1 \u00b7 VOL 640"
+    text: "Total 1RM 102.1 \u00b7 VOL 640"
 - takeScreenshot: "BWL04-bodyweight-only"
+- scrollUntilVisible:
+    element:
+      id: "exercise-records-history"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Total 1RM 102.1"
+- assertVisible:
+    text: "Vol 640"
+- takeScreenshot: "BWL04b-reviewed-history-records"
 - scrollUntilVisible:
     element:
       id: "exercise-set-logger-commit"
@@ -255,7 +268,7 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertVisible:
     id: "exercise-set-logger-preview"
-    text: "1RM 127.7 \u00b7 VOL 800"
+    text: "Total 1RM 127.7 \u00b7 VOL 800"
 - takeScreenshot: "BWL05-planned-added"
 - scrollUntilVisible:
     element:
@@ -295,7 +308,7 @@ appId: com.dinoderek.mobile
     id: "exercise-set-load-mode-assistance"
 - assertVisible:
     id: "exercise-set-logger-preview"
-    text: "1RM 76.6 \u00b7 VOL 480"
+    text: "Total 1RM 76.6 \u00b7 VOL 480"
 - takeScreenshot: "BWL06-quantified-assistance"
 - scrollUntilVisible:
     element:
@@ -335,7 +348,7 @@ appId: com.dinoderek.mobile
     id: "exercise-set-load-mode-unquantified_assistance"
 - assertVisible:
     id: "exercise-set-logger-preview"
-    text: "1RM \u2014 \u00b7 VOL \u2014"
+    text: "Total 1RM \u2014 \u00b7 VOL \u2014"
 - takeScreenshot: "BWL07-unquantified"
 - scrollUntilVisible:
     element:

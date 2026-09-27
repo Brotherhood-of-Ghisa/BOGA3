@@ -1,3 +1,4 @@
+import { LoadingEstimateSheet } from '@/components/bodyweight/loading-estimate-sheet';
 import { useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -95,13 +96,19 @@ export function ExercisePageScreen({
   });
   const exercise = draft.state.status === 'ready' ? draft.state.exercise : null;
   const isCompletedSession = draft.state.status === 'ready' && draft.state.sessionStatus === 'completed';
+  const catalog = useExerciseCatalog();
+  const editingExercise = exercise
+    ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
+    : null;
+  const [recordsRevision, setRecordsRevision] = useState(0);
+  const [estimateVisible, setEstimateVisible] = useState(false);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
     loadHistory,
-    isCompletedSession ? sessionId : null
+    isCompletedSession ? sessionId : null,
+    JSON.stringify([recordsRevision, editingExercise?.bodyweightCoefficient, editingExercise?.loadInputMode, editingExercise?.localBodyweightMetadataKnown])
   );
   const [listPreferences] = useExerciseListPreferences();
-  const catalog = useExerciseCatalog();
 
   const [recordsExpanded, setRecordsExpanded] = useState(false);
   const [recordsView, setRecordsView] = useState<RecordsView>('records');
@@ -117,17 +124,13 @@ export function ExercisePageScreen({
   }, [router]);
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
-  const editingExercise = exercise
-    ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
-    : null;
   const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : {};
   const loadContext: LoadContext = {
     bodyweightCoefficient: !editingExercise || editingExercise.localBodyweightMetadataKnown === false ? NaN : editingExercise.bodyweightCoefficient ?? 0,
     loadInputMode: editingExercise?.loadInputMode ?? 'total_load',
     bodyWeightKg: bodyWeight?.localBodyweightMetadataKnown !== false && isValidSessionWeight(bodyWeight ?? {}) ? bodyWeight?.bodyWeightKg : null,
   };
-  // Bodyweight record baselines are integrated with the history resolver in T07.
-  const baseline = loadContext.bodyweightCoefficient === 0 && records.status === 'ready'
+  const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
   const rows = buildSetRows(sets, baseline, loadContext);
   const cursorIndex = findCursorIndex(sets);
@@ -258,6 +261,8 @@ export function ExercisePageScreen({
             card's content, so page and card share one rhythm. */}
         <ScreenScroll gutter="md" keyboardShouldPersistTaps="handled" testID="exercise-page-scroll">
           <RecordsPanel
+            bodyweight={loadContext.bodyweightCoefficient > 0}
+            onEstimate={() => setEstimateVisible(true)}
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
             onOpenHistory={() =>
@@ -354,8 +359,10 @@ export function ExercisePageScreen({
         selected={loggerValues?.setType ?? null}
         visible={openSheet === 'effort'}
       />
+      <LoadingEstimateSheet visible={estimateVisible} exerciseId={exercise.exerciseDefinitionId}
+        context={loadContext} onDismiss={() => setEstimateVisible(false)} />
       <LegacyLoadReviewSheet visible={openSheet === 'review'} exerciseId={exercise.exerciseDefinitionId}
-        onDismiss={() => setOpenSheet('none')} onApplied={() => { void draft.reload(); }} />
+        onDismiss={() => setOpenSheet('none')} onApplied={() => { void draft.reload(); setRecordsRevision(value => value + 1); }} />
       <ExerciseOptionsSheet
         onReview={loadContext.bodyweightCoefficient > 0 ? () => { void draft.flush().then(saved => { if (saved) setOpenSheet('review'); }); } : undefined}
         exerciseName={exercise.name}
@@ -396,6 +403,7 @@ export function ExercisePageScreen({
           // Review may have converted sets outside this page's draft. Reload
           // them before any graph autosave can write the older values back.
           void draft.reload().then(loaded => {
+            setRecordsRevision(value => value + 1);
             if (loaded) draft.update((current) => ({ ...current, name: saved.name }), 'structural');
             setOpenSheet('none');
           });
