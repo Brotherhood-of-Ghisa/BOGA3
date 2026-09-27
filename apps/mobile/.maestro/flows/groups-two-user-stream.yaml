@@ -884,6 +884,30 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "group-exercise-form-bodyweight-percentage" }
 - eraseText
+- inputText: "101"
+- swipe:
+    start: "50%,40%"
+    end: "50%,20%"
+    duration: 500
+- scrollUntilVisible:
+    element: { id: "group-exercise-form-submit" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "group-exercise-form-submit" }
+- scrollUntilVisible:
+    element: { id: "group-exercise-form-bodyweight-error" }
+    direction: UP
+    centerElement: true
+- assertVisible: "Bodyweight contribution must be from 0% to 100%."
+- assertNotVisible: { id: "group-rules-preview" }
+- waitForAnimationToEnd
+- takeScreenshot: "groups-bodyweight-invalid-rules"
+- scrollUntilVisible:
+    element: { id: "group-exercise-form-bodyweight-percentage" }
+    direction: UP
+    centerElement: true
+- tapOn: { id: "group-exercise-form-bodyweight-percentage" }
+- eraseText
 - inputText: "70"
 # A real content drag dismisses iOS decimal/text keyboards without tapping Next.
 - swipe:
