@@ -236,7 +236,7 @@ performance "$ATHLETE_TOKEN" "$T-a" "$DA" 60 10 5
 performance "$RIVAL_TOKEN" "$T-r" "$DR" 90 20 5
 drain 'two target-specific performances'
 metric_board relative_strength
-check 'lighter athlete leads relative strength' '.entries|length==2' 
+check 'lighter athlete leads relative strength' '.entries|length==2'
 check 'relative member and unit' '.entries[0].member.user_id==$a and .entries[0].unit=="x_bw" and .entries[0].performance.weight_value=="10" and .entries[0].effective_resistance_kg==80' --arg a "$ATHLETE_UID"
 metric_board absolute_strength
 check 'heavier athlete leads absolute strength' '.entries[0].member.user_id==$r and .entries[0].unit=="kg" and .entries[0].effective_resistance_kg==110' --arg r "$RIVAL_UID"

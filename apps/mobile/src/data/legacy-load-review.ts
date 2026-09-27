@@ -10,7 +10,7 @@ import { exerciseDefinitions, exerciseSets, sessionExercises, sessions } from '.
 type Reader = Pick<Transaction, 'select'>;
 type LoadPart = 'actual' | 'planned';
 const withoutDirtyFlag = <T extends { localDirty: boolean }>(row: T) => {
-  return { ...row, localDirty: undefined }; 
+  return { ...row, localDirty: undefined };
 };
 export type LegacyLoadCandidate = {
   key: string;
