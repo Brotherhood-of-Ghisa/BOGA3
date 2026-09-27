@@ -85,7 +85,7 @@ fi
 # Seed the URL-scheme trust approval BEFORE the first openurl so the cold-sim
 # "Open in <App>?" SpringBoard dialog never renders. Without this, iOS-26 raises
 # the prompt on the first deep link of each scheme and it covers the RN root.
-# Best-effort: never fails the launch (the warm-up still backstops residual prompts).
+# Fails the launch if a scheme cannot be authorized: no flow taps the dialog away.
 maestro_preauthorize_url_schemes "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" "$SCHEME"
 
 # Seed the location TCC grant for the dev client AFTER it is installed (the
