@@ -96,6 +96,14 @@ case "$lane" in
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
     ;;
 
+  # A single focused native path: entering a dated reading changes RM and volume.
+  bodyweight)
+    MAESTRO_RESET_STRATEGY=data \
+    "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
+      --session "Bodyweight RM and volume" \
+      --scenario "Dated reading changes RM and volume" --flow "$APP_DIR/.maestro/flows/bodyweight-entry.yaml"
+    ;;
+
   # The exercise page (exercise/session redesign step 4): its own fixture,
   # seeded and reset in-flow through the maestro-harness deep link. Infra-free; its own lane so the new screen's
   # evidence (the V5-* captures) is one run. No Supabase.

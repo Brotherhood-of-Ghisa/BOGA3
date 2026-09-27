@@ -1,3 +1,4 @@
+import { loadAsOfWeightResolver } from './bodyweight';
 import type { SessionBodyWeightSnapshot } from './session-drafts';
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
@@ -439,6 +440,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
   },
   async loadSessionsForExercise({ exerciseDefinitionId, start, end }) {
     const database = await bootstrapLocalDataLayer();
+    const resolveWeight = loadAsOfWeightResolver(database);
 
     const conditions = [
       eq(sessionExercises.exerciseDefinitionId, exerciseDefinitionId),
@@ -461,8 +463,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         completedAt: sessions.completedAt,
         gymId: sessions.gymId,
         gymName: gyms.name,
-        localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource,
-        bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt,
+        startedAt: sessions.startedAt,
       })
       .from(sessionExercises)
       .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
@@ -482,8 +483,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         completedAt: row.completedAt,
         gymId: row.gymId ?? null,
         gymName: row.gymName ?? null,
-        localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, bodyWeightKg: row.bodyWeightKg, bodyWeightSource: row.bodyWeightSource,
-        bodyWeightMeasurementId: row.bodyWeightMeasurementId, bodyWeightMeasuredAt: row.bodyWeightMeasuredAt,
+        ...resolveWeight(row.startedAt),
       }));
   },
   async loadSetsForSessionExercises({ sessionExerciseIds }) {

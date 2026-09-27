@@ -125,7 +125,7 @@ describe('exercise page model', () => {
       performanceStatus: 'planned',
     });
     expect(displayedValues(set!)).toEqual({
-      weightUnit: 'kg', externalLoadMode: null,
+      weightUnit: 'kg', externalLoadMode: 'added',
       weightValue: '80',
       repsValue: '6',
       setType: 'rir_1',
@@ -195,7 +195,7 @@ describe('exercise page model', () => {
     const next = addSet(quietSets(), 'new');
     expect(next[5]).toEqual({
       id: 'new',
-      weightUnit: 'kg', externalLoadMode: null,
+      weightUnit: 'kg', externalLoadMode: 'added',
       plannedWeightUnit: null, plannedExternalLoadMode: null, localBodyweightMetadataKnown: true,
       weightValue: '85',
       repsValue: '5',

@@ -1,3 +1,4 @@
+import { loadAsOfWeightResolver } from './bodyweight';
 import type { SessionWeightContext } from '@/src/bodyweight/snapshot';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
@@ -62,16 +63,19 @@ export type ExerciseCatalogStatsStore = {
 export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsStore => ({
   async loadRawHistory() {
     const database = await bootstrapLocalDataLayer();
+    const resolveWeight = loadAsOfWeightResolver(database);
 
-    const sessionRows = database
+    const storedSessionRows = database
       .select({
         id: sessions.id,
         completedAt: sessions.completedAt,
-        localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt,
+        startedAt: sessions.startedAt,
       })
       .from(sessions)
       .where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt)))
       .all();
+
+    const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
     const sessionsCompleted = sessionRows
       .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)

@@ -1,3 +1,4 @@
+import { loadAsOfWeightResolver } from './bodyweight';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
@@ -205,12 +206,13 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 export const createDrizzleStatsStore = (): StatsStore => ({
   async loadAggregationInput({ start, end }) {
     const database = await bootstrapLocalDataLayer();
+    const resolveWeight = loadAsOfWeightResolver(database);
 
-    const sessionRows = database
+    const storedSessionRows = database
       .select({
         id: sessions.id,
         completedAt: sessions.completedAt,
-        localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt,
+        startedAt: sessions.startedAt,
       })
       .from(sessions)
       .where(
@@ -222,6 +224,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
         )
       )
       .all();
+
+    const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
     const sessionsInPeriod = sessionRows
       .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)

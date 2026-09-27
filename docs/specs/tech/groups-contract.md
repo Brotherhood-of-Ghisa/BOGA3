@@ -2338,7 +2338,7 @@ v2 must declare the complete rules and expected revision. V1-created exercises
 still get a legacy initial revision. V2 readers explicitly tag legacy payloads,
 so a ratio or rep score can never be mistaken for `value_kg`.
 
-Legacy facts version 2 recognizes kg/lb and explicit added/assistance meaning
+Legacy facts version 3 recognizes kg/lb and the added-weight meaning of numeric values
 through the shared kernel with coefficient zero. Original kg + added/null pins
 stay byte-for-byte compatible; other meanings use an explicit dependency hash.
 Unknown non-null performance statuses are ineligible, matching v2 scoring.
@@ -2348,13 +2348,16 @@ Unknown non-null performance statuses are ineligible, matching v2 scoring.
 The existing failure-isolated source queue resolves changed sessions/links into
 targets. Legacy targets use the M25 apply; generic targets coalesce into
 `group_metric_eval_queue`, one job per comparison. Personal coefficient-only
-edits and measurement-history changes do not enqueue comparison work. Source
-distribution/standard/method, raw performance, session snapshot, membership,
-link and group-rule changes do.
+edits do not enqueue comparison work. Reading insert/value/date/delete/restore
+changes enqueue shared sessions at or after the earlier old/new reading instant;
+unchanged intervals retain their pins and are suppressed by normal recompute/diff.
+Source distribution/standard/method, raw performance, session start, membership,
+link and group-rule changes also enqueue. Reading triggers use the same failure
+isolation and one-kick-per-transaction boundary.
 
 The Edge worker drains source jobs first, then metric jobs. Each metric claim
 has a generation, claim UUID and expiring lease. Preparation returns the complete
-shared graph of current members, raw sets, frozen session snapshots, links and
+shared graph of current members, raw sets, as-of reading contexts, links and
 rules. Valid observation and current counting eligibility are separate: an
 unlinked set can still invalidate an earlier attestation if it is later edited.
 No private weigh-in timeline or personal coefficient enters this graph.
@@ -2463,3 +2466,20 @@ restores its runtime settings and removes only its per-run fixtures.
 Mobile tests cover pure scoring/graph vectors, wire guards, cache upgrades and
 personal shared-session projections. Full fast/backend plus device frontend
 and two-user groups gates remain required for the integrated milestone.
+
+### Dated-context calculation revision
+
+`session_weight_as_of(owner,started_at)` resolves the latest nondeleted reading
+at/before the exact session start, with ascending ID COLLATE "C" ties. Shared
+session RPCs and the complete comparison graph return only that context; private
+reading history is never exposed. The source graph includes calculation revision
+`dated_added_load_v3`. Shared-session metric payloads use the same revision; local
+disposable cache keys move to v4 and upgrade clears old entries.
+
+Strength performance pins move to version 4 and include resolved kg/source/id/date.
+Reading changes void affected strength attestations during recompute. Reps-only
+and conventional pins retain version 2 and omit body weight, preserving their
+certifications. Retired immutable events retain original evidence; no legacy
+session tuple is used to generate a live score. All active generic comparisons
+are enqueued by the forward migration; archived/former-member behavior and
+unarchive/rejoin reconciliation remain unchanged.

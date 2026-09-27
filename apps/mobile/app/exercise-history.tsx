@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -246,7 +247,7 @@ function BestCard({
       <BestRow
         date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
         divider={false}
-        label={bodyweight ? "Total 1RM" : "1RM"}
+        label={bodyweight ? "Added 1RM" : "1RM"}
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
         testID="exercise-history-best-est-1rm"
         value={formatOneRepMax(oneRm?.value ?? null)}
@@ -355,7 +356,7 @@ function SessionCard({
             </View>
           ) : null}
           <View style={styles.stats}>
-            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Total 1RM" : "1RM"} rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
+            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Added 1RM" : "1RM"} rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
             <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Top added" : "Top set"} rank="secondary" value={formatTopSet(entry.topWeightSet)} />
             <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
               rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />
@@ -403,6 +404,7 @@ export default function ExerciseHistoryRoute() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const datedWeightRevision = useBodyWeightContextRevision();
   const loadSummary = useCallback(
     async (
       nextPeriod: ExerciseHistoryPeriod,
@@ -442,7 +444,8 @@ export default function ExerciseHistoryRoute() {
   useFocusEffect(
     useCallback(() => {
       void loadSummary(period, appliedTagDefinitionId, appliedGymId);
-    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
+    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId, datedWeightRevision])
   );
 
   const handleSelectPeriod = useCallback(

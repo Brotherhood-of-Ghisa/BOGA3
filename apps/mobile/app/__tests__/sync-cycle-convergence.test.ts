@@ -1,3 +1,4 @@
+import { subscribeToBodyWeightContext } from '@/src/bodyweight/invalidation';
 /**
  * Whole-cycle coverage with a stubbed server:
  *
@@ -571,4 +572,45 @@ describe('structured cycle-result logging', () => {
 
     await expect(runSyncCycle()).resolves.toBe('converged');
   });
+});
+
+
+describe('required app update', () => {
+  it.each(['transport', 'envelope'])('preserves pending writes and cursors for a %s rejection', async kind => {
+    markBootstrapDone();
+    database.insert(gyms).values({ id: 'update-pending', name: 'Offline gym', localDirty: true, localUpdatedAtMs: 50 }).run();
+    const before = database.select().from(syncRuntimeState).get();
+    mockRpc.mockResolvedValue(kind === 'transport'
+      ? { data: null, error: { message: 'UPDATE_REQUIRED: Update BoGa to continue syncing.' } }
+      : { data: { error: { code: 'UPDATE_REQUIRED', message: 'Update BoGa to continue syncing.' } }, error: null });
+    await expect(runSyncCycle()).resolves.toBe('update-required');
+    expect(getCycleErrorCode()).toBe('UPDATE_REQUIRED');
+    expect(database.select().from(gyms).where(eq(gyms.id, 'update-pending')).get()?.localDirty).toBe(true);
+    expect(database.select().from(syncRuntimeState).get()?.pullCursor).toEqual(before?.pullCursor);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+});
+
+it('refreshes dated projections after a committed pull even if the following push fails', async () => {
+  markBootstrapDone();
+  database.insert(gyms).values({ id: 'pending', name: 'Pending', localDirty: true, localUpdatedAtMs: 100 }).run();
+  const changed = jest.fn();
+  const unsubscribe = subscribeToBodyWeightContext(changed);
+  let served = false;
+  mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+    if (name !== 'sync_pull') return { data: null, error: { message: 'Network unavailable' } };
+    if (args.layer === 4 && !served) {
+      served = true;
+      return { data: { ...emptyPage, entities: [{ type: 'body_weight_measurements', id: 'r', client_updated_at_ms: 100,
+        fields: { weight_value: '80', weight_unit: 'kg', weight_kg: 80, measured_at: 1000,
+          created_at: 1000, updated_at: 1000, deleted_at: null } }] }, error: null };
+    }
+    return { data: emptyPage, error: null };
+  });
+  try {
+    await runSyncCycle();
+    expect(served).toBe(true);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(database.select().from(gyms).get()?.localDirty).toBe(true);
+  } finally { unsubscribe(); }
 });

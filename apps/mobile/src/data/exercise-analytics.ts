@@ -1,3 +1,4 @@
+import { loadAsOfWeightResolver } from './bodyweight';
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { addFiniteVolume, exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
@@ -199,9 +200,10 @@ const loadExerciseRawSessions = async (
   options: ComputeSelectedExerciseWeeklyEffortOptions
 ): Promise<ExerciseRawSession[]> => {
   const database = await bootstrapLocalDataLayer();
+    const resolveWeight = loadAsOfWeightResolver(database);
 
-  const sessionRows = database
-    .select({ id: sessions.id, completedAt: sessions.completedAt, localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt })
+  const storedSessionRows = database
+    .select({ id: sessions.id, completedAt: sessions.completedAt, startedAt: sessions.startedAt })
     .from(sessions)
     .where(
       and(
@@ -212,6 +214,8 @@ const loadExerciseRawSessions = async (
       )
     )
     .all();
+
+    const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
   const sessionCompletedRows = sessionRows.filter(
     (row): row is typeof row & { completedAt: Date } => row.completedAt !== null

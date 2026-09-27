@@ -201,7 +201,7 @@ it('allows missing B on reps and states that the attestation excludes body weigh
   render(<GroupBoardRoute />);
   expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('5 reps');
   fireEvent.press(screen.getByTestId('group-board-row-1'));
-  expect(await screen.findByTestId('group-metric-record-weight')).toHaveTextContent(/No usable weight saved/i);
+  expect(await screen.findByTestId('group-metric-record-weight')).toHaveTextContent(/No reading on or before this session/i);
   expect(screen.getByText(/not part of this metric’s certification/)).toBeTruthy();
   expect(screen.getByTestId('group-metric-record-certify')).toBeEnabled();
 });

@@ -13,21 +13,21 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   autoFocus?: boolean;
   title: string;
   initial: WeightEntry;
-  measuredAt?: Date;
-  explanation: string;
-  onSave: (input: WeightEntry & { measuredAt?: Date }) => Promise<void>;
+  measuredAt: Date;
+  explanation?: string;
+  onSave: (input: WeightEntry & { measuredAt: Date }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onDismiss: () => void;
 }) {
   const [value, setValue] = useState(initial.weightValue);
   const [unit, setUnit] = useState(initial.weightUnit === 'lb' ? 'lb' : 'kg');
-  const [dateText, setDateText] = useState(measuredAt ? formatCurrentDateTime(measuredAt) : '');
+  const [dateText, setDateText] = useState(formatCurrentDateTime(measuredAt));
   const [valueError, setValueError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
-  const measuredAtMs = measuredAt?.getTime();
+  const measuredAtMs = measuredAt.getTime();
   // Opening (or a new reading while open) shows it, reset in the render that opens.
   const formKey = visible ? JSON.stringify([initial.weightValue, initial.weightUnit, measuredAtMs]) : null;
   const [shownFormKey, setShownFormKey] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     if (formKey !== null) {
       setValue(initial.weightValue);
       setUnit(initial.weightUnit === 'lb' ? 'lb' : 'kg');
-      setDateText(measuredAtMs === undefined ? '' : formatCurrentDateTime(new Date(measuredAtMs)));
+      setDateText(formatCurrentDateTime(new Date(measuredAtMs)));
       setValueError(null); setDateError(null); setSaveError(null);
     }
   }
@@ -55,8 +55,8 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     const input = { weightValue: value, weightUnit: unit };
     try { validateBodyWeight(input); }
     catch (error) { setValueError((error as Error).message); return; }
-    let date: Date | undefined;
-    if (measuredAt) {
+    let date: Date;
+    {
       try { date = resolveMeasurementDate(dateText, measuredAt); }
       catch (error) { setDateError((error as Error).message); return; }
     }
@@ -66,22 +66,22 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     <Sheet visible={visible} title={title} keyboardAvoiding dismissLabel="Dismiss weight editor"
       onDismiss={() => { if (!saving.current) onDismiss(); }} testID="weight-entry-sheet">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
-        <Text allowFontScaling={false} style={styles.body}>{explanation}</Text>
+        {explanation ? <Text allowFontScaling={false} style={styles.body}>{explanation}</Text> : null}
         <FormField label={`Body weight (${unit})`} accessibilityLabel={`Body weight in ${unit}`}
           value={value} onChangeText={setValue} keyboardType="decimal-pad" autoFocus={autoFocus}
           editable={!busy} error={valueError} testID="weight-entry-value" />
         <SegmentedControl options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]}
           accessibilityLabel="Weight unit" value={unit} onChange={setUnit} disabled={busy} style={styles.unitControl} testIDPrefix="weight-entry-unit" />
-        {measuredAt ? <FormField label="Measured at" accessibilityLabel="Measurement date and time"
+        <FormField label="Measured at" accessibilityLabel="Measurement date and time"
           value={dateText} onChangeText={setDateText} autoCapitalize="none" autoCorrect={false}
           editable={!busy} error={dateError} hint="Local time · YYYY-MM-DD HH:mm"
-          testID="weight-entry-date" /> : null}
+          testID="weight-entry-date" />
         {saveError ? <Notice live tone="danger" message={saveError} testID="weight-entry-save-error" /> : null}
         <ActionButton label={busy ? 'Saving…' : 'Save weight'} onPress={save} disabled={busy}
           variant="primary" testID="weight-entry-save" />
         {onDelete ? <ActionButton label="Delete reading" variant="text" tone="danger" disabled={busy}
           testID="weight-entry-delete" onPress={() => Alert.alert('Delete reading?',
-            'This removes the reading from your history. Saved session weights stay unchanged.', [
+            'Delete this weight reading?', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Delete', style: 'destructive', onPress: () => void run(onDelete) },
             ])} /> : null}

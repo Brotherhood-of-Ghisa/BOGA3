@@ -33,7 +33,7 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: 'all' });
 highestWeight, knownVolume? }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screen already loads powers the sheet's week banner.
 Muscle history offers per-side, role-weighted `totalVolume` and
-`workingSetCount`; exercise volume and Total 1RM use effective load from each
+`workingSetCount`; exercise volume and Added 1RM use effective load from each
 session’s saved body weight and the current personal rules. Top added remains
 external load in kg; conventional exercise labels/results stay unchanged.
 

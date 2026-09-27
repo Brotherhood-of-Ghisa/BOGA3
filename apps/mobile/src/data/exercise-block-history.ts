@@ -1,3 +1,4 @@
+import { loadAsOfWeightResolver } from './bodyweight';
 import { exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
@@ -317,11 +318,12 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
   async loadRecentCompletedSessionsForExercise({ exerciseDefinitionId, limit }) {
     if (limit === 0) return [];
     const database = await bootstrapLocalDataLayer();
+    const resolveWeight = loadAsOfWeightResolver(database);
     const baseQuery = database
       .select({
         sessionId: sessions.id,
         completedAt: sessions.completedAt,
-        bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt, sessionMetadataKnown: sessions.localBodyweightMetadataKnown,
+        startedAt: sessions.startedAt,
         bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
         loadInputMode: exerciseDefinitions.loadInputMode,
         localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
@@ -351,7 +353,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         sessionId: row.sessionId,
         completedAt: row.completedAt,
         loadContext: exerciseLoadContext({ bodyweightCoefficient: row.bodyweightCoefficient ?? 0,
-          loadInputMode: row.loadInputMode ?? 'total_load', localBodyweightMetadataKnown: row.localBodyweightMetadataKnown ?? undefined }, { bodyWeightKg: row.bodyWeightKg, bodyWeightSource: row.bodyWeightSource, bodyWeightMeasurementId: row.bodyWeightMeasurementId, bodyWeightMeasuredAt: row.bodyWeightMeasuredAt, localBodyweightMetadataKnown: row.sessionMetadataKnown }),
+          loadInputMode: row.loadInputMode ?? 'total_load', localBodyweightMetadataKnown: row.localBodyweightMetadataKnown ?? undefined }, resolveWeight(row.startedAt)),
       }));
   },
   async loadSessionExercisesForSessions({ exerciseDefinitionId, sessionIds }) {

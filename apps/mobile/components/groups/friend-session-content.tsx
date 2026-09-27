@@ -79,7 +79,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
           testID: 'group-session-times',
         }}
       />
-      {session.metric_revision === 'effective_load_v1' ? (
+      {session.metric_revision === 'dated_added_load_v3' ? (
         <SessionBodyWeight editable={false} sessionId={session.session_id}
           snapshot={groupSessionWeightSnapshot(session)} onSaved={() => {}} />
       ) : null}

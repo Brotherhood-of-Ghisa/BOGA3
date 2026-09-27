@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 import { gyms } from './gyms';
 
@@ -17,16 +17,9 @@ export const sessions = sqliteTable(
     startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
     completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
     durationSec: integer('duration_sec'),
-    // Frozen values, independent of the lifetime of a source measurement.
-    bodyWeightKg: real('body_weight_kg'),
-    bodyWeightSource: text('body_weight_source'),
-    bodyWeightMeasurementId: text('body_weight_measurement_id'),
-    bodyWeightMeasuredAt: integer('body_weight_measured_at', { mode: 'timestamp_ms' }),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
-    // False only on pre-M27 rows awaiting one-time metadata hydration.
-    localBodyweightMetadataKnown: integer('local_bodyweight_metadata_known', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

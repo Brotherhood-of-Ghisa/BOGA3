@@ -18,7 +18,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Root layout: `apps/mobile/app/_layout.tsx`; root stack and its screen declarations: `apps/mobile/components/navigation/root-stack.tsx`
 - Root route access is enforced by the navigator itself. The root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under exactly one `Stack.Protected` group per access level, and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one level at a time:
   - `sign-in` — auth is configured and there is no session, or a sync cycle reported "no signed-in user": only `/sign-in` exists, so a configured-but-signed-out launch never reaches a data screen;
-  - `sync-setup` — a signed-in user whose first sync has not drained (`sync_runtime_state.bootstrap_completed_at` is null): only the first-sync block `/sync-setup` exists (a phase label plus an advancing activity/progress indicator; an offline message instead of an indefinite spinner when the device is offline; on a non-`AUTH_REQUIRED` cycle error, the message and a single Retry that fires exactly one cycle);
+  - `sync-setup` — a signed-in user whose first sync has not drained (`sync_runtime_state.bootstrap_completed_at` is null): only the first-sync block `/sync-setup` exists (a phase label plus an advancing activity/progress indicator; an offline message instead of an indefinite spinner when the device is offline; on a retryable cycle error, the message and a single Retry that fires exactly one cycle; `UPDATE_REQUIRED` instead explains the required app update without Retry);
   - `app` — everything else, including an unconfigured build (no working credential path), where no session or first sync can ever exist; `/sign-in` stays reachable there to show the disabled credential path when opened directly.
 - When the level changes, the routes of the old level leave the stack and the router lands on the first route still declared: `/sign-in`, `/sync-setup`, or `index` (which redirects to `/today`). A deep link to a route of another level lands the same way.
 - The navigator is never unmounted or swapped out to gate access: on expo-router 57, unmounting it reverts the route, so a gate that renders a `<Redirect>` or a block in its place loops ("Maximum update depth exceeded"). The only thing rendered instead of the navigator is the restore guard's neutral loading view (`apps/mobile/components/navigation/auth-route-guard.tsx`), and only before the navigator first mounts: until the session restore resolves and, for a signed-in user, the persisted first-sync flag has been read, so a cold launch (and its deep link) lands on the right level the first time.
@@ -516,11 +516,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the Tools `Gyms` row (`router.push`); native back or `Back to More` returns
 54. `/settings` -> `/body-weight`
    - the Training `Body weight` row (`router.push`); header Back returns
-   - session snapshot corrections are sheets on the owning session route,
-     with no navigation to or mutation of Settings readings
-   - historical fill is an in-route sheet on `/body-weight`; Cancel returns
-     without writes. Its no-source Add reading waits for iOS native dismissal,
-     then opens the reading editor on this same screen; it creates no route.
+   - missing session context opens a dated-entry sheet on the owning session
+     route, prefilled with its exact start; saving updates the private reading
+     timeline and every affected session. Invalid context opens `/body-weight`
+     for reading-history review. Friends expose no entry or edit route.
+   - historical fill and session-only correction are removed.
 
 Note:
 

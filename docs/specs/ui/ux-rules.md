@@ -21,46 +21,32 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 
 ## Current behavior (authoritative)
 
-### Bodyweight entry and frozen context
+### Dated bodyweight entry and session context
 
 Settings → Body weight shows the latest nondeleted reading at/before now,
-with its entered unit and measurement time. Add/edit accepts a positive finite
-decimal in kg or lb and rejects future dates. Unchanged date text preserves its
-full stored timestamp. Read errors are retryable; failed local writes keep all
-input. The interface never requires a network response to save.
+with its entered unit and measurement time. Add/edit requires a date/time and
+positive finite decimal in kg or lb, and rejects future dates. Unchanged date
+text preserves its full stored timestamp. Read errors are retryable; failed
+local writes keep all input. Saves work offline. Save/delete feedback is simply “Reading saved” or “Reading deleted”; no
+warning about past workouts or group results appears.
 
-A new session captures the latest valid reading at/before its start exactly
-once, including a new session built from a historical plan. Missing or invalid
-context stays unknown. A changed start, reopening, later readings and source
-correction/deletion never replace it. The session's Body weight row shows kg
-and source/date; historical estimates keep their estimated label. Explicit
-correction opens a sheet explaining personal/group score and certification
-impact and saves a manual session-only tuple. Settings readings stay unchanged.
-Deleted sessions expose the fact without a correction action.
+Each session derives its weight from the latest nondeleted reading on or before
+its exact start instant; equal timestamps use ascending binary/code-point ID.
+Selection precedes validation, so malformed latest context cannot fall back to
+an older plausible weight. Later readings never estimate earlier sessions.
+Value/date edits, deletion, restoration, session-start edits and sync refresh
+visible derived results without rewriting raw sets or storing a session override.
 
-The visual target is `design-targets/bodyweight.md`. Personal load-dependent projections follow the analytics rules below;
-group/coaching adoption has its own gates.
+The session's read-only Body weight card shows kg and “Reading from <date/time>”.
+Missing context says “No reading on or before this session” and offers “Add dated
+reading”, prefilled at the session start but editable. Invalid context offers
+reading-history review. Friend and deleted-session displays have no entry/edit
+actions. Historical fill and session-only correction do not exist.
 
-### Historical session weight fill
+The visual target is `design-targets/bodyweight.md`; personal and group
+calculations follow `../tech/bodyweight-load-contract.md`.
 
-Settings → Body weight → Fill missing session weights opens a scrollable sheet.
-From/Through are optional local calendar dates; Through includes that whole day.
-Applying a changed range reloads eligible completed sessions and selects them
-by default. Already-filled or malformed nonempty snapshots are excluded;
-metadata awaiting sync and unusable readings explain why selection is blocked.
-
-Preview shows the selected count, estimated count and each session's source
-weight/date. The earliest later reading is explicitly labelled estimated.
-Cancel writes nothing. Apply rechecks current inputs in one transaction and
-shows filled/skipped counts; concurrent saved overrides are never overwritten.
-Stale inputs preserve the failed preview and offer Refresh. Busy writes block
-duplicate submission and dismissal. No source offers Add reading or an
-individual session correction; on iOS the new editor opens only after the fill
-sheet's native dismissal completes. Existing/estimated session weights can be
-corrected from their own detail, with personal/group recalculation and affected
-certification consequences explained.
-
-### Bodyweight exercise setup and load review
+### Bodyweight exercise setup and added weight
 
 The shared exercise fields accept contribution from 0–100%; positive values
 require a movement standard and loading method. Help text explains the
@@ -69,20 +55,12 @@ per-side choice scales only equal external inputs, never the session weight.
 An editor whose saved metadata has not arrived preserves it unless the user
 explicitly configures these fields.
 
-The in-place logger keeps its confirmation tick. Added/Assisted/Unquantified
-choices and kg/lb controls preserve positive input. It shows effective resistance
-and the session kg, or an explicit unavailable reason. Unquantified assistance
-hides the numeric amount without inventing kg. A legacy row offers Review;
-choosing a new meaning does not silently promote an old amount. The exercise
-page exposes the same session correction control as View Session.
-
-Saving bodyweight settings on an exercise with unresolved logs opens the review
-sheet; it is also available from exercise options. Select only rows sharing the
-chosen interpretation and source unit, then Preview. Original raw values, actual
-versus planned status, proposed values and session source dates remain visible.
-Only Apply writes. Missing B blocks old-total conversion; invalid input and stale
-previews remain editable. Leave unresolved makes no set changes. Confirmation
-status is preserved even when the reviewed row has usable values.
+The in-place logger has one added-weight field, kg/lb controls, reps, effort and
+its confirmation tick. It shows total load and dated bodyweight as context;
+1RM is labelled “Added 1RM”. There are no assistance choices or legacy review.
+Every existing numeric weight means added weight. Missing bodyweight leaves
+load metrics unavailable while reps remain loggable. The exercise page exposes
+the same dated context and missing-reading entry as View Session.
 
 ### 1. Action semantics
 
@@ -853,11 +831,10 @@ None. (The primitive extraction these items tracked shipped as `StatePanel`,
 
 ## Personal bodyweight analytics and loading estimates
 
-Bodyweight strength figures read Total 1RM and top external records read Top
-added. Set rows retain added/assisted/unquantified meaning, source units and
+Bodyweight strength figures read Added 1RM and top external records read Top
+added. Set rows retain numeric added weight, source units and
 coefficient/per-side context. Historical B determines historical strength.
-Record details show saved B and effective resistance; assistance is never a
-Top added record. Conventional labels and arithmetic remain unchanged.
+Record details show dated B and effective resistance. Conventional labels and arithmetic remain unchanged.
 
 Volume subtotals explicitly say incomplete; wholly unavailable metrics show an
 em dash. Counts remain usable. Stats tables put the coverage note outside the
@@ -867,17 +844,17 @@ retry routes and do not fabricate records.
 
 Exercise records → Loading estimate opens a scrollable sheet. The strongest
 eligible completed set is selected initially; Choose another performance shows
-raw load, date, source B/provenance and total 1RM. Target reps must be a positive
+raw load, date, source B/provenance and added 1RM. Target reps must be a positive
 whole number; target B is positive kg. Saved target-session B is prefilled;
-Use current reading is explicit and shows its date. The result is positive
-added load or positive assistance in kg/lb, with effective total and estimate
+Use current reading is explicit and shows its date. The result is nonnegative
+added load in kg/lb, with effective total and estimate
 wording. Inputs clear old results, one-rep/high-rep conventions are explained,
-and Done/dismiss changes no history. No source explains review/session-weight
+and Done/dismiss changes no history. A target below bodyweight has no added-weight estimate. No source explains dated-weight
 requirements; read failures can retry and invalid inputs remain editable.
 
-After an explicit correction, backfill or personal coefficient/legacy review,
+After reading or personal coefficient changes,
 reopening affected projections recomputes their values. These are derived
-views, never persisted awards. Bodyweight share previews keep the same total
+views, never persisted awards. Bodyweight share previews keep the same added
 1RM/raw external distinction as the completed session.
 
 Session summary rows keep incomplete volume figures compact: label a known

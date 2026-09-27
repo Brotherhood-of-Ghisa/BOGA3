@@ -40,12 +40,10 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
   independent of external total/per-side entry and muscle mapping. A positive
   contribution requires a movement standard and loading method. A different
   movement gets its own exercise. Personal rule edits reinterpret personal
-  history using its frozen session weights and do not edit group rules.
-- Entry and review: external weight remains positive raw input with added,
-  quantified assistance or unquantified assistance meaning. No band kilogram
-  equivalent is invented. Old loads, including zero, require explicit review
-  before bodyweight scoring; total-to-external conversion is previewed using
-  each session's saved context. Missing context does not prevent logging reps.
+  history using the applicable dated readings and do not edit group rules.
+- Entry: every numeric weight, including old records and zero, means added
+  weight. There are no assistance modes or legacy conversion screens. Raw amounts
+  and units stay unchanged. Missing dated bodyweight does not prevent logging reps.
 - The complete calculation and rollout boundary is owned by
   `tech/bodyweight-load-contract.md`. Personal analytics uses effective load
   consistently across logging, session summaries, history, records and share
@@ -54,8 +52,12 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
   Group/coaching adoption and production activation have separate rollout gates.
 
 - Date: `2026-09-27`
-- Decision: Personal bodyweight records compare estimated total resistance using
-  each performance’s saved session weight. Top added load remains external load.
+- Decision: Personal bodyweight records calculate RM from total resistance and display
+  added-weight RM using
+  each performance’s latest reading on or before its start. The selected
+  reading must be valid; a malformed latest reading blocks older fallback.
+  Reading changes recalculate affected history and shared comparisons without
+  rewriting raw sets. Top added load remains external load.
   Loading estimates use a selected historical performance and an explicit target
   weight/repetition count; choosing a newer reading changes only the projection.
-  A negative adjustment means positive assistance, never negative plates.
+  A negative projection is unavailable; there is no assisted-load result.

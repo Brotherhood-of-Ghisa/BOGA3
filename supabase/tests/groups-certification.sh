@@ -129,7 +129,7 @@ drain() {
   local out
   out="$(mktemp)"
   STATUS="$(curl --silent --show-error -X POST \
-    -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
     -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
   BODY="$(cat "${out}")"
   rm -f "${out}"
@@ -735,7 +735,7 @@ expect_centry R weight "194@r3" "a load-mode change rescales the certified value
 run_psql "delete from app_public.group_board_entries
            where group_exercise_id = '${GX}' and member_user_id = '${RIVAL_UID}' and certified;" >/dev/null
 mark
-expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(3, 1000) >= 1;" "t"
+expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(4, 1000) >= 1;" "t"
 drain "rules"
 expect_centry R weight "194@r3" "the rules recompute restores Certified entries"
 [[ "$(active_certs r3)" == "1" ]] || fail "a rules recompute voids nothing that still matches"

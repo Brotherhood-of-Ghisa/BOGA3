@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-// Owner-private Sync v2 root. Session source ids are provenance, not FKs:
-// editing or deleting a reading must never modify a saved session snapshot.
+// Owner-private Sync v2 root. Sessions resolve applicable readings on read;
+// reading changes never write session or set rows.
 export const bodyWeightMeasurements = sqliteTable(
   'body_weight_measurements',
   {

@@ -35,7 +35,7 @@ appId: com.dinoderek.mobile
 #   D. Fully wipe the device (clearState wipes BOTH the SQLite data AND the
 #      SecureStore session — see src/auth/storage.ts) and sign in again. The
 #      bootstrapper now PULLS from the (non-empty) server, so the logged workout
-#      reappears in history with both frozen weights and the readings.
+#      reappears in history with both dated contexts and the readings.
 #      After a full local wipe the ONLY source of any
 #      session is the remote DB — so a restored session proves the data is in the
 #      remote database.
@@ -146,13 +146,13 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
-- assertVisible: "Reading saved. Existing sessions are unchanged."
+- assertVisible: "Reading saved."
 - openLink: "boga3://train"
 - extendedWaitUntil:
     visible: { id: "train-start-empty-button" }
     timeout: 30000
 
-# === Phase Ba: log one exercise with a frozen 80 kg snapshot ===
+# === Phase Ba: log one exercise with a 80 kg applicable reading ===
 # Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
 # DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
 # session view, `+ Add exercise` the picker, the card the exercise page, whose
@@ -264,13 +264,13 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
-- assertVisible: "Reading saved. Existing sessions are unchanged."
+- assertVisible: "Reading saved."
 - openLink: "boga3://train"
 - extendedWaitUntil:
     visible: { id: "train-start-empty-button" }
     timeout: 30000
 
-# === Phase Bb: log one exercise with a frozen 82 kg snapshot ===
+# === Phase Bb: log one exercise with a 82 kg applicable reading ===
 # Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
 # DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
 # session view, `+ Add exercise` the picker, the card the exercise page, whose
@@ -530,13 +530,13 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - takeScreenshot: "20-first-run-roundtrip-restored-from-remote"
 
-# The two newest completed rows were logged above. Both frozen snapshots must
+# The two newest completed rows were logged above. Both dated contexts must
 # survive the full local wipe independently of the latest 82 kg reading.
 - tapOn: { id: "completed-session-open-button-.*", index: 0 }
 - extendedWaitUntil:
     visible: { id: "session-body-weight", text: "Session body weight, 82 kg, Reading from .*" }
     timeout: 30000
-- takeScreenshot: "21-roundtrip-newer-snapshot-82kg"
+- takeScreenshot: "21-roundtrip-newer-context-82kg"
 - tapOn: { id: "completed-session-detail-back" }
 - extendedWaitUntil:
     visible: { id: "completed-history-scroll" }
@@ -545,7 +545,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "session-body-weight", text: "Session body weight, 80 kg, Reading from .*" }
     timeout: 30000
-- takeScreenshot: "22-roundtrip-older-snapshot-still-80kg"
+- takeScreenshot: "22-roundtrip-older-context-still-80kg"
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:
     visible: { id: "body-weight-reading-.*", text: "Edit 82 kg, .*" }

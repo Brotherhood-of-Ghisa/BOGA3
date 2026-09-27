@@ -14,6 +14,7 @@ import {
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
+import { seedBodyweightRmVolumeFixture } from './bodyweight-load-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
@@ -24,6 +25,7 @@ export type MaestroHarnessFixtureName =
   | 'exercise-block-history'
   // The block history plus a newest completed session with two PRs.
   | 'completion-two-prs'
+  | 'bodyweight-rm-volume'
   | 'exercise-page'
   | 'session-view'
   | 'exercise-browser';
@@ -80,6 +82,7 @@ export const resolveMaestroHarnessFixtureName = (
 ): MaestroHarnessFixtureName =>
   value === 'exercise-block-history' ||
   value === 'completion-two-prs' ||
+  value === 'bodyweight-rm-volume' ||
   value === 'exercise-page' ||
   value === 'session-view' ||
   value === 'exercise-browser'
@@ -187,6 +190,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   if (fixtureName === 'completion-two-prs') {
     await seedExerciseBlockHistoryFixture({ includeTwoPrSession: true });
   }
+  if (fixtureName === 'bodyweight-rm-volume') await seedBodyweightRmVolumeFixture();
   if (fixtureName === 'exercise-page') {
     await seedExercisePageFixture();
   }

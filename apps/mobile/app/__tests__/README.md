@@ -89,42 +89,43 @@
   `scripts/check-ui-guardrails.js`, proven by `ui-guardrails-script.test.ts`.
 
 
-## Historical bodyweight fill coverage (M27)
+## Dated bodyweight coverage
 
-`bodyweight-backfill.test.ts` must retain pure prior/earliest-later selection,
-local calendar bounds, SQLite-compatible same-time ID ties, unknown/invalid
-context, stale reading/session membership, explicit-override preservation,
-selected soft/hard deletion, repeat no-ops and transaction rollback/retry.
-Its real serializer/pull restoration case keeps source IDs as provenance and
-proves later source deletion and ordinary row LWW cannot refresh a frozen tuple.
-`bodyweight-backfill-ui.test.tsx` covers nonwriting preview/cancel, stale refresh,
-busy/dismiss guards and waiting for native iOS dismissal before Add reading.
+`bodyweight-as-of.test.ts` fixes exact-instant ordering, binary Unicode ID ties,
+DST equivalence, malformed latest context, and edit/move/delete/restore intervals.
+`bodyweight-data.test.ts` runs populated old-schema upgrades and proves obsolete
+session columns disappear while raw data, clocks and readings survive. Entry
+and analytics repository tests prove reading mutations recalculate every consumer
+without modifying sessions or sets. Sync covers LWW/reinstall and post-commit
+invalidation despite later failure. Import tests reject v3 snapshots and discard
+old ones without manufacturing readings. UI tests cover required dated entry,
+read-only known/friend context, missing-context prefill and failure feedback.
+Backend SQL/device parity and real group/coaching contracts complement these
+checks; native `ios-bodyweight` covers one dated-entry change to RM and volume at the
+accepted phone sizes.
 
+## Added bodyweight load coverage
 
-## Offline legacy load review coverage (M27)
-
-`bodyweight-load-review.test.ts` runs the real old-schema upgrade, explicit
-rule/session setup, independent actual/planned review, ordinary draft save and
-wire/pull restoration. Preserve no-write preview/cancel, partial-review refusal,
-concurrent hydration rejection, conventional unknown units and empty counterpart
-coverage. Missing sync bookkeeping must never be treated as proof of local-only
-data. `bodyweight-logging-ui.test.tsx` verifies queued choices and explicit Apply.
+`bodyweight-added-load.test.ts` preserves seed/rule/hydration checks and proves
+that old null/assistance tags and numeric values need no conversion or writes.
+`bodyweight-logging-ui.test.tsx` covers the single added-weight field, unit
+selection, added-RM display, total-load volume, missing B and planned/actual
+preservation. No assistance selector or legacy review sheet is offered.
 
 ## Personal bodyweight analytics coverage (M27)
 
-`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/assisted, unit,
+`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/legacy-tag, unit,
 coefficient/per-side, missing/invalid/legacy and hydration vectors through the
 logger, rows, records, exercise/muscle/catalogue/weekly projections and session
 models. Retain aggregate overflow and independent zero/count distinctions.
 `bodyweight-analytics-data.test.ts` uses real migrated SQLite to prove repository
-context parity (including positive B with malformed provenance), frozen
-historical B after a new reading and refresh after
-explicit B/coefficient/mode changes. Formatter tests cover incomplete totals
+context parity (including malformed applicable readings), later-reading isolation and refresh
+after reading/coefficient/mode changes. Formatter tests cover incomplete totals
 and nonfinite percentage output. Existing History/Stats/heatmap tests retain
 coverage and raw-versus-total labels.
 
 `bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
-B, explicit current reading, positive assistance/lb, validation, one-rep/high-rep
+B, explicit current reading, added pounds and below-bodyweight unavailable targets, validation, one-rep/high-rep
 notes, retry, dismissed reads and invalid restored reading context. Numerical
 forward/inverse vectors remain in the kernel tests.
 
@@ -134,7 +135,7 @@ forward/inverse vectors remain in the kernel tests.
 `groups-metric-evaluation.test.ts` cover explicit metric/default/unit families,
 movement/loading compatibility, source distribution and group coefficient
 independence, the 60+20 versus 90+20 ranking reversal, strict performed eligibility,
-assistance, missing/invalid B and historical-estimate provenance. Preserve the
+legacy mode reinterpretation, missing/invalid B and historical-estimate provenance. Preserve the
 separate source counting flag, duplicate/missing-pin refusal and explicit invalid
 weight payloads. These pure tests do not replace backend queue/publication,
 certification, legacy-reader or two-user device proofs.
@@ -145,7 +146,7 @@ items, future-kind pagination, rebuilding emptiness and attestation dependency
 coverage. Cache tests retain upgrade eviction of both old and versioned keys.
 `groups-session-metrics.test.ts` separately proves the personal shared-session
 projection, raw units/modes, incomplete volume, strict performed status and
-malformed frozen-snapshot handling. Never substitute that personal coefficient
+malformed derived-context handling. Never substitute that personal coefficient
 for the target group's coefficient in ranking tests.
 
 `groups-comparison-form.test.tsx` covers review/stale-edit behavior.

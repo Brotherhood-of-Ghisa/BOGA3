@@ -1,8 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { LegacyLoadReviewContent } from '@/components/bodyweight/legacy-load-review-sheet';
-import { listLegacyLoads } from '@/src/data/legacy-load-review';
 import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
@@ -126,8 +124,6 @@ export function ExerciseEditorModal({
   onSave,
   title,
 }: ExerciseEditorModalProps) {
-  const [reviewExercise, setReviewExercise] = useState<ExerciseCatalogExercise | null>(null);
-  const reviewBusy = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [muscleSelectorMode, setMuscleSelectorMode] = useState<MuscleSelectorMode>(null);
   const [exerciseName, setExerciseName] = useState('');
@@ -166,9 +162,7 @@ export function ExerciseEditorModal({
     shownFor.prefill !== prefill
   ) {
     setShownFor({ visible, editingExercise, prefill });
-    if (!visible) {
-      setReviewExercise(null);
-    } else {
+    if (visible) {
       if (editingExercise) {
         const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
         setExerciseName(editingExercise.name);
@@ -365,10 +359,6 @@ export function ExerciseEditorModal({
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
-      if (editingExercise && savedExercise.localBodyweightMetadataKnown !== false) {
-        const unresolved = await listLegacyLoads(savedExercise.id).then(data => data.candidates.length > 0).catch(() => true);
-        if (unresolved) { setReviewExercise(savedExercise); return; }
-      }
       onSaved(savedExercise);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Unable to save exercise.');
@@ -379,15 +369,11 @@ export function ExerciseEditorModal({
 
   const isSelectorOpen = muscleSelectorMode !== null;
 
-  const finishReview = () => {
-    if (reviewExercise && !reviewBusy.current) onSaved(reviewExercise);
-  };
-
   return (
     <Sheet
-      dismissLabel={reviewExercise ? "Leave old loads unresolved" : "Dismiss exercise editor overlay"}
+      dismissLabel="Dismiss exercise editor overlay"
       headerLeading={
-        !reviewExercise && isSelectorOpen ? (
+        isSelectorOpen ? (
           <IconButton
             accessibilityLabel="Back to exercise"
             name="chevron-left"
@@ -397,12 +383,10 @@ export function ExerciseEditorModal({
         ) : undefined
       }
       keyboardAvoiding
-      onDismiss={reviewExercise ? finishReview : closeEditorModal}
-      testID={reviewExercise ? "legacy-load-review" : "exercise-editor"}
-      title={reviewExercise ? "Review original loads" : isSelectorOpen ? selectorTitle : editorTitle}
+      onDismiss={closeEditorModal}
+      testID="exercise-editor"
+      title={isSelectorOpen ? selectorTitle : editorTitle}
       visible={visible}>
-      {reviewExercise ? <LegacyLoadReviewContent visible={visible} exerciseId={reviewExercise.id}
-        onBusyChange={value => { reviewBusy.current = value; }} onDismiss={finishReview} /> :
       <View style={[styles.body, { height: height * EDITOR_SHARE_OF_SCREEN }]}>
         {isLoadingMuscleGroups ? <StatePanel body="Loading muscle groups…" kind="loading" /> : null}
 
@@ -599,7 +583,7 @@ export function ExerciseEditorModal({
             ) : null}
           </>
         ) : null}
-      </View>}
+      </View>
     </Sheet>
   );
 }

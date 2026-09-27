@@ -61,6 +61,12 @@ export const generatedMigrationBundle = {
     tag: "0008_ordinary_bill_hollister",
     breakpoints: true,
   },
+  {
+    idx: 9,
+    when: 1790521306944,
+    tag: "0009_amazing_fixer",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -352,6 +358,14 @@ UPDATE \`sync_runtime_state\` SET \`pull_cursor\` = json_remove(
   END,
   '$."0"', '$."1"', '$."3"'
 );
+`,
+  m0009: `ALTER TABLE \`sessions\` DROP COLUMN \`body_weight_kg\`;--> statement-breakpoint
+ALTER TABLE \`sessions\` DROP COLUMN \`body_weight_source\`;--> statement-breakpoint
+ALTER TABLE \`sessions\` DROP COLUMN \`body_weight_measurement_id\`;--> statement-breakpoint
+ALTER TABLE \`sessions\` DROP COLUMN \`body_weight_measured_at\`;--> statement-breakpoint
+ALTER TABLE \`sessions\` DROP COLUMN \`local_bodyweight_metadata_known\`;
+--> statement-breakpoint
+DELETE FROM \`group_cache\`;
 `,
   },
 } as const;

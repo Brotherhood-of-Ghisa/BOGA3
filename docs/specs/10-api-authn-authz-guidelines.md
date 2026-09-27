@@ -62,24 +62,25 @@ Versioned group RPCs retain rules 15–19, with metric-specific certifications
 and expected revision/performance checks described in
 [`groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).
 Group rules, score projections and queues have no direct client privileges.
-Shared-session context exposes the saved tuple, never the owner's reading
+Shared-session context exposes the derived as-of context, never the owner's reading
 timeline. Worker-only claim/prepare/publish/fail RPCs require service-role access;
 the public Edge endpoint still requires its Vault-held secret.
 
 ## Read-only coaching projections (M27)
 
-`agent-api` batches owner-filtered exercise rules, saved session-weight tuples
+`agent-api` batches owner-filtered exercise rules, as-of session-weight contexts
 and entered set metadata, then uses the same effective-load boundary as mobile.
-The saved snapshot supplies only the context needed for authorized training
-responses; the API does not read or expose the body-weight measurement timeline.
+The service-only `session_weight_contexts(owner,session_ids)` helper resolves
+only already-authorized sessions from private readings. Normal/OAuth clients
+cannot execute this helper; the response exposes no measurement timeline.
 Its `training-metrics.ts` adapter adds no authorization paths. Live OAuth grant
 validation, non-member/nonexistent exercise equivalence, read-only routes,
 direct-table denial and the four existing MCP tools remain enforced.
 
-Raw entered unit/mode, effective resistance, metric basis, estimated provenance
+Raw entered unit, effective resistance, metric basis, dated provenance
 and volume coverage are distinct fields. Unknown totals are null; known
 subtotals are explicitly incomplete. Additive API-v1 evolution is identified
-by `metric_revision: effective_load_v1`; conventional external `load` remains
+by `metric_revision: dated_added_load_v3`; conventional external `load` remains
 kg-normalized. Full response semantics live in
 [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
 Local parity/authorization and real OAuth-to-MCP gates are required; this

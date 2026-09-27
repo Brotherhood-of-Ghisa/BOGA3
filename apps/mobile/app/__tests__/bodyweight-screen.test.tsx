@@ -12,8 +12,9 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }), useFocu
 } }));
 jest.mock('@/src/data/bodyweight', () => ({
   readCurrentBodyWeight: jest.fn(), listBodyWeightReadings: jest.fn(), saveBodyWeightReading: jest.fn(), deleteBodyWeightReading: jest.fn(),
-  correctSessionBodyWeight: jest.fn(),
 }));
+jest.mock('@/src/data/session-drafts', () => ({ loadSessionSnapshotById: jest.fn() }));
+const mockSession = jest.requireMock('@/src/data/session-drafts').loadSessionSnapshotById as jest.Mock;
 const data = jest.requireMock('@/src/data/bodyweight') as Record<string, jest.Mock>;
 const reading = { id: 'r1', weightValue: '80', weightUnit: 'kg', weightKg: 80,
   measuredAt: new Date('2026-01-01T10:23:45.678Z') };
@@ -34,14 +35,14 @@ it('shows empty history and saves an explicit lb reading with its date offline',
     weightValue: '176.4', weightUnit: 'lb', measuredAt: expect.any(Date),
   })));
   await waitFor(() => expect(screen.queryByTestId('weight-entry-sheet')).toBeNull());
-  expect(screen.getByText('Reading saved. Existing sessions are unchanged.')).toBeTruthy();
+  expect(screen.getByText('Reading saved.')).toBeTruthy();
 });
 
 it('keeps invalid and failed input editable, then retries successfully', async () => {
   const save = jest.fn().mockRejectedValueOnce(new Error('Storage full')).mockResolvedValue(undefined);
   const dismiss = jest.fn();
   render(<WeightEntrySheet title="Add reading" initial={{ weightValue: '', weightUnit: 'kg' }}
-    measuredAt={reading.measuredAt} explanation="Saved sessions stay fixed." onSave={save} onDismiss={dismiss} />);
+    measuredAt={reading.measuredAt} onSave={save} onDismiss={dismiss} />);
   fireEvent.press(screen.getByTestId('weight-entry-save'));
   expect(screen.getByTestId('weight-entry-value-error')).toBeTruthy();
   expect(save).not.toHaveBeenCalled();
@@ -81,7 +82,7 @@ it('requires a clear delete confirmation and keeps a failed delete editor open',
   fireEvent.press(await screen.findByTestId('body-weight-reading-r1'));
   fireEvent.press(screen.getByTestId('weight-entry-delete'));
   expect(data.deleteBodyWeightReading).not.toHaveBeenCalled();
-  expect(alert).toHaveBeenCalledWith('Delete reading?', expect.stringContaining('Saved session weights stay unchanged'), expect.any(Array));
+  expect(alert).toHaveBeenCalledWith('Delete reading?', 'Delete this weight reading?', expect.any(Array));
   const confirm = alert.mock.calls[0][2]?.find(button => button.style === 'destructive');
   act(() => confirm?.onPress?.());
   await screen.findByText('Could not delete');
@@ -89,21 +90,33 @@ it('requires a clear delete confirmation and keeps a failed delete editor open',
   alert.mockRestore();
 });
 
-it('shows source context and changes only a session with an explicit manual override', async () => {
-  const onSaved = jest.fn();
-  const updated = { bodyWeightKg: 82, bodyWeightSource: 'manual', bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null };
-  data.correctSessionBodyWeight.mockResolvedValue(updated);
-  render(<SessionBodyWeight sessionId="s1" snapshot={{ bodyWeightKg: 80, bodyWeightSource: 'historical_estimate',
-    bodyWeightMeasurementId: 'r1', bodyWeightMeasuredAt: reading.measuredAt }} onSaved={onSaved} />);
-  expect(screen.getByText(`Estimated from ${formatCurrentDateTime(reading.measuredAt)}`)).toBeTruthy();
+it('shows derived source context read-only, with no session correction action', () => {
+  render(<SessionBodyWeight sessionId="s1" snapshot={{ bodyWeightKg: 80, bodyWeightSource: 'reading',
+    bodyWeightMeasurementId: 'r1', bodyWeightMeasuredAt: reading.measuredAt }} onSaved={jest.fn()} />);
+  expect(screen.getByText(`Reading from ${formatCurrentDateTime(reading.measuredAt)}`)).toBeTruthy();
   fireEvent.press(screen.getByTestId('session-body-weight'));
-  expect(screen.queryByTestId('weight-entry-date')).toBeNull();
-  expect(screen.getByText(/certifications may need review/)).toBeTruthy();
+  expect(screen.queryByTestId('weight-entry-sheet')).toBeNull();
+  expect(screen.queryByTestId('session-body-weight-add-reading')).toBeNull();
+});
+
+it('adds a dated reading at the session start, keeps the date editable and refreshes context', async () => {
+  const onSaved = jest.fn();
+  const updated = { bodyWeightKg: 82, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'r1', bodyWeightMeasuredAt: reading.measuredAt };
+  mockSession.mockResolvedValueOnce({ startedAt: reading.measuredAt, deletedAt: null }).mockResolvedValueOnce(updated);
+  render(<SessionBodyWeight sessionId="s1" snapshot={{}} onSaved={onSaved} />);
+  expect(screen.getByText('No reading on or before this session')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('session-body-weight-add-reading'));
+  await screen.findByTestId('weight-entry-date');
+  expect(screen.getByTestId('weight-entry-date').props.value).toBe(formatCurrentDateTime(reading.measuredAt));
   fireEvent.changeText(screen.getByTestId('weight-entry-value'), '82');
   fireEvent.press(screen.getByTestId('weight-entry-save'));
   await waitFor(() => expect(onSaved).toHaveBeenCalledWith(updated));
-  expect(data.correctSessionBodyWeight).toHaveBeenCalledWith('s1', expect.objectContaining({ weightValue: '82', weightUnit: 'kg' }));
-  expect(data.saveBodyWeightReading).not.toHaveBeenCalled();
+  expect(data.saveBodyWeightReading).toHaveBeenCalledWith({ weightValue: '82', weightUnit: 'kg', measuredAt: reading.measuredAt });
+});
+
+it('keeps a friend session read-only even without an applicable reading', () => {
+  render(<SessionBodyWeight sessionId="friend" snapshot={{}} editable={false} onSaved={jest.fn()} />);
+  expect(screen.queryByTestId('session-body-weight-add-reading')).toBeNull();
 });
 
 it('shows the current reading on Settings and navigates to its history', async () => {

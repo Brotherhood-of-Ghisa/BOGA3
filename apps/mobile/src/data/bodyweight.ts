@@ -1,10 +1,12 @@
 import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm';
 
-import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
+import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
-import { bodyWeightMeasurements, sessions, type BodyWeightMeasurement } from './schema';
-import { EMPTY_SESSION_WEIGHT, isValidBodyWeightReading, requireDate, validateBodyWeight,
-  type SessionWeightSnapshot, type WeightEntry, type WeightReadingInput } from '@/src/bodyweight/weight-entry';
+import { bodyWeightMeasurements, type BodyWeightMeasurement } from './schema';
+import { createAsOfWeightResolver, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
+import { requireDate, validateBodyWeight, type WeightReadingInput } from '@/src/bodyweight/weight-entry';
+import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 type ReadWeightTx = Pick<Transaction, 'select'>;
@@ -16,13 +18,14 @@ export const findLatestWeightReading = (tx: ReadWeightTx, at: Date): BodyWeightM
     .orderBy(desc(bodyWeightMeasurements.measuredAt), asc(bodyWeightMeasurements.id)).limit(1).get() ?? null;
 };
 
-/** Called only for a new session, inside the transaction that creates it. */
-export const captureSessionWeight = (tx: ReadWeightTx, startedAt: Date): SessionWeightSnapshot => {
-  const reading = findLatestWeightReading(tx, startedAt);
-  if (!reading || !isValidBodyWeightReading(reading)) return { ...EMPTY_SESSION_WEIGHT };
-  return { bodyWeightKg: reading.weightKg, bodyWeightSource: 'reading',
-    bodyWeightMeasurementId: reading.id, bodyWeightMeasuredAt: reading.measuredAt,
-  };
+/** One timeline read per graph; sessions and sets remain immutable. */
+export const loadAsOfWeightResolver = (database: ReadWeightTx) => createAsOfWeightResolver(
+  database.select().from(bodyWeightMeasurements).where(isNull(bodyWeightMeasurements.deletedAt)).all(),
+);
+export const resolveSessionWeights = <T extends { startedAt: Date }>(database: ReadWeightTx, rows: readonly T[]) => {
+  if (!rows.length) return [] as (T & ResolvedSessionWeight)[];
+  const resolve = loadAsOfWeightResolver(database);
+  return rows.map(row => ({ ...row, ...resolve(row.startedAt) }));
 };
 
 export const listBodyWeightReadings = async (): Promise<BodyWeightMeasurement[]> => {
@@ -58,6 +61,8 @@ export const saveBodyWeightReading = async (input: WeightReadingInput): Promise<
     return row;
   });
   notifyLocalWrite();
+  invalidateExerciseCatalogCache();
+  invalidateBodyWeightContext();
   return saved;
 };
 
@@ -72,25 +77,6 @@ export const deleteBodyWeightReading = async (id: string, now = new Date()): Pro
     }).where(eq(bodyWeightMeasurements.id, id)).run();
   });
   notifyLocalWrite();
-};
-
-/** An explicit correction supplies the whole frozen tuple, never a live link. */
-export const correctSessionBodyWeight = async (
-  sessionId: string, input: WeightEntry, now = new Date(),
-): Promise<SessionWeightSnapshot> => {
-  requireDate(now, 'current date');
-  const { weightKg } = validateBodyWeight(input);
-  const db: LocalDatabase = await bootstrapLocalDataLayer();
-  const snapshot: SessionWeightSnapshot = { bodyWeightKg: weightKg, bodyWeightSource: 'manual',
-    bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null,
-  };
-  db.transaction(tx => {
-    const session = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
-    if (!session || session.deletedAt) throw new Error('This session is no longer available.');
-    tx.update(sessions).set({ ...snapshot, localBodyweightMetadataKnown: true,
-      updatedAt: now, localDirty: true, localUpdatedAtMs: nowMonotonic(tx as Transaction),
-    }).where(eq(sessions.id, sessionId)).run();
-  });
-  notifyLocalWrite();
-  return snapshot;
+  invalidateExerciseCatalogCache();
+  invalidateBodyWeightContext();
 };

@@ -2,9 +2,10 @@ import { eq } from 'drizzle-orm';
 import { __resetClockForTests } from '@/src/data/clock';
 import { bodyWeightMeasurements, sessions } from '@/src/data/schema';
 import { createSessionDraftRepository } from '@/src/data/session-drafts';
-import { correctSessionBodyWeight, deleteBodyWeightReading, listBodyWeightReadings,
+import { deleteBodyWeightReading, listBodyWeightReadings,
   readCurrentBodyWeight, saveBodyWeightReading } from '@/src/data/bodyweight';
 import { isValidSessionWeight, resolveMeasurementDate, validateBodyWeight } from '@/src/bodyweight/weight-entry';
+import { loadActiveSessionGraph, setSessionGym, completeActiveSession } from '@/src/session-recorder/session-lifecycle';
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -60,7 +61,7 @@ it('selects by measurement time, not edit time, with stable ascending ids for ti
   expect((await readCurrentBodyWeight(now))?.id).toBe('z-tie');
 });
 
-it('captures at session creation once, independently for later and backdated sessions', async () => {
+it('resolves from the recorded start on every read, including a changed session start', async () => {
   const reading = await save('80', at(-2));
   const repo = createSessionDraftRepository();
   const first = await newSession(at(-1));
@@ -69,11 +70,11 @@ it('captures at session creation once, independently for later and backdated ses
   await save('85', now);
   const second = await newSession(now);
   expect((await repo.loadSessionSnapshotById(second.sessionId))?.bodyWeightKg).toBe(85);
-  // Editing the start, loading, editing/deleting the source cannot recapture B.
+  // Moving the start selects the later reading; source edits cannot override it.
   await repo.persistDraftSnapshot({ ...first, gymId: null, startedAt: now, exercises: [] });
   await save('90', at(-2), reading.id);
   await deleteBodyWeightReading(reading.id, now);
-  expect((await repo.loadSessionSnapshotById(first.sessionId))?.bodyWeightKg).toBe(80);
+  expect((await repo.loadSessionSnapshotById(first.sessionId))?.bodyWeightKg).toBe(85);
   const earlier = await newSession(at(-5));
   expect(await repo.loadSessionSnapshotById(earlier.sessionId)).toMatchObject({ bodyWeightKg: null,
     bodyWeightSource: null, bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null });
@@ -87,19 +88,21 @@ it('does not borrow an older valid reading when the latest restored reading is m
   expect((await createSessionDraftRepository().loadSessionSnapshotById(session.sessionId))?.bodyWeightKg).toBeNull();
 });
 
-it('explicitly corrects only the session, replacing provenance and marking metadata known', async () => {
+it('recalculates historical context without modifying the session row or its sync clock', async () => {
   const reading = await save('80', at(-2));
   const { sessionId } = await newSession(at(-1));
-  mockFixture.database.update(sessions).set({ localBodyweightMetadataKnown: false }).where(eq(sessions.id, sessionId)).run();
-  await correctSessionBodyWeight(sessionId, { weightValue: '180', weightUnit: 'lb' }, now);
-  expect(mockFixture.database.select().from(sessions).get()).toMatchObject({ bodyWeightKg: 180 * 0.45359237,
-    bodyWeightSource: 'manual', bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null,
-    localBodyweightMetadataKnown: true, localDirty: true });
-  expect(await listBodyWeightReadings()).toEqual([reading]);
-  await expect(correctSessionBodyWeight(sessionId, { weightValue: '0', weightUnit: 'kg' })).rejects.toThrow();
-  expect((await createSessionDraftRepository().loadSessionSnapshotById(sessionId))?.bodyWeightKg).toBe(180 * 0.45359237);
-  mockFixture.database.update(sessions).set({ deletedAt: now }).where(eq(sessions.id, sessionId)).run();
-  await expect(correctSessionBodyWeight(sessionId, { weightValue: '90', weightUnit: 'kg' })).rejects.toThrow('no longer');
+  const before = mockFixture.database.select().from(sessions).get();
+  const load = () => createSessionDraftRepository().loadSessionSnapshotById(sessionId);
+  await save('180', at(-2), reading.id, 'lb');
+  expect((await load())?.bodyWeightKg).toBe(180 * 0.45359237);
+  await save('180', now, reading.id, 'lb');
+  expect((await load())?.bodyWeightKg).toBeNull();
+  await save('80', at(-2), reading.id);
+  await deleteBodyWeightReading(reading.id, now);
+  expect((await load())?.bodyWeightKg).toBeNull();
+  mockFixture.database.update(bodyWeightMeasurements).set({ deletedAt: null }).where(eq(bodyWeightMeasurements.id, reading.id)).run();
+  expect((await load())?.bodyWeightKg).toBe(80);
+  expect(mockFixture.database.select().from(sessions).get()).toEqual(before);
 });
 
 it('keeps exact measurement precision when its displayed date is unchanged', () => {
@@ -111,11 +114,24 @@ it('keeps exact measurement precision when its displayed date is unchanged', () 
   expect(validateBodyWeight({ weightValue: '80.2', weightUnit: 'kg' }).weightKg).toBe(80.2);
 });
 
-it('validates the complete frozen tuple instead of accepting positive kg alone', () => {
+it('validates dated context instead of accepting positive kg alone', () => {
   expect(isValidSessionWeight({ bodyWeightKg: 80 })).toBe(false);
-  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'manual' })).toBe(true);
+  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'manual' })).toBe(false);
   expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'manual', bodyWeightMeasurementId: 'x' })).toBe(false);
   expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'historical_estimate',
-    bodyWeightMeasurementId: 'x', bodyWeightMeasuredAt: now })).toBe(true);
+    bodyWeightMeasurementId: 'x', bodyWeightMeasuredAt: now })).toBe(false);
   expect(isValidSessionWeight({ bodyWeightKg: Infinity, bodyWeightSource: 'manual' })).toBe(false);
+});
+
+
+it('preserves exact active-session start through ordinary edits and completion', async () => {
+  const startedAt = new Date('2026-09-01T12:00:30.123Z');
+  const { sessionId } = await newSession(startedAt);
+  const reading = await save('80', startedAt);
+  const graph = await loadActiveSessionGraph(sessionId);
+  expect(graph?.startedAt).toEqual(startedAt);
+  await setSessionGym(sessionId, null);
+  expect((await createSessionDraftRepository().loadSessionSnapshotById(sessionId))?.bodyWeightMeasurementId).toBe(reading.id);
+  await completeActiveSession({ sessionId, gymId: null, startedAt: graph!.startedAt, completedHistorySession: graph!.session });
+  expect(await createSessionDraftRepository().loadSessionSnapshotById(sessionId)).toMatchObject({ startedAt, bodyWeightKg: 80 });
 });
