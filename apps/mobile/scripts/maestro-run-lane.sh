@@ -96,15 +96,12 @@ case "$lane" in
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
     ;;
 
-  # Bodyweight entry and dated context: a dedicated local-only lane so
-  # the same asserted flow can be checked on small and large phone layouts.
+  # A single focused native path: entering a dated reading changes RM and volume.
   bodyweight)
     MAESTRO_RESET_STRATEGY=data \
     "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
-      --session "Bodyweight entry, logging and dated analytics" \
-      --scenario "Bodyweight entry and dated context" --flow "$APP_DIR/.maestro/flows/bodyweight-entry.yaml" \
-      --scenario "Bodyweight setup, review and logging" --flow "$APP_DIR/.maestro/flows/bodyweight-logging.yaml" \
-      --scenario "Personal bodyweight analytics and loading estimates" --flow "$APP_DIR/.maestro/flows/bodyweight-analytics.yaml"
+      --session "Bodyweight RM and volume" \
+      --scenario "Dated reading changes RM and volume" --flow "$APP_DIR/.maestro/flows/bodyweight-entry.yaml"
     ;;
 
   # The exercise page (exercise/session redesign step 4): its own fixture,

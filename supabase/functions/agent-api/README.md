@@ -202,7 +202,7 @@ any internal safety cap explicit.
 ## Effective-load response evolution
 
 Exercise-context and workout responses carry `metric_revision:
-"dated_readings_v2"`. Routes, arguments, authorization, envelopes and existing
+"dated_added_load_v3"`. Routes, arguments, authorization, envelopes and existing
 field names stay at API v1. Added fields are additive; callers must tolerate
 unknown fields and nullable unavailable metrics. Existing conventional kg
 performances keep their numeric meaning. The existing set `load` remains the
@@ -245,20 +245,23 @@ Performed sets retain raw and effective values separately:
     "status": "known", "reason": null, "value": 100,
     "unit": "kg", "basis": "total_resistance"
   },
-  "estimated_one_rep_max": { "value": 127.67141908045373, "unit": "kg", "basis": "total_resistance" },
+  "estimated_one_rep_max": { "value": 47.67141908045373, "unit": "kg", "basis": "added_load" },
   "volume": { "value": 800, "unit": "kg_reps" }
 }
 ```
 
-Raw mode is `added`, `assistance`, `unquantified_assistance`, or null for legacy
-interpretation. Unknown/invalid effective loads retain their raw values and
+Every numeric raw weight means added weight; `entered_load.mode` is `added`.
+Old null/assistance tags are retained only as storage compatibility, never a
+calculation choice. Unknown/invalid effective loads retain raw values and
 performed reps, with null dependent metrics and a resolver `reason`. Blank
-entered amount plus valid performed reps follows the app's canonical-zero rule;
-`raw_value` still preserves the blank. Planned/skipped/unperformed rows do not
-contribute. The existing `estimated_one_rep_max` fields use total resistance
-for positive coefficients, identified by `basis`; conventional per-side
-exercise metrics retain entered-load semantics. `top_weight` remains a Top
-added external-load record, normalized to kg; assistance never wins it.
+entered amount plus valid performed reps is zero; `raw_value` preserves the
+blank. Planned/skipped/unperformed rows do not contribute.
+
+Bodyweight `estimated_one_rep_max` applies Wathan to total resistance, then
+subtracts the body contribution and divides by the external per-side factor.
+Its `basis` is `added_load`; conventional RM keeps `entered_load`. Effective
+load and volume still use total resistance. `top_weight` is entered added weight,
+normalized to kg.
 
 Performance volumes, workout totals, per-exercise workout volumes and
 `volume_series` values include coverage:

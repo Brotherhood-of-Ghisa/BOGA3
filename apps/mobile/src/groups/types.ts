@@ -38,7 +38,7 @@ export type GroupSessionStatus = 'active' | 'completed';
 /** Frozen shared-session context. Missing revision denotes an older entered-load payload. */
 export type GroupSessionLoadContext = {
   metric_scope?: 'personal';
-  metric_revision?: 'dated_readings_v2';
+  metric_revision?: 'dated_added_load_v3';
   body_weight_kg?: number | null;
   body_weight_source?: string | null;
   body_weight_measurement_id?: string | null;

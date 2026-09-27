@@ -576,15 +576,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   retain their current contract until group rule adoption. It contains percentage,
   movement and loading text, a change callback, known-metadata status and inline
   error. The personal editor validates the complete tuple before saving.
-- `SetLogger` accepts resolved `loadContext`, unit/mode, metadata-known status,
-  explicit review state and callbacks. Unit/mode segments have 44pt minimum
-  height. A legacy row opens review before its load meaning becomes eligible.
-- `LegacyLoadReviewSheet` composes Sheet, Card/ListRow selection, unit segments,
-  preview and one primary Apply action. No unit or interpretation is preselected.
-  It guards duplicate writes and retains a failed preview. The applicable reading date and unavailable context are human-readable. Test IDs use `legacy-load-*`.
-- Pure/data coverage: `bodyweight-load-review.test.ts`, `bodyweight-import.test.ts`;
-  interaction coverage: `bodyweight-logging-ui.test.tsx`. New rendered evidence
-  is required by `design-targets/bodyweight.md` before UI closeout.
+- `SetLogger` accepts resolved dated bodyweight and one added-weight field with
+  a kg/lb selector, reps, effort and a confirmation tick. It displays RM in
+  added-weight terms and volume from total load.
+- Pure/data coverage: `bodyweight-added-load.test.ts`, `bodyweight-import.test.ts`;
+  interaction coverage: `bodyweight-logging-ui.test.tsx`. The focused native
+  bodyweight flow covers reading entry and the changed RM/volume display.
 
 ### UI-supporting shared module (non-visual)
 
@@ -633,22 +630,21 @@ If a task adds/removes/renames reusable UI components or changes their role, upd
 - `LoadingEstimateSheet`: stable `Sheet`, scrollable `FormField`s, unit segments,
   source `ListRow`s, `Stat` result and validation/convention `Notice`s. Target
   changes clear results and source selection returns the scroll position to top.
-- `SetSummaryRow`: bodyweight rows separate raw context and Total 1RM/volume so
-  coefficient, units and assistance do not squeeze a conventional-width row.
-- `RecordsPanel`: Top added / Total 1RM, historical B/effective resistance and
+- `SetSummaryRow`: bodyweight rows separate raw context and Added 1RM/volume so
+  coefficient and units do not squeeze a conventional-width row.
+- `RecordsPanel`: Top added / Added 1RM, historical B/effective resistance and
   explicitly incomplete previous-session volume. Loading estimate is a text
   action beside the existing history entry.
 - Stats and `HistorySheet`: named total strength/top added, coverage notes and
   missing-metric heatmap states; no complete total or comparison from a subtotal.
 - Coverage: `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
   `bodyweight-analytics-formatting.test.ts`, `bodyweight-loading-estimate-ui.test.tsx`
-  and existing screen tests. `bodyweight-analytics.yaml` extends ios-bodyweight
-  with records/history/calculator/correction/Stats/share device evidence.
+  and existing screen tests. The focused ios-bodyweight flow asserts the reading
+  entry’s RM and volume effect; pure/data tests cover other calculations.
 
-The bodyweight logger’s fixed-height amount field uses `Added · kg/lb` or
-`Assist · kg/lb` so the legend stays on one line at 375pt. Its accessibility
-label spells out added weight or assistance and the selected unit. The mode
-selector retains the full accessible meaning; labels never crowd the number.
+The bodyweight logger’s fixed-height amount field uses `Added · kg/lb`
+so the legend stays on one line at 375pt. Its accessibility
+label spells out added weight and the selected unit. The number and unit remain legible at 375pt.
 
 
 ### Versioned group comparisons (M27; native acceptance pending)

@@ -76,21 +76,21 @@ it('reads the complete saved context across DB adapters and refreshes it after e
   expect(changed.muscle[0].totalWeight).toBeCloseTo(309.6);
 });
 
-it('preserves lb assistance through reads instead of treating the raw amount as added kg', async () => {
+it('uses legacy numeric loads as added weight while preserving their lb unit', async () => {
   mockFixture.database.update(exerciseSets).set({ weightUnit: 'lb', externalLoadMode: 'assistance' }).where(eq(exerciseSets.id, 'new-set')).run();
   const value = await read();
-  expect(value.history.sessions[0].totalVolume).toBeCloseTo(567.4252208, 8);
-  expect(value.blocks.blocks[0].totalVolume).toBeCloseTo(567.4252208, 8);
-  expect(value.daily[0].totalVolume).toBeCloseTo(567.4252208, 8);
-  expect(value.muscle[0].totalWeight).toBeCloseTo(283.7126104, 8);
-  expect(value.insights.personalRecords).toEqual([]);
-  expect(value.view.cards[0].rows[0].weightReps).toBe('BW − 20.0 lb × 8');
+  expect(value.history.sessions[0].totalVolume).toBeCloseTo(712.5747792, 8);
+  expect(value.blocks.blocks[0].totalVolume).toBeCloseTo(712.5747792, 8);
+  expect(value.daily[0].totalVolume).toBeCloseTo(712.5747792, 8);
+  expect(value.muscle[0].totalWeight).toBeCloseTo(356.2873896, 8);
+  expect(value.insights.personalRecords).toHaveLength(1);
+  expect(value.insights.personalRecords[0].estimatedOneRepMax).toBeCloseTo(33.7192915768, 8);
+  expect(value.view.cards[0].rows[0].weightReps).toBe('BW + 20.0 lb × 8');
 });
 
-it.each(['definition', 'set'] as const)('retains counts but withholds placeholder %s load metadata', async entity => {
+it.each(['definition'] as const)('retains counts but withholds placeholder %s load metadata', async entity => {
   const db = mockFixture.database;
   if (entity === 'definition') db.update(exerciseDefinitions).set({ localBodyweightMetadataKnown: false }).run();
-  if (entity === 'set') db.update(exerciseSets).set({ localBodyweightMetadataKnown: false }).where(eq(exerciseSets.id, 'new-set')).run();
   const value = await read();
   expect(value.history.sessions[0]).toMatchObject({ totalVolume: null, workingSetCount: 1 });
   expect(value.blocks.blocks[0].totalVolume).toBeNull();

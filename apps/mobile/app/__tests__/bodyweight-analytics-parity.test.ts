@@ -50,16 +50,16 @@ it.each([
   [80, 1, '0', 'added', 'total_load', 'kg', 640, 320],
   [80, 1, '', 'added', 'total_load', 'kg', 640, 320],
   [80, 1, '20', 'added', 'total_load', 'kg', 800, 400],
-  [80, 1, '20', 'assistance', 'total_load', 'kg', 480, 240],
+  [80, 1, '20', 'assistance', 'total_load', 'kg', 800, 400],
   [80, 0.7, '20', 'added', 'total_load', 'kg', 608, 304],
   [80, 1, '20', 'added', 'per_side_load', 'kg', 960, 480],
   [null, 0, '20', null, 'per_side_load', 'kg', 160, 160],
   [null, 0, '20', null, 'total_load', 'kg', 160, 80],
   [80, 1, '20', 'added', 'total_load', 'lb', 712.5747792, 356.2873896],
   [null, 1, '20', 'added', 'total_load', 'kg', null, null],
-  [80, 1, '20', 'unquantified_assistance', 'total_load', 'kg', null, null],
-  [80, 1, '0', null, 'total_load', 'kg', null, null],
-  [80, 1, '100', 'assistance', 'total_load', 'kg', null, null],
+  [80, 1, '20', 'unquantified_assistance', 'total_load', 'kg', 800, 400],
+  [80, 1, '0', null, 'total_load', 'kg', 640, 320],
+  [80, 1, '100', 'assistance', 'total_load', 'kg', 1440, 720],
 ] as const)('agrees across surfaces for B=%s c=%s %s %s %s %s', (B, c, amount, mode, loadMode, unit, volume, muscleVolume) => {
   const f = fixture(B, c, amount, mode, loadMode, unit);
   const entry = f.history.sessions[0];
@@ -97,27 +97,25 @@ it('keeps partial volume out of baselines and never awards an unavailable streng
   expect(deriveSessionPersonalRecords({ targetSession: target, historicalSessions: [] })).toEqual([]);
 });
 
-it('uses the historical snapshot for strength and changes only the projected external target', () => {
+it('uses the dated source for strength and changes only the projected external target', () => {
   const f = fixture(80, 1, '20', 'added');
   const source = loadingEstimateSources(f.history.sessions)[0];
   const before = JSON.stringify(source);
   const at90 = projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '90', unit: 'kg' });
-  const at110 = projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '110', unit: 'kg' });
+  expect(() => projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '110', unit: 'kg' })).toThrow('No added-weight estimate');
   expect(at90.enteredAmount).toBeCloseTo(10, 9); expect(at90.externalLoadMode).toBe('added');
-  expect(at110.enteredAmount).toBeCloseTo(10, 9); expect(at110.externalLoadMode).toBe('assistance');
   expect(at90.predictedResistanceKg).toBeCloseTo(100, 9);
-  expect(at110.predictedResistanceKg).toBeCloseTo(100, 9);
   expect(JSON.stringify(source)).toBe(before);
   const atOne = projectLoadingEstimate(source, f.context, { reps: '1', bodyWeightKg: '80', unit: 'kg' });
-  expect(atOne.oneRepConvention).toBe('capacity'); expect(atOne.predictedResistanceKg).toBe(source.estimatedOneRepMaxKg);
+  expect(atOne.oneRepConvention).toBe('capacity'); expect(atOne.predictedResistanceKg).toBe(source.estimatedTotalOneRepMaxKg);
   expect(() => projectLoadingEstimate(source, f.context, { reps: '0', bodyWeightKg: '80', unit: 'kg' })).toThrow('positive whole');
   expect(() => projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '', unit: 'kg' })).toThrow('positive target');
   expect(loadingEstimateSources(fixture(null, 1, '20', 'added').history.sessions)).toEqual([]);
-  expect(loadingEstimateSources(fixture(80, 1, '20', 'unquantified_assistance').history.sessions)).toEqual([]);
+  expect(loadingEstimateSources(fixture(80, 1, '20', 'unquantified_assistance').history.sessions)).toHaveLength(1);
 });
 
 
-it.each(['definition', 'session', 'set'] as const)('withholds load metrics while %s metadata is awaiting upgrade hydration', part => {
+it.each(['definition', 'session'] as const)('withholds load metrics while %s metadata is awaiting upgrade hydration', part => {
   const f = fixture(80, 1, '20', 'added', 'total_load', 'kg', { [part]: false });
   expect(f.history.sessions[0].totalVolume).toBeNull();
   expect(f.history.sessions[0].estimatedOneRepMax).toBeNull();
@@ -134,7 +132,7 @@ it('names the entered meaning without disguising coefficient or per-side amounts
   expect(formatEnteredLoad(20, { bodyweightCoefficient: 0.7, bodyWeightKg: 80, loadInputMode: 'total_load' }, 'added', 'kg'))
     .toBe('70% BW + 20.0 kg');
   expect(formatEnteredLoad(10, { bodyweightCoefficient: 1, bodyWeightKg: 80, loadInputMode: 'per_side_load' }, 'assistance', 'lb'))
-    .toBe('BW − 10.0 lb/side');
+    .toBe('BW + 10.0 lb/side');
 });
 
 

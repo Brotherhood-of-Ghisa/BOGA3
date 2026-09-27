@@ -14,7 +14,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   title: string;
   initial: WeightEntry;
   measuredAt: Date;
-  explanation: string;
+  explanation?: string;
   onSave: (input: WeightEntry & { measuredAt: Date }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onDismiss: () => void;
@@ -61,7 +61,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     <Sheet visible={visible} title={title} keyboardAvoiding dismissLabel="Dismiss weight editor"
       onDismiss={() => { if (!saving.current) onDismiss(); }} testID="weight-entry-sheet">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
-        <Text allowFontScaling={false} style={styles.body}>{explanation}</Text>
+        {explanation ? <Text allowFontScaling={false} style={styles.body}>{explanation}</Text> : null}
         <FormField label={`Body weight (${unit})`} accessibilityLabel={`Body weight in ${unit}`}
           value={value} onChangeText={setValue} keyboardType="decimal-pad" autoFocus={autoFocus}
           editable={!busy} error={valueError} testID="weight-entry-value" />
@@ -76,7 +76,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
           variant="primary" testID="weight-entry-save" />
         {onDelete ? <ActionButton label="Delete reading" variant="text" tone="danger" disabled={busy}
           testID="weight-entry-delete" onPress={() => Alert.alert('Delete reading?',
-            'This recalculates affected sessions and group comparisons using the remaining dated readings.', [
+            'Delete this weight reading?', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Delete', style: 'destructive', onPress: () => void run(onDelete) },
             ])} /> : null}

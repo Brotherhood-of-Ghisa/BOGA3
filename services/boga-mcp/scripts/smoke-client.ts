@@ -106,7 +106,7 @@ try {
     const performance = Array.isArray(context.recent_performances) ? context.recent_performances[0] : null;
     const set = isObject(performance) && Array.isArray(performance.sets) ? performance.sets[0] : null;
     const workout = workoutRows.find(row => isObject(row) && row.id === expectedSessionId);
-    if (context.metric_revision !== 'dated_readings_v2' || !isObject(performance) ||
+    if (context.metric_revision !== 'dated_added_load_v3' || !isObject(performance) ||
       !isObject(performance.volume) || performance.volume.value !== 800 || performance.volume.complete !== true ||
       !isObject(performance.session_body_weight) || performance.session_body_weight.value !== 80 ||
       performance.session_body_weight.source !== 'reading' || !isObject(set) ||

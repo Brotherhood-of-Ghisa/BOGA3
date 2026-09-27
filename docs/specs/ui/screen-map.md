@@ -727,19 +727,18 @@ Brief entrypoint map of the current mobile screens.
 ### Bodyweight load overlays on existing exercise routes
 
 The exercise editor adds contribution, movement standard and loading method.
-The session exercise page adds explicit added/assisted/unquantified meaning and
-units, effective-load context and missing-context dated reading entry.
-`LegacyLoadReviewSheet` is reached after saving an exercise with unresolved loads
-or from its exercise options/logger. It selects actual/planned originals,
-requires a source unit and interpretation, previews, then applies or leaves them
-unresolved. These are overlays on existing routes, not additional destinations.
+The session exercise page labels numeric loads as added weight, shows their
+units and effective-load context, and offers dated reading entry when body
+weight is missing. These are overlays on existing routes, not additional
+destinations.
 
 ### Personal loading estimate overlay
 
 Exercise page → records → Loading estimate uses
 `components/bodyweight/loading-estimate-sheet.tsx`. Source selection stays inside
 the same sheet. Target reps, saved/explicit current B and output unit produce a
-transient added/assistance estimate. Loading, retry, no-source, invalid input,
+transient added-weight estimate. Targets below the bodyweight contribution are
+unavailable. Loading, retry, no-source, invalid input,
 source provenance and one-rep/high-rep states use existing UI primitives.
 Exercise history, Stats/heatmaps and session/share projections use the same
 effective-load boundary and expose incomplete volume.

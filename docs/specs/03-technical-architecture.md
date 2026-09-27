@@ -18,7 +18,7 @@ Capture top-level architecture decisions for MVP, with clear `Adopted` vs `Plann
 
 | Decision | Status | Why | Source |
 | --- | --- | --- | --- |
-| Bodyweight load resolves once in a pure TS boundary, with explicit missing/invalid context, aggregate coverage and named Wathan inverse/one-rep projection conventions | `Personal/coaching/group integration implemented; native acceptance and hosted rollout pending (M27)` | Preserves entered external load and conventional semantics while preventing missing B, assistance or ambiguous legacy values from becoming plausible scores. One boundary is reusable by mobile, groups and coaching. | `apps/mobile/src/exercise-calculations/effective-load.ts`, `docs/specs/tech/bodyweight-load-contract.md` |
+| Bodyweight load resolves once in a pure TS boundary, with explicit missing/invalid context, aggregate coverage and named Wathan inverse/one-rep projection conventions | `Personal/coaching/group integration implemented; native acceptance and hosted rollout pending (M27)` | Preserves entered external load and conventional semantics while preventing missing B or invalid values from becoming plausible scores. One boundary is reusable by mobile, groups and coaching. | `apps/mobile/src/exercise-calculations/effective-load.ts`, `docs/specs/tech/bodyweight-load-contract.md` |
 | `Expo + React Native + TypeScript` for mobile frontend | `Adopted` | Fastest path to a phone-first app with one codebase and strong AI-assisted delivery. | `apps/mobile/package.json` |
 | `Expo Router` for app navigation | `Adopted` | File-based routing keeps structure simple and predictable for AI and humans. | `apps/mobile/package.json`, `apps/mobile/app/` |
 | Root route access (sign-in / first-sync block / app) is enforced by the navigator: one `Stack.Protected` group per level in the root stack, the navigator never unmounted to gate | `Adopted` (2026-09-27) | On expo-router 57 (Expo SDK 57), unmounting the root navigator reverts the route, so the old guard and gate that swapped the navigator for a `<Redirect>` or a block looped on sign-in and sign-out. `Stack.Protected` is Expo Router's own auth pattern: the router drops the routes of the old level and lands on the first one still declared. | `apps/mobile/components/navigation/root-stack.tsx`, `apps/mobile/src/navigation/root-route-access.ts`, `apps/mobile/app/__tests__/root-stack-routing.test.tsx`, `docs/specs/ui/navigation-contract.md` "Router baseline" |
@@ -81,7 +81,7 @@ including overflow. No derived metric or personal achievement is persisted.
 
 The calculator’s source loader reads completed eligible history; its target
 inputs and results are transient. Reading and session-start changes refresh focused views and open calculators
-after local commits or sync pulls. Explicit legacy review revalidates context. Group score authority remains
+after local commits or sync pulls. All existing numeric weights mean added weight; no conversion review runs. Group score authority remains
 separate and is governed by `tech/groups-contract.md`.
 
 ## Versioned group projection boundary (M27)

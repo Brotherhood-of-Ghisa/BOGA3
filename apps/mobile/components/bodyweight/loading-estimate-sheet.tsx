@@ -12,7 +12,7 @@ import { weightStyles as styles } from './styles';
 
 type Projection = Extract<ExternalLoadProjection, { status: 'known' }>;
 const sourceDescription = (source: LoadingEstimateSource) =>
-  `${formatCurrentDateTime(source.completedAt)} · ${source.externalLoadMode === 'assistance' ? 'Assistance' : 'Added'} ${source.weightValue} ${source.weightUnit}${source.loadInputMode === 'per_side_load' ? '/side' : ''} × ${source.reps}`;
+  `${formatCurrentDateTime(source.completedAt)} · Added ${source.weightValue} ${source.weightUnit}${source.loadInputMode === 'per_side_load' ? '/side' : ''} × ${source.reps}`;
 
 export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }: {
   visible: boolean; exerciseId: string | null; context: LoadContext; onDismiss: () => void;
@@ -79,19 +79,19 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="loading-estimate-scroll">
       {loading && initializedExercise.current !== exerciseId ? <StatePanel kind="loading" body="Loading performed sets…" /> : loadError ? <StatePanel kind="error" body={loadError}
         action={{ label: 'Try again', onPress: () => setRetry(value => value + 1) }} /> : sources.length === 0 ?
-        <StatePanel title="No usable source performance" body="A completed, performed set with a known load is needed. For bodyweight exercises, review the load meaning and add a reading on or before that session first." testID="loading-estimate-empty" /> :
+        <StatePanel title="No usable source performance" body="A completed, performed set with a known load is needed. For bodyweight exercises, add a reading on or before that session first." testID="loading-estimate-empty" /> :
         choosingSource ? <>
           <Card>{sources.map((candidate, index) => <ListRow key={candidate.id} divider={index > 0}
             selected={candidate.id === sourceId} testID={`loading-estimate-source-${candidate.id}`}
             onPress={() => { setSourceId(candidate.id); setChoosingSource(false); clearResult(); }}>
             <Text allowFontScaling={false} style={styles.body}>{sourceDescription(candidate)}</Text>
-            <Text allowFontScaling={false} style={styles.body}>{`${bodyweight ? 'Total ' : ''}estimated 1RM ${candidate.estimatedOneRepMaxKg.toFixed(1)} kg${bodyweight ? ` · dated body weight ${candidate.bodyWeightKg ?? 'unknown'} kg · ${sessionWeightSourceLabel(candidate)}` : ''}`}</Text>
+            <Text allowFontScaling={false} style={styles.body}>{`${bodyweight ? 'Added-weight ' : ''}estimated 1RM ${candidate.estimatedOneRepMaxKg.toFixed(1)} kg${bodyweight ? ` · dated body weight ${candidate.bodyWeightKg ?? 'unknown'} kg · ${sessionWeightSourceLabel(candidate)}` : ''}`}</Text>
           </ListRow>)}</Card>
           <ActionButton label="Back to estimate" variant="outline" onPress={() => setChoosingSource(false)} />
         </> : source ? <>
           <Text allowFontScaling={false} style={styles.label}>Source performance</Text>
           <Text allowFontScaling={false} style={styles.body} testID="loading-estimate-source-description">{sourceDescription(source)}</Text>
-          <Text allowFontScaling={false} style={styles.body}>{`${bodyweight ? 'Total ' : ''}estimated 1RM ${source.estimatedOneRepMaxKg.toFixed(1)} kg from ${source.effectiveLoadKg.toFixed(1)} kg effective load${bodyweight ? ` and dated session weight ${source.bodyWeightKg} kg` : ''}.`}</Text>
+          <Text allowFontScaling={false} style={styles.body}>{`${bodyweight ? 'Added-weight ' : ''}estimated 1RM ${source.estimatedOneRepMaxKg.toFixed(1)} kg from ${source.effectiveLoadKg.toFixed(1)} kg effective load${bodyweight ? ` and dated session weight ${source.bodyWeightKg} kg` : ''}.`}</Text>
           {bodyweight ? <Text allowFontScaling={false} style={styles.body}>{sessionWeightSourceLabel(source)}</Text> : null}
           <ActionButton label="Choose another performance" variant="outline" testID="loading-estimate-choose-source" onPress={() => setChoosingSource(true)} />
           <FormField label="Target reps" value={reps} keyboardType="number-pad" testID="loading-estimate-reps"
@@ -111,7 +111,7 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
           {inputError ? <Notice tone="danger" live message={inputError} testID="loading-estimate-error" /> : null}
           <ActionButton label="Calculate estimate" variant="primary" disabled={loading} onPress={calculate} testID="loading-estimate-calculate" />
           {result ? <View testID="loading-estimate-result">
-            <Stat label={`${result.externalLoadMode === 'assistance' ? 'Assistance' : 'Added load'}${context.loadInputMode === 'per_side_load' ? ' per side' : ''} · ${unit}`}
+            <Stat label={`Added load${context.loadInputMode === 'per_side_load' ? ' per side' : ''} · ${unit}`}
               value={result.enteredAmount.toFixed(2)} testID="loading-estimate-amount" />
             <Text allowFontScaling={false} style={styles.body}>{`Estimated ${bodyweight ? 'total resistance' : 'entered load'} ${result.predictedResistanceKg.toFixed(2)} kg for ${result.targetReps} reps.`}</Text>
             <Text allowFontScaling={false} style={styles.body}>Shown to two decimals; no plate increment has been applied. This estimate does not change the source performance or any dated session weight.</Text>

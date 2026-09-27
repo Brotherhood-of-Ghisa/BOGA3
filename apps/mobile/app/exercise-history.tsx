@@ -247,7 +247,7 @@ function BestCard({
       <BestRow
         date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
         divider={false}
-        label={bodyweight ? "Total 1RM" : "1RM"}
+        label={bodyweight ? "Added 1RM" : "1RM"}
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
         testID="exercise-history-best-est-1rm"
         value={formatOneRepMax(oneRm?.value ?? null)}
@@ -356,7 +356,7 @@ function SessionCard({
             </View>
           ) : null}
           <View style={styles.stats}>
-            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Total 1RM" : "1RM"} rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
+            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Added 1RM" : "1RM"} rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
             <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Top added" : "Top set"} rank="secondary" value={formatTopSet(entry.topWeightSet)} />
             <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
               rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />

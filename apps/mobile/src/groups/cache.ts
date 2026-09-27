@@ -16,13 +16,13 @@ export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof sche
 export const groupCacheKeys = {
   mine: 'groups:mine',
   group: (groupId: string) => `group:${groupId}`,
-  streamAll: 'stream:v3:all',
-  stream: (groupId: string) => `stream:v3:${groupId}`,
-  session: (memberUserId: string, sessionId: string) => `session:v3:${memberUserId}:${sessionId}`,
+  streamAll: 'stream:v4:all',
+  stream: (groupId: string) => `stream:v4:${groupId}`,
+  session: (memberUserId: string, sessionId: string) => `session:v4:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
-  groupExercises: (groupId: string) => `group-exercises:v3:${groupId}`,
+  groupExercises: (groupId: string) => `group-exercises:v4:${groupId}`,
   /** Versioned podium payload. Full boards and history are never cached. */
-  boards: (groupId: string) => `boards:v3:${groupId}`,
+  boards: (groupId: string) => `boards:v4:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';

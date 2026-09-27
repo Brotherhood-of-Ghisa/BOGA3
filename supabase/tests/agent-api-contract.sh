@@ -465,7 +465,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "dated_readings_v2"
+  .data.metric_revision == "dated_added_load_v3"
   and .data.exercise.bodyweight_coefficient == 0
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.complete == true
@@ -498,9 +498,9 @@ assert_training_payload '
   and .data.recent_performances[0].sets[1].entered_load.raw_value == ""
   and .data.recent_performances[0].sets[1].entered_load.value == 0
   and .data.recent_performances[0].sets[1].effective_load.value == 80
-  and .data.personal_records.estimated_one_rep_max.basis == "total_resistance"
-  and .data.personal_records.estimated_one_rep_max.value > 127.6
-  and .data.personal_records.estimated_one_rep_max.value < 127.8
+  and .data.personal_records.estimated_one_rep_max.basis == "added_load"
+  and .data.personal_records.estimated_one_rep_max.value > 47.6
+  and .data.personal_records.estimated_one_rep_max.value < 47.8
   and .data.personal_records.top_weight.value == 20
 ' 'bodyweight and added values match app fixtures including canonical blank zero'
 agent_get "workouts/recent?limit=1"
@@ -511,7 +511,7 @@ assert_training_payload '.data.workouts[0].total_volume.value == 1440
   and .data.workouts[0].exercises[0].load_rules.bodyweight_coefficient == 1
 ' 'workout and exercise totals agree'
 
-echo "[agent-api-test] verifying quantified pound assistance and raw units"
+echo "[agent-api-test] verifying legacy mode values count as added weight with raw units"
 update_training_fixture "
   update app_public.exercise_sets set weight_unit='lb',external_load_mode='assistance'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
@@ -521,12 +521,12 @@ update_training_fixture "
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
   .data.recent_performances[0].sets[0].entered_load.unit == "lb"
-  and .data.recent_performances[0].sets[0].entered_load.mode == "assistance"
+  and .data.recent_performances[0].sets[0].entered_load.mode == "added"
   and .data.recent_performances[0].sets[0].load.unit == "kg"
   and ((.data.recent_performances[0].sets[0].load.value - 9.0718474) | fabs) < 0.000001
-  and ((.data.recent_performances[0].volume.value - 567.4252208) | fabs) < 0.000001
-  and .data.personal_records.top_weight == null
-' 'pound assistance uses saved B and never wins a Top added record'
+  and ((.data.recent_performances[0].volume.value - 712.5747792) | fabs) < 0.000001
+  and ((.data.personal_records.top_weight.value - 9.0718474) | fabs) < 0.000001
+' 'legacy mode counts the saved numeric weight as added pounds'
 
 echo "[agent-api-test] verifying per-side adjustment and current personal coefficient"
 update_training_fixture "
@@ -623,7 +623,7 @@ assert_training_payload '.data.recent_performances[0].volume.value == null
   and .data.recent_performances[0].session_body_weight.value == null
 ' 'positive B with malformed provenance cannot establish valid context'
 
-echo "[agent-api-test] verifying unresolved modes and unquantified assistance"
+echo "[agent-api-test] verifying all old mode tokens follow the added-weight rule"
 update_training_fixture "
   update app_public.body_weight_measurements set weight_value='82'
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
@@ -631,18 +631,19 @@ update_training_fixture "
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].sets[0].effective_load.reason == "unquantified_assistance"
-  and .data.recent_performances[0].volume.value == null
-  and .data.personal_records.top_weight == null
-' 'unquantified assistance does not invent resistance'
+assert_training_payload '.data.recent_performances[0].sets[0].effective_load.status == "known"
+  and .data.recent_performances[0].sets[0].entered_load.mode == "added"
+  and .data.recent_performances[0].volume.value > 0
+' 'old band tag no longer changes the numeric added weight'
 update_training_fixture "
   update app_public.exercise_sets set external_load_mode=null,weight_value='0'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].sets[0].effective_load.reason == "legacy_interpretation"
-  and .data.recent_performances[0].volume.value == null
-' 'legacy zero is unresolved until reviewed'
+assert_training_payload '.data.recent_performances[0].sets[0].effective_load.status == "known"
+  and .data.recent_performances[0].sets[0].entered_load.value == 0
+  and .data.recent_performances[0].volume.value > 0
+' 'legacy zero means no added weight'
 echo "[agent-api-test] PASS: bodyweight projection parity and completeness"
 
 

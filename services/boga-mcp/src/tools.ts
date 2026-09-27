@@ -115,7 +115,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
     {
       annotations: readOnlyAnnotations,
       description:
-        'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user. Entered load includes its original unit and added/assisted meaning. Effective resistance and estimated 1RM use the latest dated reading on or before the session start and current exercise rules. Check basis, provenance, completeness and null values; known_subtotal is not a complete total.',
+        'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user. Numeric load is added weight in its original unit. Effective resistance uses the latest dated reading on or before the session start and current exercise rules; estimated 1RM is expressed as added weight. Check basis, provenance, completeness and null values; known_subtotal is not a complete total.',
       inputSchema: z.object({
         exercise_id: z.string().min(1).max(200),
         recent_sessions: z.number().int().min(1).max(20).optional(),

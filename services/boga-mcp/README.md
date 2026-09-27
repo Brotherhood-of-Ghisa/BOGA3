@@ -31,7 +31,7 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "dated_readings_v2"` pass through
+Training projections with `metric_revision: "dated_added_load_v3"` pass through
 unchanged in both structured and text JSON output. Tool names and strict input
 schemas remain compatible. Raw `entered_load` retains amount/unit/mode;
 normalized external `load` is distinct from `effective_load` and total 1RM.

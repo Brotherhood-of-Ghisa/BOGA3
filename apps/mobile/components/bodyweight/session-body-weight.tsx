@@ -46,7 +46,6 @@ export function SessionBodyWeight({ sessionId, snapshot, editable = true, onSave
     </Card>
     {entryDate ? <WeightEntrySheet visible={editing} title="Add dated reading"
       measuredAt={entryDate} initial={{ weightValue: '', weightUnit: 'kg' }}
-      explanation="This dated reading recalculates affected sessions and group comparisons, up to the next reading. It may change weight-dependent certifications."
       onDismiss={() => setEditing(false)} onSave={async input => {
         await saveBodyWeightReading(input);
         const session = await loadSessionSnapshotById(sessionId);

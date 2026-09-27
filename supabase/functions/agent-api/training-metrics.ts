@@ -14,7 +14,7 @@ import {
   isValidSessionWeight, type SessionWeightSnapshot,
 } from '../../../apps/mobile/src/bodyweight/snapshot.ts';
 
-export const METRIC_REVISION = 'dated_readings_v2';
+export const METRIC_REVISION = 'dated_added_load_v3';
 
 export type ExerciseLoadRow = {
   bodyweight_coefficient: number;
@@ -114,7 +114,7 @@ export function projectTrainingSets(
         id: set.id, order_index: set.order_index,
         // The existing load field keeps its kg external-amount meaning.
         load: kg === null ? null : { value: kg, unit: 'kg' },
-        entered_load: { raw_value: set.weight_value, value: amount, unit: set.weight_unit, mode: set.external_load_mode },
+        entered_load: { raw_value: set.weight_value, value: amount, unit: set.weight_unit, mode: 'added' },
         reps: metric.reps, set_type: set.set_type, performance_status: set.performance_status,
         outcome: 'completed',
         effective_load: {
@@ -125,7 +125,7 @@ export function projectTrainingSets(
           basis: metric.load.status === 'known' ? metric.load.resistanceBasis : null,
         },
         estimated_one_rep_max: metric.estimatedOneRepMaxKg === null
-          ? null : { value: metric.estimatedOneRepMaxKg, unit: 'kg', basis: metric.load.status === 'known' ? metric.load.resistanceBasis : null },
+          ? null : { value: metric.estimatedOneRepMaxKg, unit: 'kg', basis: context.bodyweightCoefficient > 0 ? 'added_load' : 'entered_load' },
         volume: { value: metric.volumeKgReps, unit: 'kg_reps' },
       }];
     }),

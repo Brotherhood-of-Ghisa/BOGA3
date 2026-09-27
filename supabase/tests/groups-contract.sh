@@ -742,7 +742,7 @@ card() {
 }
 
 card "active card: training now, its one live set as raw synced text" \
-  '.metric_revision == "dated_readings_v2" and .metric_scope == "personal"
+  '.metric_revision == "dated_added_load_v3" and .metric_scope == "personal"
    and .body_weight_kg == null and .body_weight_source == null and .body_weight_measurement_id == null and .body_weight_measured_at_ms == null
    and .status == "active" and .completed_at_ms == null and .duration_sec == null
    and .started_at_ms == $s and .sort_at_ms == $s and .session_id == $sid

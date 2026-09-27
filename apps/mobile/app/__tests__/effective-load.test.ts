@@ -2,7 +2,6 @@ import {
   calculateEffectiveSetMetrics,
   estimateExternalLoad,
   isBodyweightRepsEligible,
-  KG_PER_LB,
   resistanceAtReps,
   resolveEffectiveLoad,
   summarizeEffectiveVolume,
@@ -53,11 +52,6 @@ describe('shared effective-load vectors', () => {
     [{ weightUnit: 'oz' }, 'invalid', 'unit_invalid'],
     [{ weightUnit: null }, 'invalid', 'unit_invalid'],
     [{ loadInputMode: 'unknown' }, 'invalid', 'load_input_mode_invalid'],
-    [{ externalLoadMode: 'unknown' }, 'invalid', 'external_load_mode_invalid'],
-    [{ externalLoadMode: null }, 'missing', 'legacy_interpretation'],
-    [{ externalLoadMode: 'unquantified_assistance' }, 'missing', 'unquantified_assistance'],
-    [{ externalLoadMode: 'assistance', weightValue: '81' }, 'invalid', 'negative_resistance'],
-    [{ bodyweightCoefficient: 0, externalLoadMode: 'assistance' }, 'invalid', 'assistance_requires_bodyweight'],
   ] as const)('keeps unavailable load explicit: %j', (patch, status, reason) => {
     expect(resolveEffectiveLoad({ ...pullUp, ...patch })).toEqual({ status, reason });
   });
@@ -101,23 +95,22 @@ describe('performance eligibility and coverage', () => {
     const result = summarizeEffectiveVolume([
       calculateEffectiveSetMetrics(pullUp),
       calculateEffectiveSetMetrics({ ...pullUp, bodyWeightKg: null }),
-      calculateEffectiveSetMetrics({ ...pullUp, weightValue: '81', externalLoadMode: 'assistance' }),
+      calculateEffectiveSetMetrics({ ...pullUp, weightUnit: 'invalid' }),
       calculateEffectiveSetMetrics({ ...pullUp, performanceStatus: 'planned' }),
     ]);
     expect(result).toEqual({ knownVolumeKgReps: 800, totalVolumeKgReps: null, eligibleSetCount: 3,
       knownSetCount: 1, missingSetCount: 1, invalidSetCount: 1, complete: false, overflow: false });
     expect(summarizeEffectiveVolume([])).toMatchObject({ complete: true, totalVolumeKgReps: 0 });
-    expect(summarizeEffectiveVolume([calculateEffectiveSetMetrics({ ...pullUp, weightValue: '80', externalLoadMode: 'assistance' })]))
+    expect(summarizeEffectiveVolume([calculateEffectiveSetMetrics({ ...pullUp, weightValue: '0', bodyweightCoefficient: 0 })]))
       .toMatchObject({ complete: true, totalVolumeKgReps: 0, knownSetCount: 1 });
   });
 
-  it('keeps unweighted reps independent of B but requires a compatible, resolved unassisted performance', () => {
+  it('keeps unweighted reps independent of B but requires a compatible performance with zero added weight', () => {
     const set = { ...pullUp, bodyWeightKg: null, weightValue: '0' };
     expect(isBodyweightRepsEligible(set, true)).toBe(true);
     expect(isBodyweightRepsEligible(set, false)).toBe(false);
     for (const patch of [
-      { weightValue: '20' }, { externalLoadMode: 'assistance' }, { externalLoadMode: 'unquantified_assistance' },
-      { externalLoadMode: null }, { performanceStatus: 'planned' as const }, { weightUnit: 'unknown' },
+      { weightValue: '20' }, { performanceStatus: 'planned' as const }, { weightUnit: 'unknown' },
     ]) expect(isBodyweightRepsEligible({ ...set, ...patch }, true)).toBe(false);
   });
 
@@ -151,28 +144,23 @@ describe('strength ordering and projections', () => {
     const source = calculateEffectiveSetMetrics(pullUp);
     const project = (bodyWeightKg: number) => estimateExternalLoad({
       ...pullUp, bodyWeightKg, weightUnit: 'kg', oneRepConvention: 'capacity',
-      targetReps: 1, estimatedOneRepMaxKg: source.estimatedOneRepMaxKg!,
+      targetReps: 1, estimatedOneRepMaxKg: source.estimatedTotalOneRepMaxKg!,
     });
     expect(project(80)).toMatchObject({ status: 'known', externalLoadMode: 'added', enteredAmount: 47.671419080453734 });
     expect(project(82)).toMatchObject({ status: 'known', externalLoadMode: 'added', enteredAmount: 45.671419080453734 });
-    expect(source.estimatedOneRepMaxKg).toBeCloseTo(127.671419080454, 10);
+    expect(source.estimatedOneRepMaxKg).toBeCloseTo(47.671419080454, 10);
     expect(pullUp.bodyWeightKg).toBe(80);
     const exact = estimateExternalLoad({ ...pullUp, weightUnit: 'kg', oneRepConvention: 'exact_inverse',
-      targetReps: 1, estimatedOneRepMaxKg: source.estimatedOneRepMaxKg! });
+      targetReps: 1, estimatedOneRepMaxKg: source.estimatedTotalOneRepMaxKg! });
     if (exact.status !== 'known') throw new Error('Expected exact projection');
     expect(exact.enteredAmount).toBeLessThan(47.671419080453734);
-    expect(estimateOneRepMax(exact.predictedResistanceKg, 1)).toBeCloseTo(source.estimatedOneRepMaxKg!, 10);
+    expect(estimateOneRepMax(exact.predictedResistanceKg, 1)).toBeCloseTo(source.estimatedTotalOneRepMaxKg!, 10);
   });
 
-  it('returns positive assistance amounts without clamping, rounding or scaling B twice', () => {
-    const projected = estimateExternalLoad({ ...pullUp, loadInputMode: 'per_side_load',
-      weightUnit: 'lb', oneRepConvention: 'capacity', targetReps: 1, estimatedOneRepMaxKg: 60 });
-    expect(projected).toMatchObject({ status: 'known', externalLoadMode: 'assistance',
-      predictedResistanceKg: 60, totalExternalAdjustmentKg: -20, enteredAmount: 10 / KG_PER_LB });
-    if (projected.status !== 'known') throw new Error('Expected assistance projection');
-    expect(resolveEffectiveLoad({ ...pullUp, loadInputMode: 'per_side_load', weightUnit: projected.weightUnit,
-      weightValue: String(projected.enteredAmount), externalLoadMode: projected.externalLoadMode }))
-      .toMatchObject({ status: 'known', resistanceKg: 60 });
+  it('withholds targets below bodyweight instead of inventing an assisted load', () => {
+    expect(estimateExternalLoad({ ...pullUp, loadInputMode: 'per_side_load',
+      weightUnit: 'lb', oneRepConvention: 'capacity', targetReps: 1, estimatedOneRepMaxKg: 60 }))
+      .toEqual({ status: 'invalid', reason: 'target_below_bodyweight' });
   });
 
   it.each([2, 5, 8, 15, 50])('keeps a bodyweight-only round-trip at zero at %i reps', targetReps => {
@@ -184,10 +172,8 @@ describe('strength ordering and projections', () => {
             estimatedOneRepMaxKg, weightUnit, oneRepConvention: 'capacity' as const };
           expect(estimateExternalLoad(input)).toMatchObject({ status: 'known',
             externalLoadMode: 'added', totalExternalAdjustmentKg: 0, enteredAmount: 0 });
-          const slightAssistance = estimateExternalLoad({ ...input, bodyWeightKg: bodyWeightKg + 1e-8 });
-          expect(slightAssistance).toMatchObject({ status: 'known', externalLoadMode: 'assistance' });
-          if (slightAssistance.status !== 'known') throw new Error('Expected finite projection');
-          expect(slightAssistance.enteredAmount).toBeGreaterThan(0);
+          expect(estimateExternalLoad({ ...input, bodyWeightKg: bodyWeightKg + 1e-8 }))
+            .toEqual({ status: 'invalid', reason: 'target_below_bodyweight' });
         }
       }
     }

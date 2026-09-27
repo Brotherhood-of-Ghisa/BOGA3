@@ -1,7 +1,6 @@
 # Bodyweight entry and comparison — implementation target (M27)
 
-**Status: dated-reading revision accepted by the user on 2026-09-27; native
-verification recorded below.** Existing captures govern the visual recipes;
+**Status: dated-reading and added-weight simplification accepted by the user on 2026-09-27; focused native verification passed on three phone sizes.** Existing captures govern the visual recipes;
 older screenshots document their original implementation and are not evidence
 that the dated-reading behavior passed.
 
@@ -13,25 +12,36 @@ This revision supersedes frozen-weight/correction/fill interactions below; those
 older rendered captures document the previous implementation only.
 
 - Settings retains dated add/edit/delete and reading history, with required
-  date/time. Remove historical fill. Save/delete copy explains that affected past
-  sessions and group comparisons recalculate.
+  date/time. Remove historical fill and warnings about effects on past workouts
+  or group results. Save/delete feedback names only the completed action.
 - Session weight is a read-only derived fact: kg and “Reading from <date/time>”.
   No session-only override. Missing context reads “No reading on or before this
   session” with “Add dated reading”, prefilled at the session start instant.
-  The dated form stays editable and explains its effect on other sessions.
+  The dated form stays editable.
 - Friend sessions show source context without entry/edit actions. The logger
-  keeps its existing load controls and unavailable-metric treatment.
-- Capture known/missing/invalid context, backdated entry, value/date edit and
-  deletion, session-date changes, and group recalculation at the existing phone
-  sizes. Compare typography, spacing, source clarity and action visibility with
+  keeps added weight, kg/lb, reps, effort and confirmation; removes all assistance
+  choices and legacy conversion. Existing weights mean added weight. Volume and
+  RM use total load; RM results subtract body contribution and display added weight.
+- Capture the focused native path: a dated reading changes RM and volume
+  from unavailable to calculated values on the supported phone sizes. Compare typography, spacing, source clarity and action visibility with
   the selected references; preserve every independent logging action.
+
+The one-flow native path passed at 375×667pt
+(`artifacts/maestro/ad-hoc/20260927-190736-37314`), 402×874pt
+(`artifacts/maestro/ad-hoc/20260927-185542-77483`) and 440×956pt
+(`artifacts/maestro/ad-hoc/20260927-190919-38582`). Its before/after
+screenshots show the missing-reading action, then an 82 kg dated reading and
+the same 20 kg × 8 set at 48.2 kg added 1RM and 816 kg volume. Source date,
+labels and set controls remained readable without clipping at all three sizes;
+there were no material deviations from the accepted layout recipes. These
+runtime artifacts stay outside Git.
 
 ## Target and authority
 
 - Settings/history: [More and Settings](more-settings.md).
 - Read-only session context: [View Session](view-session.md).
 - Exercise metadata: [catalogue and editor](exercise-catalogue.md).
-- Added/assisted logging and projection: [exercise/session](exercise-session-v5.md).
+- Added-weight logging and projection: [exercise/session](exercise-session-v5.md).
 - Group standards/linking: [group exercise linking](group-exercise-unlink.md)
   and current [group recipes](../ux-rules.md).
 - Behavior/calculation: [bodyweight contract](../../tech/bodyweight-load-contract.md).
@@ -50,7 +60,7 @@ older rendered captures document the previous implementation only.
   in set weights. Show `Reading from <date/time>` beside derived kg. Missing
   context links to a dated form prefilled with the session start.
 - Keep the logger's in-place editing and one confirmation control. A bodyweight
-  exercise labels its value `Added weight` or `Assistance`; B and effective load
+  exercise labels its value `Added weight`; B and effective load
   are secondary context. Use `Unavailable · session weight missing` with a
   dated-entry action and unavailable metrics. Valid reps remain loggable.
 - Boards retain podium/list/record-sheet recipes. Metric names include units
@@ -64,9 +74,8 @@ older rendered captures document the previous implementation only.
 | --- | --- | --- | --- |
 | Record reading | More → Settings → Body weight → value/unit/date → Save | Latest reading and history update; next session uses it | Blank/0/negative/nonfinite input stays editable; offline local save; empty history |
 | Inspect session | View Session → read kg/source; if missing → Add dated reading | Applicable reading changes dependent history | Missing/invalid reading, save failure, friend context read-only |
-| Configure/log | Exercise editor → contribution/standard/loading method → Save → logger mode/amount/reps → Confirm | Bodyweight-only, added and assisted values retain meaning | Invalid coefficient/combination, unknown band assistance, missing B, planned/unperformed row |
-| Review legacy | Enable bodyweight exercise → select rows → inspect original values/units and interpretation → Preview → Apply | Explicit conversion or confirmation only; unavailable saved metadata offers Sync first or intentional full-tuple replacement, with independent actual/planned choices | Unknown unit, missing B, partial review refusal, cancel/no writes, unresolved rows stay unranked |
-| Project load | Exercise records → Loading estimate → target reps and B | Total estimate and positive added/assistance amount both labelled | No valid historical estimate, missing target B, invalid reps, high-rep estimate; one-rep convention explained |
+| Configure/log | Exercise editor → contribution/standard/loading method → Save → logger amount/reps → Confirm | Bodyweight-only and added values retain meaning | Invalid coefficient/combination, missing B, planned/unperformed row |
+| Project load | Exercise records → Loading estimate → target reps and B | Added-weight RM estimate and total-load context both labelled | No valid historical estimate, missing target B, target requiring assistance, invalid reps, high-rep estimate; one-rep convention explained |
 | Compare | Groups → board's default metric → switch metric/scope → record detail | Correct reps/×BW/kg, added kg/%BW, source B/provenance | Empty/unavailable, cached offline, rebuilding/stale cursor, former/archived legacy revision |
 | Set group standard | Admin exercise editor → coefficient/standard/method/default → preview impact → Save | Rules revision shown; entire board publishes together | Member cannot edit; offline write retains form; incompatible link explained |
 | Certify | Record detail → inspect attested inputs/source → Certify | Attested metric dependencies and certifier shown | Applicable reading is explicit; self-certification denied; reading-change invalidation; reps-only survives B-only edit |

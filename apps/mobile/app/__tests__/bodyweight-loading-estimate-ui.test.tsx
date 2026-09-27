@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 const mount = (dismiss = jest.fn()) => render(<LoadingEstimateSheet visible exerciseId="pull" context={context} onDismiss={dismiss} />);
 
-it('projects positive added load and assistance from the frozen source, clearing stale answers after every edit', async () => {
+it('projects added load from the dated source and withholds targets requiring assistance, clearing stale answers after every edit', async () => {
   const frozen = JSON.stringify(source);
   mount();
   await screen.findByTestId('loading-estimate-calculate');
@@ -42,11 +42,13 @@ it('projects positive added load and assistance from the frozen source, clearing
   expect(screen.getByText('Using your entered target weight. Saved performances stay unchanged.')).toBeTruthy();
   expect(screen.queryByTestId('loading-estimate-result')).toBeNull();
   fireEvent.press(screen.getByTestId('loading-estimate-calculate'));
-  expect(screen.getByLabelText('Assistance · kg 10.00')).toBeTruthy();
+  expect(screen.getByText('No added-weight estimate is available for this rep target and body weight.')).toBeTruthy();
+  expect(screen.queryByTestId('loading-estimate-result')).toBeNull();
+  fireEvent.changeText(screen.getByTestId('loading-estimate-bodyweight'), '90');
   fireEvent.press(screen.getByTestId('loading-estimate-unit-lb'));
   expect(screen.queryByTestId('loading-estimate-result')).toBeNull();
   fireEvent.press(screen.getByTestId('loading-estimate-calculate'));
-  expect(screen.getByLabelText('Assistance · lb 22.05')).toBeTruthy();
+  expect(screen.getByLabelText('Added load · lb 22.05')).toBeTruthy();
   expect(JSON.stringify(source)).toBe(frozen);
 });
 

@@ -899,7 +899,7 @@ const getExerciseContext = async (
     return best === null ? total : Math.max(best, total);
   }, null);
   const historyIncomplete = historyTruncated || setResult.truncated;
-  const basis = definition.bodyweight_coefficient > 0 ? 'total_resistance' : 'entered_load';
+  const basis = definition.bodyweight_coefficient > 0 ? 'added_load' : 'entered_load';
 
   return {
     metric_revision: METRIC_REVISION,

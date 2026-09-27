@@ -43,11 +43,11 @@ describe('group cache', () => {
   it('builds the contract cache keys', () => {
     expect(groupCacheKeys.mine).toBe('groups:mine');
     expect(groupCacheKeys.group('g1')).toBe('group:g1');
-    expect(groupCacheKeys.streamAll).toBe('stream:v3:all');
-    expect(groupCacheKeys.stream('g1')).toBe('stream:v3:g1');
-    expect(groupCacheKeys.session('u2', 's1')).toBe('session:v3:u2:s1');
-    expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:v3:g1');
-    expect(groupCacheKeys.boards('g1')).toBe('boards:v3:g1');
+    expect(groupCacheKeys.streamAll).toBe('stream:v4:all');
+    expect(groupCacheKeys.stream('g1')).toBe('stream:v4:g1');
+    expect(groupCacheKeys.session('u2', 's1')).toBe('session:v4:u2:s1');
+    expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:v4:g1');
+    expect(groupCacheKeys.boards('g1')).toBe('boards:v4:g1');
   });
 
   it('round-trips a payload and its fetch time for the owning user', () => {
@@ -75,7 +75,7 @@ describe('group cache', () => {
 
     expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-1')).toBeNull();
     expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-2')).toEqual({ payload: { v: 2 }, fetchedAtMs: 2_000 });
-    expect(allKeys()).toEqual(['stream:v3:all']);
+    expect(allKeys()).toEqual(['stream:v4:all']);
   });
 
   it('throws on a corrupt payload instead of reading it as a miss', () => {
@@ -100,7 +100,7 @@ describe('group cache', () => {
 
     evictGroup(db(), 'g1');
 
-    expect(allKeys()).toEqual(['boards:v3:g2', 'group-exercises:v3:g2', 'group:g2', 'groups:mine', 'stream:v3:all', 'stream:v3:g2']);
+    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:g2', 'groups:mine', 'stream:v4:all', 'stream:v4:g2']);
   });
 
   it('never reads a v1 payload under a v2 key and evicts both generations on access loss', () => {

@@ -77,10 +77,10 @@ Its `training-metrics.ts` adapter adds no authorization paths. Live OAuth grant
 validation, non-member/nonexistent exercise equivalence, read-only routes,
 direct-table denial and the four existing MCP tools remain enforced.
 
-Raw entered unit/mode, effective resistance, metric basis, dated provenance
+Raw entered unit, effective resistance, metric basis, dated provenance
 and volume coverage are distinct fields. Unknown totals are null; known
 subtotals are explicitly incomplete. Additive API-v1 evolution is identified
-by `metric_revision: dated_readings_v2`; conventional external `load` remains
+by `metric_revision: dated_added_load_v3`; conventional external `load` remains
 kg-normalized. Full response semantics live in
 [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
 Local parity/authorization and real OAuth-to-MCP gates are required; this

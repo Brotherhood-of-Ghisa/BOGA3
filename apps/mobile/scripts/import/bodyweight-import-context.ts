@@ -1,5 +1,5 @@
 import { parseSetWeight } from '../../src/exercise-calculations';
-import { isWeightUnit, weightToKg, type ExternalLoadMode, type WeightUnit } from '../../src/exercise-calculations/effective-load';
+import { isWeightUnit, weightToKg, type WeightUnit } from '../../src/exercise-calculations/effective-load';
 import { validateExerciseLoadRules, type ExerciseLoadRules } from '../../src/exercise-core/load-rules';
 import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
 
@@ -14,10 +14,10 @@ export type ImportedSessionWeight = {
 };
 export type ImportedSetMeaning = {
   weightUnit: WeightUnit;
-  externalLoadMode: ExternalLoadMode | null;
+  externalLoadMode: 'added' | 'assistance' | 'unquantified_assistance' | null;
   plannedWeightValue: string | null;
   plannedWeightUnit: WeightUnit | null;
-  plannedExternalLoadMode: ExternalLoadMode | null;
+  plannedExternalLoadMode: 'added' | 'assistance' | 'unquantified_assistance' | null;
   plannedRepsValue: string | null;
   plannedSetType: SessionSetTypeValue;
   performanceStatus: 'planned' | 'unperformed' | null;
@@ -68,8 +68,8 @@ export const validateImportedExerciseRules = (value: Record<string, unknown>): b
 
 export const importedSetMeaning = (schema: string, value: Partial<ImportedSetMeaning>) =>
   supportsLoadMetadata(schema) ? {
-    weightUnit: value.weightUnit!, externalLoadMode: value.externalLoadMode!,
+    weightUnit: value.weightUnit!, externalLoadMode: 'added',
     plannedWeightValue: value.plannedWeightValue!, plannedWeightUnit: value.plannedWeightUnit!,
-    plannedExternalLoadMode: value.plannedExternalLoadMode!, plannedRepsValue: value.plannedRepsValue!,
+    plannedExternalLoadMode: value.plannedWeightValue !== null || value.plannedRepsValue !== null ? 'added' : null, plannedRepsValue: value.plannedRepsValue!,
     plannedSetType: value.plannedSetType!, performanceStatus: value.performanceStatus!,
   } : {};

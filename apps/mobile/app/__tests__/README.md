@@ -101,21 +101,20 @@ invalidation despite later failure. Import tests reject v3 snapshots and discard
 old ones without manufacturing readings. UI tests cover required dated entry,
 read-only known/friend context, missing-context prefill and failure feedback.
 Backend SQL/device parity and real group/coaching contracts complement these
-checks; native `ios-bodyweight` remains required at the accepted phone sizes.
+checks; native `ios-bodyweight` covers one dated-entry change to RM and volume at the
+accepted phone sizes.
 
-## Offline legacy load review coverage (M27)
+## Added bodyweight load coverage
 
-`bodyweight-load-review.test.ts` runs the real old-schema upgrade, explicit
-rule/dated-reading setup, independent actual/planned review, ordinary draft save and
-wire/pull restoration. Preserve no-write preview/cancel, partial-review refusal,
-concurrent hydration rejection, conventional unknown units and empty counterpart
-coverage. Missing sync bookkeeping must never be treated as proof of local-only
-data. `bodyweight-logging-ui.test.tsx` verifies queued choices and explicit Apply;
-the logging Maestro flow captures the offline review on all three phone sizes.
+`bodyweight-added-load.test.ts` preserves seed/rule/hydration checks and proves
+that old null/assistance tags and numeric values need no conversion or writes.
+`bodyweight-logging-ui.test.tsx` covers the single added-weight field, unit
+selection, added-RM display, total-load volume, missing B and planned/actual
+preservation. No assistance selector or legacy review sheet is offered.
 
 ## Personal bodyweight analytics coverage (M27)
 
-`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/assisted, unit,
+`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/legacy-tag, unit,
 coefficient/per-side, missing/invalid/legacy and hydration vectors through the
 logger, rows, records, exercise/muscle/catalogue/weekly projections and session
 models. Retain aggregate overflow and independent zero/count distinctions.
@@ -126,7 +125,7 @@ and nonfinite percentage output. Existing History/Stats/heatmap tests retain
 coverage and raw-versus-total labels.
 
 `bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
-B, explicit current reading, positive assistance/lb, validation, one-rep/high-rep
+B, explicit current reading, added pounds and below-bodyweight unavailable targets, validation, one-rep/high-rep
 notes, retry, dismissed reads and invalid restored reading context. Numerical
 forward/inverse vectors remain in the kernel tests. Device evidence belongs to
 the fourth ios-bodyweight flow on all three phone sizes, plus the full frontend
@@ -138,7 +137,7 @@ gate; unit/typecheck success never substitutes for rendered evidence.
 `groups-metric-evaluation.test.ts` cover explicit metric/default/unit families,
 movement/loading compatibility, source distribution and group coefficient
 independence, the 60+20 versus 90+20 ranking reversal, strict performed eligibility,
-assistance, missing/invalid B and historical-estimate provenance. Preserve the
+legacy mode reinterpretation, missing/invalid B and historical-estimate provenance. Preserve the
 separate source counting flag, duplicate/missing-pin refusal and explicit invalid
 weight payloads. These pure tests do not replace backend queue/publication,
 certification, legacy-reader or two-user device proofs.

@@ -85,7 +85,7 @@ export const displayedValues = (
   if (isPerformed(set) || hasEnteredValues(set) || !hasPlannedValues(set)) {
     return {
       weightUnit: set.weightUnit ?? 'kg',
-      externalLoadMode: set.externalLoadMode ?? null,
+      externalLoadMode: 'added',
       weightValue: set.weightValue,
       repsValue: set.repsValue,
       setType: set.setType,
@@ -93,7 +93,7 @@ export const displayedValues = (
   }
   return {
     weightUnit: set.plannedWeightUnit ?? 'kg',
-    externalLoadMode: set.plannedExternalLoadMode ?? null,
+    externalLoadMode: 'added',
     weightValue: set.plannedWeightValue ?? '',
     repsValue: set.plannedRepsValue ?? '',
     setType: set.plannedSetType ?? set.setType ?? null,
@@ -145,7 +145,7 @@ export const buildSetRows = (
     value !== null && record !== null && value > record;
   return sets.map((set, index): SetRowView => {
     const values = displayedValues(set);
-    const metrics = metricsOf(values.weightValue, values.repsValue, set.localBodyweightMetadataKnown === false ? { ...context, bodyweightCoefficient: NaN, loadInputMode: context?.loadInputMode ?? 'total_load' } : context, values);
+    const metrics = metricsOf(values.weightValue, values.repsValue, context, values);
     const performed = isPerformed(set);
     return {
       id: set.id,
@@ -197,7 +197,7 @@ export const updateLoggerValues = (
       ...set,
       weightValue: values.weightValue ?? current.weightValue,
       weightUnit: values.weightUnit ?? current.weightUnit,
-      externalLoadMode: values.externalLoadMode === undefined ? current.externalLoadMode : values.externalLoadMode,
+      externalLoadMode: 'added',
       repsValue: values.repsValue ?? current.repsValue,
       setType: values.setType !== undefined ? values.setType : current.setType,
     };
@@ -218,7 +218,7 @@ export const commitSet = (
     ...set,
     weightValue: canonical.weight.trim(),
     weightUnit: values.weightUnit ?? set.weightUnit ?? 'kg',
-    externalLoadMode: values.externalLoadMode === undefined ? set.externalLoadMode : values.externalLoadMode,
+    externalLoadMode: 'added',
     repsValue: canonical.reps.trim(),
     setType: values.setType,
     performanceStatus: null,
@@ -264,7 +264,7 @@ export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId())
       id,
       weightValue: copied.weightValue,
       weightUnit: copied.weightUnit ?? 'kg',
-      externalLoadMode: copied.externalLoadMode ?? null,
+      externalLoadMode: 'added',
       plannedWeightUnit: null, plannedExternalLoadMode: null, localBodyweightMetadataKnown: true,
       repsValue: copied.repsValue,
       setType: defaultSessionSetType(last ? copied.setType : undefined),

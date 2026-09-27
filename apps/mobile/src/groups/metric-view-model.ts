@@ -21,10 +21,8 @@ export function formatGroupMetricValue(score: GroupMetricValue): string {
   return score.metric === 'relative_strength' ? `${score.value.toFixed(2)} ×BW` : `${score.value.toFixed(1)} kg`;
 }
 export function formatGroupRawPerformance(performance: GroupPerformanceSnapshotWire): string {
-  const mode = performance.external_load_mode === 'assistance' ? 'Assistance'
-    : performance.external_load_mode === 'unquantified_assistance' ? 'Unquantified assistance' : 'Added';
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
-  return `${mode} ${performance.weight_value} ${performance.weight_unit}${distribution} × ${performance.reps}`;
+  return `Added ${performance.weight_value} ${performance.weight_unit}${distribution} × ${performance.reps}`;
 }
 export function describeGroupPerformanceWeight(performance: GroupPerformanceSnapshotWire): string {
   if (performance.body_weight_status === 'invalid') return 'Session weight unavailable · invalid saved context';

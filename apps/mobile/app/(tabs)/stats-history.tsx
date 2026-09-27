@@ -656,7 +656,7 @@ export function StatsScreenShell({
           kind="exercise"
           metric={exerciseHistoryMetric}
           metricOptions={selectedExercise.bodyweight ? EXERCISE_HISTORY_METRIC_OPTIONS.map(option => ({ ...option,
-            label: option.value === 'estimatedRM1' ? 'Total 1RM' : option.value === 'highestWeight' ? 'Top added' : option.label,
+            label: option.value === 'estimatedRM1' ? 'Added 1RM' : option.value === 'highestWeight' ? 'Top added' : option.label,
           })) : EXERCISE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissExerciseHistory}
           onSelectMetric={onSelectExerciseHistoryMetric}
@@ -1055,7 +1055,7 @@ function ExerciseListView({
           </Text>
           {item.totalVolume === null ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}
             testID={`stats-exercise-coverage-${item.id}`}>Volume incomplete</Text> : null}
-          {item.bodyweight ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}>Total 1RM · kg</Text> : null}
+          {item.bodyweight ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}>Added 1RM · kg</Text> : null}
         </ListRow>
       ))}
     </Card>

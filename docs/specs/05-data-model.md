@@ -372,9 +372,10 @@ section states only the data-model-level invariants.
    `exercise_muscle_mappings.weight` does not alter this calculation; null-role
    and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
    sides were performed in v1. Exercise history and records use effective
-   resistance for bodyweight volume and total 1RM, with no muscle-role factor.
+   resistance for bodyweight volume; the resulting 1RM is expressed as added
+   weight after subtracting the bodyweight contribution, with no muscle-role factor.
    Conventional exercises retain entered-scalar semantics. Top added weight
-   normalizes external units to kg and excludes assistance/unresolved meaning;
+   normalizes external units to kg and treats all numeric values as added weight;
    it never substitutes total resistance for the entered external amount. Live and completion personal-record
    presentation resolves its exercise name from the current linked
    `exercise_definitions` row, falling back to the captured session-exercise

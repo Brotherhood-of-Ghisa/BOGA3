@@ -22,15 +22,15 @@ don't restate it here.
 ./boga doctor          # verify THIS machine can run every lane
 ```
 
-The `ios-bodyweight` lane runs dated entry/history and missing-context entry,
-exercise setup/logging/legacy review, and personal analytics/loading estimates.
-All three flows belong to `frontend` and `frontend-ui`; small and large phone
-runs provide form-layout evidence. Dated entry covers invalid/future feedback,
-source deletion, backdated entry, later-reading isolation and cold restart.
-Analytics edits an applicable reading and checks total records/history, target
-and current calculator B, assistance/units, Stats/heatmaps and share previews.
+The `ios-bodyweight` lane has one native path: enter a dated weight for a
+bodyweight exercise and assert that its added-weight RM and total-load volume
+change from unavailable to the expected values. Its two captures show the
+before and after state. Local unit tests cover further load and input cases.
 Pure and backend parity tests cover exact milliseconds, binary ties, date edits,
 restoration, malformed latest readings, session-date edits and certification.
+The three measured green runs of this one-flow revision took 97–111 seconds
+end-to-end (20–26 seconds inside Maestro). The generated table below still
+mixes these with older, longer multi-flow runs in its all-history median.
 
 Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
 the canonical lane names everywhere: this doc, the timing records, `boga`).
@@ -98,36 +98,36 @@ get from `./boga timings` or a run.
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
 | lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.9s |
-| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.3s |
+| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.4s |
 | jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~10s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.1s |
-| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~17s |
+| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~19s |
 | agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~3.6s |
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~4.5s |
-| handles | `./boga test handles` | — (run by name) | ✅ | ~58s |
+| handles | `./boga test handles` | — (run by name) | ✅ | ~1.0m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
 | backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~32s |
-| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~5.4s |
-| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~20s |
-| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~46s |
-| agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.2s |
+| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~5.5s |
+| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~19s |
+| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~49s |
+| agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.4s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.3s |
-| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.9s |
-| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~5.9s |
+| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~6.8s |
+| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~6.0s |
 | dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~5.0s |
 | sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~28s |
 | sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~1.7m |
 | sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~14s |
 | mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~8.8s |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
-| ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~54s |
+| ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~55s |
 | ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~1.3m |
-| ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` + `frontend-ui` | ❌ | ~7.8m |
+| ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` + `frontend-ui` | ❌ | ~7.9m |
 | ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~2.4m |
 | ios-session-view | `./boga test ios-session-view` | `boga test frontend` + `frontend-ui` | ❌ | ~2.2m |
-| ios-bodyweight | `./boga test ios-bodyweight` | `boga test frontend` + `frontend-ui` | ❌ | ~7.0m |
+| ios-bodyweight | `./boga test ios-bodyweight` | `boga test frontend` + `frontend-ui` | ❌ | ~6.6m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.7m |
 | ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.2m |

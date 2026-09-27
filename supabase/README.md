@@ -361,6 +361,8 @@ It does **not** lock the final sync API surface choice for `T-20260220-11` (`Edg
 The forward migration `20260927150155_dated_bodyweight_groups.sql` removes
 stored session weight, adds private as-of projections and reading-triggered
 group reevaluation, and rejects outdated app sync calls before removed-column
-access. Release the isolated compatibility client first, then the migration,
+access. `20260927195000_added_bodyweight_loads.sql` then updates group pins and
+calculation revisions so every numeric load is treated as added weight.
+Release the isolated compatibility client first, then both migrations,
 matching functions and dated client. Follow [RUNBOOK](../RUNBOOK.md#dated-bodyweight-cutover)
 for exact commands, hosted checks and forward repair; local gates do not deploy.

@@ -16,6 +16,7 @@ export type LoadingEstimateSource = SessionBodyWeightSnapshot & {
   reps: number;
   bodyWeightKg: number | null;
   estimatedOneRepMaxKg: number;
+  estimatedTotalOneRepMaxKg: number;
   effectiveLoadKg: number;
 };
 
@@ -32,6 +33,7 @@ export function loadingEstimateSources(entries: ExerciseHistorySessionEntry[]): 
         externalLoadMode: set.externalLoadMode ?? null, reps: metric.reps,
         bodyWeightSource: entry.bodyWeightSource, bodyWeightMeasurementId: entry.bodyWeightMeasurementId, bodyWeightMeasuredAt: entry.bodyWeightMeasuredAt,
         bodyWeightKg: context.bodyWeightKg ?? null, estimatedOneRepMaxKg: metric.estimatedOneRepMaxKg,
+        estimatedTotalOneRepMaxKg: metric.estimatedTotalOneRepMaxKg!,
         effectiveLoadKg: metric.load.resistanceKg, loadInputMode: context.loadInputMode });
     }
   }
@@ -48,8 +50,11 @@ export function projectLoadingEstimate(source: LoadingEstimateSource, context: L
   if (context.bodyweightCoefficient > 0 && (bodyWeightKg === null || !Number.isFinite(bodyWeightKg) || bodyWeightKg <= 0)) {
     throw new Error('Enter a positive target body weight in kg.');
   }
-  const result = estimateExternalLoad({ ...context, bodyWeightKg, estimatedOneRepMaxKg: source.estimatedOneRepMaxKg,
+  const result = estimateExternalLoad({ ...context, bodyWeightKg, estimatedOneRepMaxKg: source.estimatedTotalOneRepMaxKg,
     targetReps: Number(target.reps), weightUnit: target.unit, oneRepConvention: 'capacity' });
+  if (result.status === 'invalid' && result.reason === 'target_below_bodyweight') {
+    throw new Error('No added-weight estimate is available for this rep target and body weight.');
+  }
   if (result.status !== 'known') throw new Error('This load cannot be estimated from the supplied exercise rules.');
   return result;
 }

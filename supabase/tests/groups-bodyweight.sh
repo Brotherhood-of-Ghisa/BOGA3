@@ -384,7 +384,7 @@ expect_sql 'reading never queues metric work' "select count(*) from app_public.g
 rest GET "$OWNER_TOKEN" body_weight_measurements "owner_user_id=eq.${ATHLETE_UID}&select=id"
 expect_ok 'group member reading privacy';check 'no private reading rows' '.==[]'
 rpc "$OWNER_TOKEN" group_session_detail "$(jq -nc --arg u "$ATHLETE_UID" --arg s "$T-two" '{p_member_user_id:$u,p_session_id:$s}')"
-expect_ok 'shared session context';check 'saved tuple and personal scope' '.session.body_weight_kg==60 and .session.body_weight_source=="reading" and .session.metric_scope=="personal" and .session.metric_revision=="dated_readings_v2" and .session.exercises[0].bodyweight_coefficient==0.1'
+expect_ok 'shared session context';check 'saved tuple and personal scope' '.session.body_weight_kg==60 and .session.body_weight_source=="reading" and .session.metric_scope=="personal" and .session.metric_revision=="dated_added_load_v3" and .session.exercises[0].bodyweight_coefficient==0.1'
 check 'no private timeline object' '([..|objects|keys[]|select(.=="body_weight_measurements" or .=="readings")]|length)==0'
 AGENT_TOKEN="$(mint_token "$OWNER_TOKEN" 'm27-agent-client')"
 rpc "$AGENT_TOKEN" group_metric_board "$(jq -nc --arg g "$GID" --arg x "$GX" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"absolute_strength",p_certified:false}')"
@@ -474,7 +474,7 @@ expect_sql 'unarchive retains final event and appends void' "select count(*) fro
 expect_sql 'unarchive is not a rules revision' "select rules_revision from app_public.group_exercises where id='$GX';" 1
 pass 'provisional retraction, completion identity, archived freeze and unarchive reconciliation'
 
-# Assistance never enters the reps board, even at zero; lb conversion and
+# Legacy zero is zero added weight regardless of its obsolete mode; units and
 # malformed provenance remain shared-kernel decisions, not SQL formulas.
 performance "$ATHLETE_TOKEN" "$T-zero-assist" "$DP" 80 0 20 assistance
 performance "$ATHLETE_TOKEN" "$T-lb" "$DP" 80 100 5 added lb
@@ -483,13 +483,13 @@ run_psql "begin;
   select set_config('request.jwt.claims',json_build_object('sub','$ATHLETE_UID','role','authenticated')::text,true);
   update app_public.body_weight_measurements set weight_value='bad' where owner_user_id='$ATHLETE_UID' and id='$T-invalid-b-reading';
   commit;" >/dev/null
-drain 'assistance, lb and malformed tuple'
+drain 'legacy zero, lb and malformed tuple'
 metric_board bodyweight_reps
-check 'zero assistance is not unweighted reps' '.entries[0].value==5'
+check 'legacy zero counts as no added weight' '.entries[0].value==20'
 metric_board absolute_strength
 check 'lb normalized with bodyweight once' '.entries[0].set_id==$s and ((.entries[0].effective_resistance_kg-125.359237)|fabs)<0.000001' --arg s "$T-lb-set"
 expect_sql 'invalid B cannot rank as strength' "select count(*) from app_public.group_metric_set_scores where group_exercise_id='$GX' and set_id='$T-invalid-b-set' and metric in ('relative_strength','absolute_strength');" 0
-pass 'actual units, assistance eligibility and invalid-provenance refusal'
+pass 'actual units, legacy added-weight eligibility and invalid-provenance refusal'
 GX="$MAIN_GX"
 
 # Retire a live legacy comparison without silently widening its attestation.
@@ -693,7 +693,7 @@ next_cuam
 push "$RIVAL_TOKEN" 'dated mutation rival definition' \
   "$(e_def "$DTR" 'Dated rival' "$CUAM" total_load | jq '.fields += {bodyweight_coefficient:1,movement_standard:"strict_pullup",loading_method:"belt"}')" \
   "$(e_link "$DTR" "$GID" "$GX" "$CUAM")"
-performance "$RIVAL_TOKEN" "$T-dated-rival" "$DTR" 80 15 5
+performance "$RIVAL_TOKEN" "$T-dated-rival" "$DTR" 80 18 5
 next_cuam
 push "$ATHLETE_TOKEN" 'reps-only set sharing the dated source' \
   "$(e_set "$T-est-record-reps-set" "$T-est-record-se" 1 0 6 '' "$CUAM" | jq '.fields += {weight_unit:"kg",external_load_mode:"added"}')"

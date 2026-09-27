@@ -35,7 +35,7 @@ it('shows empty history and saves an explicit lb reading with its date offline',
     weightValue: '176.4', weightUnit: 'lb', measuredAt: expect.any(Date),
   })));
   await waitFor(() => expect(screen.queryByTestId('weight-entry-sheet')).toBeNull());
-  expect(screen.getByText('Reading saved. Affected sessions recalculated.')).toBeTruthy();
+  expect(screen.getByText('Reading saved.')).toBeTruthy();
 });
 
 it('keeps invalid and failed input editable, then retries successfully', async () => {
@@ -82,7 +82,7 @@ it('requires a clear delete confirmation and keeps a failed delete editor open',
   fireEvent.press(await screen.findByTestId('body-weight-reading-r1'));
   fireEvent.press(screen.getByTestId('weight-entry-delete'));
   expect(data.deleteBodyWeightReading).not.toHaveBeenCalled();
-  expect(alert).toHaveBeenCalledWith('Delete reading?', expect.stringContaining('recalculates affected sessions'), expect.any(Array));
+  expect(alert).toHaveBeenCalledWith('Delete reading?', 'Delete this weight reading?', expect.any(Array));
   const confirm = alert.mock.calls[0][2]?.find(button => button.style === 'destructive');
   act(() => confirm?.onPress?.());
   await screen.findByText('Could not delete');

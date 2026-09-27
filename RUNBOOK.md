@@ -857,7 +857,8 @@ Never reset the hosted database for this cutover.
    ```
 
    Confirm the chain includes `20260927150155_dated_bodyweight_groups.sql` and
-   no unreviewed migrations. Then apply it and immediately deploy the matching
+   `20260927195000_added_bodyweight_loads.sql`, with no unreviewed migrations.
+   Then apply the migrations and immediately deploy the matching
    functions from the full checkout (they import shared mobile TypeScript):
 
    ```bash
@@ -867,7 +868,7 @@ Never reset the hosted database for this cutover.
    bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
    ```
 
-   The migration transaction installs the protocol guard before dropping stored
+   The first migration installs the protocol guard before dropping stored
    session columns and enqueues active comparisons. Matching function deployment
    follows the schema: a short API/evaluator failure interval is possible;
    preserve the queue for retry. Retain the existing Vault secret and evaluator
@@ -888,7 +889,7 @@ Never reset the hosted database for this cutover.
    `session_weight_contexts` calls must be denied. Verify changed strength pins
    void certificates while reps-only certificates survive. Check both evaluator
    queues drain through the configured worker, with no repeated failure/backoff.
-   Confirm API/MCP responses use `dated_readings_v2` and keep incomplete totals
+   Confirm API/MCP responses use `dated_added_load_v3` and keep incomplete totals
    null. Re-run the hosted OAuth/discovery/revocation checks above.
 
 4. **Release the dated client.** From the reviewed implementation checkout after
@@ -909,7 +910,8 @@ Never reset the hosted database for this cutover.
    session fields, clears old group caches and resumes protocol-2 sync. A
    session without an applicable reading remains usable but has unavailable
    weight-dependent metrics. Nothing manufactures a reading from old manual
-   weights or interprets old external loads automatically.
+   weights. All saved numeric bodyweight loads, including rows with retired
+   mode tags, count as added weight without changing their raw amounts or units.
 
 If validation fails, hold the dated client and repair forward. Keep the guard
 active and preserve readings, raw workouts and queued jobs. Do not restore the

@@ -36,7 +36,7 @@ export function BodyWeightScreen() {
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">
       <Text allowFontScaling={false} style={styles.body}>
-        Each session uses the latest reading on or before its start. Adding, editing or deleting a reading recalculates affected sessions and group comparisons.
+        Each session uses the latest reading on or before its start.
       </Text>
       {feedback ? <Notice live message={feedback} testID="body-weight-feedback" /> : null}
       {error ? <StatePanel kind="error" title="Could not load weight history."
@@ -72,16 +72,15 @@ export function BodyWeightScreen() {
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}
       initial={editor.reading ?? { weightValue: '', weightUnit: current?.weightUnit ?? 'kg' }} measuredAt={editor.measuredAt}
-      explanation="This reading recalculates affected sessions and group comparisons, up to the next reading. Weight-dependent certifications may need review."
       onDismiss={() => setEditorVisible(false)}
       onSave={async input => {
         if (!input.measuredAt) throw new Error('Enter a measurement date.');
         await saveBodyWeightReading({ ...input, measuredAt: input.measuredAt, id: editor.reading?.id });
-        setFeedback('Reading saved. Affected sessions recalculated.');
+        setFeedback('Reading saved.');
         await load();
       }} onDelete={editor.reading ? async () => {
         await deleteBodyWeightReading(editor.reading!.id);
-        setFeedback('Reading deleted. Affected sessions recalculated.');
+        setFeedback('Reading deleted.');
         await load();
       } : undefined} /> : null}
   </>;

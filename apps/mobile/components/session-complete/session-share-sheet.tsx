@@ -97,7 +97,7 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
               </Text>
               <Text allowFontScaling={false} style={styles.recordFact}>
                 {`${record.loadLabel ?? formatWeightFigure(record.weight)} × ${record.reps}`}
-                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  ${record.bodyWeightKg != null ? "Total 1RM" : "1RM"} ${formatOneRepMaxFigure(
+                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  ${record.bodyWeightKg != null ? "Added 1RM" : "1RM"} ${formatOneRepMaxFigure(
                   record.estimatedOneRepMax
                 )}`}</Text>
               </Text>

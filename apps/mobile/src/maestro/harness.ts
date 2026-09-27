@@ -14,8 +14,7 @@ import {
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
-import { seedBodyweightAnalyticsFixture } from './bodyweight-analytics-fixture';
-import { seedBodyweightLoadFixture, seedBodyweightOfflineReviewFixture } from './bodyweight-load-fixture';
+import { seedBodyweightRmVolumeFixture } from './bodyweight-load-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
@@ -26,10 +25,7 @@ export type MaestroHarnessFixtureName =
   | 'exercise-block-history'
   // The block history plus a newest completed session with two PRs.
   | 'completion-two-prs'
-  | 'bodyweight-analytics'
-  | 'bodyweight-load-offline'
-  | 'bodyweight-load'
-  | 'bodyweight-load-missing'
+  | 'bodyweight-rm-volume'
   | 'exercise-page'
   | 'session-view'
   | 'exercise-browser';
@@ -86,10 +82,7 @@ export const resolveMaestroHarnessFixtureName = (
 ): MaestroHarnessFixtureName =>
   value === 'exercise-block-history' ||
   value === 'completion-two-prs' ||
-  value === 'bodyweight-analytics' ||
-  value === 'bodyweight-load-offline' ||
-  value === 'bodyweight-load' ||
-  value === 'bodyweight-load-missing' ||
+  value === 'bodyweight-rm-volume' ||
   value === 'exercise-page' ||
   value === 'session-view' ||
   value === 'exercise-browser'
@@ -197,12 +190,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   if (fixtureName === 'completion-two-prs') {
     await seedExerciseBlockHistoryFixture({ includeTwoPrSession: true });
   }
-  if (fixtureName === 'bodyweight-analytics') await seedBodyweightAnalyticsFixture();
-
-  if (fixtureName === 'bodyweight-load-offline') await seedBodyweightOfflineReviewFixture();
-  if (fixtureName === 'bodyweight-load' || fixtureName === 'bodyweight-load-missing') {
-    await seedBodyweightLoadFixture(new Date(), fixtureName === 'bodyweight-load-missing');
-  }
+  if (fixtureName === 'bodyweight-rm-volume') await seedBodyweightRmVolumeFixture();
   if (fixtureName === 'exercise-page') {
     await seedExercisePageFixture();
   }

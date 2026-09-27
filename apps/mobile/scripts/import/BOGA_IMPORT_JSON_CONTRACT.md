@@ -159,7 +159,7 @@ Non-empty source notes are preserved under set `source.note` and summarized in
 V3 retains the structure above and adds the following required context. The
 serializer `serializeBogaSessionImportPackage` validates before exporting JSON;
 both local and `sync_push` import paths preserve the same fields. V1 remains
-supported and never infers added/assisted meaning, even for zero. Adding v2 fields
+supported; every numeric bodyweight load is added weight, including zero. Adding v2 fields
 to a v1-labelled package is rejected rather than silently discarding them.
 
 - Top-level `bodyWeightMeasurements` is an array (empty is allowed) of `id`,
@@ -181,17 +181,17 @@ to a v1-labelled package is rejected rather than silently discarding them.
 - Each set supplies `weightUnit`, nullable `externalLoadMode`,
   `plannedWeightValue`, `plannedWeightUnit`, `plannedExternalLoadMode`,
   `plannedRepsValue`, `plannedSetType`, and `performanceStatus`. An absent plan
-  has null values; unresolved old meaning stays null. A known planned mode
+  has null values. Old mode tags are accepted for compatibility and normalized
+  to added on import. A known planned mode
   requires a known unit. Status is null (confirmed), `planned`, or `unperformed`;
   importing values never implicitly confirms planned/unperformed rows.
-- Added/assistance amounts remain raw, positive numeric text. Bands use
-  `unquantified_assistance`, with no invented equivalent load. Totals must be
-  explicitly reviewed/converted before setting an added/assistance mode.
+- Every numeric bodyweight-exercise weight means added weight, including old
+  null/assistance tags and zero. Keep raw amounts and units. No legacy review,
+  total conversion or assisted-load calculation exists.
 
 Generated exercise/session IDs use the original v1 identity namespace for both
 versions. Reimport does not duplicate a workout merely because its package
-schema changed; local already-imported rows are left unchanged. Use the app's
-review flow for legacy conversion. Reading ids use a deterministic import
+schema changed; local already-imported rows are left unchanged. No load-conversion review is needed. Reading ids use a deterministic import
 namespace, and snapshot references are remapped consistently even if the source
 reading is absent. V1 remote writes omit new fields so they cannot clear a newer
 client's context under the compatible sync writer.

@@ -1,6 +1,6 @@
 # Bodyweight Load Contract (M27)
 
-> **Status: implemented and locally verified in the release branch; hosted rollout pending.**
+> **Status: implemented in the release branch; added-weight revision verification and hosted rollout pending.**
 > This contract does not claim that the hosted feature is enabled.
 > Owns bodyweight load meaning, dated context, completeness and group dependencies.
 > Storage/wire mechanics remain in [05](../05-data-model.md) and
@@ -9,7 +9,7 @@
 
 Dated readings are the source of session body weight. Personal projections are
 resolved on read; group projections use the owner's same as-of context. The
-load equations remain unchanged. Hosted rollout requires the staged procedure
+load model supports added weight only. Hosted rollout requires the staged procedure
 in [RUNBOOK](../../../RUNBOOK.md#dated-bodyweight-cutover).
 
 ## 1. Typed values and storage boundary
@@ -27,17 +27,18 @@ Sync v2 id, timestamps, tombstone and dirty/LWW bookkeeping apply.
 | Group rules, versions, scores, attestations | Server-authoritative, described below | Out of Sync v2 scope |
 | Personal calculations | Read-time projections | Out of sync scope; no achievement ledger |
 
-`ExternalLoadMode = 'added' | 'assistance' | 'unquantified_assistance'`.
-Amounts remain nonnegative raw decimal text; a mode supplies the sign. Null
-mode on a legacy set is unresolved for bodyweight scoring. A conventional
-exercise (`c=0`) treats legacy null as added to retain existing results.
-Unquantified assistance represents e.g. a band: reps can be logged, but no kg
-equivalent or load-dependent score is invented. New logs write an explicit mode.
+`ExternalLoadMode = 'added'`. Every numeric set weight means added weight,
+including existing null or retired mode tags. There is no assisted/band mode,
+load-meaning selector, legacy review, or total-to-added conversion. Existing raw
+amounts remain unchanged. Deprecated stored mode fields are retained for wire
+compatibility and immutable evidence, but do not alter live calculations. New
+logs and imports write `added`; an absent plan retains null metadata.
 
 Both units preserve the entered value and unit; normalize only for calculation
 and the measurement's validated kg value with exactly `1 lb = 0.45359237 kg`.
-Save measurement raw value/unit and matching kg together. Existing kg-only rows stay kg; an import
-warning about unknown units requires review, not guessing. Positive finite
+Save measurement raw value/unit and matching kg together. Existing kg-only rows stay kg; the recorded unit is used, with the existing kg default for older rows.
+Invalid units remain unavailable. Set-mode hydration never blocks an otherwise
+valid numeric weight; unknown exercise rules still require sync or configuration. Positive finite
 measurements only; zero, negative, nonfinite, exponent and comma strings are
 invalid. Use the existing decimal weight parser; blank logger weight with valid
 reps canonicalizes to zero, but blank measurement does not. Reps retain the
@@ -53,40 +54,39 @@ or future-reading estimate is accepted by live calculations.
 ## 2. Effective load and distribution
 
 Let `E` be the parsed entered mass normalized to kg, `B` the as-of session kg,
-`c` the applicable coefficient, and `s=+1` for added, `s=-1` for assistance.
+`c` the applicable coefficient, and `F=2` for per-side input or `F=1` for total input.
 
 | Exercise | Exercise resistance basis | Muscle per-side basis |
 | --- | --- | --- |
 | Conventional, total input | `E` (existing meaning) | `E / 2` |
 | Conventional, per-side input | `E` (existing meaning) | `E` |
-| Bodyweight, total external input | `c × B + s × E` | resistance / 2 |
-| Bodyweight, per-side external input | `c × B + s × (2 × E)` | resistance / 2 |
+| Bodyweight, total external input | `c × B + E` | resistance / 2 |
+| Bodyweight, per-side external input | `c × B + (2 × E)` | resistance / 2 |
 
-The bodyweight per-side case declares bilateral equal external loading or
-assistance; it never multiplies B. Unilateral/asymmetric movements need their
+The bodyweight per-side case declares bilateral equal external loading; it never multiplies B. Unilateral/asymmetric movements need their
 own explicitly configured exercise and total external input; no inferred
 half-body model. Mixed conventional group input modes keep the existing
 `0.5 | 1 | 2` conversion. Bodyweight group scores always resolve in total-load
 space, so the member's external input is normalized once and the group's
-coefficient is applied once, with no second group-mode scaling of B.
+coefficient is applied once. Added RM is then expressed in the group’s external
+load convention, without scaling B.
 
 For `c=0`, missing or irrelevant B does not affect volume/absolute strength.
-Assistance requires a bodyweight exercise; conventional assistance is invalid.
-For `c>0`, missing B is missing, not 0. Negative resistance is invalid, never
-clamped. Zero resistance has zero volume and no 1RM. Reject nonfinite derived
+For `c>0`, missing B is missing, not 0. Negative entered weight is invalid. Zero resistance has zero volume and no 1RM. Reject nonfinite derived
 values (including overflow). A missing/invalid load does not remove a valid
 confirmed set's reps or working-set classification.
 
 The pure resolver returns a discriminated union: `known` with entered kg,
 total external adjustment, resistance and muscle per-side resistance; `missing`
-with a reason (body weight / legacy interpretation); or `invalid` with a reason
-(amount, unit, coefficient, mode, body weight, negative resistance, overflow).
-Unknown band assistance is an explicit unavailable result. Consumers carry the
+with a reason (body weight); or `invalid` with a reason
+(amount, unit, coefficient, distribution, body weight, overflow). Consumers carry the
 reason; they must not use `?? 0` to turn unavailable load into a valid result.
 
 For eligible performed sets, `volume = resistance × reps`; estimated total 1RM
-uses existing `estimateOneRepMax(resistance, reps)`; relative 1RM divides by
-the **same session B**. Muscle analytics applies its per-side basis and current
+uses existing `estimateOneRepMax(resistance, reps)`. Displayed bodyweight RM
+is added weight: `(estimatedTotalOneRepMaxKg - c × B) / F`. Keep the total
+capacity separately for inverse projections. Relative strength is total added
+RM divided by the **same session B**, independent of external distribution. Muscle analytics applies its per-side basis and current
 role factor (`primary=1`, `secondary=.5`) afterwards. Warm-ups remain eligible
 for load metrics but not working sets. RIR policy, confirmation and planned /
 skipped / unperformed exclusion remain as in spec 05; no RIR correction to RM.
@@ -112,15 +112,14 @@ change to the forward estimator: Wathan at one rep is about `1.01305 × L`.
 The exact inverse of 127.67 at one rep is therefore different from 127.67.
 Return the convention with the raw projection and keep display/plate rounding
 outside the calculation. At target B, `adjustment = L - c × B`; a negative
-adjustment is assistance with positive magnitude. Per-side entry divides only
+adjustment returns an unavailable added-weight estimate. Per-side entry divides only
 the external adjustment by 2. It never changes the historical B or score.
 
-| B | c | External input (total kg) | Reps | Resistance | Volume | Total 1RM (approx kg) |
+| B | c | External input (total kg) | Reps | Resistance | Volume | Added 1RM (approx kg) |
 | --- | --- | --- | --- | --- | --- | --- |
-| 80 | 1 | added 0 | 8 | 80 | 640 | 102.14 |
-| 80 | 1 | added 20 | 8 | 100 | 800 | 127.67 |
-| 80 | .7 | added 0 | 15 | 56 | 840 | 84.51 |
-| 80 | 1 | assistance 20 | 8 | 60 | 480 | 76.60 |
+| 80 | 1 | added 0 | 8 | 80 | 640 | 22.14 |
+| 80 | 1 | added 20 | 8 | 100 | 800 | 47.67 |
+| 80 | .7 | added 0 | 15 | 56 | 840 | 28.51 |
 
 Implementation foundation: `apps/mobile/src/exercise-calculations/effective-load.ts`
 implements the pure resolver, performed metrics, coverage, reps eligibility and
@@ -163,8 +162,8 @@ The UI shows read-only kg and `Reading from <date/time>`. Missing context shows
 `No reading on or before this session` and, for the owner, `Add dated reading`
 prefilled at the exact session start. Its date stays editable. Malformed context
 offers reading history for review. Friends have no entry or correction action.
-Forms explain historical recalculation and possible strength-certification
-invalidation. Missing context does not prevent logging or independent metrics.
+Forms show the value, unit and date without warnings about historical
+recalculation or group results. Missing context does not prevent logging or independent metrics.
 
 Forward migrations remove all four stored session weight columns and the
 session-only hydration marker. They preserve readings, raw sets, session clocks
@@ -172,26 +171,13 @@ and dirty state; no manual/session value is converted to a reading. The local
 migration clears disposable group caches. Unrelated exercise/set hydration
 markers remain. There is no historical-fill planner, preview, apply or override.
 
-## 5. Legacy review and canonical identity
+## 5. Existing loads and canonical identity
 
-The current GymBook digester (`scripts/import/gymbook-digester.ts` under mobile)
-imports absent weight as 0, halves a reviewed list of bilateral external
-weights, and strips non-kg unit text while emitting `weight_non_kg_unit`.
-Its source metadata preserves `weightLoggedKg` / `weightAdjustment` for halved
-inputs in the import package, but persisted sets have neither units nor a
-bodyweight interpretation. Thus a stored 80 cannot reveal whether it meant
-body mass, total resistance, plates, or a non-kg source. No heuristic is safe.
-
-Before activating bodyweight semantics for history, show original amount,
-unit/unknown-unit warning, session B/date and preview for selected sets. Choices:
-confirm external added/quantified assistance; convert previously total load;
-or leave unresolved. Total conversion first normalizes the old total to kg,
-then subtracts `c × B` and converts the signed difference to added/assistance
-in the declared external input mode/unit. Missing B, unknown units or an invalid
-conversion blocks apply. Revalidate preview inputs in the write transaction.
-Cancel changes nothing. Unresolved bodyweight rows remain unranked, including
-on reps boards; do not assume old zero means unassisted. New import/export
-versions carry the new meaning/context fields; old packages remain unresolved.
+Existing numeric values, including zero, are added weight. No conversion or
+confirmation wizard runs when enabling bodyweight rules. Actual and planned
+amounts, units, reps and performed status remain separate. The ordinary logger
+edits them and new rows use added kg. Null and retired mode tags do not suppress
+metrics or zero-added reps eligibility. Recalculating never rewrites raw sets.
 
 Only reviewed exact canonical ids receive defaults: `seed_pull_up` (1),
 `seed_chin-ups` (1), `seed_parallel_bar_dips` (1), `seed_push_up` (.7).
@@ -215,40 +201,19 @@ Unknown old-client metadata defers the generation marker until sync replay has
 hydrated it; the cycle checks again after its first pull. Omitted repository
 `loadRules` preserves the stored tuple; an explicit valid tuple marks it known.
 
-The logger carries actual/planned units and modes through typing, confirmation,
-copy and graph autosave. A stale page whose metadata was unknown omits its
-placeholders at the write boundary, preserving a replay completed meanwhile.
-New empty rows start with explicit added kg. Copies preserve their source's
-meaning, including unresolved legacy rows. The exercise page links missing
-context to dated entry. Logger previews, records and analytics resolve dated
-context through the same boundary (§8).
-
-`src/data/legacy-load-review.ts` inventories actual and planned unresolved values,
-previews selected interpretations, and rechecks the complete source membership
-and versions in one local transaction. Originals and applicable source dates stay
-visible in the preview. Unit choice is always explicit, including old `kg`
-placeholders; a legacy zero is unresolved too. Unknown exercise rules must first
-be recovered by sync or explicitly configured. For unavailable set metadata,
-the user can sync first or intentionally replace the tuple by reviewing every
-nonempty actual and planned part of each selected set. Each part has its own
-unit/meaning choice; a partial review cannot publish guessed defaults for the
-other part. Apply atomically establishes the reviewed tuple and clears metadata
-on empty counterparts. This also supports conventional exercises whose old
-units are unavailable; known conventional null modes do not require review.
-No missing cursor or bootstrap marker proves that a row has never synced.
-Changes in sync dirty bookkeeping alone do not invalidate a preview, but
-concurrent hydration or a changed as-of reading does. Apply recomputes from current source rows and never
-confirms a set. Ordinary autosave continues to preserve unavailable metadata.
-The result is ordinary dirty Sync v2 data, with no global compare-and-set claim.
+The logger preserves actual/planned amounts and recorded units through typing,
+confirmation, copying and autosave. A stale page whose metadata was unknown
+still omits placeholders at the write boundary, preserving later sync hydration.
+The exercise page links missing dated context to reading entry. Logger previews,
+records and analytics resolve that context through the same boundary (§8).
 
 Session-import v3 carries explicit actual/planned meaning, personal rules for
 new exercises and an explicit owner-private reading array (empty is allowed).
 Sessions contain no weight tuple. The serializer upgrades v2 packages to v3,
 stripping stored session weights; local and remote importers also ignore legacy
 v2 tuples, even malformed ones, and never manufacture readings from them.
-V1 remains supported with unresolved old load meaning. Existing package IDs
-retain the original import identity namespace. Reimport is not a legacy
-conversion workflow. See the owning
+V1 remains supported; its numeric weights are added weight. Existing package IDs
+retain the original import identity namespace. Reimport retains existing package identity; it does not convert amounts. See the owning
 [import contract](../../../apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md).
 
 ## 6. Group metrics, revisions and certification
@@ -271,9 +236,9 @@ phone sizes, including actual local API outages. Hosted rollout remains pending.
 | Metric key | Unit | Eligibility / default |
 | --- | --- | --- |
 | `weight`, `e1rm` | `kg` | Existing conventional boards/conversion retained |
-| `bodyweight_reps` | `reps` | Confirmed compatible set with known zero added and zero assistance; B optional; standard push-up default |
-| `relative_strength` | `x_bw` (display ×BW) | Total estimated 1RM / session B; weighted pull-up/dip default |
-| `absolute_strength` | `kg` | Total estimated 1RM under group rules |
+| `bodyweight_reps` | `reps` | Confirmed compatible set with zero added weight; B optional; standard push-up default |
+| `relative_strength` | `x_bw` (display ×BW) | Total added 1RM / session B; weighted pull-up/dip default |
+| `absolute_strength` | `kg` | Added 1RM under the group’s external distribution |
 
 New scores are `{metric, value, unit, rulesRevision}` everywhere: board rows,
 podiums, record payloads, cursors, history, caches and accessibility. Do not
@@ -303,13 +268,13 @@ Pin rules revision as the explanation of the observed score, but a rules-only
 recalculation does not void a valid performance attestation. A rules change
 cannot expand an old attestation's dependency coverage: request certification
 again for a newly dependent metric. Existing conventional attestations remain
-valid only for their original coverage; none silently certifies B or assistance.
+valid only for their original coverage; none silently certifies B.
 Reading value/date/deletion/restoration changes enqueue affected shared sessions
 through the failure-isolated source queue. Strength pins include resolved kg,
 source ID and date; changed context voids dependent attestations. Reps-only and
 conventional pins exclude weight context and retain their prior pin version.
-The calculation source hash includes `dated_readings_v2`; strength pins use
-version 3, and disposable client caches use v3 keys. Immutable retired record
+The calculation source hash includes `dated_added_load_v3`; strength pins use
+version 4, and disposable client caches use v4 keys. Immutable retired record
 and certification evidence may still display its original legacy provenance,
 but those stored values never supply new live scores. Attestation is not
 automatic scale verification.
@@ -361,7 +326,7 @@ may supply an already-validated numeric B. Optional legacy conventional callers 
 c=0 defaults; an explicit `localBodyweightMetadataKnown=false` never uses that
 default as evidence. Units normalize only for arithmetic. Blank entered mass
 with valid reps follows the existing canonical-zero rule; confirmation remains
-independent. Assistance/unresolved rows cannot set a Top added record.
+independent. Every valid numeric added amount can set a Top added record.
 
 Unknown dependent metrics render unavailable, and known volume subtotals are
 labelled incomplete. Entirely unknown volume is not zero. Aggregates propagate
@@ -379,16 +344,15 @@ The one-rep capacity convention is explained; high-rep estimates are labelled.
 Two-decimal display is separate from raw results and does not imply plate rounding.
 Forward/inverse cancellation within two machine epsilons of the resistance scale
 normalizes to zero external adjustment. An unchanged bodyweight-only performance
-therefore stays unweighted instead of displaying microscopic assistance. Larger
-positive and negative adjustments retain full precision. Manually editing target
+therefore stays at zero added weight. Positive adjustments retain full
+precision; negative adjustments return unavailable. Manually editing target
 B replaces the reading/prefill hint with an explicit entered-target explanation.
 
 Committed reading writes invalidate catalogue stats and mounted dependent views.
 Every changed sync pull page invalidates after commit, even if later sync work
 fails. Detail graphs, records, insights, open heatmaps and calculators reload;
 exercise draft reload flushes pending edits first. Session-start edits also
-invalidate context. Legacy review fingerprints include the resolved reading so
-a concurrent reading change requires a fresh preview before conversion.
+invalidate context. There is no legacy load-conversion state to invalidate.
 Gym scope filters history without changing as-of selection or borrowing a
 record from another gym.
 
@@ -399,7 +363,7 @@ owner-filtered definitions, sets and as-of contexts. Session SQL selects no
 removed columns. The service-only helper returns only selected sessions' context,
 never the owner's timeline. Reading changes affect the next API read.
 
-`metric_revision: dated_readings_v2` replaces `effective_load_v1`. Existing
+`metric_revision: dated_added_load_v3` replaces `effective_load_v1`. Existing
 normalized external `load` remains unchanged; raw `entered_load`, effective
 resistance, provenance and volume coverage retain their distinct meanings.
 Missing/invalid or truncated totals are null. `session_body_weight.source` is

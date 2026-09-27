@@ -17,7 +17,6 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
 import { loadExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
 import { __resetExerciseCatalogStatsCacheForTests } from '@/src/exercise-catalog/stats-cache';
-import { listLegacyLoads } from '@/src/data/legacy-load-review';
 
 const mockReplace = jest.fn();
 let mockSearchParams: Record<string, string> = {};
@@ -43,10 +42,6 @@ jest.mock('@/src/data/exercise-catalog-stats', () => ({
 
 const mockLoadRawHistory = jest.mocked(loadExerciseCatalogStatsRawHistory);
 
-jest.mock('@/src/data/legacy-load-review', () => ({
-  listLegacyLoads: jest.fn(),
-}));
-const mockListLegacyLoads = jest.mocked(listLegacyLoads);
 
 jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogMuscleGroups: jest.fn(),
@@ -89,11 +84,6 @@ describe('ExerciseCatalogScreen', () => {
     mockDeleteExercise.mockReset();
     mockUndeleteExercise.mockReset();
     mockLoadRawHistory.mockReset();
-    mockListLegacyLoads.mockReset();
-    mockListLegacyLoads.mockImplementation(async (exerciseId) => ({
-      exerciseId, exerciseName: 'Test exercise', bodyweightCoefficient: 0,
-      loadInputMode: 'total_load', metadataKnown: true, candidates: [], fingerprint: '',
-    }));
     mockLoadRawHistory.mockResolvedValue({
       sessions: [],
       sessionExercises: [],

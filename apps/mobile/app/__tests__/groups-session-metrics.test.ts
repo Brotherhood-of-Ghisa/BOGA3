@@ -118,7 +118,7 @@ describe('group session metrics', () => {
 
 
 describe('shared-session personal effective-load context', () => {
-  const session = { metric_scope: 'personal' as const, metric_revision: 'dated_readings_v2' as const,
+  const session = { metric_scope: 'personal' as const, metric_revision: 'dated_added_load_v3' as const,
     body_weight_kg: 80, body_weight_source: 'reading', body_weight_measurement_id: 'r',
     body_weight_measured_at_ms: 1000 };
   const bwExercise = (overrides: Partial<GroupSessionExercise> = {}) => ({
@@ -132,9 +132,9 @@ describe('shared-session personal effective-load context', () => {
     expect(selectGroupPerformedExercises([bwExercise()], session)[0].sets[0])
       .toMatchObject({ enteredWeight: 10, weightKg: 10, metrics: { load: { resistanceKg: 60 } } });
   });
-  it('preserves assisted performed sets while reducing their effective volume', () => {
+  it('uses the numeric added weight despite obsolete mode tags', () => {
     const row = bwExercise({ sets: [rawSet('assist', '10', '5', { weight_unit: 'kg', external_load_mode: 'assistance' })] });
-    expect(computeGroupSessionMetrics([row], session)).toMatchObject({ performedSets: 1, totalVolumeKg: 100 });
+    expect(computeGroupSessionMetrics([row], session)).toMatchObject({ performedSets: 1, totalVolumeKg: 300 });
   });
   it('normalizes lb, while keeping raw amount and unit for the visible row', () => {
     const row = bwExercise({ load_input_mode: 'total_load',
@@ -161,8 +161,6 @@ describe('shared-session personal effective-load context', () => {
   it.each([
     { bodyweight_coefficient: null }, { load_input_mode: null },
     { sets: [rawSet('unit', '10', '5', { external_load_mode: 'added' })] },
-    { sets: [rawSet('mode', '10', '5', { weight_unit: 'kg' })] },
-    { sets: [rawSet('band', '10', '5', { weight_unit: 'kg', external_load_mode: 'unquantified_assistance' })] },
   ])('does not guess absent or unresolved metadata: %j', overrides => {
     expect(computeGroupSessionMetrics([bwExercise(overrides)], session)).toMatchObject({
       performedSets: 1, totalVolumeKg: null, coverage: { complete: false } });

@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LegacyLoadReviewSheet } from '@/components/bodyweight/legacy-load-review-sheet';
 import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import { isValidSessionWeight } from '@/src/bodyweight/weight-entry';
 import type { LoadContext } from '@/src/exercise-calculations/effective-load';
@@ -61,7 +60,7 @@ type ExercisePageScreenProps = {
   loadHistory?: LoadExerciseHistory;
 };
 
-type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit' | 'review';
+type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit';
 
 const LOAD_ERROR_MESSAGES = {
   'missing-session': 'This session no longer exists.',
@@ -167,15 +166,11 @@ export function ExercisePageScreen({
   const onCommit = () => {
     if (!openSet || !loggerValues) return;
     Keyboard.dismiss();
-    updateSets((current) => commitSet(current, openSet.id, { ...loggerValues, externalLoadMode: loggerValues.externalLoadMode ?? (loadContext.bodyweightCoefficient === 0 ? 'added' : null) }), 'structural');
+    updateSets((current) => commitSet(current, openSet.id, { ...loggerValues, externalLoadMode: 'added' }), 'structural');
     setOpenSetId(null);
   };
 
   const onToggle = (setId: string) => {
-    const set = sets.find(candidate => candidate.id === setId);
-    if (set && loadContext.bodyweightCoefficient > 0 && loggerValuesFor(set).externalLoadMode == null) {
-      setOpenSetId(setId); return;
-    }
     const next = toggleSetPerformed(sets, setId);
     if (next === null) {
       setOpenSetId(setId);
@@ -300,11 +295,9 @@ export function ExercisePageScreen({
                     loadContext={loadContext}
                     weightUnit={loggerValues.weightUnit}
                     externalLoadMode={loggerValues.externalLoadMode}
-                    metadataKnown={openSet?.localBodyweightMetadataKnown !== false && editingExercise?.localBodyweightMetadataKnown !== false}
-                    requiresReview={openSet?.localBodyweightMetadataKnown === false ||
-                      (loadContext.bodyweightCoefficient > 0 && loggerValues.externalLoadMode == null)}
+                    metadataKnown={editingExercise?.localBodyweightMetadataKnown !== false}
+                    unitEditable={openSet?.localBodyweightMetadataKnown !== false}
                     onChangeLoad={onChangeLogger}
-                    onReview={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('review'); }); }}
                     number={row.number}
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
@@ -372,10 +365,8 @@ export function ExercisePageScreen({
       />
       <LoadingEstimateSheet visible={estimateVisible} exerciseId={exercise.exerciseDefinitionId}
         context={loadContext} onDismiss={() => setEstimateVisible(false)} />
-      <LegacyLoadReviewSheet visible={openSheet === 'review'} exerciseId={exercise.exerciseDefinitionId}
-        onDismiss={() => setOpenSheet('none')} onApplied={() => { void draft.reload(); setRecordsRevision(value => value + 1); }} />
+
       <ExerciseOptionsSheet
-        onReview={loadContext.bodyweightCoefficient > 0 ? () => { void draft.flush().then(saved => { if (saved) setOpenSheet('review'); }); } : undefined}
         exerciseName={exercise.name}
         onDismiss={() => setOpenSheet('none')}
         onEdit={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('edit'); }); }}

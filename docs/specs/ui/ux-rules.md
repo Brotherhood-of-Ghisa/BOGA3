@@ -27,9 +27,8 @@ Settings → Body weight shows the latest nondeleted reading at/before now,
 with its entered unit and measurement time. Add/edit requires a date/time and
 positive finite decimal in kg or lb, and rejects future dates. Unchanged date
 text preserves its full stored timestamp. Read errors are retryable; failed
-local writes keep all input. Saves work offline. Save/delete explanations state
-that affected sessions and group comparisons recalculate and weight-dependent
-certifications may need review.
+local writes keep all input. Saves work offline. Save/delete feedback is simply “Reading saved” or “Reading deleted”; no
+warning about past workouts or group results appears.
 
 Each session derives its weight from the latest nondeleted reading on or before
 its exact start instant; equal timestamps use ascending binary/code-point ID.
@@ -47,7 +46,7 @@ actions. Historical fill and session-only correction do not exist.
 The visual target is `design-targets/bodyweight.md`; personal and group
 calculations follow `../tech/bodyweight-load-contract.md`.
 
-### Bodyweight exercise setup and load review
+### Bodyweight exercise setup and added weight
 
 The shared exercise fields accept contribution from 0–100%; positive values
 require a movement standard and loading method. Help text explains the
@@ -56,20 +55,12 @@ per-side choice scales only equal external inputs, never the session weight.
 An editor whose saved metadata has not arrived preserves it unless the user
 explicitly configures these fields.
 
-The in-place logger keeps its confirmation tick. Added/Assisted/Unquantified
-choices and kg/lb controls preserve positive input. It shows effective resistance
-and the session kg, or an explicit unavailable reason. Unquantified assistance
-hides the numeric amount without inventing kg. A legacy row offers Review;
-choosing a new meaning does not silently promote an old amount. The exercise
-page exposes the same dated context and missing-reading entry as View Session.
-
-Saving bodyweight settings on an exercise with unresolved logs opens the review
-sheet; it is also available from exercise options. Select only rows sharing the
-chosen interpretation and source unit, then Preview. Original raw values, actual
-versus planned status, proposed values and session source dates remain visible.
-Only Apply writes. Missing B blocks old-total conversion; invalid input and stale
-previews remain editable. Leave unresolved makes no set changes. Confirmation
-status is preserved even when the reviewed row has usable values.
+The in-place logger has one added-weight field, kg/lb controls, reps, effort and
+its confirmation tick. It shows total load and dated bodyweight as context;
+1RM is labelled “Added 1RM”. There are no assistance choices or legacy review.
+Every existing numeric weight means added weight. Missing bodyweight leaves
+load metrics unavailable while reps remain loggable. The exercise page exposes
+the same dated context and missing-reading entry as View Session.
 
 ### 1. Action semantics
 
@@ -835,11 +826,10 @@ None. (The primitive extraction these items tracked shipped as `StatePanel`,
 
 ## Personal bodyweight analytics and loading estimates
 
-Bodyweight strength figures read Total 1RM and top external records read Top
-added. Set rows retain added/assisted/unquantified meaning, source units and
+Bodyweight strength figures read Added 1RM and top external records read Top
+added. Set rows retain numeric added weight, source units and
 coefficient/per-side context. Historical B determines historical strength.
-Record details show saved B and effective resistance; assistance is never a
-Top added record. Conventional labels and arithmetic remain unchanged.
+Record details show dated B and effective resistance. Conventional labels and arithmetic remain unchanged.
 
 Volume subtotals explicitly say incomplete; wholly unavailable metrics show an
 em dash. Counts remain usable. Stats tables put the coverage note outside the
@@ -849,17 +839,17 @@ retry routes and do not fabricate records.
 
 Exercise records → Loading estimate opens a scrollable sheet. The strongest
 eligible completed set is selected initially; Choose another performance shows
-raw load, date, source B/provenance and total 1RM. Target reps must be a positive
+raw load, date, source B/provenance and added 1RM. Target reps must be a positive
 whole number; target B is positive kg. Saved target-session B is prefilled;
-Use current reading is explicit and shows its date. The result is positive
-added load or positive assistance in kg/lb, with effective total and estimate
+Use current reading is explicit and shows its date. The result is nonnegative
+added load in kg/lb, with effective total and estimate
 wording. Inputs clear old results, one-rep/high-rep conventions are explained,
-and Done/dismiss changes no history. No source explains review/session-weight
+and Done/dismiss changes no history. A target below bodyweight has no added-weight estimate. No source explains dated-weight
 requirements; read failures can retry and invalid inputs remain editable.
 
-After an explicit correction, backfill or personal coefficient/legacy review,
+After reading or personal coefficient changes,
 reopening affected projections recomputes their values. These are derived
-views, never persisted awards. Bodyweight share previews keep the same total
+views, never persisted awards. Bodyweight share previews keep the same added
 1RM/raw external distinction as the completed session.
 
 Session summary rows keep incomplete volume figures compact: label a known

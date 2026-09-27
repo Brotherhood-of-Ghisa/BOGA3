@@ -2338,7 +2338,7 @@ v2 must declare the complete rules and expected revision. V1-created exercises
 still get a legacy initial revision. V2 readers explicitly tag legacy payloads,
 so a ratio or rep score can never be mistaken for `value_kg`.
 
-Legacy facts version 2 recognizes kg/lb and explicit added/assistance meaning
+Legacy facts version 3 recognizes kg/lb and the added-weight meaning of numeric values
 through the shared kernel with coefficient zero. Original kg + added/null pins
 stay byte-for-byte compatible; other meanings use an explicit dependency hash.
 Unknown non-null performance statuses are ineligible, matching v2 scoring.
@@ -2473,10 +2473,10 @@ and two-user groups gates remain required for the integrated milestone.
 at/before the exact session start, with ascending ID COLLATE "C" ties. Shared
 session RPCs and the complete comparison graph return only that context; private
 reading history is never exposed. The source graph includes calculation revision
-`dated_readings_v2`. Shared-session metric payloads use the same revision; local
-disposable cache keys move to v3 and upgrade clears old entries.
+`dated_added_load_v3`. Shared-session metric payloads use the same revision; local
+disposable cache keys move to v4 and upgrade clears old entries.
 
-Strength performance pins move to version 3 and include resolved kg/source/id/date.
+Strength performance pins move to version 4 and include resolved kg/source/id/date.
 Reading changes void affected strength attestations during recompute. Reps-only
 and conventional pins retain version 2 and omit body weight, preserving their
 certifications. Retired immutable events retain original evidence; no legacy

@@ -51,7 +51,7 @@ it('exports v3 and imports without losing private readings, raw units, planned m
   expect(fixture.database.select().from(exerciseDefinitions).get()).toMatchObject({ bodyweightCoefficient: 1, loadInputMode: 'per_side_load',
     movementStandard: 'Strict pull-up', loadingMethod: 'Belt' });
   expect(fixture.database.select().from(exerciseSets).get()).toMatchObject({ weightValue: '20', weightUnit: 'lb', externalLoadMode: 'added',
-    plannedWeightValue: '40', plannedWeightUnit: 'lb', plannedExternalLoadMode: 'assistance', performanceStatus: 'unperformed' });
+    plannedWeightValue: '40', plannedWeightUnit: 'lb', plannedExternalLoadMode: 'added', performanceStatus: 'unperformed' });
   const repeated = importBogaSessionPackageToLocalDb(fixture.database, pkg, options);
   expect(repeated.report.counts).toMatchObject({ sessionsInserted: 0, bodyWeightMeasurementsInserted: 0, exerciseSetsInserted: 0 });
 });
@@ -62,7 +62,7 @@ it('emits matching owner-scoped sync entities with explicit new metadata', () =>
   expect(reading.fields).toMatchObject({ weight_value: '180', weight_unit: 'lb', weight_kg: 180 * 0.45359237 });
   expect(entities.find(entity => entity.type === 'sessions')?.fields).not.toHaveProperty('body_weight_kg');
   expect(entities.find(entity => entity.type === 'exercise_sets')?.fields).toMatchObject({ weight_unit: 'lb', external_load_mode: 'added',
-    planned_weight_unit: 'lb', planned_external_load_mode: 'assistance', performance_status: 'unperformed' });
+    planned_weight_unit: 'lb', planned_external_load_mode: 'added', performance_status: 'unperformed' });
 });
 
 const legacyPackage = () => {
