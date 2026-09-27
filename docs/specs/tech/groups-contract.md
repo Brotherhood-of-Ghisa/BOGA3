@@ -2399,6 +2399,20 @@ evaluator voids changed observations. Rules-only rescoring preserves valid
 coverage, while a changed metric/dependency requires its own certification.
 Estimated historical B is included visibly in the returned performance context.
 
+V2 stream records include a current `record_context`: comparison publication
+state, former-member status and per-metric eligibility, derived load facts and
+matching active attestation. This context enables the same certify/withdraw/
+cancel sheet as a board row, including selection of each record metric. Cached
+records without this context remain readable but cannot enable writes. Retired,
+voided, archived, former-member or changed-input records are read-only. The
+write RPC still rechecks the live graph and expected revision/fingerprint.
+
+An equal-score input correction can refresh the existing record's raw tuple and
+fingerprint without creating a new performed PR; changed attested inputs still
+void the old certification. Reps context omits bodyweight-derived resistance
+and percent values because its fingerprint does not attest B. Late reads cannot
+replace a newer write or a refreshed performance snapshot in the client sheet.
+
 Enqueue failure is isolated from certification and personal-sync commits. A
 publication error rolls back the entire projection transaction and retains the
 job for retry. No backend evaluation error may roll back a workout push.

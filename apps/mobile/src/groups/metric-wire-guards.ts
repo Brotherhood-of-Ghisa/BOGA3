@@ -140,6 +140,27 @@ export function isGroupMetricStreamCursor(value: unknown): boolean {
     typeof value.kind === 'string' && value.kind.length > 0 && typeof value.key === 'string' && value.key.length > 0);
 }
 /** Unknown future kinds are removed by the API while retaining the server cursor. */
+const isRecordContext = (value: unknown, event: Record<string, unknown>): boolean => {
+  if (value === undefined) return true; // Old cache: never enables an attestation write.
+  if (!isMetricRecord(value) || !isGroupMetricExerciseWire(value.exercise) || value.exercise.legacy ||
+    value.exercise.group_exercise_id !== event.group_exercise_id || value.exercise.rules_revision < Number(event.rules_revision) ||
+    typeof value.former !== 'boolean' || !Array.isArray(value.metrics) || !Array.isArray(event.boards) || value.metrics.length !== event.boards.length) return false;
+  const seen = new Set<string>();
+  return value.metrics.every(context => {
+    if (!isMetricRecord(context) || !isGroupMetric(context.metric) || seen.has(context.metric)) return false;
+    seen.add(context.metric);
+    const board = (event.boards as unknown[]).find(item => isMetricRecord(item) && item.metric === context.metric);
+    return isMetricRecord(board) && board.fingerprint === context.fingerprint && typeof context.eligible === 'boolean' &&
+      nullableFinite(context.effective_resistance_kg) && nullableFinite(context.external_adjustment_kg) &&
+      nullableFinite(context.added_percent_bodyweight) &&
+      (!context.eligible || (isGroupMetricExerciseWire(value.exercise) && !value.former && !event.voided &&
+        value.exercise.archived_at_ms === null && !value.exercise.rebuilding && value.exercise.rules_revision === event.rules_revision)) &&
+      (context.certification === null || (isGroupMetricCertificationWire(context.certification) &&
+        context.certification.metric === context.metric && context.certification.performance.set_id === event.set_id &&
+        context.certification.ended_at_ms === null));
+  });
+};
+
 export function isGroupMetricStreamItem(value: unknown): boolean {
   if (!isMetricRecord(value) || typeof value.key !== 'string' || !integer(value.sort_at_ms)) return false;
   if (value.kind === 'session') return member(value.member) && typeof value.session_id === 'string' &&
@@ -154,7 +175,7 @@ export function isGroupMetricStreamItem(value: unknown): boolean {
     value.group_exercise.rules_revision !== value.rules_revision ||
     value.group_exercise.group_exercise_id !== value.group_exercise_id) return false;
   switch (value.kind) {
-    case 'record': return typeof value.session_id === 'string' && typeof value.set_id === 'string' &&
+    case 'record': return member(value.member) && isRecordContext(value.record_context, value) && typeof value.session_id === 'string' && typeof value.set_id === 'string' &&
       typeof value.provisional === 'boolean' && typeof value.voided === 'boolean' && isGroupPerformanceWire(value.performance) &&
       value.performance.set_id === value.set_id && value.performance.session_id === value.session_id &&
       Array.isArray(value.boards) && value.boards.length > 0 && value.boards.every(board => metricValueRecord(board) &&

@@ -6,7 +6,7 @@
  */
 
 import * as mockReact from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -79,6 +79,7 @@ import * as groupsApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import { buildGroupMetricPodiums } from '@/src/groups/metric-view-model';
 import type { GroupMetricBoardWire, GroupMetricCertificationWire, GroupMetricExerciseWire, GroupMetricHistoryWire, GroupMetricStreamItemWire, GroupPerformanceSnapshotWire } from '@/src/groups/metric-wire';
+import { GroupMetricRecordSheet } from '@/components/groups/group-metric-record-sheet';
 import GroupsTabRoute from '../(tabs)/groups';
 import GroupBoardRoute from '../group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../group/[groupId]/leaderboards/[exerciseId]/history';
@@ -221,7 +222,9 @@ it('renders unit-aware records and rules events through the live stream hook and
   const record: GroupMetricStreamItemWire = { kind: 'record', metric_event: true, key: 'metric-record', event_id: 'metric-record',
     sequence: 2, group: { group_id: 'group', name: 'Crew' }, group_exercise: exercise, group_exercise_id: 'pull', rules_revision: 2,
     sort_at_ms: 1000, member: row.member, session_id: 'session', set_id: 'set', provisional: false, voided: false, performance,
-    boards: [{ metric: 'relative_strength', value: 1.4, unit: 'x_bw', previous_value: null, group_record: true, fingerprint: 'pin' }] };
+    boards: [{ metric: 'relative_strength', value: 1.4, unit: 'x_bw', previous_value: null, group_record: true, fingerprint: 'pin' }],
+    record_context: { exercise, former: false, metrics: [{ metric: 'relative_strength', fingerprint: 'pin', eligible: true,
+      effective_resistance_kg: 100, external_adjustment_kg: 20, added_percent_bodyweight: 25, certification: null }] } };
   const change: GroupMetricStreamItemWire = { kind: 'rules_change', metric_event: true, key: 'change', event_id: 'change', sequence: 3,
     group: record.group, group_exercise: exercise, group_exercise_id: 'pull', rules_revision: 2, sort_at_ms: 2000,
     member: null, previous_revision: 1, rules: exercise };
@@ -230,6 +233,11 @@ it('renders unit-aware records and rules events through the live stream hook and
   expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/Relative strength.*1.40 ×BW/);
   expect(screen.getByTestId('group-metric-stream-change')).toHaveTextContent(/not a newly performed record/);
   fireEvent.press(screen.getByTestId('group-metric-stream-metric-record'));
+  expect(await screen.findByTestId('group-metric-record-weight')).toHaveTextContent(/80 kg.*Estimated from/);
+  fireEvent.press(screen.getByTestId('group-metric-record-certify'));
+  await waitFor(() => expect(api.certifyGroupMetric).toHaveBeenCalledWith(expect.objectContaining({ expectedFingerprint: 'pin', expectedRevision: 2 })));
+  await waitFor(() => expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent(/Certified by Witness/));
+  fireEvent.press(screen.getByTestId('group-metric-record-history'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/group/leaderboards/pull/history?metric=relative_strength&scope=all&revision=2');
   first.unmount();
   mockInitialOnline = false;
@@ -237,4 +245,49 @@ it('renders unit-aware records and rules events through the live stream hook and
   render(<GroupsTabRoute />);
   expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/1.40 ×BW/);
   expect(await screen.findByTestId('groups-offline-banner')).toHaveTextContent(/Offline/);
+});
+
+
+it('does not restore a successful but superseded attestation when an older detail read finishes', async () => {
+  let finishRead: (value: { contract_version: 2; certification: GroupMetricCertificationWire }) => void = () => {};
+  api.getGroupMetricCertification.mockReturnValue(new Promise(resolve => { finishRead = resolve; }));
+  const props = { exercise, groupId: 'group', userId: 'me', myRole: 'member' as const,
+    onClose: jest.fn(), onChanged: jest.fn().mockResolvedValue(undefined) };
+  const view = render(<GroupMetricRecordSheet {...props} row={row} />);
+  fireEvent.press(screen.getByTestId('group-metric-record-certify'));
+  await waitFor(() => expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent(/Certified by Witness/));
+  await waitFor(() => expect(api.getGroupMetricCertification).toHaveBeenCalled());
+  view.rerender(<GroupMetricRecordSheet {...props} row={{ ...row, fingerprint: 'corrected-pin', value: 1.3 }} />);
+  await act(async () => { finishRead({ contract_version: 2, certification: certificate }); });
+  expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent('Uncertified');
+  expect(screen.getByTestId('group-metric-record-certify')).toBeEnabled();
+});
+
+it('retains a server-ended certification when connectivity changes after a successful write', async () => {
+  const ended = { ...certificate, ended_at_ms: 3000, end_reason: 'cancelled' as const };
+  api.getGroupMetricCertification.mockResolvedValue({ contract_version: 2, certification: ended });
+  render(<GroupMetricRecordSheet exercise={exercise} groupId="group" userId="me" myRole="member" row={row}
+    onClose={jest.fn()} onChanged={jest.fn().mockResolvedValue(undefined)} />);
+  fireEvent.press(screen.getByTestId('group-metric-record-certify'));
+  await waitFor(() => expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent('Certification cancelled'));
+  act(() => { mockNetInfoListeners.forEach(listener => listener({ isConnected: false })); });
+  expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent('Certification cancelled');
+  expect(screen.queryByTestId('group-metric-record-withdraw')).toBeNull();
+  expect(screen.getByTestId('group-metric-record-certify')).toBeDisabled();
+});
+
+it('follows a replacement attestation on unchanged performance inputs', async () => {
+  const ended = { ...certificate, ended_at_ms: 3000, end_reason: 'cancelled' as const };
+  const replacement = { ...certificate, certification_id: 'replacement', certified_by: { user_id: 'other', username: 'New witness' } };
+  api.getGroupMetricCertification.mockImplementation(async (_groupId, id) => ({
+    contract_version: 2, certification: id === 'replacement' ? replacement : ended,
+  }));
+  const props = { exercise, groupId: 'group', userId: 'me', myRole: 'member' as const,
+    onClose: jest.fn(), onChanged: jest.fn().mockResolvedValue(undefined) };
+  const view = render(<GroupMetricRecordSheet {...props} row={row} />);
+  fireEvent.press(screen.getByTestId('group-metric-record-certify'));
+  await waitFor(() => expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent('Certification cancelled'));
+  view.rerender(<GroupMetricRecordSheet {...props} row={{ ...row, certified: true, certification_id: 'replacement' }} />);
+  await waitFor(() => expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent(/Certified by New witness/));
+  expect(screen.queryByTestId('group-metric-record-withdraw')).toBeNull();
 });

@@ -18,7 +18,7 @@ Capture top-level architecture decisions for MVP, with clear `Adopted` vs `Plann
 
 | Decision | Status | Why | Source |
 | --- | --- | --- | --- |
-| Bodyweight load resolves once in a pure TS boundary, with explicit missing/invalid context, aggregate coverage and named Wathan inverse/one-rep projection conventions | `Personal/coaching consumers implemented; group server integration and rollout pending (M27)` | Preserves entered external load and conventional semantics while preventing missing B, assistance or ambiguous legacy values from becoming plausible scores. One boundary is reusable by mobile, groups and coaching. | `apps/mobile/src/exercise-calculations/effective-load.ts`, `docs/specs/tech/bodyweight-load-contract.md` |
+| Bodyweight load resolves once in a pure TS boundary, with explicit missing/invalid context, aggregate coverage and named Wathan inverse/one-rep projection conventions | `Personal/coaching/group integration implemented; native acceptance and hosted rollout pending (M27)` | Preserves entered external load and conventional semantics while preventing missing B, assistance or ambiguous legacy values from becoming plausible scores. One boundary is reusable by mobile, groups and coaching. | `apps/mobile/src/exercise-calculations/effective-load.ts`, `docs/specs/tech/bodyweight-load-contract.md` |
 | `Expo + React Native + TypeScript` for mobile frontend | `Adopted` | Fastest path to a phone-first app with one codebase and strong AI-assisted delivery. | `apps/mobile/package.json` |
 | `Expo Router` for app navigation | `Adopted` | File-based routing keeps structure simple and predictable for AI and humans. | `apps/mobile/package.json`, `apps/mobile/app/` |
 | `SQLite (on-device) + Drizzle ORM` for local persistence | `Adopted` | Reliable offline-first data with typed schema and migrations. | `apps/mobile/package.json`, `apps/mobile/src/data/schema/`, `apps/mobile/drizzle/` |
@@ -98,5 +98,6 @@ are separate; changing group rules cannot silently broaden an old attestation.
 Shared-session cards use the member's personal effective-load context, while
 rankings use group rules. Both consume frozen session weight, never a current
 reading lookup. Server migration and typed mobile boundaries are implemented;
-group UI and hosted rollout remain in progress. The owning contract is
+group UI is integrated, with native acceptance and hosted rollout in progress.
+The owning contract is
 [`tech/groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).

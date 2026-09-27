@@ -125,6 +125,15 @@ describe('unit and revision-aware group payloads', () => {
     expect(isGroupMetricHistoryWire({ ...history, events: [{ ...change, group_exercise_id: 'other' }] })).toBe(false);
     expect(isGroupMetricHistoryWire({ ...history, revision: { ...history.revision, legacy: true } })).toBe(false);
   });
+  it('only enables stream certification with coherent current comparison context', () => {
+    const context = { exercise, former: false, metrics: [{ metric: 'relative_strength', fingerprint: 'pin', eligible: true,
+      effective_resistance_kg: 100, external_adjustment_kg: 20, added_percent_bodyweight: 25, certification: certificate }] };
+    expect(isGroupMetricStreamItem({ ...record, record_context: context })).toBe(true);
+    expect(isGroupMetricStreamItem({ ...record, record_context: { ...context, former: true } })).toBe(false);
+    expect(isGroupMetricStreamItem({ ...record, record_context: { ...context, exercise: { ...exercise, rules_revision: 3 } } })).toBe(false);
+    expect(isGroupMetricStreamItem({ ...record, record_context: { ...context, metrics: [{ ...context.metrics[0], fingerprint: 'other' }] } })).toBe(false);
+    expect(isGroupMetricStreamItem({ ...record, record_context: { ...context, metrics: [{ ...context.metrics[0], certification: { ...certificate, metric: 'absolute_strength' } }] } })).toBe(false);
+  });
   it('stream records and rule changes retain their value units and identities', () => {
     expect(isGroupMetricStreamItem(record)).toBe(true);
     expect(isGroupMetricStreamItem({ ...record, boards: [{ ...record.boards[0], unit: 'kg' }] })).toBe(false);

@@ -89,6 +89,6 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
         onPress={() => setSelected(board.items.find(row => row.member.user_id === item.key) ?? null)} />} />
     {liveSelected && !rebuilding ? <GroupMetricRecordSheet key={`${liveSelected.member.user_id}:${liveSelected.set_id}:${metric}:${exercise.rules_revision}`}
       row={liveSelected} exercise={exercise} groupId={groupId} userId={userId} myRole={group.data?.group.my_role ?? null}
-      onClose={() => setSelected(null)} onChanged={board.refresh} /> : null}
+      onClose={() => setSelected(null)} onChanged={async () => { await Promise.all([board.refresh(), group.refresh()]); }} /> : null}
   </>;
 }

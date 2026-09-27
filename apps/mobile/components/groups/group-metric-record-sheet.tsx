@@ -2,45 +2,64 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, ScrollView } from 'react-native';
 
-import { ActionButton, ListRow, Sheet, Stat, UiText, uiSpace } from '@/components/ui';
+import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, UiText, uiSpace } from '@/components/ui';
 import { canManageGroup, formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { certifyGroupMetric, endGroupMetricCertification, getGroupMetricCertification, toGroupApiError } from '@/src/groups/api';
-import { describeGroupPerformanceWeight, describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS } from '@/src/groups/metric-view-model';
+import { describeGroupPerformanceWeight, describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
+import type { GroupMetric } from '@/src/groups/metric-contract';
 import type { GroupMetricBoardRowWire, GroupMetricCertificationWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 import { GroupWriteNotice } from './write-notice';
 
 /** A metric attestation always submits the revision and dependency pin shown here. */
-export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole, onClose, onChanged }: {
+export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole, onClose, onChanged, readOnlyReason, initialCertification, metricOptions, onSelectMetric, onHistory }: {
   row: GroupMetricBoardRowWire; exercise: GroupMetricExerciseWire; groupId: string; userId: string;
+  readOnlyReason?: string; initialCertification?: GroupMetricCertificationWire | null;
+  metricOptions?: GroupMetric[]; onSelectMetric?: (metric: GroupMetric) => void; onHistory?: () => void;
   myRole: GroupRole | null; onClose: () => void; onChanged: () => Promise<void>;
 }) {
   const router = useRouter();
   const online = useNetworkOnline();
-  const [certification, setCertification] = useState<GroupMetricCertificationWire | null>(null);
+  const [certification, setCertification] = useState<GroupMetricCertificationWire | null>(initialCertification ?? null);
   const [pending, setPending] = useState(false);
   const [needsReview, setNeedsReview] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'error' | 'success'; message: string } | null>(null);
   const [reload, setReload] = useState(0);
   const sequence = useRef(0);
+  const written = useRef<GroupMetricCertificationWire | null>(null);
+  const writtenPin = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     const request = ++sequence.current;
     let activeRead = true;
-    setCertification(null);
-    if (!row.certification_id || online === false) return;
-    void getGroupMetricCertification(groupId, row.certification_id).then(result => {
-      if (activeRead && mounted.current && sequence.current === request) setCertification(result.certification);
+    if (writtenPin.current !== row.fingerprint ||
+      (row.certification_id && written.current && row.certification_id !== written.current.certification_id) ||
+      (readOnlyReason && initialCertification === null && !row.certification_id)) {
+      written.current = null;
+    }
+    const known = written.current ?? initialCertification ?? null;
+    setCertification(known);
+    const certificateId = written.current?.certification_id ?? row.certification_id;
+    if (!certificateId || online === false) return;
+    void getGroupMetricCertification(groupId, certificateId).then(result => {
+      if (activeRead && mounted.current && sequence.current === request) {
+        // Keep the latest server end state across connectivity changes; a
+        // successful write must not resurrect an attestation already cancelled.
+        if (written.current?.certification_id === result.certification.certification_id) {
+          written.current = result.certification;
+        }
+        setCertification(result.certification);
+      }
     }).catch(error => {
       if (activeRead && mounted.current && sequence.current === request) setNotice({ tone: 'error', message: toGroupApiError(error).message });
     });
     return () => { activeRead = false; };
-  }, [groupId, row.certification_id, row.fingerprint, online, reload]);
+  }, [groupId, row.certification_id, row.fingerprint, online, reload, initialCertification, readOnlyReason]);
   useEffect(() => { setNeedsReview(false); setNotice(null); }, [row.fingerprint, row.rules_revision]);
 
   const active = certification?.ended_at_ms === null ? certification : null;
   const certified = certification ? active !== null : row.certified;
-  const readOnly = row.former || exercise.archived_at_ms !== null || exercise.rebuilding || row.rules_revision !== exercise.rules_revision;
+  const readOnly = Boolean(readOnlyReason) || row.former || exercise.archived_at_ms !== null || exercise.rebuilding || row.rules_revision !== exercise.rules_revision;
   const isMine = row.member.user_id === userId;
   const includesWeight = row.metric === 'relative_strength' || row.metric === 'absolute_strength';
   const blocked = pending || online === false || readOnly || needsReview;
@@ -55,16 +74,20 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         : active ? await endGroupMetricCertification(groupId, active.certification_id, action) : null;
       if (!result) return;
       if (mounted.current) {
+        written.current = result.certification;
+        writtenPin.current = row.fingerprint;
         setCertification(result.certification);
         setNotice({ tone: 'success', message: action === 'certify' ? 'Performance certified.' : 'Certification ended.' });
       }
       await onChanged();
+      if (mounted.current) setReload(value => value + 1);
     } catch (caught) {
       const error = toGroupApiError(caught);
       if (mounted.current) {
         setNeedsReview(error.code === 'CONFLICT' || error.code === 'VALIDATION');
         setNotice({ tone: 'error', message: error.message });
       }
+      if (error.code === 'FORBIDDEN' || error.code === 'NOT_FOUND') await onChanged();
     } finally { if (mounted.current) setPending(false); }
   };
   const confirmEnd = (action: 'withdraw' | 'cancel') => Alert.alert(
@@ -76,6 +99,9 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   return <Sheet visible title={`${exercise.name} · ${GROUP_METRIC_LABELS[row.metric]}`} dismissLabel="Close set details"
     onDismiss={onClose} testID="group-metric-record-sheet">
     <ScrollView contentContainerStyle={{ padding: uiSpace.lg, gap: uiSpace.md }}>
+      {metricOptions && onSelectMetric ? <SegmentedControl accessibilityLabel="Record metric" value={row.metric}
+        options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
+        onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
       <UiText>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</UiText>
       <UiText testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</UiText>
@@ -91,7 +117,8 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       <UiText testID="group-metric-record-status">{active
         ? `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms)}`
         : certification?.end_reason ? `Certification ${certification.end_reason}` : certified ? 'Certified' : 'Uncertified'}</UiText>
-      {readOnly ? <UiText variant="bodyMuted">Read-only · {row.former ? 'former member' : exercise.rebuilding ? 'rules are recalculating' : 'archived or earlier rules'}</UiText> : null}
+      {active && active.rules_revision !== row.rules_revision ? <UiText variant="bodyMuted">Observed under rules {active.rules_revision}; unchanged performance inputs remain attested.</UiText> : null}
+      {readOnly ? <UiText variant="bodyMuted">Read-only · {readOnlyReason ?? (row.former ? 'former member' : exercise.rebuilding ? 'rules are recalculating' : 'archived or earlier rules')}</UiText> : null}
       {online === false ? <UiText variant="bodyMuted">Reconnect to change certification.</UiText> : null}
       {isMine && !certified ? <UiText variant="bodyMuted">Another group member can certify your performance.</UiText> : null}
       {notice ? <GroupWriteNotice {...notice} testID="group-metric-record-notice" /> : null}
@@ -104,6 +131,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         onPress={() => confirmEnd('withdraw')} tone="danger" testID="group-metric-record-withdraw" /> : null}
       {active && myRole && canManageGroup(myRole) && active.certified_by?.user_id !== userId && !readOnly ? <ListRow
         label="Cancel certification" disabled={blocked} onPress={() => confirmEnd('cancel')} tone="danger" testID="group-metric-record-cancel" /> : null}
+      {onHistory ? <ListRow label="View rules history" onPress={onHistory} testID="group-metric-record-history" /> : null}
       <ListRow label="View full session" onPress={() => { onClose(); router.push(`/group-session/${row.member.user_id}/${row.performance.session_id}`); }}
         testID="group-metric-record-session" />
     </ScrollView>

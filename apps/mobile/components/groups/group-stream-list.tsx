@@ -1,3 +1,4 @@
+import { GroupMetricStreamRecordSheet, type MetricStreamRecord } from './group-metric-stream-record-sheet';
 import { isMetricStreamEvent } from '@/src/groups/metric-wire';
 import { GroupMetricStreamCard } from './group-metric-stream-card';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
@@ -68,6 +69,10 @@ export function GroupStreamList({
   contentContainerStyle,
   testID,
 }: GroupStreamListProps) {
+  const [metricSnapshot, setMetricSnapshot] = useState<MetricStreamRecord | null>(null);
+  const liveMetric = metricSnapshot ? stream.items.find((item): item is MetricStreamRecord =>
+    isMetricStreamEvent(item) && item.kind === 'record' && item.key === metricSnapshot.key) ?? metricSnapshot : null;
+  const refreshMetric = async () => { await stream.refresh(); onCertificationChanged(); };
   const certification = useRecordSetCertification({
     myUserId: userId,
     onChanged: onCertificationChanged,
@@ -133,7 +138,9 @@ export function GroupStreamList({
   const renderItem = ({ item }: { item: StreamItemViewModel }) => {
     switch (item.kind) {
       case 'metric_event':
-        return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames} />;
+        return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames}
+          onPress={item.event.kind === 'record' ? () => { if (item.event.kind === 'record') setMetricSnapshot(item.event); } : undefined}
+          pressHint={item.event.kind === 'record' ? 'Opens the recorded performance and certification' : undefined} />;
       case 'session':
         return <GroupStreamSessionCard card={item} onPress={onPressSession} showGroupNames={showGroupNames} />;
       case 'membership':
@@ -173,6 +180,8 @@ export function GroupStreamList({
         style={groupScreenStyles.screen}
         testID={testID}
       />
+      {liveMetric ? <GroupMetricStreamRecordSheet record={liveMetric} userId={userId}
+        myRole={roleForGroup(liveMetric.group.group_id)} onClose={() => setMetricSnapshot(null)} onChanged={refreshMetric} /> : null}
       <RecordSetSheet
         certification={certification}
         detail={sheetDetail}

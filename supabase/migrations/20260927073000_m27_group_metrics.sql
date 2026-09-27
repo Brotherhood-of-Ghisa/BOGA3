@@ -2900,6 +2900,34 @@ revoke all on function app_public.group_metric_certification_get(uuid,uuid) from
 grant execute on function app_public.group_metric_certification_get(uuid,uuid) to anon,authenticated,service_role;
 
 
+-- Mutable presentation context never changes an event's recorded score/pin.
+-- A stream card can inspect/certify a still-standing historic PR even when a
+-- newer All-board best exists. The write RPC rechecks current raw dependencies.
+create function app_public.group_metric_stream_record_context(p_event app_public.group_events)
+returns jsonb language sql stable set search_path = app_public, pg_temp as $$
+  select jsonb_build_object('exercise',app_public.group_exercise_json_v2(ge),
+    'former',app_public.group_active_role(p_event.group_id,p_event.member_user_id) is null,
+    'metrics',coalesce((select jsonb_agg(jsonb_build_object(
+      'metric',b ->> 'metric','fingerprint',b ->> 'fingerprint',
+      'effective_resistance_kg',case when s.metric<>'bodyweight_reps' then s.effective_resistance_kg end,
+      'external_adjustment_kg',s.external_adjustment_kg,
+      'added_percent_bodyweight',case when s.metric<>'bodyweight_reps' then s.added_percent_bodyweight end,
+      'eligible',s.set_id is not null and ge.archived_at is null
+        and ge.rules_revision=p_event.rules_revision and ge.published_rules_revision=ge.rules_revision
+        and app_public.group_active_role(p_event.group_id,p_event.member_user_id) is not null
+        and not exists (select 1 from app_public.group_events v where v.kind='record_voided' and v.related_event_id=p_event.id),
+      'certification',case when c.id is not null then app_public.group_metric_certification_json(c) end
+    ) order by b ->> 'metric')
+      from jsonb_array_elements(p_event.payload -> 'boards') b
+      left join app_public.group_metric_set_scores s on s.group_exercise_id=ge.id
+        and s.rules_revision=p_event.rules_revision and s.member_user_id=p_event.member_user_id
+        and s.set_id=p_event.set_id and s.metric=b ->> 'metric' and s.fingerprint=b ->> 'fingerprint'
+      left join lateral app_public.group_metric_certification_matching(ge.id,p_event.member_user_id,
+        p_event.set_id,b ->> 'metric',b ->> 'fingerprint') c on true),'[]'))
+  from app_public.group_exercises ge where ge.id=p_event.group_exercise_id;
+$$;
+revoke all on function app_public.group_metric_stream_record_context(app_public.group_events) from public,anon,authenticated,service_role;
+
 -- Stream.
 -- v2 stream. Both event families retain explicit original units.
 create function app_public.group_metric_stream_event_json(p_event uuid,p_sort bigint)
@@ -2909,7 +2937,7 @@ returns jsonb language sql stable set search_path = app_public, pg_temp as $$
     'kind',case when e.kind='unlink' then 'link' else e.kind end,
     'event',case when e.kind in ('link','unlink') then e.kind end,
     'group',jsonb_build_object('group_id',e.group_id,'name',g.name),
-    'group_exercise',jsonb_build_object('group_exercise_id',e.group_exercise_id)||r.rules)
+    'group_exercise',jsonb_build_object('group_exercise_id',e.group_exercise_id)||r.rules) || case when e.kind='record' then jsonb_build_object('record_context',app_public.group_metric_stream_record_context(e)) else '{}'::jsonb end
   else app_public.group_stream_event_json(e.id,p_sort)||jsonb_build_object(
     'legacy',true,'rules_revision',r.revision,'group_exercise',
     jsonb_build_object('group_exercise_id',e.group_exercise_id,'name',r.rules -> 'name',

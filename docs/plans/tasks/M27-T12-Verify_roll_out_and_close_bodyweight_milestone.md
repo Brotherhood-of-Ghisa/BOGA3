@@ -1,7 +1,7 @@
 ---
 task_id: M27-T12-Verify_roll_out_and_close_bodyweight_milestone
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|maestro|supabase|deno|sql"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/00-product.md, docs/specs/03-technical-architecture.md
 
 # M27-T12 — Verify, roll out and close the bodyweight milestone
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T01 through M27-T11.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: all M27 decisions and milestone acceptance criteria.
@@ -92,3 +92,17 @@ or lane responsibilities changed (02/registry too if lane definitions changed).
 Mark delivered task entries completed as their cards are deleted; then delete
 this milestone and remaining shipped cards in the closing PR. Evidence remains
 in those PRs and history. Follow AGENTS.md worktree/PR lifecycle to merge/release.
+
+
+## Execution checkpoint (2026-09-27)
+
+Server-first ordering, hosted acceptance and forward-repair boundaries are
+prepared in `RUNBOOK.md`, including the exact M27 migrations and matching
+worker/API source. No hosted deployment or client activation has occurred.
+The first integrated frontend attempt failed Stats because its invalid fixture
+used canonical blank-zero, and catalogue because it reached the dev-client
+launcher. Repairs preserve the invalid-count assertion and establish app
+readiness before catalogue fixture setup. Full fast passes 184 suites / 2,218
+tests (`/tmp/boga-m27-cert-refresh-fast.log`). The dedicated group device lane
+is running before the full frontend rerun. Local and hosted acceptance remain
+open; no task cards are retired yet.

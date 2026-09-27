@@ -642,6 +642,17 @@ EST_CERT="$(certify_metric "$ATHLETE_UID" "$T-est-record" absolute_strength)"
 rpc "$OWNER_TOKEN" group_metric_certification_get "$(jq -nc --arg g "$GID" --arg c "$EST_CERT" '{p_group_id:$g,p_certification_id:$c}')"
 expect_ok 'estimated attestation detail';check 'certification retains estimate provenance' '.certification.includes_body_weight and .certification.performance.body_weight_source=="historical_estimate"'
 drain 'estimated attestation'
+rpc "$OWNER_TOKEN" group_stream_v2 "$(jq -nc --arg g "$GID" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'stream attestation context';assert_wire stream
+check 'stream context preserves score dependencies and live attestation' '
+  first(.items[]|select(.metric_event and .kind=="record" and .group_exercise_id==$x and .set_id==$s))|
+  .performance.body_weight_source=="historical_estimate" and .record_context.exercise.rules_revision==1 and
+  (.record_context.former|not) and
+  (.record_context.metrics[]|select(.metric=="absolute_strength")|
+    .eligible and .effective_resistance_kg==100 and .certification.certification_id==$c and .certification.includes_body_weight)
+' --arg x "$GX" --arg s "$T-est-record-set" --arg c "$EST_CERT"
+EST_STREAM_PIN="$(jq -r --arg s "$T-est-record-set" 'first(.items[]|select(.metric_event and .kind=="record" and .set_id==$s))|.boards[]|select(.metric=="absolute_strength")|.fingerprint' <<<"$BODY")"
+
 EST_RECORDS="$(run_psql "select count(*) from app_public.group_events where group_exercise_id='$GX' and kind='record';")"
 set_body_weight "$ATHLETE_TOKEN" "$T-est-record" 80
 drain 'same amount, corrected provenance'
@@ -650,6 +661,13 @@ expect_sql 'equal numeric score is not a new performed record' "select count(*) 
 metric_board absolute_strength
 check 'current score retains amount with corrected provenance' '.entries[0].effective_resistance_kg==100 and .entries[0].performance.body_weight_source=="manual" and (.entries[0].certified|not)'
 GX="$EST_RETURN_GX"
+rpc "$OWNER_TOKEN" group_stream_v2 "$(jq -nc --arg g "$GID" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'corrected stream context';assert_wire stream
+check 'standing event exposes corrected provenance with a fresh pin and no old attestation' '
+  first(.items[]|select(.metric_event and .kind=="record" and .set_id==$s))|
+  .performance.body_weight_source=="manual" and
+  (.record_context.metrics[]|select(.metric=="absolute_strength")|.eligible and .fingerprint!=$old and .certification==null)
+' --arg s "$T-est-record-set" --arg old "$EST_STREAM_PIN"
 pass 'estimated provenance is visible and dependency-specific attestations follow corrections'
 
 # Mixed legacy/generic readers must decode in the app and page without loss.

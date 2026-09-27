@@ -443,7 +443,7 @@ function TodaySocialSnapshot({
         </Card>
       ) : (
         viewModels.map((item) => {
-          if (item.kind === 'metric_event') return <GroupMetricStreamCard key={item.key} item={item.event} userId={null} showGroupName />;
+          if (item.kind === 'metric_event') return <GroupMetricStreamCard key={item.key} item={item.event} userId={null} showGroupName onPress={() => onOpenGroup(item.event.group.group_id)} pressHint="Opens the group" />;
           if (item.kind === 'session') {
             return (
               <GroupStreamSessionCard

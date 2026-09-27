@@ -7,7 +7,8 @@ import { describeGroupPerformanceWeight, describeGroupRules, formatGroupMetricVa
 import type { GroupMetricStreamItemWire } from '@/src/groups/metric-wire';
 
 /** Event values belong to their recorded rules; opening history preserves that revision. */
-export function GroupMetricStreamCard({ item, userId, showGroupName }: {
+export function GroupMetricStreamCard({ item, userId, showGroupName, onPress, pressHint }: {
+  onPress?: () => void; pressHint?: string;
   item: GroupMetricStreamItemWire; userId: string | null; showGroupName: boolean;
 }) {
   const router = useRouter();
@@ -38,13 +39,13 @@ export function GroupMetricStreamCard({ item, userId, showGroupName }: {
     details.push(describeGroupRules({ ...item.group_exercise, ...item.rules }));
   }
   const accessibilityLabel = [showGroupName ? item.group.name : null, label, item.kind === 'record' ? who : null, context,
-    ...details, formatBoardDate(item.sort_at_ms), 'Opens this rules revision in history'].filter(Boolean).join(', ');
+    ...details, formatBoardDate(item.sort_at_ms), pressHint ?? 'Opens this rules revision in history'].filter(Boolean).join(', ');
   return <Card accessibilityLabel={accessibilityLabel} testID={`group-metric-stream-${item.key}`} style={{ padding: uiSpace.md, gap: uiSpace.sm }}
-    onPress={() => router.push(`/group/${item.group.group_id}/leaderboards/${item.group_exercise_id}/history?metric=${metric}&scope=all&revision=${item.rules_revision}`)}>
+    onPress={onPress ?? (() => router.push(`/group/${item.group.group_id}/leaderboards/${item.group_exercise_id}/history?metric=${metric}&scope=all&revision=${item.rules_revision}`))}>
     {showGroupName ? <UiText variant="subtitle">{item.group.name}</UiText> : null}
     <UiText variant="label">{label}</UiText>
     <UiText>{item.kind === 'record' ? `${who} · ` : ''}{context}</UiText>
     <View style={{ gap: uiSpace.xs }}>{details.map((detail, index) => <UiText key={index} variant="bodyMuted">{detail}</UiText>)}</View>
-    <UiText variant="subtitle">{formatBoardDate(item.sort_at_ms)} · View rules history</UiText>
+    <UiText variant="subtitle">{formatBoardDate(item.sort_at_ms)} · {onPress ? 'View record' : 'View rules history'}</UiText>
   </Card>;
 }

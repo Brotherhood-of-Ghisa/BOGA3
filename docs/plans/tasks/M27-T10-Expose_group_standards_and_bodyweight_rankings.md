@@ -85,6 +85,31 @@ remain explicitly personal and show incomplete volume.
 Full fast passed: 184 suites / 2,214 mobile tests, plus backend fast, metadata,
 consent and MCP checks. Log: `/tmp/boga-m27-comparison-ui-fast-2.log`.
 Full backend passed: `/tmp/boga-m27-group-integration-backend-3.log`.
-Remaining: stream record certification parity, native rendering/interaction
-checks against the accepted target at all three sizes, dedicated two-user M27
-vectors and the full frontend gate. No rendered-completion or shipment claim.
+Stream certification now uses current per-metric context and the shared record
+sheet, with raw/provenance display, metric selection and stale-read protection.
+Frontend fast passed 184 suites / 2,216 tests; full backend passed, including
+real SQL stream decoding, estimated attestation and equal-score provenance
+correction. Logs: `/tmp/boga-m27-stream-cert-fast-frontend-2.log` and
+`/tmp/boga-m27-stream-cert-backend-final.log`.
+
+The existing two-user Maestro flow now targets generic conventional boards and
+separate Weight/1RM attestations while retaining its legacy unlink assertions.
+Its new M27 sequence covers 60/90 kg relative/absolute reversal, personal versus
+group coefficient authority, missing-B reps, estimated-B certification, an
+admin's rules preview/rebuild and corrected-B invalidation. Syntax and metadata
+checks pass (`/tmp/boga-m27-expanded-maestro-meta.log`); the full frontend run
+is underway (`/tmp/boga-m27-comparisons-frontend.log`). Native interaction and
+three-size visual acceptance remain unverified. No shipment claim.
+
+
+Follow-up verification: a regression reproduced an ended certification being
+restored when connectivity changed after a successful write. The sheet now
+retains the latest server end state and follows a replacement attestation on
+unchanged inputs. Full fast passed 184 suites / 2,218 tests, including all
+backend/repository/consent/MCP fast lanes (`/tmp/boga-m27-cert-refresh-fast.log`).
+The first full frontend attempt passed smoke, data smoke, session completion
+and Settings wipe. Stats exposed a stale blank-as-invalid fixture; it now uses
+malformed text while preserving the 15-set assertion. Catalogue stopped in the
+dev-client launcher; its flow now establishes app readiness before fixture
+setup. Both fixes still require the native rerun. The dedicated group lane is
+running at `/tmp/boga-m27-comparison-groups.log`; no device success is claimed.

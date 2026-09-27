@@ -199,12 +199,25 @@ export type GroupMetricCertificationResultWire = {
   contract_version: 2; certification: GroupMetricCertificationWire; created?: boolean;
 };
 
+export type GroupMetricRecordContextWire = {
+  exercise: GroupMetricExerciseWire;
+  former: boolean;
+  metrics: {
+    metric: GroupMetric; fingerprint: string; eligible: boolean;
+    effective_resistance_kg: number | null; external_adjustment_kg: number | null;
+    added_percent_bodyweight: number | null;
+    certification: GroupMetricCertificationWire | null;
+  }[];
+};
+
 type MetricLinkEvent = Extract<GroupMetricEventWire, { kind: 'link' | 'unlink' }>;
 export type GroupMetricStreamItemWire = (
   Exclude<GroupMetricEventWire, MetricLinkEvent> |
   (Omit<MetricLinkEvent, 'kind'> & { kind: 'link'; event: 'link' | 'unlink' })
 ) & {
   metric_event: true;
+  /** Missing in older cached v2 pages: details remain read-only until refreshed. */
+  record_context?: GroupMetricRecordContextWire;
   key: string;
   group: GroupRef;
   group_exercise: GroupMetricRulesWire & { group_exercise_id: string; name: string };

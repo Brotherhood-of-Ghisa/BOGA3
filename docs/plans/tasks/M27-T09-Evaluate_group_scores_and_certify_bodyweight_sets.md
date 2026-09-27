@@ -91,6 +91,6 @@ The earlier fast run passed before UI integration; the later full fast gate
 passed with 184 mobile suites / 2,214 tests at this working checkpoint:
 `/tmp/boga-m27-comparison-ui-fast-2.log`. Timings and trigger rules ran.
 
-T10 rendering, metric stream certification controls and new two-user device
+T10 native rendering and new two-user device
 proof remain in progress. Hosted rollout and final frontend acceptance are
 pending; neither task is shipped.

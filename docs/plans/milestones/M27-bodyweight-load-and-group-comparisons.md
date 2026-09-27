@@ -395,7 +395,11 @@ is complete merely because a downstream closeout card lists its tests.
   certification and metric stream rendering are integrated. Full fast passed
   (184 mobile suites / 2,214 tests), including backend fast and metadata/consent/
   MCP checks; log `/tmp/boga-m27-comparison-ui-fast-2.log`. Stream certification
-  parity, native visual proof and final frontend/two-user acceptance remain.
+  parity is integrated with current context and stale-read protection; frontend
+  fast passed 184 suites / 2,216 tests and full backend passed again
+  (`/tmp/boga-m27-stream-cert-fast-frontend-2.log`,
+  `/tmp/boga-m27-stream-cert-backend-final.log`). The expanded two-user flow has
+  syntax/meta proof; native visual and final frontend acceptance remain.
   Timings and required-gate rules ran. These changes are not shipped.
 
 ## Milestone acceptance

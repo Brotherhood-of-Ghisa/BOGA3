@@ -724,6 +724,9 @@ Owners/admins review coefficient, movement/loading standard and external input
 convention before applying a revision. Linking preserves personal settings and
 explains incompatible variants. The record sheet exposes raw units/mode, saved
 session B/provenance, group rules and the dependencies that certification pins.
+Board rows and stream records use the same certification actions; a record with
+multiple achieved metrics selects and attests them separately. Cached records
+without current eligibility context offer read-only details until refreshed.
 Prior revisions and original kg-only retirement scores are read-only history.
 Full boards/history remain online reads; catalogue, podium and stream caches
 use their versioned keys. Native acceptance of this M27 extension is in progress.

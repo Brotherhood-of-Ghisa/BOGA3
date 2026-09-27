@@ -705,6 +705,8 @@ selector retains the full accessible meaning; labels never crowd the number.
   group paging/state recipes, unit-aware rows, revision history and input-pinned
   certification. Legacy board components remain for original comparisons.
 - `GroupMetricStreamCard` preserves the recorded metric/unit/revision and gives
-  rules, voids and link changes their own explanatory text.
+  rules, voids and link changes their own explanatory text. Record cards open
+  `GroupMetricStreamRecordSheet`, which selects each achieved metric and adapts
+  the current attestation context into the shared record sheet.
 - `metric-view-model.ts` owns metric labels, saved-B provenance, raw performance,
   accessibility summaries and mixed legacy/metric podium formatting.

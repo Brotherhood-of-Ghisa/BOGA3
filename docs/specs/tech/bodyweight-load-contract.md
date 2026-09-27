@@ -276,7 +276,9 @@ so unlinking need not falsify a historical observation. The database publisher,
 versioned RPC readers, metric attestations and typed client are implemented in
 `20260927073000_m27_group_metrics.sql` and the existing Edge worker. Their
 compatibility and publication boundary is specified in the groups contract §11.
-Backend integration proof, group screens and hosted rollout remain in progress.
+Backend integration gates pass. Group editors, metric boards/history and board/stream
+certification are integrated; native visual/interaction proof and hosted rollout
+remain in progress.
 
 | Metric key | Unit | Eligibility / default |
 | --- | --- | --- |
