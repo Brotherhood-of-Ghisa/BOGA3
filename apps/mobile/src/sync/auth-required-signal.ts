@@ -6,7 +6,7 @@
 // invisible to anything watching the cycle for an exception.
 //
 // This module turns that outcome into an explicit, subscribable signal: the
-// route-layer auth guard reads it to send the user to the sign-in entry point,
+// root route access reads it to send the user to the sign-in entry point,
 // and any caller that successfully establishes a session clears it so a later
 // authenticated cycle starts from a clean slate. It carries no user data — just
 // a boolean edge — and is deliberately module-scoped so the cycle (which has no

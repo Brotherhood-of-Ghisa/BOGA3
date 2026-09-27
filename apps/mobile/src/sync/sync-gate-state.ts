@@ -45,6 +45,12 @@ export interface SyncGateStateSnapshot {
    * is reachable in a release build).
    */
   forcedProgress?: SyncProgress | null;
+  /**
+   * False only until the bridge has first read the persisted flag (or the data
+   * layer failed to come up): before that, `bootstrapCompletedAt: null` means
+   * "unknown", not "not synced". Omitted means known.
+   */
+  bootstrapFlagKnown?: boolean;
 }
 
 /** The snapshot returned before any cycle has reported anything. */
@@ -52,6 +58,7 @@ const INITIAL_SNAPSHOT: SyncGateStateSnapshot = {
   bootstrapCompletedAt: null,
   lastCycleErrorCode: null,
   forcedProgress: null,
+  bootstrapFlagKnown: false,
 };
 
 type Listener = () => void;

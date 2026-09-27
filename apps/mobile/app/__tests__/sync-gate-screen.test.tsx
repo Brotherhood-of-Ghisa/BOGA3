@@ -1,7 +1,6 @@
 /* eslint-disable import/first */
 
 const mockUseAuth = jest.fn();
-let mockPathname = '/stats-history';
 const mockRequestSync = jest.fn();
 
 jest.mock('@/src/auth', () => ({
@@ -58,25 +57,13 @@ jest.mock('@/src/logging/logEvent', () => ({
   logEvent: () => Promise.resolve(),
 }));
 
-jest.mock('expo-router', () => {
-  const React = jest.requireActual<typeof import('react')>('react');
-  const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
-  const Redirect = ({ href }: { href: string }) =>
-    React.createElement(Text, { testID: 'sync-gate-redirect' }, href);
-  Redirect.displayName = 'MockRedirect';
-  return {
-    Redirect,
-    usePathname: () => mockPathname,
-  };
-});
-
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { uiRoles } from '@/components/ui';
 import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
 import { startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
-import { SyncGate, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
+import { SyncSetupScreen, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
 import {
   __resetSyncGateStateForTests,
   publishSyncGateState,
@@ -90,15 +77,9 @@ type AuthValue = {
 
 const signedInAuth: AuthValue = { isConfigured: true, session: { user: { id: 'user-1' } } };
 
-const childTestId = 'sync-gate-child';
-const redirectTestId = 'sync-gate-redirect';
-
-const renderGate = () =>
-  render(
-    <SyncGate>
-      <Text testID={childTestId}>data screen</Text>
-    </SyncGate>,
-  );
+// Which routes exist around the block (sign-in, the block, or the app) is the root
+// stack's decision, covered by root-route-access.test.ts and root-stack-routing.test.tsx.
+const renderGate = () => render(<SyncSetupScreen />);
 
 /**
  * Publishes a fresh gate-state snapshot (and, when given, the progress the
@@ -122,11 +103,10 @@ const publish = (overrides: {
   });
 };
 
-describe('SyncGate', () => {
+describe('SyncSetupScreen', () => {
   beforeEach(() => {
     mockUseAuth.mockReset();
     mockUseAuth.mockReturnValue(signedInAuth);
-    mockPathname = '/stats-history';
     mockRequestSync.mockReset();
     mockProgress = INITIAL_SYNC_PROGRESS;
     __resetSyncGateStateForTests();
@@ -136,35 +116,6 @@ describe('SyncGate', () => {
     renderGate();
 
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.block)).toBeTruthy();
-    expect(screen.queryByTestId(childTestId)).toBeNull();
-  });
-
-  it('dismisses the block and renders the app once the bootstrap flag is set', () => {
-    renderGate();
-    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.block)).toBeTruthy();
-
-    publish({ bootstrapCompletedAt: new Date(1_700_000_000_000) });
-
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
-  });
-
-  it('does not block when auth is unconfigured (no sync will ever set the flag)', () => {
-    mockUseAuth.mockReturnValue({ isConfigured: false, session: null });
-
-    renderGate();
-
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
-  });
-
-  it('does not block a signed-out user (the auth guard handles that redirect)', () => {
-    mockUseAuth.mockReturnValue({ isConfigured: true, session: null });
-
-    renderGate();
-
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
   });
 
   it('renders the current phase label from the progress snapshot', () => {
@@ -225,7 +176,14 @@ describe('SyncGate', () => {
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.block)).toBeTruthy();
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityIndicator)).toBeTruthy();
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.offlineMessage)).toBeNull();
-    expect(screen.queryByTestId(childTestId)).toBeNull();
+  });
+
+  it('renders no Retry for a "no signed-in user" outcome (that routes to sign-in)', () => {
+    renderGate();
+
+    publish({ lastCycleErrorCode: 'AUTH_REQUIRED' });
+
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeNull();
   });
 
   it('explains a required update without offering a futile retry', () => {
@@ -264,54 +222,9 @@ describe('SyncGate', () => {
     expect(mockRequestSync).toHaveBeenCalledTimes(1);
   });
 
-  it('routes to sign-in and renders no Retry when the latest outcome is AUTH_REQUIRED', () => {
-    renderGate();
-
-    publish({ lastCycleErrorCode: 'AUTH_REQUIRED' });
-
-    expect(screen.getByTestId(redirectTestId).props.children).toBe('/sign-in');
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeNull();
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-  });
-
-  it('renders the sign-in route through rather than blocking or looping on it', () => {
-    mockPathname = '/sign-in';
-    renderGate();
-
-    publish({ lastCycleErrorCode: 'AUTH_REQUIRED' });
-
-    expect(screen.queryByTestId(redirectTestId)).toBeNull();
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
-  });
-
-  it('renders the test-harness route through the block so it can lift the gate', () => {
-    // The harness is the screen that flips the first-sync flag; if the block hid
-    // it, nothing could ever mount to lift the block. So even with the flag null
-    // and a non-auth error pending, the harness route renders through.
-    mockPathname = '/maestro-harness';
-    renderGate();
-
-    publish({ lastCycleErrorCode: 'INTERNAL' });
-
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-    expect(screen.queryByTestId(redirectTestId)).toBeNull();
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
-  });
-
-  it('renders the test-harness route through when Expo exposes the dev-client path prefix', () => {
-    mockPathname = '/--/maestro-harness';
-    renderGate();
-
-    publish({ lastCycleErrorCode: 'INTERNAL' });
-
-    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.block)).toBeNull();
-    expect(screen.queryByTestId(redirectTestId)).toBeNull();
-    expect(screen.getByTestId(childTestId)).toBeTruthy();
-  });
 });
 
-describe('SyncGate on the live scheduler network projection', () => {
+describe('SyncSetupScreen on the live scheduler network projection', () => {
   const reportNetwork = (isConnected: boolean | null) => {
     if (mockNetInfo.listener === null) {
       throw new Error('the scheduler did not register a NetInfo listener');
@@ -337,7 +250,6 @@ describe('SyncGate on the live scheduler network projection', () => {
     jest.useFakeTimers();
     mockUseAuth.mockReset();
     mockUseAuth.mockReturnValue(signedInAuth);
-    mockPathname = '/stats-history';
     __resetSyncGateStateForTests();
     mockUseLiveScheduler = true;
     startSyncScheduler();

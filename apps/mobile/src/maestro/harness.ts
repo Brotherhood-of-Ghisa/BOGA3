@@ -262,6 +262,7 @@ export const runMaestroHarnessBootstrapAction = async (
   publishSyncGateState({
     ...getSyncGateStateSnapshot(),
     bootstrapCompletedAt,
+    bootstrapFlagKnown: true,
   });
 };
 

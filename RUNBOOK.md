@@ -828,6 +828,8 @@ Never reset the hosted database for this cutover.
    ```bash
    ./boga worktree create --from 11509384 codex/bodyweight-compat-release
    # cd to the exact worktree path printed above
+   # This isolated compatibility commit predates the Expo SDK 57 upgrade.
+   ./boga ios build-client --force
    ./boga test fast
    ./boga test frontend
    ./boga sweep --ref 11509384
@@ -890,9 +892,14 @@ Never reset the hosted database for this cutover.
    null. Re-run the hosted OAuth/discovery/revocation checks above.
 
 4. **Release the dated client.** From the reviewed implementation checkout after
-   local gates and the sweep pass:
+   local gates and the sweep pass, restore its SDK 57 simulator client if the
+   compatibility release rebuilt the shared cache. Verify that native build
+   before the store build:
 
    ```bash
+   ./boga ios build-client --force
+   release_ref="$(git rev-parse HEAD)"
+   ./boga sweep --ref "$release_ref"
    cd apps/mobile
    npx eas-cli build --platform ios --profile prod --local --output /tmp/boga-dated-bodyweight.ipa
    npx eas-cli submit --platform ios --profile prod --path /tmp/boga-dated-bodyweight.ipa

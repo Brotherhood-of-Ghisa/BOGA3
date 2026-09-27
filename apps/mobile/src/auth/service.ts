@@ -115,13 +115,10 @@ const handleAuthStateChange = (_event: AuthChangeEvent, session: Session | null)
 
   // A live session definitively resolves any earlier "no signed-in user" signal a
   // pre-sign-in cycle raised. Clear it here — synchronously with the session
-  // becoming live, before the snapshot below is emitted — so the route guard
-  // never observes the contradictory (session present + auth-required) state.
-  // That state pits two redirects against each other (the sign-in screen leaves
-  // on a live session; the guard returns to it while auth-required is set) and
-  // spins React into a "Maximum update depth exceeded" loop. The sign-in handler
-  // also clears the flag, but it runs a tick too late: the SIGNED_IN event
-  // re-renders the tree before that clear lands, so the loop has already started.
+  // becoming live, before the snapshot below is emitted — so the root stack never
+  // sees the contradictory (session present + auth-required) state, which keeps
+  // the user on sign-in. The sign-in handler also clears the flag, but a tick
+  // later: the SIGNED_IN event re-renders the tree before that clear lands.
   if (nextUserId !== null) {
     clearAuthRequired();
 

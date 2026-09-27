@@ -79,12 +79,16 @@ export default ({ config }: { config: ExpoConfig }) => ({
     // keeps that chrome consistent with the tokens in
     // components/ui/tokens.ts, which have no dark variants.
     userInterfaceStyle: "light",
-    newArchEnabled: true,
 
     ios: {
         supportsTablet: true,
         infoPlist: {
-            ITSAppUsesNonExemptEncryption: false
+            ITSAppUsesNonExemptEncryption: false,
+            // Development builds only (expo-dev-menu reads it as its default): no
+            // floating "Dev tools" button, which SDK 57's dev menu adds over the
+            // top-right of every screen, where it takes taps meant for header
+            // actions like Finish. The menu still opens by shake or ^D.
+            EXDevMenuShowFloatingActionButton: false
         },
         bundleIdentifier: process.env.IOS_BUNDLE_ID ?? "com.anonymous.boga3",
         buildNumber: process.env.IOS_BUILD_NUMBER ?? "1"
@@ -98,7 +102,6 @@ export default ({ config }: { config: ExpoConfig }) => ({
             backgroundImage: "./assets/images/android-icon-background.png",
             monochromeImage: "./assets/images/android-icon-monochrome.png"
         },
-        edgeToEdgeEnabled: true,
         predictiveBackGestureEnabled: false
     },
 

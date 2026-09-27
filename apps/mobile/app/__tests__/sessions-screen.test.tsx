@@ -16,9 +16,6 @@ jest.mock('expo-router', () => ({
     dismissTo: mockDismissTo,
     push: mockPush,
   }),
-}));
-
-jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => true,
 }));
 
