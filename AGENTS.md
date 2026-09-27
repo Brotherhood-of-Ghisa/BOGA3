@@ -128,9 +128,9 @@ migrations, specs, or other docs — state the rule itself in the owning spec.
 Commit messages and PR bodies may cite them. `docs-check` enforces the path half.
 
 **Task protocol.** When the user wants to plan multi-PR work together, or hands
-you a task card to execute, offer the protocol in
-[`.claude/skills/task-protocol/SKILL.md`](.claude/skills/task-protocol/SKILL.md)
-(Claude Code: `/task-protocol`): plan together → one session per task → task-level
+you a task card to execute, offer the task protocol in
+[`docs/plans/README.md`](docs/plans/README.md#task-protocol-boga)
+(Claude Code: the user-level `/task-protocol` skill): plan together → one session per task → task-level
 design → build → review agent → PR → user review → merge → offer next cards →
 clean up the worktree and its stack.
 
