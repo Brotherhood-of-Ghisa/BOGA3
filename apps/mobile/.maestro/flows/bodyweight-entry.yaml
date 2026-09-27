@@ -1,5 +1,9 @@
 appId: com.dinoderek.mobile
 ---
+# Weight-entry sheets shrink below screen center when their keyboard closes.
+# Dismiss each keyboard explicitly before navigation, and locate sheet fields
+# without centering swipes through the backdrop. Decimal pads use the neutral
+# field label; the single-line date field uses its native Return key.
 # M27: real local entry, history, frozen new-session context and explicit correction.
 # Infra-free: writes do not depend on auth/server availability. Start/end reset.
 - runScript: ../scripts/bodyweight-dates.js
@@ -63,17 +67,21 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-value"
     direction: UP
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-value"
 - eraseText
 - inputText: "0"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "weight-entry-save"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-save"
@@ -84,27 +92,27 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-value"
     direction: UP
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-value"
 - eraseText
 - inputText: "80"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "weight-entry-date"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-date"
 - eraseText
 - inputText: "${output.bodyweightFuture}"
-# The date keyboard has a prediction row and covers Save on the small phone.
-# A neutral content tap dismisses it before locating the action. Do not
-# center Save: on the large phone the resulting short sheet is below screen center.
-- tapOn:
-    text: "Local time · YYYY-MM-DD HH:mm"
+- pressKey: Enter
 - waitForAnimationToEnd:
     timeout: 4000
 - scrollUntilVisible:
@@ -122,17 +130,13 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-date"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-date"
 - eraseText
 - inputText: "${output.bodyweightPast}"
-# The date keyboard has a prediction row and covers Save on the small phone.
-# A neutral content tap dismisses it before locating the action. Do not
-# center Save: on the large phone the resulting short sheet is below screen center.
-- tapOn:
-    text: "Local time · YYYY-MM-DD HH:mm"
+- pressKey: Enter
 - waitForAnimationToEnd:
     timeout: 4000
 - scrollUntilVisible:
@@ -225,17 +229,21 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-value"
     direction: UP
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-value"
 - eraseText
 - inputText: "85"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "weight-entry-save"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-save"
@@ -378,17 +386,21 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-value"
     direction: UP
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-value"
 - eraseText
 - inputText: "82"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "weight-entry-save"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-save"
