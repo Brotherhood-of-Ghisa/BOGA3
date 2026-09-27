@@ -135,9 +135,14 @@ e_reading() {
         created_at:$c,updated_at:$c,deleted_at:null}}'
 }
 performance() {
-  local token="$1" sid="$2" def="$3" b="$4" amount="$5" reps="$6" mode="${7:-added}" unit="${8:-kg}" at
+  local token="$1" sid="$2" def="$3" b="$4" amount="$5" reps="$6" mode="${7:-added}" unit="${8:-kg}" at clock_at
   next_cuam
-  START=$((START+1000));at="$START"
+  # A slow machine may advance past the synthetic sequence between group
+  # joins. New performances must follow the actual membership start too.
+  clock_at="$(now_ms)"
+  START=$((START+1000))
+  if (( START <= clock_at )); then START=$((clock_at+1000)); fi
+  at="$START"
   # Missing-context sessions precede the owner's timeline. Other sessions have
   # distinct instants so later readings cannot change the earlier assertions.
   if [[ "$b" == null ]]; then MISSING_START=$((MISSING_START+1000));at="$MISSING_START"; fi
@@ -635,13 +640,13 @@ pass 'generic conventional carry, link/unlink, certificate roles and final delet
 
 # Dated provenance is part of a strength attestation even when the numeric
 # score is unchanged. Moving the reading changes the dependency pin.
-EST_RETURN_GX="$GX";GX="$(create_comparison "$OWNER_TOKEN" "$GID" 1)";DE="$T-estimate-def"
+EST_RETURN_GX="$GX";GX="$(create_comparison "$OWNER_TOKEN" "$GID" 1)";EST_GX="$GX";DE="$T-estimate-def"
 next_cuam
 push "$ATHLETE_TOKEN" 'estimated comparison definition' \
   "$(e_def "$DE" 'Estimate provenance' "$CUAM" total_load | jq '.fields += {bodyweight_coefficient:1,movement_standard:"strict_pullup",loading_method:"belt"}')" \
   "$(e_link "$DE" "$GID" "$GX" "$CUAM")"
 # Establish publication before the completed improvement, to exercise records.
-performance "$ATHLETE_TOKEN" "$T-est-base" "$DE" 80 0 5
+performance "$ATHLETE_TOKEN" "$T-est-base" "$DE" 60 0 5
 drain 'estimate baseline'
 performance "$ATHLETE_TOKEN" "$T-est-record" "$DE" 80 20 5
 drain 'estimated strength result'
@@ -680,6 +685,52 @@ check 'standing event exposes corrected provenance with a fresh pin and no old a
   (.record_context.metrics[]|select(.metric=="absolute_strength")|.eligible and .fingerprint!=$old and .certification==null)
 ' --arg s "$T-est-record-set" --arg old "$EST_STREAM_PIN"
 pass 'estimated provenance is visible and dependency-specific attestations follow corrections'
+
+# Cross the session boundary and tombstone/restore the source through real sync.
+# Both strength and a reps-only set share the same dated context.
+GX="$EST_GX";DTR="$T-dated-rival-def"
+next_cuam
+push "$RIVAL_TOKEN" 'dated mutation rival definition' \
+  "$(e_def "$DTR" 'Dated rival' "$CUAM" total_load | jq '.fields += {bodyweight_coefficient:1,movement_standard:"strict_pullup",loading_method:"belt"}')" \
+  "$(e_link "$DTR" "$GID" "$GX" "$CUAM")"
+performance "$RIVAL_TOKEN" "$T-dated-rival" "$DTR" 80 15 5
+next_cuam
+push "$ATHLETE_TOKEN" 'reps-only set sharing the dated source' \
+  "$(e_set "$T-est-record-reps-set" "$T-est-record-se" 1 0 6 '' "$CUAM" | jq '.fields += {weight_unit:"kg",external_load_mode:"added"}')"
+drain 'dated mutation candidates'
+DATED_REPS_CERT="$(certify_metric "$ATHLETE_UID" "$T-est-record-reps" bodyweight_reps)"
+DATED_RAW="$(run_psql "select jsonb_agg(to_jsonb(s) order by s.id) from app_public.exercise_sets s where s.session_exercise_id='$T-est-record-se';")"
+DATED_START="$(run_psql "select started_at from app_public.sessions where id='$T-est-record';")"
+for mutation in redate delete; do
+  metric_board absolute_strength
+  check 'dated source puts athlete first' '.entries[0].member.user_id==$u and .entries[0].effective_resistance_kg==100' --arg u "$ATHLETE_UID"
+  DATED_STRENGTH_CERT="$(certify_metric "$ATHLETE_UID" "$T-est-record" absolute_strength)"
+  drain 'dated mutation attestations'
+  DATED_EVENT="$(run_psql "select e.id from app_public.group_events e where e.group_exercise_id='$GX' and e.kind='record' and e.set_id='$T-est-record-set' and not exists(select 1 from app_public.group_events v where v.related_event_id=e.id and v.kind='record_voided') order by e.seq desc limit 1;")"
+  [[ -n "$DATED_EVENT" ]] || fail 'missing live strength record before reading mutation'
+  next_cuam
+  if [[ "$mutation" == redate ]]; then
+    push "$ATHLETE_TOKEN" 'move reading after shared session' "$(e_reading "$T-est-record-reading" "$((DATED_START+1))" 80)"
+  else
+    push "$ATHLETE_TOKEN" 'delete applicable reading' "$(e_reading "$T-est-record-reading" "$EST_AT" 80 | jq --argjson t "$CUAM" '.fields.deleted_at=$t')"
+  fi
+  drain "reading $mutation recalculates shared comparisons"
+  metric_board absolute_strength
+  check 'earlier source reranks athlete below rival' '.entries[0].member.user_id==$r and (.entries[]|select(.member.user_id==$a)|.effective_resistance_kg==80 and .performance.body_weight_kg==60)' --arg r "$RIVAL_UID" --arg a "$ATHLETE_UID"
+  expect_sql "$mutation voids strength certificate" "select end_reason from app_public.group_metric_certifications where id='$DATED_STRENGTH_CERT';" voided
+  expect_sql "$mutation preserves reps certificate" "select ended_at is null from app_public.group_metric_certifications where id='$DATED_REPS_CERT';" t
+  expect_sql "$mutation appends record void" "select count(*) from app_public.group_events where related_event_id='$DATED_EVENT' and kind='record_voided';" 1
+  next_cuam
+  push "$ATHLETE_TOKEN" "restore source after $mutation" "$(e_reading "$T-est-record-reading" "$EST_AT" 80)"
+  drain "reading restoration after $mutation"
+  metric_board absolute_strength
+  check 'restoration restores ranking without reviving strength attestation' '.entries[0].member.user_id==$u and .entries[0].effective_resistance_kg==100 and (.entries[0].certified|not)' --arg u "$ATHLETE_UID"
+  expect_sql 'reading restoration never revives a voided certificate' "select end_reason from app_public.group_metric_certifications where id='$DATED_STRENGTH_CERT';" voided
+  expect_sql 'reps certificate survives restored context' "select ended_at is null from app_public.group_metric_certifications where id='$DATED_REPS_CERT';" t
+  expect_sql 'reading mutation never rewrites raw sets' "select jsonb_agg(to_jsonb(s) order by s.id) from app_public.exercise_sets s where s.session_exercise_id='$T-est-record-se';" "$DATED_RAW"
+done
+GX="$EST_RETURN_GX"
+pass 'reading boundary edits, deletion and restoration rerank, diff events and preserve reps attestations'
 
 # Mixed legacy/generic readers must decode in the app and page without loss.
 rpc "$OWNER_TOKEN" group_exercise_create "$(jq -nc --arg g "$GID" '{p_group_id:$g,p_name:"Still legacy",p_load_input_mode:"total_load",p_source_exercise_id:null}')"
