@@ -134,3 +134,13 @@ Full fast passed (178 suites / 2,127 mobile tests), including the real upgrade
 and independent review vectors, consent-web and MCP checks. Log:
 `/tmp/boga-m27-offline-fast-final.log`. Backend and three-size native verification
 are pending; this follow-up is not yet complete.
+
+First offline small-phone attempt: entry passed; logging reached the replacement
+notice but Preview still had an unkept current selection, so the intended
+partial-tuple assertion failed. The remaining flows were covered by the still
+open review modal and timed out; their screenshots confirm that cascade. Evidence:
+`M27-offline-small/20260927-031048-55068/`, log
+`/tmp/boga-m27-offline-small-verified.log`. The flow now checks each chosen
+meaning/unit/row and the kept-choice count, and runs the offline scenario first
+within logging to diagnose failures earlier. Full native verification remains
+pending; no assertion or guard was removed.
