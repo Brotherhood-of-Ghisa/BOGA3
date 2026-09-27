@@ -95,3 +95,13 @@ and MCP smoke. Frontend and three-size visual verification remain pending. Logs:
 No shipping completion is claimed. The pre-upgrade offline metadata review gap remains an explicit
 integration follow-up: do not resolve unknown actual/planned fields using
 migration defaults or infer server absence from a missing bootstrap marker.
+
+Small-phone inspection at `3ac03a6` found the logger amount label wrapping
+inside its fixed-height field and crowding the numeric value. Entry and logging
+flows passed, but the remaining run was deliberately interrupted (backfill
+rc=130) to repair this observed layout defect. The visible labels are now
+`Added · kg/lb` and `Assist · kg/lb`, with full meaning/unit accessibility
+labels. Full fast passed again (178 suites / 2,114 mobile tests), including
+repository, consent and MCP checks: `/tmp/boga-m27-analytics-fast-labels.log`.
+Fresh three-size/native verification is pending. Initial
+evidence: `M27-analytics-small/20260927-020406-61533/`, BWL04/BWL06.

@@ -29,10 +29,13 @@ beforeEach(() => { jest.clearAllMocks(); data.listLegacyLoads.mockResolvedValue(
 it('shows total resistance while added/assisted input stays positive and explicitly unit-labelled', () => {
   const view = render(<SetLogger {...props} />);
   expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM 127.7 · VOL 800');
-  expect(screen.getByText('Added weight · kg')).toBeTruthy();
+  expect(screen.getByText('Added · kg')).toBeTruthy();
+  expect(screen.getByLabelText('Set 1 added weight in kg')).toBeTruthy();
   fireEvent.press(screen.getByTestId('exercise-set-load-mode-assistance'));
   expect(props.onChangeLoad).toHaveBeenCalledWith({ externalLoadMode: 'assistance' });
   view.rerender(<SetLogger {...props} externalLoadMode="assistance" />);
+  expect(screen.getByText('Assist · kg')).toBeTruthy();
+  expect(screen.getByLabelText('Set 1 assistance in kg')).toBeTruthy();
   expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM 76.6 · VOL 480');
   expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('20');
   fireEvent.press(screen.getByTestId('exercise-set-unit-lb'));

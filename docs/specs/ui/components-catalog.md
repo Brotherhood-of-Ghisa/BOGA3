@@ -689,3 +689,8 @@ If a task adds/removes/renames reusable UI components or changes their role, upd
   `bodyweight-analytics-formatting.test.ts`, `bodyweight-loading-estimate-ui.test.tsx`
   and existing screen tests. `bodyweight-analytics.yaml` extends ios-bodyweight
   with records/history/calculator/correction/Stats/share device evidence.
+
+The bodyweight logger’s fixed-height amount field uses `Added · kg/lb` or
+`Assist · kg/lb` so the legend stays on one line at 375pt. Its accessibility
+label spells out added weight or assistance and the selected unit. The mode
+selector retains the full accessible meaning; labels never crowd the number.
