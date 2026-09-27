@@ -688,9 +688,10 @@ appId: com.dinoderek.mobile
 - stopApp
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
 # XCTest can briefly invalidate its accessibility root after a process restart.
-# Retry only this read-only readiness check; persisted-data assertions follow.
+# HTTP 500 returns before extendedWaitUntil's deadline; allow the native tree
+# to recover across five bounded retries. Persisted-data assertions follow.
 - retry:
-    maxRetries: 2
+    maxRetries: 5
     commands:
       - waitForAnimationToEnd:
           timeout: 4000
