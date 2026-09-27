@@ -42,26 +42,31 @@ trap cleanup EXIT
 mkdir -p "$STUB_BIN"
 export PATH="$STUB_BIN:$PATH"
 
+# The npx cache, laid out like the real one: argv of each layer matches production.
+SHIM="$STUB_BIN/_npx/node_modules/.bin/supabase"
+CLI="$STUB_BIN/_npx/node_modules/@supabase/cli-stub/bin/supabase"
+mkdir -p "$(dirname "$SHIM")" "$(dirname "$CLI")"
+
 # npx -y supabase@<v> <args>: `functions serve` runs the shim as a foreground
 # child (no signal forwarding, like npm exec); `status -o env` prints the env
 # local-runtime-up.sh reads; everything else (start, stop) is a no-op.
-cat >"$STUB_BIN/npx" <<'EOF'
+cat >"$STUB_BIN/npx" <<EOF
 #!/usr/bin/env bash
 shift 2
-case "$1 ${2:-}" in
-  "functions serve") "$(dirname "$0")/node-shim" "$@" ;;
-  "status -o") printf 'API_URL="http://127.0.0.1:9"\nANON_KEY="stub-anon"\n' ;;
+case "\$1 \${2:-}" in
+  "functions serve") "$SHIM" "\$@" ;;
+  "status -o") printf 'API_URL="http://127.0.0.1:9"\\nANON_KEY="stub-anon"\\n' ;;
 esac
 EOF
-cat >"$STUB_BIN/node-shim" <<'EOF'
+cat >"$SHIM" <<EOF
 #!/usr/bin/env bash
-"$(dirname "$0")/supabase-cli" "$@"
+"$CLI" "\$@"
 EOF
 # The CLI tails its edge-runtime container with `docker logs -f` in a separate
 # process group, named after the worktree dir so each tree is identifiable.
-cat >"$STUB_BIN/supabase-cli" <<'EOF'
+cat >"$CLI" <<EOF
 #!/usr/bin/env bash
-perl -e 'setpgrp; exec @ARGV' "$(dirname "$0")/docker" logs -f --timestamps "supabase_edge_runtime_$(basename "$PWD")" &
+perl -e 'setpgrp; exec @ARGV' "$STUB_BIN/docker" logs -f --timestamps "supabase_edge_runtime_\$(basename "\$PWD")" &
 while :; do sleep 1; done
 EOF
 cat >"$STUB_BIN/docker" <<'EOF'
@@ -69,7 +74,7 @@ cat >"$STUB_BIN/docker" <<'EOF'
 while :; do sleep 1; done
 EOF
 printf '#!/usr/bin/env bash\nexit 0\n' >"$STUB_BIN/curl"
-chmod +x "$STUB_BIN"/*
+chmod +x "$STUB_BIN"/* "$SHIM" "$CLI"
 
 # ---------- scaffold: a leased worktree holding the real runtime scripts ----------
 mkdir -p "$ROOT/scripts" "$ROOT/supabase/scripts" "$ROOT/supabase/functions" "$ROOT/apps/mobile" "$OTHER"
@@ -138,7 +143,7 @@ if out="$("$ROOT/supabase/scripts/local-runtime-down.sh" 2>&1)"; then pass "loca
 [[ "$(serve_pids "$OTHER" | sort | tr '\n' ' ')" == "$other_before" ]] && pass "other worktree's server untouched" || fail "other worktree's server changed"
 
 echo "== a server that ignores SIGTERM is SIGKILLed"
-cat >"$STUB_BIN/supabase-cli" <<'EOF'
+cat >"$CLI" <<'EOF'
 #!/usr/bin/env bash
 trap '' TERM
 while :; do sleep 1; done
@@ -147,6 +152,13 @@ launch_serve "$ROOT"
 wait_for_count "$ROOT" 3 && pass "TERM-ignoring tree up" || fail "tree has $(count "$ROOT") processes, want 3"
 if out="$(BOGA_FUNCTIONS_SERVE_STOP_SECONDS=1 "$ROOT/supabase/scripts/local-runtime-down.sh" 2>&1)"; then pass "local-runtime-down.sh exit 0"; else fail "local-runtime-down.sh failed"; echo "$out" | sed 's/^/      | /' >&2; fi
 grep -qF "sending SIGKILL" <<<"$out" && pass "escalated to SIGKILL" || fail "no SIGKILL escalation logged"
+[[ "$(count "$ROOT")" == 0 ]] && pass "no server process survives" || fail "survivors: $(serve_pids "$ROOT" | tr '\n' ' ')"
+
+echo "== a caller whose own command line mentions functions serve is not a match"
+launch_serve "$ROOT"
+wait_for_count "$ROOT" 3 && pass "server tree up" || fail "tree has $(count "$ROOT") processes, want 3"
+out="$(cd "$ROOT" && BOGA_FUNCTIONS_SERVE_STOP_SECONDS=1 bash -c ': npx -y supabase@99.0.0 functions serve; "$0"; echo CALLER-SURVIVED' "$ROOT/supabase/scripts/local-runtime-down.sh" 2>&1)" || true
+grep -qF CALLER-SURVIVED <<<"$out" && pass "calling shell survived local-runtime-down.sh" || { fail "calling shell was killed"; echo "$out" | sed 's/^/      | /' >&2; }
 [[ "$(count "$ROOT")" == 0 ]] && pass "no server process survives" || fail "survivors: $(serve_pids "$ROOT" | tr '\n' ' ')"
 
 echo
