@@ -75,6 +75,10 @@ export function useGroupStream({ userId, groupId }: { userId: string | null; gro
   const identity = `${userId ?? ''} ${groupId ?? ''}`;
   // Older pages belong to one user + group: another identity reads as empty.
   const [olderState, setOlderState] = useState<OlderPagesState>(() => emptyOlderPages(identity));
+  // A return to an earlier group starts empty too, as a first visit does.
+  if (olderState.identity !== identity) {
+    setOlderState(emptyOlderPages(identity));
+  }
   const { older, loadingMore, loadMoreError } =
     olderState.identity === identity ? olderState : emptyOlderPages(identity);
   const updateOlderState = useCallback(

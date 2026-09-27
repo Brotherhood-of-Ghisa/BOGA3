@@ -183,6 +183,23 @@ describe('useGroupOnlinePages', () => {
     expect(result.current.offline).toBe(true);
   });
 
+  it('a return to an earlier view offline shows nothing, not its old rows', async () => {
+    const fetchPage = jest.fn<Promise<Page>, [Cursor | null]>().mockResolvedValue(page(['a'], null));
+    const { result, rerender } = renderPages({ viewKey: 'v1', fetchPage });
+    await flush();
+    expect(ids(result.current.items)).toEqual(['a']);
+
+    emitNetInfo(false);
+    rerender({ viewKey: 'v2', fetchPage });
+    await flush();
+    rerender({ viewKey: 'v1', fetchPage });
+    await flush();
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+    expect(result.current.firstPage).toBeNull();
+    expect(result.current.items).toEqual([]);
+    expect(result.current.loadedAtMs).toBeNull();
+  });
+
   it('drops a first page that resolves after the view changed', async () => {
     let resolveOld: (value: Page) => void = () => undefined;
     const oldFetch = jest.fn<Promise<Page>, [Cursor | null]>(

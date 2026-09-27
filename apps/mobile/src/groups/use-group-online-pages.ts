@@ -120,7 +120,11 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   const online = useNetworkOnline();
   const identity = userId && viewKey ? `${userId}\u0000${groupId}\u0000${viewKey}` : null;
   const [stored, setStored] = useState<InternalState<TPage, TItem, TCursor>>(() => initialState(identity));
-  // A new view forgets everything; its first page loads on the identity effect.
+  // A new view forgets everything (also on a return to an earlier view); its
+  // first page loads on the identity effect.
+  if (stored.identity !== identity) {
+    setStored(initialState(identity));
+  }
   const state = stored.identity === identity ? stored : initialState<TPage, TItem, TCursor>(identity);
   // Writes for `identity`, starting from empty if the stored state is another view's.
   const setState = useCallback(
