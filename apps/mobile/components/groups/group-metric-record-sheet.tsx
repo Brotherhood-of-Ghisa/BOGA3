@@ -105,7 +105,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
       <UiText>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</UiText>
       <UiText testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</UiText>
-      <UiText testID="group-metric-record-weight">Session body weight: {describeGroupPerformanceWeight(row.performance)}</UiText>
+      {exercise.bodyweight_coefficient > 0 || row.performance.body_weight_kg !== null ? <UiText testID="group-metric-record-weight">Session body weight: {describeGroupPerformanceWeight(row.performance)}</UiText> : null}
       {row.effective_resistance_kg !== null ? <UiText>Effective resistance: {Number(row.effective_resistance_kg.toFixed(3))} kg</UiText> : null}
       {row.external_adjustment_kg !== null ? <UiText>External adjustment: {Number(row.external_adjustment_kg.toFixed(3))} kg
         {row.added_percent_bodyweight !== null ? ` · ${Number(row.added_percent_bodyweight.toFixed(2))}% of session body weight` : ''}</UiText> : null}
@@ -113,7 +113,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       <UiText variant="bodyMuted">{includesWeight
         ? 'Certification pins this set’s entered load, mode, reps, performed status and saved body weight with its source. Corrections can invalidate it.'
         : 'Certification pins this set’s entered load, mode, reps and performed status. Session body weight is not part of this metric’s certification.'}</UiText>
-      <UiText variant="bodyMuted">Strength values are estimates under the group’s declared rules. Personal exercise settings do not change these scores.</UiText>
+      <UiText variant="bodyMuted">{row.metric === 'e1rm' || includesWeight ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</UiText>
       <UiText testID="group-metric-record-status">{active
         ? `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms)}`
         : certification?.end_reason ? `Certification ${certification.end_reason}` : certified ? 'Certified' : 'Uncertified'}</UiText>

@@ -548,7 +548,11 @@ The existing group board route resolves the comparison through the versioned
 catalogue before choosing legacy Weight/1RM or metric-aware presentation.
 `metric` accepts `bodyweight_reps`, `relative_strength`, `absolute_strength` for
 bodyweight comparisons; conventional comparisons retain `weight` / `e1rm`.
-An omitted metric uses the group's declared default. `scope` remains
+An omitted metric uses the group's declared default. In-place board toggles
+update the route parameters; a new link's metric/scope replaces the previous
+selection even when Expo reuses the board screen. History likewise follows
+updated metric, scope and revision links; selecting a revision preserves the
+metric only if that revision supports it. `scope` remains
 `certified` / `all`. History additionally accepts a positive `revision`, and
 its revision selector keeps original kg-only entries distinct from later rules.
 Event history links carry the recorded revision rather than reinterpreting an

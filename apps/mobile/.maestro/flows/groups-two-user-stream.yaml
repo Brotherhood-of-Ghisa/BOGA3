@@ -91,6 +91,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-username-gate"
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-01-username-prompt"
 - tapOn:
     id: "group-username-input"
@@ -118,6 +119,7 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-screen-members-link"
     text: "Members, 1 member · You're the owner"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-02-group-created"
 
 # --- 3. Read the invite code off the screen -------------------------------------
@@ -129,6 +131,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - copyTextFrom:
     id: "group-invite-code"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-03-invite-code"
 
 # --- 4. The counterparty joins; "joined" after a refresh ------------------------
@@ -161,6 +164,7 @@ appId: com.dinoderek.mobile
     visible:
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} joined"
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-04-counterparty-joined"
 - openLink: "boga3://group/${output.groupsGroupId}"
 - extendedWaitUntil:
@@ -218,12 +222,19 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn:
     id: "group-exercise-source-custom"
-# Pick the weight entry before typing: on iOS, dismissing the keyboard can submit the form.
+# Pick weight entry, then dismiss the name keyboard before scrolling to Save.
 - tapOn:
     id: "group-exercise-form-load-mode-per_side_load"
 - tapOn:
     id: "group-exercise-form-name-input"
 - inputText: "Sled Push"
+# A real content drag dismisses iOS decimal/text keyboards without tapping Next.
+- swipe:
+    start: "50%,40%"
+    end: "50%,20%"
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "group-exercise-form-submit"
@@ -236,6 +247,7 @@ appId: com.dinoderek.mobile
     visible:
       text: "Sled Push, Rules 1.*per-side external weight, Not linked"
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-04b-1-exercises-added"
 # Rename the custom exercise.
 - tapOn:
@@ -254,6 +266,13 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-name-input"
 - eraseText: 40
 - inputText: "Prowler Push"
+# A real content drag dismisses iOS decimal/text keyboards without tapping Next.
+- swipe:
+    start: "50%,40%"
+    end: "50%,20%"
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "group-exercise-form-submit"
@@ -276,6 +295,7 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - assertVisible:
     id: "group-pick-sheet-retroactivity"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-04b-2-pick-sheet-link-only"
 - tapOn:
     id: "group-pick-sheet-confirm"
@@ -307,6 +327,7 @@ appId: com.dinoderek.mobile
     visible:
       text: "Barbell Bench Press, Rules 1.*total external weight, archived, Linked: Barbell Bench Press"
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-04b-3-exercise-linked-renamed-archived"
 # A member (the counterparty) reads the same list over group_exercise_list.
 - runScript:
@@ -337,7 +358,7 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - extendedWaitUntil:
     visible:
-      id: "group-stream-session-card-${output.groupsCardKey}"
+      id: "^group-stream-session-card-${output.groupsCardKey}$"
     timeout: 15000
 - runScript:
     file: ../scripts/groups-counterparty.js
@@ -356,6 +377,7 @@ appId: com.dinoderek.mobile
 # The pre-join session (started a day before joining) is never shared.
 - assertNotVisible:
     id: "group-stream-session-card-${output.groupsHistoryCardKey}"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-05-training-now-card"
 
 # --- 6. Completed, then edited -> the same card, completed + updated metrics ----
@@ -387,11 +409,12 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}-status"
     text: "Completed · 45m"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-06-completed-edited-card"
 
 # --- 7. The friend's view: exercises and performed sets, no owner actions -------
 - tapOn:
-    id: "group-stream-session-card-${output.groupsCardKey}"
+    id: "^group-stream-session-card-${output.groupsCardKey}$"
 - extendedWaitUntil:
     visible:
       id: "group-session-header"
@@ -414,6 +437,7 @@ appId: com.dinoderek.mobile
     id: "completed-session-detail-edit-button"
 - assertNotVisible:
     id: "completed-session-detail-delete-button"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07-friend-view-read-only"
 
 # --- 7b. Versioned conventional boards and preserved raw input ----------------
@@ -429,12 +453,14 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "groups-segment-leaderboards" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-6-versioned-stream-link"
 - tapOn: { id: "groups-segment-leaderboards" }
 - extendedWaitUntil:
     visible: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
     timeout: 20000
 - assertVisible: "No certified sets yet · 1 uncertified"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-1-podiums"
 - tapOn: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
 - scrollUntilVisible:
@@ -442,6 +468,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-2-board-certified-empty"
 - tapOn: { id: "group-board-see-all-button" }
 - scrollUntilVisible:
@@ -449,6 +476,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-3-board-all-1rm"
 - scrollUntilVisible:
     element: { id: "group-board-metric-weight" }
@@ -462,6 +490,7 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 15000
 - assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 51\\.3 kg, Added 102\\.5 kg × 5, .*, uncertified, rules revision 1"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-4-board-all-weight"
 - tapOn: { id: "group-board-row-1" }
 - extendedWaitUntil:
@@ -474,8 +503,11 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 15000
 - assertVisible: "Uncertified"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-7-row-detail"
-- tapOn: { point: "50%,12%" }
+# Sheet keeps a full tap target below the status bar; its backdrop is hidden
+# from the modal accessibility tree, so tap the exposed region directly.
+- tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 - scrollUntilVisible:
     element: { id: "group-board-history-button" }
@@ -488,6 +520,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07b-5-history-link"
 
 # --- 7c. Metric-specific certification from a record, preserved in Today -------
@@ -502,6 +535,7 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 20000
 - assertNotVisible: { id: "group-metric-record-certify" }
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-0-today-record"
 - tapOn: { id: "group-metric-stream-${output.groupsRecordKey}" }
 - extendedWaitUntil:
@@ -518,6 +552,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-1-record-card"
 - tapOn: { id: "group-metric-stream-${output.groupsRecordKey}" }
 - extendedWaitUntil:
@@ -533,6 +568,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-2-certified-1rm"
 # Each metric has its own dependency pin and attestation.
 - scrollUntilVisible:
@@ -550,8 +586,15 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-2-certified-weight"
-- tapOn: { point: "50%,12%" }
+- tapOn: { point: "50%,8%" }
+- assertNotVisible: { id: "group-metric-record-sheet" }
+- extendedWaitUntil:
+    visible: { id: "group-metric-stream-${output.groupsRecordKey}", text: ".*1RM.*Certified by you.*Weight.*Certified by you.*" }
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: "groups-07c-2-certified-card"
 - runScript:
     file: ../scripts/groups-counterparty.js
     env:
@@ -565,6 +608,7 @@ appId: com.dinoderek.mobile
     visible: { id: "group-podium-card-${output.groupsBoardExerciseId}-row-1" }
     timeout: 20000
 - assertVisible: "Prowler Push, Certified · 1RM kg · Rules 1, 1st ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} [0-9.]+ kg .*"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-3-podium-certified"
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=certified"
 - scrollUntilVisible:
@@ -573,6 +617,7 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 20000
 - assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 55\\.0 kg, Added 110 kg × 5, .*, rules revision 1"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-4-board-certified-weight"
 - scrollUntilVisible:
     element: { id: "group-board-history-button" }
@@ -585,6 +630,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-5-history-certified"
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.groupsBoardExerciseId}?metric=weight&scope=all"
 - scrollUntilVisible:
@@ -600,8 +646,9 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 15000
 - assertNotVisible: { id: "group-metric-record-certify" }
+- waitForAnimationToEnd
 - takeScreenshot: "groups-07c-6-row-detail-certified"
-- tapOn: { point: "50%,12%" }
+- tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 
 # --- 7d. Unlink my certified exercise: cancel, unlink, preserve, relink ---------
@@ -642,6 +689,7 @@ appId: com.dinoderek.mobile
           centerElement: true
           timeout: 15000
       - assertVisible: "Unlink Bench, Total load, Linked: Bench \\(competition\\), Bench \\(training\\)"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-01-linked-row"
 - tapOn:
     id: "group-exercise-unlink-button-${output.unlinkGroupExerciseId}"
@@ -651,6 +699,7 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - assertVisible: "Your linked exercises"
 - assertVisible: "Unlink Bench · Maestro Groups E2E"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-02-chooser"
 - tapOn:
     id: "group-unlink-choice-${output.unlinkPrimaryId}"
@@ -658,6 +707,7 @@ appId: com.dinoderek.mobile
     visible: "Unlink “Bench \\(competition\\)”\\?"
     timeout: 10000
 - assertVisible: ".*both All and Certified leaderboards.*Past activity and existing certifications will be kept.*"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-03-confirmation"
 - tapOn: "Cancel"
 - assertVisible:
@@ -685,6 +735,7 @@ appId: com.dinoderek.mobile
     direction: UP
     centerElement: true
 - assertVisible: "Unlinked “Bench \\(competition\\)” from “Unlink Bench”\\."
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-04-success"
 - openLink: "boga3://settings"
 - scrollUntilVisible:
@@ -709,6 +760,7 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "group-stream-record-card-${output.unlinkRecordKey}-status"
     text: "Certified by ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-05-preserved-record"
 - tapOn:
     id: "group-stream-record-card-${output.unlinkRecordKey}-open"
@@ -729,6 +781,7 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "group-board-scope-certified"
 - assertVisible: "No certified sets yet"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-06-certified-empty"
 # Relink the same personal exercise through the existing Link screen. The
 # group's other mapping stays intact, so its row correctly never says Not linked.
@@ -761,6 +814,7 @@ appId: com.dinoderek.mobile
       id: "group-board-row-1"
       text: "1st, You, 80\\.0 × 5, .*"
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-07-restored-certified"
 
 # --- 7e. M27: shared rules, bodyweight ranking and saved-input attestation -----
@@ -771,17 +825,20 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "group-board-row-1", text: "1st, You, Relative strength, .* ×BW, Added 20 kg × 5, .*rules revision 1" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-01-relative-reversal"
 - tapOn: { id: "group-board-metric-absolute_strength" }
 - extendedWaitUntil:
     visible: { id: "group-board-row-1", text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Absolute strength, .* kg, Added 20 kg × 5, .*rules revision 1" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-02-absolute-reversal"
 - tapOn: { id: "group-board-row-1" }
 - assertVisible: { id: "group-metric-record-raw", text: "As logged: Added 20 kg × 5" }
 - assertVisible: { id: "group-metric-record-weight", text: "Session body weight: 90 kg · Estimated from .*" }
 - assertVisible: "Effective resistance: 110 kg"
 - assertVisible: "External adjustment: 20 kg · 22\\.22% of session body weight"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-03-estimated-inputs"
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
@@ -791,8 +848,9 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "group-metric-record-status", text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-04-estimated-certified"
-- tapOn: { point: "50%,12%" }
+- tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 - runScript:
     file: ../scripts/groups-counterparty.js
@@ -803,8 +861,9 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "group-board-row-1" }
 - assertVisible: "Session body weight: No usable weight saved for this session"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-05-missing-weight-reps"
-- tapOn: { point: "50%,12%" }
+- tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 - openLink: "boga3://group/${output.groupsGroupId}/exercises/${output.bodyweightExerciseId}/edit"
 - extendedWaitUntil:
@@ -813,7 +872,11 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "group-exercise-form-bodyweight-percentage" }
 - eraseText
 - inputText: "70"
-- hideKeyboard
+# A real content drag dismisses iOS decimal/text keyboards without tapping Next.
+- swipe:
+    start: "50%,40%"
+    end: "50%,20%"
+    duration: 500
 - scrollUntilVisible:
     element: { id: "group-exercise-form-submit" }
     direction: DOWN
@@ -824,6 +887,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
 - assertVisible: "Apply rules revision 2: 100% → 70% bodyweight, .*"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-06-rule-change-preview"
 - scrollUntilVisible:
     element: { id: "group-exercise-form-submit" }
@@ -840,6 +904,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "group-board-row-1", text: ".*Absolute strength, .*rules revision 2" }
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-07-revised-certified-board"
 - runScript:
     file: ../scripts/groups-counterparty.js
@@ -850,6 +915,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: "No certified sets yet"
     timeout: 15000
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-08-correction-invalidated"
 - tapOn: { id: "group-board-scope-all" }
 - extendedWaitUntil:
@@ -862,8 +928,9 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
 - assertVisible: "Uncertified"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-m27-09-corrected-input-review"
-- tapOn: { point: "50%,12%" }
+- tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 
 # --- 8. The device removes the counterparty -> "was removed" -------------------
@@ -932,13 +999,16 @@ appId: com.dinoderek.mobile
       text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} was removed"
     timeout: 15000
 # What the removed member shared stays in the group record (decision #4).
+# Match the whole ID: the later record session shares this prefix plus -record.
 - scrollUntilVisible:
     element:
-      id: "group-stream-session-card-${output.groupsCardKey}"
+      id: "^group-stream-session-card-${output.groupsCardKey}$"
     direction: DOWN
-    timeout: 15000
+    centerElement: true
+    timeout: 30000
 - assertVisible:
-    id: "group-stream-session-card-${output.groupsCardKey}"
+    id: "^group-stream-session-card-${output.groupsCardKey}$"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-08-counterparty-removed"
 
 # --- 8b. A former member remains ranked and read-only -------------------------
@@ -949,6 +1019,7 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 15000
 - assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), Weight, 55\\.0 kg, Added 110 kg × 5, .*, certified, rules revision 1"
+- waitForAnimationToEnd
 - takeScreenshot: "groups-08b-board-former-member"
 - tapOn: { id: "group-board-row-1" }
 - scrollUntilVisible:
@@ -958,8 +1029,9 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*"
 - assertNotVisible: { id: "group-metric-record-certify" }
+- waitForAnimationToEnd
 - takeScreenshot: "groups-08b-2-row-detail-former"
-- tapOn: { point: "50%,12%" }
+- tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 
 # --- 9. The removed counterparty's next read is NOT_FOUND (AC11) ----------------
@@ -967,4 +1039,5 @@ appId: com.dinoderek.mobile
     file: ../scripts/groups-counterparty.js
     env:
       STEP: assert-removed
+- waitForAnimationToEnd
 - takeScreenshot: "groups-09-removed-member-not-found"

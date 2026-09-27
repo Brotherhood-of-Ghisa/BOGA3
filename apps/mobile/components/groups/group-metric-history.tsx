@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, View } from 'react-native';
 
-import { SegmentedControl, UiButton, UiText, uiSpace } from '@/components/ui';
+import { ChipGroup, SegmentedControl, UiText } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useGroupOnlinePages, type BoardRowViewModel, type GroupBoardScope } from '@/src/groups';
 import { getGroupMetricBoard, getGroupMetricHistory, getGroupMetricRevisions } from '@/src/groups/api';
 import { isGroupMetric, metricsForGroupRules, type GroupMetric } from '@/src/groups/metric-contract';
@@ -33,6 +34,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   userId: string; groupId: string; exercise: GroupMetricExerciseWire;
   initialMetric: string | null; initialScope: GroupBoardScope; initialRevision: number | null;
 }) {
+  const router = useRouter();
   const exerciseId = exercise.group_exercise_id;
   const fetchRevisions = useCallback(() => getGroupMetricRevisions(groupId, exerciseId), [groupId, exerciseId]);
   const revisions = useGroupOnlinePages<GroupMetricRevisionsWire, GroupMetricRevisionWire, never>({ userId, groupId,
@@ -45,6 +47,17 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : rules.default_metric;
   const [scope, setScope] = useState(initialScope);
   const [view, setView] = useState<'events' | 'scores'>('events');
+  useEffect(() => {
+    setPickedRevision(initialRevision ?? exercise.rules_revision);
+    setPickedMetric(isGroupMetric(initialMetric) ? initialMetric : null);
+    setScope(initialScope);
+  }, [exerciseId, exercise.rules_revision, initialRevision, initialMetric, initialScope]);
+  const selectView = (nextMetric: GroupMetric, nextScope: GroupBoardScope, nextRevision: number) => {
+    setPickedMetric(nextMetric);
+    setScope(nextScope);
+    setPickedRevision(nextRevision);
+    router.setParams({ metric: nextMetric, scope: nextScope, revision: String(nextRevision) });
+  };
   const identity = `${exerciseId}|${rules.rules_revision}|${metric}|${scope}`;
   const fetchHistory = useCallback((before: string | null) => getGroupMetricHistory({ groupId, groupExerciseId: exerciseId,
     metric, certified: scope === 'certified', revision: rules.rules_revision, before }), [groupId, exerciseId, metric, scope, rules.rules_revision]);
@@ -76,17 +89,20 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
       certification: null, accessibilityLabel: `${index + 1}, ${formatBoardMemberLabel(row.member, false, userId)}, ${row.value_kg} kg, original rules ${rules.rules_revision}` }));
   const header = <View style={groupScreenStyles.header}>
     <UiText variant="label">{exercise.name} · History</UiText>
-    <View style={{ gap: uiSpace.sm }}>
-      {revisions.items.map(item => <UiButton key={item.rules.rules_revision} label={`Rules ${item.rules.rules_revision}${item.legacy ? ' · original kg-only' : ''}${item.retired_at_ms !== null ? ' · retired' : ''}`}
-        variant={rules.rules_revision === item.rules.rules_revision ? 'primary' : 'secondary'}
-        onPress={() => setPickedRevision(item.rules.rules_revision)} testID={`group-history-revision-${item.rules.rules_revision}`} />)}
-    </View>
+    <ChipGroup mode="single" accessibilityLabel="Rules revision" value={rules.rules_revision}
+      options={revisions.items.map(item => ({ value: item.rules.rules_revision,
+        label: `Rules ${item.rules.rules_revision}${item.legacy ? ' · original kg-only' : ''}${item.retired_at_ms !== null ? ' · retired' : ''}` }))}
+      onChange={next => {
+        const nextRules = revisions.items.find(item => item.rules.rules_revision === next)?.rules;
+        if (nextRules) selectView(metricsForGroupRules({ bodyweightCoefficient: nextRules.bodyweight_coefficient }).includes(metric)
+          ? metric : nextRules.default_metric, scope, next);
+      }} testIDPrefix="group-history-revision" />
     <UiText variant="bodyMuted">{describeGroupRules({ ...exercise, ...rules })}</UiText>
     <UiText variant="bodyMuted">{revision.legacy ? 'Original kg-only records and frozen retirement scores. Bodyweight context was not added to these certifications.'
       : 'Rules changes recalculate the comparison. They are listed separately from new performances.'}</UiText>
-    <SegmentedControl accessibilityLabel="Metric" value={metric} onChange={setPickedMetric}
+    <SegmentedControl accessibilityLabel="Metric" value={metric} onChange={next => selectView(next, scope, rules.rules_revision)}
       options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))} testIDPrefix="group-history-metric" />
-    <SegmentedControl accessibilityLabel="Sets" value={scope} onChange={setScope}
+    <SegmentedControl accessibilityLabel="Sets" value={scope} onChange={next => selectView(metric, next, rules.rules_revision)}
       options={[{ value: 'certified', label: 'Certified' }, { value: 'all', label: 'All' }]} testIDPrefix="group-history-scope" />
     <SegmentedControl accessibilityLabel="History or revision scores" value={view} onChange={setView}
       options={[{ value: 'events', label: 'History' }, { value: 'scores', label: 'Revision scores' }]} testIDPrefix="group-history-view" />

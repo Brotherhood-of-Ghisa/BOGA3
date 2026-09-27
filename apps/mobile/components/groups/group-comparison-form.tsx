@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 
 import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
-import { SegmentedControl, UiButton, UiSurface, UiText } from '@/components/ui';
+import { ActionButton, Card, SegmentedControl, UiText, uiSpace } from '@/components/ui';
 import type { LoadInputMode } from '@/src/exercise-core';
 import { metricsForGroupRules, validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from '@/src/groups/metric-contract';
 import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 
-import { groupFormStyles } from './screen-styles';
 import { GroupWriteNotice } from './write-notice';
 
 type Props = {
@@ -70,7 +69,7 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
   const rulesError = showErrors && !validation.ok && validation.field !== 'name' ? validation.message : null;
   const stale = dirty && existing && existing.rules_revision !== baseline.revision;
   return (
-    <UiSurface style={groupFormStyles.card} testID="group-exercise-form">
+    <Card style={{ padding: uiSpace.md, gap: uiSpace.md }} testID="group-exercise-form">
       {note ? <UiText testID="group-exercise-form-note" variant="bodyMuted">{note}</UiText> : null}
       {baseline.revision !== null ? <UiText variant="bodyMuted" testID="group-rules-revision">Rules revision {baseline.revision}</UiText> : null}
       <ExerciseCoreFields editable={!pending} name={name} loadInputMode={loadInputMode}
@@ -82,7 +81,7 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
       {movementChanged ? <GroupWriteNotice tone="error" testID="group-rules-movement-error"
         message="A different movement needs a new group exercise. Keep this movement standard to preserve its history." /> : null}
       <UiText variant="bodyMuted">Default ranking</UiText>
-      <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={defaultMetric}
+      <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={defaultMetric} layout="fit"
         options={metricsForGroupRules({ bodyweightCoefficient: percentage > 0 ? percentage / 100 : 0 }).map(metric => ({
           value: metric, label: metricLabels[metric], accessibilityLabel: metricLabels[metric],
         }))}
@@ -90,7 +89,7 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
       <UiText variant="bodyMuted">Members can switch ranking views. This choice only sets the opening view.</UiText>
       {stale ? <GroupWriteNotice tone="error" testID="group-rules-stale"
         message="The group rules changed while you were editing. Your values are kept. Reload group rules to replace them with the current settings before editing again." /> : null}
-      {stale ? <UiButton label="Reload group rules" disabled={pending} testID="group-rules-reload"
+      {stale ? <ActionButton variant="outline" label="Reload group rules" disabled={pending} testID="group-rules-reload"
         onPress={() => { setDirty(false); setReviewed(false); setShowErrors(false); }} /> : null}
       {reviewed && calculationChanged && validation.ok ? <>
         <UiText variant="bodyMuted" testID="group-rules-preview">
@@ -100,8 +99,8 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
           <UiText variant="bodyMuted">Attestations of unchanged performance inputs stay valid. Personal exercise settings and saved session weights stay unchanged.</UiText>}
       </> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
-      <UiButton disabled={pending || Boolean(stale)} label={pending ? pendingLabel : calculationChanged ? reviewed ? 'Apply group rules' : 'Review rule changes' : submitLabel}
+      <ActionButton variant="primary" disabled={pending || Boolean(stale)} label={pending ? pendingLabel : calculationChanged ? reviewed ? 'Apply group rules' : 'Review rule changes' : submitLabel}
         onPress={submit} testID="group-exercise-form-submit" />
-    </UiSurface>
+    </Card>
   );
 }

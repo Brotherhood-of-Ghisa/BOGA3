@@ -106,3 +106,19 @@ readiness before catalogue fixture setup. Full fast passes 184 suites / 2,218
 tests (`/tmp/boga-m27-cert-refresh-fast.log`). The dedicated group device lane
 is running before the full frontend rerun. Local and hosted acceptance remain
 open; no task cards are retired yet.
+
+
+Baseline group device acceptance now passes: `TASK_ID=M27-long-stream ./boga
+test ios-groups-e2e` completed both flows, including the full M27 sequence,
+legacy unlink/relink, retained former-member records and removed-member denial.
+Log: `/tmp/boga-m27-long-stream-groups.log`; captures and visual review:
+`apps/mobile/artifacts/maestro/M27-long-stream/20260927-102333-82851/` and
+`20260927-103103-84904/`. The later feed check needed an exact ID, centering and
+30 seconds for the expanded feed; no data assertion was removed. The identical
+app build's detailed M27 captures are reviewed under
+`M27-route-selection/20260927-100650-69395/visual-review.md`. Small/large group
+layouts, full frontend and hosted rollout remain open.
+
+Final full fast aggregate passed after these corrections: 184 suites / 2,220
+mobile tests plus backend-fast, metadata, consent and MCP checks. Evidence:
+`/tmp/boga-m27-group-device-final-fast.log`.

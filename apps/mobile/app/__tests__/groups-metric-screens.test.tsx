@@ -34,7 +34,7 @@ jest.mock('@react-native-community/netinfo', () => ({
 }));
 let mockInitialOnline: boolean | null = null;
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn() };
+const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), dismissTo: jest.fn(), setParams: jest.fn() };
 let mockParams: Record<string, string> = {};
 jest.mock('expo-router', () => ({
   useRouter: () => mockRouter,
@@ -145,6 +145,24 @@ it('does not show old rows while a complete new revision rebuilds', async () => 
   expect(screen.queryByTestId('group-board-row-1')).toBeNull();
 });
 
+it('honours a new metric and scope link on a reused board after a rules edit', async () => {
+  mockParams = { groupId: 'group', exerciseId: 'pull', metric: 'bodyweight_reps', scope: 'all' };
+  api.getGroupMetricBoard.mockResolvedValue({ ...board, metric: 'bodyweight_reps', certified: false,
+    state: 'rebuilding', entries: [], entry_count: 0 });
+  const view = render(<GroupBoardRoute />);
+  await screen.findByTestId('group-board-rebuilding');
+  api.getGroupMetricBoard.mockResolvedValue({ ...board, metric: 'absolute_strength',
+    entries: [{ ...row, metric: 'absolute_strength', unit: 'kg', value: 112 }] });
+  mockParams = { ...mockParams, metric: 'absolute_strength', scope: 'certified' };
+  view.rerender(<GroupBoardRoute />);
+  await waitFor(() => expect(api.getGroupMetricBoard).toHaveBeenLastCalledWith(
+    expect.objectContaining({ metric: 'absolute_strength', certified: true })));
+  expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('112.0 kg');
+  expect(screen.queryByTestId('group-board-rebuilding')).toBeNull();
+  fireEvent.press(screen.getByTestId('group-board-scope-all'));
+  expect(mockRouter.setParams).toHaveBeenLastCalledWith({ metric: 'absolute_strength', scope: 'all' });
+});
+
 it('shows estimated saved B and the exact strength dependencies before certifying', async () => {
   render(<GroupBoardRoute />);
   fireEvent.press(await screen.findByTestId('group-board-row-1'));
@@ -215,6 +233,17 @@ it('retains unit and revision on cached podium presentation and labels rebuildin
     metric: 'relative_strength', certified: true, rules_revision: 2, state: 'ready', podium: [row], me: null, entry_count: 1, all_entry_count: 1 }] }, 'me');
   expect(cards[0].accessibilityLabel).toMatch(/Relative strength ×BW.*Rules 2.*1.40 ×BW/);
   expect(cards[0].rows[0].valueLabel).toBe('1.40 ×BW');
+});
+
+it('opens the requested original revision and scope when a history route is reused', async () => {
+  const view = render(<GroupBoardHistoryRoute />);
+  await screen.findByTestId('group-board-history-item-3-sentence');
+  mockParams = { ...mockParams, metric: 'e1rm', scope: 'all', revision: '1' };
+  view.rerender(<GroupBoardHistoryRoute />);
+  await waitFor(() => expect(api.getGroupMetricHistory).toHaveBeenLastCalledWith(
+    expect.objectContaining({ revision: 1, metric: 'e1rm', certified: false })));
+  fireEvent.press(screen.getByTestId('group-history-revision-2'));
+  expect(mockRouter.setParams).toHaveBeenLastCalledWith({ metric: 'relative_strength', scope: 'all', revision: '2' });
 });
 
 

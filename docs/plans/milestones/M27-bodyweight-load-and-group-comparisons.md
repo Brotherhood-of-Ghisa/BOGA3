@@ -287,9 +287,9 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | in_progress |
 | [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | in_progress |
 | [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | in_progress |
-| [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | planned |
+| [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | in_progress |
 | [M27-T11 — Coaching API and MCP](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md) | Owner-scoped, unit-aware data and metric parity | T07 | in_progress |
-| [M27-T12 — Integration and rollout](../tasks/M27-T12-Verify_roll_out_and_close_bodyweight_milestone.md) | Cross-device/group proof, server-first rollout, graduation | T01–T11 | planned |
+| [M27-T12 — Integration and rollout](../tasks/M27-T12-Verify_roll_out_and_close_bodyweight_milestone.md) | Cross-device/group proof, server-first rollout, graduation | T01–T11 | in_progress |
 
 Dependencies describe delivery order, not a request to spawn agents. No task
 is complete merely because a downstream closeout card lists its tests.
@@ -502,3 +502,28 @@ cards when shipped, marking their task-table entries completed.
   for the picker header and row instead of scrolling during that transition.
   Fresh large/full-frontend verification remains required. The failed
   large aggregate is not counted as green, and no runtime code changed.
+
+- **Integrated comparison checkpoint:** T08/T09 server publication and T10 UI
+  are implemented at `7a2157a`, including versioned rules, whole-board rebuilds,
+  metric-specific attestations and current stream certification context. Full
+  fast passed 184 suites / 2,218 mobile tests plus all repository/backend-fast
+  lanes (`/tmp/boga-m27-cert-refresh-fast.log`); full backend passed
+  (`/tmp/boga-m27-stream-cert-backend-final.log`). T11 API/MCP proof is included.
+  Native conventional setup, shared volume, boards and separate Weight/1RM
+  certification passed their assertions in the latest dedicated run, which
+  stopped at tall-sheet dismissal. The current fix reserves an exposed 44pt
+  backdrop and restores record-band/mono/per-metric-status presentation.
+  Frontend fast and open-handle checks pass 184 suites / 2,218 tests
+  (`/tmp/boga-m27-record-layout-{fast,handles}.log`). Fresh complete device,
+  three-size and hosted rollout acceptance remain open; no PR or deployment.
+
+- **Baseline group device acceptance:** `M27-long-stream` passed both groups
+  flows with the integrated metric UI. The 60/90 kg ranking reversal,
+  estimated/missing B, 100%→70% rule publication, attestation preservation,
+  90→95 kg correction invalidation, old unlink/relink, former-member read-only
+  records and removed-member denial all passed. Artifacts and visual review:
+  `apps/mobile/artifacts/maestro/M27-long-stream/20260927-102333-82851/`;
+  linking: `20260927-103103-84904/`. Log:
+  `/tmp/boga-m27-long-stream-groups.log`. The route-selection regression and
+  history counterpart bring mobile coverage to 184 suites / 2,220 tests.
+  Full frontend, small/large group layouts and hosted rollout remain open.

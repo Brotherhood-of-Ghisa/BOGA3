@@ -292,12 +292,18 @@ var steps = {
         updated_at: cuam,
         deleted_at: null,
       }),
+      // The complete-volume fixture declares both conventional definitions.
+      // An unconfigured definition now correctly yields incomplete metrics.
+      entity('exercise_definitions', sessionId + '-def-row', cuam, {
+        name: 'Barbell Row', load_input_mode: 'total_load', bodyweight_coefficient: 0,
+        movement_standard: null, loading_method: null, created_at: cuam, updated_at: cuam, deleted_at: null,
+      }),
       sessionEntity(historyId, historyStart, cuam, historyStart + DURATION_SEC * 1000),
       sessionExerciseEntity(historyId + '-bench', historyId, definitionId, 0, 'Bench Press', cuam),
       setEntity(historyId + '-set-1', historyId + '-bench', 0, '100', '5', cuam),
       sessionEntity(sessionId, startedAt, cuam, null),
       sessionExerciseEntity(sessionId + '-bench', sessionId, definitionId, 0, 'Bench Press', cuam),
-      sessionExerciseEntity(sessionId + '-row', sessionId, null, 1, 'Barbell Row', cuam),
+      sessionExerciseEntity(sessionId + '-row', sessionId, sessionId + '-def-row', 1, 'Barbell Row', cuam),
       benchSet1('100', cuam),
       setEntity(liveSet(2), sessionId + '-bench', 1, '100', '5', cuam),
       setEntity(liveSet(3), sessionId + '-row', 0, '50', '10', cuam),

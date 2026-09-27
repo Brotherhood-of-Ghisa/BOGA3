@@ -119,7 +119,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `Sheet` — bottom-anchored panel over a `scrim` backdrop, sheet radius,
     38×4 handle, optional title; the backdrop tap, Android back and the
     VoiceOver escape gesture dismiss it — there is no Cancel button. It never
-    grows past the top of the screen (a taller body shrinks to fit). DLM-T06
+    grows past the top of the screen; a taller body shrinks to fit while leaving
+    a full 44pt dismissal target below the status bar. DLM-T06
     added `headerActions` (controls on the title's row, `<testID>-header`) and
     `keyboardAvoiding` (lifts the panel above the keyboard), for the exercise
     picker. DLM-T07 added `headerLeading` (one control before the title): the
@@ -698,14 +699,19 @@ selector retains the full accessible meaning; labels never crowd the number.
 
 ### Versioned group comparisons (M27; native acceptance pending)
 
-- `GroupComparisonForm` composes the shared exercise fields, default metric,
-  revision preview and retained stale-edit state.
+- `GroupComparisonForm` composes the shared exercise fields in a `Card`, a
+  label-sized default-metric selector, revision preview and retained stale-edit
+  state. Apply is the one primary `ActionButton`; Reload is an outline.
 - `GroupComparisonBoundary` resolves direct links using the versioned catalogue.
 - `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` reuse
   group paging/state recipes, unit-aware rows, revision history and input-pinned
-  certification. Legacy board components remain for original comparisons.
+  certification. History selects revisions with neutral, wrapping chips. Legacy
+  board components remain for original comparisons.
 - `GroupMetricStreamCard` preserves the recorded metric/unit/revision and gives
-  rules, voids and link changes their own explanatory text. Record cards open
+  rules, voids and link changes light explanatory rows behind hairlines. Standing
+  records retain the indented record band, mono figures, tags and a separate
+  certification state for each achieved metric; voided records fade without a
+  band. Record cards open
   `GroupMetricStreamRecordSheet`, which selects each achieved metric and adapts
   the current attestation context into the shared record sheet.
 - `metric-view-model.ts` owns metric labels, saved-B provenance, raw performance,

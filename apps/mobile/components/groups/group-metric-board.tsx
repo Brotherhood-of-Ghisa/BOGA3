@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, View } from 'react-native';
 
 import { ActionButton, SegmentedControl, UiText, uiSpace } from '@/components/ui';
@@ -40,6 +40,21 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({ userId, cacheKey: groupCacheKeys.group(groupId), fetcher: groupFetcher, evictGroupIdOnNotFound: groupId });
   const [selected, setSelected] = useState<GroupMetricBoardRowWire | null>(null);
+  // Expo may reuse this route for another deep link. Its requested view must
+  // replace the last local selection, including a page caught during rebuild.
+  useEffect(() => {
+    setPickedMetric(isGroupMetric(initialMetric) ? initialMetric : null);
+    setScope(initialScope);
+    setSelected(null);
+  }, [exerciseId, initialMetric, initialScope]);
+  const selectView = (nextMetric: GroupMetric, nextScope: GroupBoardScope) => {
+    setSelected(null);
+    setPickedMetric(nextMetric);
+    setScope(nextScope);
+    // Keep the route aligned with in-place toggles so a later link to a
+    // previously requested view is still observable as a parameter change.
+    router.setParams({ metric: nextMetric, scope: nextScope });
+  };
   // A member's refreshed performance replaces the selected snapshot; disappeared rows cannot be certified.
   const liveSelected = selected ? board.items.find(row => row.member.user_id === selected.member.user_id) ?? null : null;
   const rows = useMemo(() => board.items.map(row => buildGroupMetricRow(row, scope, userId)), [board.items, scope, userId]);
@@ -58,9 +73,9 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
     <UiText variant="bodyMuted" testID="group-board-rules">{describeGroupRules(exercise)}</UiText>
     {exercise.archived_at_ms !== null ? <UiText testID="group-board-archived">Archived · read-only</UiText> : null}
     <SegmentedControl accessibilityLabel="Metric" options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
-      value={metric} onChange={value => { setSelected(null); setPickedMetric(value); }} testIDPrefix="group-board-metric" />
+      value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
-      onChange={value => { setSelected(null); setScope(value); }} testIDPrefix="group-board-scope" />
+      onChange={value => selectView(metric, value)} testIDPrefix="group-board-scope" />
     {metric === 'bodyweight_reps' ? <UiText variant="bodyMuted">Confirmed unweighted reps with no assistance. Body weight may be missing.</UiText>
       : <UiText variant="bodyMuted">{exercise.bodyweight_coefficient > 0
         ? 'Strength estimates use the saved session body weight. Missing or incompatible performances are not ranked.'
@@ -75,7 +90,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
         actionLabel="Refresh board" onAction={onRefresh} testID="group-board-rebuilding" />
     : <GroupStateView title={scope === 'certified' ? 'No certified sets yet' : 'No eligible sets yet'}
         body={scope === 'all' ? 'Check the movement, loading method and saved body weight in the linked session.' : undefined}
-        actionLabel={scope === 'certified' ? 'See all sets' : undefined} onAction={() => setScope('all')}
+        actionLabel={scope === 'certified' ? 'See all sets' : undefined} onAction={() => selectView(metric, 'all')}
         actionTestID="group-board-see-all-button" testID="group-board-empty" />;
   return <>
     <FlatList style={groupScreenStyles.screen} contentContainerStyle={groupScreenStyles.cardListContent}

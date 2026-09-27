@@ -300,7 +300,9 @@ describe('Sheet', () => {
     // sighted tap still reaches it.
     expect(screen.queryByLabelText('Dismiss options')).toBeNull();
     const backdrop = screen.getByLabelText('Dismiss options', { includeHiddenElements: true });
-    expect(flatStyle(backdrop).backgroundColor).toBe(uiRoles.scrim);
+    // The tappable backdrop occupies only the exposed area above the panel;
+    // even long scrollable content must leave a usable dismissal target.
+    expect(flatStyle(backdrop).minHeight).toBe(uiGeometry.tapTarget);
     fireEvent.press(backdrop);
     expect(onDismiss).toHaveBeenCalledTimes(1);
 

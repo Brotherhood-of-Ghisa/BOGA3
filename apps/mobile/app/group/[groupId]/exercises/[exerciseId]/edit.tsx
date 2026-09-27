@@ -134,6 +134,8 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
   return (
     <ScrollView
       contentContainerStyle={groupScreenStyles.content}
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       style={groupScreenStyles.screen}
       testID="group-exercise-edit-screen">
