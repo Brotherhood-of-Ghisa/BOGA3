@@ -125,3 +125,16 @@ label hidden by the modal accessibility boundary; the flow now uses the existing
 Stats/share backdrop gestures and waits for dismissal. Failed run preserved at
 `M27-analytics-small-projection/20260927-023728-10923/`; no full native pass claimed.
 The offline-upgrade review follow-up is integrated before the next complete run.
+
+Small and large phone bodyweight gates are now green at runtime source
+`19fc54d` (flow readiness fixes `4ab3ac6` / `ccff804`). Small evidence:
+`M27-restart-readiness-small/20260927-042810-28105/`; large evidence:
+`M27-picker-readiness-large/20260927-080734-63114/`, all four flows passed.
+Large BWO03, BWF06, BWA09 and BWA14 were visually compared with the target:
+reviewed 20 kg added + 80 kg B gives 100 kg effective / 127.7 total 1RM / 800
+volume; source rows fit; incomplete totals remain explicitly labelled.
+`./boga timings` and `./boga test for` were rerun; logs are
+`/tmp/boga-m27-picker-timings.log` and `/tmp/boga-m27-picker-required-gates.log`.
+Full frontend/default-phone verification remains required and will run after
+the remaining group integration, against the integrated milestone source.
+No frontend aggregate or shipping completion is claimed.
