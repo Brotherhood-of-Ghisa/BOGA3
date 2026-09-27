@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
+const { legacyVocabularyRule, rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
 
 const RAW_COLOR_LITERAL_REGEX =
   /#[0-9A-Fa-f]{3,8}\b|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)/g;
@@ -40,17 +40,41 @@ const RATCHET_RULE_DEFINITIONS = [
     id: 'rawRadius',
     title: 'raw border-radius literal scan (screens/components)',
     regex: RAW_RADIUS_REGEX,
-    remedy: 'use uiRadius.* from @/components/ui/tokens',
+    remedy: 'use uiGeometry.radius.* from @/components/ui/tokens',
     skipZero: true,
   },
 ];
+
+// The retired styling vocabulary (`legacyVocabularyRule.identifiers` in the
+// config), matched as whole words so `myUiColorsHelper` is not a hit, plus the
+// keys of the retired `uiTokens` aggregate. Like the colour rule it blocks on
+// sight: there is no budget and no allowlist. It scans wider than the other
+// rules — `src/**` and `.ts` too — because the legacy tokens were used from
+// style modules and `src/sync/SyncGate.tsx`, not only from screens.
+function buildLegacyVocabularyRegex(identifiers = legacyVocabularyRule?.identifiers ?? []) {
+  if (identifiers.length === 0) {
+    throw new Error('legacyVocabularyRule.identifiers is empty in scripts/ui-guardrails.config.js');
+  }
+  return new RegExp(
+    `\\b(?:${identifiers.join('|')})\\b|\\buiTokens\\.(?:colors|radius|elevation)\\b`,
+    'g'
+  );
+}
+
+const LEGACY_VOCABULARY_SCOPE = { targets: ['app', 'components', 'src'], extensions: ['.ts', '.tsx'] };
+
+const LEGACY_VOCABULARY_REMEDY =
+  'use uiRoles (colour) and uiGeometry.radius (radii) from @/components/ui/tokens, and Card / Stat / ' +
+  'ListRow / ActionButton / SegmentedControl / ChipGroup from @/components/ui for the retired primitives';
+
+const UI_SCOPE = { targets: ['app', 'components'], extensions: ['.tsx'] };
 
 function toPosixPath(value) {
   return value.split(path.sep).join('/');
 }
 
-function collectUiFiles(rootDir) {
-  const targets = ['app', 'components'];
+function collectUiFiles(rootDir, scope = UI_SCOPE) {
+  const { targets } = scope;
   const results = [];
 
   for (const target of targets) {
@@ -61,7 +85,7 @@ function collectUiFiles(rootDir) {
 
     walkDirectory(absoluteTarget, (absoluteFilePath) => {
       const relativePath = toPosixPath(path.relative(rootDir, absoluteFilePath));
-      if (!isUiSourceFile(relativePath)) {
+      if (!isUiSourceFile(relativePath, scope)) {
         return;
       }
 
@@ -93,12 +117,13 @@ function walkDirectory(directoryPath, onFile) {
   }
 }
 
-function isUiSourceFile(relativePath) {
-  if (!(relativePath.startsWith('app/') || relativePath.startsWith('components/'))) {
+function isUiSourceFile(relativePath, { targets, extensions } = UI_SCOPE) {
+  if (!targets.some((target) => relativePath.startsWith(`${target}/`))) {
     return false;
   }
 
-  if (!relativePath.endsWith('.tsx')) {
+  const extension = extensions.find((candidate) => relativePath.endsWith(candidate));
+  if (!extension) {
     return false;
   }
 
@@ -106,11 +131,7 @@ function isUiSourceFile(relativePath) {
     return false;
   }
 
-  if (
-    relativePath.endsWith('.test.tsx') ||
-    relativePath.endsWith('.spec.tsx') ||
-    relativePath.endsWith('.stories.tsx')
-  ) {
+  if (['.test', '.spec', '.stories'].some((suffix) => relativePath.endsWith(`${suffix}${extension}`))) {
     return false;
   }
 
@@ -138,10 +159,11 @@ function findViolations({
   matchLiteral,
   includeAllowlisted = false,
   allowlistedFiles = [],
+  scope = UI_SCOPE,
 } = {}) {
   const resolvedRootDir = rootDir || path.resolve(__dirname, '..');
   const allowlist = normalizeAllowlistEntries(allowlistedFiles);
-  const files = collectUiFiles(resolvedRootDir);
+  const files = collectUiFiles(resolvedRootDir, scope);
 
   const violations = [];
   const skippedAllowlistedFiles = [];
@@ -199,6 +221,15 @@ function findRawColorLiteralViolations({
     matchLiteral: (match) => match[0],
     includeAllowlisted,
     allowlistedFiles,
+  });
+}
+
+function findLegacyVocabularyViolations({ rootDir, identifiers } = {}) {
+  return findViolations({
+    rootDir,
+    regex: buildLegacyVocabularyRegex(identifiers),
+    matchLiteral: (match) => match[0],
+    scope: LEGACY_VOCABULARY_SCOPE,
   });
 }
 
@@ -299,6 +330,22 @@ function formatSummary(result) {
   return lines.join('\n');
 }
 
+function formatLegacyVocabularySummary(result) {
+  const lines = [];
+  lines.push('UI guardrail: legacy vocabulary scan (app/components/src, .ts + .tsx)');
+  lines.push(`Files scanned: ${result.filesScanned}`);
+  lines.push(`Blocking violations: ${result.blockingViolations.length}`);
+
+  if (result.blockingViolations.length > 0) {
+    lines.push('');
+    lines.push(`FAIL the retired styling vocabulary is back — ${LEGACY_VOCABULARY_REMEDY}.`);
+    lines.push('');
+    formatViolationGroups(lines, result.blockingViolations);
+  }
+
+  return lines.join('\n');
+}
+
 function formatRatchetSummary(result, ratchet, { verbose = false } = {}) {
   const lines = [];
   lines.push(`UI guardrail: ${result.definition.title}`);
@@ -367,6 +414,10 @@ function runUiGuardrailCheck(options = {}) {
   const colorResult = findRawColorLiteralViolations(options);
   write(formatSummary(colorResult));
 
+  const legacyResult = findLegacyVocabularyViolations(options);
+  write('');
+  write(formatLegacyVocabularySummary(legacyResult));
+
   const ratchetResults = [];
   const counts = {};
 
@@ -388,14 +439,15 @@ function runUiGuardrailCheck(options = {}) {
       write(`${BUDGET_LINE_INDENT}${ruleId}: ${count}`);
     }
 
-    return { color: colorResult, ratchets: ratchetResults, counts, ok: true };
+    return { color: colorResult, legacy: legacyResult, ratchets: ratchetResults, counts, ok: true };
   }
 
   const ok =
     colorResult.blockingViolations.length === 0 &&
+    legacyResult.blockingViolations.length === 0 &&
     ratchetResults.every((entry) => entry.ratchet.ok);
 
-  return { color: colorResult, ratchets: ratchetResults, counts, ok };
+  return { color: colorResult, legacy: legacyResult, ratchets: ratchetResults, counts, ok };
 }
 
 function parseArgs(argv) {
@@ -418,10 +470,13 @@ module.exports = {
   RAW_SPACING_REGEX,
   RAW_RADIUS_REGEX,
   RATCHET_RULE_DEFINITIONS,
+  buildLegacyVocabularyRegex,
   collectUiFiles,
   evaluateRatchet,
+  findLegacyVocabularyViolations,
   findRawColorLiteralViolations,
   findRatchetRuleViolations,
+  formatLegacyVocabularySummary,
   formatRatchetSummary,
   formatSummary,
   runUiGuardrailCheck,

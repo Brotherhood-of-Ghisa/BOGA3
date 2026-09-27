@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Icon, UiText, uiColors, uiRadius, uiSpace } from '@/components/ui';
+import { Icon, ListRow, Tag, uiRoles } from '@/components/ui';
 import { GROUP_ROLE_LABELS, formatMemberName, type GroupMember } from '@/src/groups';
 
 type GroupMemberRowProps = {
@@ -8,66 +8,34 @@ type GroupMemberRowProps = {
   isMe: boolean;
   /** Set only when my role offers actions on this member: the row then opens the action sheet. */
   onPress?: (member: GroupMember) => void;
+  /** A hairline above the row: every row but the card's first. */
+  divider: boolean;
 };
 
-/** One Members-segment row: name (+ "you") and a role badge; pressable when it has actions. */
-export function GroupMemberRow({ member, isMe, onPress }: GroupMemberRowProps) {
+/**
+ * One Members-screen row, a dense `ListRow` in the members `Card`: the name (+
+ * "(you)") and the role as a `Tag`; a chevron only when it opens actions. The
+ * control column is kept empty otherwise, so the tags stay on one axis.
+ */
+export function GroupMemberRow({ member, isMe, onPress, divider }: GroupMemberRowProps) {
   const name = isMe ? `${formatMemberName(member.username)} (you)` : formatMemberName(member.username);
-  const content = (
-    <>
-      <UiText numberOfLines={1} style={styles.name} variant="label">
-        {name}
-      </UiText>
-      <View style={styles.badge}>
-        <UiText testID={`group-member-role-${member.user_id}`} variant="subtitle">
-          {GROUP_ROLE_LABELS[member.role]}
-        </UiText>
-      </View>
-      {onPress ? (
-        <Icon color={uiColors.textSecondary} name="chevron-right" />
-      ) : null}
-    </>
-  );
-  if (!onPress) {
-    return (
-      <View style={styles.row} testID={`group-member-row-${member.user_id}`}>
-        {content}
-      </View>
-    );
-  }
+  const role = GROUP_ROLE_LABELS[member.role];
   return (
-    <Pressable
-      accessibilityHint="Opens member actions"
-      accessibilityLabel={`${name}, ${GROUP_ROLE_LABELS[member.role]}`}
-      accessibilityRole="button"
-      onPress={() => onPress(member)}
-      style={styles.row}
-      testID={`group-member-row-${member.user_id}`}>
-      {content}
-    </Pressable>
+    <ListRow
+      accessibilityHint={onPress ? 'Opens member actions' : undefined}
+      accessibilityLabel={onPress ? `${name}, ${role}` : undefined}
+      density="list"
+      divider={divider}
+      label={name}
+      meta={
+        // The Tag sets its own `alignSelf: flex-start`; the wrapper centres it in the row.
+        <View>
+          <Tag label={role} testID={`group-member-role-${member.user_id}`} />
+        </View>
+      }
+      onPress={onPress ? () => onPress(member) : undefined}
+      testID={`group-member-row-${member.user_id}`}
+      trailing={onPress ? <Icon color={uiRoles.inkMuted} name="chevron-right" /> : null}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingVertical: uiSpace.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: uiColors.borderMuted,
-  },
-  name: {
-    flex: 1,
-    minWidth: 0,
-  },
-  badge: {
-    borderRadius: uiRadius.full,
-    borderWidth: 1,
-    borderColor: uiColors.borderMuted,
-    backgroundColor: uiColors.surfacePage,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
-  },
-});

@@ -155,9 +155,27 @@ describe('settings and profile routes', () => {
     expect(screen.getByTestId('settings-date-format-YYYY-MM-DD')).toBeTruthy();
     expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('DD-MM-YYYY');
 
-    fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
+    act(() => {
+      fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
+    });
 
     expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD');
+
+    expect(screen.getByTestId('settings-records-gym-all')).toBeTruthy();
+    expect(screen.getByTestId('settings-records-gym-current-gym')).toBeTruthy();
+    expect(getExerciseListPreferencesSnapshot().pastRecordsGymScope).toBe('all');
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('settings-records-gym-current-gym'));
+    });
+
+    expect(getExerciseListPreferencesSnapshot().pastRecordsGymScope).toBe('current-gym');
+
+    act(() => {
+      fireEvent.press(screen.getByTestId('settings-records-gym-all'));
+    });
+
+    expect(getExerciseListPreferencesSnapshot().pastRecordsGymScope).toBe('all');
   });
 
   it('exposes the dev reset surface in development builds and invokes the reset helper after confirmation', async () => {

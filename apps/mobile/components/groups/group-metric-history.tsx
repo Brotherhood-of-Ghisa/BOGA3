@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { Text, FlatList, RefreshControl, View } from 'react-native';
 
-import { ChipGroup, SegmentedControl, UiText } from '@/components/ui';
+import { ChipGroup, SegmentedControl } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useGroupOnlinePages, type BoardRowViewModel, type GroupBoardScope } from '@/src/groups';
 import { getGroupMetricBoard, getGroupMetricHistory, getGroupMetricRevisions } from '@/src/groups/api';
 import { isGroupMetric, metricsForGroupRules, type GroupMetric } from '@/src/groups/metric-contract';
@@ -13,7 +13,7 @@ import { GroupBoardRow } from './group-board-row';
 import { GroupOfflineBanner } from './offline-banner';
 import { GroupPagesFooter } from './group-pages-footer';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from './group-state-view';
-import { groupScreenStyles } from './screen-styles';
+import { groupScreenStyles, groupMetricTextStyles as textStyles } from './screen-styles';
 import { usePullToRefresh } from './use-pull-to-refresh';
 
 type Event = GroupMetricHistoryWire['events'][number];
@@ -88,7 +88,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
       valueLabel: `${row.value_kg.toFixed(1)} kg`, detailLabel: `${row.weight_kg} kg × ${row.reps}`, dateLabel: formatBoardDate(row.achieved_at_ms),
       certification: null, accessibilityLabel: `${index + 1}, ${formatBoardMemberLabel(row.member, false, userId)}, ${row.value_kg} kg, original rules ${rules.rules_revision}` }));
   const header = <View style={groupScreenStyles.header}>
-    <UiText variant="label">{exercise.name} · History</UiText>
+    <Text allowFontScaling={false} style={textStyles.heading}>{exercise.name} · History</Text>
     <ChipGroup mode="single" accessibilityLabel="Rules revision" value={rules.rules_revision}
       options={revisions.items.map(item => ({ value: item.rules.rules_revision,
         label: `Rules ${item.rules.rules_revision}${item.legacy ? ' · original kg-only' : ''}${item.retired_at_ms !== null ? ' · retired' : ''}` }))}
@@ -97,9 +97,9 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
         if (nextRules) selectView(metricsForGroupRules({ bodyweightCoefficient: nextRules.bodyweight_coefficient }).includes(metric)
           ? metric : nextRules.default_metric, scope, next);
       }} testIDPrefix="group-history-revision" />
-    <UiText variant="bodyMuted">{describeGroupRules({ ...exercise, ...rules })}</UiText>
-    <UiText variant="bodyMuted">{revision.legacy ? 'Original kg-only records and frozen retirement scores. Bodyweight context was not added to these certifications.'
-      : 'Rules changes recalculate the comparison. They are listed separately from new performances.'}</UiText>
+    <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules({ ...exercise, ...rules })}</Text>
+    <Text allowFontScaling={false} style={textStyles.muted}>{revision.legacy ? 'Original kg-only records and frozen retirement scores. Bodyweight context was not added to these certifications.'
+      : 'Rules changes recalculate the comparison. They are listed separately from new performances.'}</Text>
     <SegmentedControl accessibilityLabel="Metric" value={metric} onChange={next => selectView(next, scope, rules.rules_revision)}
       options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))} testIDPrefix="group-history-metric" />
     <SegmentedControl accessibilityLabel="Sets" value={scope} onChange={next => selectView(metric, next, rules.rules_revision)}

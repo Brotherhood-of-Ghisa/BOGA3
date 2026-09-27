@@ -72,7 +72,7 @@ export function SessionWeightBackfillSheet({ visible, onDismiss, onAfterDismiss,
   };
   const estimated = preview?.rows.filter(row => row.status === 'ready' && row.snapshot.bodyWeightSource === 'historical_estimate').length ?? 0;
 
-  return <Sheet visible={visible} onAfterDismiss={onAfterDismiss} title="Fill session weights" testID="bodyweight-backfill" keyboardAvoiding
+  return <Sheet visible={visible} onDismissed={onAfterDismiss} title="Fill session weights" testID="bodyweight-backfill" keyboardAvoiding
     dismissLabel="Cancel filling session weights" onDismiss={() => { if (!busyRef.current) onDismiss(); }}>
     <ScrollView ref={scroll} style={{ maxHeight: height * 0.8, flexGrow: 0 }} contentContainerStyle={styles.form}
       keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" testID="bodyweight-backfill-scroll">

@@ -9,17 +9,19 @@ import {
   GroupsEmptyActions,
   GroupsEmptyState,
   GroupsSignInRequired,
+  cardListItemStyles,
   groupScreenStyles,
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
+import { ActionButton } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import { UiButton } from '@/components/ui';
 import { groupCacheKeys, listMyGroups, useGroupResource, type GroupListMineResult } from '@/src/groups';
 
 /**
  * My groups (groups contract §6.3): every active membership, sorted by name,
- * with Join / Create. A row opens the group's management page.
+ * as one `Card` of rows, under Join (outline) and Create (the one `accent`). A
+ * row opens the group's management page.
  */
 export default function MyGroupsRoute() {
   const { isConfigured, user } = useAuth();
@@ -35,6 +37,8 @@ function MyGroupsContent({ userId }: { userId: string }) {
   const { pulling, onRefresh } = usePullToRefresh(mine.refresh);
   const groups = mine.data?.groups ?? null;
   const inlineError = pickInlineError(mine.error);
+  const hasActions = groups !== null && groups.length > 0;
+  const hasHeader = hasActions || mine.offline || (groups !== null && inlineError !== null);
 
   return (
     <FlatList
@@ -48,23 +52,26 @@ function MyGroupsContent({ userId }: { userId: string }) {
         )
       }
       ListHeaderComponent={
-        <View style={groupScreenStyles.header}>
+        <View style={[groupScreenStyles.header, hasHeader ? groupScreenStyles.cardListHeader : null]}>
           {/* With no groups the empty state carries Create / Join instead. */}
-          {groups && groups.length > 0 ? (
+          {hasActions ? (
             <View style={groupScreenStyles.actionRow}>
-              <UiButton
-                label="Join group"
-                onPress={() => router.push('/group/join')}
-                style={groupScreenStyles.actionRowItem}
-                testID="group-mine-join-button"
-                variant="secondary"
-              />
-              <UiButton
-                label="Create group"
-                onPress={() => router.push('/group/new')}
-                style={groupScreenStyles.actionRowItem}
-                testID="group-mine-create-button"
-              />
+              <View style={groupScreenStyles.actionRowItem}>
+                <ActionButton
+                  label="Join group"
+                  onPress={() => router.push('/group/join')}
+                  testID="group-mine-join-button"
+                  variant="outline"
+                />
+              </View>
+              <View style={groupScreenStyles.actionRowItem}>
+                <ActionButton
+                  label="Create group"
+                  onPress={() => router.push('/group/new')}
+                  testID="group-mine-create-button"
+                  variant="primary"
+                />
+              </View>
             </View>
           ) : null}
           {mine.offline ? <GroupOfflineBanner lastUpdatedAtMs={mine.lastUpdatedAtMs} /> : null}
@@ -73,12 +80,14 @@ function MyGroupsContent({ userId }: { userId: string }) {
           ) : null}
         </View>
       }
-      contentContainerStyle={groupScreenStyles.content}
+      contentContainerStyle={groupScreenStyles.cardListContent}
       data={groups ?? []}
       keyExtractor={(group) => group.group_id}
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-      renderItem={({ item }) => (
-        <GroupSummaryRow group={item} onPress={(group) => router.push(`/group/${group.group_id}`)} />
+      renderItem={({ item, index }) => (
+        <View style={cardListItemStyles(index, groups?.length ?? 0)}>
+          <GroupSummaryRow divider={index > 0} group={item} onPress={(group) => router.push(`/group/${group.group_id}`)} />
+        </View>
       )}
       style={groupScreenStyles.screen}
       testID="group-mine-list"

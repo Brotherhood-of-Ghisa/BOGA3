@@ -1,4 +1,4 @@
--- M27-T02: owner-private readings and reproducible bodyweight load inputs.
+-- Owner-private readings and reproducible bodyweight load inputs.
 -- Additive/server-first. Existing clients retain layers 0..3; bodyweight_v1
 -- readers drain a fresh layer-4 cursor. Omitted new columns preserve stored
 -- values on LWW updates; explicit null clears nullable columns. No snapshot

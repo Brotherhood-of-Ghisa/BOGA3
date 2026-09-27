@@ -75,6 +75,7 @@ jest.mock('@/src/exercise-catalog/stats-cache', () => ({
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { uiRoles } from '@/components/ui/tokens';
+import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import type { ExerciseHistorySessionEntry } from '@/src/data/exercise-history';
 import type {
   SessionDraftExerciseInput,
@@ -104,7 +105,7 @@ const planned = (id: string, weight: string, reps: string, setType: SessionDraft
     performanceStatus: 'planned',
   });
 
-const makeSession = (): SessionGraphSnapshot => ({
+const makeSession = (overrides?: Partial<SessionGraphSnapshot>): SessionGraphSnapshot => ({
   sessionId: 'session-1',
   gymId: null,
   status: 'active',
@@ -136,6 +137,7 @@ const makeSession = (): SessionGraphSnapshot => ({
       sets: [set('q1', { weightValue: '100', repsValue: '5', setType: 'rir_2' })],
     },
   ],
+  ...overrides,
 });
 
 // A fake repository holding one session graph, so the tests read back exactly
@@ -183,12 +185,14 @@ const createClient = (initial: SessionGraphSnapshot = makeSession()) => {
 const historyEntry = (
   sessionId: string,
   completedAt: string,
-  sets: [string, string, ExerciseHistorySessionEntry['sets'][number]['setType']][]
+  sets: [string, string, ExerciseHistorySessionEntry['sets'][number]['setType']][],
+  gym: { gymId?: string | null; gymName?: string | null } = {}
 ): ExerciseHistorySessionEntry => ({
   sessionId,
   sessionExerciseId: `${sessionId}-bench`,
   completedAt: new Date(completedAt),
-  gymName: null,
+  gymId: gym.gymId ?? null,
+  gymName: gym.gymName ?? null,
   tagIds: [],
   sets: sets.map(([weightValue, repsValue, setType], index) => ({
     setId: `${sessionId}-${index}`,
@@ -210,7 +214,9 @@ const loadHistory: LoadExerciseHistory = jest.fn(async () => ({
   exerciseDeletedAt: null,
   period: 'all' as const,
   appliedTagDefinitionId: null,
+  appliedGymId: null,
   tagOptions: [],
+  gymOptions: [],
   allTimeBest: { estimatedOneRepMax: null, topWeight: null },
   sessions: [
     historyEntry('h2', '2026-09-11T10:00:00Z', [
@@ -457,6 +463,20 @@ describe('ExercisePageScreen', () => {
     });
   });
 
+  it('forwards currentGymId to exercise-history when the active session has a gym', async () => {
+    const { client } = createClient(makeSession({ gymId: 'gym-downtown' }));
+    await renderPage(client);
+
+    fireEvent.press(screen.getByTestId('exercise-records-history'));
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      pathname: '/exercise-history',
+      params: {
+        exerciseDefinitionId: 'def-bench',
+        currentGymId: 'gym-downtown',
+      },
+    });
+  });
+
   it('leaves the records panel collapsed or expanded when switching Records and Last', async () => {
     const { client } = createClient();
     await renderPage(client);
@@ -619,6 +639,113 @@ describe('ExercisePageScreen', () => {
       />
     );
     expect(await screen.findByText('This exercise is no longer in the session.')).toBeTruthy();
+  });
+
+  it('filters past records by current workout gym when preference is current-gym and displays gym names', async () => {
+    setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' });
+
+    const gymHistory: LoadExerciseHistory = jest.fn(async () => ({
+      exerciseDefinitionId: 'def-bench',
+      exerciseName: 'Barbell Bench Press',
+      exerciseDeletedAt: null,
+      period: 'all' as const,
+      appliedTagDefinitionId: null,
+      appliedGymId: null,
+      tagOptions: [],
+      gymOptions: [],
+      allTimeBest: { estimatedOneRepMax: null, topWeight: null },
+      sessions: [
+        historyEntry(
+          'h-metroflex',
+          '2026-09-11T10:00:00Z',
+          [
+            ['60', '10', 'warm_up'],
+            ['90', '5', 'rir_1'],
+          ],
+          { gymId: 'gym-metroflex', gymName: 'Metroflex' }
+        ),
+        historyEntry(
+          'h-golds',
+          '2026-08-12T10:00:00Z',
+          [
+            ['60', '10', 'warm_up'],
+            ['120', '5', 'rir_0'],
+          ],
+          { gymId: 'gym-golds', gymName: "Gold's Gym" }
+        ),
+      ],
+    }));
+
+    const sessionAtMetroflex = makeSession({ gymId: 'gym-metroflex' });
+    const { client } = createClient(sessionAtMetroflex);
+
+    render(
+      <ExercisePageScreen
+        draftClient={client}
+        loadHistory={gymHistory}
+        sessionExerciseId="bench"
+        sessionId="session-1"
+      />
+    );
+    await screen.findByTestId('exercise-page');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max90.0')
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-records-toggle'));
+    expect(screen.getByTestId('exercise-record-1rm')).toHaveTextContent(
+      '1RM104.911-09-2026 · Metroflex · 90.0 × 5'
+    );
+    expect(screen.getByTestId('exercise-record-max')).toHaveTextContent(
+      'Max90.011-09-2026 · Metroflex · 5 reps'
+    );
+
+    fireEvent.press(screen.getByTestId('exercise-records-view-last'));
+    const last = screen.getByTestId('exercise-records-last');
+    expect(within(last).getByText(/Metroflex/)).toBeTruthy();
+  });
+
+  it('shows empty gym-filtered state when current gym has no completed sessions for this exercise', async () => {
+    setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' });
+
+    const gymHistory: LoadExerciseHistory = jest.fn(async () => ({
+      exerciseDefinitionId: 'def-bench',
+      exerciseName: 'Barbell Bench Press',
+      exerciseDeletedAt: null,
+      period: 'all' as const,
+      appliedTagDefinitionId: null,
+      appliedGymId: null,
+      tagOptions: [],
+      gymOptions: [],
+      allTimeBest: { estimatedOneRepMax: null, topWeight: null },
+      sessions: [
+        historyEntry(
+          'h-golds',
+          '2026-08-12T10:00:00Z',
+          [['120', '5', 'rir_0']],
+          { gymId: 'gym-golds', gymName: "Gold's Gym" }
+        ),
+      ],
+    }));
+
+    const sessionAtNewGym = makeSession({ gymId: 'gym-new' });
+    const { client } = createClient(sessionAtNewGym);
+
+    render(
+      <ExercisePageScreen
+        draftClient={client}
+        loadHistory={gymHistory}
+        sessionExerciseId="bench"
+        sessionId="session-1"
+      />
+    );
+    await screen.findByTestId('exercise-page');
+
+    fireEvent.press(screen.getByTestId('exercise-records-toggle'));
+    expect(await screen.findByTestId('exercise-records-empty')).toHaveTextContent(
+      'No completed sessions for this gym yet.'
+    );
   });
 });
 

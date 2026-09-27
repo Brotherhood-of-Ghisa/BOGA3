@@ -20,7 +20,12 @@ beforeEach(() => {
 it.each([true, false])('migrates legacy recents %s and ignores flat/range while retaining detail date format', async (recentsOnTop) => {
   read.mockResolvedValue(JSON.stringify({ recentsOnTop, dateRange: 7, groupByMuscleFamily: false, dateFormat: 'YYYY-MM-DD' }));
   await ensureExerciseListPreferencesLoaded();
-  expect(getExerciseListPreferencesSnapshot()).toEqual({ sort: recentsOnTop ? 'favourite' : 'name', showNeverDone: true, dateFormat: 'YYYY-MM-DD' });
+  expect(getExerciseListPreferencesSnapshot()).toEqual({
+    sort: recentsOnTop ? 'favourite' : 'name',
+    showNeverDone: true,
+    dateFormat: 'YYYY-MM-DD',
+    pastRecordsGymScope: 'all',
+  });
 });
 
 it.each([null, 'bad-json', 'null', '[]', '3', '{"sort":"recent","showNeverDone":"no"}'])('defaults malformed or absent preferences %s', async (stored) => {
@@ -52,7 +57,12 @@ it('keeps edits made during a slow initial read and preserves unrelated stored v
   resolve(JSON.stringify({ recentsOnTop: false, dateFormat: 'MM-DD-YYYY' }));
   await loading;
   await flush();
-  expect(getExerciseListPreferencesSnapshot()).toEqual({ sort: 'name', showNeverDone: false, dateFormat: 'MM-DD-YYYY' });
+  expect(getExerciseListPreferencesSnapshot()).toEqual({
+    sort: 'name',
+    showNeverDone: false,
+    dateFormat: 'MM-DD-YYYY',
+    pastRecordsGymScope: 'all',
+  });
   expect(JSON.parse(write.mock.calls.at(-1)![1])).toEqual(getExerciseListPreferencesSnapshot());
 });
 

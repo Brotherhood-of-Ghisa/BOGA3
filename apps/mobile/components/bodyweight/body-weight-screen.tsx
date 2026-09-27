@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { ActionButton, Card, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat, uiRoles } from '@/components/ui';
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
@@ -81,9 +81,6 @@ export function BodyWeightScreen() {
       onAddReading={() => {
         readingAfterBackfill.current = true;
         setBackfillVisible(false);
-        // iOS cannot present the next Modal while its predecessor is dismissing.
-        // Other platforms have no native onDismiss completion event.
-        if (Platform.OS !== 'ios') finishBackfillDismissal();
       }} />
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}

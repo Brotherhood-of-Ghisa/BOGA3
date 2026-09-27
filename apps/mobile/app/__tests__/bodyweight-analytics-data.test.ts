@@ -1,5 +1,7 @@
+import { renderHook, waitFor } from '@testing-library/react-native';
+import { useExerciseRecords } from '@/src/session-recorder/use-exercise-records';
 import { eq } from 'drizzle-orm';
-import { exerciseDefinitions, exerciseMuscleMappings, exerciseSets, muscleGroups, sessionExercises, sessions, bodyWeightMeasurements } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseMuscleMappings, exerciseSets, muscleGroups, sessionExercises, sessions, gyms, bodyWeightMeasurements } from '@/src/data/schema';
 import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
 import { loadRecentExerciseBlocks } from '@/src/data/exercise-block-history';
 import { computeSelectedExerciseDailyEffort } from '@/src/data/exercise-analytics';
@@ -10,6 +12,12 @@ import { loadCompletedSessionInsights } from '@/src/session-insights/repository'
 import { buildSessionViewModel } from '@/src/session-recorder/session-view-model';
 import { mapDraftSnapshotToSession } from '@/src/session-recorder/session-model';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
+
+jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    jest.requireActual('react').useEffect(callback, [callback]);
+  },
+}));
 
 let mockFixture: InMemoryDatabaseFixture;
 jest.mock('@/src/data/bootstrap', () => ({ bootstrapLocalDataLayer: async () => mockFixture.database }));
@@ -113,4 +121,39 @@ it.each([
   expect(value.view.volume).toBe('—');
   expect(value.view.volumeNote).toContain('Volume unavailable');
   expect((await loadExerciseCatalogStats('all', end)).aggregatesById.get('pull')?.totalVolume).toBeNull();
+});
+
+
+it('keeps gym-scoped history and records on the same frozen bodyweight context after corrections', async () => {
+  const db = mockFixture.database;
+  db.insert(gyms).values([{ id: 'home', name: 'Home' }, { id: 'club', name: 'Club' }]).run();
+  db.update(sessions).set({ gymId: 'home' }).where(eq(sessions.id, 'old')).run();
+  db.update(sessions).set({ gymId: 'club' }).where(eq(sessions.id, 'new')).run();
+  const scopedHistory = () => loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: 'all', gymId: 'home' });
+  const initial = await scopedHistory();
+  expect(initial?.sessions).toHaveLength(1);
+  expect(initial?.sessions[0]).toMatchObject({ sessionId: 'old', gymName: 'Home', bodyWeightKg: 80, totalVolume: 640 });
+  expect(initial?.allTimeBest.estimatedOneRepMax?.sessionId).toBe('old');
+
+  const hook = renderHook(({ scope, revision }: { scope: 'all' | 'current-gym'; revision: number }) =>
+    useExerciseRecords('pull', loadExercisePerformanceHistory, null, { scope, currentGymId: 'home' }, revision),
+  { initialProps: { scope: 'current-gym', revision: 0 } });
+  await waitFor(() => expect(hook.result.current).toMatchObject({ status: 'ready', summary: {
+    records: { oneRepMax: { bodyWeightKg: 80, effectiveResistanceKg: 80, gymName: 'Home' }, volume: { value: 640 } },
+  } }));
+
+  db.update(sessions).set({ bodyWeightKg: 90 }).where(eq(sessions.id, 'old')).run();
+  hook.rerender({ scope: 'current-gym', revision: 1 });
+  await waitFor(() => expect(hook.result.current).toMatchObject({ status: 'ready', summary: {
+    records: { oneRepMax: { bodyWeightKg: 90, effectiveResistanceKg: 90, gymName: 'Home' }, volume: { value: 720 } },
+  } }));
+  expect((await scopedHistory())?.sessions[0].totalVolume).toBe(720);
+  expect((await loadExercisePerformanceHistory({ exerciseDefinitionId: 'pull', period: 'all', gymId: 'club' }))?.sessions[0])
+    .toMatchObject({ bodyWeightKg: 80, totalVolume: 800 });
+
+  hook.rerender({ scope: 'all', revision: 1 });
+  await waitFor(() => expect(hook.result.current).toMatchObject({ status: 'ready', summary: {
+    records: { oneRepMax: { bodyWeightKg: 80, effectiveResistanceKg: 100, gymName: 'Club' }, volume: { value: 800 } },
+  } }));
+  hook.unmount();
 });

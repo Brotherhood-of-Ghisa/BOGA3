@@ -155,6 +155,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-mine-list"
     timeout: 15000
+- takeScreenshot: "groups-mine-list"
 - openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
@@ -202,12 +203,16 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-exercise-form-note"
     timeout: 10000
+# The picked row stays listed above the prefilled form and its submit.
+- assertVisible:
+    id: "group-standard-exercise-seed_barbell_bench_press"
 - scrollUntilVisible:
     element:
       id: "group-exercise-form-submit"
     direction: DOWN
     centerElement: true
     timeout: 15000
+- takeScreenshot: "groups-add-exercise-catalogue"
 - tapOn:
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
@@ -222,6 +227,14 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn:
     id: "group-exercise-source-custom"
+- extendedWaitUntil:
+    visible:
+      id: "group-exercise-form-name-input"
+    timeout: 10000
+- assertVisible:
+    id: "group-exercise-source-custom"
+    selected: true
+- takeScreenshot: "groups-add-exercise-custom"
 # Pick weight entry, then dismiss the name keyboard before scrolling to Save.
 - tapOn:
     id: "group-exercise-form-load-mode-per_side_load"
@@ -946,12 +959,14 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-members-list"
     timeout: 15000
+- takeScreenshot: "groups-members-list"
 - tapOn:
     id: "group-member-row-${output.groupsCounterpartyUserId}"
 - extendedWaitUntil:
     visible:
       id: "group-member-actions-sheet"
     timeout: 10000
+- takeScreenshot: "groups-member-actions-sheet"
 - tapOn:
     id: "group-member-action-remove"
 # The native confirmation Alert's destructive button.
@@ -972,6 +987,7 @@ appId: com.dinoderek.mobile
     text: "1 member · You're the owner"
 - assertNotVisible:
     id: "group-member-row-${output.groupsCounterpartyUserId}"
+- takeScreenshot: "groups-members-removed"
 - openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:

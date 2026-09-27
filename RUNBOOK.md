@@ -75,7 +75,7 @@ PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/ho
 ## Worktree setup and isolation
 
 The worktree lifecycle — open (`./boga worktree create` / `start`), PR opened
-(`./boga db down`, `./boga pr wait`), and merged (`./boga worktree release`) — is
+(`./boga db down`, optionally `./boga pr wait`), and merged (`./boga worktree release`) — is
 in `docs/specs/01-worktree-and-environment.md`. The slot-lease and isolation
 contract is `docs/specs/12-worktree-config-and-isolation.md`; clearing leftovers
 from dead sessions is `docs/procedures/worktree-cleanup.md`.
@@ -810,9 +810,9 @@ Locally, the shared baseline sets the URL for you
 ## Bodyweight feature rollout (M27)
 
 This is the server-first release procedure, not a record of a hosted deployment.
-The local gates and native acceptance are tracked in the M27 milestone until
-shipping; record the deployed commit, migration versions, function versions and
-hosted smoke evidence in the release PR before activating the new client.
+Record local gate and native acceptance evidence alongside the deployed commit,
+migration versions, function versions and hosted smoke evidence in the release
+PR before activating the new client.
 
 1. From the reviewed release checkout, apply the complete migration chain,
    including `20260926181114_m27_bodyweight_sync.sql` and

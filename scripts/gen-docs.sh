@@ -10,27 +10,32 @@
 #
 # What it owns:
 #   1. The lane-matrix table in docs/specs/02-quality-and-test-gates.md,
-#      generated from scripts/lanes.tsv + measured medians from
-#      docs/testing/timings/records/ between these markers:
+#      generated from scripts/lanes.tsv + measured medians from this
+#      machine's timing store (scripts/lane-timing.sh) between these markers:
 #        <!-- boga:gen:lane-matrix ... -->  ...  <!-- /boga:gen:lane-matrix -->
 #   2. check-only validations:
 #      - every `boga test <name>` citation in the always-load docs + PR
 #        template names a real lane or gate alias,
 #      - every relative .md link in curated docs resolves,
-#      - every numbered spec carries the Owns/Not here/Load when header.
+#      - every numbered spec carries the Owns/Not here/Load when header,
+#      - no file outside docs/plans/** and docs/brainstorms/** references a
+#        plan file (plans are ephemeral; AGENTS.md "Planning").
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-check}"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lane-timing.sh"
+RECORDS_DIR="$(boga_timing_records_dir)"
 
 case "${MODE}" in
   gen|check) ;;
   *) echo "usage: $0 gen|check" >&2; exit 2 ;;
 esac
 
-REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" python3 - <<'PY'
-import json, os, re, statistics, sys
+REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" RECORDS_DIR="${RECORDS_DIR}" python3 - <<'PY'
+import json, os, re, statistics, subprocess, sys
 
 root = os.environ["REPO_ROOT"]
 mode = os.environ["MODE"]
@@ -49,13 +54,13 @@ with open(os.path.join(root, "scripts/lanes.tsv")) as f:
             continue
         lanes.append(parts)
 lane_names = {l[0] for l in lanes}
-GATE_ALIASES = {"fast", "backend", "frontend", "slow", "all",
+GATE_ALIASES = {"fast", "backend", "frontend", "frontend-ui", "slow", "all",
                 "fast-frontend", "fast-backend", "fast-repo",
                 "for"}  # `boga test for` — the trigger-matcher subcommand
 
 # ---------- measured medians (all machines, green runs) ----------
 def load_medians():
-    rec_dir = os.path.join(root, "docs/testing/timings/records")
+    rec_dir = os.environ["RECORDS_DIR"]
     by_lane = {}
     if not os.path.isdir(rec_dir):
         return {}
@@ -119,10 +124,13 @@ def matrix_lines():
             med = fmt(medians[name]) if name in medians else "N/A"
             ci_mark = "✅" if ci == "yes" else "❌"
             suffix = " *(+ local Supabase)*" if infra == "ios+supabase" else ""
-            out.append(f"| {name}{suffix} | `./boga test {name}` | {GATE_DISPLAY.get(gate, gate)} | {ci_mark} | {med} |")
+            gate_cell = GATE_DISPLAY.get(gate, gate)
+            if gate == "slow-frontend" and infra == "ios":
+                gate_cell += " + `frontend-ui`"
+            out.append(f"| {name}{suffix} | `./boga test {name}` | {gate_cell} | {ci_mark} | {med} |")
     out.append("")
     out.append("† All-machine median of the recorded green runs "
-               "(`docs/testing/timings/records/`); `N/A` = no measured data yet, **not** \"instant\" — "
+               "in the generating machine's timing store (`~/.config/boga/timings/records/`); `N/A` = no measured data yet, **not** \"instant\" — "
                "run the lane to record it. Per-machine numbers: `./boga timings`.")
     return out
 
@@ -201,6 +209,37 @@ for fname in sorted(os.listdir(os.path.join(root, "docs/specs"))):
         head = open(os.path.join(root, "docs/specs", fname)).read(800)
         if "**Owns:**" not in head:
             problems.append(f"docs/specs/{fname}: missing the '> **Owns:** … / **Not here:** … / **Load when:** …' header")
+
+# 4. plans are never referenced: no concrete plan file path (other than the
+#    README and templates) in any tracked or new file outside the working-notes
+#    trees. Matches docs/plans/…, ../plans/…, ./plans/… and plans/… (relative
+#    from docs/); placeholders like docs/plans/tasks/<task-id>.md pass.
+PLAN_REF = re.compile(r"(?<![A-Za-z0-9_-])plans/((?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.[A-Za-z0-9]+)\b")
+try:
+    listed = subprocess.run(
+        ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        capture_output=True, check=True).stdout.decode().split("\0")
+except (OSError, subprocess.CalledProcessError) as exc:
+    listed = []
+    problems.append(f"plan-reference check needs a git work tree ({exc})")
+for rel in listed:
+    if not rel or rel.startswith(("docs/plans/", "docs/brainstorms/")):
+        continue
+    path = os.path.join(root, rel)
+    if os.path.islink(path) or not os.path.isfile(path) or os.path.getsize(path) > 2_000_000:
+        continue
+    try:
+        text = open(path, encoding="utf-8").read()
+    except (UnicodeDecodeError, OSError):
+        continue
+    if "plans/" not in text:
+        continue
+    for ln, line in enumerate(text.splitlines(), 1):
+        for m in PLAN_REF.finditer(line):
+            target = m.group(1)
+            if target == "README.md" or target.startswith("templates/"):
+                continue
+            problems.append(f"{rel}:{ln}: references plan file {m.group(0)} — plans are ephemeral; cite the owning spec instead")
 
 if problems:
     print(f"[gen-docs] {len(problems)} problem(s):", file=sys.stderr)

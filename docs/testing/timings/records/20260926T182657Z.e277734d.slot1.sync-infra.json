@@ -1,0 +1,13 @@
+{
+  "lane": "sync-infra",
+  "wall_ms": 17987,
+  "exit_code": 1,
+  "recorded_at": "20260926T182657Z",
+  "machine_id": "e277734d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.6.2",
+  "slot": "1",
+  "commit": "7fcad5eb",
+  "source": "gate"
+}

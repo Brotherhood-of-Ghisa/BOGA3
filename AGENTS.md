@@ -14,9 +14,10 @@ place each under `docs/specs/**`, routed from here.
    not a skip.
 
 2. **Never state a test duration you didn't measure.** Run `./boga timings` —
-   it aggregates the measured per-run records the gates write automatically
-   (`docs/testing/timings/records/`). If a lane has no data, run it; the gate
-   records it. Estimating a duration is an error.
+   it aggregates the measured per-run records every `./boga test` lane run
+   writes automatically to this machine's store (`~/.config/boga/timings/`,
+   shared by all worktrees). If a lane has no data, run it; the gate records
+   it. Estimating a duration is an error.
 
 3. **Run the gates for what you changed, to green, before opening the PR.**
    `./boga` is the single entrypoint (runnable from anywhere in the repo;
@@ -25,19 +26,26 @@ place each under `docs/specs/**`, routed from here.
    ```bash
    ./boga test fast       # mobile + docs/meta + consent/MCP unit + backend fast smoke
    ./boga test backend    # local Supabase: auth/agent/sync contracts + MCP smoke
-   ./boga test frontend   # iOS sim: Maestro smoke + data-smoke + ui-regression + exercise-page + auth-profile + sync e2e + groups e2e
+   ./boga test frontend   # iOS sim: every Maestro lane (the frontend-ui lanes + auth-profile + sync e2e + groups e2e)
+   ./boga test frontend-ui  # iOS sim: the lanes that need no backend — what a screen/component change requires
    ```
 
    | You changed… | Run |
    | --- | --- |
    | Any `apps/mobile` TS/JS logic | `boga test fast` |
-   | UI screens / components / navigation | `boga test fast` + `boga test frontend` |
+   | UI screens / components / navigation | `boga test fast` + `boga test frontend-ui` (+ the area e2e lane `boga test for` prints) |
+   | Root layout (`app/_layout.tsx`) / Maestro harness or runtime scripts | `boga test fast` + `boga test frontend` |
    | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
    | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test ios-groups-e2e` (two-user e2e) |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
+
+   Gate selection is path-based and selective (`./boga test for` is the
+   authority). The backstop is `./boga sweep --ref <ref>` — every lane, in its
+   own worktree — run before an iOS build and on large or shared-UI PRs
+   (`boga test for` flags those; spec `02`).
 
    Once the worktree holds a slot lease (rule 5), the gates bootstrap deps and
    the local Supabase stack themselves; Docker must be running for the slow lanes. Full lane matrix, CI posture, and the dev-client
@@ -49,14 +57,18 @@ place each under `docs/specs/**`, routed from here.
    no remote-only test lane in this repo.
 
 5. **You own your worktree from open to merge.** Nothing cleans up after you
-   (spec `01`; contract `12`):
+   (spec `01`; contract `12`). Work always happens in a local worktree unless
+   the user says otherwise (cloud containers have no iOS simulator).
    - **Open:** `./boga worktree create <branch>` (new worktree from the latest
      `origin/main`), or `./boga worktree start` inside a worktree your harness
      made. It fails unless the worktree contains the latest `origin/main`; pass
      `--base`/`--from <ref>` only when told to. Every `./boga test|db|ios|env`
      command, Supabase script, and Maestro run fails hard without this slot lease.
-   - **PR opened:** `./boga db down`, then run `./boga pr wait` in the background.
-   - **PR merged or closed** (`pr wait` exits): `./boga worktree release`.
+   - **PR opened:** `./boga db down`. Optional: `./boga pr wait` in the
+     background to notice the merge.
+   - **PR merged:** you clean up in the same session — `./boga worktree release`
+     removes the slot's Supabase containers/volumes, the lease, and the
+     worktree. PR closed unmerged: ask the human first.
    - **Leftovers from dead sessions:** follow
      `docs/procedures/worktree-cleanup.md` — it asks the human before removing
      anything.
@@ -109,6 +121,18 @@ optional workflow (`docs/plans/README.md`). Every planning doc lives under
 `docs/plans/**` and is deleted once its work ships; git history keeps it.
 Durable decisions belong in `docs/specs/**`, and a PR updates the owning spec
 when it ships the decision.
+
+**Never reference a plan from code or docs**: no `docs/plans/...` path and no
+task/milestone ID (`M<n>-T<nn>`, `T-<YYYYMMDD>-<nn>`) in code, tests, flows,
+migrations, specs, or other docs — state the rule itself in the owning spec.
+Commit messages and PR bodies may cite them. `docs-check` enforces the path half.
+
+**Task protocol.** When the user wants to plan multi-PR work together, or hands
+you a task card to execute, offer the protocol in
+[`.claude/skills/task-protocol/SKILL.md`](.claude/skills/task-protocol/SKILL.md)
+(Claude Code: `/task-protocol`): plan together → one session per task → task-level
+design → build → review agent → PR → user review → merge → offer next cards →
+clean up the worktree and its stack.
 
 `docs/plans/**` and `docs/brainstorms/**` are working notes, not
 source-of-truth, and may be stale. **Do not read them, and do not let them

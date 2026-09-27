@@ -1,0 +1,13 @@
+{
+  "lane": "backend-fast",
+  "wall_ms": 30050,
+  "exit_code": 0,
+  "recorded_at": "20260926T181819Z",
+  "machine_id": "e277734d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.6.2",
+  "slot": "1",
+  "commit": "7fcad5eb",
+  "source": "gate"
+}

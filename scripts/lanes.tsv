@@ -1,7 +1,7 @@
 # BOGA lane registry — the single source for test lanes.
 #
 # Consumed by ./boga (gates, `test --list`, `test <lane>`); lane names here ARE
-# the timing-record lane names (docs/testing/timings/records/) and the names the
+# the timing-record lane names (scripts/lane-timing.sh) and the names the
 # docs cite. Keep docs/specs/02-quality-and-test-gates.md's matrix in sync with
 # this file in the same change.
 #

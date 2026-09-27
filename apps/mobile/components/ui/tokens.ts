@@ -1,55 +1,5 @@
-export const uiColors = {
-  actionPrimary: '#0f5cc0',
-  actionPrimaryDisabled: '#96afcf',
-  actionPrimarySubtleBg: '#eaf2ff',
-  actionPrimarySubtleBorder: '#cfe1ff',
-  actionDanger: '#b3261e',
-  actionDangerText: '#8a2323',
-  actionDangerSubtleBg: '#fff0f0',
-  actionDangerSubtleBorder: '#f3c5c5',
-  actionNeutralSubtleBg: '#eef2f9',
-  actionNeutralSubtleBorder: '#c7d3e8',
-  actionNeutralSubtleText: '#20324f',
-  borderDefault: '#d0d0d0',
-  borderStrong: '#6f6f6f',
-  borderInputStrong: '#b7c6dd',
-  borderSuccess: '#b9dfc3',
-  borderWarning: '#f0c9a5',
-  borderMuted: '#dbe3ef',
-  overlayScrim: 'rgba(0, 0, 0, 0.35)',
-  overlayScrimSoft: 'rgba(0, 0, 0, 0.28)',
-  surfaceDisabled: '#f4f6fa',
-  surfaceDefault: '#ffffff',
-  surfaceInfo: '#f5f9ff',
-  surfaceMuted: '#fafafa',
-  surfacePage: '#f4f7fb',
-  surfaceReadOnly: '#f4f4f4',
-  surfaceSuccess: '#effcf3',
-  surfaceWarning: '#fff7ee',
-  textPrimary: '#122033',
-  textSuccess: '#125d2f',
-  textSecondary: '#56667f',
-  textDisabled: '#8190a8',
-  textMuted: '#555555',
-  textWarning: '#7f4214',
-  textAccentStrong: '#0f2a46',
-  textAccentMuted: '#37516f',
-  actionSuccess: '#1f8740',
-  rowActiveBackground: '#eef5ff',
-  rowActiveBorder: '#a9c7f5',
-  rowPlannedBackground: '#e8eef7',
-  rowPlannedBorder: '#b8c7da',
-  rowSwipeDeleteBackground: '#fff0f0',
-  rowSwipeIcon: '#20324f',
-  rowSwipeText: '#20324f',
-} as const;
-
-// The design-language colour roles (`docs/specs/ui/design-language.md` §2).
-// Added alongside `uiColors`, not into it: the two vocabularies are meant to
-// stay visibly separate so the switch-over step can delete the legacy palette
-// wholesale instead of untangling one object. Nothing adopts these yet.
-//
-// A screen names the role, never the hex.
+// The colour roles (`docs/specs/ui/design-language.md` §2). A screen names the
+// role, never the hex.
 export const uiRoles = {
   // Text and realised values.
   ink: '#15181D',
@@ -97,11 +47,9 @@ export const uiRoles = {
   scrim: 'rgba(21, 24, 29, 0.42)',
 } as const;
 
-// The design-language geometry (`docs/specs/ui/design-language.md` §4): the
-// radii, fixed widths and label tracking the accepted target is drawn with
-// that the legacy scales do not carry. Kept apart from `uiRadius` / `uiSpace`
-// for the same reason `uiRoles` is kept apart from `uiColors` — the switch-over
-// step can then retire the legacy scales wholesale. Decided 2026-09-22.
+// The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
+// widths and label tracking the accepted target is drawn with. Decided
+// 2026-09-22.
 export const uiGeometry = {
   radius: {
     // Cards: `surface` on `paper`, 1px `rule`.
@@ -112,8 +60,7 @@ export const uiGeometry = {
     // button. The target drew 4 and 5, a difference with no name, so one value.
     // Added 2026-09-23 (exercise page).
     control: 4,
-    // Fully rounded ends: pills, tags and handles. Replaces the legacy
-    // `uiRadius.full` on design-language surfaces (2026-09-24).
+    // Fully rounded ends: pills, tags and handles.
     pill: 999,
   },
   // The minimum tap target, and the width of the set row's type and control
@@ -141,14 +88,6 @@ export const uiSpace = {
   lg: 16,
   xl: 24,
   xxl: 32,
-} as const;
-
-// Three values, each with a job. If two radii sit side by side and the
-// difference cannot be named, there is only one radius.
-export const uiRadius = {
-  sm: 8,
-  md: 12,
-  full: 999,
 } as const;
 
 // Eight sizes, down from the fourteen that used to ship. `base` stays at 14:
@@ -191,7 +130,7 @@ export const uiTypography = {
 // The three typefaces of `docs/specs/ui/design-language.md` §3, and the only
 // weights of each that ship. They are embedded in the binary by the expo-font
 // config plugin (`app.config.ts`), so they are available before JS runs and
-// need no loading step. Nothing adopts these yet.
+// need no loading step.
 //
 // Name a face as `{ fontFamily: uiFonts.x.family, fontWeight: <one of its
 // weights> }` — the same pair on iOS and Android. `family` is the files'
@@ -223,21 +162,7 @@ export const uiBorder = {
   width: 1,
 } as const;
 
-export const uiTokens = {
-  colors: uiColors,
-  roles: uiRoles,
-  fonts: uiFonts,
-  geometry: uiGeometry,
-  space: uiSpace,
-  radius: uiRadius,
-  typography: uiTypography,
-  border: uiBorder,
-  iconSize: uiIconSize,
-} as const;
-
-export type UiColorToken = keyof typeof uiColors;
 export type UiRoleToken = keyof typeof uiRoles;
 export type UiFontToken = keyof typeof uiFonts;
 export type UiSpaceToken = keyof typeof uiSpace;
 export type UiIconSizeToken = keyof typeof uiIconSize;
-export type UiRadiusToken = keyof typeof uiRadius;

@@ -74,19 +74,19 @@
 
 ## Design-token coverage policy
 
-- Applies to the design-language vocabularies in
-  `apps/mobile/components/ui/tokens.ts` (`uiRoles`, `uiFonts`, `uiGeometry`) and
-  the type scale (`docs/specs/ui/design-language.md` §2–§4, `ux-rules.md` §9a).
+- Applies to the one token vocabulary in `apps/mobile/components/ui/tokens.ts`
+  (`uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`,
+  `uiBorder`; `docs/specs/ui/design-language.md` §2–§4, `ux-rules.md` §9a).
 - `ui-design-tokens.test.ts` asserts, by whole-object equality: the eight type
   rungs and their line-heights, the colour roles named in §2, the geometry of
   §4 and the embedded faces of §3; and that `record !== accent` and `record`
-  clears 4.5:1 on `paper`, `surface` and `record-wash`. Change a value there
-  and in the spec together — never loosen the test to make an unrelated change
-  pass.
-- The redesign's temporary "additive only" snapshots of the legacy scales
-  (`uiColors`, `uiSpace`, `uiRadius`, `uiBorder`, `uiElevation`) were retired
-  with the redesign's close-out: the legacy scales may now change as screens
-  move to the design language.
+  clears 4.5:1 on `paper`, `surface` and `record-wash`; and that `tokens.ts`
+  exports exactly that vocabulary. Change a value there and in the spec
+  together — never loosen the test to make an unrelated change pass.
+- The retired legacy vocabulary (the `uiColors` / `uiRadius` / `uiElevation`
+  scales and the `UiText` / `UiSurface` / `UiButton` / `SegmentedChips`
+  primitives, removed 2026-09-26) is blocked by the `legacyVocabulary` rule in
+  `scripts/check-ui-guardrails.js`, proven by `ui-guardrails-script.test.ts`.
 
 
 ## Historical bodyweight fill coverage (M27)

@@ -33,6 +33,7 @@ import {
   type ExerciseHistoryTagOption,
 } from '@/src/data';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
   EMPTY_FIGURE,
@@ -90,6 +91,7 @@ export type ExerciseHistoryScreenShellProps = {
   summary: ExerciseHistorySummary | null;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
+  appliedGymId?: string | null;
   isLoading: boolean;
   errorMessage: string | null;
   onSelectPeriod: (period: ExerciseHistoryPeriod) => void;
@@ -103,6 +105,7 @@ export function ExerciseHistoryScreenShell({
   summary,
   period,
   appliedTagDefinitionId,
+  appliedGymId = null,
   isLoading,
   errorMessage,
   onSelectPeriod,
@@ -194,9 +197,11 @@ export function ExerciseHistoryScreenShell({
               <Card>
                 <StatePanel
                   body={
-                    appliedTagDefinitionId
-                      ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
-                      : 'No completed sessions for this exercise in this period.'
+                    appliedGymId
+                      ? 'No completed sessions for this gym in this period.'
+                      : appliedTagDefinitionId
+                        ? 'No sessions in this period have the selected tag. Pick another tag or widen the period.'
+                        : 'No completed sessions for this exercise in this period.'
                   }
                   fill={false}
                   testID="exercise-history-empty-state"
@@ -373,10 +378,22 @@ export default function ExerciseHistoryRoute() {
     exerciseDefinitionId?: string | string[];
     tagDefinitionId?: string | string[];
     period?: string | string[];
+    gymId?: string | string[];
+    currentGymId?: string | string[];
   }>();
+  const [listPreferences] = useExerciseListPreferences();
+
   const exerciseDefinitionId = coerceRouteParam(params.exerciseDefinitionId);
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
   const initialPeriod = parsePeriodParam(coerceRouteParam(params.period));
+
+  const routeGymId = coerceRouteParam(params.gymId);
+  const routeCurrentGymId = coerceRouteParam(params.currentGymId);
+  const appliedGymId =
+    routeGymId ??
+    (listPreferences.pastRecordsGymScope === 'current-gym' && routeCurrentGymId
+      ? routeCurrentGymId
+      : null);
 
   const [period, setPeriod] = useState<ExerciseHistoryPeriod>(initialPeriod);
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
@@ -387,7 +404,11 @@ export default function ExerciseHistoryRoute() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadSummary = useCallback(
-    async (nextPeriod: ExerciseHistoryPeriod, nextTagDefinitionId: string | null) => {
+    async (
+      nextPeriod: ExerciseHistoryPeriod,
+      nextTagDefinitionId: string | null,
+      nextGymId: string | null
+    ) => {
       if (!exerciseDefinitionId) {
         setSummary(null);
         setIsLoading(false);
@@ -401,6 +422,7 @@ export default function ExerciseHistoryRoute() {
           exerciseDefinitionId,
           period: nextPeriod,
           tagDefinitionId: nextTagDefinitionId,
+          gymId: nextGymId,
         });
         if (next === null) {
           setSummary(null);
@@ -419,24 +441,24 @@ export default function ExerciseHistoryRoute() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadSummary(period, appliedTagDefinitionId);
-    }, [loadSummary, period, appliedTagDefinitionId])
+      void loadSummary(period, appliedTagDefinitionId, appliedGymId);
+    }, [loadSummary, period, appliedTagDefinitionId, appliedGymId])
   );
 
   const handleSelectPeriod = useCallback(
     (next: ExerciseHistoryPeriod) => {
       setPeriod(next);
-      void loadSummary(next, appliedTagDefinitionId);
+      void loadSummary(next, appliedTagDefinitionId, appliedGymId);
     },
-    [loadSummary, appliedTagDefinitionId]
+    [loadSummary, appliedTagDefinitionId, appliedGymId]
   );
 
   const handleSelectTag = useCallback(
     (next: string | null) => {
       setAppliedTagDefinitionId(next);
-      void loadSummary(period, next);
+      void loadSummary(period, next, appliedGymId);
     },
-    [loadSummary, period]
+    [loadSummary, period, appliedGymId]
   );
 
   const title = summary?.exerciseName ?? 'Exercise History';
@@ -448,6 +470,7 @@ export default function ExerciseHistoryRoute() {
         summary={summary}
         period={period}
         appliedTagDefinitionId={appliedTagDefinitionId}
+        appliedGymId={appliedGymId}
         isLoading={isLoading}
         errorMessage={errorMessage}
         onSelectPeriod={handleSelectPeriod}

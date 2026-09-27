@@ -102,13 +102,19 @@ export function ExercisePageScreen({
     : null;
   const [recordsRevision, setRecordsRevision] = useState(0);
   const [estimateVisible, setEstimateVisible] = useState(false);
+  const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
+  const [listPreferences] = useExerciseListPreferences();
+  const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
     loadHistory,
     isCompletedSession ? sessionId : null,
+    {
+      scope: listPreferences.pastRecordsGymScope,
+      currentGymId,
+    },
     JSON.stringify([recordsRevision, editingExercise?.bodyweightCoefficient, editingExercise?.loadInputMode, editingExercise?.localBodyweightMetadataKnown])
   );
-  const [listPreferences] = useExerciseListPreferences();
 
   const [recordsExpanded, setRecordsExpanded] = useState(false);
   const [recordsView, setRecordsView] = useState<RecordsView>('records');
@@ -265,10 +271,14 @@ export function ExercisePageScreen({
             onEstimate={() => setEstimateVisible(true)}
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
+            isFilteredByGym={isFilteredByGym}
             onOpenHistory={() =>
               router.push({
                 pathname: '/exercise-history',
-                params: { exerciseDefinitionId: exercise.exerciseDefinitionId },
+                params: {
+                  exerciseDefinitionId: exercise.exerciseDefinitionId,
+                  ...(currentGymId ? { currentGymId } : {}),
+                },
               })
             }
             onSelectView={setRecordsView}

@@ -95,6 +95,7 @@ const buildInput = (
     exerciseDefinition,
     period: overrides.period ?? 30,
     appliedTagDefinitionId: overrides.appliedTagDefinitionId ?? null,
+    appliedGymId: overrides.appliedGymId ?? null,
     sessionsInPeriod,
     sessionsAllTime: overrides.sessionsAllTime ?? sessionsInPeriod,
     setsBySessionExerciseId: overrides.setsBySessionExerciseId ?? groupBy(setRows),
@@ -171,6 +172,90 @@ describe('aggregateExerciseHistory', () => {
       'tag-westside',
       'tag-wide',
     ]);
+  });
+
+  it('builds gym occurrence counts from the period and sorts by count desc then name', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        sessionsInPeriod: [
+          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+          sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-13T16:00:00.000Z'), gymId: 'gym-b', gymName: 'Beta Gym' }),
+          sessionRow({ sessionId: 's3', sessionExerciseId: 'se3', completedAt: new Date('2026-05-14T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+          sessionRow({ sessionId: 's4', sessionExerciseId: 'se4', completedAt: new Date('2026-05-15T16:00:00.000Z'), gymId: null, gymName: null }),
+        ],
+        setsBySessionExerciseId: {
+          se1: [setRow({ setId: 'st1', sessionExerciseId: 'se1', orderIndex: 0 })],
+          se2: [setRow({ setId: 'st2', sessionExerciseId: 'se2', orderIndex: 0 })],
+          se3: [setRow({ setId: 'st3', sessionExerciseId: 'se3', orderIndex: 0 })],
+          se4: [setRow({ setId: 'st4', sessionExerciseId: 'se4', orderIndex: 0 })],
+        },
+      })
+    );
+
+    expect(summary.gymOptions).toEqual([
+      { gymId: 'gym-a', name: 'Alpha Gym', occurrenceCount: 2 },
+      { gymId: 'gym-b', name: 'Beta Gym', occurrenceCount: 1 },
+      { gymId: 'no-gym', name: 'No gym', occurrenceCount: 1 },
+    ]);
+  });
+
+  it('filters sessions to those matching the applied gym ID', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        appliedGymId: 'gym-b',
+        sessionsInPeriod: [
+          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+          sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-13T16:00:00.000Z'), gymId: 'gym-b', gymName: 'Beta Gym' }),
+        ],
+        setsBySessionExerciseId: {
+          se1: [setRow({ setId: 'st1', sessionExerciseId: 'se1', orderIndex: 0 })],
+          se2: [setRow({ setId: 'st2', sessionExerciseId: 'se2', orderIndex: 0 })],
+        },
+      })
+    );
+
+    expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s2']);
+    expect(summary.gymOptions).toHaveLength(2);
+  });
+
+  it('filters sessions to unassigned gym when appliedGymId is no-gym', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        appliedGymId: 'no-gym',
+        sessionsInPeriod: [
+          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+          sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-13T16:00:00.000Z'), gymId: null, gymName: null }),
+        ],
+        setsBySessionExerciseId: {
+          se1: [setRow({ setId: 'st1', sessionExerciseId: 'se1', orderIndex: 0 })],
+          se2: [setRow({ setId: 'st2', sessionExerciseId: 'se2', orderIndex: 0 })],
+        },
+      })
+    );
+
+    expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s2']);
+  });
+
+  it('scopes all-time best to the applied gym', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        appliedGymId: 'gym-a',
+        sessionsInPeriod: [
+          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+        ],
+        sessionsAllTime: [
+          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+          sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-15T16:00:00.000Z'), gymId: 'gym-b', gymName: 'Beta Gym' }),
+        ],
+        setsBySessionExerciseId: {
+          se1: [setRow({ setId: 'st1', sessionExerciseId: 'se1', orderIndex: 0, weightValue: '100', repsValue: '5' })],
+          se2: [setRow({ setId: 'st2', sessionExerciseId: 'se2', orderIndex: 0, weightValue: '150', repsValue: '5' })],
+        },
+      })
+    );
+
+    expect(summary.allTimeBest.topWeight?.weight).toBe(100);
+    expect(summary.allTimeBest.topWeight?.sessionId).toBe('s1');
   });
 
   it('computes all-time best from the all-time pool, independent of the period filter', () => {

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
-# (gen-docs.sh, test-for.sh, pr-check.sh), the Supabase container resolver,
+# (gen-docs.sh, test-for.sh, pr-check.sh), the lane-timing store, the
+# Supabase container resolver,
 # the Maestro fixture-user and
 # flow-has-a-lane rules, and
 # the worktree lifecycle (temp git repos + stub gh/docker), Android
@@ -15,10 +16,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TESTS=(
   "gen-docs.test.sh"
+  "lane-timing.test.sh"
   "test-for.test.sh"
   "pr-check.test.sh"
+  "full-sweep.test.sh"
   "maestro-fixture-users.test.sh"
   "maestro-flow-lanes.test.sh"
+  "maestro-testids.test.sh"
   "supabase-cli-version.test.sh"
   "supabase-exit-trap-guard.test.sh"
   "supabase-container-resolver.test.sh"

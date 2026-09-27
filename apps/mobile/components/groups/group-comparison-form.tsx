@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Text } from 'react-native';
 
 import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
-import { ActionButton, Card, SegmentedControl, UiText, uiSpace } from '@/components/ui';
+import { ActionButton, Card, SegmentedControl, uiSpace } from '@/components/ui';
 import type { LoadInputMode } from '@/src/exercise-core';
 import { metricsForGroupRules, validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from '@/src/groups/metric-contract';
 import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 
 import { GroupWriteNotice } from './write-notice';
+import { groupMetricTextStyles as textStyles } from './screen-styles';
 
 type Props = {
   initialRules?: GroupExerciseRules;
@@ -70,8 +72,8 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
   const stale = dirty && existing && existing.rules_revision !== baseline.revision;
   return (
     <Card style={{ padding: uiSpace.md, gap: uiSpace.md }} testID="group-exercise-form">
-      {note ? <UiText testID="group-exercise-form-note" variant="bodyMuted">{note}</UiText> : null}
-      {baseline.revision !== null ? <UiText variant="bodyMuted" testID="group-rules-revision">Rules revision {baseline.revision}</UiText> : null}
+      {note ? <Text allowFontScaling={false} style={textStyles.muted} testID="group-exercise-form-note">{note}</Text> : null}
+      {baseline.revision !== null ? <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-revision">Rules revision {baseline.revision}</Text> : null}
       <ExerciseCoreFields editable={!pending} name={name} loadInputMode={loadInputMode}
         nameError={showErrors && !validation.ok && validation.field === 'name' ? validation.message : null}
         onChangeName={value => { changed(); setName(value); }}
@@ -80,23 +82,23 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
           onChange: value => { changed(); setLoadFields(value); }, error: rulesError }} />
       {movementChanged ? <GroupWriteNotice tone="error" testID="group-rules-movement-error"
         message="A different movement needs a new group exercise. Keep this movement standard to preserve its history." /> : null}
-      <UiText variant="bodyMuted">Default ranking</UiText>
+      <Text allowFontScaling={false} style={textStyles.muted}>Default ranking</Text>
       <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={defaultMetric} layout="fit"
         options={metricsForGroupRules({ bodyweightCoefficient: percentage > 0 ? percentage / 100 : 0 }).map(metric => ({
           value: metric, label: metricLabels[metric], accessibilityLabel: metricLabels[metric],
         }))}
         onChange={value => { changed(); setDefaultMetric(value); }} testIDPrefix="group-exercise-default-metric" />
-      <UiText variant="bodyMuted">Members can switch ranking views. This choice only sets the opening view.</UiText>
+      <Text allowFontScaling={false} style={textStyles.muted}>Members can switch ranking views. This choice only sets the opening view.</Text>
       {stale ? <GroupWriteNotice tone="error" testID="group-rules-stale"
         message="The group rules changed while you were editing. Your values are kept. Reload group rules to replace them with the current settings before editing again." /> : null}
       {stale ? <ActionButton variant="outline" label="Reload group rules" disabled={pending} testID="group-rules-reload"
         onPress={() => { setDirty(false); setReviewed(false); setShowErrors(false); }} /> : null}
       {reviewed && calculationChanged && validation.ok ? <>
-        <UiText variant="bodyMuted" testID="group-rules-preview">
+        <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-preview">
           {`Apply rules revision ${(baseline.revision ?? 0) + 1}: ${baseline.rules.bodyweightCoefficient * 100}% → ${validation.value.bodyweightCoefficient * 100}% bodyweight, ${validation.value.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} external weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`}
-        </UiText>
-        {baseline.legacy ? <UiText variant="bodyMuted">Existing certifications keep their original coverage. Recalculated comparisons need new metric-specific attestations.</UiText> :
-          <UiText variant="bodyMuted">Attestations of unchanged performance inputs stay valid. Personal exercise settings and saved session weights stay unchanged.</UiText>}
+        </Text>
+        {baseline.legacy ? <Text allowFontScaling={false} style={textStyles.muted}>Existing certifications keep their original coverage. Recalculated comparisons need new metric-specific attestations.</Text> :
+          <Text allowFontScaling={false} style={textStyles.muted}>Attestations of unchanged performance inputs stay valid. Personal exercise settings and saved session weights stay unchanged.</Text>}
       </> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
       <ActionButton variant="primary" disabled={pending || Boolean(stale)} label={pending ? pendingLabel : calculationChanged ? reviewed ? 'Apply group rules' : 'Review rule changes' : submitLabel}

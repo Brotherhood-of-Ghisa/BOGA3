@@ -1,15 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { ScrollView } from 'react-native';
 
 import {
   GroupLostAccessState,
   GroupMissingDataState,
   GroupStateView,
   GroupsSignInRequired,
-  groupScreenStyles,
   pickInlineError,
 } from '@/components/groups';
+import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
 import type { GroupExerciseRules } from '@/src/groups/metric-contract';
@@ -132,14 +131,8 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
-      automaticallyAdjustKeyboardInsets
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      style={groupScreenStyles.screen}
-      testID="group-exercise-edit-screen">
+    <ScreenScroll automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" testID="group-exercise-edit-screen">
       {body}
-    </ScrollView>
+    </ScreenScroll>
   );
 }

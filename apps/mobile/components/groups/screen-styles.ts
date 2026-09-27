@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { uiBorder, uiColors, uiGeometry, uiRadius, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiFonts, uiTypography, uiGeometry, uiRoles, uiSpace } from '@/components/ui';
 
 /**
  * Shared page shell for the group routes: the `Screen` / `ScreenScroll` ground
@@ -67,31 +67,27 @@ export const cardListItemStyles = (index: number, count: number) => [
   index === count - 1 ? groupScreenStyles.cardListItemLast : null,
 ];
 
-/** Field styles for the group write forms (same input treatment as the profile form). */
-export const groupFormStyles = StyleSheet.create({
-  card: {
-    padding: uiSpace.xxl,
-    gap: uiSpace.md,
-  },
-  field: {
-    gap: uiSpace.xs,
-  },
-  input: {
-    borderWidth: uiBorder.width,
-    borderColor: uiColors.borderInputStrong,
-    borderRadius: uiRadius.md,
-    backgroundColor: uiColors.surfaceDefault,
-    color: uiColors.textPrimary,
-    minHeight: 48,
-    paddingHorizontal: uiSpace.xxl,
-    paddingVertical: uiSpace.lg,
+/** Shared prose and section headings for versioned comparison screens. */
+export const groupMetricTextStyles = StyleSheet.create({
+  body: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
   },
-  multiline: {
-    minHeight: 96,
-    textAlignVertical: 'top',
+  muted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
   },
-  fieldError: {
-    color: uiColors.actionDangerText,
+  heading: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
   },
 });

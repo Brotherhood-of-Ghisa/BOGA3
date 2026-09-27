@@ -1,8 +1,8 @@
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { Text, FlatList, RefreshControl, View } from 'react-native';
 
-import { ActionButton, SegmentedControl, UiText, uiSpace } from '@/components/ui';
+import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getGroupMetricBoard } from '@/src/groups/api';
 import { isGroupMetric, metricsForGroupRules, type GroupMetric } from '@/src/groups/metric-contract';
@@ -13,7 +13,7 @@ import { GroupMetricRecordSheet } from './group-metric-record-sheet';
 import { GroupOfflineBanner } from './offline-banner';
 import { GroupPagesFooter } from './group-pages-footer';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from './group-state-view';
-import { groupScreenStyles } from './screen-styles';
+import { groupScreenStyles, groupMetricTextStyles as textStyles } from './screen-styles';
 import { usePullToRefresh } from './use-pull-to-refresh';
 
 const selectItems = (page: GroupMetricBoardWire) => page.entries;
@@ -66,20 +66,20 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const header = <View style={groupScreenStyles.header}>
     <Stack.Screen options={{ title: exercise.name }} />
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: uiSpace.md }}>
-      <UiText style={{ flex: 1 }} variant="label">{GROUP_METRIC_VIEW_LABELS[metric]}</UiText>
+      <Text allowFontScaling={false} style={[textStyles.heading, { flex: 1 }]}>{GROUP_METRIC_VIEW_LABELS[metric]}</Text>
       <ActionButton label="History" variant="text" testID="group-board-history-button" onPress={() => router.push(
         `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}&revision=${exercise.rules_revision}`)} />
     </View>
-    <UiText variant="bodyMuted" testID="group-board-rules">{describeGroupRules(exercise)}</UiText>
-    {exercise.archived_at_ms !== null ? <UiText testID="group-board-archived">Archived · read-only</UiText> : null}
+    <Text allowFontScaling={false} style={textStyles.muted} testID="group-board-rules">{describeGroupRules(exercise)}</Text>
+    {exercise.archived_at_ms !== null ? <Text allowFontScaling={false} style={textStyles.body} testID="group-board-archived">Archived · read-only</Text> : null}
     <SegmentedControl accessibilityLabel="Metric" options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
       value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
       onChange={value => selectView(metric, value)} testIDPrefix="group-board-scope" />
-    {metric === 'bodyweight_reps' ? <UiText variant="bodyMuted">Confirmed unweighted reps with no assistance. Body weight may be missing.</UiText>
-      : <UiText variant="bodyMuted">{exercise.bodyweight_coefficient > 0
+    {metric === 'bodyweight_reps' ? <Text allowFontScaling={false} style={textStyles.muted}>Confirmed unweighted reps with no assistance. Body weight may be missing.</Text>
+      : <Text allowFontScaling={false} style={textStyles.muted}>{exercise.bodyweight_coefficient > 0
         ? 'Strength estimates use the saved session body weight. Missing or incompatible performances are not ranked.'
-        : 'Weight and 1RM use the entered external load under the group’s declared weight convention.'}</UiText>}
+        : 'Weight and 1RM use the entered external load under the group’s declared weight convention.'}</Text>}
     {board.offline ? <GroupOfflineBanner lastUpdatedAtMs={board.loadedAtMs} /> : null}
     {error && board.firstPage ? <GroupInlineError error={error} onRetry={onRefresh} testID="group-board-inline-error" /> : null}
     {staleCursor ? <GroupStateView title="The board changed" body="Refresh to load one consistent rules revision."

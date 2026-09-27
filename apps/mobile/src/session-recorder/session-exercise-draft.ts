@@ -39,6 +39,7 @@ export type SessionExerciseDraftLoad =
       exercise: SessionDraftExerciseSnapshot;
       sessionStatus: SessionGraphSnapshot['status'];
       bodyWeight: SessionBodyWeightSnapshot;
+      gymId: string | null;
     }
   | { status: SessionExerciseDraftLoadError };
 
@@ -61,7 +62,7 @@ export const loadSessionExerciseDraft = async (
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
-  return exercise ? { status: 'ready', exercise, sessionStatus: session.status, bodyWeight: {
+  return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, bodyWeight: {
     bodyWeightKg: session.bodyWeightKg, bodyWeightSource: session.bodyWeightSource,
     bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
     localBodyweightMetadataKnown: session.localBodyweightMetadataKnown,

@@ -24,8 +24,9 @@ Scope boundary:
   are required, which command wrappers are canonical, where evidence is expected).
 - `docs/specs/12-worktree-config-and-isolation.md` owns the worktree slot model,
   port derivation, and runtime isolation.
-- Durations are owned by the measured per-run records under
-  `docs/testing/timings/records/` (written automatically by the gate wrappers).
+- Durations are owned by the measured per-run records in each machine's timing
+  store, `~/.config/boga/timings/records/` (written automatically by every
+  `./boga test` lane run; not in git).
   Read them with `./scripts/test-timings.sh` (median + a 3× "investigate above
   this" ceiling per lane); interpretation guide:
   `docs/testing/local-test-timings.md`. Cite the reader or re-measure; do not
@@ -105,7 +106,8 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 | Gate | Expands to (registry order) | Infrastructure | When to run |
 |---|---|---|---|
 | `./boga test fast` | `lint` + `typecheck` + `jest-full` + `docs-check` + `meta-tests` + `agent-auth-web` + `mcp-unit` + `backend-fast` | mobile/repository/consent/MCP lanes none; backend-fast local Supabase + Docker | Default local closeout fast gate. (`fast-frontend`, `fast-repo`, and `fast-backend` run the parts.) |
-| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-auth-profile` + `ios-sync-e2e` + `ios-groups-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile, sync-e2e, and groups-e2e additionally need local Supabase + Docker | Risk-triggered: UI/runtime/auth-profile/sync changes needing real-simulator evidence. |
+| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-auth-profile` + `ios-sync-e2e` + `ios-groups-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile, sync-e2e, and groups-e2e additionally need local Supabase + Docker | Risk-triggered: root layout / Maestro harness / Maestro runtime changes, and the full sweep (`./boga sweep`, run before iOS builds and on large PRs). |
+| `./boga test frontend-ui` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` (the `frontend` lanes whose infra is `ios`) | iOS simulator + Metro + Maestro dev-client; no Supabase | Any screen/component change (`app/**`, `components/**`); the Supabase-backed e2e lanes are added by their own area triggers (spec 02). |
 | `./boga test backend` | `auth-authz` → `groups-contract` → `groups-leaderboards` → `agent-api` → `sync-v2-schema` → `sync-push-contract` → `sync-pull-contract` → `dev-wipe-my-data` → `sync-drift` → `sync-v2-e2e` → `sync-infra` → `mcp-smoke` | local Supabase + Docker (`run-suite.sh` ensures `ensure-local-runtime-baseline.sh`; the smoke also starts the local MCP process) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures, or the MCP-to-API boundary. |
 
 > The slow gate runs are not always mandatory. "When to run" is governed by the
@@ -116,7 +118,7 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 
 | Lane | Purpose | When to run |
 |---|---|---|
-| `docs-check` | `gen-docs.sh check`: generated doc blocks current (lane matrix; median column exempt from staleness), lane-name citations valid, relative `.md` links resolve, spec ownership headers present. | Any docs/registry/CI-definition change. Part of `boga test fast` and CI. |
+| `docs-check` | `gen-docs.sh check`: generated doc blocks current (lane matrix; median column exempt from staleness), lane-name citations valid, relative `.md` links resolve, spec ownership headers present, no plan-file path (`docs/plans/<file>.md`) referenced outside `docs/plans/**` / `docs/brainstorms/**`. | Any docs/registry/CI-definition change. Part of `boga test fast` and CI. |
 | `meta-tests` | `scripts/tests/run-meta-tests.sh`: fixture-based self-tests for `gen-docs.sh`, `test-for.sh` (trigger matcher), `pr-check.sh` (PR Tests-table checker), the Android launchers (SDK discovery, evaluated Metro ports, matching local API reverse, argument forwarding and failure paths with stub adb/Expo), and the iOS simulator boot-wait (`ios-sim-boot.sh` fails within its deadline with a diagnosis, killing the blocked `simctl bootstatus`, with stub xcrun). | Any change to the meta-tooling under `scripts/`, or to `apps/mobile/scripts/ios-sim-boot.sh`. Part of `boga test fast` and CI. |
 | `agent-auth-web` | `scripts/test-agent-auth-web.sh`: clean locked install, production-dependency audit, consent authorization-state tests, typecheck, and Vite production build. | Any `apps/agent-auth-web/**` change. Part of `boga test fast` and CI. |
 | `mcp-unit` | `scripts/test-boga-mcp.sh`: clean locked install, production-dependency audit, typecheck, MCP discovery/tool translation/security-contract tests, and production build. | Any `services/boga-mcp/**` change. Part of `boga test fast` and CI. |
@@ -218,7 +220,10 @@ screenshots are the visual evidence.
 
 - `.github/workflows/ci.yml` runs one job (`frontend`) on every push and pull
   request to `main`.
-- It runs `docs-check` and `meta-tests`, installs the mobile workspace, runs
+- It runs `docs-check` and `meta-tests` (including `maestro-testids`: every
+  Maestro `id:` selector must still exist in app source, so a restyle that
+  renames an id a flow taps fails on the PR even when that flow's lane was not
+  required), installs the mobile workspace, runs
   mobile lint/typecheck/Jest, runs the locked `agent-auth-web` and `mcp-unit`
   wrappers in their workspaces, then runs the mobile open-handle guard. These
   are all infra-free lanes marked CI-enabled in the registry.
@@ -339,10 +344,12 @@ This document keeps only the cross-cutting policies below.
   real tab navigation (no teleport). Required smoke screenshots: `01-m26-today`
   … `05-m26-session-view-empty` (capture automated by the flow; stored under
   the canonical artifact root).
-- Require `./boga test frontend` when a change touches the committed
-  smoke/data-smoke flows, Maestro runtime scripts, the dev-client/runtime
-  handshake, harness setup behavior, or user-facing UI that needs fresh
-  real-simulator smoke evidence.
+- Require `./boga test frontend` when a change touches Maestro runtime
+  scripts, the dev-client/runtime handshake, the root layout, or harness setup
+  behavior. A screen/component change requires `./boga test frontend-ui` (plus
+  the e2e lane of its area); editing one committed flow requires only the lane
+  that runs it. The authoritative path → lane map is `scripts/triggers.tsv`
+  (`./boga test for`), summarized in spec 02.
 
 ## iOS simulator data smoke policy (Maestro)
 

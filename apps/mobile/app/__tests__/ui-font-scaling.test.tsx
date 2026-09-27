@@ -5,7 +5,6 @@ import ts from 'typescript';
 
 import { FormField } from '@/components/ui/form-field';
 import { SearchField } from '@/components/ui/search-field';
-import { UiText } from '@/components/ui/text';
 
 const APP_ROOT = join(__dirname, '../..');
 
@@ -17,7 +16,7 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-// Screen-local Text/TextInput uses can bypass UiText and the field primitives.
+// Screen-local Text/TextInput uses can bypass the field primitives.
 // Check the parsed JSX (including import aliases), and require false AFTER
 // every spread so callers cannot accidentally turn scaling back on.
 it('disables font scaling on every app-owned native text and input', () => {
@@ -61,12 +60,6 @@ it('disables font scaling on every app-owned native text and input', () => {
   }
   expect(checked).toBeGreaterThan(0);
   expect(violations).toEqual([]);
-});
-
-it('keeps shared text and nested text fixed even when a caller requests scaling', () => {
-  render(<UiText allowFontScaling>Weight <UiText allowFontScaling>100 kg</UiText></UiText>);
-  expect(screen.getByText('Weight 100 kg').props.allowFontScaling).toBe(false);
-  expect(screen.getByText('100 kg').props.allowFontScaling).toBe(false);
 });
 
 it('keeps form values and validation text fixed while preserving editing', () => {

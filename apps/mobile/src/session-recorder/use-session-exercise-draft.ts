@@ -30,6 +30,7 @@ export type SessionExerciseDraftState =
       // A completed session is edited in place (history, not a draft).
       sessionStatus: SessionGraphSnapshot['status'];
       bodyWeight: SessionBodyWeightSnapshot;
+      gymId: string | null;
     };
 
 // `text`: typing, saved after the debounce. `structural`: a commit, toggle,
@@ -71,6 +72,7 @@ export const useSessionExerciseDraft = ({
   const exerciseRef = useRef<SessionDraftExerciseSnapshot | null>(null);
   const sessionStatusRef = useRef<SessionGraphSnapshot['status']>('active');
   const bodyWeightRef = useRef<SessionBodyWeightSnapshot>({});
+  const gymIdRef = useRef<string | null>(null);
   const saveFailedRef = useRef(false);
   const isMountedRef = useRef(true);
   const autosaveRef = useRef<DraftAutosaveController | null>(null);
@@ -136,7 +138,7 @@ export const useSessionExerciseDraft = ({
       const next = recipe(current);
       if (next === current) return;
       exerciseRef.current = next;
-      setState({ status: 'ready', exercise: next, sessionStatus: sessionStatusRef.current, bodyWeight: bodyWeightRef.current });
+      setState({ status: 'ready', exercise: next, sessionStatus: sessionStatusRef.current, bodyWeight: bodyWeightRef.current, gymId: gymIdRef.current });
       if (kind === 'text') {
         autosave.markTextMutation();
       } else {
@@ -173,7 +175,8 @@ export const useSessionExerciseDraft = ({
     if (result.status === 'ready') {
       exerciseRef.current = result.exercise; sessionStatusRef.current = result.sessionStatus;
       bodyWeightRef.current = result.bodyWeight;
-      setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight });
+      gymIdRef.current = result.gymId;
+      setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId });
     } else setState({ status: 'error', reason: result.status });
     return result.status === 'ready';
     } catch (error) {

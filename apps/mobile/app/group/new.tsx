@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView } from 'react-native';
 
 import {
   GroupDetailsForm,
   GroupLoadingState,
   GroupsSignInRequired,
   UsernameGate,
-  groupScreenStyles,
   useUsernameGate,
 } from '@/components/groups';
+import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { createGroup, describeGroupWriteError, useGroupAction, type GroupDetailsInput } from '@/src/groups';
 
@@ -43,11 +42,7 @@ function NewGroupContent({ userId }: { userId: string }) {
   };
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
-      keyboardShouldPersistTaps="handled"
-      style={groupScreenStyles.screen}
-      testID="group-new-screen">
+    <ScreenScroll keyboardShouldPersistTaps="handled" testID="group-new-screen">
       {gate.status === 'checking' ? <GroupLoadingState testID="group-new-loading" /> : null}
       {gate.status === 'required' ? <UsernameGate notice={gate.notice} onSaved={gate.complete} userId={userId} /> : null}
       {gate.status === 'ready' ? (
@@ -61,6 +56,6 @@ function NewGroupContent({ userId }: { userId: string }) {
           submitLabel="Create group"
         />
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }

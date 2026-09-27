@@ -1,0 +1,13 @@
+{
+  "lane": "ios-bodyweight",
+  "wall_ms": 1017287,
+  "exit_code": 1,
+  "recorded_at": "20260927T031029Z",
+  "machine_id": "e277734d",
+  "hw": "Apple M4",
+  "cores": 10,
+  "os": "macOS 26.6.2",
+  "slot": "1",
+  "commit": "629a6b4b",
+  "source": "gate"
+}

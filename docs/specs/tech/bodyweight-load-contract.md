@@ -1,7 +1,7 @@
 # Bodyweight Load Contract (M27)
 
-> **Status: planned**, except where an implementation is explicitly identified.
-> This is the agreed implementation contract, not a claim that M27 is enabled.
+> **Status: implemented in the release branch; final native acceptance and hosted rollout pending.**
+> This contract does not claim that the hosted feature is enabled.
 > Owns bodyweight load meaning, snapshots, completeness and group dependencies.
 > Storage/wire mechanics remain in [05](../05-data-model.md) and
 > [Sync v2](sync-v2-server-contract.md); group authorization and ordinary events
@@ -10,7 +10,7 @@
 Baseline reviewed: `a34708c0d6622e2d842771bdfbf2038a38f9aaed`, containing
 `origin/main` on 2026-09-26. The existing calculation is **Wathan**, and raw
 set weights had no unit or added/assisted interpretation column at that baseline.
-T02 implements the paired schema, transport and compatibility replay below.
+The paired schema, transport and compatibility replay are implemented below.
 The implementation order is storage/read compatibility, explicit load entry
 and legacy review, consumer adoption, then server-first feature rollout.
 
@@ -128,7 +128,8 @@ Implementation foundation: `apps/mobile/src/exercise-calculations/effective-load
 implements the pure resolver, performed metrics, coverage, reps eligibility and
 named projection conventions. `effective-load-vectors.json` beside it contains
 shared numerical evidence, asserted by `app/__tests__/effective-load.test.ts`.
-Consumer adoption remains planned; existing production calls are unchanged.
+Personal, shared-session, group and coaching consumers use this boundary as
+described in §6, §8 and §9.
 The vectors and tests
 also cover kg/lb parity, bilateral external inputs, missing/invalid context,
 zero/negative load, confirmed versus planned, high reps, conventional behavior,
@@ -139,7 +140,7 @@ release convention, not a claim of full mass borne through the hands.
 
 ## 4. Readings, snapshots and historical fill
 
-T04 implements Settings reading entry/history and explicit session correction
+Settings reading entry/history and explicit session correction are implemented
 in `src/data/bodyweight.ts`, with positive finite kg/lb validation, no future
 readings, dirty/monotonic writes and post-commit sync nudges. New-session
 `saveDraftGraph` captures the tuple inside its creation transaction; ordinary
@@ -208,7 +209,7 @@ versions carry the new meaning/context fields; old packages remain unresolved.
 
 Only reviewed exact canonical ids receive defaults: `seed_pull_up` (1),
 `seed_chin-ups` (1), `seed_parallel_bar_dips` (1), `seed_push_up` (.7).
-The T05 inventory confirms those four identities survive the M19 starter filter;
+Those four identities survive the starter catalogue filter;
 no alias is added. Their initial standards/methods are `Strict pull-up` / `Belt`,
 `Strict chin-up` / `Belt`, `Parallel-bar dip` / `Belt`, and
 `Standard floor push-up` / `Vest`. These are editable explicit descriptions,
@@ -221,7 +222,7 @@ conventional identities); unequal c alone does not make a link incompatible.
 A different movement needs a different exercise. Linking never copies rules
 over personal metadata. Two groups can evaluate one set with different c.
 
-T05 implementation: the catalogue's generation 3 patch changes only live, exact
+The catalogue's generation 3 patch changes only live, exact
 canonical identities whose names still match the bundle and whose known metadata
 remains 0/null/null. Renames, custom rules and deleted seeds are preserved.
 Unknown old-client metadata defers the generation marker until sync replay has
@@ -233,8 +234,8 @@ copy and graph autosave. A stale page whose metadata was unknown omits its
 placeholders at the write boundary, preserving a replay completed meanwhile.
 New empty rows start with explicit added kg. Copies preserve their source's
 meaning, including unresolved legacy rows. Session-only correction is available
-on the exercise page. Logger previews resolve the frozen context; broader
-records/analytics adoption remains T07.
+on the exercise page. Logger previews, records and analytics resolve the frozen
+context through the same boundary (§8).
 
 `src/data/legacy-load-review.ts` inventories actual and planned unresolved values,
 previews selected interpretations, and rechecks the complete source membership
@@ -342,7 +343,8 @@ are supplied atomically; partial tuples are rejected at the application
 boundary. Tests must prove older writes cannot erase populated new fields.
 Row LWW still controls whether the write wins; this is compatibility, not
 independent field clocks. Deploy compatible server readers/writers before
-enabling new client fields; T12 verifies hosted smoke and rollout order.
+enabling new client fields. The release procedure in RUNBOOK requires hosted
+compatibility smoke before activation.
 
 Authorized group reads reveal only needed shared session context, never
 reading history, owner-private gym coordinates or unrelated measurements.
@@ -395,8 +397,11 @@ B replaces the reading/prefill hint with an explicit entered-target explanation.
 
 Explicit B corrections reload detail graphs and insights. Definition edits and
 legacy conversion refresh records/history on save or focus. New readings leave
-old projections unchanged. Shared-session, group and coaching consumers require
-their own corresponding integration; this section does not claim their rollout.
+old projections unchanged. The current-gym preference filters records and
+history without changing the frozen context or importing another gym’s best.
+Changing the gym scope or explicitly correcting a saved input reloads the
+projection under that scope. Group and coaching integration is described in
+§6 and §9; this section does not claim hosted rollout.
 
 ## 9. Coaching integration (locally verified; hosted rollout pending)
 
@@ -414,5 +419,5 @@ totals are null; records exclude incomplete session volume. MCP passes both
 structured and text JSON through without recalculating or acquiring database
 access. The [API contract](../../../supabase/functions/agent-api/README.md#effective-load-response-evolution)
 owns response shapes and compatibility details. Fast, backend contract parity
-and real OAuth MCP smoke passed locally; T12 still owns hosted rollout and
-deployed verification.
+and real OAuth MCP smoke passed locally. Hosted rollout and deployed
+verification remain required before client activation.

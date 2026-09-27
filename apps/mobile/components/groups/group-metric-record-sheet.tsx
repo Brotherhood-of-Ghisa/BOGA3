@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, ScrollView } from 'react-native';
+import { Text, Alert, ScrollView } from 'react-native';
 
-import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, UiText, uiSpace } from '@/components/ui';
+import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, uiSpace } from '@/components/ui';
 import { canManageGroup, formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { certifyGroupMetric, endGroupMetricCertification, getGroupMetricCertification, toGroupApiError } from '@/src/groups/api';
 import { describeGroupPerformanceWeight, describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
 import type { GroupMetric } from '@/src/groups/metric-contract';
 import type { GroupMetricBoardRowWire, GroupMetricCertificationWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 import { GroupWriteNotice } from './write-notice';
+import { groupMetricTextStyles as textStyles } from './screen-styles';
 
 /** A metric attestation always submits the revision and dependency pin shown here. */
 export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole, onClose, onChanged, readOnlyReason, initialCertification, metricOptions, onSelectMetric, onHistory }: {
@@ -103,24 +104,24 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
-      <UiText>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</UiText>
-      <UiText testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</UiText>
-      {exercise.bodyweight_coefficient > 0 || row.performance.body_weight_kg !== null ? <UiText testID="group-metric-record-weight">Session body weight: {describeGroupPerformanceWeight(row.performance)}</UiText> : null}
-      {row.effective_resistance_kg !== null ? <UiText>Effective resistance: {Number(row.effective_resistance_kg.toFixed(3))} kg</UiText> : null}
-      {row.external_adjustment_kg !== null ? <UiText>External adjustment: {Number(row.external_adjustment_kg.toFixed(3))} kg
-        {row.added_percent_bodyweight !== null ? ` · ${Number(row.added_percent_bodyweight.toFixed(2))}% of session body weight` : ''}</UiText> : null}
-      <UiText variant="bodyMuted">{describeGroupRules(exercise)}</UiText>
-      <UiText variant="bodyMuted">{includesWeight
+      <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</Text>
+      <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</Text>
+      {exercise.bodyweight_coefficient > 0 || row.performance.body_weight_kg !== null ? <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-weight">Session body weight: {describeGroupPerformanceWeight(row.performance)}</Text> : null}
+      {row.effective_resistance_kg !== null ? <Text allowFontScaling={false} style={textStyles.body}>Effective resistance: {Number(row.effective_resistance_kg.toFixed(3))} kg</Text> : null}
+      {row.external_adjustment_kg !== null ? <Text allowFontScaling={false} style={textStyles.body}>External adjustment: {Number(row.external_adjustment_kg.toFixed(3))} kg
+        {row.added_percent_bodyweight !== null ? ` · ${Number(row.added_percent_bodyweight.toFixed(2))}% of session body weight` : ''}</Text> : null}
+      <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules(exercise)}</Text>
+      <Text allowFontScaling={false} style={textStyles.muted}>{includesWeight
         ? 'Certification pins this set’s entered load, mode, reps, performed status and saved body weight with its source. Corrections can invalidate it.'
-        : 'Certification pins this set’s entered load, mode, reps and performed status. Session body weight is not part of this metric’s certification.'}</UiText>
-      <UiText variant="bodyMuted">{row.metric === 'e1rm' || includesWeight ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</UiText>
-      <UiText testID="group-metric-record-status">{active
+        : 'Certification pins this set’s entered load, mode, reps and performed status. Session body weight is not part of this metric’s certification.'}</Text>
+      <Text allowFontScaling={false} style={textStyles.muted}>{row.metric === 'e1rm' || includesWeight ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</Text>
+      <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-status">{active
         ? `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms)}`
-        : certification?.end_reason ? `Certification ${certification.end_reason}` : certified ? 'Certified' : 'Uncertified'}</UiText>
-      {active && active.rules_revision !== row.rules_revision ? <UiText variant="bodyMuted">Observed under rules {active.rules_revision}; unchanged performance inputs remain attested.</UiText> : null}
-      {readOnly ? <UiText variant="bodyMuted">Read-only · {readOnlyReason ?? (row.former ? 'former member' : exercise.rebuilding ? 'rules are recalculating' : 'archived or earlier rules')}</UiText> : null}
-      {online === false ? <UiText variant="bodyMuted">Reconnect to change certification.</UiText> : null}
-      {isMine && !certified ? <UiText variant="bodyMuted">Another group member can certify your performance.</UiText> : null}
+        : certification?.end_reason ? `Certification ${certification.end_reason}` : certified ? 'Certified' : 'Uncertified'}</Text>
+      {active && active.rules_revision !== row.rules_revision ? <Text allowFontScaling={false} style={textStyles.muted}>Observed under rules {active.rules_revision}; unchanged performance inputs remain attested.</Text> : null}
+      {readOnly ? <Text allowFontScaling={false} style={textStyles.muted}>Read-only · {readOnlyReason ?? (row.former ? 'former member' : exercise.rebuilding ? 'rules are recalculating' : 'archived or earlier rules')}</Text> : null}
+      {online === false ? <Text allowFontScaling={false} style={textStyles.muted}>Reconnect to change certification.</Text> : null}
+      {isMine && !certified ? <Text allowFontScaling={false} style={textStyles.muted}>Another group member can certify your performance.</Text> : null}
       {notice ? <GroupWriteNotice {...notice} testID="group-metric-record-notice" /> : null}
       {needsReview || (row.certification_id && !certification && notice?.tone === 'error') ? <ActionButton label="Refresh and review"
         disabled={pending || online === false} onPress={() => { setReload(n => n + 1); void onChanged(); }} variant="outline"

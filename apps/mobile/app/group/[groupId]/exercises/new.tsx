@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import {
   GroupLostAccessState,
@@ -8,10 +8,9 @@ import {
   GroupStateView,
   GroupsSignInRequired,
   StandardExercisePicker,
-  groupScreenStyles,
   pickInlineError,
 } from '@/components/groups';
-import { SegmentedChips, UiText } from '@/components/ui';
+import { ScreenScroll, SegmentedControl, uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
 import { BODYWEIGHT_SEED_RULES, CONVENTIONAL_LOAD_RULES } from '@/src/exercise-core/load-rules';
@@ -117,7 +116,8 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   } else {
     body = (
       <>
-        <SegmentedChips
+        <SegmentedControl
+          accessibilityLabel="Exercise source"
           onChange={(next: ExerciseSource) => {
             setSource(next);
             create.reset();
@@ -125,7 +125,6 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
           options={SOURCE_OPTIONS}
           testIDPrefix="group-exercise-source"
           value={source}
-          variant="joined"
         />
         {source === 'custom' ? (
           <GroupComparisonForm key="custom" {...formProps} />
@@ -150,9 +149,9 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
                 {...formProps}
               />
             ) : (
-              <UiText testID="group-exercise-pick-hint" variant="bodyMuted">
+              <Text allowFontScaling={false} style={styles.hint} testID="group-exercise-pick-hint">
                 Pick a standard exercise to copy.
-              </UiText>
+              </Text>
             )}
           </>
         )}
@@ -161,14 +160,18 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
-      automaticallyAdjustKeyboardInsets
-      keyboardDismissMode="on-drag"
-      keyboardShouldPersistTaps="handled"
-      style={groupScreenStyles.screen}
-      testID="group-exercise-new-screen">
+    <ScreenScroll automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" testID="group-exercise-new-screen">
       {body}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
+
+const styles = StyleSheet.create({
+  hint: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+});

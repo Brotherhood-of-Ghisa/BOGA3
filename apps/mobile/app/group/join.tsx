@@ -1,17 +1,24 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   GroupLoadingState,
   GroupWriteNotice,
   GroupsSignInRequired,
   UsernameGate,
-  groupFormStyles,
-  groupScreenStyles,
   useUsernameGate,
 } from '@/components/groups';
-import { UiButton, UiSurface, UiText, uiColors } from '@/components/ui';
+import {
+  ActionButton,
+  Card,
+  FormField,
+  ScreenScroll,
+  uiFonts,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   describeGroupWriteError,
@@ -28,7 +35,8 @@ const firstParam = (value: string | string[] | undefined): string =>
 /**
  * Join a group (groups contract §6.3, card flow 3). `boga3://group/join?code=…`
  * opens here with the code prefilled and previewed; a new link remounts the
- * screen with its own code.
+ * screen with its own code. The code is a figure (a Plex Mono field); the
+ * preview `Card`'s `Join group` is the screen's one `accent`.
  */
 export default function JoinGroupRoute() {
   const { isConfigured, user } = useAuth();
@@ -109,65 +117,86 @@ function JoinGroupContent({ userId, initialCode }: { userId: string; initialCode
   const busy = lookup.pending || join.pending;
 
   return (
-    <ScrollView
-      contentContainerStyle={groupScreenStyles.content}
-      keyboardShouldPersistTaps="handled"
-      style={groupScreenStyles.screen}
-      testID="group-join-screen">
+    <ScreenScroll keyboardShouldPersistTaps="handled" testID="group-join-screen">
       {gate.status === 'checking' ? <GroupLoadingState testID="group-join-loading" /> : null}
       {gate.status === 'required' ? <UsernameGate notice={gate.notice} onSaved={gate.complete} userId={userId} /> : null}
       {gate.status === 'ready' ? (
         <>
-          <UiSurface style={groupFormStyles.card} testID="group-join-form">
-            <View style={groupFormStyles.field}>
-              <UiText variant="subtitle">Invite code</UiText>
-              <TextInput
-                allowFontScaling={false}
-                accessibilityLabel="Invite code"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                editable={!busy}
-                onChangeText={onChangeCode}
-                onSubmitEditing={() => void runPreview(code)}
-                placeholder="8-character code"
-                placeholderTextColor={uiColors.textDisabled}
-                returnKeyType="go"
-                style={groupFormStyles.input}
-                testID="group-join-code-input"
-                value={code}
-              />
-            </View>
+          <View style={styles.form} testID="group-join-form">
+            <FormField
+              accessibilityLabel="Invite code"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!busy}
+              label="Invite code"
+              onChangeText={onChangeCode}
+              onSubmitEditing={() => void runPreview(code)}
+              placeholder="8-character code"
+              returnKeyType="go"
+              testID="group-join-code-input"
+              value={code}
+            />
             {failureMessage ? <GroupWriteNotice message={failureMessage} testID="group-join-error" tone="error" /> : null}
             {preview ? null : (
-              <UiButton
+              <ActionButton
                 disabled={busy}
                 label={lookup.pending ? 'Checking…' : 'Find group'}
                 onPress={() => void runPreview(code)}
                 testID="group-join-preview-button"
-                variant="secondary"
+                variant="outline"
               />
             )}
-          </UiSurface>
+          </View>
           {preview ? (
-            <UiSurface style={groupFormStyles.card} testID="group-join-preview">
-              <UiText testID="group-join-preview-name" variant="title">
+            <Card style={styles.preview} testID="group-join-preview">
+              <Text allowFontScaling={false} accessibilityRole="header" style={styles.name} testID="group-join-preview-name">
                 {preview.name}
-              </UiText>
-              <UiText testID="group-join-preview-meta" variant="subtitle">
+              </Text>
+              <Text allowFontScaling={false} style={styles.meta} testID="group-join-preview-meta">
                 {preview.already_member
                   ? `${formatMemberCount(preview.member_count)} · You're already a member`
                   : formatMemberCount(preview.member_count)}
-              </UiText>
-              <UiButton
-                disabled={busy}
-                label={preview.already_member ? 'Open group' : join.pending ? 'Joining…' : 'Join group'}
-                onPress={() => void onJoin()}
-                testID="group-join-submit"
-              />
-            </UiSurface>
+              </Text>
+              <View style={styles.previewAction}>
+                <ActionButton
+                  disabled={busy}
+                  label={preview.already_member ? 'Open group' : join.pending ? 'Joining…' : 'Join group'}
+                  onPress={() => void onJoin()}
+                  testID="group-join-submit"
+                  variant="primary"
+                />
+              </View>
+            </Card>
           ) : null}
         </>
       ) : null}
-    </ScrollView>
+    </ScreenScroll>
   );
 }
+
+const styles = StyleSheet.create({
+  form: {
+    gap: uiSpace.md,
+  },
+  preview: {
+    padding: uiSpace.md,
+    gap: uiSpace.xs,
+  },
+  name: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  meta: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  previewAction: {
+    marginTop: uiSpace.sm,
+  },
+});

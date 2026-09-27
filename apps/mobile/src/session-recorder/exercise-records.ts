@@ -38,13 +38,29 @@ export type ExerciseRecords = {
     loadLabel?: string;
     effectiveResistanceKg?: number | null;
     bodyWeightKg?: number | null;
+    gymId?: string | null;
+    gymName?: string | null;
   } | null;
-  maxWeight: { weight: number; reps: number; completedAt: Date } | null;
-  volume: { value: number; completedAt: Date; setCount: number } | null;
+  maxWeight: {
+    weight: number;
+    reps: number;
+    completedAt: Date;
+    gymId?: string | null;
+    gymName?: string | null;
+  } | null;
+  volume: {
+    value: number;
+    completedAt: Date;
+    setCount: number;
+    gymId?: string | null;
+    gymName?: string | null;
+  } | null;
 };
 
 export type LastSession = {
   completedAt: Date;
+  gymId?: string | null;
+  gymName?: string | null;
   oneRepMax: number | null;
   volume: number | null;
   sets: RecordSet[];
@@ -60,6 +76,8 @@ export type ExerciseRecordsSummary = {
 type SessionBlock = {
   sessionId: string;
   completedAt: Date;
+  gymId: string | null;
+  gymName: string | null;
   sets: RecordSet[];
 };
 
@@ -92,6 +110,8 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
     const block = blocks.get(entry.sessionId) ?? {
       sessionId: entry.sessionId,
       completedAt: entry.completedAt,
+      gymId: entry.gymId ?? null,
+      gymName: entry.gymName ?? null,
       sets: [],
     };
     for (const set of entry.sets) {
@@ -138,6 +158,8 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
           loadLabel: set.loadLabel,
           effectiveResistanceKg: set.effectiveResistanceKg,
           bodyWeightKg: set.bodyWeightKg,
+          gymId: block.gymId,
+          gymName: block.gymName,
         };
       }
       const max = records.maxWeight;
@@ -146,6 +168,8 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
           weight: set.addedWeightKg,
           reps: set.reps,
           completedAt: block.completedAt,
+          gymId: block.gymId,
+          gymName: block.gymName,
         };
       }
     }
@@ -155,6 +179,8 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
         value: volume,
         completedAt: block.completedAt,
         setCount: block.sets.length,
+        gymId: block.gymId,
+        gymName: block.gymName,
       };
     }
   }
@@ -165,6 +191,8 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
     last: newest
       ? {
           completedAt: newest.completedAt,
+          gymId: newest.gymId,
+          gymName: newest.gymName,
           oneRepMax: bestOneRepMax(newest.sets),
           volume: sumVolume(newest.sets),
           knownVolume: newest.sets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),

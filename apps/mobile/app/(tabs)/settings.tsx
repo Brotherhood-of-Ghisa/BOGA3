@@ -257,6 +257,16 @@ export default function SettingsScreen() {
               value={listPreferences.dateFormat}
             />
           </View>
+          <View style={styles.preference}>
+            <Text allowFontScaling={false} style={styles.fieldLabel}>Past records gym filter</Text>
+            <SegmentedControl
+              accessibilityLabel="Past records gym filter"
+              onChange={(scope) => setListPreferences({ pastRecordsGymScope: scope })}
+              options={PAST_RECORDS_GYM_SCOPE_OPTIONS}
+              testIDPrefix="settings-records-gym"
+              value={listPreferences.pastRecordsGymScope}
+            />
+          </View>
         </Card>
       </View>
 
@@ -369,6 +379,19 @@ const DATE_FORMAT_OPTIONS = (['DD-MM-YYYY', 'MM-DD-YYYY', 'YYYY-MM-DD'] as const
   label: format,
   accessibilityLabel: `Set date format to ${format}`,
 }));
+
+const PAST_RECORDS_GYM_SCOPE_OPTIONS = [
+  {
+    value: 'all' as const,
+    label: 'All gyms',
+    accessibilityLabel: 'Set past records gym filter to All gyms',
+  },
+  {
+    value: 'current-gym' as const,
+    label: 'Current gym only',
+    accessibilityLabel: 'Set past records gym filter to Current gym only',
+  },
+];
 
 // A section's name: a micro-label over its card, as on More.
 function SectionLabel({ title }: { title: string }) {

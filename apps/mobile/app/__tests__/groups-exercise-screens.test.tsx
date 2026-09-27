@@ -11,7 +11,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, Modal, type AlertButton } from 'react-native';
+import { Alert, Modal, StyleSheet, type AlertButton, type ViewStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
@@ -80,6 +80,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
   createExerciseWithGroupLink: jest.fn(),
 }));
 
+import { uiRoles } from '@/components/ui';
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import * as exerciseCatalogRepo from '@/src/data/exercise-catalog';
 import * as linksRepo from '@/src/data/exercise-group-links';
@@ -180,6 +181,18 @@ const openExercisesAs = async (role: GroupRole) => {
 
 const rowIds = () => screen.getAllByTestId(/^group-exercise-row-/).map((node) => node.props.testID as string);
 
+type TestNode = typeof screen.UNSAFE_root;
+
+/** Host views on a primary ground (`accent`). */
+const primaryGrounds = (): string[] =>
+  screen.UNSAFE_root
+    .findAll((node: TestNode) => typeof node.type === 'string')
+    .filter((node: TestNode) => {
+      const ground = (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor;
+      return ground === uiRoles.accent;
+    })
+    .map((node: TestNode) => String(node.props.testID));
+
 const sheetActions = () =>
   within(screen.getByTestId('group-exercise-actions-sheet'))
     .queryAllByTestId(/^group-exercise-action-/)
@@ -212,6 +225,19 @@ describe('Group page (D10, D14)', () => {
     expect(screen.queryByTestId('group-screen-segment-row')).toBeNull();
     expect(api.getGroupStream).not.toHaveBeenCalled();
     expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
+  });
+
+  // G6, T13-D1: Invite is the one accent; Add exercise, in the list or the empty state, is an outline.
+  it.each<GroupRole>(['owner', 'admin', 'member'])('%s: at most one accent, and only Invite', async (role) => {
+    await openExercisesAs(role);
+    expect(primaryGrounds()).toEqual(role === 'member' ? [] : ['group-screen-invite-button']);
+  });
+
+  it('owner with no exercises: the empty state adds no second accent', async () => {
+    api.listGroupExercises.mockResolvedValue({ exercises: [] });
+    await openGroupAs('owner');
+    await screen.findByTestId('group-exercises-empty');
+    expect(primaryGrounds()).toEqual(['group-screen-invite-button']);
   });
 
   it('opens the Members screen from the header member count', async () => {
@@ -275,11 +301,13 @@ describe('Exercises page (E0.4)', () => {
     expect(screen.queryByTestId('group-exercises-add-button')).toBeNull();
   });
 
-  it('empty list as owner offers Add exercise in the empty state', async () => {
+  it('empty list as owner: the empty state, with Add exercise in the section header', async () => {
     api.listGroupExercises.mockResolvedValue({ exercises: [] });
     await openGroupAs('owner');
     const empty = await screen.findByTestId('group-exercises-empty');
-    expect(within(empty).getByTestId('group-exercises-add-button')).toBeTruthy();
+    // One Add exercise, an outline beside the section's micro-label (T13-D1), not repeated in the panel.
+    expect(within(empty).queryByTestId('group-exercises-add-button')).toBeNull();
+    expect(screen.getAllByTestId('group-exercises-add-button')).toHaveLength(1);
   });
 
   it('renders the cached list under the offline marker when offline', async () => {
@@ -875,7 +903,7 @@ describe('Unlink from the group exercise list', () => {
     fireEvent.press(unlinkButton());
     return spy;
   };
-  const dismissChooser = () => screen.UNSAFE_getAllByType(Modal).find((node) => node.props.testID === 'group-unlink-modal')!.props.onDismiss;
+  const dismissChooser = () => screen.UNSAFE_getAllByType(Modal).find((node) => node.props.testID === 'group-unlink-chooser-modal')!.props.onDismiss;
   const choose = (id: string) => {
     const dismiss = dismissChooser();
     fireEvent.press(screen.getByTestId(`group-unlink-choice-${id}`));
@@ -947,7 +975,8 @@ describe('Unlink from the group exercise list', () => {
     const spy = alertSpy();
     fireEvent.press(unlinkButton());
     const dismiss = dismissChooser();
-    fireEvent.press(screen.getByTestId('group-unlink-cancel'));
+    // No Cancel (G5): the backdrop dismisses the chooser.
+    fireEvent.press(screen.getByTestId('group-unlink-chooser-backdrop', { includeHiddenElements: true }));
     act(() => dismiss());
     expect(spy).not.toHaveBeenCalled();
     expect(await linksRepo.listLinks()).toHaveLength(2);
@@ -1050,5 +1079,54 @@ describe('Unlink from the group exercise list', () => {
     await pressAlertButton(spy, 'Unlink');
     expect(await linksRepo.listLinks()).toEqual([]);
     expect(screen.queryByTestId('group-exercise-link-button-ge-old')).toBeNull();
+  });
+});
+
+describe('Design language (DLM-T14)', () => {
+  type TestNode = typeof screen.UNSAFE_root;
+  /** testIDs of the host views drawn on the `accent` ground (G6: at most one per screen or sheet). */
+  const accentGrounds = (root: TestNode): string[] =>
+    root
+      .findAll((node: TestNode) => typeof node.type === 'string')
+      .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent)
+      .map((node: TestNode) => String(node.props.testID));
+
+  it('the Exercises section draws no accent: Add exercise is an outline (T13-D1), Archived a Tag', async () => {
+    await openExercisesAs('owner');
+    const section = screen.getByTestId('group-screen-exercises');
+    expect(accentGrounds(section)).toEqual([]);
+    expect(StyleSheet.flatten(screen.getByTestId('group-exercises-add-button').props.style)).toMatchObject({
+      borderColor: uiRoles.ink,
+      backgroundColor: uiRoles.surface,
+    });
+    expect(screen.getByTestId('group-exercise-archived-ge-old')).toHaveTextContent('Archived');
+  });
+
+  it('the pick sheet has one accent, its confirm (T14-D3), and radio rows with no ground change', async () => {
+    addMyExercise('seed_barbell_bench_press', 'Barbell Bench Press');
+    await openExercisesAs('member');
+    fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));
+    const sheet = await screen.findByTestId('group-pick-sheet');
+    expect(accentGrounds(sheet)).toEqual(['group-pick-sheet-confirm']);
+    const suggested = screen.getByTestId('group-pick-sheet-option-suggested');
+    expect(suggested.props.accessibilityRole).toBe('radio');
+    expect(StyleSheet.flatten(suggested.props.style)?.backgroundColor).toBeUndefined();
+    expect(screen.getByTestId('group-pick-sheet-option-add-new').props.accessibilityState).toEqual({ checked: false });
+  });
+
+  it('Add exercise: the picked standard exercise is the checked radio, and the submit the one accent', async () => {
+    render(<NewGroupExerciseRoute />);
+    await screen.findByTestId('group-exercise-source-row');
+    expect(accentGrounds(screen.UNSAFE_root)).toEqual([]);
+    fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
+    fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
+
+    expect(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press').props.accessibilityState).toEqual({ checked: true });
+    const others = screen
+      .getAllByTestId(/^group-standard-exercise-seed_/)
+      .filter((node) => node.props.testID !== 'group-standard-exercise-seed_barbell_bench_press');
+    expect(others.length).toBeGreaterThan(0);
+    for (const node of others) expect(node.props.accessibilityState).toEqual({ checked: false });
+    expect(accentGrounds(screen.UNSAFE_root)).toEqual(['group-exercise-form-submit']);
   });
 });
