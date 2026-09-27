@@ -288,7 +288,7 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | planned |
 | [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | planned |
 | [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | planned |
-| [M27-T11 — Coaching API and MCP](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md) | Owner-scoped, unit-aware data and metric parity | T07 | planned |
+| [M27-T11 — Coaching API and MCP](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md) | Owner-scoped, unit-aware data and metric parity | T07 | in_progress |
 | [M27-T12 — Integration and rollout](../tasks/M27-T12-Verify_roll_out_and_close_bodyweight_milestone.md) | Cross-device/group proof, server-first rollout, graduation | T01–T11 | planned |
 
 Dependencies describe delivery order, not a request to spawn agents. No task
@@ -428,3 +428,12 @@ cards when shipped, marking their task-table entries completed.
 - [Suprak et al., body mass supported during push-up variants](https://pubmed.ncbi.nlm.nih.gov/20179649/): a basis for a simple approximate coefficient, not a universal measurement.
 - [Weighted push-ups and load-velocity relationships](https://pmc.ncbi.nlm.nih.gov/articles/PMC7386139/): loading method/support affects effective resistance.
 - [Strength scaling to body size](https://pubmed.ncbi.nlm.nih.gov/18172672/): relative strength is not synonymous with a validated size-neutral competition score.
+
+- **T11 integration checkpoint (2026-09-27):** the dedicated API now adapts
+  owner-filtered rules, frozen session weight and raw unit/mode through the
+  shared mobile boundary. Additive metric semantics preserve external kg fields
+  and expose effective resistance, provenance and completeness. MCP remains a
+  four-tool protocol adapter. Runtime parity, real OAuth smoke and full fast/
+  backend gates are pending; mobile code stays fixed for T07 device verification.
+  [T11](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md)
+  tracks proof and compatible response evolution.
