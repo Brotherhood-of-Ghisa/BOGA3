@@ -1,15 +1,6 @@
 appId: com.dinoderek.mobile
 ---
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr&presentation=completion"
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"
@@ -30,22 +21,29 @@ appId: com.dinoderek.mobile
     id: "session-completion-sets"
 - assertVisible:
     id: "session-completion-muscle-quads"
+# No centerElement: this target ends its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
 - takeScreenshot: "session-completion-one-pr"
 
 # Legacy Summary links open View Session; both review sections switch locally.
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr&presentation=summary"
-- tapOn:
-    text: "Open"
-    optional: true
+# The completion screen still showing underneath matches "View Session" (its
+# hidden native title) and has the same insight toggle, so wait for View
+# Session's own section control, then for the PR card that loads above the
+# toggle and would shift it mid-tap (spec 06 rule 4).
 - extendedWaitUntil:
-    visible: "View Session"
+    visible:
+      id: "view-session-section-summary"
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-pr-seed_barbell_back_squat"
+    timeout: 15000
 - scrollUntilVisible:
     element:
       id: "session-insight-mode-muscle"
@@ -66,11 +64,12 @@ appId: com.dinoderek.mobile
     centerElement: true
 - tapOn:
     id: "session-insight-mode-exercise"
+# No centerElement: this target ends its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "session-completion-exercise-maestro_m24_completion_one_pr_squat"
     direction: DOWN
-    centerElement: true
 - takeScreenshot: "session-summary-exercise"
 - scrollUntilVisible:
     element:
@@ -94,9 +93,6 @@ appId: com.dinoderek.mobile
 
 
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_no_pr&presentation=completion&maestroCatalog=fail-once"
-- tapOn:
-    text: "Open"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"
@@ -125,16 +121,13 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "session-completion-safe-done"
 
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_unmapped&presentation=completion"
-- tapOn:
-    text: "Open"
-    optional: true
+# The no-PR completion screen above is also `session-completion-presentation`;
+# wait for text only the unmapped session shows (spec 06 rule 4).
 - extendedWaitUntil:
-    visible:
-      id: "session-completion-presentation"
+    visible: "No mapped working sets for this session."
     timeout: 30000
 - assertVisible: "Session complete"
 - assertNotVisible: "Personal records"
-- assertVisible: "No mapped working sets for this session."
 - assertNotVisible:
     id: "session-completion-view-muscle-load"
 - takeScreenshot: "session-completion-unmapped"
@@ -142,9 +135,6 @@ appId: com.dinoderek.mobile
 # A completion target that does not exist: the top bar without Done, and one
 # safe exit back to Progress.
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_missing_session&presentation=completion"
-- tapOn:
-    text: "Open"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "session-completion-safe-exit"
@@ -159,9 +149,6 @@ appId: com.dinoderek.mobile
 # notice, a valid one clears it, and Done returns to the completed session,
 # which reads the edits back without replaying completion.
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr"
-- tapOn:
-    text: "Open"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "completed-session-detail-screen"
@@ -203,11 +190,12 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "session-insight-presentation"
 - takeScreenshot: "completed-edit-session-view"
+# No centerElement: this target starts its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "session-view-start-time"
     direction: UP
-    centerElement: true
 
 # Change the set on the exercise page: 275 × 5 becomes 275 × 6.
 - tapOn:
@@ -369,9 +357,6 @@ appId: com.dinoderek.mobile
 # Insight enrichment never blocks facts, Sets, Share or session controls.
 - openLink: "boga3://completed-session/maestro_m24_completion_one_pr?maestroInsights=loading"
 - tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
     id: "view-session-section-summary"
 - extendedWaitUntil:
     visible: "Loading comparisons…"
@@ -382,9 +367,6 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat"
 - openLink: "boga3://completed-session/maestro_m24_completion_one_pr?maestroInsights=error"
-- tapOn:
-    text: "Open"
-    optional: true
 - tapOn:
     id: "view-session-section-summary"
 - extendedWaitUntil:
@@ -398,9 +380,6 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat"
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_unmapped"
-- tapOn:
-    text: "Open"
-    optional: true
 - extendedWaitUntil:
     visible: "No mapped working sets for this session."
     timeout: 30000
@@ -418,9 +397,6 @@ appId: com.dinoderek.mobile
 
 # A session that does not exist: the in-route state, with the top bar's back.
 - openLink: "boga3://maestro-harness?fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_missing_session"
-- tapOn:
-    text: "Open"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "completed-session-detail-empty"
@@ -436,9 +412,6 @@ appId: com.dinoderek.mobile
 # the first share-image render fail, so the preview shows its inline error; the
 # second opens the native share sheet, which is dismissed without a target.
 - openLink: "boga3://maestro-harness?fixture=completion-two-prs&teleport=completed-session&sessionId=maestro_m24_completion_two_prs&presentation=completion&maestroShare=fail-once"
-- tapOn:
-    text: "Open"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"
@@ -460,20 +433,22 @@ appId: com.dinoderek.mobile
     centerElement: true
 - assertVisible:
     id: "session-completion-sets"
+# No centerElement: this target ends its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "session-completion-exercise-volume"
     direction: DOWN
     visibilityPercentage: 80
-    centerElement: true
 - assertVisible: "Exercise volume"
 - takeScreenshot: "session-completion-exercise-volume"
+# No centerElement: this target ends its scroll content, so it can never be
+# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
 - scrollUntilVisible:
     element:
       id: "session-completion-share-session"
     direction: DOWN
     visibilityPercentage: 100
-    centerElement: true
 - tapOn:
     id: "session-completion-share-session"
 - waitForAnimationToEnd

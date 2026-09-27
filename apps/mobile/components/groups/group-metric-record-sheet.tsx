@@ -56,7 +56,10 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
     });
     return () => { activeRead = false; };
   }, [groupId, row.certification_id, row.fingerprint, online, reload, initialCertification, readOnlyReason]);
-  useEffect(() => { setNeedsReview(false); setNotice(null); }, [row.fingerprint, row.rules_revision]);
+  // Another performance or rules revision starts without the last one's review or notice.
+  const rowKey = JSON.stringify([row.fingerprint, row.rules_revision]);
+  const [shownRowKey, setShownRowKey] = useState(rowKey);
+  if (shownRowKey !== rowKey) { setShownRowKey(rowKey); setNeedsReview(false); setNotice(null); }
 
   const active = certification?.ended_at_ms === null ? certification : null;
   const certified = certification ? active !== null : row.certified;

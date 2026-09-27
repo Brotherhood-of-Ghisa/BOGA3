@@ -171,11 +171,8 @@ export default function ExerciseCatalogScreen() {
     setIsEditorModalVisible(true);
   };
 
-  useEffect(() => {
-    if (didHandleInitialIntent || isLoading || loadError) {
-      return;
-    }
-
+  // The route's intent is handled once, in the first render after the catalog loads.
+  if (!didHandleInitialIntent && !isLoading && !loadError) {
     if (routeIntent === 'add') {
       setEditorExerciseTarget(null);
       setSaveFeedback(null);
@@ -183,7 +180,7 @@ export default function ExerciseCatalogScreen() {
     }
 
     setDidHandleInitialIntent(true);
-  }, [didHandleInitialIntent, isLoading, loadError, routeIntent]);
+  }
 
   const closeEditorModal = () => {
     setIsEditorModalVisible(false);
@@ -348,7 +345,7 @@ export default function ExerciseCatalogScreen() {
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}
           label="Edit"
-          leading={<Icon color={isActionTargetDeleted ? uiRoles.disabled : uiRoles.ink} name="pencil" size="md" />}
+          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="pencil" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget && !actionTarget.deletedAt) {
@@ -363,7 +360,7 @@ export default function ExerciseCatalogScreen() {
             // A soft-deleted exercise is never linked from the UI (M25-T07 (b)).
             disabled={isActionTargetDeleted}
             label="Link to group exercise…"
-            leading={<Icon color={isActionTargetDeleted ? uiRoles.disabled : uiRoles.ink} name="link" size="md" />}
+            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="link" size="md" />}
             onPress={() => {
               setExerciseActionMenuTarget(null);
               if (actionTarget && !actionTarget.deletedAt) {

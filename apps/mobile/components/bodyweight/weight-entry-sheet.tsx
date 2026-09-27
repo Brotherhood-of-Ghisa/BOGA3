@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Keyboard, ScrollView, Text } from 'react-native';
 import { ActionButton, FormField, Notice, SegmentedControl, Sheet } from '@/components/ui';
 import { resolveMeasurementDate, validateBodyWeight, type WeightEntry } from '@/src/bodyweight/weight-entry';
@@ -28,13 +28,18 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const measuredAtMs = measuredAt.getTime();
-  useEffect(() => {
-    if (!visible) return;
-    setValue(initial.weightValue);
-    setUnit(initial.weightUnit === 'lb' ? 'lb' : 'kg');
-    setDateText(formatCurrentDateTime(new Date(measuredAtMs)));
-    setValueError(null); setDateError(null); setSaveError(null);
-  }, [visible, initial.weightValue, initial.weightUnit, measuredAtMs]);
+  // Opening (or a new reading while open) shows it, reset in the render that opens.
+  const formKey = visible ? JSON.stringify([initial.weightValue, initial.weightUnit, measuredAtMs]) : null;
+  const [shownFormKey, setShownFormKey] = useState<string | null>(null);
+  if (formKey !== shownFormKey) {
+    setShownFormKey(formKey);
+    if (formKey !== null) {
+      setValue(initial.weightValue);
+      setUnit(initial.weightUnit === 'lb' ? 'lb' : 'kg');
+      setDateText(formatCurrentDateTime(new Date(measuredAtMs)));
+      setValueError(null); setDateError(null); setSaveError(null);
+    }
+  }
   const run = async (action: () => Promise<void>) => {
     if (saving.current) return;
     saving.current = true;

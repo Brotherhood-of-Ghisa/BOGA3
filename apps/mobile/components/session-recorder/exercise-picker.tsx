@@ -149,16 +149,25 @@ export function ExercisePicker({
     };
   }, []);
 
+  // A new open request starts from a clear picker, reset in the render that
+  // sees it; the effect below drops a pending preselection and reloads links.
+  const [shownOpenRequestId, setShownOpenRequestId] = useState(0);
+  if (shownOpenRequestId !== openRequestId) {
+    setShownOpenRequestId(openRequestId);
+    if (openRequestId !== 0) {
+      setGroupsOnly(false);
+      setSearchValue('');
+      setPreselection(null);
+    }
+  }
+
   const { reloadLinks, refresh } = groupLinking;
   useEffect(() => {
     if (openRequestId === 0) {
       return;
     }
-    setGroupsOnly(false);
     void reloadLinks();
     void refresh();
-    setSearchValue('');
-    setPreselection(null);
     preselectionRequestKeyRef.current = null;
     // Only a new open request resets; the link loaders are stable per user.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -560,7 +569,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
   },

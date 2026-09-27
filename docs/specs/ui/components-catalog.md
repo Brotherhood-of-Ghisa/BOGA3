@@ -138,7 +138,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     other `ScrollView` props through (refresh, keyboard insets). Used by the
     session view, exercise page, View Session, Gyms and the group session view;
     the Groups tab (`ScreenScroll` with `refreshControl`, DLM-T11)
-  - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule-strong`
+  - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule`
     turning `danger` while invalid, the error below (`<testID>-error` or
     `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
     `text`. The completed edit's Start / End (`session-times-fields`), and the
@@ -148,7 +148,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `accessibilityLabel` required. The swap sheet's search, the exercise
     picker's filter (DLM-T06), the Progress filter (DLM-T08) and the
     catalogue's filter (DLM-T07)
-  - `SegmentedControl` — one choice from a few, joined in a `rule-strong` frame,
+  - `SegmentedControl` — one choice from a few, joined in a `rule` frame,
     the selected segment solid `ink`; `layout` `fill` (equal width), `inline`,
     or `fit` (across the row, label-sized segments sharing the rest: the
     exercise history's four metrics, DLM-T09);
@@ -174,7 +174,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), the
     exercise list's `Deleted` (`faint`, DLM-T06), and a group record card's
     boards (DLM-T11)
-  - `Notice` — a `surface-subtle` band on a `rule` hairline: optional glyph, words,
+  - `Notice` — a `paper` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
     is no success or warning hue: the glyph and words carry the state. An
     optional `title` (Archivo 700, a `header`) names a message that is a reason
@@ -216,7 +216,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     success or warning hue,
     plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
-    check), `set-current` (`accent` ring), `set-planned` (dashed `planned` ring),
+    check), `set-current` (`accent` ring), `set-planned` (dashed `ink-ghost` ring),
     which carry their role colour by default and are meant for `ListRow`'s
     trailing slot on the set row. Add icons from the same Lucide
     release, named by role
@@ -236,7 +236,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - collapsible bottom navigation tray that wraps `MainTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
   - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
-  - the handle is the sheet handle's recipe (38×4, `rule-strong`, `radius.pill`; DLM-T02)
+  - the handle is the sheet handle's recipe (38×4, `rule`, `radius.pill`; DLM-T02)
 
 2. `MainTabs`
 - File: `apps/mobile/components/navigation/main-tabs.tsx`
@@ -301,7 +301,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     <1RM>`), the exercise and its set (`185.0 × 8`), the 1RM bold `record`;
     read as one accessibility element
   - `ExerciseVolumeCard` — name, set counts, the `Vol` figure (no separator,
-    no unit) and its delta from the median, and the P5–P95 range (`rule-strong`
+    no unit) and its delta from the median, and the P5–P95 range (`rule`
     track, `ink-muted` median tick, `ink` current dot) or the single/equal
     baseline and no-history states; no `accent`. `variant="share"` for the share
     image
@@ -395,7 +395,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
   - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09; design language DLM-T12) — the Groups screen's Leaderboards segment: one link `Card` per group exercise (the name in Archivo 700, the view label as a micro-label, an `Archived` `Tag`, up to three podium rows with rank, value and date in Plex Mono and my row's `You` in bold, the empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
   - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `RecordSetSheet` and `GroupBoardRow`
-  - `GroupBoardRow` (M25-T09; design language DLM-T12) — one full-board row, a dense `ListRow` in the board's one card (`cardListItemStyles` in `screen-styles.ts` draws the card across the `FlatList`'s cells), as a single accessibility element: rank and value in Plex Mono, the member in Source Sans with the 1RM's set below it in `ink-muted`, the date, the certification mark on All; my row on `surface-subtle` reading `You` (DLM-T12-D1); (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
+  - `GroupBoardRow` (M25-T09; design language DLM-T12) — one full-board row, a dense `ListRow` in the board's one card (`cardListItemStyles` in `screen-styles.ts` draws the card across the `FlatList`'s cells), as a single accessibility element: rank and value in Plex Mono, the member in Source Sans with the 1RM's set below it in `ink-muted`, the date, the certification mark on All; my row on `paper` reading `You` (DLM-T12-D1); (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
   - `GroupBoardHistoryItem` (M25-T09; design language DLM-T12) — one lead change, a row of the history's one card: the date in small Plex Mono, then the sentence in Source Sans. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
   - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: an inline `StatePanel`, loading, or the failure with an outline `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
   - `UsernameGate` + `useUsernameGate(userId)` (M22-T05) — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`): a `Card` with the reason, a `FormField` and `Save username` (`accent`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
@@ -457,7 +457,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     Sets / Volume; given `times`, `SessionTimesFields` replace Time
   - `SessionTimesFields` — a completed session's `Start` / `End` text fields
     (`YYYY-MM-DD HH:mm`, the logger's field style: `fieldHeight`,
-    `radius.control`, `ruleStrong`, `danger` while invalid), each field's error
+    `radius.control`, `rule`, `danger` while invalid), each field's error
     below it and the autosave-paused notice. testIDs `session-view-start-time`,
     `session-view-end-time` (`-error`), `session-view-times-notice`
   - `SessionExerciseCard` — `ExerciseSetsCard` as a link per exercise: name,
@@ -567,8 +567,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   to `/body-weight`; no primary accent on the Settings overview.
 - `BodyWeightScreen` composes current reading, Add and history with edit/delete;
   history and saves stay in the owner-private local/sync domain. Covered by
-  `bodyweight-entry.test.ts`, `bodyweight-screen.test.tsx` and the bodyweight
-  flow in `ios-bodyweight`.
+  `bodyweight-entry.test.ts` and `bodyweight-screen.test.tsx`; `ios-sync-e2e`
+  drives the real weight editor on device.
 
 ### Bodyweight load controls
 

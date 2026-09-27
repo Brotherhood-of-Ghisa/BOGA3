@@ -1,11 +1,11 @@
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useFocusEffect, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import type { SessionBodyWeightSnapshot, SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
 
-import { createDraftAutosaveController, type DraftAutosaveController } from './draft-autosave';
+import { createDraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
 import {
   defaultSessionExerciseDraftClient,
@@ -57,6 +57,63 @@ export type UseSessionExerciseDraft = {
 const describeSaveError = (error: unknown) =>
   error instanceof Error ? error.message : 'Changes could not be saved.';
 
+// What the autosave controller writes, kept outside React state so the
+// controller — created once, on first render — always writes the latest.
+type ExerciseDraftLive = {
+  exercise: SessionDraftExerciseSnapshot | null;
+  sessionStatus: SessionGraphSnapshot['status'];
+  bodyWeight: SessionBodyWeightSnapshot;
+  gymId: string | null;
+  saveFailed: boolean;
+  mounted: boolean;
+};
+
+const createExerciseDraftPersistence = ({
+  sessionId,
+  sessionExerciseId,
+  client,
+  setSaveError,
+}: {
+  sessionId: string;
+  sessionExerciseId: string;
+  client: SessionExerciseDraftClient;
+  setSaveError: (message: string | null) => void;
+}) => {
+  const live: ExerciseDraftLive = {
+    exercise: null,
+    sessionStatus: 'active',
+    bodyWeight: {},
+    gymId: null,
+    saveFailed: false,
+    mounted: true,
+  };
+  const autosave = createDraftAutosaveController({
+    persistDraft: async () => {
+      const exercise = live.exercise;
+      if (!exercise) return;
+      await saveSessionExerciseDraft(
+        sessionId,
+        { sessionExerciseId, exercise, sessionStatus: live.sessionStatus },
+        client
+      );
+      live.saveFailed = false;
+      if (live.mounted) setSaveError(null);
+    },
+    onError: (error) => {
+      live.saveFailed = true;
+      if (live.mounted) setSaveError(describeSaveError(error));
+    },
+  });
+  return {
+    live: live as Readonly<ExerciseDraftLive>,
+    setLive: (patch: Partial<ExerciseDraftLive>) => {
+      Object.assign(live, patch);
+    },
+    autosave,
+    lifecycle: createSessionRecorderLifecycleHelpers(autosave),
+  };
+};
+
 export const useSessionExerciseDraft = ({
   sessionId,
   sessionExerciseId,
@@ -70,36 +127,10 @@ export const useSessionExerciseDraft = ({
     status: 'loading',
   });
   const [saveError, setSaveError] = useState<string | null>(null);
-  const exerciseRef = useRef<SessionDraftExerciseSnapshot | null>(null);
-  const sessionStatusRef = useRef<SessionGraphSnapshot['status']>('active');
-  const bodyWeightRef = useRef<SessionBodyWeightSnapshot>({});
-  const gymIdRef = useRef<string | null>(null);
-  const saveFailedRef = useRef(false);
-  const isMountedRef = useRef(true);
-  const autosaveRef = useRef<DraftAutosaveController | null>(null);
   const navigation = useNavigation();
-
-  if (!autosaveRef.current) {
-    autosaveRef.current = createDraftAutosaveController({
-      persistDraft: async () => {
-        const exercise = exerciseRef.current;
-        if (!exercise) return;
-        await saveSessionExerciseDraft(
-          sessionId,
-          { sessionExerciseId, exercise, sessionStatus: sessionStatusRef.current },
-          client
-        );
-        saveFailedRef.current = false;
-        if (isMountedRef.current) setSaveError(null);
-      },
-      onError: (error) => {
-        saveFailedRef.current = true;
-        if (isMountedRef.current) setSaveError(describeSaveError(error));
-      },
-    });
-  }
-  const autosave = autosaveRef.current;
-  const lifecycle = useMemo(() => createSessionRecorderLifecycleHelpers(autosave), [autosave]);
+  const [{ live, setLive, autosave, lifecycle }] = useState(() =>
+    createExerciseDraftPersistence({ sessionId, sessionExerciseId, client, setSaveError })
+  );
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -110,11 +141,11 @@ export const useSessionExerciseDraft = ({
 
   useEffect(
     () => () => {
-      isMountedRef.current = false;
+      setLive({ mounted: false });
       void lifecycle.onRouteChange();
       void autosave.dispose({ flushDirty: true });
     },
-    [autosave, lifecycle]
+    [autosave, lifecycle, setLive]
   );
 
   // Leaving the page writes pending edits before the screen goes, so the
@@ -134,58 +165,56 @@ export const useSessionExerciseDraft = ({
 
   const update = useCallback<UseSessionExerciseDraft['update']>(
     (recipe, kind) => {
-      const current = exerciseRef.current;
+      const current = live.exercise;
       if (!current) return;
       const next = recipe(current);
       if (next === current) return;
-      exerciseRef.current = next;
-      setState({ status: 'ready', exercise: next, sessionStatus: sessionStatusRef.current, bodyWeight: bodyWeightRef.current, gymId: gymIdRef.current });
+      setLive({ exercise: next });
+      setState({ status: 'ready', exercise: next, sessionStatus: live.sessionStatus, bodyWeight: live.bodyWeight, gymId: live.gymId });
       if (kind === 'text') {
         autosave.markTextMutation();
       } else {
         void autosave.markStructuralMutation();
       }
     },
-    [autosave]
+    [autosave, live, setLive]
   );
 
   const flush = useCallback(async () => {
     await autosave.flushNow();
-    return !saveFailedRef.current;
-  }, [autosave]);
+    return !live.saveFailed;
+  }, [autosave, live]);
 
   const remove = useCallback(async () => {
     await autosave.dispose({ flushDirty: false });
     await saveSessionExerciseDraft(
       sessionId,
-      { sessionExerciseId, exercise: null, sessionStatus: sessionStatusRef.current },
+      { sessionExerciseId, exercise: null, sessionStatus: live.sessionStatus },
       client
     );
-  }, [autosave, client, sessionExerciseId, sessionId]);
+  }, [autosave, client, live, sessionExerciseId, sessionId]);
 
   const setBodyWeight = useCallback((snapshot: SessionBodyWeightSnapshot) => {
-    bodyWeightRef.current = snapshot;
+    setLive({ bodyWeight: snapshot });
     setState(current => current.status === 'ready' ? { ...current, bodyWeight: snapshot } : current);
-  }, []);
+  }, [setLive]);
   const datedWeightRevision = useBodyWeightContextRevision();
   const reload = useCallback(async () => {
     if (!await flush()) return false;
-    const prior = exerciseRef.current;
+    const prior = live.exercise;
     try {
     const result = await loadSessionExerciseDraft(sessionId, sessionExerciseId, client);
-    if (!isMountedRef.current || prior !== exerciseRef.current) return false;
+    if (!live.mounted || prior !== live.exercise) return false;
     if (result.status === 'ready') {
-      exerciseRef.current = result.exercise; sessionStatusRef.current = result.sessionStatus;
-      bodyWeightRef.current = result.bodyWeight;
-      gymIdRef.current = result.gymId;
+      setLive({ exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId });
       setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId });
     } else setState({ status: 'error', reason: result.status });
     return result.status === 'ready';
     } catch (error) {
-      if (isMountedRef.current) { setState({ status: 'error', reason: 'load-failed' }); setSaveError(describeSaveError(error)); }
+      if (live.mounted) { setState({ status: 'error', reason: 'load-failed' }); setSaveError(describeSaveError(error)); }
       return false;
     }
-  }, [client, flush, sessionExerciseId, sessionId]);
+  }, [client, flush, live, sessionExerciseId, setLive, sessionId]);
   useFocusEffect(useCallback(() => {
     void reload();
     return () => { void lifecycle.onScreenBlur(); };

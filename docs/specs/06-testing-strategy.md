@@ -179,7 +179,7 @@ instead (`maestro-ios-run-flow.sh --flow …`, see `RUNBOOK.md`) and delete it.
 lane: it fails if any `apps/mobile/.maestro/flows/*.yaml` is named by no
 runner.
 
-Three rules follow, and each is load-bearing for a lane flow:
+Four rules follow, and each is load-bearing for a lane flow:
 
 1. **Assert, don't only screenshot.** A flow whose steps are `takeScreenshot`
    with `optional: true` taps between them goes green while the screen behind it
@@ -209,6 +209,26 @@ Three rules follow, and each is load-bearing for a lane flow:
    at the end of `stats-screen-ux.yaml`. A scroll that only positions the screen
    for a screenshot or for an assertion on a *different* element is outside this
    rule; centring the wrong element can push the one you care about off-screen.
+   **Exception: a target that ends (or, scrolling UP, starts) its scroll
+   content.** It can never reach the centre, so Maestro 2.8.0 swipes five more
+   times against the end of the content (~9s, the element does not move) and
+   then passes anyway. The run's `maestro.log` shows the case: `Scrolling try
+   count:` reaches 5 with identical `Element bounds:` on every try. Drop
+   `centerElement` there only when the target's *first* visible position is
+   clear of fixed chrome, and say why in a comment; the default 100% visibility
+   still forces the scroll when the target is past the fold. The first swipe
+   can matter: the More screen's last row first shows over the minimised tab
+   bar, and its tap misses without it.
+4. **After an `openLink`, wait for something only the destination has.** A
+   harness link runs its reset/fixture and then *replaces* the route, so the
+   previous screen stays up for a moment and anything it shares with the
+   destination (the same screen id, the same toggle, a hidden native title)
+   matches early — the flow then asserts or taps the old screen. Wait on an id
+   or text the previous screen cannot show, and, before tapping, on any
+   content that loads in above the target. Do not tap the trust dialog or the
+   dev-menu sheet away: `maestro-ios-launch.sh` pre-seeds both off and fails
+   the run if it cannot, and an optional tap on an absent element costs the
+   full ~7s `optionalLookupTimeoutMs`, which also hides these races.
 
 Run the insights flows on the supported small and large phone viewports when
 closing changes to those presentations; their timestamped artifact roots and

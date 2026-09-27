@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
 import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
@@ -42,11 +42,14 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const [selected, setSelected] = useState<GroupMetricBoardRowWire | null>(null);
   // Expo may reuse this route for another deep link. Its requested view must
   // replace the last local selection, including a page caught during rebuild.
-  useEffect(() => {
+  const requestKey = JSON.stringify([exerciseId, initialMetric, initialScope]);
+  const [shownRequestKey, setShownRequestKey] = useState(requestKey);
+  if (shownRequestKey !== requestKey) {
+    setShownRequestKey(requestKey);
     setPickedMetric(isGroupMetric(initialMetric) ? initialMetric : null);
     setScope(initialScope);
     setSelected(null);
-  }, [exerciseId, initialMetric, initialScope]);
+  }
   const selectView = (nextMetric: GroupMetric, nextScope: GroupBoardScope) => {
     setSelected(null);
     setPickedMetric(nextMetric);

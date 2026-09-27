@@ -16,7 +16,7 @@
 // Group code never runs inside the sync cycle (C3.10.5).
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 
@@ -61,6 +61,8 @@ export type GroupOnlinePagesState<TPage, TItem> = {
 };
 
 type InternalState<TPage, TItem, TCursor> = {
+  // The view the state belongs to: another identity reads as `initialState`.
+  identity: string | null;
   firstPage: TPage | null;
   items: TItem[];
   cursor: TCursor | null;
@@ -75,7 +77,8 @@ type InternalState<TPage, TItem, TCursor> = {
   loadMoreError: GroupApiError | null;
 };
 
-const initialState = <TPage, TItem, TCursor>(): InternalState<TPage, TItem, TCursor> => ({
+const initialState = <TPage, TItem, TCursor>(identity: string | null): InternalState<TPage, TItem, TCursor> => ({
+  identity,
   firstPage: null,
   items: [],
   cursor: null,
@@ -115,9 +118,28 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   itemKey,
 }: GroupOnlinePagesOptions<TPage, TItem, TCursor>): GroupOnlinePagesState<TPage, TItem> {
   const online = useNetworkOnline();
-  const [state, setState] = useState<InternalState<TPage, TItem, TCursor>>(initialState);
-
   const identity = userId && viewKey ? `${userId}\u0000${groupId}\u0000${viewKey}` : null;
+  const [stored, setStored] = useState<InternalState<TPage, TItem, TCursor>>(() => initialState(identity));
+  // A new view forgets everything (also on a return to an earlier view); its
+  // first page loads on the identity effect.
+  if (stored.identity !== identity) {
+    setStored(initialState(identity));
+  }
+  const state = stored.identity === identity ? stored : initialState<TPage, TItem, TCursor>(identity);
+  // Writes for `identity`, starting from empty if the stored state is another view's.
+  const setState = useCallback(
+    (
+      next:
+        | InternalState<TPage, TItem, TCursor>
+        | ((previous: InternalState<TPage, TItem, TCursor>) => InternalState<TPage, TItem, TCursor>),
+    ) =>
+      setStored((previous) => {
+        const base = previous.identity === identity ? previous : initialState<TPage, TItem, TCursor>(identity);
+        return typeof next === 'function' ? next(base) : next;
+      }),
+    [identity],
+  );
+
   // Bumped on every identity change and every first-page request: a response
   // from an older generation is dropped.
   const generationRef = useRef(0);
@@ -128,14 +150,17 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   const stateRef = useRef(state);
   const callbacksRef = useRef({ fetchPage, selectItems, selectCursor, selectHasMore, itemKey });
 
-  onlineRef.current = online;
-  stateRef.current = state;
-  callbacksRef.current = { fetchPage, selectItems, selectCursor, selectHasMore, itemKey };
+  // Before any effect or handler reads them.
+  useLayoutEffect(() => {
+    onlineRef.current = online;
+    stateRef.current = state;
+    callbacksRef.current = { fetchPage, selectItems, selectCursor, selectHasMore, itemKey };
+  });
 
   const handleNotFound = useCallback(
     async (error: GroupApiError, isCurrent: () => boolean) => {
       if (isGroupExerciseNotFound(error)) {
-        setState({ ...initialState<TPage, TItem, TCursor>(), exerciseMissing: true });
+        setState({ ...initialState<TPage, TItem, TCursor>(identity), exerciseMissing: true });
         return;
       }
       let evictionError: GroupApiError | null = null;
@@ -145,9 +170,9 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
         evictionError = toGroupApiError(caught);
       }
       if (!isCurrent()) return;
-      setState({ ...initialState<TPage, TItem, TCursor>(), lostAccess: true, error: evictionError ?? error });
+      setState({ ...initialState<TPage, TItem, TCursor>(identity), lostAccess: true, error: evictionError ?? error });
     },
-    [groupId],
+    [groupId, identity, setState],
   );
 
   const refresh = useCallback((): Promise<void> => {
@@ -185,7 +210,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
       }
       if (!isCurrent()) return;
       setState({
-        ...initialState<TPage, TItem, TCursor>(),
+        ...initialState<TPage, TItem, TCursor>(identity),
         firstPage: page,
         items: appendUniqueByKey([], callbacks.selectItems(page), callbacks.itemKey),
         cursor: callbacks.selectCursor(page),
@@ -200,15 +225,15 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
 
     inFlightRef.current = run;
     return run;
-  }, [identity, handleNotFound]);
+  }, [identity, handleNotFound, setState]);
 
-  // A new view: forget everything, then load its first page.
+  // A new view: drop the old view's requests, then load its first page (the
+  // state already reads empty for it).
   useEffect(() => {
     identityRef.current = identity;
     generationRef.current += 1;
     inFlightRef.current = null;
     loadingMoreRef.current = false;
-    setState(initialState<TPage, TItem, TCursor>());
   }, [identity]);
 
   useFocusEffect(
@@ -258,7 +283,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
         loadingMoreRef.current = false;
       }
     }
-  }, [identity, handleNotFound]);
+  }, [identity, handleNotFound, setState]);
 
   return {
     firstPage: state.firstPage,

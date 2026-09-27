@@ -29,7 +29,7 @@ export type SegmentedControlProps<TValue extends string | number> = {
   style?: StyleProp<ViewStyle>;
 };
 
-// One choice from a few, joined in a single `rule-strong` frame at the control
+// One choice from a few, joined in a single `rule` frame at the control
 // radius; the selected segment is solid `ink` (`design-language.md` §4). A tab
 // list to assistive tech. Selecting the selected segment does nothing.
 export function SegmentedControl<TValue extends string | number>({
@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
   },
   controlFill: {
@@ -116,13 +116,13 @@ const styles = StyleSheet.create({
   },
   segmentDivider: {
     borderLeftWidth: uiBorder.width,
-    borderLeftColor: uiRoles.ruleStrong,
+    borderLeftColor: uiRoles.rule,
   },
   segmentSelected: {
     backgroundColor: uiRoles.ink,
   },
   segmentSelectedDisabled: {
-    backgroundColor: uiRoles.disabled,
+    backgroundColor: uiRoles.inkGhost,
   },
   label: {
     fontFamily: uiFonts.display.family,
@@ -137,6 +137,6 @@ const styles = StyleSheet.create({
     color: uiRoles.surface,
   },
   labelDisabled: {
-    color: uiRoles.disabled,
+    color: uiRoles.inkGhost,
   },
 });

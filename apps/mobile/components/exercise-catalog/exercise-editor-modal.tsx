@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
@@ -104,7 +104,8 @@ const buildEditorMuscleSelectionsFromExercise = (
       return true;
     })
     .map((mapping) => ({
-      rowId: mapping.id || createRowId(),
+      // Built during render, so derived, not random: secondary rows are unique per muscle.
+      rowId: mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`,
       muscleGroupId: mapping.muscleGroupId,
     }));
 
@@ -148,45 +149,55 @@ export function ExerciseEditorModal({
     [muscleGroups]
   );
 
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
+  // Opening, or a different exercise or prefill, fills the form in the render that shows it.
+  const [shownFor, setShownFor] = useState<{
+    visible: boolean;
+    editingExercise: typeof editingExercise;
+    prefill: typeof prefill;
+  } | null>(null);
+  if (
+    !shownFor ||
+    shownFor.visible !== visible ||
+    shownFor.editingExercise !== editingExercise ||
+    shownFor.prefill !== prefill
+  ) {
+    setShownFor({ visible, editingExercise, prefill });
+    if (visible) {
+      if (editingExercise) {
+        const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
+        setExerciseName(editingExercise.name);
+        setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
+        setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+        setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+      } else if (prefill) {
+        const nextSelections = buildEditorMuscleSelectionsFromExercise({
+          id: '',
+          name: prefill.name,
+          loadInputMode: prefill.loadInputMode,
+          deletedAt: null,
+          mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
+        });
+        setExerciseName(prefill.name);
+        setLoadInputMode(prefill.loadInputMode);
+        setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+        setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+      } else {
+        setExerciseName('');
+        setLoadInputMode('total_load');
+        setPrimaryMuscleGroupId(null);
+        setSecondaryMuscleRows([]);
+      }
 
-    if (editingExercise) {
-      const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
-      setExerciseName(editingExercise.name);
-      setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
-      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
-      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
-    } else if (prefill) {
-      const nextSelections = buildEditorMuscleSelectionsFromExercise({
-        id: '',
-        name: prefill.name,
-        loadInputMode: prefill.loadInputMode,
-        deletedAt: null,
-        mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
-      });
-      setExerciseName(prefill.name);
-      setLoadInputMode(prefill.loadInputMode);
-      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
-      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
-    } else {
-      setExerciseName('');
-      setLoadInputMode('total_load');
-      setPrimaryMuscleGroupId(null);
-      setSecondaryMuscleRows([]);
+      const rules = editingExercise ?? prefill?.loadRules;
+      setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
+        movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
+      setLoadFieldsTouched(false);
+      setLoadRulesError(null);
+      setMuscleSelectorMode(null);
+      setValidation(createBlankValidationState());
+      setSaveError(null);
     }
-
-    const rules = editingExercise ?? prefill?.loadRules;
-    setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
-      movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
-    setLoadFieldsTouched(false);
-    setLoadRulesError(null);
-    setMuscleSelectorMode(null);
-    setValidation(createBlankValidationState());
-    setSaveError(null);
-  }, [editingExercise, prefill, visible]);
+  }
 
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
   const availablePrimaryMuscleGroupsForSelector = muscleGroups.filter(
@@ -606,12 +617,12 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   // The primary-muscle trigger is framed like a field (`FormField`): a
-  // `rule-strong` hairline at the control radius that turns `danger` when
+  // `rule` hairline at the control radius that turns `danger` when
   // the choice is missing.
   triggerFrame: {
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
     backgroundColor: uiRoles.surface,
   },

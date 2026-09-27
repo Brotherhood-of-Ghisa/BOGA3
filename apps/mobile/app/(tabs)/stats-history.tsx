@@ -462,16 +462,18 @@ export function StatsScreenShell({
       )
     : null;
 
+  // Read outside the memo: the compiler takes `summary.current` for a ref.
+  const muscleFamilies = summary ? summary.current.totals.muscleFamilies : null;
   const filteredFamilies = useMemo((): DisplayMuscleFamily[] => {
-    if (!summary) return [];
+    if (!muscleFamilies) return [];
     const query = searchQuery.toLowerCase().trim();
     if (!query) {
-      return summary.current.totals.muscleFamilies.map((family) => ({
+      return muscleFamilies.map((family) => ({
         family,
         visibleMuscles: family.muscles,
       }));
     }
-    return summary.current.totals.muscleFamilies
+    return muscleFamilies
       .map((family) => {
         const familyMatches = family.familyName.toLowerCase().includes(query);
         const matchingMuscles = family.muscles.filter((muscle) =>
@@ -487,7 +489,7 @@ export function StatsScreenShell({
         return null;
       })
       .filter((family): family is DisplayMuscleFamily => family !== null);
-  }, [summary, searchQuery]);
+  }, [muscleFamilies, searchQuery]);
 
   const filteredExerciseListItems = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
@@ -1547,7 +1549,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   headerCellPressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   headerLabel: microLabel,
   headerLabelActive: {

@@ -9,7 +9,7 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|session-view|bodyweight|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|ui-regression|exercise-page|session-view|bodyweight|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
@@ -177,7 +177,7 @@ case "$lane" in
     MAESTRO_GROUPS_SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \
     MAESTRO_GROUPS_SUPABASE_ANON_KEY="$EXPO_PUBLIC_SUPABASE_ANON_KEY" \
     run_flow full "Two-user groups stream" groups-two-user-stream.yaml
-    # M25-T07: its own device fixture (user_e), reset above with the others.
+    # Its own device fixture (user_e), reset above with the others.
     MAESTRO_GROUPS_LINK_DEVICE_EMAIL="$USER_E_EMAIL" \
     MAESTRO_GROUPS_LINK_DEVICE_PASSWORD="$USER_E_PASSWORD" \
     MAESTRO_GROUPS_SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \

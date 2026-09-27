@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text } from 'react-native';
 
 import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
@@ -48,13 +48,14 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
   const [dirty, setDirty] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [reviewed, setReviewed] = useState(false);
+  // Until the user edits (or after Reload), follow the prefill, adjusted in the render that sees it change.
   const prefillKey = JSON.stringify([prefill, existing?.rules_revision, existing?.legacy]);
-  useEffect(() => {
-    if (dirty) return;
-    const [next, revision, legacy] = JSON.parse(prefillKey) as [GroupExerciseRules, number | null, boolean | null];
-    setBaseline({ rules: next, revision: revision ?? null, legacy: legacy ?? false });
-    setName(next.name); setLoadInputMode(next.loadInputMode); setLoadFields(fieldsFromRules(next)); setDefaultMetric(next.defaultMetric);
-  }, [dirty, prefillKey]);
+  const [followedKey, setFollowedKey] = useState<string | null>(prefillKey);
+  if (!dirty && followedKey !== prefillKey) {
+    setFollowedKey(prefillKey);
+    setBaseline({ rules: prefill, revision: existing?.rules_revision ?? null, legacy: existing?.legacy ?? false });
+    setName(prefill.name); setLoadInputMode(prefill.loadInputMode); setLoadFields(fieldsFromRules(prefill)); setDefaultMetric(prefill.defaultMetric);
+  }
   const changed = () => { setDirty(true); setReviewed(false); };
   const percentage = loadFields.percentage.trim() === '' ? NaN : Number(loadFields.percentage.replace(',', '.'));
   const validation = validateGroupExerciseRules({ name, loadInputMode, bodyweightCoefficient: percentage / 100,
@@ -92,7 +93,7 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
       {stale ? <GroupWriteNotice tone="error" testID="group-rules-stale"
         message="The group rules changed while you were editing. Your values are kept. Reload group rules to replace them with the current settings before editing again." /> : null}
       {stale ? <ActionButton variant="outline" label="Reload group rules" disabled={pending} testID="group-rules-reload"
-        onPress={() => { setDirty(false); setReviewed(false); setShowErrors(false); }} /> : null}
+        onPress={() => { setDirty(false); setFollowedKey(null); setReviewed(false); setShowErrors(false); }} /> : null}
       {reviewed && calculationChanged && validation.ok ? <>
         <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-preview">
           {`Apply rules revision ${(baseline.revision ?? 0) + 1}: ${baseline.rules.bodyweightCoefficient * 100}% → ${validation.value.bodyweightCoefficient * 100}% bodyweight, ${validation.value.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} external weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`}

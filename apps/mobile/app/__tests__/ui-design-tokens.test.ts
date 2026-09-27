@@ -26,22 +26,18 @@ describe('design-language tokens', () => {
         'accent',
         'accentWash',
         'danger',
-        'disabled',
         'ink',
         'inkFaint',
+        'inkGhost',
         'inkMuted',
         'paper',
-        'planned',
         'record',
         'recordRule',
         'recordWash',
         'rule',
-        'ruleFaint',
         'ruleSoft',
-        'ruleStrong',
         'scrim',
         'surface',
-        'surfaceSubtle',
         'viz0',
         'viz1',
         'viz2',
@@ -76,9 +72,46 @@ describe('design-language tokens', () => {
   });
 
   it('dims a sheet backdrop with ink, not a neutral black', () => {
-    expect(uiRoles.scrim).toBe('rgba(21, 24, 29, 0.42)');
-    // `ink` (#15181D) is rgb(21, 24, 29).
-    expect(uiRoles.ink).toBe('#15181D');
+    expect(uiRoles.scrim).toBe('rgba(27, 23, 18, 0.42)');
+    // `ink` (#1B1712) is rgb(27, 23, 18).
+    expect(uiRoles.ink).toBe('#1B1712');
+  });
+
+  describe('one value per role (design-language.md §2, rationalised 2026-09-27)', () => {
+    it('gives no two roles the same value', () => {
+      // Two roles that cannot be told apart are one role (ux-rules §9a.6a).
+      const byValue = new Map<string, string[]>();
+      for (const [role, value] of Object.entries(uiRoles)) {
+        byValue.set(value, [...(byValue.get(value) ?? []), role]);
+      }
+      const shared = [...byValue.values()].filter((roles) => roles.length > 1);
+      expect(shared).toEqual([]);
+    });
+
+    it('keeps every neutral on one warm hue', () => {
+      // The neutrals are one ramp — the ground a later theme is derived from.
+      // `surface` is pure white and has no hue.
+      const neutrals = [
+        uiRoles.ink,
+        uiRoles.inkMuted,
+        uiRoles.inkFaint,
+        uiRoles.inkGhost,
+        uiRoles.paper,
+        uiRoles.rule,
+        uiRoles.ruleSoft,
+      ];
+      for (const neutral of neutrals) {
+        const { chroma, hue } = lch(neutral);
+        expect(chroma).toBeLessThanOrEqual(10);
+        expect(hue).toBeGreaterThanOrEqual(75);
+        expect(hue).toBeLessThanOrEqual(95);
+      }
+    });
+
+    it('tints `accent-wash` from `accent`, not from the ground', () => {
+      expect(hueDistance(lch(uiRoles.accentWash).hue, lch(uiRoles.accent).hue)).toBeLessThanOrEqual(10);
+      expect(lightness(uiRoles.accentWash)).toBeGreaterThanOrEqual(95);
+    });
   });
 
   it('carries exactly the typefaces and weights named in design-language.md §3', () => {
@@ -141,8 +174,25 @@ describe('design-language tokens', () => {
 
 // CIE L* (0–100), the perceptual lightness the ramp is stepped in.
 function lightness(hex: string): number {
-  const y = relativeLuminance(hex);
-  return y > 216 / 24389 ? 116 * Math.cbrt(y) - 16 : (y * 24389) / 27;
+  return lch(hex).lightness;
+}
+
+// CIE LCh (D65): lightness, chroma (colourfulness) and hue angle in degrees.
+function lch(hex: string): { lightness: number; chroma: number; hue: number } {
+  const [r, g, b] = linearChannels(hex);
+  const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+  const f = (t: number) => (t > 216 / 24389 ? Math.cbrt(t) : ((24389 / 27) * t + 16) / 116);
+  const a = 500 * (f(x) - f(y));
+  const bStar = 200 * (f(y) - f(z));
+  const hue = (Math.atan2(bStar, a) * 180) / Math.PI;
+  return { lightness: 116 * f(y) - 16, chroma: Math.hypot(a, bStar), hue: hue < 0 ? hue + 360 : hue };
+}
+
+function hueDistance(a: number, b: number): number {
+  const distance = Math.abs(a - b) % 360;
+  return distance > 180 ? 360 - distance : distance;
 }
 
 function contrastRatio(foreground: string, background: string): number {
@@ -154,9 +204,14 @@ function contrastRatio(foreground: string, background: string): number {
 }
 
 function relativeLuminance(hex: string): number {
-  const channels = [1, 3, 5].map((offset) => {
+  const [r, g, b] = linearChannels(hex);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function linearChannels(hex: string): [number, number, number] {
+  const [r, g, b] = [1, 3, 5].map((offset) => {
     const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
     return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   });
-  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  return [r, g, b];
 }

@@ -430,14 +430,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: uiSpace.xs,
     minHeight: uiGeometry.tapTarget,
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   addSetDivider: {
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
   },
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   saveError: {
     color: uiRoles.danger,

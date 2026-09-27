@@ -97,7 +97,7 @@ face ships no 700) confirmed.
   `ListRow`s behind `rule-soft` hairlines: rank and value in Plex Mono, the
   member in Source Sans with the 1RM's set under it in `ink-muted`, and the
   date with the certification mark on All (T11's check in `ink`, ring and
-  `uncertified` in `ink-muted`). My row sits on `surface-subtle` and reads
+  `uncertified` in `ink-muted`). My row sits on `paper` and reads
   `You` (T12-D1). Empty, missing-data and lost-access are T11's `StatePanel`s;
   `See all sets` is their outline.
 - **History** is the view's micro-label over one `Card` of rows: the date in
@@ -126,7 +126,7 @@ Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream
 | `groups-07c-4-board-certified-weight` | Certified · Weight after the certify |
 | `groups-07c-5-history-certified` | History: `(certified by you)` |
 | `groups-unlink-06-certified-empty` | Certified empty after an unlink |
-| `groups-unlink-07-restored-certified` | my own row: `surface-subtle` and `You` |
+| `groups-unlink-07-restored-certified` | my own row: `paper` and `You` |
 | `groups-08b-board-former-member` | a former member's row, certified |
 
 Jest only: the podium row with `You` in bold, the offline marker over loaded

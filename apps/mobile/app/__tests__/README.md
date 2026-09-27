@@ -127,9 +127,7 @@ coverage and raw-versus-total labels.
 `bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
 B, explicit current reading, added pounds and below-bodyweight unavailable targets, validation, one-rep/high-rep
 notes, retry, dismissed reads and invalid restored reading context. Numerical
-forward/inverse vectors remain in the kernel tests. Device evidence belongs to
-the fourth ios-bodyweight flow on all three phone sizes, plus the full frontend
-gate; unit/typecheck success never substitutes for rendered evidence.
+forward/inverse vectors remain in the kernel tests.
 
 ## Target-specific group score coverage (M27)
 

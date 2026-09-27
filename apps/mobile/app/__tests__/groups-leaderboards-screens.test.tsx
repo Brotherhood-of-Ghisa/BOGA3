@@ -319,8 +319,8 @@ describe('Full board (E1.2)', () => {
     expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
-    // My row sits on surface-subtle, the others on the card's surface (DLM-T12-D1).
-    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(uiRoles.surfaceSubtle);
+    // My row sits on paper, the others on the card's surface (DLM-T12-D1).
+    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(uiRoles.paper);
     expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(uiRoles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');
     expect(screen.getByTestId('group-board-row-2-mark-certified', { includeHiddenElements: true })).toBeTruthy();
