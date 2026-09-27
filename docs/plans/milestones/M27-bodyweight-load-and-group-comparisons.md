@@ -294,113 +294,39 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 Dependencies describe delivery order, not a request to spawn agents. No task
 is complete merely because a downstream closeout card lists its tests.
 
-### Execution checkpoint (through 2026-09-27)
+### Current execution checkpoint (2026-09-27)
 
-- Worktree: `codex/m27-bodyweight`, based on `a34708c0` (latest `origin/main`
-  when work started); isolated slot 1. `./boga doctor` passed.
-- T01 contract and repo-native brief are written under `docs/specs/tech/` and
-  `docs/specs/ui/design-targets/`; selected current-screen references are real
-  402×874pt simulator captures. New M27 UI captures are tracked below.
-- T03 pure resolver, coverage, group-reps eligibility and named Wathan
-  projection conventions are implemented with shared numerical vectors.
-  Existing consumers are intentionally awaiting T07/T09/T11 adoption.
-- `./boga test fast` passed (165 suites, 1,984 tests); `groups-leaderboards`
-  passed. Full `frontend` passed at `0f0ec368` with `TASK_ID=M27-foundation`,
-  including the UI-regression repeat after the baseline XCTest hierarchy HTTP
-  500. Artifacts: `apps/mobile/artifacts/maestro/M27-foundation/`; local lane
-  logs `/tmp/boga-m27-{fast,groups,frontend}.log`. No gate was waived.
-- T02 schema/transport implementation is in progress: private readings, frozen
-  snapshots and load metadata; guarded server compatibility, a separate reading
-  cursor, and one-time metadata hydration for upgraded old clients. Normal
-  autosave and source deletion preserve snapshots. Paired migrations are
-  `20260926181114_m27_bodyweight_sync.sql` and SQLite `0007`/`0008`.
-- T02 fast passed (166 suites, 1,994 tests); every backend lane passed. Backend
-  reruns updated legacy full-field fixtures and the expected entity count, while
-  preserving their assertions. Real sync: 6 suites / 15 tests, including
-  reinstall and old-reader metadata recovery. Drift: zero errors/warnings.
-  Logs: `/tmp/boga-m27-data-{fast,backend,backend-tail}.log`; measured runs are
-  in the normal timings records. `./boga timings` and `./boga test for` ran.
-- Full T02 `frontend` passed at `29ff94f` (`TASK_ID=M27-data`), including
-  sign-in/profile, UI/server sync, two-user groups and exercise linking.
-  Artifacts: `apps/mobile/artifacts/maestro/M27-data/`; log:
-  `/tmp/boga-m27-data-frontend.log`. `./boga timings` recorded the measured runs.
-  No implementation PR opened.
-- T04 local readings/history, creation-time capture and explicit session
-  correction are implemented. Fast passed (168 suites / 2,016 tests), all
-  backend lanes passed, and `handles` passed. Logs:
-  `/tmp/boga-m27-entry-fast-final.log`, `/tmp/boga-m27-entry-backend.log` and
-  `/tmp/boga-m27-entry-fast-tail.log`.
-- The default-device `ios-bodyweight` flow passed with real local writes,
-  validation, source deletion, stable active weight, manual correction,
-  next-session defaults, process restart and unknown-weight entry. Evidence:
-  `apps/mobile/artifacts/maestro/M27-entry/20260926-211346-10105/`.
-  Device checks found and fixed a native Back item that stopped dispatching
-  on repeat visits, and an outer scroll view consuming the correction Save tap
-  to dismiss the keyboard. The shared header arrow dispatches explicitly;
-  session scroll views pass handled keyboard taps through to the editor.
-- The bodyweight flow also passed on iPhone SE 3 (375×667pt) and iPhone 17
-  Pro Max (440×956pt), both iOS 26.4. Evidence under `apps/mobile/artifacts/maestro/`:
-  `M27-entry-small/20260926-212207-22348/` and
-  `M27-entry-large/20260926-213103-26283/`. Existing readings open without
-  autofocus so inspection/delete does not immediately raise the keyboard.
-  Forms, Settings rows and snapshot facts were compared with T01's target;
-  the large run includes clean restart/unknown captures after waiting for
-  development-client loading to finish. The final `fast-frontend` rerun passed
-  all 2,016 tests; log `/tmp/boga-m27-entry-fast-frontend.log`.
-- Every T04 frontend lane passed at `62f73ea`. The aggregate passed smoke,
-  data, UI regression, exercise, session and bodyweight flows; resumed runs passed
-  auth/profile, UI/server sync and both group flows. Logs:
-  `/tmp/boga-m27-entry-frontend.log`, `/tmp/boga-m27-entry-frontend-tail.log`,
-  `/tmp/boga-m27-entry-frontend-tail2.log`,
-  `/tmp/boga-m27-entry-groups-final.log`. Groups evidence:
-  `apps/mobile/artifacts/maestro/M27-entry/20260926-222458-63377/` and
-  `20260926-223027-65331/`. The interrupted attempts were simulator storage
-  exhaustion and an XCTest accessibility failure; doctor passed, and closing
-  the test Simulator app plus erasing only this task's disposable simulator
-  data restored space. No assertion was weakened. `./boga timings` and
-  `./boga test for` ran. No implementation PR opened.
-- T05 setup/logging/review/import implementation is committed at `e2bc65ba`.
-  Fast passed (171 suites / 2,043 tests), backend and handles passed. Bodyweight
-  entry plus logging passed on all three phone sizes; final default evidence:
-  `apps/mobile/artifacts/maestro/M27-load-frontend-resume/20260927-001636-38972/`.
-  The T05 card records the small/large captures and visual review. Every frontend
-  lane passed, including auth/profile, UI/server sync and both group flows.
-  Logs: `/tmp/boga-m27-load-frontend-fit.log` and
-  `/tmp/boga-m27-load-resume-<lane>.log`. The UI-regression visibility timeout
-  passed unchanged on repeat; no lane was waived. `./boga timings` and
-  `./boga test for` ran. No implementation PR opened.
-- T06 historical-fill planner, atomic repository, UI, fixture and tests are
-  integrated. Fast passed (173 suites / 2,067 tests), the final fast-frontend
-  rerun passed, and all backend and meta-test lanes passed. Logs:
-  `/tmp/boga-m27-backfill-fast-final.log`,
-  `/tmp/boga-m27-backfill-fast-frontend-final.log`,
-  `/tmp/boga-m27-backfill-backend.log`. All three bodyweight flows passed at
-  `5a5892b` on small and large phones; their BWF captures were visually reviewed
-  and are linked from the T06 card. Default-device bodyweight also passed;
-  full frontend passed every lane at `5a5892b`, including auth/profile,
-  UI/server sync and both group flows. Final log:
-  `/tmp/boga-m27-backfill-frontend-final.log`. Timings, trigger rules and docs
-  checks ran; no gate was waived.
-  T07 analytics/calculator is integrated. Full fast passed (178 suites / 2,114
-  mobile tests), and full backend passed (including real sync and MCP smoke).
-  Device gates and visual proof remain pending. Logs:
-  `/tmp/boga-m27-analytics-fast-rerun.log`, `/tmp/boga-m27-analytics-backend.log`.
-  Neither task is claimed shipped.
+This replaces the earlier chronological checkpoints; git history retains them.
+T01–T11 are implemented in `codex/m27-bodyweight`, isolated slot 1. The branch
+integrates `origin/main` at `8b5c47c1`; app/server source is `b636f234`.
+The task cards remain open until shipment. No PR, hosted deployment or client
+activation has occurred.
 
-- T08/T09 server integration is now implemented: versioned rules/publication,
-  metric attestations, legacy compatibility, readers and strict mobile decoders.
-  Full backend passed with real SQL-to-client vectors and failure injection;
-  log `/tmp/boga-m27-group-integration-backend-3.log`.
-- T10 editor, catalogue/linking, podiums, boards, historical revisions, board
-  certification and metric stream rendering are integrated. Full fast passed
-  (184 mobile suites / 2,214 tests), including backend fast and metadata/consent/
-  MCP checks; log `/tmp/boga-m27-comparison-ui-fast-2.log`. Stream certification
-  parity is integrated with current context and stale-read protection; frontend
-  fast passed 184 suites / 2,216 tests and full backend passed again
-  (`/tmp/boga-m27-stream-cert-fast-frontend-2.log`,
-  `/tmp/boga-m27-stream-cert-backend-final.log`). The expanded two-user flow has
-  syntax/meta proof; native visual and final frontend acceptance remain.
-  Timings and required-gate rules ran. These changes are not shipped.
+| Acceptance | Current evidence |
+| --- | --- |
+| Complete fast gate | Green: 183 mobile suites / 2,243 tests plus repository, backend-fast, consent and MCP; `/tmp/boga-m27-main-integrated-fast-final.log` |
+| Complete backend gate | Green, including real sync-infra, API, group scoring/publication/certification and OAuth MCP smoke; `/tmp/boga-m27-main-integrated-backend.log` |
+| Handle teardown | Green, 183 suites / 2,243 tests; `/tmp/boga-m27-merged-handles.log` |
+| Native smoke, data and UI regression | Green on integrated source; `/tmp/boga-m27-merged-frontend.log` |
+| Native exercise and session flows | Green after fixing safe-area dismissal and keyboard-obscured Add taps; `/tmp/boga-m27-merged-native-final.log` |
+| Native bodyweight entry, logging and backfill | Green in `M27-review-viewport/20260927-112539-413`; analytics and subsequent lanes are still running |
+| Native two-user groups | Earlier baseline passed the full M27 sequence in `M27-long-stream/20260927-102333-82851`; fresh integrated-source run remains pending |
+| Native reinstall with two frozen weights | Flow now saves 80/82 kg readings and two sessions, wipes/signs in, then checks both restored snapshots/readings; fresh native verification pending |
+| Small/large and offline group UI | Earlier personal captures predate the merged Sheet; fresh bodyweight/groups runs and actual gateway-outage captures remain pending |
+| Hosted rollout | Server-first migration/function/smoke/activation procedure prepared in RUNBOOK; not executed |
+
+Native artifact paths above are relative to `apps/mobile/artifacts/maestro/`.
+Selected captures have adjacent `visual-review.md` records. Failed aggregate
+attempts remain failed; only their individually completed lanes are listed as
+passes. No assertion or required lane was waived. Latest flow metadata check:
+`/tmp/boga-m27-review-visibility-meta.log` (14 files).
+
+`./boga test for` confirms the required fast/backend/frontend union. Timing
+records were imported into the machine store and verified byte-for-byte before
+removal from the branch, matching current spec 02; `./boga timings` reads them.
+Remaining work: complete native lanes, compare dense states on all three phone
+sizes, finish real outage/error proof, validate the PR gate table, then perform
+authorised hosted smoke before client activation. Do not retire the plan early.
 
 ## Milestone acceptance
 
@@ -443,87 +369,3 @@ cards when shipped, marking their task-table entries completed.
 - [Suprak et al., body mass supported during push-up variants](https://pubmed.ncbi.nlm.nih.gov/20179649/): a basis for a simple approximate coefficient, not a universal measurement.
 - [Weighted push-ups and load-velocity relationships](https://pmc.ncbi.nlm.nih.gov/articles/PMC7386139/): loading method/support affects effective resistance.
 - [Strength scaling to body size](https://pubmed.ncbi.nlm.nih.gov/18172672/): relative strength is not synonymous with a validated size-neutral competition score.
-
-- **T11 integration checkpoint (2026-09-27):** the dedicated API now adapts
-  owner-filtered rules, frozen session weight and raw unit/mode through the
-  shared mobile boundary. Additive metric semantics preserve external kg fields
-  and expose effective resistance, provenance and completeness. MCP remains a
-  four-tool protocol adapter. Runtime API parity, real OAuth MCP smoke and every fast/backend lane have
-  passed locally. The T11 card links aggregate and resumed lane evidence.
-  Mobile source at `5f9e3f6` includes the offline-upgrade review follow-up;
-  small/large/full-frontend verification is running before further mobile edits.
-  [T11](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md)
-  tracks proof and compatible response evolution.
-
-- **T07/T08/T09 checkpoint (2026-09-27):** the complete personal analytics flow
-  passed on the small phone at `c119d5e`; new share/incomplete/coefficient/source
-  captures BWA13d–BWA16 were visually reviewed. Evidence:
-  `apps/mobile/artifacts/maestro/M27-offline-viewport-small/20260927-032818-73881/`.
-  That aggregate still failed the offline logging case: its fixture changed
-  rules directly in SQLite without refreshing the catalogue cache. `71702c1`
-  uses the real exercise-save path and checks bodyweight context before review;
-  fresh three-size/full-frontend verification is pending. T08/T09 pure scoring
-  and graph/metric contracts are now integrated for actual gate validation;
-  server publication, certification and group UI are still unfinished.
-
-- **Group scorer gate checkpoint:** full fast and backend passed at `19fc54d`
-  (181 mobile suites / 2,150 tests; real sync 6 suites / 15 tests; all API,
-  group and MCP lanes). Logs: `/tmp/boga-m27-group-score-verified-{fast,backend}.log`.
-  An earlier fast attempt launched Node ABI 137 against an ABI 141 SQLite addon;
-  doctor passed, and pinning the local runner to the installed Node 25.9.0 / ABI
-  141 restored the matching runtime. No addon or dependency source was changed.
-  `/tmp/boga-m27-group-score-jest-probe.log` retains the diagnostic green run.
-  Small, large and full frontend runs are continuing with the fixture fix;
-  database rule publication and certification remain pending implementation.
-
-- **Native restart follow-up:** at `19fc54d`, offline review/logging, backfill
-  and the complete analytics flow passed on the small phone in
-  `M27-group-score-verified-small/20260927-035332-13411/`; BWO03–BWO05 were
-  visually checked, including 20 kg added / B=80 / total 1RM 127.7 / volume 800
-  surviving reload. Entry failed on an XCTest hierarchy HTTP 500 immediately
-  after cold restart, with the expected Today screen visible. An unchanged
-  repeat (`M27-group-score-native-small/20260927-041047-17338/`) passed entry,
-  backfill and analytics but hit the same HTTP 500 in logging's restart check.
-  Logs: `/tmp/boga-m27-group-score-{verified,native}-small.log`. The aggregate
-  was not green in either attempt. Entry/logging now retry only the read-only
-  post-restart readiness assertion (bounded to two retries with animation
-  settling); every saved-data assertion remains required. Fresh device gates
-  are pending. No product runtime code changed in this follow-up.
-
-- **Three-size verification follow-up:** all four `ios-bodyweight` flows passed
-  on the small phone at `4ab3ac6`, with runtime source still `19fc54d`.
-  Evidence: `M27-restart-readiness-small/20260927-042810-28105/`;
-  BWO03 and BWA14 were visually checked again for the reviewed load and
-  incomplete-volume presentation. The large-phone run passed entry, logging
-  and backfill but failed after opening the estimate source picker:
-  `M27-restart-readiness-large/20260927-044519-32038/`. Its screenshot shows
-  the sheet dismissed during the immediate full-screen centering scroll.
-  The three source rows fit on the small phone already; the flow now waits
-  for the picker header and row instead of scrolling during that transition.
-  Fresh large/full-frontend verification remains required. The failed
-  large aggregate is not counted as green, and no runtime code changed.
-
-- **Integrated comparison checkpoint:** T08/T09 server publication and T10 UI
-  are implemented at `7a2157a`, including versioned rules, whole-board rebuilds,
-  metric-specific attestations and current stream certification context. Full
-  fast passed 184 suites / 2,218 mobile tests plus all repository/backend-fast
-  lanes (`/tmp/boga-m27-cert-refresh-fast.log`); full backend passed
-  (`/tmp/boga-m27-stream-cert-backend-final.log`). T11 API/MCP proof is included.
-  Native conventional setup, shared volume, boards and separate Weight/1RM
-  certification passed their assertions in the latest dedicated run, which
-  stopped at tall-sheet dismissal. The current fix reserves an exposed 44pt
-  backdrop and restores record-band/mono/per-metric-status presentation.
-  Frontend fast and open-handle checks pass 184 suites / 2,218 tests
-  (`/tmp/boga-m27-record-layout-{fast,handles}.log`). Fresh complete device,
-  three-size and hosted rollout acceptance remain open; no PR or deployment.
-
-- **Baseline group device acceptance:** `M27-long-stream` passed both groups
-  flows with the integrated metric UI. The 60/90 kg ranking reversal,
-  estimated/missing B, 100%→70% rule publication, attestation preservation,
-  90→95 kg correction invalidation, old unlink/relink, former-member read-only
-  records and removed-member denial all passed. Artifacts and visual review:
-  `apps/mobile/artifacts/maestro/M27-long-stream/20260927-102333-82851/`;
-  linking: `20260927-103103-84904/`. Log:
-  `/tmp/boga-m27-long-stream-groups.log`. The route-selection regression and
-  history counterpart bring mobile coverage to 184 suites / 2,220 tests.
-  Full frontend, small/large group layouts and hosted rollout remain open.

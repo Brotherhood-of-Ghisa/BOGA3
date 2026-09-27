@@ -94,31 +94,22 @@ this milestone and remaining shipped cards in the closing PR. Evidence remains
 in those PRs and history. Follow AGENTS.md worktree/PR lifecycle to merge/release.
 
 
-## Execution checkpoint (2026-09-27)
+## Current execution checkpoint (2026-09-27)
 
-Server-first ordering, hosted acceptance and forward-repair boundaries are
-prepared in `RUNBOOK.md`, including the exact M27 migrations and matching
-worker/API source. No hosted deployment or client activation has occurred.
-The first integrated frontend attempt failed Stats because its invalid fixture
-used canonical blank-zero, and catalogue because it reached the dev-client
-launcher. Repairs preserve the invalid-count assertion and establish app
-readiness before catalogue fixture setup. Full fast passes 184 suites / 2,218
-tests (`/tmp/boga-m27-cert-refresh-fast.log`). The dedicated group device lane
-is running before the full frontend rerun. Local and hosted acceptance remain
-open; no task cards are retired yet.
+Implementation is integrated with `origin/main` at `8b5c47c1`; app/server source
+is `b636f234`. The milestone's [current acceptance table](../milestones/M27-bodyweight-load-and-group-comparisons.md#current-execution-checkpoint-2026-09-27)
+owns the latest gate results and remaining work, replacing earlier partial-run
+checkpoints here. Full fast (183 suites / 2,243 tests), backend and handles are
+green. Native constituent lanes are being completed on this integrated source;
+failed aggregates are not counted as passes. No assertion has been waived.
 
+Baseline two-user proof covers ranking reversal, estimated/missing weight,
+100%→70% rules publication, preserved attestation, correction invalidation,
+legacy unlink/relink, former-member read-only details and removed-member denial.
+Fresh three-size layouts, cached-board outage and failed-publication evidence
+remain open. The sync flow now checks two frozen weights across a local wipe
+and real bootstrap; its fresh native result is pending.
 
-Baseline group device acceptance now passes: `TASK_ID=M27-long-stream ./boga
-test ios-groups-e2e` completed both flows, including the full M27 sequence,
-legacy unlink/relink, retained former-member records and removed-member denial.
-Log: `/tmp/boga-m27-long-stream-groups.log`; captures and visual review:
-`apps/mobile/artifacts/maestro/M27-long-stream/20260927-102333-82851/` and
-`20260927-103103-84904/`. The later feed check needed an exact ID, centering and
-30 seconds for the expanded feed; no data assertion was removed. The identical
-app build's detailed M27 captures are reviewed under
-`M27-route-selection/20260927-100650-69395/visual-review.md`. Small/large group
-layouts, full frontend and hosted rollout remain open.
-
-Final full fast aggregate passed after these corrections: 184 suites / 2,220
-mobile tests plus backend-fast, metadata, consent and MCP checks. Evidence:
-`/tmp/boga-m27-group-device-final-fast.log`.
+`RUNBOOK.md` contains the exact server-first migration/function order, hosted
+acceptance and forward-repair boundaries. No PR, hosted deployment or client
+activation has occurred; do not retire this card until its work ships.

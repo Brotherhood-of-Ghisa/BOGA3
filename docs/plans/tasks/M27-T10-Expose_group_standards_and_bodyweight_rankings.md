@@ -72,86 +72,22 @@ group coefficient authority, backfill and correction invalidation. Run
 milestone entry complete and delete this card when shipped.
 
 
-## Execution checkpoint (2026-09-27)
+## Current execution checkpoint (2026-09-27)
 
-Integrated the reviewed group rule form with revision-bound preview and stale
-edit preservation; versioned catalogue/archive calls; compatibility explanations
-and guarded Add as new; metric podiums, full boards, revision history and frozen
-legacy scores; saved-B/provenance record details and metric-specific board
-certification. Groups and Today now read the v2 stream and preserve units and
-original rule revisions in event presentation. Personal shared-session metrics
-remain explicitly personal and show incomplete volume.
+Implementation is integrated with `origin/main` at `8b5c47c1`; app/server source
+is `b636f234`. The milestone's [current acceptance table](../milestones/M27-bodyweight-load-and-group-comparisons.md#current-execution-checkpoint-2026-09-27)
+owns the latest gate results and remaining work, replacing earlier partial-run
+checkpoints here. Full fast (183 suites / 2,243 tests), backend and handles are
+green. Native constituent lanes are being completed on this integrated source;
+failed aggregates are not counted as passes. No assertion has been waived.
 
-Full fast passed: 184 suites / 2,214 mobile tests, plus backend fast, metadata,
-consent and MCP checks. Log: `/tmp/boga-m27-comparison-ui-fast-2.log`.
-Full backend passed: `/tmp/boga-m27-group-integration-backend-3.log`.
-Stream certification now uses current per-metric context and the shared record
-sheet, with raw/provenance display, metric selection and stale-read protection.
-Frontend fast passed 184 suites / 2,216 tests; full backend passed, including
-real SQL stream decoding, estimated attestation and equal-score provenance
-correction. Logs: `/tmp/boga-m27-stream-cert-fast-frontend-2.log` and
-`/tmp/boga-m27-stream-cert-backend-final.log`.
+Baseline two-user proof covers ranking reversal, estimated/missing weight,
+100%→70% rules publication, preserved attestation, correction invalidation,
+legacy unlink/relink, former-member read-only details and removed-member denial.
+Fresh three-size layouts, cached-board outage and failed-publication evidence
+remain open. The sync flow now checks two frozen weights across a local wipe
+and real bootstrap; its fresh native result is pending.
 
-The existing two-user Maestro flow now targets generic conventional boards and
-separate Weight/1RM attestations while retaining its legacy unlink assertions.
-Its new M27 sequence covers 60/90 kg relative/absolute reversal, personal versus
-group coefficient authority, missing-B reps, estimated-B certification, an
-admin's rules preview/rebuild and corrected-B invalidation. Syntax and metadata
-checks pass (`/tmp/boga-m27-expanded-maestro-meta.log`); the full frontend run
-is underway (`/tmp/boga-m27-comparisons-frontend.log`). Native interaction and
-three-size visual acceptance remain unverified. No shipment claim.
-
-
-Follow-up verification: a regression reproduced an ended certification being
-restored when connectivity changed after a successful write. The sheet now
-retains the latest server end state and follows a replacement attestation on
-unchanged inputs. Full fast passed 184 suites / 2,218 tests, including all
-backend/repository/consent/MCP fast lanes (`/tmp/boga-m27-cert-refresh-fast.log`).
-The first full frontend attempt passed smoke, data smoke, session completion
-and Settings wipe. Stats exposed a stale blank-as-invalid fixture; it now uses
-malformed text while preserving the 15-set assertion. Catalogue stopped in the
-dev-client launcher; its flow now establishes app readiness before fixture
-setup. Both fixes still require the native rerun. The dedicated group lane is
-running at `/tmp/boga-m27-comparison-groups.log`; no device success is claimed.
-
-Native follow-up: comparison create/rename now dismisses the keyboard on drag
-and adjusts scroll insets. The shared-session fixture explicitly declares its
-conventional row exercise; unknown metadata still yields incomplete volume.
-The latest native run reached and passed separate Weight/1RM certification, then
-exposed a tall sheet without a usable backdrop. Sheets now reserve 44pt below
-the status bar, and stream records retain the accepted band/mono/tag treatment
-with per-metric certification status. Frontend fast and handles both pass all
-184 suites / 2,218 tests; metadata checks pass 11 files. Logs:
-`/tmp/boga-m27-record-layout-{fast,handles,meta}.log`. The fresh native run is
-`/tmp/boga-m27-record-layout-groups.log`; completion remains unverified.
-
-The `M27-record-layout` native run passed sheet dismissal, both conventional
-attestations, legacy unlink/relink, bodyweight relative/absolute reversal,
-estimated-B certification, missing-B reps and the 100%→70% preview/publication.
-It stopped on a reused board route retaining Reps/All after an Absolute/Certified
-deep link. The failure hierarchy, rather than Maestro's stale attached image,
-identified this. A regression reproduced the bug; board and history now follow
-updated route selections and keep toggle choices in their URLs. Full fast
-passed 184 suites / 2,219 tests before the analogous history fix; frontend fast
-then passed 184 / 2,220 (`/tmp/boga-m27-board-link-fast.log`,
-`/tmp/boga-m27-route-selection-fast.log`). The rule form now uses the current
-Card/ActionButton recipe and label-sized selector, and history uses neutral
-revision chips. Fresh native acceptance is running at
-`/tmp/boga-m27-route-selection-groups.log`. Prior partial captures and their
-visual review are under `M27-record-layout/20260927-095316-49356/`.
-
-
-Baseline group device acceptance now passes: `TASK_ID=M27-long-stream ./boga
-test ios-groups-e2e` completed both flows, including the full M27 sequence,
-legacy unlink/relink, retained former-member records and removed-member denial.
-Log: `/tmp/boga-m27-long-stream-groups.log`; captures and visual review:
-`apps/mobile/artifacts/maestro/M27-long-stream/20260927-102333-82851/` and
-`20260927-103103-84904/`. The later feed check needed an exact ID, centering and
-30 seconds for the expanded feed; no data assertion was removed. The identical
-app build's detailed M27 captures are reviewed under
-`M27-route-selection/20260927-100650-69395/visual-review.md`. Small/large group
-layouts, full frontend and hosted rollout remain open.
-
-Final full fast aggregate passed after these corrections: 184 suites / 2,220
-mobile tests plus backend-fast, metadata, consent and MCP checks. Evidence:
-`/tmp/boga-m27-group-device-final-fast.log`.
+`RUNBOOK.md` contains the exact server-first migration/function order, hosted
+acceptance and forward-repair boundaries. No PR, hosted deployment or client
+activation has occurred; do not retire this card until its work ships.

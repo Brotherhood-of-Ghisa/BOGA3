@@ -84,7 +84,7 @@ same device. Logger and board references below come from this green run
 | [Group board](bodyweight/board-reference.png) | Existing All / 1RM board; `ios-groups-e2e` |
 | [Group exercise reference](group-exercise-unlink/baseline-group.png) | Existing group exercise list; accepted group-link target |
 
-T04–T10 capture every relevant flow above in the running app, at baseline phone
+Capture every relevant flow above in the running app, at baseline phone
 width plus a smaller and larger supported phone layout for new dense forms,
 preview lists and boards. Record actual device/viewport, screenshot paths and
 material deviations in the PR. Keep runtime comparisons under the gitignored
