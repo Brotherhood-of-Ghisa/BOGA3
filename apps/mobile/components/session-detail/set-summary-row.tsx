@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     color: uiRoles.ink,
   },
   typePlanned: {
-    color: uiRoles.planned,
+    color: uiRoles.inkGhost,
   },
   weightReps: {
     flex: 1,

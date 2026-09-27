@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
   },

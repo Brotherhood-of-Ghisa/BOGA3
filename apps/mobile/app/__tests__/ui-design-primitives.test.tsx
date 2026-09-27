@@ -170,7 +170,7 @@ describe('Stat', () => {
       fontWeight: '500',
       color: uiRoles.inkFaint,
     });
-    expect(flatStyle(screen.getByText('1RM')).color).toBe(uiRoles.planned);
+    expect(flatStyle(screen.getByText('1RM')).color).toBe(uiRoles.inkGhost);
   });
 });
 
@@ -501,7 +501,7 @@ describe('ActionButton', () => {
     render(<ActionButton disabled label="Done" onPress={onPress} testID="button" variant="primary" />);
 
     const button = screen.getByTestId('button');
-    expect(flatStyle(button).backgroundColor).toBe(uiRoles.disabled);
+    expect(flatStyle(button).backgroundColor).toBe(uiRoles.inkGhost);
     expect(button.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
@@ -596,7 +596,7 @@ describe('FormField', () => {
   it('labels a field one field-height tall and shows its error below in danger', () => {
     const { rerender } = render(<FormField label="Start" onChangeText={jest.fn()} testID="start" value="" />);
     expect(flatStyle(screen.getByText('Start'))).toMatchObject({ textTransform: 'uppercase', color: uiRoles.inkFaint });
-    expect(screen.getByTestId('start').props.placeholderTextColor).toBe(uiRoles.disabled);
+    expect(screen.getByTestId('start').props.placeholderTextColor).toBe(uiRoles.inkGhost);
     expect(flatStyle(screen.getByTestId('start')).fontFamily).toBe('IBM Plex Mono');
     expect(screen.queryByTestId('start-error')).toBeNull();
 
@@ -685,7 +685,7 @@ describe('SegmentedControl', () => {
 
     expect(screen.getByTestId('view-records').props.accessibilityState).toEqual({ selected: true, disabled: true });
     expect(screen.getByTestId('view-last').props.accessibilityState).toEqual({ selected: false, disabled: true });
-    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.disabled);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -762,7 +762,7 @@ describe('Notice', () => {
     render(<Notice icon="offline" live message="Offline · last updated 09:41" testID="notice" />);
 
     const band = screen.getByTestId('notice');
-    expect(flatStyle(band)).toMatchObject({ backgroundColor: uiRoles.surfaceSubtle, borderColor: uiRoles.rule });
+    expect(flatStyle(band)).toMatchObject({ backgroundColor: uiRoles.paper, borderColor: uiRoles.rule });
     expect(band.props.accessibilityLiveRegion).toBe('polite');
     expect(band.props.accessibilityRole).toBeUndefined();
     expect(flatStyle(screen.getByText('Offline · last updated 09:41')).color).toBe(uiRoles.ink);

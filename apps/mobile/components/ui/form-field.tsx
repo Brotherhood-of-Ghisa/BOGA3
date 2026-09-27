@@ -21,7 +21,7 @@ export type FormFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColo
 };
 
 // A labelled input field (`design-language.md` §4): the micro-label inside the
-// field above the value, one field height, `radius.control`, a `rule-strong`
+// field above the value, one field height, `radius.control`, a `rule`
 // hairline that turns `danger` while the value is invalid. The logger's figure
 // fields are the same recipe drawn larger (`exercise-page/set-logger.tsx`).
 export function FormField({
@@ -43,7 +43,7 @@ export function FormField({
           {...inputProps}
           allowFontScaling={false}
           multiline={multiline}
-          placeholderTextColor={uiRoles.disabled}
+          placeholderTextColor={uiRoles.inkGhost}
           style={[styles.input, face === 'text' ? styles.inputText : null]}
           testID={testID}
         />
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.xs,
     backgroundColor: uiRoles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
   },
   // Grows with its text from one field height.

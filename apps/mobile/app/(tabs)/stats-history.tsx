@@ -1516,7 +1516,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   headerCellPressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   headerLabel: microLabel,
   headerLabelActive: {

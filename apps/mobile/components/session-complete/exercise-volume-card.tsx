@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   track: {
     height: uiSpace.xs,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.ruleStrong,
+    backgroundColor: uiRoles.rule,
   },
   endpoint: {
     position: 'absolute',
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
     height: uiSpace.sm,
     marginLeft: -uiSpace.xs,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.ruleStrong,
+    backgroundColor: uiRoles.rule,
   },
   leftEndpoint: {
     left: 0,
@@ -310,6 +310,6 @@ const styles = StyleSheet.create({
   baselineTrack: {
     height: uiBorder.width * 2,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.ruleStrong,
+    backgroundColor: uiRoles.rule,
   },
 });

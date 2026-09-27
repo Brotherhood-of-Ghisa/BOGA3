@@ -33,24 +33,20 @@ Semantic roles, not a palette. A screen names the role, never the hex.
 
 | Role | Value | Use |
 | --- | --- | --- |
-| `ink` | `#15181D` | primary text, chrome, realised values |
+| `ink` | `#1B1712` | primary text, chrome, realised values |
 | `ink-muted` | `#6B6358` | secondary text |
 | `ink-faint` | `#9B948A` | mini legends, tertiary labels, not-yet-realised values |
-| `planned` | `#B3ABA0` | legends of not-yet-realised values |
-| `disabled` | `#C4BDB0` | absent values, faintest labels |
-| `paper` | `#F6F4EF` | page ground |
+| `ink-ghost` | `#BAB2A7` | legends of not-yet-realised values, absent values, placeholders, disabled controls |
+| `paper` | `#F6F4EF` | page ground; a pressed control and an action strip inside a card |
 | `surface` | `#FFFFFF` | cards, sheets, inputs |
-| `surface-subtle` | `#FBF9F5` | action strips inside a card |
-| `rule` | `#E2DCD0` | card borders |
-| `rule-soft` | `#EFEAE0` | dividers inside a card |
-| `rule-faint` | `#F3EFE6` | dividers inside a panel |
-| `rule-strong` | `#DDD6C8` | control borders, sheet handle |
+| `rule` | `#E2DCD0` | card borders, control borders, sheet handle |
+| `rule-soft` | `#EFEAE0` | dividers inside a card or panel |
 | `accent` | `#C2410C` | the one primary action on a screen |
-| `accent-wash` | `#FDF6EE` | the row or field being edited |
+| `accent-wash` | `#FFF4EF` | the row or field being edited (`accent`'s hue at L* 97) |
 | `record` | `#8A6516` | an all-time best value |
 | `record-wash` / `record-rule` | `#FBF3E2` / `#EEDFBE` | a band announcing a record |
 | `danger` | `#A4262C` | destructive actions only |
-| `scrim` | `rgba(21, 24, 29, 0.42)` | the dimmed backdrop behind a sheet (`ink` at 42%) |
+| `scrim` | `rgba(27, 23, 18, 0.42)` | the dimmed backdrop behind a sheet (`ink` at 42%) |
 
 **`accent` vs `record`, decided 2026-09-22:** the two shared `#C2410C`, so "your
 best ever" and "the button that commits" read identically. **`record` moved** —
@@ -64,6 +60,29 @@ relationship to `record` that the orange pair had to `accent`.
 
 The floor is a gate, not a note: `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
 fails if `record` ever equals `accent` again or drops below 4.5:1.
+
+**Rationalised 2026-09-27.** The roles were picked by eye and had drifted into
+near-duplicates, which also blocks deriving them from a few seed colours later.
+Measured in CIE LCh:
+
+- **Two neutrals that cannot be told apart are one role.** `rule-strong`
+  (L* 86) folded into `rule` (88), and `rule-faint` (95) into `rule-soft` (93).
+  `planned` (70) and `disabled` (77) became one `ink-ghost` (73), completing
+  the ink series `ink` → `ink-muted` → `ink-faint` → `ink-ghost`.
+  `surface-subtle` (98) folded into `paper` (96): an action strip or a pressed
+  control inside a `surface` card now reads as the page showing through.
+  Chosen from an on-device before/after capture of every `frontend-ui` state:
+  23 roles became 19, and 13 greys became 9.
+- **The neutrals are one hue.** Every neutral sat at hue 77–94 except `ink`,
+  a cool near-black at 271°; `ink` moved to `#1B1712` (same L* 8 and chroma 4,
+  hue 77), invisible at that darkness. `scrim` follows `ink`.
+- **A wash is a tint of its role.** `accent-wash` was a warm neutral (hue 78)
+  rather than a tint of `accent` (47); it is now `accent`'s hue at L* 97
+  (hue 53 after sRGB rounding), so the edited row carries the accent's hue.
+
+Gated by `ui-design-tokens.test.ts`: no two roles share a value, every neutral
+sits within hue 75–95 at chroma ≤ 10, and `accent-wash` stays within 10° of
+`accent`'s hue.
 
 ### Data visualisation
 
@@ -170,7 +189,7 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
   elevation ramp; there is no elevation token.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
-  and a 38×4 `rule-strong` handle. **Tapping outside dismisses; sheets carry no
+  and a 38×4 `rule` handle. **Tapping outside dismisses; sheets carry no
   Cancel button.**
 - Tap targets ≥44. The iOS status bar and the tab tray are never redrawn in
   content.
@@ -218,8 +237,8 @@ additionally render faded (§6).
 - **No unit suffix inside an input.** The unit belongs in the field label.
 - **Show a figure wherever it can be computed**, including for values that are
   not yet realised — a planned set shows its projected 1RM and volume faded:
-  values in `ink-faint`, legends in `planned` (decided on device 2026-09-22;
-  `planned` for the values themselves read too faint to use).
+  values in `ink-faint`, legends in `ink-ghost` (decided on device 2026-09-22;
+  the faintest ink for the values themselves read too faint to use).
 - **Warm-ups are presented exactly like working sets**, including a real 1RM.
   They count toward 1RM and records, but not toward working sets (kept as
   shipped, decided 2026-09-23): `isWorkingSetType`

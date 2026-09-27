@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     width: uiGeometry.sheetHandle.width,
     height: uiGeometry.sheetHandle.height,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.ruleStrong,
+    backgroundColor: uiRoles.rule,
   },
   header: {
     flexDirection: 'row',

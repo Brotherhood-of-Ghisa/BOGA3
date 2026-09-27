@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiRoles.accentWash,
   },
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   content: {
     flex: 1,
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     color: uiRoles.accent,
   },
   labelDisabled: {
-    color: uiRoles.disabled,
+    color: uiRoles.inkGhost,
   },
 });
 

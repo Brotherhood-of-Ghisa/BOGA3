@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     width: uiGeometry.sheetHandle.width,
     height: uiGeometry.sheetHandle.height,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.ruleStrong,
+    backgroundColor: uiRoles.rule,
   },
   body: {
     // Leaves the inner MainTabs / tab bar to manage its own surface.

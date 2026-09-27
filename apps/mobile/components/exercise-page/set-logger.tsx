@@ -212,6 +212,6 @@ const styles = StyleSheet.create({
     backgroundColor: uiRoles.accent,
   },
   tickDisabled: {
-    backgroundColor: uiRoles.disabled,
+    backgroundColor: uiRoles.inkGhost,
   },
 });
