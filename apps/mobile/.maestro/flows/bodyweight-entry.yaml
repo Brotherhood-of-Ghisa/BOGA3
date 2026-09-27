@@ -100,6 +100,12 @@ appId: com.dinoderek.mobile
     id: "weight-entry-date"
 - eraseText
 - inputText: "${output.bodyweightFuture}"
+# The date keyboard has a prediction row and covers Save on the small phone.
+# A neutral content tap dismisses it before scrolling to the action.
+- tapOn:
+    text: "Local time · YYYY-MM-DD HH:mm"
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "weight-entry-save"
@@ -121,6 +127,12 @@ appId: com.dinoderek.mobile
     id: "weight-entry-date"
 - eraseText
 - inputText: "${output.bodyweightPast}"
+# The date keyboard has a prediction row and covers Save on the small phone.
+# A neutral content tap dismisses it before scrolling to the action.
+- tapOn:
+    text: "Local time · YYYY-MM-DD HH:mm"
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "weight-entry-save"
