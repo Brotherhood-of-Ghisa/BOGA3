@@ -125,16 +125,29 @@ beforeEach(() => {
 });
 afterEach(() => fixture.close());
 
+/** Drain the screen's reads inside act. Every RPC and cache read here resolves in
+ * microtasks, so act's drain covers the whole catalogue → board mount → board
+ * and group reads chain, however long it takes. The file's first board mount
+ * loads the list/header module graph (seconds on a cold transform cache), which
+ * a findBy would race against its 1 s wall clock. A read that never settles
+ * leaves the rows missing and the next getBy fails loud. */
+const settleReads = () => act(async () => {});
+
 it('opens the declared default, switches units and scope, and never calls the kg-only board', async () => {
   render(<GroupBoardRoute />);
-  expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('1.40 ×BW');
+  await settleReads();
+  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('1.40 ×BW');
+  expect(api.getGroupMetricBoard).toHaveBeenCalledTimes(1);
   expect(api.getGroupMetricBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'relative_strength', certified: true }));
   expect(api.getGroupBoard).not.toHaveBeenCalled();
   api.getGroupMetricBoard.mockResolvedValue({ ...board, metric: 'absolute_strength', entries: [{ ...row, metric: 'absolute_strength', unit: 'kg', value: 112 }] });
   fireEvent.press(screen.getByTestId('group-board-metric-absolute_strength'));
-  expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('112.0 kg');
+  await settleReads();
+  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('112.0 kg');
   fireEvent.press(screen.getByTestId('group-board-scope-all'));
-  await waitFor(() => expect(api.getGroupMetricBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'absolute_strength', certified: false })));
+  await settleReads();
+  expect(api.getGroupMetricBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'absolute_strength', certified: false }));
+  expect(api.getGroupMetricBoard).toHaveBeenCalledTimes(3);
 });
 
 it('does not show old rows while a complete new revision rebuilds', async () => {
@@ -161,6 +174,8 @@ it('honours a new metric and scope link on a reused board after a rules edit', a
   expect(screen.queryByTestId('group-board-rebuilding')).toBeNull();
   fireEvent.press(screen.getByTestId('group-board-scope-all'));
   expect(mockRouter.setParams).toHaveBeenLastCalledWith({ metric: 'absolute_strength', scope: 'all' });
+  await settleReads();
+  expect(api.getGroupMetricBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'absolute_strength', certified: false }));
 });
 
 it('shows estimated saved B and the exact strength dependencies before certifying', async () => {
@@ -244,6 +259,8 @@ it('opens the requested original revision and scope when a history route is reus
     expect.objectContaining({ revision: 1, metric: 'e1rm', certified: false })));
   fireEvent.press(screen.getByTestId('group-history-revision-2'));
   expect(mockRouter.setParams).toHaveBeenLastCalledWith({ metric: 'relative_strength', scope: 'all', revision: '2' });
+  await settleReads();
+  expect(api.getGroupMetricHistory).toHaveBeenLastCalledWith(expect.objectContaining({ revision: 2, metric: 'relative_strength', certified: false }));
 });
 
 
