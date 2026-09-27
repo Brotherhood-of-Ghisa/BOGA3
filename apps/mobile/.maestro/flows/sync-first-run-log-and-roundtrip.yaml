@@ -146,7 +146,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
-- assertVisible: "Reading saved. Affected sessions recalculated."
+- assertVisible: "Reading saved."
 - openLink: "boga3://train"
 - extendedWaitUntil:
     visible: { id: "train-start-empty-button" }
@@ -264,7 +264,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
-- assertVisible: "Reading saved. Affected sessions recalculated."
+- assertVisible: "Reading saved."
 - openLink: "boga3://train"
 - extendedWaitUntil:
     visible: { id: "train-start-empty-button" }

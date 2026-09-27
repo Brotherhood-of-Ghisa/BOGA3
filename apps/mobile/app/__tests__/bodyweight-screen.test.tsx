@@ -42,7 +42,7 @@ it('keeps invalid and failed input editable, then retries successfully', async (
   const save = jest.fn().mockRejectedValueOnce(new Error('Storage full')).mockResolvedValue(undefined);
   const dismiss = jest.fn();
   render(<WeightEntrySheet title="Add reading" initial={{ weightValue: '', weightUnit: 'kg' }}
-    measuredAt={reading.measuredAt} explanation="Affected sessions recalculate." onSave={save} onDismiss={dismiss} />);
+    measuredAt={reading.measuredAt} onSave={save} onDismiss={dismiss} />);
   fireEvent.press(screen.getByTestId('weight-entry-save'));
   expect(screen.getByTestId('weight-entry-value-error')).toBeTruthy();
   expect(save).not.toHaveBeenCalled();
