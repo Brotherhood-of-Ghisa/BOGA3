@@ -343,6 +343,39 @@ then client activation. The intended release channel and deployed MCP/consent
 URLs still need to be supplied. No hosted mutation or client activation is
 claimed by these local results. Do not retire the plan early.
 
+### Hosted release preflight (read-only, 2026-09-27)
+
+The existing checkout points to **BOGA_DEV** (`onluhhnvvmknqzdxgntl`). This is
+a candidate, not a confirmed release target. From PR #370 at `0a0e39bc`, the
+repository-pinned Supabase CLI 2.117.0 connected to that project with
+`db push --project-ref onluhhnvvmknqzdxgntl --include-all --dry-run`.
+Its structured result reported `dryRun: true`, exactly the two migrations below,
+and no seeds or roles. Independent read-only project inspection found 27 earlier
+migrations applied and `agent-api` / `group-eval` active at version 1, both with
+`verify_jwt=false`. The dry run performed no hosted write.
+
+| Pending migration, in order | SHA-256 of reviewed file |
+| --- | --- |
+| `20260926181114_m27_bodyweight_sync.sql` | `4d827d6c2ef9313071d27e1cfbe19c642818623210d820fef6669eccf4594250` |
+| `20260927073000_m27_group_metrics.sql` | `52c99eaa73ba8cc7c7e5c1bb12f282bc60d858c6031926e54eed011310ba0015` |
+
+Before a hosted write, identify the intended project and repeat this exact
+dry run from the reviewed commit. If its migration list or file hashes differ,
+stop and review the drift. Then follow [RUNBOOK's server-first procedure](../../../RUNBOOK.md#bodyweight-feature-rollout-m27), recording:
+
+| Release phase | Evidence needed before proceeding |
+| --- | --- |
+| Schema and functions | Applied migration versions; matching `agent-api` and `group-eval` deployed from the full checkout; function versions and evaluator URL; both metric queues drain |
+| Compatibility and privacy | Old layers 0–3 readable; old omitted-field writer preserves populated new fields; layer 4 restores frozen tuple and private readings; cross-owner reading denied |
+| Group transitions | Two dedicated members reverse relative/absolute rank; missing B allows only eligible reps; rules revision publishes one board; correction invalidates only affected attestation; former records retain meaning |
+| Coaching and activation | Deployed API/MCP values match the app; hosted OAuth/discovery/revocation succeeds at the intended MCP and consent URLs; only then activate the chosen client channel |
+
+The intended project, deployed MCP/consent URLs, dedicated test-account access
+and client channel remain release inputs. No hosted smoke or activation is
+claimed. Keep historical backfill and legacy-load conversion explicit user
+operations; if hosted validation fails, hold the client and use the RUNBOOK's
+forward repair without dropping saved tuples.
+
 ## Milestone acceptance
 
 1. Settings weight saved offline populates every subsequently started session;
