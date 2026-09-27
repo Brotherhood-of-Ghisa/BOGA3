@@ -46,7 +46,6 @@ elif declare -F boga_config_root >/dev/null 2>&1 && [[ -f "$(boga_config_root)/s
 fi
 
 SUPABASE_CLI_VERSION="${resolved_supabase_cli_version}"
-FUNCTIONS_PID_FILE="${SUPABASE_DIR}/.temp/health-functions-serve.pid"
 FUNCTIONS_LOG_FILE="${SUPABASE_DIR}/.temp/health-functions-serve.log"
 FUNCTION_ENV_FILE="${SUPABASE_DIR}/functions/.env.local"
 
@@ -206,21 +205,8 @@ curl_health() {
     "${url}"
 }
 
-functions_pid_is_running() {
-  [[ -f "${FUNCTIONS_PID_FILE}" ]] || return 1
-
-  local pid
-  pid="$(cat "${FUNCTIONS_PID_FILE}")"
-  [[ -n "${pid}" ]] || return 1
-  kill -0 "${pid}" 2>/dev/null
-}
-
+# Stop this worktree's edge function server: the whole npx process tree plus
+# any orphans an earlier run left (boga_functions_serve_stop, worktree-lib.sh).
 stop_functions_serve_if_running() {
-  if functions_pid_is_running; then
-    local pid
-    pid="$(cat "${FUNCTIONS_PID_FILE}")"
-    kill "${pid}" 2>/dev/null || true
-    wait "${pid}" 2>/dev/null || true
-  fi
-  rm -f "${FUNCTIONS_PID_FILE}"
+  boga_functions_serve_stop "${REPO_ROOT}" "[supabase]"
 }

@@ -82,6 +82,8 @@ supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies
 supabase/tests/lib/**	groups-contract,groups-leaderboards	shared group lane fixtures
 supabase/scripts/**	backend	backend wrappers / runtime scripts
+supabase/scripts/local-runtime-*.sh	meta-tests	edge function server start/stop (functions-serve-stop meta-test)
+supabase/scripts/_common.sh	meta-tests	edge function server start/stop (functions-serve-stop meta-test)
 supabase/config.toml.template	backend	Supabase auth/runtime configuration
 scripts/smoke-boga-mcp.sh	mcp-smoke	MCP live smoke harness
 scripts/test-agent-auth-web.sh	agent-auth-web	agent consent web gate wrapper

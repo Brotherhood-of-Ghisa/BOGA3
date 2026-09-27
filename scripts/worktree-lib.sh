@@ -454,3 +454,101 @@ boga_version_at_least() {
   done
   return 0
 }
+
+# ---------- the worktree's edge function server (`supabase functions serve`) ----------
+#
+# `npx supabase functions serve` is a process tree, not a process:
+#   npm exec supabase@<v> functions serve …           <- what `$!` records
+#   └─ node …/.bin/supabase functions serve …
+#      └─ …/@supabase/cli-<platform>/bin/supabase functions serve …
+#         └─ docker logs -f … supabase_edge_runtime_<project_id>   (own process group)
+# Killing the recorded PID orphans everything below it (PPID 1); the CLI then
+# lives on for days tailing a container that no longer exists. So a worktree's
+# server is found by what it is, never by a saved PID: every process whose cwd
+# is the worktree root (local-runtime-up.sh launches it from there) and whose
+# argv IS one of the commands above (launcher words, then `supabase[@<v>]
+# functions serve`, or `docker logs … supabase_edge_runtime_…`), plus all their
+# descendants. That also finds orphans an earlier run left behind. The argv
+# shape is matched, not a substring, so a shell whose script merely mentions
+# `functions serve` (`zsh -c 'pgrep -f "supabase functions serve"; …'`) is never
+# a match; the caller and its ancestors are excluded regardless.
+
+# _boga_pid_cwd <pid>: the process's working directory (physical path), or nothing.
+_boga_pid_cwd() {
+  if [[ -d "/proc/$1" ]]; then
+    readlink "/proc/$1/cwd" 2>/dev/null || true
+  else
+    lsof -a -d cwd -p "$1" -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true
+  fi
+}
+
+# _boga_live_pids <pid...>: the given PIDs that are still running (zombies excluded).
+_boga_live_pids() {
+  (( $# > 0 )) || return 0
+  ps -o pid= -o stat= -p "$(IFS=,; echo "$*")" 2>/dev/null | awk '$2 !~ /^Z/ { print $1 }'
+}
+
+# boga_functions_serve_pids <repo_root>: the PIDs (one per line) of that
+# worktree's functions-serve processes and all their descendants.
+boga_functions_serve_pids() {
+  local root table pid seeds=""
+  root="$(boga_abs_dir "$1")" || return 1
+  if [[ ! -d /proc/self ]] && ! command -v lsof >/dev/null 2>&1; then
+    echo "[functions-serve] lsof not found: cannot tell which worktree a functions serve belongs to" >&2
+    return 1
+  fi
+  table="$(ps -ww -e -o pid= -o ppid= -o args=)"
+  while read -r pid; do
+    [[ -n "$pid" && "$(_boga_pid_cwd "$pid")" == "$root" ]] && seeds+="$pid "
+  done < <(awk '
+    function base(w) { sub(/.*\//, "", w); return w }
+    {
+      i = 3
+      while (i <= NF && base($i) ~ /^(bash|sh|env|node|npm|npx|exec|-y|--yes)$/) i++
+      if ((base($i) == "supabase" || $i ~ /^supabase@/) && $(i + 1) == "functions" && $(i + 2) == "serve") print $1
+      else if (base($i) == "docker" && $(i + 1) == "logs" && index($0, " supabase_edge_runtime_")) print $1
+    }' <<<"$table")
+  [[ -n "$seeds" ]] || return 0
+  awk -v seeds="$seeds" -v self="$$" '
+    { parent[$1] = $2 }
+    END {
+      for (p = self; p != "" && p != 0 && !(p in mine); p = parent[p]) mine[p] = 1
+      n = split(seeds, s, " ")
+      for (i = 1; i <= n; i++) if (!(s[i] in mine)) keep[s[i]] = 1
+      for (grew = 1; grew; ) {
+        grew = 0
+        for (p in parent) if (!(p in keep) && !(p in mine) && (parent[p] in keep)) { keep[p] = 1; grew = 1 }
+      }
+      for (p in keep) print p
+    }' <<<"$table"
+}
+
+# boga_functions_serve_stop <repo_root> [log_prefix]: stop that worktree's
+# functions serve — the whole tree, orphans included. SIGTERM (the CLI removes
+# its edge-runtime container on it), up to BOGA_FUNCTIONS_SERVE_STOP_SECONDS
+# (default 10) to exit, then SIGKILL. Fails if any process survives.
+boga_functions_serve_stop() {
+  local root="$1" prefix="${2:-[functions-serve]}" polls
+  local -a pids survivors
+  pids=($(boga_functions_serve_pids "$root")) || return 1
+  (( ${#pids[@]} > 0 )) || return 0
+
+  echo "$prefix stopping functions serve for $root (pids ${pids[*]})"
+  kill -TERM "${pids[@]}" 2>/dev/null || true
+  polls=$(( ${BOGA_FUNCTIONS_SERVE_STOP_SECONDS:-10} * 5 ))
+  while (( polls-- > 0 )) && [[ -n "$(_boga_live_pids "${pids[@]}")" ]]; do
+    sleep 0.2
+  done
+
+  survivors=($(_boga_live_pids "${pids[@]}") $(boga_functions_serve_pids "$root"))
+  if (( ${#survivors[@]} > 0 )); then
+    echo "$prefix functions serve still running after SIGTERM; sending SIGKILL (pids ${survivors[*]})"
+    kill -KILL "${survivors[@]}" 2>/dev/null || true
+    sleep 0.5
+    survivors=($(_boga_live_pids "${survivors[@]}") $(boga_functions_serve_pids "$root"))
+    if (( ${#survivors[@]} > 0 )); then
+      echo "$prefix could not stop functions serve for $root (pids ${survivors[*]} still running)" >&2
+      return 1
+    fi
+  fi
+}
