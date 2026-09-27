@@ -240,9 +240,18 @@ records/analytics adoption remains T07.
 previews selected interpretations, and rechecks the complete source membership
 and versions in one local transaction. Originals and estimated source dates stay
 visible in the preview. Unit choice is always explicit, including old `kg`
-placeholders; a legacy zero is unresolved too. Known transport metadata is
-required before review. Changes in sync dirty bookkeeping alone do not invalidate
-a preview. Apply recomputes from current source rows and never confirms a set.
+placeholders; a legacy zero is unresolved too. Unknown exercise rules must first
+be recovered by sync or explicitly configured. For unavailable set metadata,
+the user can sync first or intentionally replace the tuple by reviewing every
+nonempty actual and planned part of each selected set. Each part has its own
+unit/meaning choice; a partial review cannot publish guessed defaults for the
+other part. Apply atomically establishes the reviewed tuple and clears metadata
+on empty counterparts. This also supports conventional exercises whose old
+units are unavailable; known conventional null modes do not require review.
+No missing cursor or bootstrap marker proves that a row has never synced.
+Changes in sync dirty bookkeeping alone do not invalidate a preview, but
+concurrent hydration does. Apply recomputes from current source rows and never
+confirms a set. Ordinary autosave continues to preserve unavailable metadata.
 The result is ordinary dirty Sync v2 data, with no global compare-and-set claim.
 
 Session-import v2 adds explicit actual/planned meaning, frozen context, personal

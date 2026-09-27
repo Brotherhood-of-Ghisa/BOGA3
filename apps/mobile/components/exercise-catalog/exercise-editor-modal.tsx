@@ -353,7 +353,7 @@ export function ExerciseEditorModal({
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
-      if (editingExercise && (savedExercise.bodyweightCoefficient ?? 0) > 0) {
+      if (editingExercise && savedExercise.localBodyweightMetadataKnown !== false) {
         const unresolved = await listLegacyLoads(savedExercise.id).then(data => data.candidates.length > 0).catch(() => true);
         if (unresolved) { setReviewExercise(savedExercise); return; }
       }

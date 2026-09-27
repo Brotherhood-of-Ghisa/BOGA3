@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { ActionButton, Card, Icon, ListRow, Notice, SegmentedControl, Sheet, StatePanel, uiRoles } from '@/components/ui';
 import { sessionWeightSourceLabel } from '@/src/bodyweight/weight-entry';
-import { type LegacyLoadInterpretation } from '@/src/bodyweight/legacy-load';
+import { type LegacyLoadChoice, type LegacyLoadInterpretation } from '@/src/bodyweight/legacy-load';
 import { applyLegacyLoadReview, listLegacyLoads, previewLegacyLoads, type LegacyLoadInventory,
   type LegacyLoadPreview } from '@/src/data/legacy-load-review';
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
@@ -38,6 +38,8 @@ export function LegacyLoadReviewContent({ exerciseId, visible, onDismiss, onAppl
   const { height } = useWindowDimensions();
   const [inventory, setInventory] = useState<LegacyLoadInventory | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [choices, setChoices] = useState<Record<string, LegacyLoadChoice>>({});
+  const replacingMetadata = inventory?.candidates.some(row => !row.metadataKnown) ?? false;
   const [unit, setUnit] = useState<'kg' | 'lb' | ''>('');
   const [meaning, setMeaning] = useState<LegacyLoadInterpretation | null>(null);
   const [preview, setPreview] = useState<LegacyLoadPreview | null>(null);
@@ -51,18 +53,34 @@ export function LegacyLoadReviewContent({ exerciseId, visible, onDismiss, onAppl
     if (!visible) return;
     let cancelled = false;
     setInventory(null); setPreview(null); setSelected([]); setError(null); setResult(null);
-    setUnit(''); setMeaning(null);
+    setUnit(''); setMeaning(null); setChoices({});
     void listLegacyLoads(exerciseId).then(data => { if (!cancelled) setInventory(data); })
       .catch(cause => { if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load old sets.'); });
     return () => { cancelled = true; };
   }, [exerciseId, visible, refresh]);
 
+  const keepChoices = () => {
+    setError(null);
+    if (!selected.length || !unit || !meaning) {
+      setError('Select loads and choose their original unit and meaning first.'); return;
+    }
+    setChoices(current => ({ ...current, ...Object.fromEntries(selected.map(key =>
+      [key, { unit, interpretation: meaning }])) }));
+    setSelected([]); setUnit(''); setMeaning(null);
+  };
   const prepare = () => {
     if (!inventory) return;
     setError(null);
-    if (!unit || !meaning) { setError('Choose the original unit and what the selected values meant.'); return; }
+    if (replacingMetadata && selected.length > 0) {
+      setError('Keep the choices for your current selection before previewing.'); return;
+    }
+    if (!replacingMetadata && (!unit || !meaning)) {
+      setError('Choose the original unit and what the selected values meant.'); return;
+    }
     try {
-      setPreview(previewLegacyLoads(inventory, selected.map(key => ({ key, choice: { unit, interpretation: meaning } }))));
+      const selections = replacingMetadata ? Object.entries(choices).map(([key, choice]) => ({ key, choice }))
+        : selected.map(key => ({ key, choice: { unit: unit as 'kg' | 'lb', interpretation: meaning! } }));
+      setPreview(previewLegacyLoads(inventory, selections));
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not preview these loads.'); }
   };
   const apply = async () => {
@@ -89,12 +107,14 @@ export function LegacyLoadReviewContent({ exerciseId, visible, onDismiss, onAppl
         <Text allowFontScaling={false} style={styles.body}>
           {inventory.exerciseName}: old numbers do not reveal whether they meant added weight, assistance or total resistance. Original units were not always retained by imports. Confirm the source unit yourself. No conversion happens until Apply.
         </Text>
+        {replacingMetadata ? <Notice testID="legacy-load-replace-metadata"
+          message="Saved load settings are unavailable on this device. Sync first to recover settings saved elsewhere, or review them here. Applying this review intentionally replaces those settings. Review every nonempty actual and planned part of each chosen set, using separate choices when their units or meanings differ. Empty parts have no load meaning. Nothing changes before Apply." /> : null}
         {preview ? <>
           <Text allowFontScaling={false} style={styles.label}>{`${preview.rows.length} selected loads`}</Text>
           {preview.rows.map(({ original, reviewed }) => <Card key={original.key}>
             <View style={styles.cardBody}>
               <Text allowFontScaling={false} style={styles.label}>{`${formatCurrentDateTime(original.startedAt)} · Set ${original.setNumber} · ${original.part}`}</Text>
-              <Text allowFontScaling={false} style={styles.body}>{`Original: ${original.weightValue || '(blank → 0 with reps)'} ${unit} × ${original.repsValue || '—'}`}</Text>
+              <Text allowFontScaling={false} style={styles.body}>{`Original: ${original.weightValue || '(blank → 0 with reps)'} ${reviewed.weightUnit} × ${original.repsValue || '—'}`}</Text>
               <Text allowFontScaling={false} style={styles.body} testID={`legacy-load-preview-${original.key}`}>
                 {reviewed.externalLoadMode === 'unquantified_assistance' ? 'Unquantified assistance · no load score' :
                   `${loadLabel(reviewed.externalLoadMode)}: ${reviewed.weightValue} ${reviewed.weightUnit} · Effective load ${reviewed.resistanceKg === null ? 'unavailable' : `${Number(reviewed.resistanceKg.toFixed(3))} kg`}`}
@@ -126,9 +146,19 @@ export function LegacyLoadReviewContent({ exerciseId, visible, onDismiss, onAppl
               leading={<Icon name={selected.includes(row.key) ? 'check' : 'plus'} color={uiRoles.ink} />}>
               <Text allowFontScaling={false} style={styles.body}>{`${formatCurrentDateTime(row.startedAt)} · Set ${row.setNumber} · ${row.part}`}</Text>
               <Text allowFontScaling={false} style={styles.body}>{`Original ${row.weightValue || '(blank)'} × ${row.repsValue || '—'} · unit unverified`}</Text>
+              {choices[row.key] ? <Text allowFontScaling={false} style={styles.body}
+                testID={`legacy-load-choice-${row.key}`}>{`Review choice: ${meanings.find(option => option.value === choices[row.key].interpretation)?.label} · ${choices[row.key].unit}`}</Text> : null}
               <Text allowFontScaling={false} style={styles.body}>{`Session weight: ${row.bodyWeightKg === null ? 'unknown' : `${row.bodyWeightKg} kg`} · ${sessionWeightSourceLabel(row)}`}</Text>
             </ListRow>)}</Card>
-            <ActionButton label="Preview selected loads" onPress={prepare} testID="legacy-load-preview" variant="primary" />
+            {replacingMetadata ? <>
+              <ActionButton label="Keep choices for selected loads" onPress={keepChoices}
+                testID="legacy-load-keep-choices" variant="outline" />
+              <Text allowFontScaling={false} style={styles.body}>{`${Object.keys(choices).length} loads have review choices. Select more loads to give them a different unit or meaning.`}</Text>
+              {Object.keys(choices).length > 0 ? <ActionButton label="Clear review choices" variant="outline"
+                onPress={() => { setChoices({}); setSelected([]); setUnit(''); setMeaning(null); setError(null); }} /> : null}
+            </> : null}
+            <ActionButton label={replacingMetadata ? 'Preview reviewed loads' : 'Preview selected loads'}
+              onPress={prepare} testID="legacy-load-preview" variant="primary" />
           </>}
         </>}
       </> : null}

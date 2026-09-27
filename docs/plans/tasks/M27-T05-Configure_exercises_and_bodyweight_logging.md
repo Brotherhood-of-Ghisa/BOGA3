@@ -124,3 +124,13 @@ Completed simulator system logs were losslessly
 compressed, with checked SHA-256 hashes recorded in
 `apps/mobile/artifacts/maestro/M27-compressed-simulator-logs.json`;
 screenshots and active-run logs remain in place.
+
+Offline-upgrade follow-up (2026-09-27): complete actual/planned load review now
+allows intentional replacement of unavailable metadata after explicit rule setup.
+The UI queues separate unit/meaning choices and rejects partial tuples; ordinary
+autosave and concurrent hydration protection remain. Real old-schema migration,
+wire/pull and UI coverage is integrated, with BWO00–05 added to the logging flow.
+Full fast passed (178 suites / 2,127 mobile tests), including the real upgrade
+and independent review vectors, consent-web and MCP checks. Log:
+`/tmp/boga-m27-offline-fast-final.log`. Backend and three-size native verification
+are pending; this follow-up is not yet complete.

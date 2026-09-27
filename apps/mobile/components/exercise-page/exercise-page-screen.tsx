@@ -291,7 +291,8 @@ export function ExercisePageScreen({
                     weightUnit={loggerValues.weightUnit}
                     externalLoadMode={loggerValues.externalLoadMode}
                     metadataKnown={openSet?.localBodyweightMetadataKnown !== false && editingExercise?.localBodyweightMetadataKnown !== false}
-                    requiresReview={loadContext.bodyweightCoefficient > 0 && loggerValues.externalLoadMode == null}
+                    requiresReview={openSet?.localBodyweightMetadataKnown === false ||
+                      (loadContext.bodyweightCoefficient > 0 && loggerValues.externalLoadMode == null)}
                     onChangeLoad={onChangeLogger}
                     onReview={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('review'); }); }}
                     number={row.number}

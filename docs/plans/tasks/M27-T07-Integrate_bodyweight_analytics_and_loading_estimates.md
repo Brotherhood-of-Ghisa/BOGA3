@@ -117,3 +117,11 @@ Full fast passed with 178 suites / 2,119 mobile tests, plus all other fast lanes
 `/tmp/boga-m27-analytics-fast-projection-fix.log`. Required backend and native
 reruns are pending. Failed-run evidence is
 `M27-analytics-small-final/20260927-021437-72662/bodyweight-analytics/`.
+
+Native checkpoint (2026-09-27): the small projection run passed entry, logging,
+backfill and analytics through BWA13c, including zero round-trip, corrected
+history (816) and incomplete Stats/heatmap rendering. It stopped at a backdrop
+label hidden by the modal accessibility boundary; the flow now uses the existing
+Stats/share backdrop gestures and waits for dismissal. Failed run preserved at
+`M27-analytics-small-projection/20260927-023728-10923/`; no full native pass claimed.
+The offline-upgrade review follow-up is integrated before the next complete run.

@@ -129,7 +129,12 @@ monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
 wire. M27 additionally tracks `local_bodyweight_metadata_known` on sessions,
 exercise definitions and sets to restore fields an older reader could have
 ignored, without pushing unknown defaults or discarding newer local edits.
-It is local-only and never an independent conflict clock. Device-global sync state lives on the `sync_runtime_state` singleton row:
+It is local-only and never an independent conflict clock. Explicit exercise-rule
+configuration, session correction or complete actual/planned load review can
+establish a tuple offline; ordinary autosave cannot. Load review rechecks its
+source inventory and marks the whole tuple known in one transaction (bodyweight
+contract §5), without assuming missing sync bookkeeping means never uploaded.
+Device-global sync state lives on the `sync_runtime_state` singleton row:
 `pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
 high-water mark), and `bootstrap_completed_at`. Deep detail:
 `docs/specs/tech/sync-v2-server-contract.md` §B.9.

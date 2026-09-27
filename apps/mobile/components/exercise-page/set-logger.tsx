@@ -67,13 +67,13 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
   const load = context ? resolveEffectiveLoad({ ...context, weightValue: canonicalWeight, weightUnit, externalLoadMode }) : null;
   const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, context, { weightUnit, externalLoadMode });
   const canCommit = canCommitLogger({ weightValue, repsValue }) &&
-    (!bodyweight || !requiresReview) &&
+    !requiresReview &&
     (!bodyweight || externalLoadMode === 'added' || externalLoadMode === 'assistance' || externalLoadMode === 'unquantified_assistance');
   // Keep the fixed-height field label on one line on the smallest phone.
   const amountLabel = !bodyweight ? 'Weight' : externalLoadMode === 'assistance' ? 'Assist' : 'Added';
   const amountMeaning = externalLoadMode === 'unquantified_assistance' ? 'unquantified assistance'
     : externalLoadMode === 'assistance' ? 'assistance' : 'added weight';
-  const unavailable = !metadataKnown ? 'Unavailable · saved load settings are syncing.' :
+  const unavailable = !metadataKnown ? 'Unavailable · sync or explicitly review the saved load settings.' :
     load?.status === 'missing' && load.reason === 'body_weight_missing' ? 'Unavailable · session weight missing.' :
     load?.status === 'missing' && load.reason === 'legacy_interpretation' ? 'Unavailable · review the original load meaning.' :
     load?.status === 'missing' && load.reason === 'unquantified_assistance' ? 'Assistance is unquantified. Reps can be logged; load metrics are unavailable.' :
@@ -114,7 +114,8 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
           <Text allowFontScaling={false} style={pageText.microLabel}>{externalLoadMode === 'unquantified_assistance' ? 'Load unknown' : `${amountLabel} · ${weightUnit}`}</Text>
           <TextInput
             allowFontScaling={false}
-            accessibilityLabel={bodyweight ? `Set ${number} ${amountMeaning} in ${weightUnit}` : `Set ${number} weight`}
+            accessibilityLabel={externalLoadMode === 'unquantified_assistance' ? `Set ${number} load unknown`
+              : bodyweight ? `Set ${number} ${amountMeaning} in ${weightUnit}` : `Set ${number} weight`}
             editable={externalLoadMode !== 'unquantified_assistance'}
             keyboardType="decimal-pad"
             onChangeText={(text) => {

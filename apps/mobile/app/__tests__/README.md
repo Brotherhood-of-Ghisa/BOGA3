@@ -103,6 +103,16 @@ Device behavior belongs to the third flow in `ios-bodyweight`, including small
 and large phone evidence; these unit tests do not replace that gate.
 
 
+## Offline legacy load review coverage (M27)
+
+`bodyweight-load-review.test.ts` runs the real old-schema upgrade, explicit
+rule/session setup, independent actual/planned review, ordinary draft save and
+wire/pull restoration. Preserve no-write preview/cancel, partial-review refusal,
+concurrent hydration rejection, conventional unknown units and empty counterpart
+coverage. Missing sync bookkeeping must never be treated as proof of local-only
+data. `bodyweight-logging-ui.test.tsx` verifies queued choices and explicit Apply;
+the logging Maestro flow captures the offline review on all three phone sizes.
+
 ## Personal bodyweight analytics coverage (M27)
 
 `bodyweight-analytics-parity.test.ts` runs weighted/unweighted/assisted, unit,

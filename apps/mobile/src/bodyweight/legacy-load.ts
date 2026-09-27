@@ -36,9 +36,9 @@ export const reviewLegacyLoad = (
   if (!['added', 'assistance', 'total', 'unquantified_assistance'].includes(choice.interpretation)) {
     throw new Error('Choose what the original value meant.');
   }
-  if (!Number.isFinite(context.bodyweightCoefficient) || context.bodyweightCoefficient <= 0 ||
+  if (!Number.isFinite(context.bodyweightCoefficient) || context.bodyweightCoefficient < 0 ||
       context.bodyweightCoefficient > 1 || !['total_load', 'per_side_load'].includes(context.loadInputMode)) {
-    throw new Error('Configure valid bodyweight exercise rules before reviewing old loads.');
+    throw new Error('Configure valid exercise load rules before reviewing old loads.');
   }
   const raw = canonicalizeWeightForReps(original.weightValue, original.repsValue).trim();
   const amount = parseSetWeight(raw);
@@ -46,12 +46,13 @@ export const reviewLegacyLoad = (
   let weightValue = raw;
   let mode: ExternalLoadMode;
   if (choice.interpretation === 'total') {
-    if (context.bodyWeightKg == null || !Number.isFinite(context.bodyWeightKg) || context.bodyWeightKg <= 0) {
+    if (context.bodyweightCoefficient > 0 && (context.bodyWeightKg == null || !Number.isFinite(context.bodyWeightKg) || context.bodyWeightKg <= 0)) {
       throw new Error('Save a body weight on this session before converting an old total.');
     }
     // The reviewed original is TOTAL resistance, even when external entry is per side.
-    const adjustmentKg = amount * (choice.unit === 'lb' ? KG_PER_LB : 1) -
-      context.bodyweightCoefficient * context.bodyWeightKg;
+    const bodyContribution = context.bodyweightCoefficient === 0 ? 0
+      : context.bodyweightCoefficient * context.bodyWeightKg!;
+    const adjustmentKg = amount * (choice.unit === 'lb' ? KG_PER_LB : 1) - bodyContribution;
     const converted = Math.abs(adjustmentKg) / (context.loadInputMode === 'per_side_load' ? 2 : 1) /
       (choice.unit === 'lb' ? KG_PER_LB : 1);
     if (!Number.isFinite(converted)) throw new Error('This total cannot be converted safely.');

@@ -50,6 +50,8 @@ it('permits confirmed reps with missing B or unquantified assistance without sho
   expect(props.onCommit).toHaveBeenCalledTimes(1);
   view.rerender(<SetLogger {...props} weightValue="" externalLoadMode="unquantified_assistance" />);
   expect(screen.getByTestId('exercise-set-logger-weight').props.editable).toBe(false);
+  expect(screen.getByLabelText('Set 1 load unknown')).toBeTruthy();
+  expect(screen.queryByLabelText('Set 1 unquantified assistance in kg')).toBeNull();
   expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Total 1RM — · VOL —');
   fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
   expect(props.onCommit).toHaveBeenCalledTimes(2);
@@ -58,6 +60,17 @@ it('permits confirmed reps with missing B or unquantified assistance without sho
 it('keeps a legacy zero unresolved and offers explicit review before activating it', () => {
   const review = jest.fn();
   render(<SetLogger {...props} externalLoadMode={null} weightValue="0" requiresReview onReview={review} />);
+  fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+  expect(props.onCommit).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByTestId('exercise-set-review-load'));
+  expect(review).toHaveBeenCalledTimes(1);
+});
+
+it('requires explicit review for unknown conventional units too', () => {
+  const review = jest.fn();
+  render(<SetLogger {...props} loadContext={{ ...context, bodyweightCoefficient: 0 }}
+    metadataKnown={false} requiresReview onReview={review} />);
+  expect(screen.getByText('Unavailable · sync or explicitly review the saved load settings.')).toBeTruthy();
   fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
   expect(props.onCommit).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('exercise-set-review-load'));
@@ -108,4 +121,57 @@ it('leaves a failed/stale preview visible and cancellation makes no conversion',
   fireEvent.press(screen.getByTestId('legacy-load-cancel'));
   await waitFor(() => expect(dismiss).toHaveBeenCalledTimes(1));
   expect(data.applyLegacyLoadReview).toHaveBeenCalledTimes(1);
+});
+
+it('keeps independent actual/planned review choices and requires a final apply', async () => {
+  const actual = { ...inventory.candidates[0], metadataKnown: false };
+  const planned = { ...actual, key: 'set:planned', part: 'planned' as const, weightValue: '60', repsValue: '10' };
+  data.listLegacyLoads.mockResolvedValue({ ...inventory, candidates: [actual, planned] });
+  render(<LegacyLoadReviewSheet exerciseId="pull" visible onDismiss={jest.fn()} />);
+  await screen.findByTestId('legacy-load-replace-metadata');
+  fireEvent.press(screen.getByTestId('legacy-load-select-set:actual'));
+  fireEvent.press(screen.getByTestId('legacy-load-meaning-total'));
+  fireEvent.press(screen.getByTestId('legacy-load-unit-kg'));
+  fireEvent.press(screen.getByTestId('legacy-load-preview'));
+  expect(screen.getByText('Keep the choices for your current selection before previewing.')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('legacy-load-keep-choices'));
+  expect(screen.getByText('Review choice: Total resistance · kg')).toBeTruthy();
+  data.previewLegacyLoads.mockImplementationOnce(() => { throw new Error('Review both actual and planned loads for this set before replacing unavailable saved metadata.'); });
+  fireEvent.press(screen.getByTestId('legacy-load-preview'));
+  expect(screen.getByText(/Review both actual and planned/)).toBeTruthy();
+  expect(data.applyLegacyLoadReview).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByTestId('legacy-load-select-set:planned'));
+  fireEvent.press(screen.getByTestId('legacy-load-meaning-assistance'));
+  fireEvent.press(screen.getByTestId('legacy-load-unit-lb'));
+  fireEvent.press(screen.getByTestId('legacy-load-keep-choices'));
+  expect(screen.getByText('Review choice: Assistance · lb')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('legacy-load-preview'));
+  expect(screen.getByText('Original: 100 kg × 8')).toBeTruthy();
+  expect(screen.getByText('Original: 60 lb × 10')).toBeTruthy();
+  expect(data.previewLegacyLoads).toHaveBeenLastCalledWith(expect.anything(), [
+    { key: 'set:actual', choice: { interpretation: 'total', unit: 'kg' } },
+    { key: 'set:planned', choice: { interpretation: 'assistance', unit: 'lb' } },
+  ]);
+  expect(data.applyLegacyLoadReview).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByTestId('legacy-load-apply'));
+  await screen.findByTestId('legacy-load-result');
+  expect(data.applyLegacyLoadReview).toHaveBeenCalledTimes(1);
+});
+
+it('clears queued choices on refresh and can leave the unavailable metadata untouched', async () => {
+  data.listLegacyLoads.mockResolvedValue({ ...inventory, candidates: [{ ...inventory.candidates[0], metadataKnown: false }] });
+  const dismiss = jest.fn();
+  render(<LegacyLoadReviewSheet exerciseId="pull" visible onDismiss={dismiss} />);
+  fireEvent.press(await screen.findByTestId('legacy-load-select-set:actual'));
+  fireEvent.press(screen.getByTestId('legacy-load-meaning-added'));
+  fireEvent.press(screen.getByTestId('legacy-load-unit-kg'));
+  fireEvent.press(screen.getByTestId('legacy-load-keep-choices'));
+  expect(screen.getByText('Review choice: Added weight · kg')).toBeTruthy();
+  fireEvent.press(screen.getByText('Refresh review'));
+  await waitFor(() => expect(data.listLegacyLoads).toHaveBeenCalledTimes(2));
+  await screen.findByTestId('legacy-load-select-set:actual');
+  expect(screen.queryByText('Review choice: Added weight · kg')).toBeNull();
+  fireEvent.press(screen.getByTestId('legacy-load-cancel'));
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  expect(data.applyLegacyLoadReview).not.toHaveBeenCalled();
 });

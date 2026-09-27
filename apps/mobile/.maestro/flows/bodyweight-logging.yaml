@@ -496,3 +496,261 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
+
+# Explicit local review of unavailable actual/planned metadata. No hydration is performed.
+- openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-load-offline&teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-review-load"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-review-load"
+- extendedWaitUntil:
+    visible:
+      id: "legacy-load-review"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-replace-metadata"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BWO00-explicit-replacement-notice"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-cancel"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-cancel"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-review-load"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-review-load"
+- extendedWaitUntil:
+    visible:
+      id: "legacy-load-review"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-meaning-total"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-meaning-total"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-unit-kg"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-unit-kg"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-select-maestro_bw_new:actual"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-select-maestro_bw_new:actual"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-keep-choices"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-keep-choices"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-preview"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-error"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Review both actual and planned loads for this set before replacing unavailable saved metadata."
+- takeScreenshot: "BWO01-partial-review-refused"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-meaning-assistance"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-meaning-assistance"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-unit-lb"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-unit-lb"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-select-maestro_bw_new:planned"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-select-maestro_bw_new:planned"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-keep-choices"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-keep-choices"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-preview"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview-maestro_bw_new:actual"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Added: 20 kg \u00b7 Effective load 100 kg"
+- takeScreenshot: "BWO02a-actual-total-reviewed"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-preview-maestro_bw_new:planned"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Assistance: 60 lb \u00b7 Effective load 52.784 kg"
+- takeScreenshot: "BWO02b-independent-planned-unit"
+- scrollUntilVisible:
+    element:
+      id: "legacy-load-apply"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "legacy-load-apply"
+- extendedWaitUntil:
+    visible:
+      id: "legacy-load-result"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Done"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-preview"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Total 1RM 127.7 \u00b7 VOL 800"
+- takeScreenshot: "BWO03-reviewed-logger"
+- scrollUntilVisible:
+    element:
+      id: "exercise-set-logger-commit"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "exercise-set-logger-commit"
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BWO04-explicitly-confirmed"
+- openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-page"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Total 1RM 127.7"
+- assertVisible:
+    text: "Vol 800"
+- takeScreenshot: "BWO05-reloaded-reviewed-load"

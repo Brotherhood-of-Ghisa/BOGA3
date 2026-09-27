@@ -569,7 +569,13 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "stats-exercise-history-metric-chip-totalVolume"
 - takeScreenshot: "BWA13c-volume-heatmap"
-- tapOn: "Dismiss exercise history"
+# Modal accessibility hides the backdrop; use the established Stats gesture.
+- tapOn:
+    point: "50%,10%"
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-exercise-history"
+    timeout: 10000
 - openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_bwa_weighted&presentation=completion"
 - extendedWaitUntil:
     visible:
@@ -594,7 +600,13 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 - takeScreenshot: "BWA13d-corrected-share-preview"
-- tapOn: "Close session share preview"
+# The share preview uses the same modal sheet; tap its visible backdrop.
+- tapOn:
+    point: "50%,8%"
+- extendedWaitUntil:
+    notVisible:
+      id: "session-share-preview"
+    timeout: 10000
 - openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_bwa_incomplete"
 - extendedWaitUntil:
     visible:

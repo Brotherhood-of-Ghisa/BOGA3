@@ -16,7 +16,7 @@ import { isDevMode } from '@/src/utils/isDevMode';
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
 import { seedBodyweightAnalyticsFixture } from './bodyweight-analytics-fixture';
 import { seedBodyweightBackfillFixture } from './bodyweight-backfill-fixture';
-import { seedBodyweightLoadFixture } from './bodyweight-load-fixture';
+import { seedBodyweightLoadFixture, seedBodyweightOfflineReviewFixture } from './bodyweight-load-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
@@ -30,6 +30,7 @@ export type MaestroHarnessFixtureName =
   | 'bodyweight-analytics'
   | 'bodyweight-backfill'
   | 'bodyweight-backfill-empty'
+  | 'bodyweight-load-offline'
   | 'bodyweight-load'
   | 'bodyweight-load-missing'
   | 'exercise-page'
@@ -91,6 +92,7 @@ export const resolveMaestroHarnessFixtureName = (
   value === 'bodyweight-analytics' ||
   value === 'bodyweight-backfill' ||
   value === 'bodyweight-backfill-empty' ||
+  value === 'bodyweight-load-offline' ||
   value === 'bodyweight-load' ||
   value === 'bodyweight-load-missing' ||
   value === 'exercise-page' ||
@@ -204,6 +206,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   if (fixtureName === 'bodyweight-backfill' || fixtureName === 'bodyweight-backfill-empty') {
     await seedBodyweightBackfillFixture(new Date(), fixtureName === 'bodyweight-backfill-empty');
   }
+  if (fixtureName === 'bodyweight-load-offline') await seedBodyweightOfflineReviewFixture();
   if (fixtureName === 'bodyweight-load' || fixtureName === 'bodyweight-load-missing') {
     await seedBodyweightLoadFixture(new Date(), fixtureName === 'bodyweight-load-missing');
   }

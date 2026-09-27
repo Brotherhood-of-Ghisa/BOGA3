@@ -57,11 +57,13 @@ const readInventory = (database: Reader, exerciseId: string): LegacyLoadInventor
       bodyWeightSource: session.bodyWeightSource, bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
       metadataKnown: set.localBodyweightMetadataKnown };
     const result: LegacyLoadCandidate[] = [];
-    if (set.externalLoadMode === null && (set.weightValue.trim() || set.repsValue.trim())) {
+    if ((!set.localBodyweightMetadataKnown || (definition.bodyweightCoefficient > 0 && set.externalLoadMode === null)) &&
+        (set.weightValue.trim() || set.repsValue.trim())) {
       result.push({ ...common, key: `${set.id}:actual`, part: 'actual', weightValue: set.weightValue,
         repsValue: set.repsValue, storedUnit: set.weightUnit });
     }
-    if (set.plannedExternalLoadMode === null && (set.plannedWeightValue?.trim() || set.plannedRepsValue?.trim())) {
+    if ((!set.localBodyweightMetadataKnown || (definition.bodyweightCoefficient > 0 && set.plannedExternalLoadMode === null)) &&
+        (set.plannedWeightValue?.trim() || set.plannedRepsValue?.trim())) {
       result.push({ ...common, key: `${set.id}:planned`, part: 'planned', weightValue: set.plannedWeightValue ?? '',
         repsValue: set.plannedRepsValue ?? '', storedUnit: set.plannedWeightUnit });
     }
@@ -86,7 +88,7 @@ export type LegacyLoadPreview = {
 
 /** Pure preview; original text stays alongside the proposed explicit interpretation. */
 export const previewLegacyLoads = (inventory: LegacyLoadInventory, selections: LegacyLoadSelection[]): LegacyLoadPreview => {
-  if (!inventory.metadataKnown) throw new Error('Sync the saved exercise rules before reviewing these loads.');
+  if (!inventory.metadataKnown) throw new Error('Sync or explicitly configure the exercise rules before reviewing these loads.');
   if (selections.length === 0) throw new Error('Select at least one old load to review.');
   const seen = new Set<string>();
   const rows = selections.map(({ key, choice }) => {
@@ -94,12 +96,18 @@ export const previewLegacyLoads = (inventory: LegacyLoadInventory, selections: L
     seen.add(key);
     const original = inventory.candidates.find(row => row.key === key);
     if (!original) throw new Error('The selected load is no longer unresolved. Refresh the review.');
-    if (!original.metadataKnown) throw new Error('Sync the saved load metadata before reviewing this set.');
     return { original, reviewed: reviewLegacyLoad(original, {
       bodyweightCoefficient: inventory.bodyweightCoefficient, loadInputMode: inventory.loadInputMode,
       bodyWeightKg: original.bodyWeightKg,
     }, choice) };
   });
+  for (const { original } of rows) {
+    if (original.metadataKnown) continue;
+    const required = inventory.candidates.filter(row => row.setId === original.setId);
+    if (required.some(row => !seen.has(row.key))) {
+      throw new Error('Review both actual and planned loads for this set before replacing unavailable saved metadata.');
+    }
+  }
   return { exerciseId: inventory.exerciseId, fingerprint: inventory.fingerprint,
     selections: selections.map(selection => ({ key: selection.key, choice: { ...selection.choice } })), rows };
 };
@@ -115,6 +123,14 @@ export const applyLegacyLoadReview = async (preview: LegacyLoadPreview, now = ne
     // Recompute from the transaction's source rows; never trust converted values
     // carried by a rendered preview. A failure leaves every selected row alone.
     const verified = previewLegacyLoads(current, preview.selections);
+    // An explicit full-row review replaces the unavailable tuple atomically.
+    // Empty counterparts have no load interpretation; nonempty parts are all
+    // recomputed below before known=true can leave this transaction.
+    const unknownSetIds = new Set(verified.rows.filter(row => !row.original.metadataKnown).map(row => row.original.setId));
+    for (const setId of unknownSetIds) {
+      tx.update(exerciseSets).set({ weightUnit: 'kg', externalLoadMode: null,
+        plannedWeightUnit: null, plannedExternalLoadMode: null }).where(eq(exerciseSets.id, setId)).run();
+    }
     for (const { original, reviewed } of verified.rows) {
       const values = original.part === 'actual'
         ? { weightValue: reviewed.weightValue, weightUnit: reviewed.weightUnit, externalLoadMode: reviewed.externalLoadMode }
