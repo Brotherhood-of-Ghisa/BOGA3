@@ -65,10 +65,18 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
+# The replacement notice puts Total resistance below the small-phone viewport.
+# iOS exposes the clipped row to accessibility before its centre is tappable.
+- swipe:
+    start: "50%,80%"
+    end: "50%,45%"
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 4000
 - scrollUntilVisible:
     element:
       id: "legacy-load-meaning-total"
-    direction: UP
+    direction: DOWN
     centerElement: true
     timeout: 20000
 - waitForAnimationToEnd:
