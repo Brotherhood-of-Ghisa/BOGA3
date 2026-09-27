@@ -39,9 +39,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
-  const meaning = !row.bodyweight ? `Weight · ${row.weightUnit ?? 'kg'}` : row.externalLoadMode === 'unquantified_assistance' ? 'Unquantified assistance' :
-    row.externalLoadMode === 'assistance' ? `Assistance · ${row.weightUnit ?? 'kg'}` :
-    row.externalLoadMode === 'added' ? `Added · ${row.weightUnit ?? 'kg'}` : `Original load · ${row.weightUnit ?? 'kg'}`;
+  const meaning = `${row.bodyweight ? 'Added' : 'Weight'} · ${row.weightUnit ?? 'kg'}`;
   const glyph = performed ? 'set-done' : row.isCursor ? 'set-current' : 'set-planned';
   const statState = performed ? 'realised' : 'planned';
 
@@ -58,7 +56,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         <View>
           <Stat
             emphasis={row.oneRepMaxRecord ? 'record' : 'none'}
-            label={row.bodyweight ? "Total 1RM" : "1RM"}
+            label={row.bodyweight ? "Added 1RM" : "1RM"}
             layout={row.bodyweight ? "stacked" : "inline"}
             rank={row.bodyweight ? "secondary" : "primary"}
             state={statState}
@@ -104,7 +102,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
             performed ? (row.weightRecord ? styles.figureRecord : null) : styles.figurePlanned,
           ]}
           testID={`exercise-set-${row.number}-values`}>
-          {row.externalLoadMode === 'unquantified_assistance' ? `${row.reps ?? DASH} reps` : row.weight === null && row.reps === null
+          {row.weight === null && row.reps === null
             ? DASH
             : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`}
         </Text>

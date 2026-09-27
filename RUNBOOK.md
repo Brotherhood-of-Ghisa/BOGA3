@@ -807,51 +807,119 @@ deploy and one setting per hosted project:
 Locally, the shared baseline sets the URL for you
 (`supabase/scripts/group-eval-configure.sh`).
 
-## Bodyweight feature rollout (M27)
+## Dated bodyweight cutover
 
-This is the server-first release procedure, not a record of a hosted deployment.
-Record local gate and native acceptance evidence alongside the deployed commit,
-migration versions, function versions and hosted smoke evidence in the release
-PR before activating the new client.
+This is an operator procedure, not a record of hosted deployment. Keep the
+compatibility commit independently buildable; do not squash it away before
+publishing the compatibility build. Record commit SHAs, TestFlight build numbers,
+project ref, migration/function versions and smoke evidence in the release PR.
+Never reset the hosted database for this cutover.
 
-1. From the reviewed release checkout, apply the complete migration chain,
-   including `20260926181114_m27_bodyweight_sync.sql` and
-   `20260927073000_m27_group_metrics.sql`, to the intended hosted project.
-   Do not reset a populated hosted database. The first migration adds the
-   owner-private reading entity, omission-preserving writers and capability-gated
-   layer 4; the second adds versioned group rules, projections and attestations.
-2. Deploy the matching `agent-api` and `group-eval` functions from the full
-   checkout using the existing hosted procedures above. The evaluator imports
-   the shared TypeScript load resolver/scorer from `apps/mobile/src/**`; deploy
-   that source together with the function. Retain the existing Vault secret and
-   verify the configured evaluator URL targets this project's deployment.
-3. Before releasing the mobile client, verify hosted old-client reads of layers
-   0–3 and an unrelated old-writer edit against populated bodyweight metadata;
-   then use an upgraded test client to restore layer 4 and the complete frozen
-   session tuple. Confirm cross-owner measurement reads are denied. Use only
-   dedicated test accounts and keep credentials out of evidence.
-4. With two hosted test members, verify missing-weight reps, relative/absolute
-   ranking reversal, a rule revision publishing as one board, estimated-weight
-   attestation and its invalidation after an explicit snapshot correction.
-   Inspect both `group_eval_queue` and `group_metric_eval_queue` for successful
-   drainage. A revision still rebuilding must not expose mixed scores.
-5. Verify the deployed coaching API and MCP against the same owned session:
-   raw external amount, effective resistance, saved weight/source and partial
-   coverage must agree with the app. Run the hosted OAuth/discovery/revocation
-   checks in the MCP procedure above against the deployed URLs.
-6. Release/enable the upgraded client only after those checks pass. Reading
-   entry, session correction, legacy-load review and historical backfill remain
-   explicit user operations. No deployment script fills historical weights or
-   interprets old entered loads automatically.
+1. **Distribute compatibility first.** Commit `11509384` contains only the
+   update-required client support and its tests. It keeps the old schema and
+   old sync protocol. From a clean release worktree at that commit, run the
+   required gates and build/submit the store profile. The commands below use
+   `prod` (`com.phano.boga3`). If the installed TestFlight fleet uses `preview`
+   (`com.phano.boga3.dev`), use `--profile preview` in **both** build and submit
+   commands, for **both** releases. Confirm that profile's EAS environment points
+   at the same hosted project selected in step 2; distributing another bundle
+   cannot update the installed fleet.
 
-If hosted validation fails, hold the client release and repair the server.
-Keep the additive schema and saved tuples; do not drop bodyweight columns or
-restore an older full-row writer that loses them. If the new evaluator must be
-stopped, preserve its queued work and mark the release blocked: personal sync
-continues, but group projections are not current. Existing published revisions
-and old kg-only history retain their original meaning. Restore the compatible
-worker and verify drainage/publication before resuming activation. This is a
-forward-repair procedure, not a destructive data rollback.
+   ```bash
+   ./boga worktree create --from 11509384 codex/bodyweight-compat-release
+   # cd to the exact worktree path printed above
+   # This isolated compatibility commit predates the Expo SDK 57 upgrade.
+   ./boga ios build-client --force
+   ./boga test fast
+   ./boga test frontend
+   ./boga sweep --ref 11509384
+   cd apps/mobile
+   npx eas-cli build --platform ios --profile prod --local --output /tmp/boga-bodyweight-compat.ipa
+   npx eas-cli submit --platform ios --profile prod --path /tmp/boga-bodyweight-compat.ipa
+   ```
+
+   Verify this compatibility build reaches normal sync on the pre-cutover
+   server, and distribute it before the breaking server step. It recognizes
+   `UPDATE_REQUIRED` in first-run setup and steady-state Settings, keeps data
+   on-device, and offers no misleading Retry in the setup gate. Builds predating
+   this compatibility commit may show a generic sync failure; their UI cannot be
+   changed remotely. TestFlight's update path is required for those builds.
+
+2. **Review pending migrations, then cut over the server.** Use the reviewed
+   full implementation checkout, its slot lease and the intended linked hosted
+   project. The pinned CLI wrapper uses that checkout's configuration. Verify
+   the linked project ref before proceeding; the command below shows the
+   migration plan without modifying the hosted database:
+
+   ```bash
+   bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
+   bash -lc 'source supabase/scripts/_common.sh && run_supabase db push --linked --dry-run'
+   ```
+
+   Confirm the chain includes `20260927150155_dated_bodyweight_groups.sql` and
+   `20260927195000_added_bodyweight_loads.sql`, with no unreviewed migrations.
+   Then apply the migrations and immediately deploy the matching
+   functions from the full checkout (they import shared mobile TypeScript):
+
+   ```bash
+   bash -lc 'source supabase/scripts/_common.sh && run_supabase db push --linked'
+   bash -lc 'source supabase/scripts/_common.sh && run_supabase functions deploy group-eval --no-verify-jwt'
+   bash -lc 'source supabase/scripts/_common.sh && run_supabase functions deploy agent-api --no-verify-jwt'
+   bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
+   ```
+
+   The first migration installs the protocol guard before dropping stored
+   session columns and enqueues active comparisons. Matching function deployment
+   follows the schema: a short API/evaluator failure interval is possible;
+   preserve the queue for retry. Retain the existing Vault secret and evaluator
+   URL. Do not release the dated client before the following smoke checks.
+
+3. **Verify the cutoff and projections with dedicated hosted test accounts.**
+   Use the compatibility build: Sync now and a clean setup must display the
+   update requirement, retaining dirty changes and existing local data. At the
+   HTTP boundary, calls to `app_public.sync_push` and `sync_pull` with no protocol
+   header or value 1 return SQLSTATE `P0001` and message beginning
+   `UPDATE_REQUIRED:`; calls with `x-boga-sync-protocol: 2` succeed normally.
+   Confirm neither a rejected push nor pull changes rows/cursors. Session rows
+   contain no `body_weight_*` fields; layer 4 still restores private readings.
+
+   With two group members, add/backdate/edit/move/delete/restore a reading.
+   Verify affected personal/shared/coaching values agree; later readings cannot
+   fill earlier sessions. Cross-owner reading access and direct authenticated
+   `session_weight_contexts` calls must be denied. Verify changed strength pins
+   void certificates while reps-only certificates survive. Check both evaluator
+   queues drain through the configured worker, with no repeated failure/backoff.
+   Confirm API/MCP responses use `dated_added_load_v3` and keep incomplete totals
+   null. Re-run the hosted OAuth/discovery/revocation checks above.
+
+4. **Release the dated client.** From the reviewed implementation checkout after
+   local gates and the sweep pass, restore its SDK 57 simulator client if the
+   compatibility release rebuilt the shared cache. Verify that native build
+   before the store build:
+
+   ```bash
+   ./boga ios build-client --force
+   release_ref="$(git rev-parse HEAD)"
+   ./boga sweep --ref "$release_ref"
+   cd apps/mobile
+   npx eas-cli build --platform ios --profile prod --local --output /tmp/boga-dated-bodyweight.ipa
+   npx eas-cli submit --platform ios --profile prod --path /tmp/boga-dated-bodyweight.ipa
+   ```
+
+   Verify an upgrade preserves raw workouts/readings, drops obsolete local
+   session fields, clears old group caches and resumes protocol-2 sync. A
+   session without an applicable reading remains usable but has unavailable
+   weight-dependent metrics. Nothing manufactures a reading from old manual
+   weights. All saved numeric bodyweight loads, including rows with retired
+   mode tags, count as added weight without changing their raw amounts or units.
+
+If validation fails, hold the dated client and repair forward. Keep the guard
+active and preserve readings, raw workouts and queued jobs. Do not restore the
+old session writer or old calculation worker. Pausing the evaluator must retain
+its pending jobs; resume with matching code and verify coherent publication.
+Retired rule/event evidence keeps its historical meaning. Local gate results do
+not substitute for these hosted checks, and executing the implementation task
+does not authorize any deployment or store submission.
 
 ## Upgrading from v1 sync (one-time wipe)
 

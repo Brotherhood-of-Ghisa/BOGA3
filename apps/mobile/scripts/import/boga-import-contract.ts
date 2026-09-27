@@ -1,7 +1,7 @@
-import { BOGA_SESSION_IMPORT_SCHEMA_V2, validateImportedSessionWeight, validateImportedSetMeaning,
+import { BOGA_SESSION_IMPORT_SCHEMA_V2, BOGA_SESSION_IMPORT_SCHEMA_V3, supportsLoadMetadata, validateImportedSetMeaning,
   validateImportedWeightReading, validateImportedExerciseRules, type ImportedSessionWeight,
   type ImportedSetMeaning, type ImportedWeightReading, type ImportedExerciseRules } from './bodyweight-import-context';
-export { BOGA_SESSION_IMPORT_SCHEMA_V2 } from './bodyweight-import-context';
+export { BOGA_SESSION_IMPORT_SCHEMA_V2, BOGA_SESSION_IMPORT_SCHEMA_V3 } from './bodyweight-import-context';
 import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
 
 export const BOGA_SESSION_IMPORT_SCHEMA = 'boga.session-import.v1' as const;
@@ -106,7 +106,7 @@ export type BogaImportSession = Partial<ImportedSessionWeight> & {
 };
 
 export type BogaSessionImportPackage = {
-  schema: typeof BOGA_SESSION_IMPORT_SCHEMA | typeof BOGA_SESSION_IMPORT_SCHEMA_V2;
+  schema: typeof BOGA_SESSION_IMPORT_SCHEMA | typeof BOGA_SESSION_IMPORT_SCHEMA_V2 | typeof BOGA_SESSION_IMPORT_SCHEMA_V3;
   bodyWeightMeasurements?: ImportedWeightReading[];
   generatedAt: string;
   target: {
@@ -201,9 +201,9 @@ export const validateBogaSessionImportPackage = (
     return { ok: false, errors: ['package must be an object'] };
   }
 
-  const v2 = value.schema === BOGA_SESSION_IMPORT_SCHEMA_V2;
+  const v2 = supportsLoadMetadata(value.schema);
   if (value.schema !== BOGA_SESSION_IMPORT_SCHEMA && !v2) {
-    errors.push(`schema must be ${BOGA_SESSION_IMPORT_SCHEMA} or ${BOGA_SESSION_IMPORT_SCHEMA_V2}`);
+    errors.push(`schema must be ${BOGA_SESSION_IMPORT_SCHEMA} or ${BOGA_SESSION_IMPORT_SCHEMA_V2} or ${BOGA_SESSION_IMPORT_SCHEMA_V3}`);
   }
 
   if (!isString(value.generatedAt)) {
@@ -302,7 +302,8 @@ export const validateBogaSessionImportPackage = (
         errors.push(`sessions[${sessionIndex}] must be an object`);
         return;
       }
-      if (v2 && !validateImportedSessionWeight(session)) errors.push(`sessions[${sessionIndex}] needs a complete valid bodyweight snapshot (or all null)`);
+      // Legacy v2 snapshots are ignored, including malformed tuples; only explicit readings import.
+      if (value.schema === BOGA_SESSION_IMPORT_SCHEMA_V3 && ['bodyWeightKg', 'bodyWeightSource', 'bodyWeightMeasurementId', 'bodyWeightMeasuredAt'].some(key => key in session)) errors.push('v3 sessions cannot contain stored body weight');
       if (!v2 && ['bodyWeightKg', 'bodyWeightSource', 'bodyWeightMeasurementId', 'bodyWeightMeasuredAt'].some(key => session[key] !== undefined)) errors.push('Session body weight requires the v2 schema');
       if (!isString(session.importSessionKey) || session.importSessionKey.trim() === '') {
         errors.push(`sessions[${sessionIndex}].importSessionKey is required`);
@@ -372,5 +373,8 @@ export const validateBogaSessionImportPackage = (
 export const serializeBogaSessionImportPackage = (pkg: BogaSessionImportPackage): string => {
   const validation = validateBogaSessionImportPackage(pkg);
   if (!validation.ok) throw new Error(validation.errors.join('\n'));
-  return JSON.stringify(pkg, null, 2) + '\n';
+  const { sessions, ...rest } = pkg;
+  const exported = { ...rest, schema: supportsLoadMetadata(pkg.schema) ? BOGA_SESSION_IMPORT_SCHEMA_V3 : pkg.schema,
+    sessions: sessions.map(({ bodyWeightKg, bodyWeightSource, bodyWeightMeasurementId, bodyWeightMeasuredAt, ...session }) => session) };
+  return JSON.stringify(exported, null, 2) + '\n';
 };

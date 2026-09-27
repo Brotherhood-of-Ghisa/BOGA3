@@ -57,7 +57,7 @@ describe('Icon', () => {
     const planned = render(<Icon name="set-planned" />);
     const arcs = planned.UNSAFE_getAllByType(Path);
     expect(arcs).toHaveLength(8);
-    expect(arcs.every((arc) => arc.props.stroke === uiRoles.planned)).toBe(true);
+    expect(arcs.every((arc) => arc.props.stroke === uiRoles.inkGhost)).toBe(true);
   });
 });
 

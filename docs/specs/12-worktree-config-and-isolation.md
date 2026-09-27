@@ -312,6 +312,16 @@ Supabase runtime helpers (unchanged, lease-checked): `supabase/scripts/local-run
 `ensure-local-runtime-baseline.sh` (idempotent up + migrate + seed + auth
 fixtures, lock-serialized), `reset-local.sh`, `local-runtime-down.sh`.
 
+The edge function server (`npx supabase functions serve`) is a process tree:
+npm wrapper → node shim → CLI → `docker logs -f`. No PID is recorded for it.
+`boga_functions_serve_stop` (`worktree-lib.sh`) finds every process whose argv
+is `functions serve` or the edge-runtime `docker logs` tail and whose cwd is the
+worktree root, plus all their descendants. It sends SIGTERM, then SIGKILL, and
+fails if anything survives. `local-runtime-up.sh` (before it starts the server),
+`local-runtime-down.sh`, and `worktree release` all use it, so orphans of an
+earlier run are removed too. `scripts/tests/functions-serve-stop.test.sh`
+checks this.
+
 ## Removed mechanisms (do not reintroduce)
 
 Each of these guessed, or acted on another worktree's resources, and each

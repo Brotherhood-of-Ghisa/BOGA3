@@ -5,7 +5,7 @@ Starter for a task card (docs/plans/README.md). Drop any section that doesn't
 help. File: docs/plans/tasks/<task-id>.md, where <task-id> is
 <Milestone ID>-T<NN>-<Short_name> (e.g. M33-T04-Do_something) or
 T-<YYYYMMDD>-<NN>-<Short_name> without a milestone.
-One card = one session = one worktree = one PR (.claude/skills/task-protocol).
+One card = one session = one worktree = one PR (task protocol, docs/plans/README.md).
 The executing PR deletes this card; evidence goes in the PR body.
 -->
 

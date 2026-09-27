@@ -186,8 +186,10 @@ maestro_development_client_url() {
 #
 # Verified on iPhone 17 Pro / iOS 26.2: after seeding these, opening BOTH
 # `exp+boga3://...` and `boga3://...` surfaces zero trust dialogs and the RN root
-# mounts directly. Best-effort: a write failure is logged and never fails the
-# gate — the warm-up's coordinate/text dialog dismissal still backstops it.
+# mounts directly. A failed write fails the launch: no flow taps the dialog
+# away (an optional tap on an absent "Open" cost ~7s per deep link), so an
+# unauthorized scheme would otherwise surface later as an unrelated assertion
+# timeout behind the dialog.
 maestro_preauthorize_url_schemes() {
   local udid="$1"
   local bundle_id="$2"
@@ -197,9 +199,9 @@ maestro_preauthorize_url_schemes() {
   local dev_client_scheme
   local s
 
-  [[ -n "$udid" ]] || { echo "[maestro] preauthorize: missing simulator UDID (skipping)"; return 0; }
-  [[ -n "$bundle_id" ]] || { echo "[maestro] preauthorize: missing bundle id (skipping)"; return 0; }
-  [[ -n "$scheme" ]] || { echo "[maestro] preauthorize: missing app scheme (skipping)"; return 0; }
+  [[ -n "$udid" ]] || maestro_fail "[maestro] preauthorize: missing simulator UDID"
+  [[ -n "$bundle_id" ]] || maestro_fail "[maestro] preauthorize: missing bundle id"
+  [[ -n "$scheme" ]] || maestro_fail "[maestro] preauthorize: missing app scheme"
 
   if [[ "$scheme" == exp+* ]]; then
     dev_client_scheme="$scheme"
@@ -214,7 +216,7 @@ maestro_preauthorize_url_schemes() {
     if xcrun simctl spawn "$udid" defaults write "$approval_domain" "${caller}-->${s}" -string "$bundle_id" >/dev/null 2>&1; then
       echo "[maestro]   authorized scheme '$s' -> $bundle_id"
     else
-      echo "[maestro]   could not pre-authorize scheme '$s' (best-effort; warm-up dialog dismissal will backstop)"
+      maestro_fail "[maestro] could not pre-authorize scheme '$s' on $udid: the 'Open in \"<App>\"?' dialog would block every deep link"
     fi
   done
 }
@@ -262,6 +264,33 @@ maestro_preauthorize_location() {
       echo "[maestro]   could not pre-authorize '$service' (best-effort; warm-up will backstop)"
     fi
   done
+}
+
+# Seed expo-dev-menu's preferences in the dev client's data container so its
+# launch-time UI never covers the RN root. Since SDK 57 the dev menu opens its
+# onboarding sheet ("Continue") on every fresh install; a `full` provision reset
+# reinstalls the app, so it would come back every cold run. (Its floating "Dev
+# tools" button is off in the binary's Info.plist, `app.config.ts`, so it also
+# stays off after a flow's `clearState`.) The keys are expo-dev-menu's own
+# (ios/Modules/DevMenuPreferences.swift), written into the app's preferences
+# plist, where UserDefaults.standard reads them ahead of the registered defaults.
+# The write goes through the simulator's own `defaults` so its cfprefsd records
+# it; a host-side write to the plist is overwritten by cfprefsd's cached copy.
+#
+# Not best-effort: a miss leaves the sheet over every screen, so the flow's first
+# assertion would fail far from the cause. Fail here instead.
+maestro_seed_dev_menu_preferences() {
+  local udid="$1"
+  local bundle_id="$2"
+  local container plist
+
+  container="$(xcrun simctl get_app_container "$udid" "$bundle_id" data 2>/dev/null)" \
+    || maestro_fail "Unable to resolve the $bundle_id data container on $udid to seed dev-menu preferences."
+  plist="$container/Library/Preferences/$bundle_id.plist"
+  xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuIsOnboardingFinished -bool true \
+    && xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuShowsAtLaunch -bool false \
+    || maestro_fail "Unable to seed dev-menu preferences in $plist."
+  echo "[maestro] seeded dev-menu preferences (onboarding finished, no launch menu) for $bundle_id"
 }
 
 maestro_wait_for_http() {

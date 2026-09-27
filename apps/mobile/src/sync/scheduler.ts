@@ -292,6 +292,8 @@ const describeOutcome = (outcome: Exclude<SyncCycleOutcome, 'converged'>): strin
       return 'Sync needs you to sign in again.';
     case 'fk-violation':
       return 'Sync could not reconcile your data (structural conflict).';
+    case 'update-required':
+      return 'Update BoGa to continue syncing. Your data remains on this device.';
     case 'internal':
       return 'Sync did not complete; it will retry automatically.';
     default:

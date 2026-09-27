@@ -156,7 +156,7 @@ function PanelBody({
               : ''
           }
           multiline={bodyweight}
-          label={bodyweight ? "Total 1RM" : "1RM"}
+          label={bodyweight ? "Added 1RM" : "1RM"}
           testID="exercise-record-1rm"
           value={records.oneRepMax ? formatOneRepMax(records.oneRepMax.value) : DASH}
         />
@@ -197,7 +197,7 @@ function PanelBody({
           {`${date(last.completedAt)}${last.gymName ? ` · ${last.gymName}` : ''} · ${formatDaysAgo(last.completedAt, now)}`}
         </Text>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
-          {`${bodyweight ? 'Total 1RM' : '1RM'} ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
+          {`${bodyweight ? 'Added 1RM' : '1RM'} ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
         </Text>
       </View>
       {last.sets.map((set, index) => (
@@ -224,7 +224,7 @@ function CollapsedStats({
     <View>
     <View style={styles.collapsed} testID="exercise-records-collapsed">
       <View style={styles.collapsedCell}>
-        <Stat label={bodyweight ? "Total 1RM" : "1RM"} testID="exercise-records-1rm" value={oneRepMax} />
+        <Stat label={bodyweight ? "Added 1RM" : "1RM"} testID="exercise-records-1rm" value={oneRepMax} />
       </View>
       <View style={styles.collapsedCell}>
         <Stat label={bodyweight ? "Added kg" : "Max"} testID="exercise-records-max" value={maxWeight} />
@@ -278,7 +278,7 @@ function LastSetLine({ set, index, bodyweight }: { set: RecordSet; index: number
     </View>
     <Text allowFontScaling={false} style={pageText.body}>{`Saved body weight ${set.bodyWeightKg == null ? DASH : formatWeight(set.bodyWeightKg)} kg · Effective load ${set.effectiveResistanceKg == null ? DASH : formatWeight(set.effectiveResistanceKg)} kg`}</Text>
     <View style={styles.bodyweightSetHeading}>
-      <Stat label="Total 1RM" layout="inline" value={set.oneRepMax !== null ? formatOneRepMax(set.oneRepMax) : DASH} />
+      <Stat label="Added 1RM" layout="inline" value={set.oneRepMax !== null ? formatOneRepMax(set.oneRepMax) : DASH} />
       <Stat label="Vol" layout="inline" rank="secondary" value={set.volume === null ? DASH : formatVolume(set.volume)} />
     </View>
   </View>;
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   recordDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleFaint,
+    borderTopColor: uiRoles.ruleSoft,
   },
   recordLabel: {
     width: uiGeometry.tapTarget,

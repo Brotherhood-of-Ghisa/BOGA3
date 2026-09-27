@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { LegacyLoadReviewContent } from '@/components/bodyweight/legacy-load-review-sheet';
-import { listLegacyLoads } from '@/src/data/legacy-load-review';
 import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
@@ -106,7 +104,8 @@ const buildEditorMuscleSelectionsFromExercise = (
       return true;
     })
     .map((mapping) => ({
-      rowId: mapping.id || createRowId(),
+      // Built during render, so derived, not random: secondary rows are unique per muscle.
+      rowId: mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`,
       muscleGroupId: mapping.muscleGroupId,
     }));
 
@@ -125,8 +124,6 @@ export function ExerciseEditorModal({
   onSave,
   title,
 }: ExerciseEditorModalProps) {
-  const [reviewExercise, setReviewExercise] = useState<ExerciseCatalogExercise | null>(null);
-  const reviewBusy = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [muscleSelectorMode, setMuscleSelectorMode] = useState<MuscleSelectorMode>(null);
   const [exerciseName, setExerciseName] = useState('');
@@ -152,46 +149,55 @@ export function ExerciseEditorModal({
     [muscleGroups]
   );
 
-  useEffect(() => {
-    if (!visible) {
-      setReviewExercise(null);
-      return;
-    }
+  // Opening, or a different exercise or prefill, fills the form in the render that shows it.
+  const [shownFor, setShownFor] = useState<{
+    visible: boolean;
+    editingExercise: typeof editingExercise;
+    prefill: typeof prefill;
+  } | null>(null);
+  if (
+    !shownFor ||
+    shownFor.visible !== visible ||
+    shownFor.editingExercise !== editingExercise ||
+    shownFor.prefill !== prefill
+  ) {
+    setShownFor({ visible, editingExercise, prefill });
+    if (visible) {
+      if (editingExercise) {
+        const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
+        setExerciseName(editingExercise.name);
+        setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
+        setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+        setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+      } else if (prefill) {
+        const nextSelections = buildEditorMuscleSelectionsFromExercise({
+          id: '',
+          name: prefill.name,
+          loadInputMode: prefill.loadInputMode,
+          deletedAt: null,
+          mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
+        });
+        setExerciseName(prefill.name);
+        setLoadInputMode(prefill.loadInputMode);
+        setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+        setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+      } else {
+        setExerciseName('');
+        setLoadInputMode('total_load');
+        setPrimaryMuscleGroupId(null);
+        setSecondaryMuscleRows([]);
+      }
 
-    if (editingExercise) {
-      const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
-      setExerciseName(editingExercise.name);
-      setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
-      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
-      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
-    } else if (prefill) {
-      const nextSelections = buildEditorMuscleSelectionsFromExercise({
-        id: '',
-        name: prefill.name,
-        loadInputMode: prefill.loadInputMode,
-        deletedAt: null,
-        mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
-      });
-      setExerciseName(prefill.name);
-      setLoadInputMode(prefill.loadInputMode);
-      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
-      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
-    } else {
-      setExerciseName('');
-      setLoadInputMode('total_load');
-      setPrimaryMuscleGroupId(null);
-      setSecondaryMuscleRows([]);
+      const rules = editingExercise ?? prefill?.loadRules;
+      setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
+        movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
+      setLoadFieldsTouched(false);
+      setLoadRulesError(null);
+      setMuscleSelectorMode(null);
+      setValidation(createBlankValidationState());
+      setSaveError(null);
     }
-
-    const rules = editingExercise ?? prefill?.loadRules;
-    setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
-      movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
-    setLoadFieldsTouched(false);
-    setLoadRulesError(null);
-    setMuscleSelectorMode(null);
-    setValidation(createBlankValidationState());
-    setSaveError(null);
-  }, [editingExercise, prefill, visible]);
+  }
 
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
   const availablePrimaryMuscleGroupsForSelector = muscleGroups.filter(
@@ -353,10 +359,6 @@ export function ExerciseEditorModal({
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
-      if (editingExercise && savedExercise.localBodyweightMetadataKnown !== false) {
-        const unresolved = await listLegacyLoads(savedExercise.id).then(data => data.candidates.length > 0).catch(() => true);
-        if (unresolved) { setReviewExercise(savedExercise); return; }
-      }
       onSaved(savedExercise);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Unable to save exercise.');
@@ -367,15 +369,11 @@ export function ExerciseEditorModal({
 
   const isSelectorOpen = muscleSelectorMode !== null;
 
-  const finishReview = () => {
-    if (reviewExercise && !reviewBusy.current) onSaved(reviewExercise);
-  };
-
   return (
     <Sheet
-      dismissLabel={reviewExercise ? "Leave old loads unresolved" : "Dismiss exercise editor overlay"}
+      dismissLabel="Dismiss exercise editor overlay"
       headerLeading={
-        !reviewExercise && isSelectorOpen ? (
+        isSelectorOpen ? (
           <IconButton
             accessibilityLabel="Back to exercise"
             name="chevron-left"
@@ -385,12 +383,10 @@ export function ExerciseEditorModal({
         ) : undefined
       }
       keyboardAvoiding
-      onDismiss={reviewExercise ? finishReview : closeEditorModal}
-      testID={reviewExercise ? "legacy-load-review" : "exercise-editor"}
-      title={reviewExercise ? "Review original loads" : isSelectorOpen ? selectorTitle : editorTitle}
+      onDismiss={closeEditorModal}
+      testID="exercise-editor"
+      title={isSelectorOpen ? selectorTitle : editorTitle}
       visible={visible}>
-      {reviewExercise ? <LegacyLoadReviewContent visible={visible} exerciseId={reviewExercise.id}
-        onBusyChange={value => { reviewBusy.current = value; }} onDismiss={finishReview} /> :
       <View style={[styles.body, { height: height * EDITOR_SHARE_OF_SCREEN }]}>
         {isLoadingMuscleGroups ? <StatePanel body="Loading muscle groups…" kind="loading" /> : null}
 
@@ -587,7 +583,7 @@ export function ExerciseEditorModal({
             ) : null}
           </>
         ) : null}
-      </View>}
+      </View>
     </Sheet>
   );
 }
@@ -621,12 +617,12 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   // The primary-muscle trigger is framed like a field (`FormField`): a
-  // `rule-strong` hairline at the control radius that turns `danger` when
+  // `rule` hairline at the control radius that turns `danger` when
   // the choice is missing.
   triggerFrame: {
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
     backgroundColor: uiRoles.surface,
   },

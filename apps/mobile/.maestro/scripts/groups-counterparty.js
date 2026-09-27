@@ -70,7 +70,7 @@ function signIn() {
 }
 
 function rpc(token, name, args) {
-  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public' });
+  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '2' });
 }
 
 function rpcOk(token, name, args) {
@@ -228,13 +228,15 @@ function awaitBodyweightBoard(metric, certified, matches) {
     pause(POLL_INTERVAL_MS);
   }
 }
-function bodyweightSession(id, kg, source, stamp) {
-  var session = sessionEntity(id, output.bodyweightStartedAt, stamp, output.bodyweightStartedAt + 60000);
-  session.fields.body_weight_kg = kg;
-  session.fields.body_weight_source = source;
-  session.fields.body_weight_measurement_id = source === 'historical_estimate' ? id + '-reading' : null;
-  session.fields.body_weight_measured_at = source === 'historical_estimate' ? output.bodyweightStartedAt + DAY_MS : null;
-  return session;
+function bodyweightSession(id, stamp, missing) {
+  var at = output.bodyweightStartedAt - (missing ? 1 : 0);
+  return sessionEntity(id, at, stamp, at + 60000);
+}
+function bodyweightReading(id, kg, stamp) {
+  return entity('body_weight_measurements', id + '-reading', stamp, {
+    weight_value: String(kg), weight_unit: 'kg', weight_kg: kg,
+    measured_at: output.bodyweightStartedAt, created_at: stamp, updated_at: stamp, deleted_at: null,
+  });
 }
 
 var steps = {
@@ -603,8 +605,8 @@ var steps = {
     output.bodyweightStartedAt = nextClientUpdatedAt();
     output.bodyweightCounterpartySessionId = 'maestro-m27-heavy';
     var people = [
-      { token: output.unlinkDeviceToken, id: 'maestro-m27-light', kg: 60, source: 'manual', coefficient: 0.1 },
-      { token: output.groupsToken, id: output.bodyweightCounterpartySessionId, kg: 90, source: 'historical_estimate', coefficient: 0.7 },
+      { token: output.unlinkDeviceToken, id: 'maestro-m27-light', kg: 60, coefficient: 0.1 },
+      { token: output.groupsToken, id: output.bodyweightCounterpartySessionId, kg: 90, coefficient: 0.7 },
     ];
     for (var i = 0; i < people.length; i++) {
       var person = people[i];
@@ -621,15 +623,16 @@ var steps = {
           exercise_definition_id: def, group_id: output.groupsGroupId, group_exercise_id: output.bodyweightExerciseId,
           created_at: stamp, updated_at: stamp, deleted_at: null,
         }),
-        bodyweightSession(person.id, person.kg, person.source, stamp),
+        bodyweightSession(person.id, stamp, false),
+        bodyweightReading(person.id, person.kg, stamp),
         sessionExerciseEntity(person.id + '-se', person.id, def, 0, 'M27 Personal Pull-up', stamp), set,
       ];
-      // A missing snapshot is eligible for the unweighted-reps board only.
+      // A session preceding the timeline is eligible for the unweighted-reps board only.
       if (i === 1) {
         var missing = person.id + '-missing';
         var reps = setEntity(missing + '-set', missing + '-se', 0, '0', '15', stamp);
         reps.fields.weight_unit = 'kg'; reps.fields.external_load_mode = 'added';
-        entities.push(bodyweightSession(missing, null, null, stamp));
+        entities.push(bodyweightSession(missing, stamp, true));
         entities.push(sessionExerciseEntity(missing + '-se', missing, def, 0, 'M27 Personal Pull-up', stamp));
         entities.push(reps);
       }
@@ -655,8 +658,8 @@ var steps = {
     var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
       p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
     }).certification;
-    if (!cert.includes_body_weight || cert.performance.body_weight_source !== 'historical_estimate' ||
-      cert.certified_by.user_id !== output.unlinkDeviceUserId) fail('estimated inputs were not attested');
+    if (!cert.includes_body_weight || cert.performance.body_weight_source !== 'reading' ||
+      cert.certified_by.user_id !== output.unlinkDeviceUserId) fail('dated inputs were not attested');
   },
   'assert-bodyweight-rules': function () {
     var board = awaitBodyweightBoard('absolute_strength', false, function (b) {
@@ -671,7 +674,7 @@ var steps = {
   },
   'correct-bodyweight': function () {
     var stamp = nextClientUpdatedAt();
-    push([bodyweightSession(output.bodyweightCounterpartySessionId, 95, 'manual', stamp)]);
+    push([bodyweightReading(output.bodyweightCounterpartySessionId, 95, stamp)]);
     awaitBodyweightBoard('absolute_strength', false, function (b) {
       return b.rules_revision === 2 && b.entries.length === 2 && b.entries[0].performance.body_weight_kg === 95 && !b.entries[0].certified;
     });
@@ -680,7 +683,7 @@ var steps = {
       p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
     }).certification;
     if (cert.ended_at_ms === null) fail('bodyweight correction retained an active strength certification');
-    console.log(TAG + ' M27 saved-bodyweight correction invalidated the strength attestation');
+    console.log(TAG + ' M27 dated-reading correction invalidated the strength attestation');
   },
 
   // AC11: once removed, the counterparty's next read of the group is NOT_FOUND.

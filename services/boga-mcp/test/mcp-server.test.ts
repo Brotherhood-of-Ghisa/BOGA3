@@ -56,9 +56,9 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'effective_load_v1',
+    metric_revision: 'dated_added_load_v3',
     recent_performances: [{
-      session_body_weight: { status: 'known', value: 80, unit: 'kg', source: 'historical_estimate', estimated: true },
+      session_body_weight: { status: 'known', value: 80, unit: 'kg', source: 'reading', measurement_id: 'reading-a', measured_at: '2026-09-01T10:00:00Z', estimated: false },
       volume: { value: null, unit: 'kg_reps', known_subtotal: 500, complete: false },
       sets: [{ entered_load: { raw_value: '20', value: 20, unit: 'lb', mode: 'assistance' },
         effective_load: { value: 70.9281526, unit: 'kg', status: 'known', basis: 'total_resistance' } }],
@@ -66,7 +66,7 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/workouts/recent': {
     next_cursor: null,
-    metric_revision: 'effective_load_v1',
+    metric_revision: 'dated_added_load_v3',
     workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
 };

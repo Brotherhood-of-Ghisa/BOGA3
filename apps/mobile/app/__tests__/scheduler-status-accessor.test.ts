@@ -16,7 +16,7 @@ import type { LogEventParams } from '@/src/logging/logEvent';
 // Controllable cycle stub: resolve/reject by hand so RUNNING is observable. The
 // cycle returns a classified outcome (it never throws in production); the stub
 // resolves with that outcome so the status accessor sees the same contract.
-type CycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+type CycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'update-required' | 'internal';
 let cycleResolvers: { resolve: (outcome: CycleOutcome) => void; reject: (error: unknown) => void }[] =
   [];
 const mockRunSyncCycle = jest.fn(
@@ -107,6 +107,14 @@ afterEach(() => {
 });
 
 describe('production scheduler status accessor', () => {
+  it('retains a required-update message without recording sync success', async () => {
+    goOnline();
+    jest.advanceTimersByTime(1000);
+    await endCycleOutcome('update-required');
+    expect(getSchedulerStatus().lastCycleError).toBe('Update BoGa to continue syncing. Your data remains on this device.');
+    expect(getSchedulerStatus().lastSuccessAtMs).toBeNull();
+  });
+
   it('starts OFFLINE with no error, no success time, and an unknown (not offline) network', () => {
     // Before NetInfo's first report the machine is OFFLINE (it never syncs on an
     // unconfirmed link), but the network is unknown, not offline: the surfacing

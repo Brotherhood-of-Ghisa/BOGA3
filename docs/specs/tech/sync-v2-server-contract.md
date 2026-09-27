@@ -1,9 +1,10 @@
 # Sync v2 Server Contract
 
-M27 adds owner-private readings and frozen session/load inputs (A.2.11,
-B.3.3, B.4.1). See [bodyweight semantics](bodyweight-load-contract.md) for their
-meaning. Deploy the additive server migration before the new sync client;
-entry, historical backfill and group-score activation are separate work.
+Private dated readings are synced in layer 4; session weight is a read projection
+and absent from session storage/wire rows. The staged cutoff requires protocol
+header `x-boga-sync-protocol: 2` before any authenticated app push/pull accesses
+obsolete fields. See [bodyweight semantics](bodyweight-load-contract.md) and the
+[operator rollout](../../../RUNBOOK.md#dated-bodyweight-cutover).
 
 > **Promoted from the sync-v2 plan; this is the authoritative sync-v2 server
 > contract.** It merges the two former design docs (`t1` — server schema &
@@ -222,10 +223,6 @@ Source: `apps/mobile/src/data/schema/sessions.ts`.
 | `startedAt` | `started_at` | `bigint` | NO | — | — | — |
 | `completedAt` | `completed_at` | `bigint` | YES | — | yes (`sessions_completed_at_idx`) | — |
 | `durationSec` | `duration_sec` | `integer` | YES | — | — | — |
-| `bodyWeightKg` | `body_weight_kg` | `double precision` | YES | — | — | — |
-| `bodyWeightSource` | `body_weight_source` | `text` | YES | — | — | — |
-| `bodyWeightMeasurementId` | `body_weight_measurement_id` | `text` | YES | — | — | **none** (frozen provenance) |
-| `bodyWeightMeasuredAt` | `body_weight_measured_at` | `bigint` | YES | — | — | — |
 | `deletedAt` | `deleted_at` | `bigint` | YES | — | yes (`sessions_deleted_at_idx`) | — |
 | `createdAt` | `created_at` | `bigint` | NO | — | — | — |
 | `updatedAt` | `updated_at` | `bigint` | NO | — | — | — |
@@ -472,8 +469,9 @@ Source: `apps/mobile/src/data/schema/body-weight-measurements.ts`; migration
 
 Includes universal owner/received index, envelope columns, structural triggers,
 owner RLS and restrictive OAuth direct-access denial. Unit/value/date validation
-belongs at client entry; the server remains a typed mirror. Source identity in
-`sessions` is not an FK and never dereferenced to refresh the saved tuple.
+belongs at client entry; the server remains a typed mirror. The read-time
+as-of boundary validates restored rows before calculation. There is no session
+weight column or source FK.
 Account-switch wipe, developer reset and `dev_wipe_my_data` include readings.
 A new **layer 4** avoids introducing an unknown type into legacy pulls and avoids
 missing old readings behind an existing cursor. It is a root entity despite
@@ -860,6 +858,7 @@ too). **No `extras` blob, no top-level `deleted` flag** — deletion is
 | --- | --- | --- |
 | `AUTH_REQUIRED` | No/expired JWT, RLS denies the row. | Refresh token; if it fails, keep dirty bits, surface "Sign in again." |
 | `FK_VIOLATION` | Deferrable-FK check failed at COMMIT (A.5). Structural bug. | **Non-retriable.** Log; leave dirty bits; surface non-recoverable error. Fix lands by app update. |
+| `UPDATE_REQUIRED` | Server minimum sync protocol exceeds this build. | Preserve dirty rows/cursors; show “Update BoGa to continue syncing” in setup and Settings. Setup offers no retry. |
 | `INTERNAL` | Anything else (transport, 5xx, malformed payload). | Cycle returns with error; dirty bits stay set; next scheduler tick re-pushes. No backoff. |
 
 **The server validates hierarchy (FKs) only** — no enum/range/length/format/
@@ -919,16 +918,19 @@ under `fields.<wire_key>` (snake_case Postgres column name); nullable columns
 get JSON null. Local-only sync columns (B.9) must not appear; any other client
 column is drift, caught at PR time.
 
-**M27 older-writer compatibility:** on an accepted LWW update, each new field
-in A.2.2/A.2.4/A.2.5 is assigned only when that key is present in `fields`.
-An older full-row writer cannot reset snapshots, coefficients, standards or
-actual/planned load metadata merely by omitting them. Explicit null clears
-nullable columns; non-null coefficient/unit fields reject null. An insert from
-an older writer defaults coefficient to 0 and actual unit to kg; other new
-columns start null. This preserves row LWW, not independent field clocks.
-Current writers send complete session provenance tuples; T04/T06 validate them
-at the application boundary. Reinstall/normal autosave never resolves the
-source id into a new body weight.
+**Metadata omission compatibility:** on accepted LWW updates, exercise-rule and
+actual/planned set metadata is assigned only when the key is present. Explicit
+null clears nullable fields; inserts retain legacy defaults. This is row LWW,
+not independent field clocks. Session weight keys are neither written nor read.
+
+**Update-required cutoff:** the original RPC signatures remain available.
+Normal authenticated app calls with absent/old/malformed
+`x-boga-sync-protocol` fail with SQLSTATE `P0001` and message
+`UPDATE_REQUIRED: Update BoGa to continue syncing.` before row access/mutation.
+The compatibility client recognizes this transport error (and an equivalent
+error envelope), preserving local dirty data and cursors. Protocol 2 is sent
+by the dated client and import CLI. Auth-required and OAuth-denial behavior is
+unchanged. Header gating is compatibility enforcement, not authorization.
 
 ### B.3.4 Building the batch
 
@@ -1042,11 +1044,13 @@ on the client.
 > all four keys with a `type` that is one of the eleven entity types — otherwise
 > `INTERNAL`.
 
-Migration `0008_ordinary_bill_hollister.sql` marks pre-M27 sessions, exercise
+Historical migration `0008_ordinary_bill_hollister.sql` marked pre-M27 sessions, exercise
 definitions and sets with `local_bodyweight_metadata_known = false`, and removes
 only their layer 0/1/3 cursors. A legacy reader could have advanced past new
 fields it ignored; replay is required even though the server is additive.
 Other runtime bookkeeping, layer 2, dirty flags and LWW clocks are unchanged.
+Forward migration `0009_amazing_fixer.sql` removes session weight and its marker;
+only exercise/set hydration remains in current writers.
 New rows default to known metadata. Unknown metadata keys are omitted from
 push, never emitted as placeholder defaults. The first complete metadata
 projection hydrates just those unknown fields even if the local row clock is

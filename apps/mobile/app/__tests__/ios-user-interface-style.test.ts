@@ -26,6 +26,19 @@ const appConfig = require('../../app.config').default({
   plugins: (string | [string, Record<string, unknown>])[];
 };
 
+// expo-splash-screen's `exports` map hides its plugin build, so both tests below
+// reach it by path.
+const SPLASH_INFO_PLIST_PLUGIN = join(
+  __dirname,
+  '..',
+  '..',
+  'node_modules',
+  'expo-splash-screen',
+  'plugin',
+  'build',
+  'withIosSplashInfoPlist.js',
+);
+
 function splashPluginOptions(): Record<string, unknown> {
   const entry = appConfig.plugins.find(
     (plugin): plugin is [string, Record<string, unknown>] =>
@@ -60,7 +73,7 @@ describe('iOS userInterfaceStyle is pinned to light', () => {
     // { UIUserInterfaceStyle: 'Automatic' } and the test fails.
     const {
       setSplashInfoPlist,
-    } = require('@expo/prebuild-config/build/plugins/unversioned/expo-splash-screen/withIosSplashInfoPlist');
+    } = require(SPLASH_INFO_PLIST_PLUGIN);
 
     const infoPlist = setSplashInfoPlist(appConfig, {}, splashPluginOptions());
 
@@ -75,22 +88,7 @@ describe('iOS userInterfaceStyle is pinned to light', () => {
     // Mirrors background-sync-task.test.ts: read the plugin source so an
     // upstream rename of the overriding assignment fails loudly here instead of
     // quietly making the test above vacuous.
-    const pluginSource = readFileSync(
-      join(
-        __dirname,
-        '..',
-        '..',
-        'node_modules',
-        '@expo',
-        'prebuild-config',
-        'build',
-        'plugins',
-        'unversioned',
-        'expo-splash-screen',
-        'withIosSplashInfoPlist.js',
-      ),
-      'utf8',
-    );
+    const pluginSource = readFileSync(SPLASH_INFO_PLIST_PLUGIN, 'utf8');
 
     expect(pluginSource).toContain("infoPlist.UIUserInterfaceStyle = 'Automatic'");
   });

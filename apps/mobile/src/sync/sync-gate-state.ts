@@ -6,7 +6,7 @@
 //     dismissal on this. It lives in the local runtime-state row, not on the
 //     scheduler, so the gate reads it from the row and republishes it here.
 //   - `lastCycleErrorCode`: the classification of the most recent failed cycle
-//     ('AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL'), or
+//     ('AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL'), or
 //     null when the last cycle was clean. The gate renders an error + Retry for
 //     the non-auth codes and routes to sign-in for the auth one. It is mirrored
 //     from the cycle's own observable signals (the auth-required flag and the
@@ -23,7 +23,7 @@
 import type { SyncProgress } from '@/src/sync/progress';
 
 /** The classification of a failed cycle, mirroring the cycle's own error codes. */
-export type LastCycleErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
+export type LastCycleErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
 
 /** The immutable gate-scoped snapshot the gate subscribes to. */
 export interface SyncGateStateSnapshot {
@@ -45,6 +45,12 @@ export interface SyncGateStateSnapshot {
    * is reachable in a release build).
    */
   forcedProgress?: SyncProgress | null;
+  /**
+   * False only until the bridge has first read the persisted flag (or the data
+   * layer failed to come up): before that, `bootstrapCompletedAt: null` means
+   * "unknown", not "not synced". Omitted means known.
+   */
+  bootstrapFlagKnown?: boolean;
 }
 
 /** The snapshot returned before any cycle has reported anything. */
@@ -52,6 +58,7 @@ const INITIAL_SNAPSHOT: SyncGateStateSnapshot = {
   bootstrapCompletedAt: null,
   lastCycleErrorCode: null,
   forcedProgress: null,
+  bootstrapFlagKnown: false,
 };
 
 type Listener = () => void;

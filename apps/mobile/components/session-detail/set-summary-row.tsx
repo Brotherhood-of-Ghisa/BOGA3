@@ -17,7 +17,7 @@ export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID:
         <Text allowFontScaling={false} style={[styles.weightReps, row.done ? null : styles.valuePlanned]} testID={`${testID}-values`}>{row.weightReps}</Text>
       </View>
       <View style={styles.bodyweightMetrics}>
-        <Stat emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'} label="Total 1RM" layout="inline" rank="primary" state={state} testID={`${testID}-1rm`} value={row.oneRepMax} />
+        <Stat emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'} label="Added 1RM" layout="inline" rank="primary" state={state} testID={`${testID}-1rm`} value={row.oneRepMax} />
         <Stat label="Vol" layout="inline" rank="primary" state={state} testID={`${testID}-vol`} value={row.volume} />
       </View>
     </View>
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     color: uiRoles.ink,
   },
   typePlanned: {
-    color: uiRoles.planned,
+    color: uiRoles.inkGhost,
   },
   weightReps: {
     flex: 1,

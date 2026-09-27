@@ -45,12 +45,12 @@ export function scoreGroupPerformance(performance: GroupPerformanceInput, rules:
   if (metrics.load.status !== 'known') return result;
   result.effectiveResistanceKg = metrics.load.resistanceKg;
   result.externalAdjustmentKg = metrics.load.totalExternalAdjustmentKg;
-  if (rules.bodyweightCoefficient > 0 && performance.externalLoadMode === 'added' && bodyweight !== null && Number.isFinite(bodyweight) && bodyweight > 0) {
+  if (rules.bodyweightCoefficient > 0 && bodyweight !== null && Number.isFinite(bodyweight) && bodyweight > 0) {
     const percent = metrics.load.totalExternalAdjustmentKg / bodyweight * 100;
     result.addedPercentBodyweight = Number.isFinite(percent) ? percent : null;
   }
   if (rules.bodyweightCoefficient > 0) {
-    if (metrics.estimatedOneRepMaxKg !== null) result.scores.push({ metric: 'absolute_strength', value: metrics.estimatedOneRepMaxKg, unit: 'kg' });
+    if (metrics.estimatedOneRepMaxKg !== null) result.scores.push({ metric: 'absolute_strength', value: metrics.estimatedOneRepMaxKg * compatibility.externalLoadFactor, unit: 'kg' });
     if (metrics.relativeEstimatedOneRepMax !== null) result.scores.push({ metric: 'relative_strength', value: metrics.relativeEstimatedOneRepMax, unit: 'x_bw' });
   } else {
     const weight = metrics.load.enteredWeightKg * compatibility.externalLoadFactor;

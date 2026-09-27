@@ -51,7 +51,7 @@ export const groupSessionWeightSnapshot = (session: GroupSessionLoadContext) => 
 export function groupSessionExerciseLoadContext(
   exercise: GroupSessionExercise, session?: GroupSessionLoadContext,
 ): LoadContext {
-  if (session?.metric_revision !== 'effective_load_v1') return legacyContext;
+  if (session?.metric_revision !== 'dated_added_load_v3') return legacyContext;
   const snapshot = groupSessionWeightSnapshot(session);
   const absent = Object.values(snapshot).every(value => value === null);
   return {
@@ -85,7 +85,7 @@ export function selectGroupPerformedExercises(
   return exercises.flatMap(exercise => {
     const loadContext = groupSessionExerciseLoadContext(exercise, session);
     const sets = exercise.sets.flatMap(set =>
-      toGroupPerformedSet(set, loadContext, session?.metric_revision === 'effective_load_v1') ?? []);
+      toGroupPerformedSet(set, loadContext, session?.metric_revision === 'dated_added_load_v3') ?? []);
     return sets.length ? [{ sessionExerciseId: exercise.session_exercise_id, name: exercise.name,
       machineName: exercise.machine_name, orderIndex: exercise.order_index, loadContext, sets }] : [];
   });
@@ -98,5 +98,5 @@ export function computeGroupSessionMetrics(
   const coverage = summarizeEffectiveVolume(performed.flatMap(exercise => exercise.sets.map(set => set.metrics)));
   return { performedSets: coverage.eligibleSetCount, totalVolumeKg: coverage.totalVolumeKgReps,
     exerciseCount: performed.length, coverage,
-    basis: session?.metric_revision === 'effective_load_v1' ? 'personal' : 'legacy_entered_load' };
+    basis: session?.metric_revision === 'dated_added_load_v3' ? 'personal' : 'legacy_entered_load' };
 }

@@ -34,7 +34,7 @@ place each under `docs/specs/**`, routed from here.
    | --- | --- |
    | Any `apps/mobile` TS/JS logic | `boga test fast` |
    | UI screens / components / navigation | `boga test fast` + `boga test frontend-ui` (+ the area e2e lane `boga test for` prints) |
-   | Root layout (`app/_layout.tsx`) / Maestro harness or runtime scripts | `boga test fast` + `boga test frontend` |
+   | Root layout / root stack / route access (`app/_layout.tsx`, `components/navigation/root-stack.tsx`) / Maestro harness or runtime scripts | `boga test fast` + `boga test frontend` |
    | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
    | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test ios-groups-e2e` (two-user e2e) |
@@ -128,9 +128,9 @@ migrations, specs, or other docs — state the rule itself in the owning spec.
 Commit messages and PR bodies may cite them. `docs-check` enforces the path half.
 
 **Task protocol.** When the user wants to plan multi-PR work together, or hands
-you a task card to execute, offer the protocol in
-[`.claude/skills/task-protocol/SKILL.md`](.claude/skills/task-protocol/SKILL.md)
-(Claude Code: `/task-protocol`): plan together → one session per task → task-level
+you a task card to execute, offer the task protocol in
+[`docs/plans/README.md`](docs/plans/README.md#task-protocol-boga)
+(Claude Code: the user-level `/task-protocol` skill): plan together → one session per task → task-level
 design → build → review agent → PR → user review → merge → offer next cards →
 clean up the worktree and its stack.
 

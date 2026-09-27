@@ -102,6 +102,7 @@ import {
   syncRuntimeState,
 } from '@/src/data/schema';
 import { runSyncCycle } from '@/src/sync/cycle';
+import { loadAsOfWeightResolver } from '@/src/data/bodyweight';
 
 // Reads the live-endpoint config; throws here (failing the suite) when the env
 // is missing or incomplete, since this suite runs only when an endpoint has
@@ -399,16 +400,13 @@ describe('sync cycle round-trip against a live endpoint', () => {
     }
   }, 45_000);
 
-  it('restores readings and frozen snapshots after reinstall and starts a fresh reading cursor on upgrade', async () => {
+  it('restores readings without stored session context after reinstall and starts a fresh reading cursor on upgrade', async () => {
     seedDirtyChain();
     const readingId = `${ids.session}-weight`;
     const ms = Date.now() + 20;
     database.insert(bodyWeightMeasurements).values({ id: readingId, weightValue: '176', weightUnit: 'lb',
-      weightKg: 79.83225712, measuredAt: new Date(ms - 1000), localDirty: true, localUpdatedAtMs: ms,
+      weightKg: 79.83225712, measuredAt: database.select().from(sessions).where(eq(sessions.id, ids.session)).get()!.startedAt, localDirty: true, localUpdatedAtMs: ms,
     }).run();
-    database.update(sessions).set({ bodyWeightKg: 79.83225712, bodyWeightSource: 'reading',
-      bodyWeightMeasurementId: readingId, bodyWeightMeasuredAt: new Date(ms - 1000), localUpdatedAtMs: ms,
-    }).where(eq(sessions.id, ids.session)).run();
     database.update(exerciseSets).set({ weightUnit: 'lb', externalLoadMode: 'assistance',
       plannedWeightUnit: 'kg', plannedExternalLoadMode: 'added', localUpdatedAtMs: ms,
     }).where(eq(exerciseSets.id, ids.exerciseSet)).run();
@@ -421,8 +419,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
     delete existingCursors['4'];
     delete existingCursors['1'];
     delete existingCursors['3'];
-    database.update(sessions).set({ bodyWeightKg: null, bodyWeightSource: null,
-      bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null, localBodyweightMetadataKnown: false,
+    database.update(sessions).set({
       localDirty: true, localUpdatedAtMs: ms + 100, durationSec: 123,
     }).where(eq(sessions.id, ids.session)).run();
     database.update(exerciseSets).set({ weightUnit: 'kg', externalLoadMode: null,
@@ -435,20 +432,44 @@ describe('sync cycle round-trip against a live endpoint', () => {
     expect(readCursorMap()['4']).toBeDefined();
     for (const layer of ['0', '2']) expect(readCursorMap()[layer]).toEqual(existingCursors[layer]);
     expect(database.select().from(sessions).where(eq(sessions.id, ids.session)).get()).toMatchObject({
-      bodyWeightKg: 79.83225712, durationSec: 123, localBodyweightMetadataKnown: true, localDirty: false,
+      durationSec: 123, localDirty: false,
     });
 
-    // Reinstall restores both the source and its independent session snapshot.
+    // Reinstall restores the independent timeline and session, then derives context.
     wipeLocalStore();
     expect(await runSyncCycle()).toBe('converged');
     expect(database.select().from(bodyWeightMeasurements).where(eq(bodyWeightMeasurements.id, readingId)).get()).toEqual(storedReading);
-    expect(database.select().from(sessions).where(eq(sessions.id, ids.session)).get()).toMatchObject({
-      bodyWeightKg: 79.83225712, bodyWeightSource: 'reading', bodyWeightMeasurementId: readingId,
-      bodyWeightMeasuredAt: new Date(ms - 1000), localDirty: false,
-    });
-    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, ids.exerciseSet)).get()).toMatchObject({
+    const restoredSession = database.select().from(sessions).where(eq(sessions.id, ids.session)).get()!;
+    expect(restoredSession).not.toHaveProperty('bodyWeightKg');
+    const resolve = () => loadAsOfWeightResolver(database)(restoredSession.startedAt);
+    expect(resolve()).toMatchObject({ bodyWeightKg: 79.83225712, bodyWeightSource: 'reading', bodyWeightMeasurementId: readingId });
+    const rawSet = database.select().from(exerciseSets).where(eq(exerciseSets.id, ids.exerciseSet)).get();
+    expect(rawSet).toMatchObject({
       weightUnit: 'lb', externalLoadMode: 'assistance', plannedWeightUnit: 'kg', plannedExternalLoadMode: 'added',
     });
+
+    // A second authenticated device edits and redates the reading. The first
+    // device recalculates on pull while its session/set rows remain identical.
+    const remote = await createAuthedTestClient(config);
+    try {
+      for (const [index, delta, expected] of [[0, 0, 82], [1, 1, null], [2, 0, 82]] as const) {
+        const { error, data } = await remote.client.schema(SYNC_RPC_SCHEMA).rpc('sync_push', { entities: [{
+          type: 'body_weight_measurements', id: readingId, client_updated_at_ms: ms + 200 + index,
+          fields: { weight_value: '82', weight_unit: 'kg', weight_kg: 82,
+            measured_at: restoredSession.startedAt.getTime() + delta,
+            created_at: storedReading!.createdAt.getTime(), updated_at: ms + 200 + index, deleted_at: null },
+        }] }) as { error: unknown; data: { ok: boolean } };
+        expect(error).toBeNull(); expect(data.ok).toBe(true);
+        expect(await runSyncCycle()).toBe('converged');
+        // Redating can expose another earlier fixture reading, so prove that
+        // this reading no longer applies, rather than assuming an empty owner.
+        if (expected === null) expect(resolve().bodyWeightMeasurementId).not.toBe(readingId);
+        else expect(resolve()).toMatchObject({ bodyWeightKg: expected, bodyWeightMeasurementId: readingId });
+        expect(database.select().from(sessions).where(eq(sessions.id, ids.session)).get()).toEqual(restoredSession);
+        expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, ids.exerciseSet)).get()).toEqual(rawSet);
+      }
+    } finally { await remote.teardown(); }
+
   }, 45_000);
 
   it('a no-op re-run with no local edits moves nothing and does not advance the cursors', async () => {

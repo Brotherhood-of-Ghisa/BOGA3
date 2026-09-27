@@ -109,7 +109,7 @@ assert_wire() {
 drain() {
   local out
   out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST -H "Content-Type: application/json" \
+  STATUS="$(curl --silent --show-error -X POST -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
     -H "x-group-eval-secret: ${EVAL_SECRET}" -o "$out" -w "%{http_code}" --data '{}' \
     "${API_URL}/functions/v1/group-eval")"
   BODY="$(cat "$out")"; rm -f "$out"
@@ -128,21 +128,36 @@ metric_board() {
   expect_ok "board $1"; check "board $1 revision" '.contract_version==2 and .state=="ready"'
   assert_wire board
 }
+e_reading() {
+  jq -nc --arg id "$1" --argjson at "$2" --argjson kg "$3" --argjson c "$CUAM" '
+    {type:"body_weight_measurements",id:$id,client_updated_at_ms:$c,
+      fields:{weight_value:($kg|tostring),weight_unit:"kg",weight_kg:$kg,measured_at:$at,
+        created_at:$c,updated_at:$c,deleted_at:null}}'
+}
 performance() {
-  local token="$1" sid="$2" def="$3" b="$4" amount="$5" reps="$6" mode="${7:-added}" unit="${8:-kg}"
+  local token="$1" sid="$2" def="$3" b="$4" amount="$5" reps="$6" mode="${7:-added}" unit="${8:-kg}" at clock_at
   next_cuam
+  # A slow machine may advance past the synthetic sequence between group
+  # joins. New performances must follow the actual membership start too.
+  clock_at="$(now_ms)"
+  START=$((START+1000))
+  if (( START <= clock_at )); then START=$((clock_at+1000)); fi
+  at="$START"
+  # Missing-context sessions precede the owner's timeline. Other sessions have
+  # distinct instants so later readings cannot change the earlier assertions.
+  if [[ "$b" == null ]]; then MISSING_START=$((MISSING_START+1000));at="$MISSING_START"; fi
   push "$token" "performance $sid" \
-    "$(e_session "$sid" "$START" completed "$((START+60000))" 60 null "$CUAM" | jq --argjson b "$b" '.fields += {
-      body_weight_kg:$b,body_weight_source:(if $b==null then null else "manual" end),
-      body_weight_measurement_id:null,body_weight_measured_at:null}')" \
+    "$(e_session "$sid" "$at" completed "$((at+60000))" 60 null "$CUAM")" \
     "$(e_se "$sid-se" "$sid" "$def" 0 'Strict pull-up' "$CUAM")" \
     "$(e_set "$sid-set" "$sid-se" 0 "$amount" "$reps" '' "$CUAM" | jq --arg m "$mode" --arg u "$unit" \
       '.fields += {weight_unit:$u,external_load_mode:$m}')"
+  if [[ "$b" != null ]]; then push "$token" "dated reading $sid" "$(e_reading "$sid-reading" "$at" "$b")"; fi
 }
 set_body_weight() {
+  local at
+  at="$(run_psql "select started_at from app_public.sessions where id='$2';")"
   next_cuam
-  push "$1" 'correct saved session weight' "$(e_session "$2" "$START" completed "$((START+60000))" 60 null "$CUAM" | \
-    jq --argjson b "$3" '.fields += {body_weight_kg:$b,body_weight_source:"manual",body_weight_measurement_id:null,body_weight_measured_at:null}')"
+  push "$1" 'edit dated reading' "$(e_reading "$2-reading" "$at" "$3")"
 }
 certify_metric() {
   local uid="$1" sid="$2" metric="$3" pin revision
@@ -161,6 +176,7 @@ provision OWNER owner
 provision ATHLETE athlete
 provision RIVAL rival
 provision OUTSIDER outsider
+node "$SUPABASE_DIR/tests/bodyweight-as-of-parity.mjs" "$DB_CONTAINER" "$OWNER_UID"
 for pair in OWNER:owner ATHLETE:athlete RIVAL:rival OUTSIDER:outsider; do
   uid_var="${pair%%:*}_UID"
   set_username "${!uid_var}" "bw_${pair##*:}_${RUN_TAG//-/_}"
@@ -221,7 +237,7 @@ for table in group_rule_revisions group_metric_eval_queue group_metric_set_score
   check "$table denied by privilege" '.code=="42501"'
 done
 pass 'new RPC authorization, private projection tables and shared description validation'
-CUAM="$(now_ms)";START=$((CUAM+1000));T="bw-$RUN_TAG";DA="$T-da";DR="$T-dr"
+CUAM="$(now_ms)";START=$((CUAM+1000));MISSING_START=$((START-1000));T="bw-$RUN_TAG";DA="$T-da";DR="$T-dr"
 next_cuam
 push "$ATHLETE_TOKEN" 'athlete definition and link' \
   "$(e_def "$DA" 'Personal coefficient 0.4' "$CUAM" per_side_load | jq '.fields += {
@@ -346,7 +362,7 @@ rpc "$OWNER_TOKEN" group_invite_get "$(jq -nc --arg g "$GID2" '{p_group_id:$g}')
 expect_ok 'second invite';INVITE2="$(jq -er .code <<<"$BODY")"
 rpc "$ATHLETE_TOKEN" group_join "$(jq -nc --arg c "$INVITE2" '{p_code:$c}')";expect_ok 'second join'
 GX2="$(create_comparison "$OWNER_TOKEN" "$GID2" 0.5)"
-START=$(( $(now_ms) + 1000 ))
+START=$(( START + 1000 ))
 next_cuam
 push "$ATHLETE_TOKEN" 'same source linked to second group' "$(e_link "$DA" "$GID2" "$GX2" "$CUAM")"
 performance "$ATHLETE_TOKEN" "$T-two" "$DA" 60 15 5
@@ -358,17 +374,17 @@ rpc "$OWNER_TOKEN" group_metric_board "$(jq -nc --arg g "$GID2" --arg x "$GX2" \
 expect_ok 'second group score';check 'second group c0.5' '.entries[0].effective_resistance_kg==60 and .entries[0].performance.weight_value=="15"'
 pass 'two target groups use independent rules for the same raw source'
 
-# Private owner readings never leak into shared readers or change frozen B.
+# A later private reading never leaks or changes earlier session context.
 next_cuam
-push "$ATHLETE_TOKEN" 'new private reading' "$(jq -nc --arg id "$T-private-reading" --argjson c "$CUAM" \
+push "$ATHLETE_TOKEN" 'new private reading' "$(jq -nc --arg id "$T-private-reading" --argjson c "$CUAM" --argjson at "$((START+86400000))" \
   '{type:"body_weight_measurements",id:$id,client_updated_at_ms:$c,fields:{weight_value:"200",weight_unit:"kg",
-    weight_kg:200,measured_at:$c,created_at:$c,updated_at:$c,deleted_at:null}}')"
+    weight_kg:200,measured_at:$at,created_at:$c,updated_at:$c,deleted_at:null}}')"
 expect_sql 'reading never queues group work' "select count(*) from app_public.group_eval_queue where member_user_id='$ATHLETE_UID';" 0
 expect_sql 'reading never queues metric work' "select count(*) from app_public.group_metric_eval_queue where group_id in ('$GID','$GID2');" 0
 rest GET "$OWNER_TOKEN" body_weight_measurements "owner_user_id=eq.${ATHLETE_UID}&select=id"
 expect_ok 'group member reading privacy';check 'no private reading rows' '.==[]'
 rpc "$OWNER_TOKEN" group_session_detail "$(jq -nc --arg u "$ATHLETE_UID" --arg s "$T-two" '{p_member_user_id:$u,p_session_id:$s}')"
-expect_ok 'shared session context';check 'saved tuple and personal scope' '.session.body_weight_kg==60 and .session.body_weight_source=="manual" and .session.metric_scope=="personal" and .session.metric_revision=="effective_load_v1" and .session.exercises[0].bodyweight_coefficient==0.1'
+expect_ok 'shared session context';check 'saved tuple and personal scope' '.session.body_weight_kg==60 and .session.body_weight_source=="reading" and .session.metric_scope=="personal" and .session.metric_revision=="dated_added_load_v3" and .session.exercises[0].bodyweight_coefficient==0.1'
 check 'no private timeline object' '([..|objects|keys[]|select(.=="body_weight_measurements" or .=="readings")]|length)==0'
 AGENT_TOKEN="$(mint_token "$OWNER_TOKEN" 'm27-agent-client')"
 rpc "$AGENT_TOKEN" group_metric_board "$(jq -nc --arg g "$GID" --arg x "$GX" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"absolute_strength",p_certified:false}')"
@@ -458,22 +474,22 @@ expect_sql 'unarchive retains final event and appends void' "select count(*) fro
 expect_sql 'unarchive is not a rules revision' "select rules_revision from app_public.group_exercises where id='$GX';" 1
 pass 'provisional retraction, completion identity, archived freeze and unarchive reconciliation'
 
-# Assistance never enters the reps board, even at zero; lb conversion and
+# Legacy zero is zero added weight regardless of its obsolete mode; units and
 # malformed provenance remain shared-kernel decisions, not SQL formulas.
 performance "$ATHLETE_TOKEN" "$T-zero-assist" "$DP" 80 0 20 assistance
 performance "$ATHLETE_TOKEN" "$T-lb" "$DP" 80 100 5 added lb
 performance "$ATHLETE_TOKEN" "$T-invalid-b" "$DP" 1000 1000 5 added kg
 run_psql "begin;
   select set_config('request.jwt.claims',json_build_object('sub','$ATHLETE_UID','role','authenticated')::text,true);
-  update app_public.sessions set body_weight_source=null where owner_user_id='$ATHLETE_UID' and id='$T-invalid-b';
+  update app_public.body_weight_measurements set weight_value='bad' where owner_user_id='$ATHLETE_UID' and id='$T-invalid-b-reading';
   commit;" >/dev/null
-drain 'assistance, lb and malformed tuple'
+drain 'legacy zero, lb and malformed tuple'
 metric_board bodyweight_reps
-check 'zero assistance is not unweighted reps' '.entries[0].value==5'
+check 'legacy zero counts as no added weight' '.entries[0].value==20'
 metric_board absolute_strength
 check 'lb normalized with bodyweight once' '.entries[0].set_id==$s and ((.entries[0].effective_resistance_kg-125.359237)|fabs)<0.000001' --arg s "$T-lb-set"
 expect_sql 'invalid B cannot rank as strength' "select count(*) from app_public.group_metric_set_scores where group_exercise_id='$GX' and set_id='$T-invalid-b-set' and metric in ('relative_strength','absolute_strength');" 0
-pass 'actual units, assistance eligibility and invalid-provenance refusal'
+pass 'actual units, legacy added-weight eligibility and invalid-provenance refusal'
 GX="$MAIN_GX"
 
 # Retire a live legacy comparison without silently widening its attestation.
@@ -622,31 +638,29 @@ GX="$PARITY_RETURN_GX"
 pass 'generic conventional carry, link/unlink, certificate roles and final delete/undelete'
 
 
-# Snapshot provenance is part of a strength attestation even when the numeric
-# score is unchanged. Historical estimates remain explicitly visible.
-EST_RETURN_GX="$GX";GX="$(create_comparison "$OWNER_TOKEN" "$GID" 1)";DE="$T-estimate-def"
+# Dated provenance is part of a strength attestation even when the numeric
+# score is unchanged. Moving the reading changes the dependency pin.
+EST_RETURN_GX="$GX";GX="$(create_comparison "$OWNER_TOKEN" "$GID" 1)";EST_GX="$GX";DE="$T-estimate-def"
 next_cuam
 push "$ATHLETE_TOKEN" 'estimated comparison definition' \
   "$(e_def "$DE" 'Estimate provenance' "$CUAM" total_load | jq '.fields += {bodyweight_coefficient:1,movement_standard:"strict_pullup",loading_method:"belt"}')" \
   "$(e_link "$DE" "$GID" "$GX" "$CUAM")"
 # Establish publication before the completed improvement, to exercise records.
-performance "$ATHLETE_TOKEN" "$T-est-base" "$DE" 80 0 5
+performance "$ATHLETE_TOKEN" "$T-est-base" "$DE" 60 0 5
 drain 'estimate baseline'
 performance "$ATHLETE_TOKEN" "$T-est-record" "$DE" 80 20 5
-next_cuam
-push "$ATHLETE_TOKEN" 'explicit estimated provenance' "$(e_session "$T-est-record" "$START" completed "$((START+60000))" 60 null "$CUAM" | jq --arg m "$T-est-reading" --argjson t "$((START+86400000))" '.fields += {body_weight_kg:80,body_weight_source:"historical_estimate",body_weight_measurement_id:$m,body_weight_measured_at:$t}')"
 drain 'estimated strength result'
 metric_board absolute_strength
-check 'estimate is visible in ranked performance' '.entries[0].performance.body_weight_source=="historical_estimate" and .entries[0].performance.body_weight_measurement_id==$m' --arg m "$T-est-reading"
+check 'estimate is visible in ranked performance' '.entries[0].performance.body_weight_source=="reading" and .entries[0].performance.body_weight_measurement_id==$m' --arg m "$T-est-record-reading"
 EST_CERT="$(certify_metric "$ATHLETE_UID" "$T-est-record" absolute_strength)"
 rpc "$OWNER_TOKEN" group_metric_certification_get "$(jq -nc --arg g "$GID" --arg c "$EST_CERT" '{p_group_id:$g,p_certification_id:$c}')"
-expect_ok 'estimated attestation detail';check 'certification retains estimate provenance' '.certification.includes_body_weight and .certification.performance.body_weight_source=="historical_estimate"'
+expect_ok 'estimated attestation detail';check 'certification retains estimate provenance' '.certification.includes_body_weight and .certification.performance.body_weight_source=="reading"'
 drain 'estimated attestation'
 rpc "$OWNER_TOKEN" group_stream_v2 "$(jq -nc --arg g "$GID" '{p_group_id:$g,p_limit:50}')"
 expect_ok 'stream attestation context';assert_wire stream
 check 'stream context preserves score dependencies and live attestation' '
   first(.items[]|select(.metric_event and .kind=="record" and .group_exercise_id==$x and .set_id==$s))|
-  .performance.body_weight_source=="historical_estimate" and .record_context.exercise.rules_revision==1 and
+  .performance.body_weight_source=="reading" and .record_context.exercise.rules_revision==1 and
   (.record_context.former|not) and
   (.record_context.metrics[]|select(.metric=="absolute_strength")|
     .eligible and .effective_resistance_kg==100 and .certification.certification_id==$c and .certification.includes_body_weight)
@@ -654,21 +668,69 @@ check 'stream context preserves score dependencies and live attestation' '
 EST_STREAM_PIN="$(jq -r --arg s "$T-est-record-set" 'first(.items[]|select(.metric_event and .kind=="record" and .set_id==$s))|.boards[]|select(.metric=="absolute_strength")|.fingerprint' <<<"$BODY")"
 
 EST_RECORDS="$(run_psql "select count(*) from app_public.group_events where group_exercise_id='$GX' and kind='record';")"
-set_body_weight "$ATHLETE_TOKEN" "$T-est-record" 80
+next_cuam
+EST_AT="$(run_psql "select started_at-1 from app_public.sessions where id='$T-est-record';")"
+push "$ATHLETE_TOKEN" 'move reading without changing kg' "$(e_reading "$T-est-record-reading" "$EST_AT" 80)"
 drain 'same amount, corrected provenance'
 expect_sql 'provenance correction invalidates strength attestation' "select end_reason from app_public.group_metric_certifications where id='$EST_CERT';" voided
 expect_sql 'equal numeric score is not a new performed record' "select count(*) from app_public.group_events where group_exercise_id='$GX' and kind='record';" "$EST_RECORDS"
 metric_board absolute_strength
-check 'current score retains amount with corrected provenance' '.entries[0].effective_resistance_kg==100 and .entries[0].performance.body_weight_source=="manual" and (.entries[0].certified|not)'
+check 'current score retains amount with corrected provenance' '.entries[0].effective_resistance_kg==100 and .entries[0].performance.body_weight_source=="reading" and (.entries[0].certified|not)'
 GX="$EST_RETURN_GX"
 rpc "$OWNER_TOKEN" group_stream_v2 "$(jq -nc --arg g "$GID" '{p_group_id:$g,p_limit:50}')"
 expect_ok 'corrected stream context';assert_wire stream
 check 'standing event exposes corrected provenance with a fresh pin and no old attestation' '
   first(.items[]|select(.metric_event and .kind=="record" and .set_id==$s))|
-  .performance.body_weight_source=="manual" and
+  .performance.body_weight_source=="reading" and
   (.record_context.metrics[]|select(.metric=="absolute_strength")|.eligible and .fingerprint!=$old and .certification==null)
 ' --arg s "$T-est-record-set" --arg old "$EST_STREAM_PIN"
 pass 'estimated provenance is visible and dependency-specific attestations follow corrections'
+
+# Cross the session boundary and tombstone/restore the source through real sync.
+# Both strength and a reps-only set share the same dated context.
+GX="$EST_GX";DTR="$T-dated-rival-def"
+next_cuam
+push "$RIVAL_TOKEN" 'dated mutation rival definition' \
+  "$(e_def "$DTR" 'Dated rival' "$CUAM" total_load | jq '.fields += {bodyweight_coefficient:1,movement_standard:"strict_pullup",loading_method:"belt"}')" \
+  "$(e_link "$DTR" "$GID" "$GX" "$CUAM")"
+performance "$RIVAL_TOKEN" "$T-dated-rival" "$DTR" 80 18 5
+next_cuam
+push "$ATHLETE_TOKEN" 'reps-only set sharing the dated source' \
+  "$(e_set "$T-est-record-reps-set" "$T-est-record-se" 1 0 6 '' "$CUAM" | jq '.fields += {weight_unit:"kg",external_load_mode:"added"}')"
+drain 'dated mutation candidates'
+DATED_REPS_CERT="$(certify_metric "$ATHLETE_UID" "$T-est-record-reps" bodyweight_reps)"
+DATED_RAW="$(run_psql "select jsonb_agg(to_jsonb(s) order by s.id) from app_public.exercise_sets s where s.session_exercise_id='$T-est-record-se';")"
+DATED_START="$(run_psql "select started_at from app_public.sessions where id='$T-est-record';")"
+for mutation in redate delete; do
+  metric_board absolute_strength
+  check 'dated source puts athlete first' '.entries[0].member.user_id==$u and .entries[0].effective_resistance_kg==100' --arg u "$ATHLETE_UID"
+  DATED_STRENGTH_CERT="$(certify_metric "$ATHLETE_UID" "$T-est-record" absolute_strength)"
+  drain 'dated mutation attestations'
+  DATED_EVENT="$(run_psql "select e.id from app_public.group_events e where e.group_exercise_id='$GX' and e.kind='record' and e.set_id='$T-est-record-set' and not exists(select 1 from app_public.group_events v where v.related_event_id=e.id and v.kind='record_voided') order by e.seq desc limit 1;")"
+  [[ -n "$DATED_EVENT" ]] || fail 'missing live strength record before reading mutation'
+  next_cuam
+  if [[ "$mutation" == redate ]]; then
+    push "$ATHLETE_TOKEN" 'move reading after shared session' "$(e_reading "$T-est-record-reading" "$((DATED_START+1))" 80)"
+  else
+    push "$ATHLETE_TOKEN" 'delete applicable reading' "$(e_reading "$T-est-record-reading" "$EST_AT" 80 | jq --argjson t "$CUAM" '.fields.deleted_at=$t')"
+  fi
+  drain "reading $mutation recalculates shared comparisons"
+  metric_board absolute_strength
+  check 'earlier source reranks athlete below rival' '.entries[0].member.user_id==$r and (.entries[]|select(.member.user_id==$a)|.effective_resistance_kg==80 and .performance.body_weight_kg==60)' --arg r "$RIVAL_UID" --arg a "$ATHLETE_UID"
+  expect_sql "$mutation voids strength certificate" "select end_reason from app_public.group_metric_certifications where id='$DATED_STRENGTH_CERT';" voided
+  expect_sql "$mutation preserves reps certificate" "select ended_at is null from app_public.group_metric_certifications where id='$DATED_REPS_CERT';" t
+  expect_sql "$mutation appends record void" "select count(*) from app_public.group_events where related_event_id='$DATED_EVENT' and kind='record_voided';" 1
+  next_cuam
+  push "$ATHLETE_TOKEN" "restore source after $mutation" "$(e_reading "$T-est-record-reading" "$EST_AT" 80)"
+  drain "reading restoration after $mutation"
+  metric_board absolute_strength
+  check 'restoration restores ranking without reviving strength attestation' '.entries[0].member.user_id==$u and .entries[0].effective_resistance_kg==100 and (.entries[0].certified|not)' --arg u "$ATHLETE_UID"
+  expect_sql 'reading restoration never revives a voided certificate' "select end_reason from app_public.group_metric_certifications where id='$DATED_STRENGTH_CERT';" voided
+  expect_sql 'reps certificate survives restored context' "select ended_at is null from app_public.group_metric_certifications where id='$DATED_REPS_CERT';" t
+  expect_sql 'reading mutation never rewrites raw sets' "select jsonb_agg(to_jsonb(s) order by s.id) from app_public.exercise_sets s where s.session_exercise_id='$T-est-record-se';" "$DATED_RAW"
+done
+GX="$EST_RETURN_GX"
+pass 'reading boundary edits, deletion and restoration rerank, diff events and preserve reps attestations'
 
 # Mixed legacy/generic readers must decode in the app and page without loss.
 rpc "$OWNER_TOKEN" group_exercise_create "$(jq -nc --arg g "$GID" '{p_group_id:$g,p_name:"Still legacy",p_load_input_mode:"total_load",p_source_exercise_id:null}')"

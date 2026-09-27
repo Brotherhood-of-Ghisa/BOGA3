@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
     backgroundColor: uiRoles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.pill,
   },
   chipOn: {
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.ink,
   },
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   label: {
     fontFamily: uiFonts.display.family,

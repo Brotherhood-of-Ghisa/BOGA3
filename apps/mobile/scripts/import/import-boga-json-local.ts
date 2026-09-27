@@ -15,7 +15,7 @@ import {
   type BogaImportWarning,
   type BogaSessionImportPackage,
 } from './boga-import-contract';
-import { BOGA_SESSION_IMPORT_SCHEMA_V2, importedSessionWeight, importedSetMeaning, validateImportedWeightReading, type ImportedWeightReading, type ImportedExerciseRules } from './bodyweight-import-context';
+import { supportsLoadMetadata, importedSetMeaning, validateImportedWeightReading, type ImportedWeightReading, type ImportedExerciseRules } from './bodyweight-import-context';
 import { nowMonotonic } from '../../src/data/clock';
 import * as schema from '../../src/data/schema';
 import {
@@ -461,7 +461,7 @@ export const planBogaLocalImport = (
       generatedExerciseRows.push({
         id: exerciseDefinitionId,
         name: decision.exerciseName,
-        ...(pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2 ? { loadInputMode: decision.loadInputMode, loadRules: decision.loadRules } : {}),
+        ...(supportsLoadMetadata(pkg.schema) ? { loadInputMode: decision.loadInputMode, loadRules: decision.loadRules } : {}),
         createdAt: generatedAt,
         updatedAt: generatedAt,
       });
@@ -595,7 +595,7 @@ export const planBogaLocalImport = (
 
   ensureUnique('generated import row id', generatedIds, errors);
 
-  const readingRows = pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2 && Array.isArray(pkg.bodyWeightMeasurements) ? pkg.bodyWeightMeasurements
+  const readingRows = supportsLoadMetadata(pkg.schema) && Array.isArray(pkg.bodyWeightMeasurements) ? pkg.bodyWeightMeasurements
     .filter(validateImportedWeightReading)
     .map(source => ({ id: generatedBodyWeightMeasurementId(pkg, source.id), source }))
     .filter(row => !database.select({ id: bodyWeightMeasurements.id }).from(bodyWeightMeasurements)
@@ -718,9 +718,6 @@ export const importBogaSessionPackageToLocalDb = (
         .values({
           id: row.id,
           gymId: row.source.gymId,
-          ...importedSessionWeight(pkg.schema, row.source),
-          ...(pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2 && row.source.bodyWeightMeasurementId
-            ? { bodyWeightMeasurementId: generatedBodyWeightMeasurementId(pkg, row.source.bodyWeightMeasurementId) } : {}),
           status: 'completed',
           startedAt: row.startedAt,
           completedAt: row.completedAt,

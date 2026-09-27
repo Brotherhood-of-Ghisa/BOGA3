@@ -1,8 +1,10 @@
 import { parseSetWeight } from '../../src/exercise-calculations';
-import { isWeightUnit, weightToKg, type ExternalLoadMode, type WeightUnit } from '../../src/exercise-calculations/effective-load';
+import { isWeightUnit, weightToKg, type WeightUnit } from '../../src/exercise-calculations/effective-load';
 import { validateExerciseLoadRules, type ExerciseLoadRules } from '../../src/exercise-core/load-rules';
 import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
 
+export const BOGA_SESSION_IMPORT_SCHEMA_V3 = 'boga.session-import.v3' as const;
+export const supportsLoadMetadata = (schema: unknown) => schema === BOGA_SESSION_IMPORT_SCHEMA_V2 || schema === BOGA_SESSION_IMPORT_SCHEMA_V3;
 export const BOGA_SESSION_IMPORT_SCHEMA_V2 = 'boga.session-import.v2' as const;
 export type ImportedSessionWeight = {
   bodyWeightKg: number | null;
@@ -12,10 +14,10 @@ export type ImportedSessionWeight = {
 };
 export type ImportedSetMeaning = {
   weightUnit: WeightUnit;
-  externalLoadMode: ExternalLoadMode | null;
+  externalLoadMode: 'added' | 'assistance' | 'unquantified_assistance' | null;
   plannedWeightValue: string | null;
   plannedWeightUnit: WeightUnit | null;
-  plannedExternalLoadMode: ExternalLoadMode | null;
+  plannedExternalLoadMode: 'added' | 'assistance' | 'unquantified_assistance' | null;
   plannedRepsValue: string | null;
   plannedSetType: SessionSetTypeValue;
   performanceStatus: 'planned' | 'unperformed' | null;
@@ -34,15 +36,6 @@ const date = (value: unknown): value is string => typeof value === 'string' &&
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && Number.isFinite(new Date(value).getTime()) &&
   new Date(value).toISOString() === (value.includes('.') ? value : value.replace('Z', '.000Z'));
 const mode = (value: unknown) => value === null || value === 'added' || value === 'assistance' || value === 'unquantified_assistance';
-
-/** Strict v2 metadata validation; v1 callers never infer these fields. */
-export const validateImportedSessionWeight = (value: Record<string, unknown>): boolean => {
-  const { bodyWeightKg: kg, bodyWeightSource: source, bodyWeightMeasurementId: id, bodyWeightMeasuredAt: at } = value;
-  if (kg === null) return source === null && id === null && at === null;
-  if (typeof kg !== 'number' || !Number.isFinite(kg) || kg <= 0) return false;
-  if (source === 'manual') return id === null && at === null;
-  return (source === 'reading' || source === 'historical_estimate') && typeof id === 'string' && id.trim() !== '' && date(at);
-};
 
 export const validateImportedSetMeaning = (value: Record<string, unknown>): boolean => {
   if (!isWeightUnit(value.weightUnit) || !mode(value.externalLoadMode)) return false;
@@ -73,17 +66,10 @@ export const validateImportedExerciseRules = (value: Record<string, unknown>): b
     movementStandard: value.loadRules.movementStandard, loadingMethod: value.loadRules.loadingMethod }).ok;
 };
 
-export const importedSessionWeight = (schema: string, value: Partial<ImportedSessionWeight>) =>
-  schema === BOGA_SESSION_IMPORT_SCHEMA_V2 ? {
-    bodyWeightKg: value.bodyWeightKg!, bodyWeightSource: value.bodyWeightSource!,
-    bodyWeightMeasurementId: value.bodyWeightMeasurementId!,
-    bodyWeightMeasuredAt: value.bodyWeightMeasuredAt ? new Date(value.bodyWeightMeasuredAt) : null,
-  } : {};
-
 export const importedSetMeaning = (schema: string, value: Partial<ImportedSetMeaning>) =>
-  schema === BOGA_SESSION_IMPORT_SCHEMA_V2 ? {
-    weightUnit: value.weightUnit!, externalLoadMode: value.externalLoadMode!,
+  supportsLoadMetadata(schema) ? {
+    weightUnit: value.weightUnit!, externalLoadMode: 'added',
     plannedWeightValue: value.plannedWeightValue!, plannedWeightUnit: value.plannedWeightUnit!,
-    plannedExternalLoadMode: value.plannedExternalLoadMode!, plannedRepsValue: value.plannedRepsValue!,
+    plannedExternalLoadMode: value.plannedWeightValue !== null || value.plannedRepsValue !== null ? 'added' : null, plannedRepsValue: value.plannedRepsValue!,
     plannedSetType: value.plannedSetType!, performanceStatus: value.performanceStatus!,
   } : {};

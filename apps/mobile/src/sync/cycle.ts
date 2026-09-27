@@ -1,3 +1,4 @@
+import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 // Client sync cycle: converges local SQLite state with the server by issuing
 // PULL -> PUSH -> PULL until both ends are quiet for one full round.
 //
@@ -106,7 +107,7 @@ interface ErrorEnvelope {
 // Error classification
 // -----------------------------------------------------------------------------
 
-export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
+export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
@@ -131,7 +132,7 @@ export class SyncCycleError extends Error {
  * classified into one of these values so the gate, scheduler, background task,
  * and status surfaces derive their view from the same result.
  */
-export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'update-required' | 'internal';
 
 /**
  * Maps a server response into a sync error code, or null when the response is a
@@ -153,6 +154,7 @@ export const classifyRpcResult = (
 ): SyncErrorCode | null => {
   if (rpcError) {
     const message = rpcError.message ?? '';
+    if (message.includes('UPDATE_REQUIRED')) return 'UPDATE_REQUIRED';
     if (message.includes('AUTH_REQUIRED')) {
       return 'AUTH_REQUIRED';
     }
@@ -164,6 +166,7 @@ export const classifyRpcResult = (
 
   const envelope = (data ?? null) as ErrorEnvelope | null;
   const code = envelope?.error?.code;
+  if (code === 'UPDATE_REQUIRED') return 'UPDATE_REQUIRED';
   if (code === 'AUTH_REQUIRED') {
     return 'AUTH_REQUIRED';
   }
@@ -531,10 +534,6 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('started_at', 'startedAt'),
     TS('completed_at', 'completedAt'),
     SC('duration_sec', 'durationSec'),
-    SC('body_weight_kg', 'bodyWeightKg'),
-    SC('body_weight_source', 'bodyWeightSource'),
-    SC('body_weight_measurement_id', 'bodyWeightMeasurementId'),
-    TS('body_weight_measured_at', 'bodyWeightMeasuredAt'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -620,7 +619,6 @@ const ENTITY_ORDER: EntityTableName[] = TOPO_LAYERS.flatMap(
 // and replays their layers once. Unknown defaults must never reach the server:
 // an old app may already have pulled past another device's richer metadata.
 const BODYWEIGHT_WIRE_KEYS: Partial<Record<EntityTableName, readonly string[]>> = {
-  sessions: ['body_weight_kg', 'body_weight_source', 'body_weight_measurement_id', 'body_weight_measured_at'],
   exercise_definitions: ['bodyweight_coefficient', 'movement_standard', 'loading_method'],
   exercise_sets: ['weight_unit', 'external_load_mode', 'planned_weight_unit', 'planned_external_load_mode'],
 };
@@ -1012,6 +1010,13 @@ const runPullLeg = async (
         throw error;
       }
 
+      // Notify after this page commits, even if a later pull/push fails.
+      if (pageChanged > 0) {
+        invalidateExerciseCatalogCache();
+        if (page.entities.some(entity => entity.type === 'body_weight_measurements' || entity.type === 'sessions')) {
+          invalidateBodyWeightContext();
+        }
+      }
       receivedTotal += page.entities.length;
       changedTotal += pageChanged;
       // Progress reflects rows the server delivered (received), matching what a
@@ -1234,22 +1239,6 @@ export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
       const pushed = await runPushLeg(database);
       const pulledAfter = await runPullLeg(database);
 
-      // A pull leg that applied rows changed the local read model the running app
-      // shows — an exercise/muscle-group renamed, added, or tombstoned on the
-      // server and pulled down here. The in-memory exercise-catalog cache mirrors
-      // those tables and is not touched by the SQLite write, so without this it
-      // keeps serving a stale snapshot until an unrelated local write, a screen
-      // refocus, or an app restart. The first-sign-in bootstrapper already
-      // invalidates after its pull (see bootstrapper.ts); this extends the same
-      // guarantee to every steady-state cycle. Keyed on pull motion only: a push
-      // merely clears dirty bits (invisible to readers) and an empty/no-op pull
-      // changes nothing locally, so neither needs an invalidation. The catalog
-      // cache is the only in-memory read model; rebuilding it is cheap, so a
-      // coarse "any pulled change" trigger is acceptable.
-      if (pulledBefore.changed > 0 || pulledAfter.changed > 0) {
-        invalidateExerciseCatalogCache();
-      }
-
       if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {
         return markConverged();
       }
@@ -1285,6 +1274,11 @@ const markConverged = (): SyncCycleOutcome => {
  * in-progress with nothing to lift it.
  */
 const classifyThrow = (error: unknown): SyncCycleOutcome => {
+  if (error instanceof SyncCycleError && error.code === 'UPDATE_REQUIRED') {
+    markCycleError('UPDATE_REQUIRED');
+    logCycleOutcome('update-required', 'UPDATE_REQUIRED', error);
+    return 'update-required';
+  }
   if (error instanceof SyncCycleError && error.code === 'AUTH_REQUIRED') {
     // The server reports no signed-in user. This is not an error to surface — it
     // is the route signal that the app needs a session. Raise the observable flag

@@ -32,8 +32,8 @@ beforeEach(() => {
   db.insert(exerciseMuscleMappings).values({ id: 'map', exerciseDefinitionId: 'pull', muscleGroupId: 'back', role: 'primary', weight: 1 }).run();
   for (const [id, date, amount] of [['old', '2026-09-19T12:00:00Z', '0'], ['new', '2026-09-20T12:00:00Z', '20']]) {
     const startedAt = new Date(date);
-    db.insert(sessions).values({ id, status: 'completed', startedAt, completedAt: new Date(startedAt.getTime() + 3600000),
-      bodyWeightKg: 80, bodyWeightSource: 'manual' }).run();
+    db.insert(sessions).values({ id, status: 'completed', startedAt, completedAt: new Date(startedAt.getTime() + 3600000) }).run();
+    db.insert(bodyWeightMeasurements).values({ id: `${id}-reading`, weightValue: '80', weightKg: 80, weightUnit: 'kg', measuredAt: startedAt }).run();
     db.insert(sessionExercises).values({ id: `${id}-ex`, sessionId: id, exerciseDefinitionId: 'pull', name: 'Pull-up', orderIndex: 0 }).run();
     db.insert(exerciseSets).values({ id: `${id}-set`, sessionExerciseId: `${id}-ex`, orderIndex: 0,
       weightValue: amount, repsValue: '8', weightUnit: 'kg', externalLoadMode: 'added', setType: 'rir_1', performanceStatus: null }).run();
@@ -67,7 +67,7 @@ it('reads the complete saved context across DB adapters and refreshes it after e
   const db = mockFixture.database;
   db.insert(bodyWeightMeasurements).values({ id: 'today', weightValue: '100', weightUnit: 'kg', weightKg: 100, measuredAt: end }).run();
   expect((await read()).daily[0].totalVolume).toBe(800);
-  db.update(sessions).set({ bodyWeightKg: 82 }).where(eq(sessions.id, 'new')).run();
+  db.update(bodyWeightMeasurements).set({ weightKg: 82, weightValue: '82' }).where(eq(bodyWeightMeasurements.id, 'new-reading')).run();
   expect((await read()).daily[0].totalVolume).toBe(816);
   db.update(exerciseDefinitions).set({ bodyweightCoefficient: 0.7 }).where(eq(exerciseDefinitions.id, 'pull')).run();
   const changed = await read();
@@ -76,22 +76,21 @@ it('reads the complete saved context across DB adapters and refreshes it after e
   expect(changed.muscle[0].totalWeight).toBeCloseTo(309.6);
 });
 
-it('preserves lb assistance through reads instead of treating the raw amount as added kg', async () => {
+it('uses legacy numeric loads as added weight while preserving their lb unit', async () => {
   mockFixture.database.update(exerciseSets).set({ weightUnit: 'lb', externalLoadMode: 'assistance' }).where(eq(exerciseSets.id, 'new-set')).run();
   const value = await read();
-  expect(value.history.sessions[0].totalVolume).toBeCloseTo(567.4252208, 8);
-  expect(value.blocks.blocks[0].totalVolume).toBeCloseTo(567.4252208, 8);
-  expect(value.daily[0].totalVolume).toBeCloseTo(567.4252208, 8);
-  expect(value.muscle[0].totalWeight).toBeCloseTo(283.7126104, 8);
-  expect(value.insights.personalRecords).toEqual([]);
-  expect(value.view.cards[0].rows[0].weightReps).toBe('BW − 20.0 lb × 8');
+  expect(value.history.sessions[0].totalVolume).toBeCloseTo(712.5747792, 8);
+  expect(value.blocks.blocks[0].totalVolume).toBeCloseTo(712.5747792, 8);
+  expect(value.daily[0].totalVolume).toBeCloseTo(712.5747792, 8);
+  expect(value.muscle[0].totalWeight).toBeCloseTo(356.2873896, 8);
+  expect(value.insights.personalRecords).toHaveLength(1);
+  expect(value.insights.personalRecords[0].estimatedOneRepMax).toBeCloseTo(33.7192915768, 8);
+  expect(value.view.cards[0].rows[0].weightReps).toBe('BW + 20.0 lb × 8');
 });
 
-it.each(['definition', 'session', 'set'] as const)('retains counts but withholds placeholder %s load metadata', async entity => {
+it.each(['definition'] as const)('retains counts but withholds placeholder %s load metadata', async entity => {
   const db = mockFixture.database;
   if (entity === 'definition') db.update(exerciseDefinitions).set({ localBodyweightMetadataKnown: false }).run();
-  if (entity === 'session') db.update(sessions).set({ localBodyweightMetadataKnown: false }).where(eq(sessions.id, 'new')).run();
-  if (entity === 'set') db.update(exerciseSets).set({ localBodyweightMetadataKnown: false }).where(eq(exerciseSets.id, 'new-set')).run();
   const value = await read();
   expect(value.history.sessions[0]).toMatchObject({ totalVolume: null, workingSetCount: 1 });
   expect(value.blocks.blocks[0].totalVolume).toBeNull();
@@ -104,12 +103,9 @@ it.each(['definition', 'session', 'set'] as const)('retains counts but withholds
 });
 
 
-it.each([
-  { bodyWeightSource: 'reading', bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null },
-  { bodyWeightSource: 'manual', bodyWeightMeasurementId: 'unexpected-source', bodyWeightMeasuredAt: null },
-  { bodyWeightSource: null, bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null },
-])('withholds a numeric B with malformed stored provenance across every reader', async badProvenance => {
-  mockFixture.database.update(sessions).set(badProvenance).where(eq(sessions.id, 'new')).run();
+it.each([{ weightKg: 900 }, { weightValue: 'NaN' }, { weightUnit: 'stone' }])(
+  'withholds a malformed latest reading across every reader without falling back', async badReading => {
+  mockFixture.database.update(bodyWeightMeasurements).set(badReading).where(eq(bodyWeightMeasurements.id, 'new-reading')).run();
   const value = await read();
   expect(value.history.sessions[0]).toMatchObject({ totalVolume: null, workingSetCount: 1, loadContext: { bodyWeightKg: null } });
   expect(value.blocks.blocks[0].totalVolume).toBeNull();
@@ -124,7 +120,7 @@ it.each([
 });
 
 
-it('keeps gym-scoped history and records on the same frozen bodyweight context after corrections', async () => {
+it('keeps gym-scoped history and records on the same dated bodyweight context after corrections', async () => {
   const db = mockFixture.database;
   db.insert(gyms).values([{ id: 'home', name: 'Home' }, { id: 'club', name: 'Club' }]).run();
   db.update(sessions).set({ gymId: 'home' }).where(eq(sessions.id, 'old')).run();
@@ -142,7 +138,7 @@ it('keeps gym-scoped history and records on the same frozen bodyweight context a
     records: { oneRepMax: { bodyWeightKg: 80, effectiveResistanceKg: 80, gymName: 'Home' }, volume: { value: 640 } },
   } }));
 
-  db.update(sessions).set({ bodyWeightKg: 90 }).where(eq(sessions.id, 'old')).run();
+  db.update(bodyWeightMeasurements).set({ weightKg: 90, weightValue: '90' }).where(eq(bodyWeightMeasurements.id, 'old-reading')).run();
   hook.rerender({ scope: 'current-gym', revision: 1 });
   await waitFor(() => expect(hook.result.current).toMatchObject({ status: 'ready', summary: {
     records: { oneRepMax: { bodyWeightKg: 90, effectiveResistanceKg: 90, gymName: 'Home' }, volume: { value: 720 } },

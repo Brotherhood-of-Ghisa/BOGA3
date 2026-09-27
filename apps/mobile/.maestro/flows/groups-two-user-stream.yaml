@@ -426,6 +426,22 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-06-completed-edited-card"
 
 # --- 7. The friend's view: exercises and performed sets, no owner actions -------
+# The native back arrow returns to the stream on every visit, not just the first:
+# react-native-screens 4.16 on iOS 26 left it dead from the second visit on.
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          id: "^group-stream-session-card-${output.groupsCardKey}$"
+      - extendedWaitUntil:
+          visible:
+            id: "group-session-header"
+          timeout: 15000
+      - tapOn: "Back"
+      - extendedWaitUntil:
+          visible:
+            id: "groups-stream-list"
+          timeout: 10000
 - tapOn:
     id: "^group-stream-session-card-${output.groupsCardKey}$"
 - extendedWaitUntil:
@@ -475,6 +491,20 @@ appId: com.dinoderek.mobile
 - assertVisible: "No certified sets yet · 1 uncertified"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-07b-1-podiums"
+# Back from a board returns to the podiums on every visit (see step 7).
+- repeat:
+    times: 2
+    commands:
+      - tapOn: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
+      - scrollUntilVisible:
+          element: { id: "group-board-see-all-button" }
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
+      - tapOn: "Back"
+      - extendedWaitUntil:
+          visible: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
+          timeout: 10000
 - tapOn: { id: "group-podium-card-${output.groupsBoardExerciseId}" }
 - scrollUntilVisible:
     element: { id: "group-board-see-all-button" }
@@ -848,11 +878,11 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-m27-02-absolute-reversal"
 - tapOn: { id: "group-board-row-1" }
 - assertVisible: { id: "group-metric-record-raw", text: "As logged: Added 20 kg × 5" }
-- assertVisible: { id: "group-metric-record-weight", text: "Session body weight: 90 kg · Estimated from .*" }
+- assertVisible: { id: "group-metric-record-weight", text: "Session body weight: 90 kg · Reading from .*" }
 - assertVisible: "Effective resistance: 110 kg"
 - assertVisible: "External adjustment: 20 kg · 22\\.22% of session body weight"
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-03-estimated-inputs"
+- takeScreenshot: "groups-m27-03-dated-inputs"
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
@@ -862,7 +892,7 @@ appId: com.dinoderek.mobile
     visible: { id: "group-metric-record-status", text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
     timeout: 15000
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-04-estimated-certified"
+- takeScreenshot: "groups-m27-04-dated-certified"
 - tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 - runScript:
@@ -873,7 +903,7 @@ appId: com.dinoderek.mobile
     visible: { id: "group-board-row-1", text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Reps, 15 reps, .*" }
     timeout: 15000
 - tapOn: { id: "group-board-row-1" }
-- assertVisible: "Session body weight: No usable weight saved for this session"
+- assertVisible: "Session body weight: No reading on or before this session"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-m27-05-missing-weight-reps"
 - tapOn: { point: "50%,8%" }
@@ -959,7 +989,7 @@ appId: com.dinoderek.mobile
     visible: { id: "group-board-row-1" }
     timeout: 15000
 - tapOn: { id: "group-board-row-1" }
-- assertVisible: "Session body weight: 95 kg · Set manually for this session"
+- assertVisible: { id: "group-metric-record-weight", text: "Session body weight: 95 kg · Reading from .*" }
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN

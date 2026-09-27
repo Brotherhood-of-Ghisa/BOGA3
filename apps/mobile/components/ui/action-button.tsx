@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     backgroundColor: uiRoles.accent,
   },
   primaryDisabled: {
-    backgroundColor: uiRoles.disabled,
+    backgroundColor: uiRoles.inkGhost,
   },
   primaryPressed: {
     opacity: 0.85,
@@ -96,11 +96,11 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.danger,
   },
   outlineDisabled: {
-    borderColor: uiRoles.disabled,
+    borderColor: uiRoles.inkGhost,
   },
   // Depth is a ground change, never an elevation.
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
     opacity: 0.7,
   },
   label: {
@@ -119,6 +119,6 @@ const styles = StyleSheet.create({
     color: uiRoles.danger,
   },
   labelDisabled: {
-    color: uiRoles.disabled,
+    color: uiRoles.inkGhost,
   },
 });

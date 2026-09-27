@@ -108,7 +108,7 @@ export function ExerciseCoreFields({
             </Text>
           ) : null}
           <Text allowFontScaling={false} style={styles.helperText}>
-            0% uses external weight only. A bodyweight exercise uses this share of the weight saved on each session, plus added weight or minus assistance.
+            0% uses external weight only. A bodyweight exercise uses this share of your dated body weight, plus added weight.
           </Text>
           {(Number(loadRules.value.percentage) > 0 || loadRules.value.movementStandard || loadRules.value.loadingMethod) ? (
             <>

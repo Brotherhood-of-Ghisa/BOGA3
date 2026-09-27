@@ -1,7 +1,6 @@
 import type { CurrentGroupStreamItem as StreamItem } from '@/src/groups/metric-wire';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
-import { useIsFocused } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -120,7 +119,7 @@ export function TodayScreen({
   const [planLaunchError, setPlanLaunchError] = useState<string | null>(null);
   const [isStartingPlan, setIsStartingPlan] = useState(false);
   const planLaunchInFlightRef = useRef(false);
-  const { sessions, isLoadingSessions, loadErrorMessage, reloadSessions } = useSessionListData({
+  const { sessions, isLoadingSessions, loadErrorMessage, loadedAtMs, reloadSessions } = useSessionListData({
     dataClient,
     initialSessions,
     showDeletedSessions: false,
@@ -185,6 +184,7 @@ export function TodayScreen({
                 <Text allowFontScaling={false} style={styles.cardTitle}>Active session</Text>
               </View>
               <SessionSummaryLine
+                nowMs={loadedAtMs}
                 session={activeSession}
                 testIdPrefix={`today-active-session-${activeSession.id}`}
               />

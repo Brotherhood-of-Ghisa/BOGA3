@@ -19,7 +19,7 @@ type PersonalRecordCardProps = {
  */
 export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCardProps) {
   const oneRepMax = formatOneRepMaxFigure(personalRecord.estimatedOneRepMax);
-  const metricLabel = personalRecord.bodyWeightKg != null ? 'Total 1RM' : '1RM';
+  const metricLabel = personalRecord.bodyWeightKg != null ? 'Added 1RM' : '1RM';
   const set = `${personalRecord.loadLabel ?? formatWeightFigure(personalRecord.weight)} × ${personalRecord.reps}`;
 
   return (

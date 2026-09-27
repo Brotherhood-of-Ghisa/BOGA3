@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     borderTopColor: uiRoles.ruleSoft,
   },
   rowPressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   rowHeader: {
     flexDirection: 'row',
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   context: {
     paddingTop: uiSpace.sm,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleFaint,
+    borderTopColor: uiRoles.ruleSoft,
     fontFamily: uiFonts.figure.family,
     fontWeight: '500',
     fontSize: uiTypography.size.sm,

@@ -71,6 +71,7 @@ export const getSupabaseMobileClient = () => {
   }
 
   supabaseClient = createClient(config.url, config.anonKey, {
+    global: { headers: { 'x-boga-sync-protocol': '2' } },
     auth: {
       storage: getAuthStorageAdapter(),
       // Pin the session storage key to the deployment flavor instead of letting

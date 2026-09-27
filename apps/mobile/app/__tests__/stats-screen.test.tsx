@@ -1921,7 +1921,7 @@ it('keeps partial volume readable in the exercise table and names total bodyweig
   }] })} />);
   expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');
   expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
-  expect(screen.getByText('Total 1RM · kg')).toBeTruthy();
+  expect(screen.getByText('Added 1RM · kg')).toBeTruthy();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
     .toBe('Open Pull-up heatmap. 2 sets, 2 working sets. Volume 800 · incomplete. Estimated total one rep max 128 kg');
 });

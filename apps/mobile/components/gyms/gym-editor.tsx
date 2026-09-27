@@ -219,7 +219,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
       <Text allowFontScaling={false} style={styles.microLabel}>Location</Text>
       <View style={styles.status}>
-        <Icon color={hasLocation ? uiRoles.ink : uiRoles.disabled} name="location" size="sm" />
+        <Icon color={hasLocation ? uiRoles.ink : uiRoles.inkGhost} name="location" size="sm" />
         <Text allowFontScaling={false} style={styles.statusText} testID="gym-editor-location-status">
           {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
         </Text>

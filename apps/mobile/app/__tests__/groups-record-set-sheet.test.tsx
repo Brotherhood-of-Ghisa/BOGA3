@@ -170,10 +170,20 @@ const accentGrounds = (root: TestNode): string[] =>
     .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent)
     .map((node: TestNode) => String(node.props.testID));
 
+/** Drain the screen's reads inside act. Every RPC and cache read here resolves in
+ * microtasks, so act's drain covers the whole My groups → stream list mount →
+ * stream read chain, however long it takes. The file's first stream mount loads
+ * the list/header module graph (seconds on a cold transform cache), which a
+ * findBy would race against its 1 s wall clock. A read that never settles
+ * leaves the card missing and the next getBy fails loud. */
+const settleReads = () => act(async () => {});
+
 const openGroupStream = async () => {
   mockParams = { groupId: GROUP_ID };
   render(<GroupsTabRoute />);
-  return screen.findByTestId(RECORD_CARD);
+  await settleReads();
+  expect(api.getGroupStream).toHaveBeenCalledTimes(1);
+  return screen.getByTestId(RECORD_CARD);
 };
 
 describe('stream items (E3, D15, P16)', () => {

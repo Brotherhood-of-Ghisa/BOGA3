@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   pillName: {
     fontFamily: uiFonts.display.family,

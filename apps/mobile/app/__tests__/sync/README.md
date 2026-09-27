@@ -57,8 +57,8 @@
   the breadth lane (LWW, multi-device, drift) — it bypasses the UI, NetInfo, and
   the scheduler wiring, so a green run there is not evidence for those layers.
   The device flow also saves two weight readings and two completed sessions,
-  syncs, wipes local state and signs in again: both restored snapshots must keep
-  their original 80/82 kg values and reading provenance. It checks the private
+  syncs, wipes local state and signs in again: both restored sessions must resolve
+  their applicable 80/82 kg readings and provenance. It checks the private
   reading history through the real screen after bootstrap.
 - Current frontend baseline suites for this policy (Sync v2) include the
   `apps/mobile/app/__tests__/sync-cycle-*.test.ts` family

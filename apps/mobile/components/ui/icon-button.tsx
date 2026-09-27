@@ -59,7 +59,7 @@ export function IconButton({
       ]}
       testID={testID}>
       <Icon
-        color={disabled && tone !== 'accent' ? uiRoles.disabled : GLYPH_COLOR[tone]}
+        color={disabled && tone !== 'accent' ? uiRoles.inkGhost : GLYPH_COLOR[tone]}
         name={name}
         size={size}
       />
@@ -79,14 +79,14 @@ const styles = StyleSheet.create({
     backgroundColor: uiRoles.accent,
   },
   accentDisabled: {
-    backgroundColor: uiRoles.disabled,
+    backgroundColor: uiRoles.inkGhost,
   },
   accentPressed: {
     opacity: 0.85,
   },
   // Depth is a ground change, never an elevation.
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
     opacity: 0.7,
   },
 });

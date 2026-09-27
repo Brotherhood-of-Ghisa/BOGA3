@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { unlinkExercise } from '@/src/data/exercise-group-links';
@@ -23,8 +23,11 @@ export function useExerciseUnlink({ offline, reloadLinks, onNotice }: {
   const pendingRef = useRef(false);
   const confirmingRef = useRef(false);
   const mounted = useMountedRef();
+  // Read after the unlink resolves: the success message reflects connectivity then.
   const offlineRef = useRef(offline);
-  offlineRef.current = offline;
+  useEffect(() => {
+    offlineRef.current = offline;
+  }, [offline]);
 
   const confirmUnlink = (target: ExerciseUnlinkTarget, onClose?: () => void) => {
     if (pendingRef.current || confirmingRef.current || !mounted.current) return;

@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
@@ -33,6 +34,7 @@ export const useExerciseRecords = (
     status: 'loading',
   });
 
+  const datedWeightRevision = useBodyWeightContextRevision();
   const filterScope = gymFilter?.scope ?? 'all';
   const filterGymId = gymFilter?.currentGymId ?? null;
 
@@ -60,7 +62,7 @@ export const useExerciseRecords = (
     };
   // The explicit revision invalidates history after a saved-weight or load review.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [excludeSessionId, exerciseDefinitionId, filterGymId, filterScope, load, refreshKey]));
+  }, [excludeSessionId, exerciseDefinitionId, filterGymId, filterScope, load, refreshKey, datedWeightRevision]));
 
   return state;
 };

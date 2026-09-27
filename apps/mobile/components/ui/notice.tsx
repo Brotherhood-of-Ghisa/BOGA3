@@ -24,7 +24,7 @@ export type NoticeProps = {
   testID?: string;
 };
 
-// A band that states something about the screen: `surface-subtle` on a `rule`
+// A band that states something about the screen: `paper` on a `rule`
 // hairline at the card radius, an optional leading glyph and the words.
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const danger = tone === 'danger';
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.card,

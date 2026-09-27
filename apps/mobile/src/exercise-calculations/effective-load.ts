@@ -8,7 +8,7 @@ import {
 } from '../session-recorder/set-semantics.ts';
 
 export type WeightUnit = 'kg' | 'lb';
-export type ExternalLoadMode = 'added' | 'assistance' | 'unquantified_assistance';
+export type ExternalLoadMode = 'added';
 export type ResistanceBasis = 'entered_load' | 'total_resistance';
 export type OneRepConvention = 'exact_inverse' | 'capacity';
 
@@ -24,23 +24,18 @@ export type EffectiveLoadInput = LoadContext & {
   weightValue: string | null | undefined;
   /** Absent unit is the existing kg-only schema, never a guessed import unit. */
   weightUnit?: string | null;
-  /** Null/absent legacy mode is unresolved when the coefficient is positive. */
+  /** Deprecated storage metadata, ignored: every numeric load means added weight. */
   externalLoadMode?: string | null;
 };
 
-export type MissingLoadReason =
-  | 'body_weight_missing'
-  | 'legacy_interpretation'
-  | 'unquantified_assistance';
+export type MissingLoadReason = 'body_weight_missing';
 export type InvalidLoadReason =
   | 'amount_invalid'
   | 'unit_invalid'
   | 'coefficient_invalid'
   | 'load_input_mode_invalid'
-  | 'external_load_mode_invalid'
-  | 'assistance_requires_bodyweight'
   | 'body_weight_invalid'
-  | 'negative_resistance'
+  | 'target_below_bodyweight'
   | 'numeric_overflow';
 
 export type UnavailableLoad =
@@ -51,7 +46,7 @@ export type KnownLoad = {
   status: 'known';
   resistanceBasis: ResistanceBasis;
   enteredWeightKg: number;
-  /** Signed, in total external-load space. B is never scaled by this factor. */
+  /** Added weight in total external-load space. B is never scaled by this factor. */
   totalExternalAdjustmentKg: number;
   bodyContributionKg: number;
   resistanceKg: number;
@@ -98,16 +93,11 @@ export const resolveEffectiveLoad = (input: EffectiveLoadInput): EffectiveLoad =
   const enteredWeightKg = weightToKg(amount, unit);
   if (enteredWeightKg === null) return invalid('numeric_overflow');
   const c = input.bodyweightCoefficient;
-  const mode = input.externalLoadMode ?? (c === 0 ? 'added' : null);
-  if (mode === null) return missing('legacy_interpretation');
-  if (mode === 'unquantified_assistance') return missing('unquantified_assistance');
-  if (mode !== 'added' && mode !== 'assistance') return invalid('external_load_mode_invalid');
-  if (mode === 'assistance' && c === 0) return invalid('assistance_requires_bodyweight');
   if (c > 0 && input.bodyWeightKg == null) return missing('body_weight_missing');
   if (c > 0 && !positiveFinite(input.bodyWeightKg)) return invalid('body_weight_invalid');
 
   const externalFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
-  const totalExternalAdjustmentKg = enteredWeightKg * externalFactor * (mode === 'assistance' ? -1 : 1);
+  const totalExternalAdjustmentKg = enteredWeightKg * externalFactor;
   const bodyContributionKg = c === 0 ? 0 : c * (input.bodyWeightKg as number);
   const resistanceKg = c === 0 ? enteredWeightKg : bodyContributionKg + totalExternalAdjustmentKg;
   const muscleResistancePerSideKg = c > 0
@@ -116,7 +106,6 @@ export const resolveEffectiveLoad = (input: EffectiveLoadInput): EffectiveLoad =
   if (![totalExternalAdjustmentKg, bodyContributionKg, resistanceKg, muscleResistancePerSideKg].every(Number.isFinite)) {
     return invalid('numeric_overflow');
   }
-  if (resistanceKg < 0) return invalid('negative_resistance');
   return {
     status: 'known',
     resistanceBasis: c === 0 ? 'entered_load' : 'total_resistance',
@@ -136,7 +125,9 @@ export type EffectiveSetInput = EffectiveLoadInput & {
 
 type SetMetricValues = {
   volumeKgReps: number | null;
+  /** Estimated added weight for bodyweight exercises, in the entered distribution. */
   estimatedOneRepMaxKg: number | null;
+  estimatedTotalOneRepMaxKg: number | null;
   relativeEstimatedOneRepMax: number | null;
 };
 
@@ -146,7 +137,7 @@ export type EffectiveSetMetrics = SetMetricValues & (
 );
 
 const unavailableMetrics: SetMetricValues = {
-  volumeKgReps: null, estimatedOneRepMaxKg: null, relativeEstimatedOneRepMax: null,
+  volumeKgReps: null, estimatedOneRepMaxKg: null, estimatedTotalOneRepMaxKg: null, relativeEstimatedOneRepMax: null,
 };
 
 /** Actual performed values only. Warm-ups count; RIR does not alter the math. */
@@ -161,16 +152,21 @@ export const calculateEffectiveSetMetrics = (input: EffectiveSetInput): Effectiv
   const load = resolveEffectiveLoad({ ...input, weightValue: weight });
   if (load.status !== 'known') return { eligible: true, reps, load, ...unavailableMetrics };
   const volumeKgReps = load.resistanceKg * reps;
-  const estimatedOneRepMaxKg = estimateOneRepMax(load.resistanceKg, reps);
-  const relativeEstimatedOneRepMax = estimatedOneRepMaxKg !== null && positiveFinite(input.bodyWeightKg)
-    ? estimatedOneRepMaxKg / input.bodyWeightKg
+  const estimatedTotalOneRepMaxKg = estimateOneRepMax(load.resistanceKg, reps);
+  const externalFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
+  const estimatedOneRepMaxKg = estimatedTotalOneRepMaxKg === null ? null
+    : input.bodyweightCoefficient > 0
+      ? (estimatedTotalOneRepMaxKg - load.bodyContributionKg) / externalFactor
+      : estimatedTotalOneRepMaxKg;
+  const relativeEstimatedOneRepMax = estimatedTotalOneRepMaxKg !== null && positiveFinite(input.bodyWeightKg)
+    ? (estimatedTotalOneRepMaxKg - load.bodyContributionKg) / input.bodyWeightKg
     : null;
-  if (![volumeKgReps, estimatedOneRepMaxKg, relativeEstimatedOneRepMax].every(
+  if (![volumeKgReps, estimatedOneRepMaxKg, estimatedTotalOneRepMaxKg, relativeEstimatedOneRepMax].every(
     value => value === null || Number.isFinite(value)
   )) {
     return { eligible: true, reps, load: invalid('numeric_overflow'), ...unavailableMetrics };
   }
-  return { eligible: true, reps, load, volumeKgReps, estimatedOneRepMaxKg, relativeEstimatedOneRepMax };
+  return { eligible: true, reps, load, volumeKgReps, estimatedOneRepMaxKg, estimatedTotalOneRepMaxKg, relativeEstimatedOneRepMax };
 };
 
 export type VolumeCoverage = {
@@ -215,8 +211,6 @@ export const summarizeEffectiveVolume = (sets: readonly EffectiveSetMetrics[]): 
 /** B is deliberately not an eligibility dependency for the unweighted reps board. */
 export const isBodyweightRepsEligible = (input: EffectiveSetInput, compatibleMovement: boolean): boolean => {
   if (!compatibleMovement || validateContext(input) || input.bodyweightCoefficient <= 0) return false;
-  // Explicit assistance is never an unassisted performance, even at zero.
-  if (input.externalLoadMode !== 'added') return false;
   if (!isWeightUnit(input.weightUnit === undefined ? 'kg' : input.weightUnit)) return false;
   const weight = canonicalizeWeightForReps(input.weightValue ?? '', input.repsValue ?? '');
   return parseSetWeight(weight) === 0 && parseSetReps(input.repsValue) !== null &&
@@ -237,7 +231,7 @@ export type ExternalLoadProjection = UnavailableLoad | {
   targetBodyWeightKg: number | null;
   predictedResistanceKg: number;
   totalExternalAdjustmentKg: number;
-  externalLoadMode: 'added' | 'assistance';
+  externalLoadMode: 'added';
   enteredAmount: number;
   weightUnit: WeightUnit;
 };
@@ -272,19 +266,20 @@ export const estimateExternalLoad = (input: LoadContext & {
     ? predictedResistanceKg * externalFactor
     : predictedResistanceKg - c * (input.bodyWeightKg as number);
   // Forward/inverse floating-point cancellation must not turn a bodyweight-only
-  // round-trip into microscopic assistance. This is machine-precision cleanup,
-  // not display or plate rounding; meaningful positive/negative loads survive.
+  // round-trip into a microscopic negative result. This is machine-precision cleanup,
+  // not display or plate rounding.
   const cancellationTolerance = 2 * Number.EPSILON * Math.max(predictedResistanceKg, c * (input.bodyWeightKg ?? 0));
   const totalExternalAdjustmentKg = c > 0 && Math.abs(rawExternalAdjustmentKg) <= cancellationTolerance
     ? 0 : rawExternalAdjustmentKg;
-  const enteredAmount = Math.abs(totalExternalAdjustmentKg) / externalFactor /
+  if (totalExternalAdjustmentKg < 0) return invalid('target_below_bodyweight');
+  const enteredAmount = totalExternalAdjustmentKg / externalFactor /
     (input.weightUnit === 'lb' ? KG_PER_LB : 1);
   if (![totalExternalAdjustmentKg, enteredAmount].every(Number.isFinite)) return invalid('numeric_overflow');
   return {
     status: 'known', oneRepConvention: input.oneRepConvention, targetReps: input.targetReps,
     targetBodyWeightKg: c > 0 ? input.bodyWeightKg as number : null,
     predictedResistanceKg, totalExternalAdjustmentKg,
-    externalLoadMode: totalExternalAdjustmentKg < 0 ? 'assistance' : 'added',
+    externalLoadMode: 'added',
     enteredAmount, weightUnit: input.weightUnit,
   };
 };

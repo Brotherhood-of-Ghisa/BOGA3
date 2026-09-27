@@ -48,6 +48,8 @@ cleanup() {
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.sessions
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
+        delete from app_public.body_weight_measurements
+          where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.exercise_definitions
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.gyms
@@ -121,11 +123,15 @@ else
         ('${USER_UUID}'::uuid,'${EXERCISE_ID}','${EXERCISE_QUERY}','total_load',1,
          ${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.sessions
-        (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,body_weight_kg,body_weight_source,
+        (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,
          created_at,updated_at,client_updated_at_ms)
       values
         ('${USER_UUID}'::uuid,'${SESSION_ID}','${GYM_ID}','completed',
-         $((NOW_MS - 900000)),$((NOW_MS - 600000)),300,80,'manual',${NOW_MS},${NOW_MS},${NOW_MS});
+         $((NOW_MS - 900000)),$((NOW_MS - 600000)),300,${NOW_MS},${NOW_MS},${NOW_MS});
+      insert into app_public.body_weight_measurements
+        (owner_user_id,id,weight_value,weight_unit,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
+      values ('${USER_UUID}'::uuid,'${SESSION_ID}-reading','80','kg',80,
+        $((NOW_MS - 900000)),${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.session_exercises
         (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
          created_at,updated_at,client_updated_at_ms)

@@ -67,7 +67,7 @@ http_request() {
   fi
 
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL-2}" -H "Content-Type: application/json" --data "${body}")
   fi
 
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"

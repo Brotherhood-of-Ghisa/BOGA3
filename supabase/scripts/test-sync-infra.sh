@@ -29,6 +29,10 @@ load_supabase_status_env
 export SYNC_TEST_SUPABASE_URL="${API_URL}"
 export SYNC_TEST_SUPABASE_ANON_KEY="${ANON_KEY}"
 
+# test:sync:infra sets EXPO_PUBLIC_USE_RN_FETCH=1: under Jest, `expo/fetch` (the
+# app's runtime fetch since SDK 56) runs over jest-expo's stubbed native module and
+# returns empty bodies, so these live-endpoint suites use React Native's fetch. The
+# device lanes (ios-sync-e2e) exercise `expo/fetch` against the same stack.
 echo "[test-sync-infra] running apps/mobile test:sync:infra against ${API_URL}"
 (cd "${REPO_ROOT}/apps/mobile" && npm run test:sync:infra)
 

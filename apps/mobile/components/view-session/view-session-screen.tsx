@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.card,

@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
 import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
@@ -42,11 +42,14 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const [selected, setSelected] = useState<GroupMetricBoardRowWire | null>(null);
   // Expo may reuse this route for another deep link. Its requested view must
   // replace the last local selection, including a page caught during rebuild.
-  useEffect(() => {
+  const requestKey = JSON.stringify([exerciseId, initialMetric, initialScope]);
+  const [shownRequestKey, setShownRequestKey] = useState(requestKey);
+  if (shownRequestKey !== requestKey) {
+    setShownRequestKey(requestKey);
     setPickedMetric(isGroupMetric(initialMetric) ? initialMetric : null);
     setScope(initialScope);
     setSelected(null);
-  }, [exerciseId, initialMetric, initialScope]);
+  }
   const selectView = (nextMetric: GroupMetric, nextScope: GroupBoardScope) => {
     setSelected(null);
     setPickedMetric(nextMetric);
@@ -76,7 +79,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
       value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
       onChange={value => selectView(metric, value)} testIDPrefix="group-board-scope" />
-    {metric === 'bodyweight_reps' ? <Text allowFontScaling={false} style={textStyles.muted}>Confirmed unweighted reps with no assistance. Body weight may be missing.</Text>
+    {metric === 'bodyweight_reps' ? <Text allowFontScaling={false} style={textStyles.muted}>Confirmed reps with zero added weight. Body weight may be missing.</Text>
       : <Text allowFontScaling={false} style={textStyles.muted}>{exercise.bodyweight_coefficient > 0
         ? 'Strength estimates use the saved session body weight. Missing or incompatible performances are not ranked.'
         : 'Weight and 1RM use the entered external load under the group’s declared weight convention.'}</Text>}

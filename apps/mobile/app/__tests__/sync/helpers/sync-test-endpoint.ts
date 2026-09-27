@@ -124,6 +124,12 @@ export interface AuthedTestClient {
 export const createAuthedTestClient = async (
   config: SyncTestEndpointConfig,
 ): Promise<AuthedTestClient> => {
+  if (process.env.EXPO_PUBLIC_USE_RN_FETCH !== '1') {
+    throw new Error(
+      'live-endpoint sync suites need EXPO_PUBLIC_USE_RN_FETCH=1 (set by `npm run test:sync:infra`): ' +
+        "jest-expo's expo/fetch stub returns empty bodies",
+    );
+  }
   const createClient = loadCreateClient();
 
   const authClient = createClient(config.url, config.anonKey, { auth: NO_TIMER_AUTH });
@@ -138,7 +144,7 @@ export const createAuthedTestClient = async (
 
   const client = createClient(config.url, config.anonKey, {
     auth: NO_TIMER_AUTH,
-    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    global: { headers: { 'x-boga-sync-protocol': '2', Authorization: `Bearer ${jwt}` } },
   });
 
   return {

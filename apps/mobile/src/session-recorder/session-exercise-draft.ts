@@ -65,7 +65,7 @@ export const loadSessionExerciseDraft = async (
   return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, bodyWeight: {
     bodyWeightKg: session.bodyWeightKg, bodyWeightSource: session.bodyWeightSource,
     bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
-    localBodyweightMetadataKnown: session.localBodyweightMetadataKnown,
+
   } } : { status: 'missing-exercise' };
 };
 

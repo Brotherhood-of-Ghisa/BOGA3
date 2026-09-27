@@ -113,12 +113,9 @@ fi
 boga_docker_ready \
   || fail "Docker did not answer within ${BOGA_DOCKER_TIMEOUT_SECONDS:-10}s; lease kept so the stack stays findable (docs/specs/12 failure hypothesis 8)"
 
-if [[ -n "$TARGET_PATH" && -f "$TARGET_PATH/supabase/.temp/health-functions-serve.pid" ]]; then
-  serve_pid="$(cat "$TARGET_PATH/supabase/.temp/health-functions-serve.pid" 2>/dev/null || true)"
-  if [[ -n "$serve_pid" ]] && kill -0 "$serve_pid" 2>/dev/null; then
-    kill "$serve_pid" 2>/dev/null || true
-    echo "[worktree-release] stopped functions serve (pid $serve_pid)"
-  fi
+if [[ -n "$TARGET_PATH" && -d "$TARGET_PATH" ]]; then
+  boga_functions_serve_stop "$TARGET_PATH" "[worktree-release]" \
+    || fail "functions serve for $TARGET_PATH would not stop; lease kept"
 fi
 
 label="label=com.supabase.cli.project=$TARGET_PROJECT_ID"

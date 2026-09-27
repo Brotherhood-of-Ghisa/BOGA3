@@ -202,7 +202,7 @@ any internal safety cap explicit.
 ## Effective-load response evolution
 
 Exercise-context and workout responses carry `metric_revision:
-"effective_load_v1"`. Routes, arguments, authorization, envelopes and existing
+"dated_added_load_v3"`. Routes, arguments, authorization, envelopes and existing
 field names stay at API v1. Added fields are additive; callers must tolerate
 unknown fields and nullable unavailable metrics. Existing conventional kg
 performances keep their numeric meaning. The existing set `load` remains the
@@ -211,8 +211,9 @@ normalized **external amount** in kg, never effective bodyweight resistance.
 Exercise search/context includes `bodyweight_coefficient`, `movement_standard`,
 `loading_method` and `resistance_basis`. Workout exercises include the same
 `load_rules`, or null when their source definition is unavailable. Calculations
-use current personal rules and each session's frozen weight tuple. The API does
-not read measurement history or substitute today's weight.
+use current personal rules and the owner's latest nondeleted reading at/before
+each session start, resolved by the service-only `session_weight_contexts` RPC.
+The selected context is returned; the private timeline is never exposed.
 
 Each performance and workout includes `session_body_weight`:
 
@@ -221,17 +222,18 @@ Each performance and workout includes `session_body_weight`:
   "status": "known",
   "value": 80,
   "unit": "kg",
-  "source": "historical_estimate",
+  "source": "reading",
   "measurement_id": "reading-id",
   "measured_at": "2026-07-25T08:00:00.000Z",
-  "estimated": true
+  "estimated": false
 }
 ```
 
-Sources are `manual`, `reading`, or `historical_estimate`. Missing and malformed
-tuples have `status: "missing"` or `"invalid"` and null value. A manual tuple
-has no source reading ID/date. Estimated provenance describes a saved historical
-fallback; it is not proof of a measurement on the workout date.
+Source is `reading` or null. Missing and malformed applicable context has
+`status: "missing"` or `"invalid"` and null value. The deprecated `estimated`
+field remains false; future-reading fallback and session-only overrides no
+longer exist. Reading value/date/delete/restore changes affect subsequent API
+reads. Invalid latest readings do not fall back to older valid readings.
 
 Performed sets retain raw and effective values separately:
 
@@ -243,20 +245,23 @@ Performed sets retain raw and effective values separately:
     "status": "known", "reason": null, "value": 100,
     "unit": "kg", "basis": "total_resistance"
   },
-  "estimated_one_rep_max": { "value": 127.67141908045373, "unit": "kg", "basis": "total_resistance" },
+  "estimated_one_rep_max": { "value": 47.67141908045373, "unit": "kg", "basis": "added_load" },
   "volume": { "value": 800, "unit": "kg_reps" }
 }
 ```
 
-Raw mode is `added`, `assistance`, `unquantified_assistance`, or null for legacy
-interpretation. Unknown/invalid effective loads retain their raw values and
+Every numeric raw weight means added weight; `entered_load.mode` is `added`.
+Old null/assistance tags are retained only as storage compatibility, never a
+calculation choice. Unknown/invalid effective loads retain raw values and
 performed reps, with null dependent metrics and a resolver `reason`. Blank
-entered amount plus valid performed reps follows the app's canonical-zero rule;
-`raw_value` still preserves the blank. Planned/skipped/unperformed rows do not
-contribute. The existing `estimated_one_rep_max` fields use total resistance
-for positive coefficients, identified by `basis`; conventional per-side
-exercise metrics retain entered-load semantics. `top_weight` remains a Top
-added external-load record, normalized to kg; assistance never wins it.
+entered amount plus valid performed reps is zero; `raw_value` preserves the
+blank. Planned/skipped/unperformed rows do not contribute.
+
+Bodyweight `estimated_one_rep_max` applies Wathan to total resistance, then
+subtracts the body contribution and divides by the external per-side factor.
+Its `basis` is `added_load`; conventional RM keeps `entered_load`. Effective
+load and volume still use total resistance. `top_weight` is entered added weight,
+normalized to kg.
 
 Performance volumes, workout totals, per-exercise workout volumes and
 `volume_series` values include coverage:

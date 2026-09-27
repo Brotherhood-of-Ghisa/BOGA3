@@ -18,16 +18,13 @@ export const exerciseLoadContext = (
 
 export type AnalyticsSetInput = Omit<EffectiveSetInput, keyof LoadContext> & { localBodyweightMetadataKnown?: boolean };
 
-/** Local upgrade placeholders are not a source of load units or interpretation. */
+/** Stored amounts use their recorded units and always mean added weight. */
 export function calculateAnalyticsSetMetrics(input: EffectiveSetInput & { localBodyweightMetadataKnown?: boolean }) {
-  return calculateEffectiveSetMetrics(input.localBodyweightMetadataKnown === false
-    ? { ...input, bodyweightCoefficient: NaN } : input);
+  return calculateEffectiveSetMetrics(input);
 }
 
-/** Top external weight remains an added-load record, never an assistance record. */
+/** Every entered numeric weight is an added-load record candidate. */
 export function enteredAddedWeightKg(set: AnalyticsSetInput, context: LoadContext): number | null {
-  if (set.localBodyweightMetadataKnown === false) return null;
-  if (set.externalLoadMode !== 'added' && !(context.bodyweightCoefficient === 0 && set.externalLoadMode == null)) return null;
   const unit = set.weightUnit === undefined ? 'kg' : set.weightUnit;
   const value = parseSetWeight(canonicalizeWeightForReps(set.weightValue ?? '', set.repsValue ?? ''));
   return value === null || !isWeightUnit(unit) ? null : weightToKg(value, unit);
@@ -70,9 +67,8 @@ export function formatEnteredLoad(
   weightUnit?: string | null, formatWeight: (weight: number) => string = value => value.toFixed(1),
 ): string {
   const bodyweight = context.bodyweightCoefficient > 0;
-  if (externalLoadMode === 'unquantified_assistance') return 'Unquantified assistance';
   const body = context.bodyweightCoefficient === 1 ? 'BW' : `${Number((100 * context.bodyweightCoefficient).toFixed(3))}% BW`;
-  const prefix = !bodyweight ? '' : externalLoadMode === 'added' ? `${body} + ` : externalLoadMode === 'assistance' ? `${body} − ` : 'Original ';
+  const prefix = bodyweight ? `${body} + ` : '';
   const unit = bodyweight || weightUnit === 'lb' ? ` ${weightUnit ?? 'kg'}` : '';
   const side = bodyweight && context.loadInputMode === 'per_side_load' ? '/side' : '';
   return `${prefix}${weight === null ? '—' : formatWeight(weight)}${unit}${side}`;

@@ -1,5 +1,4 @@
 import Database from 'better-sqlite3';
-import { eq } from 'drizzle-orm';
 
 import { generatedMigrationBundle } from '@/drizzle/migrations.generated';
 import { __resetClockForTests, type Transaction } from '@/src/data/clock';
@@ -74,13 +73,10 @@ const seedGraph = async () => {
       }],
     }],
   });
-  db.update(sessions).set({ bodyWeightKg: 80, bodyWeightSource: 'reading',
-    bodyWeightMeasurementId: 'reading', bodyWeightMeasuredAt: new Date(1000),
-  }).where(eq(sessions.id, saved.sessionId)).run();
   return { repository, sessionId: saved.sessionId };
 };
 
-it('retains snapshot and actual/planned metadata through legacy autosave, complete and reopen', async () => {
+it('derives context and retains actual/planned metadata through legacy autosave, complete and reopen', async () => {
   const { repository, sessionId } = await seedGraph();
   // Older callers omit the new keys while editing an unrelated field.
   await repository.persistDraftSnapshot({ sessionId, gymId: null, startedAt: new Date(2000), exercises: [{
@@ -99,17 +95,18 @@ it('retains snapshot and actual/planned metadata through legacy autosave, comple
   });
 });
 
-it('never refreshes a saved snapshot after its source is changed, tombstoned or physically deleted', async () => {
+it('re-resolves edited, tombstoned and hard-deleted readings without persisting session context', async () => {
   const { repository, sessionId } = await seedGraph();
   const db = mockFixture.database;
-  for (const change of [{ weightKg: 90 }, { deletedAt: new Date(3000) }]) {
-    db.update(bodyWeightMeasurements).set(change).where(eq(bodyWeightMeasurements.id, 'reading')).run();
-    expect((await repository.loadSessionSnapshotById(sessionId))?.bodyWeightKg).toBe(80);
-  }
-  db.delete(bodyWeightMeasurements).where(eq(bodyWeightMeasurements.id, 'reading')).run();
-  expect(await repository.loadSessionSnapshotById(sessionId)).toMatchObject({
-    bodyWeightKg: 80, bodyWeightMeasurementId: 'reading', bodyWeightMeasuredAt: new Date(1000),
-  });
+  const before = db.select().from(sessions).get();
+  db.update(bodyWeightMeasurements).set({ weightKg: 90, weightValue: '90' }).run();
+  expect((await repository.loadSessionSnapshotById(sessionId))?.bodyWeightKg).toBe(90);
+  db.update(bodyWeightMeasurements).set({ deletedAt: new Date(3000) }).run();
+  expect((await repository.loadSessionSnapshotById(sessionId))?.bodyWeightKg).toBeNull();
+  db.delete(bodyWeightMeasurements).run();
+  expect((await repository.loadSessionSnapshotById(sessionId))?.bodyWeightKg).toBeNull();
+  expect(db.select().from(sessions).get()).toEqual(before);
+  expect(entityToWire(before!, 'sessions').fields).not.toHaveProperty('body_weight_kg');
 });
 
 it('copies source actual units and mode into a plan without copying the old session weight', async () => {
@@ -187,4 +184,32 @@ it('restores a reading through sync, keeps newer local changes, and applies tomb
   wire.fields.bodyweight_coefficient = 0.7;
   expect(apply()).toBe(0);
   expect(db.select().from(exerciseDefinitions).get()?.bodyweightCoefficient).toBe(1);
+});
+
+it('removes populated session tuples in a forward migration while preserving readings, raw sets and row clocks', () => {
+  const client = new Database(':memory:');
+  const apply = (idx: number) => {
+    const sql = (generatedMigrationBundle.migrations as Record<string, string>)[`m${String(idx).padStart(4, '0')}`];
+    for (const statement of sql.split('--> statement-breakpoint')) if (statement.trim()) client.exec(statement);
+  };
+  try {
+    for (let i = 0; i < 9; i++) apply(i);
+    client.exec(`INSERT INTO sessions (id,status,started_at,body_weight_kg,body_weight_source,local_dirty,local_updated_at_ms)
+      VALUES ('manual','completed',2000,90,'manual',1,123),('reading','active',2000,80,'reading',0,456);
+      INSERT INTO body_weight_measurements (id,weight_value,weight_unit,weight_kg,measured_at)
+      VALUES ('r','80','kg',80,1000);
+      INSERT INTO session_exercises (id,session_id,name,order_index) VALUES ('ex','manual','Pull',0);
+      INSERT INTO exercise_sets (id,session_exercise_id,order_index,weight_value,reps_value)
+      VALUES ('set','ex',0,'20','8');`);
+    const readings = client.prepare('SELECT * FROM body_weight_measurements').all();
+    const sets = client.prepare('SELECT * FROM exercise_sets').all();
+    apply(9);
+    expect(client.prepare('SELECT * FROM body_weight_measurements').all()).toEqual(readings);
+    expect(client.prepare('SELECT * FROM exercise_sets').all()).toEqual(sets);
+    expect(client.prepare('SELECT id,local_dirty,local_updated_at_ms FROM sessions ORDER BY id').all()).toEqual([
+      { id: 'manual', local_dirty: 1, local_updated_at_ms: 123 }, { id: 'reading', local_dirty: 0, local_updated_at_ms: 456 },
+    ]);
+    expect((client.prepare('PRAGMA table_info(sessions)').all() as { name: string }[])
+      .filter(column => column.name.includes('body_weight') || column.name.includes('bodyweight'))).toEqual([]);
+  } finally { client.close(); }
 });

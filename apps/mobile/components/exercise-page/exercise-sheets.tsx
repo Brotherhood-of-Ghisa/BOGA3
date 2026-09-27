@@ -51,7 +51,6 @@ type ExerciseOptionsSheetProps = {
   // Signed in only: opens the Link screen for this exercise (product E0.3).
   onLink?: () => void;
   onRemove: () => void;
-  onReview?: () => void;
   onDismiss: () => void;
 };
 
@@ -65,7 +64,6 @@ export function ExerciseOptionsSheet({
   onSwap,
   onLink,
   onRemove,
-  onReview,
   onDismiss,
 }: ExerciseOptionsSheetProps) {
   return (
@@ -81,8 +79,6 @@ export function ExerciseOptionsSheet({
         onPress={onEdit}
         testID="exercise-options-edit"
       />
-      {onReview ? <ListRow label="Review original loads" onPress={onReview}
-        testID="exercise-options-review-loads" /> : null}
       <ListRow
         label="Swap exercise"
         leading={<Icon color={uiRoles.ink} name="swap" />}

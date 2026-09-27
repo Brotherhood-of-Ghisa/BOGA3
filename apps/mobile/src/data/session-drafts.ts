@@ -1,10 +1,12 @@
+import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { exerciseLoadContext } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
-import { captureSessionWeight } from './bodyweight';
+import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
+import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
@@ -17,10 +19,8 @@ import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
 
-// Optional at the repository boundary for older callers; hydrated rows always
-// include these fields. A source id is provenance, never a live relationship.
+// Read-time context only. Never persisted or sent with a session write.
 export type SessionBodyWeightSnapshot = {
-  localBodyweightMetadataKnown?: boolean;
   bodyWeightKg?: number | null;
   bodyWeightSource?: string | null;
   bodyWeightMeasurementId?: string | null;
@@ -315,7 +315,7 @@ const assertCompletedSessionTiming = (startedAt: Date, completedAt: Date) => {
   }
 };
 
-const mapSessionRow = (row: typeof sessions.$inferSelect): SessionPersistenceRecord => {
+const mapSessionRow = (row: typeof sessions.$inferSelect & ResolvedSessionWeight): SessionPersistenceRecord => {
   const startedAt = toDate(row.startedAt);
   const createdAt = toDate(row.createdAt);
   const updatedAt = toDate(row.updatedAt);
@@ -327,7 +327,6 @@ const mapSessionRow = (row: typeof sessions.$inferSelect): SessionPersistenceRec
   return {
     id: row.id,
     gymId: row.gymId,
-    localBodyweightMetadataKnown: row.localBodyweightMetadataKnown,
     bodyWeightKg: row.bodyWeightKg,
     bodyWeightSource: row.bodyWeightSource,
     bodyWeightMeasurementId: row.bodyWeightMeasurementId,
@@ -345,7 +344,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect): SessionPersistenceRec
 const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
   sessionId: graph.session.id,
   gymId: graph.session.gymId,
-  localBodyweightMetadataKnown: graph.session.localBodyweightMetadataKnown,
+
   bodyWeightKg: graph.session.bodyWeightKg ?? null,
   bodyWeightSource: graph.session.bodyWeightSource ?? null,
   bodyWeightMeasurementId: graph.session.bodyWeightMeasurementId ?? null,
@@ -384,7 +383,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
 const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot => ({
   sessionId: graph.session.id,
   gymId: graph.session.gymId,
-  localBodyweightMetadataKnown: graph.session.localBodyweightMetadataKnown,
+
   bodyWeightKg: graph.session.bodyWeightKg ?? null,
   bodyWeightSource: graph.session.bodyWeightSource ?? null,
   bodyWeightMeasurementId: graph.session.bodyWeightMeasurementId ?? null,
@@ -429,6 +428,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
     return null;
   }
 
+  const weight = loadAsOfWeightResolver(database)(sessionRow.startedAt);
   const exerciseRows = database
     .select()
     .from(sessionExercises)
@@ -490,7 +490,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
   }, new Map<string, StoredDraftSetRecord[]>());
 
   return {
-    session: mapSessionRow(sessionRow),
+    session: mapSessionRow({ ...sessionRow, ...weight }),
     exercises: exerciseRows.map((exercise) => {
       if (!exercise.exerciseDefinitionId) {
         throw new Error(`Session exercise ${exercise.id} is missing exerciseDefinitionId`);
@@ -503,7 +503,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
-        loadContext: exerciseLoadContext(definitionById.get(exercise.exerciseDefinitionId), sessionRow),
+        loadContext: exerciseLoadContext(definitionById.get(exercise.exerciseDefinitionId), weight),
         sets: setsByExerciseId.get(exercise.id) ?? [],
       };
     }),
@@ -872,6 +872,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     const database = await bootstrapLocalDataLayer();
     const sessionId = input.sessionId?.trim() || createLocalEntityId('session');
 
+    let startChanged = false;
     database.transaction((tx) => {
       // One monotonic last-write-wins timestamp for every row written in this
       // draft-save transaction — the `sessions` row plus the whole
@@ -882,6 +883,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       const localUpdatedAtMs = nowMonotonic(tx);
 
       const existingSession = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+      startChanged = !!existingSession && existingSession.startedAt.getTime() !== input.startedAt.getTime();
       if (existingSession?.status === 'completed') {
         throw new Error(`Cannot modify completed session ${sessionId}`);
       }
@@ -890,7 +892,6 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
         tx.insert(sessions)
           .values({
             id: sessionId,
-            ...captureSessionWeight(tx, input.startedAt),
             gymId: input.gymId,
             status: input.status,
             startedAt: input.startedAt,
@@ -930,12 +931,14 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     // dirtied in the transaction above; one nudge per save asks the scheduler to
     // push the batch soon.
     notifyLocalWrite();
+    if (startChanged) invalidateBodyWeightContext();
 
     return { sessionId };
   },
   async saveCompletedSessionGraph(input) {
     const database = await bootstrapLocalDataLayer();
 
+    let startChanged = false;
     database.transaction((tx) => {
       // Single monotonic last-write-wins timestamp for the completed-session
       // row and the whole exercise/set/tag graph rebuilt below, stamped inside
@@ -943,6 +946,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       const localUpdatedAtMs = nowMonotonic(tx);
 
       const existingSession = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
+      startChanged = !!existingSession && existingSession.startedAt.getTime() !== input.startedAt.getTime();
       if (!existingSession) {
         throw new Error(`Session ${input.sessionId} does not exist`);
       }
@@ -975,6 +979,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     // Post-commit: the completed-session row and its exercise/set/tag graph were
     // dirtied in the transaction above; one nudge per save pushes the batch soon.
     notifyLocalWrite();
+    if (startChanged) invalidateBodyWeightContext();
 
     return { sessionId: input.sessionId };
   },
@@ -1000,7 +1005,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   async loadSessionById(sessionId) {
     const database = await bootstrapLocalDataLayer();
     const row = database.select().from(sessions).where(eq(sessions.id, sessionId)).get();
-    return row ? mapSessionRow(row) : null;
+    return row ? mapSessionRow({ ...row, ...loadAsOfWeightResolver(database)(row.startedAt) }) : null;
   },
   async completeSession(input) {
     const database = await bootstrapLocalDataLayer();
@@ -1067,7 +1072,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     const database = await bootstrapLocalDataLayer();
     const rows = database.select().from(sessions).where(eq(sessions.status, 'completed')).all();
     const nonDeletedRows = rows.filter((row) => row.deletedAt === null);
-    return nonDeletedRows.map(mapSessionRow);
+    return resolveSessionWeights(database, nonDeletedRows).map(mapSessionRow);
   },
 });
 
@@ -1417,7 +1422,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       .map((session) => ({
         sessionId: session.id,
         gymId: session.gymId,
-        localBodyweightMetadataKnown: session.localBodyweightMetadataKnown,
+
         bodyWeightKg: session.bodyWeightKg ?? null,
         bodyWeightSource: session.bodyWeightSource ?? null,
         bodyWeightMeasurementId: session.bodyWeightMeasurementId ?? null,

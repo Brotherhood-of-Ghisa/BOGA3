@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
@@ -57,6 +58,7 @@ const loadViewedSession = async (sessionId: string | null) => {
  */
 export function useSessionView(sessionId: string | null) {
   const [state, setState] = useState<SessionViewState>({ status: 'loading' });
+  const datedWeightRevision = useBodyWeightContextRevision();
   const generationRef = useRef(0);
 
   const reload = useCallback(async () => {
@@ -81,7 +83,7 @@ export function useSessionView(sessionId: string | null) {
         bodyWeightSource: snapshot.bodyWeightSource,
         bodyWeightMeasurementId: snapshot.bodyWeightMeasurementId,
         bodyWeightMeasuredAt: snapshot.bodyWeightMeasuredAt,
-        localBodyweightMetadataKnown: snapshot.localBodyweightMetadataKnown,
+
         status: snapshot.status,
         gymId: snapshot.gymId,
         gymName: gym?.name ?? null,
@@ -141,7 +143,8 @@ export function useSessionView(sessionId: string | null) {
         // A read still in flight when the screen blurs must not land later.
         generationRef.current += 1;
       };
-    }, [reload])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
+    }, [reload, datedWeightRevision])
   );
 
   return { state, reload };

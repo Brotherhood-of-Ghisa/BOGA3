@@ -119,7 +119,7 @@ drain() {
   local out
   out="$(mktemp)"
   STATUS="$(curl --silent --show-error -X POST \
-    -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
     -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
   BODY="$(cat "${out}")"
   rm -f "${out}"
@@ -658,7 +658,7 @@ echo "[${LANE_LABEL}] R10 — a rules_version bump recomputes silently"
 run_psql "update app_public.group_board_entries set value_kg = 1
            where group_exercise_id = '${GX1}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" >/dev/null
 mark
-expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(3, 1000) >= 1;" "t"
+expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(4, 1000) >= 1;" "t"
 drain "R10 rules"
 expect_entry "${GX1}" A weight "105@r1c1" "R10 the recompute corrects entries"
 expect_sql "R10 the recompute writes no event in the group" \
@@ -902,7 +902,7 @@ rest GET "${ATHLETE_TOKEN}" exercise_sets "select=weight_value&id=eq.${T}-r1b1"
 expect_ok "read back under the apply fault"
 check "sync_push committed under the apply fault" '.[0].weight_value == "91"'
 out="$(mktemp)"
-STATUS="$(curl --silent -X POST -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+STATUS="$(curl --silent -X POST -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
   -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
 BODY="$(cat "${out}")"; rm -f "${out}"
 expect_ok "drain under the apply fault"
