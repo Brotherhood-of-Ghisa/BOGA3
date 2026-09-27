@@ -41,25 +41,20 @@ HEALTH_URL="$(health_url)"
 
 stop_functions_serve_if_running
 
-echo "[supabase] starting local edge function server"
+serve_args=(functions serve --no-verify-jwt)
 if [[ -f "${FUNCTION_ENV_FILE}" ]]; then
-  (
-    cd "${REPO_ROOT}"
-    nohup npx -y "supabase@${SUPABASE_CLI_VERSION}" functions serve \
-      --no-verify-jwt \
-      --env-file "${FUNCTION_ENV_FILE}" \
-      >"${FUNCTIONS_LOG_FILE}" 2>&1 &
-    echo $! > "${FUNCTIONS_PID_FILE}"
-  )
-else
-  (
-    cd "${REPO_ROOT}"
-    nohup npx -y "supabase@${SUPABASE_CLI_VERSION}" functions serve \
-      --no-verify-jwt \
-      >"${FUNCTIONS_LOG_FILE}" 2>&1 &
-    echo $! > "${FUNCTIONS_PID_FILE}"
-  )
+  serve_args+=(--env-file "${FUNCTION_ENV_FILE}")
 fi
+
+# No PID is recorded: `$!` is the npm wrapper, several processes above the real
+# server. The stop helpers find the whole tree by its cwd, so launch from the
+# worktree root.
+echo "[supabase] starting local edge function server"
+(
+  cd "${REPO_ROOT}"
+  nohup npx -y "supabase@${SUPABASE_CLI_VERSION}" "${serve_args[@]}" \
+    >"${FUNCTIONS_LOG_FILE}" 2>&1 </dev/null &
+)
 
 START_TS="$(date +%s)"
 until curl_health --max-time 2 >/dev/null; do
