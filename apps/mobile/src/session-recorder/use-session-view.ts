@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
+import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
 import type { Session } from '@/components/session-recorder/types';
 import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
 import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
@@ -8,7 +9,7 @@ import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotBy
 import { loadHistoricalBestsExcluding } from './historical-bests';
 import { mapDraftSnapshotToSession } from './session-model';
 
-export type SessionViewData = {
+export type SessionViewData = SessionBodyWeightSnapshot & {
   sessionId: string;
   // `completed`: a finished session opened to edit it (History, completed
   // session `Edit`); `completedAt` is then its persisted End.
@@ -76,6 +77,11 @@ export function useSessionView(sessionId: string | null) {
       const session = mapDraftSnapshotToSession(snapshot);
       const base: SessionViewData = {
         sessionId: snapshot.sessionId,
+        bodyWeightKg: snapshot.bodyWeightKg,
+        bodyWeightSource: snapshot.bodyWeightSource,
+        bodyWeightMeasurementId: snapshot.bodyWeightMeasurementId,
+        bodyWeightMeasuredAt: snapshot.bodyWeightMeasuredAt,
+        localBodyweightMetadataKnown: snapshot.localBodyweightMetadataKnown,
         status: snapshot.status,
         gymId: snapshot.gymId,
         gymName: gym?.name ?? null,

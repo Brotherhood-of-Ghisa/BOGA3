@@ -1,13 +1,10 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.98.0';
 
+import { summarizeEffectiveVolume } from '../../../apps/mobile/src/exercise-calculations/effective-load.ts';
 import {
-  computeExerciseVolume,
-  computeMaxRepsByWeight,
-  estimateExerciseOneRepMax,
-  parseSetReps,
-  parseSetWeight,
-  type CalculationSetInput,
-} from '../../../apps/mobile/src/exercise-calculations/index.ts';
+  METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
+  type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
+} from './training-metrics.ts';
 
 const API_VERSION = 'v1';
 const DEFAULT_EXERCISE_LIMIT = 20;
@@ -44,7 +41,7 @@ type RateWindow = {
   resetAt: number;
 };
 
-type ExerciseDefinitionRow = {
+type ExerciseDefinitionRow = ExerciseLoadRow & {
   id: string;
   load_input_mode: string;
   name: string;
@@ -72,7 +69,7 @@ type SessionExerciseRow = {
   session_id: string;
 };
 
-type SessionRow = {
+type SessionRow = SessionWeightRow & {
   completed_at: number | null;
   duration_sec: number | null;
   gym_id: string | null;
@@ -80,15 +77,10 @@ type SessionRow = {
   started_at: number;
 };
 
-type SetRow = {
-  id: string;
-  order_index: number;
-  performance_status: string | null;
-  reps_value: string;
-  session_exercise_id: string;
-  set_type: string | null;
-  weight_value: string;
-};
+type SetRow = EnteredSetRow & { session_exercise_id: string };
+
+const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_coefficient,movement_standard,loading_method';
+const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec,body_weight_kg,body_weight_source,body_weight_measurement_id,body_weight_measured_at';
 
 class ApiError extends Error {
   constructor(
@@ -414,7 +406,7 @@ const errorResponse = (requestId: string, error: unknown): Response => {
   const apiError = error instanceof ApiError
     ? error
     : new ApiError(500, 'INTERNAL', 'The agent request could not be completed.');
-  const headers = apiError.status === 401
+  const headers: Record<string, string> = apiError.status === 401
     ? { 'www-authenticate': 'Bearer realm="boga-agent-api"' }
     : {};
   return jsonResponse(
@@ -671,7 +663,7 @@ const searchExercises = async (
   let definitionsQuery = client
     .schema('app_public')
     .from('exercise_definitions')
-    .select('id,name,load_input_mode')
+    .select(EXERCISE_COLUMNS)
     .eq('owner_user_id', userId)
     .is('deleted_at', null)
     .order('name')
@@ -707,7 +699,7 @@ const searchExercises = async (
     exercises: page.map((row) => ({
       id: row.id,
       name: row.name,
-      load_input_mode: row.load_input_mode,
+      ...exerciseLoadPayload(row),
       muscles: mappings.get(row.id) ?? [],
       equipment: equipmentByExercise.get(row.id) ?? [],
     })),
@@ -731,7 +723,7 @@ const loadSessionsById = async (
     const { data, error } = await client
       .schema('app_public')
       .from('sessions')
-      .select('id,gym_id,started_at,completed_at,duration_sec')
+      .select(SESSION_COLUMNS)
       .eq('owner_user_id', userId)
       .eq('status', 'completed')
       .is('deleted_at', null)
@@ -756,7 +748,7 @@ const loadSetsByBlock = async (
       .schema('app_public')
       .from('exercise_sets')
       .select(
-        'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status',
+        'id,session_exercise_id,order_index,weight_value,weight_unit,external_load_mode,reps_value,set_type,performance_status',
       )
       .eq('owner_user_id', userId)
       .is('deleted_at', null)
@@ -773,12 +765,19 @@ const loadSetsByBlock = async (
   return { rows, truncated };
 };
 
-const calculationInputsFor = (sets: SetRow[]): CalculationSetInput[] =>
-  sets.map((set) => ({
-    weightValue: set.weight_value,
-    repsValue: set.reps_value,
-    setType: set.set_type,
-  }));
+const loadDefinitionsById = async (
+  client: SupabaseClient, userId: string, exerciseIds: string[],
+): Promise<Map<string, ExerciseDefinitionRow>> => {
+  const rows: ExerciseDefinitionRow[] = [];
+  for (const ids of chunk(uniqueStrings(exerciseIds, MAX_CONTEXT_BLOCKS), 100)) {
+    const { data, error } = await client.schema('app_public').from('exercise_definitions')
+      .select(EXERCISE_COLUMNS).eq('owner_user_id', userId).is('deleted_at', null)
+      .in('id', ids).limit(100).returns<ExerciseDefinitionRow[]>();
+    throwDatabaseError(error);
+    rows.push(...(data ?? []));
+  }
+  return new Map(rows.map(row => [row.id, row]));
+};
 
 const getExerciseContext = async (
   client: SupabaseClient,
@@ -801,7 +800,7 @@ const getExerciseContext = async (
   const { data: definition, error: definitionError } = await client
     .schema('app_public')
     .from('exercise_definitions')
-    .select('id,name,load_input_mode')
+    .select(EXERCISE_COLUMNS)
     .eq('owner_user_id', userId)
     .eq('id', exerciseId)
     .is('deleted_at', null)
@@ -859,44 +858,37 @@ const getExerciseContext = async (
 
   const performanceRows = completedSessions
     .filter((session) => blocksBySession.has(session.id))
-    .map((session) => {
-      const sessionBlocks = blocksBySession.get(session.id) ?? [];
-      const blockSets = sessionBlocks
-        .flatMap((block) => setsByBlock.get(block.id) ?? [])
-        .filter(
-          (set) =>
-            parseSetWeight(set.weight_value) !== null &&
-            parseSetReps(set.reps_value) !== null,
-        );
-      const inputs = calculationInputsFor(blockSets);
-      return {
-        session,
-        sessionBlocks,
-        sets: blockSets,
-        volume: computeExerciseVolume(inputs),
-        estimatedOneRepMax: estimateExerciseOneRepMax(inputs),
-      };
-    })
-    .filter((row) => row.sets.length > 0);
+    .map((session) => ({
+      session,
+      ...projectTrainingSets((blocksBySession.get(session.id) ?? [])
+        .flatMap(block => setsByBlock.get(block.id) ?? []), definition, session),
+    }))
+    .filter(row => row.sets.length > 0);
 
-  const allSets = performanceRows.flatMap((row) => row.sets);
-  const allInputs = calculationInputsFor(allSets);
-  const maxRepsByWeight = computeMaxRepsByWeight(allInputs);
-  const topWeight = maxRepsByWeight[0] ?? null;
+  const topWeight = performanceRows.reduce<{ weight: number; reps: number } | null>((best, row) => {
+    const candidate = row.topWeightSet;
+    if (candidate === null) return best;
+    return best === null || candidate.weight > best.weight ||
+      (candidate.weight === best.weight && candidate.reps > best.reps) ? candidate : best;
+  }, null);
   const bestOneRepMax = performanceRows.reduce<number | null>((best, row) => {
     if (row.estimatedOneRepMax === null) return best;
     return best === null ? row.estimatedOneRepMax : Math.max(best, row.estimatedOneRepMax);
   }, null);
-  const maxSessionVolume = performanceRows.reduce<number | null>(
-    (best, row) => best === null ? row.volume : Math.max(best, row.volume),
-    null,
-  );
+  const maxSessionVolume = performanceRows.reduce<number | null>((best, row) => {
+    const total = row.volumeCoverage.totalVolumeKgReps;
+    if (total === null || historyTruncated || setResult.truncated) return best;
+    return best === null ? total : Math.max(best, total);
+  }, null);
+  const historyIncomplete = historyTruncated || setResult.truncated;
+  const basis = definition.bodyweight_coefficient > 0 ? 'total_resistance' : 'entered_load';
 
   return {
+    metric_revision: METRIC_REVISION,
     exercise: {
       id: definition.id,
       name: definition.name,
-      load_input_mode: definition.load_input_mode,
+      ...exerciseLoadPayload(definition),
       muscles: mappings.get(exerciseId) ?? [],
       equipment: equipmentByExercise.get(exerciseId) ?? [],
     },
@@ -905,51 +897,35 @@ const getExerciseContext = async (
       started_at: toIsoTimestamp(row.session.started_at),
       completed_at: toIsoTimestamp(row.session.completed_at),
       duration_seconds: row.session.duration_sec,
-      volume: { value: row.volume, unit: 'kg_reps' },
+      session_body_weight: sessionWeightPayload(row.session),
+      volume: volumePayload(row.volumeCoverage, historyIncomplete),
       estimated_one_rep_max: row.estimatedOneRepMax === null
-        ? null
-        : { value: row.estimatedOneRepMax, unit: 'kg' },
-      sets: row.sets.map((set) => {
-        const weight = parseSetWeight(set.weight_value);
-        const reps = parseSetReps(set.reps_value);
-        const outcome = set.performance_status === 'skipped'
-          ? 'skipped'
-          : weight !== null && reps !== null
-          ? 'completed'
-          : 'incomplete';
-        return {
-          id: set.id,
-          order_index: set.order_index,
-          load: weight === null ? null : { value: weight, unit: 'kg' },
-          reps,
-          set_type: set.set_type,
-          performance_status: set.performance_status,
-          outcome,
-        };
-      }),
+        ? null : { value: row.estimatedOneRepMax, unit: 'kg', basis },
+      sets: row.sets,
     })),
     personal_records: {
       estimated_one_rep_max: bestOneRepMax === null
         ? null
-        : { value: bestOneRepMax, unit: 'kg' },
+        : { value: bestOneRepMax, unit: 'kg', basis },
       top_weight: topWeight === null
         ? null
-        : { value: topWeight.weight, reps: topWeight.maxReps, unit: 'kg' },
+        : { value: topWeight.weight, reps: topWeight.reps, unit: 'kg', meaning: 'added_external_load' },
       max_session_volume: maxSessionVolume === null
         ? null
         : { value: maxSessionVolume, unit: 'kg_reps' },
+      history_truncated: historyIncomplete,
+      excluded_incomplete_volume_sessions: performanceRows.filter(row => !row.volumeCoverage.complete || historyIncomplete).length,
     },
     volume_series: performanceRows.slice(0, 12).reverse().map((row) => ({
       completed_at: toIsoTimestamp(row.session.completed_at),
-      value: row.volume,
-      unit: 'kg_reps',
+      ...volumePayload(row.volumeCoverage, historyIncomplete),
     })),
     last_performed_at: performanceRows.length > 0
       ? toIsoTimestamp(performanceRows[0].session.completed_at)
       : null,
     training_notes: [],
     unavailable_fields: ['failed_set_semantics', 'user_authored_training_notes'],
-    history_truncated: historyTruncated || setResult.truncated,
+    history_truncated: historyIncomplete,
   };
 };
 
@@ -971,7 +947,7 @@ const getRecentWorkouts = async (
   let sessionsQuery = client
     .schema('app_public')
     .from('sessions')
-    .select('id,gym_id,started_at,completed_at,duration_sec')
+    .select(SESSION_COLUMNS)
     .eq('owner_user_id', userId)
     .eq('status', 'completed')
     .is('deleted_at', null)
@@ -1013,7 +989,10 @@ const getRecentWorkouts = async (
       .returns<SessionExerciseRow[]>();
   throwDatabaseError(blockError);
   const blocksTruncated = (blocks?.length ?? 0) === 500;
-  const setResult = await loadSetsByBlock(client, userId, (blocks ?? []).map((row) => row.id));
+  const [setResult, definitionsById] = await Promise.all([
+    loadSetsByBlock(client, userId, (blocks ?? []).map((row) => row.id)),
+    loadDefinitionsById(client, userId, (blocks ?? []).flatMap(row => row.exercise_definition_id ? [row.exercise_definition_id] : [])),
+  ]);
 
   const gymIds = uniqueStrings(page.map((row) => row.gym_id), 50);
   const { data: gyms, error: gymError } = gymIds.length === 0
@@ -1043,13 +1022,13 @@ const getRecentWorkouts = async (
   }
 
   return {
+    metric_revision: METRIC_REVISION,
     workouts: page.map((session) => {
       const workoutBlocks = blocksBySession.get(session.id) ?? [];
-      const workoutSets = workoutBlocks.flatMap((block) => setsByBlock.get(block.id) ?? []);
-      const validSetCount = workoutSets.reduce((count, set) =>
-        parseSetWeight(set.weight_value) !== null && parseSetReps(set.reps_value) !== null
-          ? count + 1
-          : count, 0);
+      const projections = workoutBlocks.map(block => projectTrainingSets(
+        setsByBlock.get(block.id) ?? [], definitionsById.get(block.exercise_definition_id ?? '') ?? null, session,
+      ));
+      const coverage = summarizeEffectiveVolume(projections.flatMap(row => row.metrics));
       return {
         id: session.id,
         started_at: toIsoTimestamp(session.started_at),
@@ -1059,17 +1038,18 @@ const getRecentWorkouts = async (
           ? { id: session.gym_id, name: gymById.get(session.gym_id) ?? null }
           : null,
         exercise_count: workoutBlocks.length,
-        completed_set_count: validSetCount,
-        total_volume: {
-          value: computeExerciseVolume(calculationInputsFor(workoutSets)),
-          unit: 'kg_reps',
-        },
-        exercises: workoutBlocks.slice(0, 50).map((block) => ({
+        completed_set_count: coverage.eligibleSetCount,
+        session_body_weight: sessionWeightPayload(session),
+        total_volume: volumePayload(coverage, blocksTruncated || setResult.truncated),
+        exercises: workoutBlocks.slice(0, 50).map((block, index) => ({
           id: block.id,
           exercise_id: block.exercise_definition_id,
           name: block.name,
           equipment: block.machine_name,
           set_count: (setsByBlock.get(block.id) ?? []).length,
+          load_rules: definitionsById.has(block.exercise_definition_id ?? '')
+            ? exerciseLoadPayload(definitionsById.get(block.exercise_definition_id ?? '')!) : null,
+          volume: volumePayload(projections[index].volumeCoverage, setResult.truncated),
         })),
         truncated: workoutBlocks.length > 50 || blocksTruncated || setResult.truncated,
       };

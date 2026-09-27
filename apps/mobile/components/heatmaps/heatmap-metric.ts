@@ -23,7 +23,7 @@ export const HEAT_RAMP = [
 
 /** Structural subset of an effort row carrying the four selectable metrics. */
 export type HeatmapMetricSource = {
-  totalVolume: number;
+  totalVolume: number | null;
   workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
@@ -39,9 +39,9 @@ export const getMetricValue = (
 ): number | null => {
   switch (metric) {
     case 'totalVolume':
-      return source.totalVolume > 0 ? source.totalVolume : null;
+      return source.totalVolume;
     case 'workingSetCount':
-      return source.workingSetCount > 0 ? source.workingSetCount : null;
+      return source.workingSetCount;
     case 'estimatedRM1':
       return source.estimatedRM1;
     case 'highestWeight':

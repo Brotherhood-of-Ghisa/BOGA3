@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
-import { uiSpace } from '@/components/ui/tokens';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { formatElapsed } from '@/src/session-recorder/session-view-model';
 
 import { SessionTimesFields, type SessionTimesFieldsProps } from './session-times-fields';
@@ -13,6 +13,7 @@ type SessionSummaryCardProps = {
   gymName: string | null;
   performedSetCount: number;
   volume: string;
+  volumeNote?: string;
   // Opens the gym picker; the whole Gym cell is the target.
   onPressGym: () => void;
   // A completed session being edited: its Start/End fields replace the
@@ -42,6 +43,7 @@ export function SessionSummaryCard({
   gymName,
   performedSetCount,
   volume,
+  volumeNote,
   onPressGym,
   times,
   now = systemNow,
@@ -62,8 +64,10 @@ export function SessionSummaryCard({
           <Stat kind="text" label="Gym" testID="session-view-summary-gym" value={gymName ?? 'No gym'} />
         </Pressable>
         <Stat label="Sets" testID="session-view-summary-sets" value={String(performedSetCount)} />
-        <Stat align="end" label="Volume" testID="session-view-summary-volume" value={volume} />
+        <Stat align="end" label={volumeNote && volume !== '—' ? 'Known vol' : 'Volume'} testID="session-view-summary-volume" value={volume} />
       </View>
+      {volumeNote ? <Text allowFontScaling={false} style={styles.coverageNote}
+        testID="session-view-summary-volume-note">{volumeNote}</Text> : null}
     </Card>
   );
 }
@@ -75,6 +79,11 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
+  },
+  coverageNote: {
+    paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.sm,
+    fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted,
   },
   gym: {
     flex: 1,

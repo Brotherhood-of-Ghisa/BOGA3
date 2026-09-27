@@ -1,3 +1,4 @@
+export { bodyWeightMeasurements, type BodyWeightMeasurement, type NewBodyWeightMeasurement } from './body-weight-measurements';
 export {
   exerciseDefinitions,
   type ExerciseDefinition,

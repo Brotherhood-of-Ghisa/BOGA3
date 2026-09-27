@@ -84,6 +84,7 @@ MCP_PID=""
 APP_ACCESS_TOKEN=""
 AGENT_CLIENT_ID=""
 
+EXPECT_BODYWEIGHT=0
 if [[ -n "${BOGA_MCP_SMOKE_ACCESS_TOKEN:-}" ]]; then
   ACCESS_TOKEN="${BOGA_MCP_SMOKE_ACCESS_TOKEN}"
   EXERCISE_ID="${BOGA_MCP_SMOKE_EXERCISE_ID:-}"
@@ -103,6 +104,7 @@ else
   SESSION_ID="mcp-smoke-${RUN_TAG}-session"
   BLOCK_ID="mcp-smoke-${RUN_TAG}-block"
   SET_ID="mcp-smoke-${RUN_TAG}-set"
+  EXPECT_BODYWEIGHT=1
   EXERCISE_QUERY="MCP Smoke ${RUN_TAG}"
   NOW_MS="$(($(date +%s) * 1000))"
 
@@ -114,16 +116,16 @@ else
       values
         ('${USER_UUID}'::uuid,'${GYM_ID}','MCP Smoke Gym',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_definitions
-        (owner_user_id,id,name,load_input_mode,created_at,updated_at,client_updated_at_ms)
+        (owner_user_id,id,name,load_input_mode,bodyweight_coefficient,created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${EXERCISE_ID}','${EXERCISE_QUERY}','total_load',
+        ('${USER_UUID}'::uuid,'${EXERCISE_ID}','${EXERCISE_QUERY}','total_load',1,
          ${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.sessions
-        (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,
+        (owner_user_id,id,gym_id,status,started_at,completed_at,duration_sec,body_weight_kg,body_weight_source,
          created_at,updated_at,client_updated_at_ms)
       values
         ('${USER_UUID}'::uuid,'${SESSION_ID}','${GYM_ID}','completed',
-         $((NOW_MS - 900000)),$((NOW_MS - 600000)),300,${NOW_MS},${NOW_MS},${NOW_MS});
+         $((NOW_MS - 900000)),$((NOW_MS - 600000)),300,80,'manual',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.session_exercises
         (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
          created_at,updated_at,client_updated_at_ms)
@@ -131,10 +133,10 @@ else
         ('${USER_UUID}'::uuid,'${BLOCK_ID}','${SESSION_ID}','${EXERCISE_ID}',0,
          '${EXERCISE_QUERY}',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_sets
-        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,
+        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,external_load_mode,
          created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'50','10',
+        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8','added',
          ${NOW_MS},${NOW_MS},${NOW_MS});
     commit;
   " >/dev/null
@@ -179,6 +181,7 @@ curl --silent --show-error --fail \
   fail "MCP service did not become ready"
 
 echo "[boga-mcp-smoke] discovering and calling all four tools"
+BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
 BOGA_MCP_SMOKE_URL="${MCP_URL}" \
 BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
 BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \

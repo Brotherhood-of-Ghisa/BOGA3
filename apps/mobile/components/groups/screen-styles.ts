@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui';
+import { uiBorder, uiFonts, uiTypography, uiGeometry, uiRoles, uiSpace } from '@/components/ui';
 
 /**
  * Shared page shell for the group routes: the `Screen` / `ScreenScroll` ground
@@ -66,3 +66,28 @@ export const cardListItemStyles = (index: number, count: number) => [
   index === 0 ? groupScreenStyles.cardListItemFirst : null,
   index === count - 1 ? groupScreenStyles.cardListItemLast : null,
 ];
+
+/** Shared prose and section headings for versioned comparison screens. */
+export const groupMetricTextStyles = StyleSheet.create({
+  body: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.ink,
+  },
+  muted: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  heading: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+});

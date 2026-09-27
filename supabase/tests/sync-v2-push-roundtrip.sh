@@ -400,7 +400,6 @@ assert_jq --argjson ts "${T2}" '.[0].name == "Renamed Gym" and .[0].client_updat
 echo "[sync-v2-push-roundtrip] step 4 — future-clock clamp"
 NOW_MS_BEFORE="$(($(date +%s) * 1000))"
 DAY_MS=$((24 * 60 * 60 * 1000))
-FIVE_MIN_MS=$((5 * 60 * 1000))
 FUTURE_CUAM=$((NOW_MS_BEFORE + DAY_MS))
 CLAMP_ID="rt-${RUN_TAG}-clamp"
 CLAMP_PAYLOAD="$(jq -nc --arg id "${CLAMP_ID}" --argjson ts "${FUTURE_CUAM}" \
@@ -413,12 +412,18 @@ CLAMP_PAYLOAD="$(jq -nc --arg id "${CLAMP_ID}" --argjson ts "${FUTURE_CUAM}" \
 sync_push "${USER_A_TOKEN}" "${CLAMP_PAYLOAD}"
 assert_status "200" "step 4 clamp push"
 
-NOW_MS_AFTER="$(($(date +%s) * 1000))"
-MAX_ACCEPTABLE=$((NOW_MS_AFTER + FIVE_MIN_MS + 1000))
+# Use the transaction clock returned by sync_push, as the push-contract lane
+# does. A truncated host clock can fail near a second boundary when Docker's
+# clock is slightly ahead. PostgreSQL rounds fractional milliseconds to bigint;
+# the ISO acknowledgement truncates them, hence the one-millisecond allowance.
+CLAMP_SERVER_RECEIVED_AT="$(printf '%s' "${REQUEST_BODY}" | jq -er '.server_received_at')"
+EXPECTED_CLAMP="$(node -e 'process.stdout.write(String(Date.parse(process.argv[1]) + 300000))' "${CLAMP_SERVER_RECEIVED_AT}")"
+MAX_ACCEPTABLE=$((EXPECTED_CLAMP + 1))
 service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${CLAMP_ID}&select=client_updated_at_ms"
-assert_jq --argjson max "${MAX_ACCEPTABLE}" --argjson sent "${FUTURE_CUAM}" \
-  '.[0].client_updated_at_ms <= $max and .[0].client_updated_at_ms < $sent' \
-  "step 4 clamp: stored cuam clamped to <= now()+5min and strictly less than sent"
+assert_status "200" "step 4 clamp read"
+assert_jq --argjson min "${EXPECTED_CLAMP}" --argjson max "${MAX_ACCEPTABLE}" --argjson sent "${FUTURE_CUAM}" \
+  '.[0].client_updated_at_ms >= $min and .[0].client_updated_at_ms <= $max and .[0].client_updated_at_ms < $sent' \
+  "step 4 clamp: stored cuam matches server transaction time +5min and is strictly less than sent"
 
 # ---------------------------------------------------------------------------
 # Step 5 — Orphan child → FK_VIOLATION; zero rows from the rejected batch land.

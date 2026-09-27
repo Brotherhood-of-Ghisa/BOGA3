@@ -1,3 +1,4 @@
+import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -37,6 +38,7 @@ import {
   setSessionGym,
 } from '@/src/session-recorder/session-lifecycle';
 import {
+  toSessionInsightExercises,
   describeSubmitCleanupPrompt,
   nextSubmitCleanup,
   sessionHasInvalidSetValues,
@@ -169,22 +171,8 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
       sessionId,
       status: "completed" as const,
       completedAt: state.data.comparisonAt,
-      exercises: state.data.session.exercises.map(
-        (exercise, exerciseIndex) => ({
-          id: exercise.id,
-          orderIndex: exerciseIndex,
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          exerciseName: exercise.name,
-          sets: exercise.sets.map((set, setIndex) => ({
-            id: set.id,
-            orderIndex: setIndex,
-            weightValue: set.weight,
-            repsValue: set.reps,
-            setType: set.setType,
-            performanceStatus: set.performanceStatus,
-          })),
-        }),
-      ),
+      bodyWeightKg: state.data.localBodyweightMetadataKnown === false ? null : state.data.bodyWeightKg,
+      exercises: toSessionInsightExercises(state.data.session, new Map()),
     };
     const base = { targetSession, historicalSessions: state.data.insightHistory };
     return {
@@ -197,6 +185,8 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
                 (exercise) => ({
                   id: exercise.id,
                   loadInputMode: exercise.loadInputMode ?? "total_load",
+                  bodyweightCoefficient: exercise.bodyweightCoefficient,
+                  localBodyweightMetadataKnown: exercise.localBodyweightMetadataKnown,
                 }),
               ),
               muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
@@ -423,7 +413,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   } else if (model) {
     const data = state.data;
     body = (
-      <ScreenScroll testID="session-view-scroll">
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID="session-view-scroll">
         <SessionSummaryCard
           gymName={data.gymName}
           onPressGym={openGymPicker}
@@ -443,7 +433,10 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
               : undefined
           }
           volume={model.volume}
+          volumeNote={model.volumeNote}
         />
+        <SessionBodyWeight sessionId={data.sessionId} snapshot={data}
+          metadataKnown={data.localBodyweightMetadataKnown} onSaved={() => void reload()} />
         {model.cards.map((card) => (
           <SessionExerciseCard
             card={card}

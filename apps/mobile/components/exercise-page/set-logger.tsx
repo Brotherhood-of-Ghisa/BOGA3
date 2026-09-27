@@ -1,6 +1,10 @@
 import { forwardRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ActionButton } from '@/components/ui/action-button';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { resolveEffectiveLoad, type LoadContext } from '@/src/exercise-calculations/effective-load';
+import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
 import { Icon } from '@/components/ui/icon';
 import {
   uiBorder,
@@ -22,6 +26,13 @@ import {
 import { pageText } from './text-styles';
 
 type SetLoggerProps = {
+  loadContext?: LoadContext;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
+  metadataKnown?: boolean;
+  requiresReview?: boolean;
+  onReview?: () => void;
+  onChangeLoad?: (value: { weightUnit?: string; externalLoadMode?: string }) => void;
   number: number;
   weightValue: string;
   repsValue: string;
@@ -46,11 +57,28 @@ const DASH = '—';
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, loadContext, weightUnit = 'kg', externalLoadMode,
+    metadataKnown = true, requiresReview = false, onReview, onChangeLoad },
   weightInputRef
 ) {
-  const { oneRepMax, volume } = previewMetrics(weightValue, repsValue);
-  const canCommit = canCommitLogger({ weightValue, repsValue });
+  const bodyweight = (loadContext?.bodyweightCoefficient ?? 0) > 0;
+  const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
+  const context = metadataKnown ? loadContext : { bodyweightCoefficient: NaN, loadInputMode: 'total_load' };
+  const load = context ? resolveEffectiveLoad({ ...context, weightValue: canonicalWeight, weightUnit, externalLoadMode }) : null;
+  const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, context, { weightUnit, externalLoadMode });
+  const canCommit = canCommitLogger({ weightValue, repsValue }) &&
+    !requiresReview &&
+    (!bodyweight || externalLoadMode === 'added' || externalLoadMode === 'assistance' || externalLoadMode === 'unquantified_assistance');
+  // Keep the fixed-height field label on one line on the smallest phone.
+  const amountLabel = !bodyweight ? 'Weight' : externalLoadMode === 'assistance' ? 'Assist' : 'Added';
+  const amountMeaning = externalLoadMode === 'unquantified_assistance' ? 'unquantified assistance'
+    : externalLoadMode === 'assistance' ? 'assistance' : 'added weight';
+  const unavailable = !metadataKnown ? 'Unavailable · sync or explicitly review the saved load settings.' :
+    load?.status === 'missing' && load.reason === 'body_weight_missing' ? 'Unavailable · session weight missing.' :
+    load?.status === 'missing' && load.reason === 'legacy_interpretation' ? 'Unavailable · review the original load meaning.' :
+    load?.status === 'missing' && load.reason === 'unquantified_assistance' ? 'Assistance is unquantified. Reps can be logged; load metrics are unavailable.' :
+    load?.status === 'invalid' && load.reason === 'negative_resistance' ? 'Unavailable · assistance exceeds bodyweight resistance.' :
+    load?.status === 'invalid' && load.reason !== 'amount_invalid' ? 'Unavailable · check the load settings.' : null;
   const effort = formatEffort(setType);
 
   return (
@@ -58,15 +86,37 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
       <View style={styles.header}>
         <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
         <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
-          {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
+          {`${bodyweight ? 'Total 1RM' : '1RM'} ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
         </Text>
       </View>
+      {onChangeLoad ? (
+        <View style={styles.loadControls}>
+          {bodyweight ? <SegmentedControl layout="fit" disabled={!metadataKnown || requiresReview}
+            onChange={(externalLoadMode) => onChangeLoad({ externalLoadMode })}
+            options={[{ value: 'added', label: 'Added', accessibilityLabel: 'Added weight' },
+              { value: 'assistance', label: 'Assisted', accessibilityLabel: 'Quantified assistance' },
+              { value: 'unquantified_assistance', label: 'Unquantified', accessibilityLabel: 'Unquantified assistance, such as a band' }]}
+            style={styles.modeControl} testIDPrefix="exercise-set-load-mode" value={externalLoadMode ?? ''} /> : null}
+          <SegmentedControl disabled={!metadataKnown || requiresReview || externalLoadMode === 'unquantified_assistance'}
+            onChange={(weightUnit) => onChangeLoad({ weightUnit })}
+            options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]}
+            style={styles.modeControl} testIDPrefix="exercise-set-unit" value={weightUnit} />
+        </View>
+      ) : null}
+      {unavailable ? <Text allowFontScaling={false} style={pageText.microLabel}
+        testID="exercise-set-load-unavailable">{unavailable}</Text> : null}
+      {bodyweight && load?.status === 'known' ? <Text allowFontScaling={false} style={pageText.microLabel}
+        testID="exercise-set-effective-load">{`Session ${Number(loadContext!.bodyWeightKg!.toFixed(3))} kg · Effective load ${Number(load.resistanceKg.toFixed(3))} kg`}</Text> : null}
+      {requiresReview && onReview ? <ActionButton label="Review original loads" onPress={onReview}
+        testID="exercise-set-review-load" variant="outline" /> : null}
       <View style={styles.fields}>
         <View style={[styles.field, styles.weightField]}>
-          <Text allowFontScaling={false} style={pageText.microLabel}>Weight</Text>
+          <Text allowFontScaling={false} style={pageText.microLabel}>{externalLoadMode === 'unquantified_assistance' ? 'Load unknown' : `${amountLabel} · ${weightUnit}`}</Text>
           <TextInput
             allowFontScaling={false}
-            accessibilityLabel={`Set ${number} weight`}
+            accessibilityLabel={externalLoadMode === 'unquantified_assistance' ? `Set ${number} load unknown`
+              : bodyweight ? `Set ${number} ${amountMeaning} in ${weightUnit}` : `Set ${number} weight`}
+            editable={externalLoadMode !== 'unquantified_assistance'}
             keyboardType="decimal-pad"
             onChangeText={(text) => {
               if (isWeightInput(text)) onChangeWeight(text);
@@ -75,7 +125,7 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
             selectTextOnFocus
             style={styles.input}
             testID="exercise-set-logger-weight"
-            value={weightValue}
+            value={externalLoadMode === 'unquantified_assistance' ? '—' : weightValue}
           />
         </View>
         <View style={[styles.field, styles.repsField]}>
@@ -143,6 +193,8 @@ const styles = StyleSheet.create({
     borderTopColor: uiRoles.ruleSoft,
     borderBottomColor: uiRoles.ruleSoft,
   },
+  loadControls: { gap: uiSpace.sm },
+  modeControl: { minHeight: uiGeometry.tapTarget },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

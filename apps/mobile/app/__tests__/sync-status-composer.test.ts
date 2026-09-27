@@ -4,7 +4,7 @@
  * The sync-status composer: it folds the scheduler's production status, the
  * runtime-state row, and a dirty-row count into the single snapshot the Settings
  * surface renders. These tests pin two things against a real in-memory database:
- *  1. the dirty count sums `local_dirty = 1` rows across all ten entity tables
+ *  1. the dirty count sums `local_dirty = 1` rows across all eleven entity tables
  *     (and excludes clean rows), and
  *  2. the snapshot carries the scheduler's last-success time, error, network
  *     state, the auth-required flag, and the bootstrap-completed flag.
@@ -33,6 +33,7 @@ jest.mock('@/src/sync/auth-required-signal', () => ({
 
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import {
+  bodyWeightMeasurements,
   exerciseDefinitions,
   exerciseGroupLinks,
   exerciseMuscleMappings,
@@ -72,7 +73,15 @@ afterEach(() => {
   fixture.close();
 });
 
-describe('dirty-row count across the ten entity tables', () => {
+describe('dirty-row count across the eleven entity tables', () => {
+  it('includes pending bodyweight readings but excludes clean readings', async () => {
+    await fixture.database.insert(bodyWeightMeasurements).values([
+      { id: 'pending', weightValue: '80', weightUnit: 'kg', weightKg: 80, measuredAt: new Date(1000), localDirty: true },
+      { id: 'clean', weightValue: '81', weightUnit: 'kg', weightKg: 81, measuredAt: new Date(2000), localDirty: false },
+    ]);
+    expect((await getSyncStatus()).dirtyCount).toBe(1);
+  });
+
   it('is zero on an empty database', async () => {
     const status = await getSyncStatus();
     expect(status.dirtyCount).toBe(0);

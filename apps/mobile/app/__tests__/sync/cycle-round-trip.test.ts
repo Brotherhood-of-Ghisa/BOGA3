@@ -91,6 +91,7 @@ import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { linkExercise, listLinks, unlinkExercise } from '@/src/data/exercise-group-links';
 import {
+  bodyWeightMeasurements,
   exerciseDefinitions,
   exerciseGroupLinks,
   exerciseSets,
@@ -396,6 +397,58 @@ describe('sync cycle round-trip against a live endpoint', () => {
       expect(cursorMap[layer]).not.toBeNull();
       expect(cursorMap[layer]).toBeDefined();
     }
+  }, 45_000);
+
+  it('restores readings and frozen snapshots after reinstall and starts a fresh reading cursor on upgrade', async () => {
+    seedDirtyChain();
+    const readingId = `${ids.session}-weight`;
+    const ms = Date.now() + 20;
+    database.insert(bodyWeightMeasurements).values({ id: readingId, weightValue: '176', weightUnit: 'lb',
+      weightKg: 79.83225712, measuredAt: new Date(ms - 1000), localDirty: true, localUpdatedAtMs: ms,
+    }).run();
+    database.update(sessions).set({ bodyWeightKg: 79.83225712, bodyWeightSource: 'reading',
+      bodyWeightMeasurementId: readingId, bodyWeightMeasuredAt: new Date(ms - 1000), localUpdatedAtMs: ms,
+    }).where(eq(sessions.id, ids.session)).run();
+    database.update(exerciseSets).set({ weightUnit: 'lb', externalLoadMode: 'assistance',
+      plannedWeightUnit: 'kg', plannedExternalLoadMode: 'added', localUpdatedAtMs: ms,
+    }).where(eq(exerciseSets.id, ids.exerciseSet)).run();
+    expect(await runSyncCycle()).toBe('converged');
+    const storedReading = database.select().from(bodyWeightMeasurements).where(eq(bodyWeightMeasurements.id, readingId)).get();
+    expect(storedReading?.localDirty).toBe(false);
+
+    // Model an upgraded device whose legacy cursors are already advanced.
+    const existingCursors = readCursorMap();
+    delete existingCursors['4'];
+    delete existingCursors['1'];
+    delete existingCursors['3'];
+    database.update(sessions).set({ bodyWeightKg: null, bodyWeightSource: null,
+      bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null, localBodyweightMetadataKnown: false,
+      localDirty: true, localUpdatedAtMs: ms + 100, durationSec: 123,
+    }).where(eq(sessions.id, ids.session)).run();
+    database.update(exerciseSets).set({ weightUnit: 'kg', externalLoadMode: null,
+      plannedWeightUnit: null, plannedExternalLoadMode: null, localBodyweightMetadataKnown: false,
+    }).where(eq(exerciseSets.id, ids.exerciseSet)).run();
+    database.delete(bodyWeightMeasurements).run();
+    database.update(syncRuntimeState).set({ pullCursor: existingCursors }).run();
+    expect(await runSyncCycle()).toBe('converged');
+    expect(database.select().from(bodyWeightMeasurements).where(eq(bodyWeightMeasurements.id, readingId)).get()).toEqual(storedReading);
+    expect(readCursorMap()['4']).toBeDefined();
+    for (const layer of ['0', '2']) expect(readCursorMap()[layer]).toEqual(existingCursors[layer]);
+    expect(database.select().from(sessions).where(eq(sessions.id, ids.session)).get()).toMatchObject({
+      bodyWeightKg: 79.83225712, durationSec: 123, localBodyweightMetadataKnown: true, localDirty: false,
+    });
+
+    // Reinstall restores both the source and its independent session snapshot.
+    wipeLocalStore();
+    expect(await runSyncCycle()).toBe('converged');
+    expect(database.select().from(bodyWeightMeasurements).where(eq(bodyWeightMeasurements.id, readingId)).get()).toEqual(storedReading);
+    expect(database.select().from(sessions).where(eq(sessions.id, ids.session)).get()).toMatchObject({
+      bodyWeightKg: 79.83225712, bodyWeightSource: 'reading', bodyWeightMeasurementId: readingId,
+      bodyWeightMeasuredAt: new Date(ms - 1000), localDirty: false,
+    });
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, ids.exerciseSet)).get()).toMatchObject({
+      weightUnit: 'lb', externalLoadMode: 'assistance', plannedWeightUnit: 'kg', plannedExternalLoadMode: 'added',
+    });
   }, 45_000);
 
   it('a no-op re-run with no local edits moves nothing and does not advance the cursors', async () => {

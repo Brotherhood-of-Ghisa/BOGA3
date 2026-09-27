@@ -217,9 +217,10 @@ appId: com.dinoderek.mobile
       id: "exercise-swap-list"
     timeout: 10000
 - takeScreenshot: "exercise-swap-sheet"
-# The shared browser is taller; dismiss in the remaining backdrop above it.
+# The shared browser is taller. Tap the exposed backdrop below the safe area;
+# 7% lands inside the top inset on the 402×874pt phone.
 - tapOn:
-    point: "5%,7%"
+    point: "50%,8%"
 - extendedWaitUntil:
     notVisible:
       id: "exercise-swap-list"
@@ -285,8 +286,8 @@ appId: com.dinoderek.mobile
     id: "exercise-set-logger"
 - takeScreenshot: "exercise-page-after-complete"
 
-# Use the session's short squat list for default inheritance so Add stays clear
-# of the fixed footer while the logger's keyboard animates.
+# Use the session's short squat list for default inheritance. A neutral records
+# statistic dismisses the decimal keyboard; center Add above the fixed footer.
 - openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_squat"
 - extendedWaitUntil:
     visible:
@@ -295,14 +296,27 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - waitForAnimationToEnd:
     timeout: 4000
+- scrollUntilVisible:
+    element: { id: "exercise-add-set" }
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: "exercise-add-set"
 - extendedWaitUntil:
     visible:
       id: "exercise-set-logger"
     timeout: 10000
-- hideKeyboard:
-    optional: true
+- scrollUntilVisible:
+    element: { id: "exercise-records-1rm" }
+    direction: UP
+    centerElement: true
+- tapOn: { id: "exercise-records-1rm" }
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element: { id: "exercise-set-logger-effort" }
+    direction: DOWN
+    centerElement: true
 - longPressOn:
     id: "exercise-set-logger-effort"
 - tapOn:
@@ -313,19 +327,45 @@ appId: com.dinoderek.mobile
     timeout: 5000
 - waitForAnimationToEnd:
     timeout: 4000
+- scrollUntilVisible:
+    element: { id: "exercise-add-set" }
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: "exercise-add-set"
-- hideKeyboard:
-    optional: true
+- scrollUntilVisible:
+    element: { id: "exercise-records-1rm" }
+    direction: UP
+    centerElement: true
+- tapOn: { id: "exercise-records-1rm" }
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element: { id: "exercise-set-logger-effort" }
+    direction: DOWN
+    centerElement: true
 - assertVisible: "Change effort, currently none"
 - takeScreenshot: "effort-after-warmup-blank"
 - tapOn:
     id: "exercise-set-logger-effort"
 - assertVisible: "Change effort, currently RIR 3"
+- scrollUntilVisible:
+    element: { id: "exercise-add-set" }
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: "exercise-add-set"
-- hideKeyboard:
-    optional: true
+- scrollUntilVisible:
+    element: { id: "exercise-records-1rm" }
+    direction: UP
+    centerElement: true
+- tapOn: { id: "exercise-records-1rm" }
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element: { id: "exercise-set-logger-effort" }
+    direction: DOWN
+    centerElement: true
 - assertVisible: "Change effort, currently RIR 3"
 - takeScreenshot: "effort-inherited-rir3"
 

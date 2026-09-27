@@ -102,6 +102,20 @@ try {
   ) {
     throw new Error('Recent workouts did not return the test user session.');
   }
+  if (process.env.BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT === '1') {
+    const performance = Array.isArray(context.recent_performances) ? context.recent_performances[0] : null;
+    const set = isObject(performance) && Array.isArray(performance.sets) ? performance.sets[0] : null;
+    const workout = workoutRows.find(row => isObject(row) && row.id === expectedSessionId);
+    if (context.metric_revision !== 'effective_load_v1' || !isObject(performance) ||
+      !isObject(performance.volume) || performance.volume.value !== 800 || performance.volume.complete !== true ||
+      !isObject(performance.session_body_weight) || performance.session_body_weight.value !== 80 ||
+      performance.session_body_weight.source !== 'manual' || !isObject(set) ||
+      !isObject(set.entered_load) || set.entered_load.value !== 20 || set.entered_load.mode !== 'added' ||
+      !isObject(set.effective_load) || set.effective_load.value !== 100 ||
+      !isObject(workout) || !isObject(workout.total_volume) || workout.total_volume.value !== 800) {
+      throw new Error('Bodyweight context or volume changed across the real OAuth-to-MCP path.');
+    }
+  }
 } finally {
   await client.close();
 }

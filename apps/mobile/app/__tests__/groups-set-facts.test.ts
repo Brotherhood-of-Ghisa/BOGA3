@@ -87,7 +87,7 @@ describe('group evaluator set facts', () => {
       fingerprint: 'fp-s1',
       rules_version: GROUP_EVAL_RULES_VERSION,
     });
-    expect(GROUP_EVAL_RULES_VERSION).toBe(1);
+    expect(GROUP_EVAL_RULES_VERSION).toBe(2);
   });
 
   it('keeps the entered value of a per-side set (conversion happens later, in SQL)', () => {
@@ -124,4 +124,18 @@ describe('group evaluator set facts', () => {
   it('yields no facts for a session that no longer exists', () => {
     expect(normalizeGroupSetFacts({ session_id: 'gone', started_at_ms: null, sets: [] })).toEqual([]);
   });
+});
+
+
+it('normalizes explicit lb before writing conventional set facts', () => {
+  expect(factOf(row('lb', '20', '5', { weight_unit: 'lb', external_load_mode: 'added' })))
+    .toMatchObject({ performed: true, weight_kg: 20 * 0.45359237 });
+});
+it.each(['assistance', 'unquantified_assistance', 'future-mode'])('refuses %s in a legacy external-load fact', external_load_mode => {
+  expect(factOf(row('mode', '0', '5', { weight_unit: 'kg', external_load_mode })))
+    .toMatchObject({ performed: false, weight_kg: null, reps: null, e1rm_kg: null });
+});
+it('does not normalize an unknown future performance status into a record', () => {
+  expect(factOf(row('future', '100', '5', { performance_status: 'future_status' })))
+    .toMatchObject({ performed: false, weight_kg: null });
 });

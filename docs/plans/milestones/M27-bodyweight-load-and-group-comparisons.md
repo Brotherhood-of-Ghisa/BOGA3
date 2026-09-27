@@ -1,7 +1,7 @@
 # M27 — Bodyweight load and group comparisons
 
 - Milestone ID: `M27`
-- Status: `planned`
+- Status: `in_progress`
 - Created: 2026-09-25
 - Planning baseline: `c1104b65` on `origin/main`
 - Source: the bodyweight exercise design discussion and the user's request for Settings weight entry and historical backfill.
@@ -278,21 +278,103 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| [M27-T01 — Contracts and design target](../tasks/M27-T01-Define_bodyweight_contracts_and_design_target.md) | Exact domain types, compatibility and UX target | — | planned |
-| [M27-T02 — Synced data](../tasks/M27-T02-Add_bodyweight_schema_and_sync.md) | Measurements, snapshots, personal metadata and load mode | T01 | planned |
-| [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | planned |
-| [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | planned |
-| [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | planned |
-| [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | planned |
-| [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | planned |
-| [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | planned |
-| [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | planned |
-| [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | planned |
-| [M27-T11 — Coaching API and MCP](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md) | Owner-scoped, unit-aware data and metric parity | T07 | planned |
-| [M27-T12 — Integration and rollout](../tasks/M27-T12-Verify_roll_out_and_close_bodyweight_milestone.md) | Cross-device/group proof, server-first rollout, graduation | T01–T11 | planned |
+| [M27-T01 — Contracts and design target](../tasks/M27-T01-Define_bodyweight_contracts_and_design_target.md) | Exact domain types, compatibility and UX target | — | in_progress |
+| [M27-T02 — Synced data](../tasks/M27-T02-Add_bodyweight_schema_and_sync.md) | Measurements, snapshots, personal metadata and load mode | T01 | in_progress |
+| [M27-T03 — Shared calculations](../tasks/M27-T03-Implement_effective_load_and_RM_calculations.md) | Resolver, volume, forward/inverse RM and completeness | T01 | in_progress |
+| [M27-T04 — Settings and snapshots](../tasks/M27-T04-Add_Settings_weight_and_session_snapshots.md) | Weight entry/history and stable new-session defaults | T02, T03 | in_progress |
+| [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | in_progress |
+| [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | in_progress |
+| [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | in_progress |
+| [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | in_progress |
+| [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | in_progress |
+| [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | in_progress |
+| [M27-T11 — Coaching API and MCP](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md) | Owner-scoped, unit-aware data and metric parity | T07 | in_progress |
+| [M27-T12 — Integration and rollout](../tasks/M27-T12-Verify_roll_out_and_close_bodyweight_milestone.md) | Cross-device/group proof, server-first rollout, graduation | T01–T11 | in_progress |
 
 Dependencies describe delivery order, not a request to spawn agents. No task
 is complete merely because a downstream closeout card lists its tests.
+
+### Current execution checkpoint (2026-09-27)
+
+This replaces the earlier chronological checkpoints; git history retains them.
+T01–T11 are implemented in `codex/m27-bodyweight`, isolated slot 1. The branch
+integrates `origin/main` at `8b5c47c1`; app/server source is `b636f234`.
+The task cards remain open until shipment. Hosted deployment and client
+activation have not occurred; the implementation is being prepared for review.
+
+| Acceptance | Current evidence |
+| --- | --- |
+| Complete fast gate | Green: 183 mobile suites / 2,243 tests plus repository, backend-fast, consent and MCP; `/tmp/boga-m27-main-integrated-fast-final.log` |
+| Complete backend gate | Green, including real sync-infra, API, group scoring/publication/certification and OAuth MCP smoke; `/tmp/boga-m27-main-integrated-backend.log` |
+| Handle teardown | Green, 183 suites / 2,243 tests; `/tmp/boga-m27-merged-handles.log` |
+| Native smoke, data and UI regression | Green on integrated source; `/tmp/boga-m27-merged-frontend.log` |
+| Native exercise and session flows | Green after fixing safe-area dismissal and keyboard-obscured Add taps; `/tmp/boga-m27-merged-native-final.log` |
+| Native bodyweight entry, logging, backfill and analytics | All four green in `M27-review-viewport/20260927-112539-413`; `/tmp/boga-m27-review-viewport-frontend.log` |
+| Native auth and two-user groups | Auth and both groups flows green on integrated source; `M27-review-viewport/20260927-114553-6692`, `20260927-115139-11377`, `20260927-115956-13621`; same resumed frontend log |
+| Native wipe/sign-in with two frozen weights | Green: real editor saves 80/82 kg and two workouts; real sync/bootstrap restores both frozen snapshots, provenance and private readings; `M27-review-viewport/20260927-114819-8825` |
+| Baseline real API outage | Green: cached board, former-member read-only details, failed publication/retained input and unchanged server revision; `M27-network-baseline/20260927-120516-16517`, `/tmp/boga-m27-network-baseline.log` |
+| Small group UI and real API outage | Both groups flows green in `M27-merged-small/20260927-121530-37307` / `20260927-122152-39234`; actual gateway outage green in `M27-network-small/20260927-122313-40437` |
+| Small personal UI | Backfill green in `M27-merged-small/20260927-123024-51355`; logging/analytics green in `M27-small-editor/20260927-124806-63030`. Fresh entry and settled invalid-percentage capture verified in `M27-small-final/20260927-134013-94101`; complete logging green in `M27-small-logging-recovery/20260927-135422-98663` |
+| Large groups and real API outage | Both groups flows green in `M27-merged-large/20260927-125834-66605` / `20260927-130700-68964`; actual gateway outage green with unchanged SQL revision in `M27-network-large/20260927-130833-70173` |
+| Large personal UI | Logging/backfill/analytics green in `M27-large-bodyweight-final/20260927-131619-80994`; entry green in `M27-large-entry-final/20260927-133637-90619`. Reviewed future-date feedback, snapshots, coefficient error, legacy review, backfill and analytics |
+| Hosted rollout | Server-first migration/function/smoke/activation procedure prepared in RUNBOOK; not executed |
+
+Native artifact paths above are relative to `apps/mobile/artifacts/maestro/`.
+Selected captures have adjacent `visual-review.md` records. Failed aggregate
+attempts remain failed; only their individually completed lanes are listed as
+passes. No assertion or required lane was waived. Latest flow metadata check:
+`/tmp/boga-m27-final-meta.log` (14 files). Final docs check:
+`/tmp/boga-m27-closeout-docs-check.log`.
+
+`./boga test for` confirms the required fast/backend/frontend union. Timing
+records were imported into the machine store and verified byte-for-byte before
+removal from the branch, matching current spec 02; `./boga timings` reads them.
+All required frontend constituent lanes are now green across the aggregate and
+resumed runs, on unchanged app source `b636f234`. All three phone sizes have
+completed personal and group flows plus actual gateway-outage verification.
+Selected stills were reviewed against the repo-native target, including the
+settled small-phone validation error. The final small logging run passed after
+two retained XCTest `kAXErrorInvalidUIElement` restart failures. The readiness
+retry is normalized to Maestro 2.5.1's effective maximum of three; it does not
+catch or waive native HTTP errors, and all persistence assertions remain.
+
+Remaining work: PR review, hosted migration/function rollout and deployed smoke,
+then client activation. The intended release channel and deployed MCP/consent
+URLs still need to be supplied. No hosted mutation or client activation is
+claimed by these local results. Do not retire the plan early.
+
+### Hosted release preflight (read-only, 2026-09-27)
+
+The existing checkout points to **BOGA_DEV** (`onluhhnvvmknqzdxgntl`). This is
+a candidate, not a confirmed release target. From PR #370 at `0a0e39bc`, the
+repository-pinned Supabase CLI 2.117.0 connected to that project with
+`db push --project-ref onluhhnvvmknqzdxgntl --include-all --dry-run`.
+Its structured result reported `dryRun: true`, exactly the two migrations below,
+and no seeds or roles. Independent read-only project inspection found 27 earlier
+migrations applied and `agent-api` / `group-eval` active at version 1, both with
+`verify_jwt=false`. The dry run performed no hosted write.
+
+| Pending migration, in order | SHA-256 of reviewed file |
+| --- | --- |
+| `20260926181114_m27_bodyweight_sync.sql` | `4d827d6c2ef9313071d27e1cfbe19c642818623210d820fef6669eccf4594250` |
+| `20260927073000_m27_group_metrics.sql` | `52c99eaa73ba8cc7c7e5c1bb12f282bc60d858c6031926e54eed011310ba0015` |
+
+Before a hosted write, identify the intended project and repeat this exact
+dry run from the reviewed commit. If its migration list or file hashes differ,
+stop and review the drift. Then follow [RUNBOOK's server-first procedure](../../../RUNBOOK.md#bodyweight-feature-rollout-m27), recording:
+
+| Release phase | Evidence needed before proceeding |
+| --- | --- |
+| Schema and functions | Applied migration versions; matching `agent-api` and `group-eval` deployed from the full checkout; function versions and evaluator URL; both metric queues drain |
+| Compatibility and privacy | Old layers 0–3 readable; old omitted-field writer preserves populated new fields; layer 4 restores frozen tuple and private readings; cross-owner reading denied |
+| Group transitions | Two dedicated members reverse relative/absolute rank; missing B allows only eligible reps; rules revision publishes one board; correction invalidates only affected attestation; former records retain meaning |
+| Coaching and activation | Deployed API/MCP values match the app; hosted OAuth/discovery/revocation succeeds at the intended MCP and consent URLs; only then activate the chosen client channel |
+
+The intended project, deployed MCP/consent URLs, dedicated test-account access
+and client channel remain release inputs. No hosted smoke or activation is
+claimed. Keep historical backfill and legacy-load conversion explicit user
+operations; if hosted validation fails, hold the client and use the RUNBOOK's
+forward repair without dropping saved tuples.
 
 ## Milestone acceptance
 

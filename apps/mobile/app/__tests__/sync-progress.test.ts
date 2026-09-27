@@ -31,7 +31,7 @@ describe('sync progress snapshot seam', () => {
   });
 
   it('exposes the fixed four-layer denominator', () => {
-    expect(PULL_LAYER_COUNT).toBe(4);
+    expect(PULL_LAYER_COUNT).toBe(5);
   });
 
   it('returns the latest snapshot a producer publishes', () => {

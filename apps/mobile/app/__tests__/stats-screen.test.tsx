@@ -1912,3 +1912,16 @@ describe('StatsRoute — view mode toggle search query reset', () => {
     expect(screen.getByTestId('stats-search-input').props.value).toBe('');
   });
 });
+
+
+it('keeps partial volume readable in the exercise table and names total bodyweight strength', () => {
+  render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseListItems: [{
+    id: 'bw', name: 'Pull-up', bodyweight: true, setCount: 2, nearFailureCount: 2,
+    totalVolume: null, knownVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
+  }] })} />);
+  expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');
+  expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
+  expect(screen.getByText('Total 1RM · kg')).toBeTruthy();
+  expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
+    .toBe('Open Pull-up heatmap. 2 sets, 2 working sets. Volume 800 · incomplete. Estimated total one rep max 128 kg');
+});

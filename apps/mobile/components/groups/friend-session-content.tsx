@@ -4,7 +4,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { computeSetVolume } from '@/src/exercise-calculations';
+import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
+import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
+import { computeGroupSessionMetrics, groupSessionWeightSnapshot } from '@/src/groups/session-metrics';
 import {
   formatGroupDateTime,
   formatMemberName,
@@ -12,7 +14,7 @@ import {
   selectGroupPerformedExercises,
   type GroupSessionDetail,
 } from '@/src/groups';
-import { formatSetRow, formatVolumeFigure } from '@/src/session-recorder/session-view-model';
+import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
 const IN_PROGRESS_LABEL = 'In progress';
 
@@ -29,20 +31,20 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
  */
 export function FriendSessionContent({ session }: { session: GroupSessionDetail }) {
   const model = useMemo(() => {
-    let setCount = 0;
-    let volume = 0;
-    const cards = selectGroupPerformedExercises(session.exercises).map((exercise) => {
-      setCount += exercise.sets.length;
-      for (const set of exercise.sets) volume += computeSetVolume(set.weightKg, set.reps);
-      return {
-        id: exercise.sessionExerciseId,
-        name: exercise.name,
-        rows: exercise.sets.map((set) =>
-          formatSetRow({ id: set.setId, weight: set.weightKg, reps: set.reps, setType: set.setType, done: true })
-        ),
-      };
-    });
-    return { cards, setCount, volume: formatVolumeFigure(volume) };
+    const metrics = computeGroupSessionMetrics(session.exercises, session);
+    const cards = selectGroupPerformedExercises(session.exercises, session).map(exercise => ({
+      id: exercise.sessionExerciseId,
+      name: exercise.name,
+      rows: exercise.sets.map(set => formatSetRow({ id: set.setId, weight: set.enteredWeight,
+        reps: set.reps, setType: set.setType, done: true, loadContext: exercise.loadContext,
+        weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode })),
+    }));
+    const summary = sessionVolumeSummary(metrics.coverage);
+    const basis = metrics.basis === 'personal'
+      ? 'Personal metrics · this member’s exercise settings and saved session weight.'
+      : 'Original entered-load metrics · bodyweight context is unavailable in this older result.';
+    return { cards, setCount: metrics.performedSets, volume: summary.volume,
+      note: [basis, summary.volumeNote].filter(Boolean).join(' ') };
   }, [session]);
 
   const isActive = session.status === 'active';
@@ -50,6 +52,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
   return (
     <>
       <SessionFactsCard
+        note={model.note}
         facts={[
           { label: 'Gym', value: session.gym_name?.trim() || 'No gym', kind: 'text', testID: 'group-session-gym' },
           { label: 'Sets', value: String(model.setCount), testID: 'group-session-sets' },
@@ -76,6 +79,10 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
           testID: 'group-session-times',
         }}
       />
+      {session.metric_revision === 'effective_load_v1' ? (
+        <SessionBodyWeight editable={false} sessionId={session.session_id}
+          snapshot={groupSessionWeightSnapshot(session)} onSaved={() => {}} />
+      ) : null}
       {model.cards.length === 0 ? (
         <Text allowFontScaling={false} style={styles.empty} testID="group-session-no-sets">
           No performed sets yet.

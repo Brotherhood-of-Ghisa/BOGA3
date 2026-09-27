@@ -1,5 +1,10 @@
 # Sync v2 Server Contract
 
+M27 adds owner-private readings and frozen session/load inputs (A.2.11,
+B.3.3, B.4.1). See [bodyweight semantics](bodyweight-load-contract.md) for their
+meaning. Deploy the additive server migration before the new sync client;
+entry, historical backfill and group-score activation are separate work.
+
 > **Promoted from the sync-v2 plan; this is the authoritative sync-v2 server
 > contract.** It merges the two former design docs (`t1` — server schema &
 > drift control; `t2` — push/pull RPC protocol) into one normative reference
@@ -32,7 +37,7 @@ of it.**
 
 # Part A — Server schema
 
-The server is a typed mirror of the ten client entity tables. One
+The server is a typed mirror of the eleven client entity tables. One
 `app_public.<entity>` table per client Drizzle table; no projection function,
 no event log, no per-row dispatch. Every write reaches the tables through the
 push RPC (Part B); the server is otherwise not a write source.
@@ -42,7 +47,7 @@ push RPC (Part B); the server is otherwise not a write source.
 These invariants hold for every table below.
 
 - **Server schema mirrors client.** One `app_public.<entity>` table per client
-  Drizzle table for the ten user-owned entities.
+  Drizzle table for the eleven user-owned entities.
 - **Composite PK `(owner_user_id, id)`** on every table. Column order is
   owner-first so the canonical pull query (`where owner_user_id = … order by
   server_received_at`) leads with the PK column.
@@ -105,7 +110,7 @@ These invariants hold for every table below.
 
 > **Build note (verified).** A.1's schema rules are confirmed against the
 > clean-room migration: composite PKs, `bigint` timestamps, `deleted_at bigint`
-> on all ten tables (`exercise_group_links` from its own M25 migration, A.2.10),
+> on all eleven tables (`exercise_group_links` from its own M25 migration, A.2.10),
 > only the named M19 load-mode CHECK, no `extras` column, no `deleted`
 > boolean, and the non-unique form of every slot/pair index. The drift checker
 > independently asserts the single named M19 CHECK, no-`extras`, no-`deleted` (see A.7).
@@ -176,9 +181,9 @@ Every table also gets the **identical** index
 below.
 
 > **Build note (verified).** All three universal columns, the
-> `<table>_owner_received_idx` index, and both triggers exist on all ten
-> tables (nine from the clean-room migration, `exercise_group_links` from
-> `20260913170000_m25_exercise_group_links.sql`); the drift checker asserts the
+> `<table>_owner_received_idx` index, and both triggers exist on all eleven
+> tables (nine from the clean-room migration, `exercise_group_links` from M25,
+> and `body_weight_measurements` from M27); the drift checker asserts the
 > index and both triggers per entity.
 
 ### A.2.1 `gyms`
@@ -217,6 +222,10 @@ Source: `apps/mobile/src/data/schema/sessions.ts`.
 | `startedAt` | `started_at` | `bigint` | NO | — | — | — |
 | `completedAt` | `completed_at` | `bigint` | YES | — | yes (`sessions_completed_at_idx`) | — |
 | `durationSec` | `duration_sec` | `integer` | YES | — | — | — |
+| `bodyWeightKg` | `body_weight_kg` | `double precision` | YES | — | — | — |
+| `bodyWeightSource` | `body_weight_source` | `text` | YES | — | — | — |
+| `bodyWeightMeasurementId` | `body_weight_measurement_id` | `text` | YES | — | — | **none** (frozen provenance) |
+| `bodyWeightMeasuredAt` | `body_weight_measured_at` | `bigint` | YES | — | — | — |
 | `deletedAt` | `deleted_at` | `bigint` | YES | — | yes (`sessions_deleted_at_idx`) | — |
 | `createdAt` | `created_at` | `bigint` | NO | — | — | — |
 | `updatedAt` | `updated_at` | `bigint` | NO | — | — | — |
@@ -256,6 +265,10 @@ Source: `apps/mobile/src/data/schema/exercise-sets.ts`.
 | `sessionExerciseId` | `session_exercise_id` | `text` | NO | — | yes (`exercise_sets_session_exercise_id_idx`) | `(owner_user_id, session_exercise_id) → session_exercises(owner_user_id, id)` `on delete cascade` deferred |
 | `orderIndex` | `order_index` | `integer` | NO | — | — | — |
 | `weightValue` | `weight_value` | `text` | NO | `''` | — | — |
+| `weightUnit` | `weight_unit` | `text` | NO | `'kg'` | — | — |
+| `externalLoadMode` | `external_load_mode` | `text` | YES | — | — | — |
+| `plannedWeightUnit` | `planned_weight_unit` | `text` | YES | — | — | — |
+| `plannedExternalLoadMode` | `planned_external_load_mode` | `text` | YES | — | — | — |
 | `repsValue` | `reps_value` | `text` | NO | `''` | — | — |
 | `setType` | `set_type` | `text` | YES | — | — | — |
 | `plannedWeightValue` | `planned_weight_value` | `text` | YES | — | — | — |
@@ -280,6 +293,9 @@ Source: `apps/mobile/src/data/schema/exercise-definitions.ts`.
 | `id` | `id` | `text` | NO | — | part of PK |
 | `name` | `name` | `text` | NO | yes (`exercise_definitions_name_idx`) | — |
 | `loadInputMode` | `load_input_mode` | `text` | NO | — | — |
+| `bodyweightCoefficient` | `bodyweight_coefficient` | `double precision` | NO (default 0) | — | — |
+| `movementStandard` | `movement_standard` | `text` | YES | — | — |
+| `loadingMethod` | `loading_method` | `text` | YES | — | — |
 | `deletedAt` | `deleted_at` | `bigint` | YES | yes (`exercise_definitions_deleted_at_idx`) | — |
 | `createdAt` | `created_at` | `bigint` | NO | — | — |
 | `updatedAt` | `updated_at` | `bigint` | NO | — | — |
@@ -311,7 +327,7 @@ uniform; local readers filter `WHERE deleted_at IS NULL`.
 
 #### A.2.6.1 `muscle_group_id` is a synced-parent FK
 
-`muscle_groups` is one of the ten user-owned synced entities (A.2.9), seeded as
+`muscle_groups` is one of the eleven user-owned synced entities (A.2.9), seeded as
 a starter catalog and then synced per-user like `exercise_definitions`. So
 `muscle_group_id` is **not** opaque text: it is a real composite FK into
 `app_public.muscle_groups(owner_user_id, id)` (constraint
@@ -390,7 +406,7 @@ cross the wire (A.3).
 Source: `apps/mobile/src/data/schema/exercise-group-links.ts`; server migration
 `20260913170000_m25_exercise_group_links.sql` (M25). A member's link from one
 of their own exercises to a group exercise. It is the member's own data, so it
-is a Sync v2 entity like the other nine — not a group table. A **Layer 1**
+is a Sync v2 entity like the other ten — not a group table. A **Layer 1**
 entity: its only FK parent is `exercise_definitions` (Layer 0).
 
 | Client column | Server column | Server type | Null | Indexed | FK |
@@ -438,9 +454,34 @@ PK `(owner_user_id, id)`. No CHECK constraints (A.1).
   breaks the local CHECK fails the layer-1 page apply (INTERNAL), and pull
   cannot advance past it.
 
+### A.2.11 `body_weight_measurements`
+
+Source: `apps/mobile/src/data/schema/body-weight-measurements.ts`; migration
+`20260926181114_m27_bodyweight_sync.sql`. Normal owner-scoped mirror, no entity FKs.
+
+| Client column | Server column | Server type | Null | Indexed | FK |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `id` | `text` | NO | — | part of PK |
+| `weightValue` | `weight_value` | `text` | NO | — | — |
+| `weightUnit` | `weight_unit` | `text` | NO | — | — |
+| `weightKg` | `weight_kg` | `double precision` | NO | — | — |
+| `measuredAt` | `measured_at` | `bigint` | NO | yes (`body_weight_measurements_measured_at_idx`) | — |
+| `createdAt` | `created_at` | `bigint` | NO | — | — |
+| `updatedAt` | `updated_at` | `bigint` | NO | — | — |
+| `deletedAt` | `deleted_at` | `bigint` | YES | yes (`body_weight_measurements_deleted_at_idx`) | — |
+
+Includes universal owner/received index, envelope columns, structural triggers,
+owner RLS and restrictive OAuth direct-access denial. Unit/value/date validation
+belongs at client entry; the server remains a typed mirror. Source identity in
+`sessions` is not an FK and never dereferenced to refresh the saved tuple.
+Account-switch wipe, developer reset and `dev_wipe_my_data` include readings.
+A new **layer 4** avoids introducing an unknown type into legacy pulls and avoids
+missing old readings behind an existing cursor. It is a root entity despite
+being pulled last. There remain ten cross-entity FKs.
+
 ## A.3 Local schema additions (mechanism)
 
-Sync v2 adds local-only sync-bookkeeping columns to the ten client tables.
+Sync v2 adds local-only sync-bookkeeping columns to the eleven client tables.
 They are set/cleared by the sync engine and **never travel on the wire**. The
 canonical names and types are owned by Part B (B.9): `local_dirty` and
 `local_updated_at_ms` on each entity table, plus singleton state on
@@ -462,13 +503,15 @@ drift check at PR time. See A.9 for the worked example.
 ```jsonc
 {
   "exemptions": {
-    "local_only_columns": ["local_dirty", "local_updated_at_ms"]
+    "local_only_columns": ["local_dirty", "local_updated_at_ms", "local_bodyweight_metadata_known"]
   }
 }
 ```
 
 > **Build note (verified).** The as-built `sync-extras.json` matches: only the
-> two `local_only_columns` remain. There is no `untyped_text_references` entry —
+> two universal bookkeeping columns plus M27
+> `local_bodyweight_metadata_known` on sessions, exercise definitions and sets.
+> There is no `untyped_text_references` entry —
 > the former `muscleGroupId` waiver was removed when `muscle_groups` became a
 > typed synced entity (A.2.9) and `muscle_group_id` gained its real FK (A.5.2),
 > so the checker now enforces the typed-column and FK rule on that column like
@@ -477,7 +520,7 @@ drift check at PR time. See A.9 for the worked example.
 
 ### A.3.1 `deleted_at` columns
 
-All ten tables carry `deleted_at` (`bigint`, nullable) plus a
+All eleven tables carry `deleted_at` (`bigint`, nullable) plus a
 `<table>_deleted_at_idx` index. The tables that previously lacked it on the
 client (`gyms`, `session_exercises`, `exercise_sets`,
 `exercise_muscle_mappings`, `session_exercise_tags`) gained it in the v2 build
@@ -543,7 +586,7 @@ COMMIT-time failure is a defense-in-depth backstop only; there is no retry path.
 
 ### A.6.1 Universal shape
 
-Identical for all ten tables (substitute `<table>`):
+Identical for all eleven tables (substitute `<table>`):
 
 ```sql
 alter table app_public.<table> enable row level security;
@@ -642,7 +685,7 @@ Location: `apps/mobile/scripts/check-sync-schema-drift.ts`. Command:
 1. Reset the local Postgres (apply all migrations) unless `--skip-reset`.
 2. `drizzle-kit export` → in-memory SQLite; introspect via PRAGMAs.
 3. Derive `ENTITY_TABLES` = every `app_public` table with an `owner_user_id`
-   column (do **not** hardcode the count — there are ten today — A.7.7).
+   column (do **not** hardcode the count — there are eleven today — A.7.7).
 4. Per entity: walk client→server (every client column must map to a typed
    server column of compatible type, unless `local_only` or
    `untyped_text_references`), and server→client (a server column with no client
@@ -689,6 +732,7 @@ export const TOPO_LAYERS: readonly (readonly string[])[] = [
   ['sessions', 'exercise_muscle_mappings', 'exercise_tag_definitions', 'exercise_group_links'], // Layer 1
   ['session_exercises'],                                                                        // Layer 2
   ['exercise_sets', 'session_exercise_tags'],                                                   // Layer 3
+  ['body_weight_measurements'], // Layer 4, capability-gated independent root
 ];
 ```
 
@@ -719,7 +763,7 @@ strictly earlier layer or is a self-edge**. The assertion:
 The client-schema-drift rule lives in `docs/specs/05-data-model.md`
 ("Client schema drift rule (Sync v2)") because that file is always-loaded for
 agents and already owns the sync-impact gate. The rule requires a paired,
-deployed-first server migration for any new domain column on the ten entity
+deployed-first server migration for any new domain column on the eleven entity
 tables, enforced by the drift checker. It does not apply to adding a value to an
 existing column (the column exists on both sides; the server stores arbitrary
 text per A.1).
@@ -792,7 +836,7 @@ carries the LWW key; `fields` carries every typed column (including
 }
 ```
 
-- `type` — one of the ten entity names (plural, snake_case), matching the
+- `type` — one of the eleven entity names (plural, snake_case), matching the
   Part A table names.
 - `id` — client-assigned (ULID for user rows, slug for seeds), stable forever.
 - `client_updated_at_ms` — epoch ms, the LWW key, `>= 0`, produced by the
@@ -875,10 +919,21 @@ under `fields.<wire_key>` (snake_case Postgres column name); nullable columns
 get JSON null. Local-only sync columns (B.9) must not appear; any other client
 column is drift, caught at PR time.
 
+**M27 older-writer compatibility:** on an accepted LWW update, each new field
+in A.2.2/A.2.4/A.2.5 is assigned only when that key is present in `fields`.
+An older full-row writer cannot reset snapshots, coefficients, standards or
+actual/planned load metadata merely by omitting them. Explicit null clears
+nullable columns; non-null coefficient/unit fields reject null. An insert from
+an older writer defaults coefficient to 0 and actual unit to kg; other new
+columns start null. This preserves row LWW, not independent field clocks.
+Current writers send complete session provenance tuples; T04/T06 validate them
+at the application boundary. Reinstall/normal autosave never resolves the
+source id into a new body weight.
+
 ### B.3.4 Building the batch
 
 The client must never push a child whose parent is neither in the batch nor on
-the server (B.10 #6). It satisfies this by walking the ten tables in a fixed
+the server (B.10 #6). It satisfies this by walking the eleven tables in a fixed
 **topological order** when collecting dirty rows.
 
 #### B.3.4.1 Topological order
@@ -889,6 +944,7 @@ the server (B.10 #6). It satisfies this by walking the ten tables in a fixed
 | 1 | `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links` | `sessions → gyms`; `exercise_muscle_mappings → exercise_definitions`, `→ muscle_groups`; `exercise_tag_definitions → exercise_definitions`; `exercise_group_links → exercise_definitions` |
 | 2 | `session_exercises` | `→ sessions`, `→ exercise_definitions` |
 | 3 | `exercise_sets`, `session_exercise_tags` | `exercise_sets → session_exercises`; `session_exercise_tags → session_exercises`, `→ exercise_tag_definitions` |
+| 4 | `body_weight_measurements` | none; separate capability and cursor for compatibility |
 
 No table has a within-layer FK and none is self-referential, so any intra-layer
 order is safe. This layering is hardcoded in
@@ -970,7 +1026,8 @@ on the client.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `layer` | integer `0..3` | The topological layer being drained (mapping = B.3.4.1). |
+| `layer` | integer `0..4` | Layers 0–3 retain legacy behavior. Layer 4 requires the capability below (mapping = B.3.4.1). |
+| `capabilities` | optional string array | `bodyweight_v1` enables layer 4; omitted/invalid capability denies that layer. Existing layers never emit readings. |
 | `cursor` | object or `null` | Opaque; round-trip the value the server emitted. `null` = snapshot/initial pull of this layer. Each layer has its own cursor. |
 | `cursor.{server_received_at, owner_user_id, type, id}` | — | The four tiebreak axes from the last row of the previous page. |
 | `limit` | integer `1..200` | Default 200. |
@@ -980,10 +1037,30 @@ on the client.
 > single-jsonb fallback routes the raw body, and the body reads `payload->'layer'`,
 > `payload->'cursor'`, `payload->'limit'`. It is `security invoker`, granted
 > `execute` to `authenticated`, `service_role`, and `anon` (same `AUTH_REQUIRED`
-> rationale as push). `layer` must be an integer `0..3`; `limit` an integer
+> rationale as push). `layer` must be an integer `0..4` (4 requires `bodyweight_v1`); `limit` an integer
 > `1..200` defaulting to 200; `cursor` either null/absent or an object carrying
-> all four keys with a `type` that is one of the ten entity types — otherwise
+> all four keys with a `type` that is one of the eleven entity types — otherwise
 > `INTERNAL`.
+
+Migration `0008_ordinary_bill_hollister.sql` marks pre-M27 sessions, exercise
+definitions and sets with `local_bodyweight_metadata_known = false`, and removes
+only their layer 0/1/3 cursors. A legacy reader could have advanced past new
+fields it ignored; replay is required even though the server is additive.
+Other runtime bookkeeping, layer 2, dirty flags and LWW clocks are unchanged.
+New rows default to known metadata. Unknown metadata keys are omitted from
+push, never emitted as placeholder defaults. The first complete metadata
+projection hydrates just those unknown fields even if the local row clock is
+equal/newer; ordinary fields and dirty state are untouched. The marker becomes
+true in that transaction, so subsequent updates obey normal row LWW. New
+feature writers that explicitly establish an entire metadata tuple mark it
+known in the same transaction; ordinary autosaves never change the marker.
+Do not treat unknown metadata as an established bodyweight configuration.
+
+The new reading entity starts absent layer 4 at null. Its request is `{ "layer": 4, "cursor": null, "limit": 200,
+"capabilities": ["bodyweight_v1"] }`. Every page of that layer retains the
+capability. The fresh cursor restores all readings, even those older than the
+legacy cursors. No new runtime-state column is required; existing affected layers replay only
+once during the local schema upgrade.
 
 ### B.4.2 Response
 
@@ -1030,7 +1107,7 @@ limitation; future hardening could use `pg_xact_commit_timestamp(xmin)`.
 > **Build note (verified).** The as-built query fetches `limit + 1` rows to
 > compute `has_more`, then trims the overshoot row and strips the cursor-axis
 > fields (`owner_user_id`, `server_received_at`) off each emitted envelope. The
-> static `UNION ALL` over all ten tables is scoped to the layer by
+> static `UNION ALL` over all eleven tables is scoped to the layer by
 > `type = any(v_types)`; each leg also carries an explicit
 > `where owner_user_id = auth.uid()` to pin the planner on
 > `<table>_owner_received_idx`. The known race is documented in the migration
@@ -1086,11 +1163,11 @@ page.
 
 ### B.4.7 Cursor lifecycle
 
-There are **four cursors**, one per layer, advancing independently; push affects
+There are **five cursors**, one per layer, advancing independently; push affects
 none of them. A cursor advances only after its layer's page COMMIT succeeds; a
-rolled-back apply leaves all cursors unchanged. The four are stored in
+rolled-back apply leaves all cursors unchanged. The five are stored in
 `sync_runtime_state.pull_cursor` as a JSON object keyed by layer index
-(`"0".."3"`); see B.9.2.
+(`"0".."4"`); see B.9.2.
 
 ## B.5 First sign-in
 
@@ -1099,7 +1176,7 @@ On first successful sign-in (no `bootstrap_completed_at` in
 pulls everything (each layer's cursor = null) and pushes whatever is locally
 dirty; LWW reconciles. No modal, no user choice.
 
-`bootstrap_completed_at` is set the first time all four layers drain to
+`bootstrap_completed_at` is set the first time all five layers drain to
 `has_more = false` in one cycle. It is a cold-start UX surface only; the
 protocol does not branch on it.
 
@@ -1113,11 +1190,11 @@ account (RLS sets `owner_user_id = auth.uid()`) and break B.3.4.3's
 
 ### B.6.1 What a cycle does
 
-1. **Pull** — drain all four layers in order (B.4.4), applying each page (B.4.5)
+1. **Pull** — drain all five layers in order (B.4.4), applying each page (B.4.5)
    and advancing `cursors[layer]` after each.
 2. **Push** — repeatedly `selectPushBatch` (B.3.4) + `sync_push` until the dirty
    stream is exhausted.
-3. **Re-pull** — drain all four layers again; if a full round APPLIED no rows in
+3. **Re-pull** — drain all five layers again; if a full round APPLIED no rows in
    either direction — every re-pull page empty or a pure no-op (re-delivering
    rows the device already holds at an equal-or-older timestamp), and the push
    leg sent nothing — the cycle converged; otherwise apply and continue.
@@ -1178,7 +1255,7 @@ such a no-op as motion and spin a pointless extra round.
 When the dirty stream exceeds 200 rows, batch N's ack must be applied (dirty
 bits cleared on committed rows) before batch N+1 is built, else N+1 re-sends.
 
-### B.6.4 Why four cursors
+### B.6.4 Why five cursors
 
 Per-layer cursors give the FK-closure guarantee on apply (each layer-K page
 applies after layers 0..K-1 are local). One cursor can't; per-table cursors give
@@ -1193,6 +1270,11 @@ default 0` (1 iff the row needs pushing) and `local_updated_at_ms integer not
 null default 0` (the row's client-monotonic timestamp, sent as
 `client_updated_at_ms`). Neither crosses the wire. `local_dirty = 0` ⇒ the
 server has the row (it only clears via push ack or pull apply).
+
+M27 also stores `local_bodyweight_metadata_known` on sessions, exercise
+definitions and sets. It is a local upgrade marker, not a conflict clock, and
+never crosses the wire (B.4.1). Hydrating unknown metadata preserves both dirty
+bit and row timestamp; normal known-field conflicts still obey row LWW.
 
 ### B.7.2 Setting and clearing
 
@@ -1234,7 +1316,7 @@ module-scoped cache mirrors the persisted value for tight loops.
 
 ### B.9.1 The two entity columns
 
-All ten entity tables gain `local_dirty` (SQLite 0/1, default 0) and
+All eleven entity tables gain `local_dirty` (SQLite 0/1, default 0) and
 `local_updated_at_ms` (epoch ms, default 0) — snake_case in SQLite,
 `localDirty` / `localUpdatedAtMs` in Drizzle. Both are local-only: the push
 serialiser omits them (B.3.3); the pull apply writes them (B.4.5).
@@ -1242,7 +1324,7 @@ serialiser omits them (B.3.3); the pull apply writes them (B.4.5).
 ### B.9.2 The pull cursors
 
 Stored as a single JSON column `pull_cursor` (default `{}`) on
-`sync_runtime_state`, keyed by layer index `"0".."3"`. Each entry is absent/null
+`sync_runtime_state`, keyed by layer index `"0".."4"`. Each entry is absent/null
 (snapshot) or the opaque blob `{server_received_at, owner_user_id, type, id}`.
 Each advances independently after that layer's page COMMIT (B.4.7).
 
@@ -1256,7 +1338,7 @@ Each advances independently after that layer's page COMMIT (B.4.7).
 The two entity columns are registered globally in `sync-extras.json` under
 `exemptions.local_only_columns`. `sync_runtime_state` is **not** in the drift
 checker's scope (it has no server counterpart by design — the checker scans only
-the ten entity tables), so `pull_cursor`, `last_emitted_ms`, and
+the eleven entity tables), so `pull_cursor`, `last_emitted_ms`, and
 `bootstrap_completed_at` need no registration.
 
 ### B.9.5 Push serialiser exclusion

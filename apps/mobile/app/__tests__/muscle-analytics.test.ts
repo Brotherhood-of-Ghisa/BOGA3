@@ -41,9 +41,11 @@ describe('per-side load semantics', () => {
   });
 
   it('combines barbell and dumbbell chest work on the same per-side basis', () => {
-    expect(contributionFor('total_load', '45') + contributionFor('per_side_load', '22')).toBe(
-      44.5
-    );
+    const barbell = contributionFor('total_load', '45');
+    const dumbbell = contributionFor('per_side_load', '22');
+    expect(barbell).not.toBeNull(); expect(dumbbell).not.toBeNull();
+    if (barbell == null || dumbbell == null) throw new Error('Expected complete conventional volume');
+    expect(barbell + dumbbell).toBe(44.5);
   });
 
   it('aggregates different exercises hitting the same muscle into daily and weekly volume', () => {

@@ -1,0 +1,568 @@
+appId: com.dinoderek.mobile
+---
+# Weight-entry sheets shrink below screen center when their keyboard closes.
+# Dismiss each keyboard explicitly before navigation, and locate sheet fields
+# without centering swipes through the backdrop. Decimal pads use the neutral
+# field label; the single-line date field uses its native Return key.
+# M27: real local entry, history, frozen new-session context and explicit correction.
+# Infra-free: writes do not depend on auth/server availability. Start/end reset.
+- runScript: ../scripts/bodyweight-dates.js
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    text: "Continue"
+    optional: true
+- tapOn:
+    text: "Close"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- tapOn:
+    id: "top-level-tab-more"
+- extendedWaitUntil:
+    visible:
+      id: "more-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "more-settings-row"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "settings-body-weight-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: "BW00-settings-entry"
+- tapOn:
+    id: "settings-body-weight-row"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-empty"
+    timeout: 30000
+- takeScreenshot: "BW01-empty"
+- tapOn:
+    id: "body-weight-add"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-value"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-value"
+- eraseText
+- inputText: "0"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-save"
+- assertVisible:
+    text: "Enter a weight greater than zero."
+- takeScreenshot: "BW02-invalid-weight"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-value"
+- eraseText
+- inputText: "80"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-date"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-date"
+- eraseText
+- inputText: "${output.bodyweightFuture}"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-save"
+- assertVisible:
+    text: "The measurement date cannot be in the future."
+- takeScreenshot: "BW03-future-date"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-date"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-date"
+- eraseText
+- inputText: "${output.bodyweightPast}"
+- pressKey: Enter
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-feedback"
+    timeout: 30000
+# Feedback can already exist behind the editor; wait for native dismissal
+# before the next navigation tap.
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Reading saved. Existing sessions are unchanged."
+- takeScreenshot: "BW04-populated"
+- tapOn:
+    id: "body-weight-back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "settings-body-weight-row"
+      text: "Body weight, 80 kg.*"
+    timeout: 10000
+- takeScreenshot: "BW04b-settings-reading"
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "train-start-empty-button"
+    timeout: 30000
+- tapOn:
+    id: "train-start-empty-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 80 kg, .*"
+- assertVisible:
+    id: "session-body-weight"
+    text: ".*Reading from ${output.bodyweightPast}"
+- takeScreenshot: "BW05-session-snapshot"
+- tapOn:
+    id: "top-level-tab-more"
+- extendedWaitUntil:
+    visible:
+      id: "more-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "more-settings-row"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "settings-body-weight-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "settings-body-weight-row"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- tapOn:
+    id: "body-weight-add"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-value"
+- eraseText
+- inputText: "85"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-feedback"
+    timeout: 30000
+# Feedback can already exist behind the editor; wait for native dismissal
+# before the next navigation tap.
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "body-weight-back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "train-resume-session-button"
+    timeout: 30000
+- tapOn:
+    id: "train-resume-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 80 kg, .*"
+- tapOn:
+    id: "top-level-tab-more"
+- extendedWaitUntil:
+    visible:
+      id: "more-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "more-settings-row"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "settings-body-weight-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "settings-body-weight-row"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Edit 80 kg, .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Edit 80 kg, .*"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-sheet"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-delete"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    id: "weight-entry-delete"
+- extendedWaitUntil:
+    visible:
+      text: '^Delete reading\?$'
+    timeout: 10000
+- tapOn:
+    text: "^Delete$"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-feedback"
+    timeout: 30000
+# Feedback can already exist behind the editor; wait for native dismissal
+# before the next navigation tap.
+- extendedWaitUntil:
+    notVisible:
+      id: "weight-entry-sheet"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Reading deleted. Existing sessions are unchanged."
+- takeScreenshot: "BW06-source-deleted"
+- tapOn:
+    id: "body-weight-back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "train-resume-session-button"
+    timeout: 30000
+- tapOn:
+    id: "train-resume-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 80 kg, .*"
+- assertVisible:
+    id: "session-body-weight"
+    text: ".*Reading from ${output.bodyweightPast}"
+- tapOn:
+    id: "session-body-weight"
+- extendedWaitUntil:
+    visible:
+      id: "weight-entry-sheet"
+    timeout: 30000
+- takeScreenshot: "BW07-correction-sheet"
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-value"
+    direction: UP
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-value"
+- eraseText
+- inputText: "82"
+- tapOn:
+    text: "(?i)body weight \\((kg|lb)\\)"
+- waitForAnimationToEnd:
+    timeout: 4000
+- scrollUntilVisible:
+    element:
+      id: "weight-entry-save"
+    direction: DOWN
+    centerElement: false
+    timeout: 15000
+- tapOn:
+    id: "weight-entry-save"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 82 kg, .*"
+- assertVisible:
+    id: "session-body-weight"
+    text: ".*Set manually for this session"
+- takeScreenshot: "BW08-manual-snapshot"
+- tapOn:
+    id: "top-level-tab-more"
+- extendedWaitUntil:
+    visible:
+      id: "more-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "more-settings-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "more-settings-row"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "settings-body-weight-row"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: "settings-body-weight-row"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
+- assertVisible:
+    id: "body-weight-current"
+    text: "Current body weight · kg 85"
+- tapOn:
+    id: "body-weight-back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 30000
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "train-resume-session-button"
+    timeout: 30000
+- tapOn:
+    id: "train-resume-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 30000
+- tapOn:
+    id: "session-view-options-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-abandon"
+    timeout: 30000
+- tapOn:
+    id: "session-view-abandon"
+- assertVisible:
+    text: "Abandon session?"
+- tapOn: "Abandon"
+- extendedWaitUntil:
+    visible:
+      id: "train-start-empty-button"
+    timeout: 30000
+- tapOn:
+    id: "train-start-empty-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+    timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 85 kg, .*"
+- takeScreenshot: "BW09-next-session"
+# A cold process restart keeps both private history and the frozen session.
+# Open the dev-client URL once from a stopped process. Launching and then
+# reopening that URL can tear down the bridge while its WebSocket opens.
+- stopApp
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+# XCTest can briefly invalidate its accessibility root after a process restart.
+# Retry only this read-only readiness check; persisted-data assertions follow.
+- retry:
+    maxRetries: 2
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 4000
+      - extendedWaitUntil:
+          visible:
+            id: "today-screen"
+          timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      text: '(Loading from Metro|Downloading|Bundling).*'
+    timeout: 30000
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-current"
+      text: "Current body weight · kg 85"
+    timeout: 30000
+- openLink: "boga3://train"
+- extendedWaitUntil:
+    visible:
+      id: "train-resume-session-button"
+    timeout: 30000
+- tapOn:
+    id: "train-resume-session-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+      text: "Session body weight, 85 kg, .*"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      text: '(Loading from Metro|Downloading|Bundling).*'
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BW10-restored-session"
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "train-start-empty-button"
+    timeout: 30000
+- tapOn:
+    id: "train-start-empty-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-body-weight"
+      text: "Session body weight, unknown, .*"
+    timeout: 30000
+- extendedWaitUntil:
+    notVisible:
+      text: '(Loading from Metro|Downloading|Bundling).*'
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "BW11-unknown-session"
+- openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000

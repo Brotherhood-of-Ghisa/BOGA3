@@ -1,7 +1,7 @@
 ---
 task_id: M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "node|deno|supabase|sql"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/tech/groups-c
 
 # M27-T09 — Evaluate group scores and certify bodyweight sets
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T06, M27-T08.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D7–D10.
@@ -65,3 +65,32 @@ and `sync-infra`) and `./boga test ios-groups-e2e`; resolve additional lanes
 with `./boga test for`. T12 owns deployed Edge Function smoke/rollout.
 Graduate evaluator/certification rules, attach evidence, mark the milestone
 entry complete and delete this card when shipped.
+
+## Execution checkpoint (2026-09-27)
+
+The shared target-specific scorer and full-graph score adapter are integrated. Tests cover the two-member ranking reversal, group coefficient/distribution authority, assistance, missing/invalid B, dependency-pin propagation and unlinked observations. Database queue/publication, event reconciliation, certification and group readers remain pending.
+
+Full fast and backend gates passed at `19fc54d`: 181 mobile suites / 2,150
+mobile tests, all backend contracts, 6 real-sync suites / 15 tests and real
+OAuth/MCP smoke. Logs: `/tmp/boga-m27-group-score-verified-fast.log` and
+`/tmp/boga-m27-group-score-verified-backend.log`. `./boga timings` and
+`./boga test for` ran. Device gates remain in progress. No new server RPC,
+publisher, certification behavior or group UI is claimed shipped.
+
+
+### Integrated backend checkpoint (2026-09-27)
+
+The migration, Deno evaluator, atomic versioned publication, legacy compatibility,
+metric-specific certification, readers and client decoders are integrated.
+`./boga test backend` passed in full with the expanded `groups-bodyweight.sh`
+body, including actual SQL responses decoded by the mobile guards, paged mixed
+streams, UTF-16 validation, role/privacy checks, generation/lease fencing,
+rollback/retry, legacy activation, archived/former entries and correction pins.
+Evidence: `/tmp/boga-m27-group-integration-backend-3.log`.
+The earlier fast run passed before UI integration; the later full fast gate
+passed with 184 mobile suites / 2,214 tests at this working checkpoint:
+`/tmp/boga-m27-comparison-ui-fast-2.log`. Timings and trigger rules ran.
+
+T10 native rendering and new two-user device
+proof remain in progress. Hosted rollout and final frontend acceptance are
+pending; neither task is shipped.

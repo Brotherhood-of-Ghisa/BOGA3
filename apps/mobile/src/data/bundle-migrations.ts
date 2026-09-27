@@ -28,12 +28,14 @@
 //     ride the normal sync push leg to the server next cycle); a migration must
 //     never flip the dirty bit itself.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { BODYWEIGHT_SEED_RULES, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
 
 import { nowMonotonic, type Transaction } from './clock';
 import {
   CURRENT_APP_VERSION,
   PER_SIDE_LOAD_SEED_IDS,
+  SYSTEM_EXERCISE_DEFINITION_SEEDS,
   readSeedsAppliedMarker,
 } from './exercise-catalog-seeds';
 import { exerciseDefinitions, syncRuntimeState } from './schema';
@@ -57,6 +59,7 @@ const PRIMARY_RUNTIME_STATE_ID = 'primary';
  * migrated rows (or a row the user has since edited) is a safe no-op.
  */
 export interface BundleMigrationRepo {
+  reviseUntouchedBodyweightSeed(id: string, expectedName: string, rules: ExerciseLoadRules): void;
   /**
    * Rewrites the `name` of the exercise definition with the given id from
    * `fromName` to `toName`, but ONLY when the row still holds `fromName` — the
@@ -95,6 +98,8 @@ export interface BundleMigrationRepo {
 export interface BundleMigration {
   /** The catalog-bundle generation this migration belongs to. */
   readonly appVersion: number;
+  /** Unknown old-client metadata must hydrate before a seed patch can claim it. */
+  canApply?(database: LocalDatabase): boolean;
   /** Applies the patch through the dirty-routing repo handle. */
   apply(repo: BundleMigrationRepo): void;
 }
@@ -114,6 +119,21 @@ export const BUNDLE_MIGRATIONS: readonly BundleMigration[] = [
     apply(repo) {
       for (const id of PER_SIDE_LOAD_SEED_IDS) {
         repo.reviseExerciseDefinitionLoadInputMode(id, 'total_load', 'per_side_load');
+      }
+    },
+  },
+  {
+    appVersion: 3,
+    canApply(database) {
+      return database.select({ id: exerciseDefinitions.id }).from(exerciseDefinitions)
+        .where(and(inArray(exerciseDefinitions.id, Object.keys(BODYWEIGHT_SEED_RULES)),
+          isNull(exerciseDefinitions.deletedAt), eq(exerciseDefinitions.localBodyweightMetadataKnown, false)))
+        .all().length === 0;
+    },
+    apply(repo) {
+      for (const seed of SYSTEM_EXERCISE_DEFINITION_SEEDS) {
+        const rules = BODYWEIGHT_SEED_RULES[seed.id];
+        if (rules) repo.reviseUntouchedBodyweightSeed(seed.id, seed.name, rules);
       }
     },
   },
@@ -166,6 +186,15 @@ export const __setCurrentAppVersionForTests = (version: number | null): void => 
  * rows commit atomically with the marker advance and ride the next sync push.
  */
 const createBundleMigrationRepo = (tx: Transaction): BundleMigrationRepo => ({
+  reviseUntouchedBodyweightSeed(id, expectedName, rules) {
+    tx.update(exerciseDefinitions).set({ ...rules, localBodyweightMetadataKnown: true,
+      updatedAt: new Date(), localDirty: true, localUpdatedAtMs: nowMonotonic(tx) })
+      .where(and(eq(exerciseDefinitions.id, id), eq(exerciseDefinitions.name, expectedName),
+        isNull(exerciseDefinitions.deletedAt), eq(exerciseDefinitions.localBodyweightMetadataKnown, true),
+        eq(exerciseDefinitions.bodyweightCoefficient, 0), isNull(exerciseDefinitions.movementStandard),
+        isNull(exerciseDefinitions.loadingMethod)))
+      .run();
+  },
   reviseExerciseDefinitionName: (id, fromName, toName) => {
     const stampMs = nowMonotonic(tx);
     tx.update(exerciseDefinitions)
@@ -268,6 +297,7 @@ export const runBundleMigrations = (database: LocalDatabase): void => {
   let marker = applied;
 
   for (const migration of pending) {
+    if (migration.canApply && !migration.canApply(database)) return;
     database.transaction((tx) => {
       migration.apply(createBundleMigrationRepo(tx as Transaction));
       advanceAppliedMarker(tx as Transaction, migration.appVersion);

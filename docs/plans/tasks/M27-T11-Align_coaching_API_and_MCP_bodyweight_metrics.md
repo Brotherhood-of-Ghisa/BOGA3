@@ -1,7 +1,7 @@
 ---
 task_id: M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "node|deno|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/tech/bodyweight-load-contract.md, docs/specs/10-api-au
 
 # M27-T11 — Align coaching API and MCP bodyweight metrics
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T07.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D1–D6, D10.
@@ -51,3 +51,60 @@ OAuth-to-MCP path. Run `./boga test fast`, `./boga test backend`,
 `./boga test mcp-smoke`; use `./boga test for` for the final diff.
 T12 owns deployed API/MCP smoke and release ordering. Graduate API semantics,
 attach evidence, mark the milestone entry complete and delete this card when shipped.
+
+## Implementation checkpoint — 2026-09-27
+
+API/MCP implementation is integrated, with runtime verification pending. The
+owner-filtered API adapter uses mobile's load/snapshot boundary; raw entered
+unit/mode, effective load, metric basis, saved B/provenance and coverage remain
+separate. Existing kg external-load fields are retained with additive
+`effective_load_v1` semantics. Incomplete/truncated totals stay unavailable.
+MCP keeps four read-only tools and passes enriched JSON through unchanged.
+
+The backend contract adds conventional/BW-only/added/assisted/lb/per-side,
+missing/malformed/estimated B, explicit correction, later-reading invariance,
+partial-workout coverage and legacy ambiguity cases. Existing OAuth, ownership,
+denial and revocation coverage stays. The real MCP smoke now checks B80 +20×8
+=800 across API and protocol; unit fixtures preserve null/coverage in both JSON
+channels. API and MCP TypeScript overlays and Bash syntax checks passed; they
+are preparation checks, not runtime gates.
+
+Integrated while T07's device sequence runs with mobile code fixed at f9d5b56;
+none of this task's implementation files changes that app build. Run full fast
+and backend (including MCP smoke) after the native sequence: the backend drift
+negative fixture temporarily edits a mobile schema file and must not race Metro.
+No hosted deployment or shipping completion is claimed.
+
+The actual `./boga test mcp-unit` lane passed (5 tests, typecheck and build):
+`/tmp/boga-m27-coaching-mcp-unit.log`. Actual API source also typechecks with
+the installed pinned Supabase types and a minimal Deno-global declaration;
+this does not replace the pending real Edge Function backend contracts.
+`docs-check` and `git diff --check` passed.
+
+Actual API verification (2026-09-27): `./boga test agent-api` passed all new
+bodyweight/parity/completeness vectors and the existing owner/OAuth/write-denial/
+revocation cases. Log: `/tmp/boga-m27-coaching-agent-api-fix.log`. The initial
+aggregate stopped when a fixture update lacked its owner database identity; the
+fixture now sets that identity and keeps ownership triggers enabled. The full
+fast aggregate also passed, including five MCP tests and build, at `5f9e3f6`
+(`/tmp/boga-m27-offline-fast-final.log`). Remaining backend lanes/MCP smoke run
+sequentially before native verification; no full backend completion claimed yet.
+
+The remaining schema/push/pull/wipe/drift lanes passed. Sync e2e initially
+exposed the second host-clock clamp assertion (Docker measured 24 ms ahead);
+like the existing push-contract check it now compares to the server transaction
+acknowledgement, within the PostgreSQL/ISO 1 ms rounding difference, and also
+asserts the lower bound. All ten sync e2e tests then passed in
+`/tmp/boga-m27-offline-sync-v2-e2e-verified.log`, including synthetic drift and
+as-built zero-error/zero-warning recovery. `./boga doctor` passed.
+
+All backend lanes are now green for the coaching/offline integration. Auth,
+group contract/evaluator/board/certification lanes passed in
+`/tmp/boga-m27-coaching-offline-backend.log`; the corrected API lane passed in
+`/tmp/boga-m27-coaching-agent-api-fix.log`. Schema, push, pull, wipe and drift
+passed in `/tmp/boga-m27-offline-<lane>-final.log`; sync e2e, real sync (six
+suites / 15 tests) and the real four-tool OAuth MCP smoke passed in
+`/tmp/boga-m27-offline-<lane>-verified.log`. MCP smoke checks B80 +20×8 = 800
+through the actual API, preserving 20 raw and 100 effective load. Timings and
+trigger rules: `/tmp/boga-m27-coaching-offline-{timings,test-for}.log`. No PR or
+deployment has occurred; native integration verification is running separately.

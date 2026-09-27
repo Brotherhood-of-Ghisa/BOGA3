@@ -31,6 +31,16 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
+Training projections with `metric_revision: "effective_load_v1"` pass through
+unchanged in both structured and text JSON output. Tool names and strict input
+schemas remain compatible. Raw `entered_load` retains amount/unit/mode;
+normalized external `load` is distinct from `effective_load` and total 1RM.
+Descriptions direct coaches to inspect metric basis, saved session-weight
+provenance, null availability and volume coverage. `known_subtotal` must never
+be described as a complete total, and estimated historical weight stays labelled.
+The adapter adds no body-weight write tools, measurement timeline reads, group
+access or database credentials. See the [agent API contract](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
+
 ## Configuration
 
 Copy `.env.example` into the secret/config mechanism owned by the Node hosting

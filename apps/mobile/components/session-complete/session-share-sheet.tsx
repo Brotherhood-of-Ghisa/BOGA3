@@ -96,11 +96,14 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
                 {record.exerciseName}
               </Text>
               <Text allowFontScaling={false} style={styles.recordFact}>
-                {`${formatWeightFigure(record.weight)} × ${record.reps}`}
-                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  1RM ${formatOneRepMaxFigure(
+                {`${record.loadLabel ?? formatWeightFigure(record.weight)} × ${record.reps}`}
+                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  ${record.bodyWeightKg != null ? "Total 1RM" : "1RM"} ${formatOneRepMaxFigure(
                   record.estimatedOneRepMax
                 )}`}</Text>
               </Text>
+              {record.bodyWeightKg != null ? <Text allowFontScaling={false} style={styles.meta}>
+                {`Saved session weight ${record.bodyWeightKg} kg · Effective load ${record.effectiveResistanceKg == null ? '—' : formatWeightFigure(record.effectiveResistanceKg)} kg`}
+              </Text> : null}
             </View>
           ))}
         </View>

@@ -1,13 +1,14 @@
-import { parseSetReps, parseSetWeight, computeSetVolume } from '@/src/exercise-calculations';
+import { summarizeEffectiveVolume, type EffectiveSetMetrics, type LoadContext } from '@/src/exercise-calculations/effective-load';
+import { calculateAnalyticsSetMetrics, exerciseLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord, type SessionInsightExerciseInput } from '@/src/session-insights';
 
 import {
   formatOneRepMaxFigure,
   formatSetRow,
-  formatVolumeFigure,
   type SessionViewSetRow,
 } from './session-view-model';
-import { isConfirmedPerformedSet, type SessionSetPerformanceStatus } from './set-semantics';
+import { canonicalizeWeightForReps, isConfirmedPerformedSet, type SessionSetPerformanceStatus } from './set-semantics';
 
 /**
  * View Session's presentation model: what a finished session did, set by set.
@@ -23,12 +24,15 @@ export type CompletedSessionDetailSetInput = {
   reps: string;
   setType: unknown;
   performanceStatus?: SessionSetPerformanceStatus;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
 };
 
 export type CompletedSessionDetailExerciseInput = {
   id: string;
   exerciseDefinitionId?: string | null;
   name: string;
+  loadContext?: LoadContext;
   sets: CompletedSessionDetailSetInput[];
 };
 
@@ -45,13 +49,14 @@ export type CompletedSessionDetailModel = {
   cards: CompletedSessionDetailCard[];
   performedSetCount: number;
   volume: string;
+  volumeNote?: string;
 };
 
 const performedFigures = (set: CompletedSessionDetailSetInput) => {
   if (!isConfirmedPerformedSet({ weight: set.weight, reps: set.reps, performanceStatus: set.performanceStatus })) {
     return null;
   }
-  const weight = parseSetWeight(set.weight);
+  const weight = parseSetWeight(canonicalizeWeightForReps(set.weight, set.reps));
   const reps = parseSetReps(set.reps);
   return weight === null || reps === null ? null : { weight, reps };
 };
@@ -62,10 +67,12 @@ const toInsightExercises = (exercises: CompletedSessionDetailExerciseInput[]): S
     orderIndex: exerciseIndex,
     exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
     exerciseName: exercise.name,
+    loadContext: exercise.loadContext,
     sets: exercise.sets.map((set, setIndex) => ({
       id: set.id,
       orderIndex: setIndex,
       weightValue: set.weight,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
       repsValue: set.reps,
       setType: typeof set.setType === 'string' ? set.setType : null,
       performanceStatus: set.performanceStatus,
@@ -80,7 +87,7 @@ export const buildCompletedSessionDetailModel = (
 ): CompletedSessionDetailModel => {
   const insightExercises = toInsightExercises(exercises);
   let performedSetCount = 0;
-  let volume = 0;
+  const metrics: EffectiveSetMetrics[] = [];
 
   const cards = exercises.flatMap((exercise): CompletedSessionDetailCard[] => {
     const performed = exercise.sets.flatMap((set) => {
@@ -102,8 +109,8 @@ export const buildCompletedSessionDetailModel = (
     const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
 
     performedSetCount += performed.length;
-    for (const { weight, reps } of performed) {
-      volume += computeSetVolume(weight, reps);
+    for (const { set } of performed) {
+      metrics.push(calculateAnalyticsSetMetrics({ ...(exercise.loadContext ?? exerciseLoadContext()), weightValue: set.weight, repsValue: set.reps, localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode, performanceStatus: set.performanceStatus }));
     }
 
     return [
@@ -116,6 +123,8 @@ export const buildCompletedSessionDetailModel = (
             id: set.id,
             weight,
             reps,
+            localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
+            loadContext: exercise.loadContext,
             setType: set.setType,
             done: true,
             oneRepMaxRecord: set.id === recordSetId,
@@ -126,5 +135,5 @@ export const buildCompletedSessionDetailModel = (
     ];
   });
 
-  return { cards, performedSetCount, volume: formatVolumeFigure(volume) };
+  return { cards, performedSetCount, ...sessionVolumeSummary(summarizeEffectiveVolume(metrics)) };
 };

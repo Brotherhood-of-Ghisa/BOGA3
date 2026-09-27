@@ -1,9 +1,8 @@
+import type { SessionWeightContext } from '@/src/bodyweight/snapshot';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
-import {
-  estimateOneRepMax,
-  parseCalculationSet,
-} from '@/src/exercise-calculations';
+
+import { addFiniteVolume, calculateAnalyticsSetMetrics, exerciseLoadContext } from '@/src/exercise-calculations/analytics';
 import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
@@ -11,7 +10,7 @@ import {
 } from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
-import { exerciseSets, sessionExercises, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions } from './schema';
 import { isWorkingSessionSetType } from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 
@@ -22,7 +21,8 @@ export type ExerciseAggregate = {
   sessionCount: number;
   setCount: number;
   nearFailureCount: number;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   estimatedOneRepMax: number | null;
 };
 
@@ -41,7 +41,8 @@ export type ExerciseCatalogStats = {
 };
 
 export type ExerciseCatalogStatsRawHistory = {
-  sessions: { id: string; completedAt: Date }[];
+  sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
+  exerciseDefinitions?: { id: string; bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean; loadInputMode?: string }[];
   sessionExercises: { id: string; sessionId: string; exerciseDefinitionId: string | null }[];
   exerciseSets: {
     sessionExerciseId: string;
@@ -49,6 +50,8 @@ export type ExerciseCatalogStatsRawHistory = {
     repsValue: string;
     setType: string | null;
     performanceStatus?: SessionSetPerformanceStatus;
+    localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
   }[];
 };
 
@@ -64,14 +67,15 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       .select({
         id: sessions.id,
         completedAt: sessions.completedAt,
+        localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt,
       })
       .from(sessions)
       .where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt)))
       .all();
 
     const sessionsCompleted = sessionRows
-      .filter((row): row is { id: string; completedAt: Date } => row.completedAt !== null)
-      .map((row) => ({ id: row.id, completedAt: row.completedAt }));
+      .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)
+      .map((row) => ({ ...row, completedAt: row.completedAt }));
 
     const sessionIds = sessionsCompleted.map((row) => row.id);
     const sessionExerciseRows =
@@ -100,6 +104,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
             .select({
               sessionExerciseId: exerciseSets.sessionExerciseId,
               weightValue: exerciseSets.weightValue,
+              localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
               repsValue: exerciseSets.repsValue,
               setType: exerciseSets.setType,
               performanceStatus: exerciseSets.performanceStatus,
@@ -115,12 +120,17 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
             .all()
         : [];
 
+    const definitionIds = [...new Set(sessionExerciseRows.map(row => row.exerciseDefinitionId).filter((id): id is string => id !== null))];
+    const definitions = definitionIds.length ? database.select().from(exerciseDefinitions)
+      .where(inArray(exerciseDefinitions.id, definitionIds)).all() : [];
     return {
+      exerciseDefinitions: definitions,
       sessions: sessionsCompleted,
       sessionExercises: sessionExerciseRows,
       exerciseSets: exerciseSetRows.map((row) => ({
         sessionExerciseId: row.sessionExerciseId,
         weightValue: row.weightValue,
+        localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit, externalLoadMode: row.externalLoadMode,
         repsValue: row.repsValue,
         setType: row.setType ?? null,
         performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
@@ -162,6 +172,8 @@ export const aggregateExerciseCatalogStats = (
 ): ExerciseCatalogStats => {
   const window = resolvePeriodWindow(period, now);
 
+  const sessionById = new Map(raw.sessions.map(row => [row.id, row]));
+  const definitionById = new Map((raw.exerciseDefinitions ?? []).map(row => [row.id, row]));
   const sessionInWindow = new Map<string, boolean>();
   const sessionCompletedAt = new Map<string, Date>();
   for (const session of raw.sessions) {
@@ -202,12 +214,8 @@ export const aggregateExerciseCatalogStats = (
     const defId = link.exerciseDefinitionId;
     const completedAt = sessionCompletedAt.get(link.sessionId);
     if (!completedAt) continue;
-    const parsed = parseCalculationSet({
-      weightValue: set.weightValue,
-      repsValue: set.repsValue,
-      setType: set.setType,
-    });
-    if (parsed === null) continue;
+    const metric = calculateAnalyticsSetMetrics({ ...set, ...exerciseLoadContext(definitionById.get(defId), sessionById.get(link.sessionId)) });
+    if (!metric.eligible) continue;
 
     // All browser history uses the same eligible sets as Favourite and counts.
     everDoneIds.add(defId);
@@ -245,6 +253,7 @@ export const aggregateExerciseCatalogStats = (
         setCount: 0,
         nearFailureCount: 0,
         totalVolume: 0,
+        knownVolume: 0,
         estimatedOneRepMax: null,
       };
       aggregatesById.set(defId, aggregate);
@@ -265,9 +274,10 @@ export const aggregateExerciseCatalogStats = (
       aggregate.nearFailureCount += 1;
     }
 
-    aggregate.totalVolume += parsed.weight * parsed.reps;
+    aggregate.knownVolume = addFiniteVolume(aggregate.knownVolume, metric.volumeKgReps ?? 0);
+    aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps);
 
-    const oneRm = estimateOneRepMax(parsed.weight, parsed.reps);
+    const oneRm = metric.estimatedOneRepMaxKg;
     if (
       oneRm !== null &&
       (aggregate.estimatedOneRepMax === null || oneRm > aggregate.estimatedOneRepMax)

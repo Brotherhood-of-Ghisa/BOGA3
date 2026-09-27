@@ -59,16 +59,20 @@ let mockScreenTitle: string | null = null;
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
-jest.mock('@/src/groups/api', () => ({
+jest.mock('@/src/groups/api', () => {
+  const streamRead = jest.fn();
+  return {
   ...jest.requireActual('@/src/groups/api'),
   getGroup: jest.fn(),
   listMyGroups: jest.fn(),
-  getGroupStream: jest.fn(),
+  getGroupStream: streamRead,
+  getGroupMetricStream: streamRead,
   listGroupExercises: jest.fn(),
-  getGroupBoardPodiums: jest.fn(),
+  getGroupMetricPodiums: jest.fn(),
   getGroupBoard: jest.fn(),
   getGroupBoardHistory: jest.fn(),
-}));
+  };
+});
 
 import { groupCache } from '@/src/data/schema';
 import {
@@ -82,9 +86,9 @@ import {
   type GroupBoardHistoryResult,
   type GroupBoardPodiumsResult,
   type GroupBoardResult,
-  type GroupExercise,
   type GroupGetResult,
 } from '@/src/groups';
+import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 import * as groupsApi from '@/src/groups/api';
 import { uiRoles } from '@/components/ui';
 
@@ -112,7 +116,9 @@ const EXERCISE_ID = 'ge-bench';
 const T0 = new Date(2026, 8, 11, 9, 5).getTime();
 const SEP_10 = new Date(2026, 8, 10, 18, 0).getTime();
 
-const exercise = (id: string, name: string, archived = false): GroupExercise => ({
+const exercise = (id: string, name: string, archived = false): GroupMetricExerciseWire => ({
+  legacy: true, bodyweight_coefficient: 0, movement_standard: null, loading_method: null,
+  default_metric: 'e1rm', rules_revision: 1, published_revision: 1, rebuilding: false,
   group_exercise_id: id,
   name,
   load_input_mode: 'total_load',
@@ -171,6 +177,8 @@ const boardPage = (rows: BoardRow[], overrides: Partial<GroupBoardResult> = {}):
   ...overrides,
 });
 
+const METRIC_PODIUMS = { contract_version: 2 as const, exercises: PODIUMS.exercises.map(board => ({ legacy: true as const, exercise: board.exercise as GroupMetricExerciseWire, board })) };
+
 const seedCache = (cacheKey: string, payload: unknown) =>
   writeGroupCache(fixture.database, { cacheKey, userId: USER_ID, payload, fetchedAtMs: T0 });
 
@@ -183,7 +191,7 @@ const cacheKeys = () =>
     .sort();
 
 /** The board route also reads `group:<groupId>` for my role (M25-T10 row detail); board rows themselves are never cached. */
-const cacheKeysBesidesGroup = () => cacheKeys().filter((key) => key !== groupCacheKeys.group(GROUP_ID));
+const cacheKeysBesidesGroup = () => cacheKeys().filter((key) => key !== groupCacheKeys.group(GROUP_ID) && key !== groupCacheKeys.groupExercises(GROUP_ID));
 
 const emitNetInfo = (isConnected: boolean) => {
   act(() => {
@@ -203,7 +211,7 @@ beforeEach(() => {
   api.listMyGroups.mockResolvedValue({ groups: [detail.group] });
   api.getGroupStream.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
   api.listGroupExercises.mockResolvedValue({ exercises: [BENCH, OLD] });
-  api.getGroupBoardPodiums.mockResolvedValue(PODIUMS);
+  api.getGroupMetricPodiums.mockResolvedValue(METRIC_PODIUMS);
   api.getGroupBoard.mockResolvedValue(boardPage([]));
   api.getGroupBoardHistory.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
 });
@@ -223,11 +231,11 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     mockParams = { groupId: GROUP_ID };
     render(<GroupsTabRoute />);
     await screen.findByTestId('groups-segment-leaderboards');
-    expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
+    expect(api.getGroupMetricPodiums).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
     const bench = await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
-    expect(api.getGroupBoardPodiums).toHaveBeenCalledWith(GROUP_ID);
+    expect(api.getGroupMetricPodiums).toHaveBeenCalledWith(GROUP_ID);
 
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-view`)).toHaveTextContent('Certified · 1RM');
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/Dave.*145\.0.*10 Sep/);
@@ -236,27 +244,27 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     expect(screen.getByTestId('group-podium-card-ge-old-empty')).toHaveTextContent('No certified sets yet · 2 uncertified');
     expect(screen.queryByTestId('group-podium-card-ge-old-you')).toBeNull();
 
-    await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.boards(GROUP_ID), USER_ID)?.payload).toEqual(PODIUMS));
+    await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.boards(GROUP_ID), USER_ID)?.payload).toEqual(METRIC_PODIUMS));
 
     fireEvent.press(bench);
     expect(mockRouter.push).toHaveBeenCalledWith(`/group/${GROUP_ID}/leaderboards/${EXERCISE_ID}`);
   });
 
   it('shows the empty state when the group has no exercises', async () => {
-    api.getGroupBoardPodiums.mockResolvedValue({ metric: 'e1rm', certified: true, exercises: [] });
+    api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 2, exercises: [] });
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-empty')).toHaveTextContent(/No group exercises yet/);
   });
 
   it('offline: renders cached podiums with the offline marker, and requests nothing', async () => {
     seedCache(groupCacheKeys.mine, { groups: [detail.group] });
-    seedCache(groupCacheKeys.boards(GROUP_ID), PODIUMS);
+    seedCache(groupCacheKeys.boards(GROUP_ID), METRIC_PODIUMS);
     mockInitialOnline = false;
     await openLeaderboards();
 
     expect(await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`)).toBeTruthy();
     expect(screen.getByTestId('groups-offline-banner')).toHaveTextContent('Offline · last updated 09:05');
-    expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
+    expect(api.getGroupMetricPodiums).not.toHaveBeenCalled();
   });
 
   it('offline with no cached podiums: the offline empty state', async () => {
@@ -269,7 +277,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
   it('NOT_FOUND evicts the podiums and re-reads My groups, which drops the group', async () => {
     await openLeaderboards();
     await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`);
-    api.getGroupBoardPodiums.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
+    api.getGroupMetricPodiums.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     api.listMyGroups.mockResolvedValue({ groups: [] });
 
     fireEvent(screen.getByTestId('groups-segment-stream'), 'press');
@@ -377,7 +385,7 @@ describe('Full board (E1.2)', () => {
   });
 
   it('group NOT_FOUND evicts and shows lost access', async () => {
-    seedCache(groupCacheKeys.boards(GROUP_ID), PODIUMS);
+    seedCache(groupCacheKeys.boards(GROUP_ID), METRIC_PODIUMS);
     api.getGroupBoard.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     openBoard();
@@ -386,7 +394,7 @@ describe('Full board (E1.2)', () => {
   });
 
   it('exercise NOT_FOUND shows the exercise-missing state and evicts nothing', async () => {
-    seedCache(groupCacheKeys.boards(GROUP_ID), PODIUMS);
+    seedCache(groupCacheKeys.boards(GROUP_ID), METRIC_PODIUMS);
     api.getGroupBoard.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group exercise not found'));
     openBoard();
     expect(await screen.findByTestId('group-board-exercise-missing')).toHaveTextContent(/This exercise isn't in this group/);
@@ -399,6 +407,8 @@ describe('Full board (E1.2)', () => {
     api.getGroupBoard.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     openBoard();
     expect(await screen.findByTestId('group-board-offline-empty-state')).toBeTruthy();
+    await screen.findByTestId('group-board-scope-all');
+    await waitFor(() => expect(api.getGroupBoard).toHaveBeenCalled());
     const calls = api.getGroupBoard.mock.calls.length;
 
     fireEvent.press(screen.getByTestId('group-board-scope-all'));
@@ -493,7 +503,7 @@ describe('History (E1.3)', () => {
     expect(await screen.findByTestId('group-board-history-item-7-sentence')).toHaveTextContent(
       'Sam took #1 · 138 kg (linked Bench Press)',
     );
-    expect(cacheKeys()).toEqual([]);
+    expect(cacheKeys()).toEqual([groupCacheKeys.groupExercises(GROUP_ID)]);
   });
 
   it('no lead changes: the empty state', async () => {

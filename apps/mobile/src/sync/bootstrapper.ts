@@ -194,7 +194,7 @@ export const runBootstrapper = async (database: LocalDatabase): Promise<void> =>
     setSyncProgress({ phase, layersCompleted, rowsApplied, offline: false });
   };
 
-  // Pull phase: drain all four layers, bumping the counters as each page applies
+  // Pull phase: drain all five layers, bumping the counters as each page applies
   // and each layer completes so a watcher sees motion the whole way through.
   publish('pull');
   const rowsPulled = await runFirstFullPull(database, {

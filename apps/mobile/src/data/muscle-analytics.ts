@@ -1,10 +1,13 @@
+import type { SessionWeightContext } from '@/src/bodyweight/snapshot';
+import { type EffectiveSetMetrics } from '@/src/exercise-calculations/effective-load';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredAddedWeightKg, exerciseLoadContext } from '@/src/exercise-calculations/analytics';
 import {
   computeSetVolume,
   estimateOneRepMax,
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
-import {
+import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
@@ -16,8 +19,9 @@ export type MuscleAnalyticsInput = {
   exerciseDefinitions?: {
     id: string;
     loadInputMode: 'total_load' | 'per_side_load';
+    bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean;
   }[];
-  sessions: { id: string; completedAt: Date }[];
+  sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
   sessionExercises: {
     id: string;
     sessionId: string;
@@ -32,6 +36,8 @@ export type MuscleAnalyticsInput = {
     weightValue: string;
     repsValue: string;
     performanceStatus?: SessionSetPerformanceStatus;
+    localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
   }[];
   muscleMappings: {
     exerciseDefinitionId: string;
@@ -54,8 +60,10 @@ export type MuscleSetContribution = {
   muscleGroupId: string;
   role: MuscleContributionRole;
   roleWeight: number;
-  weightedVolume: number;
-  setVolume: number;
+  weightedVolume: number | null;
+  setVolume: number | null;
+  metrics?: EffectiveSetMetrics;
+  addedWeightKg?: number | null;
   sessionId: string;
   sessionCompletedAt: Date;
   sessionExerciseId: string;
@@ -75,7 +83,8 @@ export type SelectedMuscleDailyEffort = {
   muscleGroupId: string;
   sessionCount: number;
   setCount: number;
-  totalWeight: number;
+  totalWeight: number | null;
+  knownWeight?: number | null;
   contributions: SelectedMuscleDailyContribution[];
 };
 
@@ -114,7 +123,7 @@ const isMuscleAnalyticsPerformedSet = (
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
   }) &&
-  parseSetWeight(set.weightValue) !== null &&
+  parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)) !== null &&
   parseSetReps(set.repsValue) !== null;
 
 export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
@@ -208,8 +217,8 @@ export const collectMuscleSetContributions = (
   }
 
   const mappingsByExerciseDefinitionId = buildMappingsByExerciseDefinitionId(input);
-  const loadInputModeByExerciseDefinitionId = new Map(
-    (input.exerciseDefinitions ?? []).map((definition) => [definition.id, definition.loadInputMode])
+  const definitionById = new Map(
+    (input.exerciseDefinitions ?? []).map((definition) => [definition.id, definition])
   );
   const contributions: MuscleSetContribution[] = [];
 
@@ -227,13 +236,11 @@ export const collectMuscleSetContributions = (
     const mappings = mappingsByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? [];
     if (mappings.length === 0) continue;
 
-    const loadInputMode =
-      loadInputModeByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? 'total_load';
-    const setVolume = computePerSideMuscleSetVolume(
-      set.weightValue,
-      set.repsValue,
-      loadInputMode
-    );
+    const context = exerciseLoadContext(definitionById.get(exercise.exerciseDefinitionId), session);
+    const metrics = calculateAnalyticsSetMetrics({ ...set, ...context });
+    const rawSetVolume = metrics.eligible && metrics.load.status === 'known'
+      ? metrics.load.muscleResistancePerSideKg * metrics.reps : null;
+    const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
     for (const mapping of mappings) {
       const roleWeight = getMuscleContributionRoleWeight(mapping.role);
@@ -244,7 +251,8 @@ export const collectMuscleSetContributions = (
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
         roleWeight,
-        weightedVolume: setVolume * roleWeight,
+        weightedVolume: setVolume === null ? null : setVolume * roleWeight,
+        metrics, addedWeightKg: enteredAddedWeightKg(set, context),
         setVolume,
         sessionId: exercise.sessionId,
         sessionCompletedAt: session.completedAt,
@@ -304,13 +312,15 @@ export const aggregateSelectedMuscleDailyEffort = (
       sessionCount: 0,
       setCount: 0,
       totalWeight: 0,
+      knownWeight: 0,
       contributions: [],
       sessionIds: new Set<string>(),
     };
 
     entry.sessionIds.add(contribution.sessionId);
     entry.setCount += 1;
-    entry.totalWeight += contribution.weightedVolume;
+    entry.knownWeight = addFiniteVolume(entry.knownWeight, contribution.weightedVolume ?? 0);
+    entry.totalWeight = addFiniteVolume(entry.totalWeight, contribution.weightedVolume);
     entry.contributions.push(contribution);
     entriesByDate.set(dateKey, entry);
   }
@@ -330,7 +340,8 @@ export type SelectedMuscleWeeklyEffort = {
   weekStartDateKey: string;
   monthKey: string;
   weekOfMonth: number;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
@@ -344,14 +355,16 @@ export type SelectedMuscleWeeklyEffort = {
  */
 export type DailyEffortMetrics = {
   dateKey: string;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
 };
 
 type EffortMetricAccumulator = {
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
@@ -359,6 +372,7 @@ type EffortMetricAccumulator = {
 
 export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
   totalVolume: 0,
+  knownVolume: 0,
   workingSetCount: 0,
   bestRM1: null,
   highestWeight: null,
@@ -369,25 +383,21 @@ export const accumulateContributionMetrics = (
   acc: EffortMetricAccumulator,
   contribution: MuscleSetContribution
 ): void => {
-  acc.totalVolume += contribution.weightedVolume;
+  acc.knownVolume = addFiniteVolume(acc.knownVolume, contribution.weightedVolume ?? 0);
+  acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume);
 
   if (isWorkingSessionSetType(contribution.setType)) {
     acc.workingSetCount += 1;
   }
 
-  const weight = parseSetWeight(contribution.weightValue);
+  const weight = contribution.addedWeightKg === undefined
+    ? parseSetWeight(contribution.weightValue) : contribution.addedWeightKg;
+  if (weight !== null) acc.highestWeight = Math.max(acc.highestWeight ?? 0, weight);
   const reps = parseSetReps(contribution.repsValue);
-
-  if (weight !== null) {
-    acc.highestWeight = acc.highestWeight === null ? weight : Math.max(acc.highestWeight, weight);
-
-    if (reps !== null) {
-      const rm1 = estimateOneRepMax(weight, reps);
-      if (rm1 !== null) {
-        acc.bestRM1 = acc.bestRM1 === null ? rm1 : Math.max(acc.bestRM1, rm1);
-      }
-    }
-  }
+  const rm1 = contribution.metrics === undefined
+    ? (weight !== null && reps !== null ? estimateOneRepMax(weight, reps) : null)
+    : contribution.metrics.estimatedOneRepMaxKg;
+  if (rm1 !== null) acc.bestRM1 = Math.max(acc.bestRM1 ?? 0, rm1);
 };
 
 const dateKeyToUtcDate = (dateKey: string): Date => {
@@ -413,7 +423,8 @@ export const aggregateSelectedMuscleWeeklyEffort = (
   type WeekAccumulator = {
     weekStartDateKey: string;
     monthKey: string;
-    totalVolume: number;
+    totalVolume: number | null;
+  knownVolume?: number | null;
     workingSetCount: number;
     bestRM1: number | null;
     highestWeight: number | null;
@@ -431,6 +442,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
       weekStartDateKey,
       monthKey,
       totalVolume: 0,
+  knownVolume: 0,
       workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
@@ -463,7 +475,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
       weekStartDateKey: week.weekStartDateKey,
       monthKey: week.monthKey,
       weekOfMonth,
-      totalVolume: week.totalVolume,
+      totalVolume: week.totalVolume, knownVolume: week.knownVolume,
       workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,
@@ -488,7 +500,7 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
       }
       return {
         dateKey: day.dateKey,
-        totalVolume: acc.totalVolume,
+        totalVolume: acc.totalVolume, knownVolume: acc.knownVolume,
         workingSetCount: acc.workingSetCount,
         estimatedRM1: acc.bestRM1,
         highestWeight: acc.highestWeight,

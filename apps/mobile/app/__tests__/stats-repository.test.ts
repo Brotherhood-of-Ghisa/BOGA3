@@ -182,9 +182,10 @@ describe('aggregateStats', () => {
 
     const totals = aggregateStats(input);
     const chest = flattenMuscles(totals).find((entry) => entry.muscleGroupId === 'chest_sternal');
-    expect(totals.setCount).toBe(3);
-    expect(totals.workingSetCount).toBe(1);
-    expect(chest).toMatchObject({ setCount: 3, nearFailureCount: 1, totalVolume: 200 });
+    // Confirmed blank weight with valid reps is another zero-load working set.
+    expect(totals.setCount).toBe(4);
+    expect(totals.workingSetCount).toBe(2);
+    expect(chest).toMatchObject({ setCount: 4, nearFailureCount: 2, totalVolume: 200 });
   });
 
   it('always returns the full muscle taxonomy grouped by family', () => {

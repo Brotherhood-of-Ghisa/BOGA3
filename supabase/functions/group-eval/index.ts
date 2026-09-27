@@ -19,6 +19,8 @@ import {
   type GroupSetFact,
 } from '../../../apps/mobile/src/groups/set-facts.ts';
 
+import { evaluateGroupMetricGraph, type GroupMetricEvaluationGraph } from '../../../apps/mobile/src/groups/metric-evaluation.ts';
+
 const CLAIM_LIMIT = 20;
 const MAX_CLAIM_ROUNDS = 10;
 const RULES_REQUEUE_LIMIT = 50;
@@ -114,6 +116,42 @@ const processJob = async (db: SupabaseClient, job: Job): Promise<JobResult> => {
   }
 };
 
+type MetricJob = {
+  job_id: number;
+  group_id: string;
+  group_exercise_id: string;
+  generation: number;
+  claim_id: string;
+  causes: string[];
+};
+type MetricJobResult = MetricJob & {
+  outcome: 'completed' | 'requeued' | 'failed';
+  sqlstate: string | null;
+};
+
+const processMetricJob = async (db: SupabaseClient, job: MetricJob): Promise<MetricJobResult> => {
+  const claim = { p_job_id: job.job_id, p_generation: job.generation, p_claim_id: job.claim_id };
+  try {
+    const prepared = await rpc<{ prepared: boolean; frozen?: boolean; graph?: GroupMetricEvaluationGraph }>(
+      db, 'group_metric_eval_prepare', claim);
+    if (!prepared.prepared) return { ...job, outcome: 'requeued', sqlstate: null };
+    if (!prepared.frozen && !prepared.graph) throw new Error('Missing comparison source graph');
+    const evaluation = prepared.frozen ? null : evaluateGroupMetricGraph(prepared.graph!);
+    const done = await rpc<{ completed: boolean }>(db, 'group_metric_eval_publish', {
+      ...claim, p_evaluation: evaluation,
+    });
+    return { ...job, outcome: done.completed ? 'completed' : 'requeued', sqlstate: null };
+  } catch (error) {
+    const sqlstate = error instanceof RpcError ? error.sqlstate : NON_DB_ERROR;
+    try {
+      await rpc(db, 'group_metric_eval_fail', { ...claim, p_sqlstate: sqlstate });
+    } catch {
+      console.error(`group-eval: could not record comparison failure for job ${job.job_id}`);
+    }
+    return { ...job, outcome: 'failed', sqlstate };
+  }
+};
+
 export const handleRequest = async (request: Request): Promise<Response> => {
   if (request.method !== 'POST') {
     return json(405, { error: 'METHOD_NOT_ALLOWED' });
@@ -147,15 +185,27 @@ export const handleRequest = async (request: Request): Promise<Response> => {
       }
     }
 
-    const count = (outcome: JobResult['outcome']) => jobs.filter((job) => job.outcome === outcome).length;
+    // Source jobs above coalesce a complete comparison rebuild. Target-specific
+    // mathematics runs once per claimed graph; publication rechecks the graph
+    // and revision under ordered locks before exposing any new board rows.
+    const metricJobs: MetricJobResult[] = [];
+    for (let round = 0; round < MAX_CLAIM_ROUNDS; round += 1) {
+      const { jobs: claimed } = await rpc<{ jobs: MetricJob[] }>(db, 'group_metric_eval_claim', { p_limit: CLAIM_LIMIT });
+      if (claimed.length === 0) break;
+      for (const job of claimed) metricJobs.push(await processMetricJob(db, job));
+    }
+    const count = (outcome: JobResult['outcome']) =>
+      jobs.filter((job) => job.outcome === outcome).length + metricJobs.filter((job) => job.outcome === outcome).length;
     return json(200, {
       rules_version: GROUP_EVAL_RULES_VERSION,
       rules_requeued: rulesRequeued,
-      claimed: jobs.length,
+      claimed: jobs.length + metricJobs.length,
+      metric_claimed: metricJobs.length,
       completed: count('completed'),
       requeued: count('requeued'),
       failed: count('failed'),
       jobs,
+      metric_jobs: metricJobs,
     });
   } catch (error) {
     const sqlstate = error instanceof RpcError ? error.sqlstate : NON_DB_ERROR;

@@ -2,7 +2,7 @@ import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
+import type { SessionBodyWeightSnapshot, SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
 
 import { createDraftAutosaveController, type DraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
@@ -29,6 +29,7 @@ export type SessionExerciseDraftState =
       exercise: SessionDraftExerciseSnapshot;
       // A completed session is edited in place (history, not a draft).
       sessionStatus: SessionGraphSnapshot['status'];
+      bodyWeight: SessionBodyWeightSnapshot;
       gymId: string | null;
     };
 
@@ -48,6 +49,8 @@ export type UseSessionExerciseDraft = {
   flush: () => Promise<boolean>;
   // Removes the exercise from its session. Pending edits are dropped.
   remove: () => Promise<void>;
+  reload: () => Promise<boolean>;
+  setBodyWeight: (snapshot: SessionBodyWeightSnapshot) => void;
 };
 
 const describeSaveError = (error: unknown) =>
@@ -68,6 +71,7 @@ export const useSessionExerciseDraft = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const exerciseRef = useRef<SessionDraftExerciseSnapshot | null>(null);
   const sessionStatusRef = useRef<SessionGraphSnapshot['status']>('active');
+  const bodyWeightRef = useRef<SessionBodyWeightSnapshot>({});
   const gymIdRef = useRef<string | null>(null);
   const saveFailedRef = useRef(false);
   const isMountedRef = useRef(true);
@@ -97,47 +101,11 @@ export const useSessionExerciseDraft = ({
   const lifecycle = useMemo(() => createSessionRecorderLifecycleHelpers(autosave), [autosave]);
 
   useEffect(() => {
-    let cancelled = false;
-    void loadSessionExerciseDraft(sessionId, sessionExerciseId, client)
-      .then((result) => {
-        if (cancelled) return;
-        if (result.status === 'ready') {
-          exerciseRef.current = result.exercise;
-          sessionStatusRef.current = result.sessionStatus;
-          gymIdRef.current = result.gymId;
-          setState({
-            status: 'ready',
-            exercise: result.exercise,
-            sessionStatus: result.sessionStatus,
-            gymId: result.gymId,
-          });
-        } else {
-          setState({ status: 'error', reason: result.status });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setState({ status: 'error', reason: 'load-failed' });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [client, sessionExerciseId, sessionId]);
-
-  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       void lifecycle.onAppStateChange(nextState);
     });
     return () => subscription.remove();
   }, [lifecycle]);
-
-  useFocusEffect(
-    useCallback(
-      () => () => {
-        void lifecycle.onScreenBlur();
-      },
-      [lifecycle]
-    )
-  );
 
   useEffect(
     () => () => {
@@ -170,12 +138,7 @@ export const useSessionExerciseDraft = ({
       const next = recipe(current);
       if (next === current) return;
       exerciseRef.current = next;
-      setState({
-        status: 'ready',
-        exercise: next,
-        sessionStatus: sessionStatusRef.current,
-        gymId: gymIdRef.current,
-      });
+      setState({ status: 'ready', exercise: next, sessionStatus: sessionStatusRef.current, bodyWeight: bodyWeightRef.current, gymId: gymIdRef.current });
       if (kind === 'text') {
         autosave.markTextMutation();
       } else {
@@ -199,5 +162,31 @@ export const useSessionExerciseDraft = ({
     );
   }, [autosave, client, sessionExerciseId, sessionId]);
 
-  return { state, saveError, update, flush, remove };
+  const setBodyWeight = useCallback((snapshot: SessionBodyWeightSnapshot) => {
+    bodyWeightRef.current = snapshot;
+    setState(current => current.status === 'ready' ? { ...current, bodyWeight: snapshot } : current);
+  }, []);
+  const reload = useCallback(async () => {
+    if (!await flush()) return false;
+    const prior = exerciseRef.current;
+    try {
+    const result = await loadSessionExerciseDraft(sessionId, sessionExerciseId, client);
+    if (!isMountedRef.current || prior !== exerciseRef.current) return false;
+    if (result.status === 'ready') {
+      exerciseRef.current = result.exercise; sessionStatusRef.current = result.sessionStatus;
+      bodyWeightRef.current = result.bodyWeight;
+      gymIdRef.current = result.gymId;
+      setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId });
+    } else setState({ status: 'error', reason: result.status });
+    return result.status === 'ready';
+    } catch (error) {
+      if (isMountedRef.current) { setState({ status: 'error', reason: 'load-failed' }); setSaveError(describeSaveError(error)); }
+      return false;
+    }
+  }, [client, flush, sessionExerciseId, sessionId]);
+  useFocusEffect(useCallback(() => {
+    void reload();
+    return () => { void lifecycle.onScreenBlur(); };
+  }, [lifecycle, reload]));
+  return { state, saveError, update, flush, remove, reload, setBodyWeight };
 };

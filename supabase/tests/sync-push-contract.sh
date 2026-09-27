@@ -536,7 +536,6 @@ assert_json_expr 'length == 1 and .[0].name == "Resurrected" and .[0].deleted_at
 echo "[sync-push] future-clock clamp"
 NOW_MS_BEFORE="$(($(date +%s) * 1000))"
 DAY_MS=$((24 * 60 * 60 * 1000))
-FIVE_MIN_MS=$((5 * 60 * 1000))
 FUTURE_CUAM=$((NOW_MS_BEFORE + DAY_MS))
 
 PAYLOAD="$(jq -nc --arg id "${GYM_CLAMP_ID}" --argjson cuam "${FUTURE_CUAM}" \
@@ -550,14 +549,19 @@ PAYLOAD="$(jq -nc --arg id "${GYM_CLAMP_ID}" --argjson cuam "${FUTURE_CUAM}" \
 sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
 assert_status "200" "clamp: push future-stamped row"
 
-NOW_MS_AFTER="$(($(date +%s) * 1000))"
-MAX_ACCEPTABLE=$((NOW_MS_AFTER + FIVE_MIN_MS + 1000))
+# The acknowledgement carries the same transaction timestamp used by the
+# clamp. Compare against that clock, not a truncated host clock (Docker may
+# run slightly ahead). PostgreSQL rounds fractional milliseconds to bigint;
+# JavaScript Date truncates them, hence the one-millisecond upper allowance.
+CLAMP_SERVER_RECEIVED_AT="$(printf '%s' "${REQUEST_BODY}" | jq -er '.server_received_at')"
+EXPECTED_CLAMP="$(node -e 'process.stdout.write(String(Date.parse(process.argv[1]) + 300000))' "${CLAMP_SERVER_RECEIVED_AT}")"
+MAX_ACCEPTABLE=$((EXPECTED_CLAMP + 1))
 
 service_select "gyms" "owner_user_id=eq.${USER_A_UUID}&id=eq.${GYM_CLAMP_ID}&select=client_updated_at_ms"
 assert_status "200" "clamp: service-role select"
-assert_json_expr --argjson max "${MAX_ACCEPTABLE}" --argjson sent "${FUTURE_CUAM}" \
-  '.[0].client_updated_at_ms <= $max and .[0].client_updated_at_ms < $sent' \
-  "clamp: stored client_updated_at_ms clamped to <= now()+5min and strictly less than the sent value"
+assert_json_expr --argjson min "${EXPECTED_CLAMP}" --argjson max "${MAX_ACCEPTABLE}" --argjson sent "${FUTURE_CUAM}" \
+  '.[0].client_updated_at_ms >= $min and .[0].client_updated_at_ms <= $max and .[0].client_updated_at_ms < $sent' \
+  "clamp: stored client_updated_at_ms matches server transaction time +5min and is less than the sent value"
 
 # ===========================================================================
 # 10. FK closure: missing parent — push session_exercise pointing at a
@@ -728,6 +732,9 @@ assert_body_contains "AUTH_REQUIRED" "auth: no JWT body carries AUTH_REQUIRED"
 # ===========================================================================
 # Cleanup: remove the rows this run created. RLS-safe via service_role.
 # ===========================================================================
+
+# shellcheck source=sync-bodyweight-contract.sh
+source "${SUPABASE_DIR}/tests/sync-bodyweight-contract.sh"
 
 echo "[sync-push] cleanup"
 service_delete "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=like.push-set-%-${RUN_TAG}"

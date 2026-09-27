@@ -1,3 +1,6 @@
+import { GroupMetricStreamRecordSheet, type MetricStreamRecord } from './group-metric-stream-record-sheet';
+import { isMetricStreamEvent } from '@/src/groups/metric-wire';
+import { GroupMetricStreamCard } from './group-metric-stream-card';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { FlatList, RefreshControl, type StyleProp, type ViewStyle } from 'react-native';
 
@@ -66,6 +69,10 @@ export function GroupStreamList({
   contentContainerStyle,
   testID,
 }: GroupStreamListProps) {
+  const [metricSnapshot, setMetricSnapshot] = useState<MetricStreamRecord | null>(null);
+  const liveMetric = metricSnapshot ? stream.items.find((item): item is MetricStreamRecord =>
+    isMetricStreamEvent(item) && item.kind === 'record' && item.key === metricSnapshot.key) ?? metricSnapshot : null;
+  const refreshMetric = async () => { await stream.refresh(); onCertificationChanged(); };
   const certification = useRecordSetCertification({
     myUserId: userId,
     onChanged: onCertificationChanged,
@@ -75,8 +82,8 @@ export function GroupStreamList({
   const [sheetSnapshot, setSheetSnapshot] = useState<{ itemKey: string; detail: RecordSetDetail } | null>(null);
   const sheetDetail = useMemo(() => {
     if (!sheetSnapshot) return null;
-    const live = stream.items.find((item) => item.kind === 'record' && item.key === sheetSnapshot.itemKey);
-    return live && live.kind === 'record' ? recordSetFromStreamRecord(live) : sheetSnapshot.detail;
+    const live = stream.items.find((item) => !isMetricStreamEvent(item) && item.kind === 'record' && item.key === sheetSnapshot.itemKey);
+    return live && !isMetricStreamEvent(live) && live.kind === 'record' ? recordSetFromStreamRecord(live) : sheetSnapshot.detail;
   }, [sheetSnapshot, stream.items]);
 
   // Show the write's result until the stream agrees with it. A read already in
@@ -86,9 +93,9 @@ export function GroupStreamList({
   useEffect(() => {
     if (!written) return;
     const live = stream.items.find(
-      (item) => item.kind === 'record' && recordSetKey(recordSetFromStreamRecord(item)) === written.setKey,
+      (item) => !isMetricStreamEvent(item) && item.kind === 'record' && recordSetKey(recordSetFromStreamRecord(item)) === written.setKey,
     );
-    const liveCertification = live && live.kind === 'record' ? (live.certified ? live.certification : null) : undefined;
+    const liveCertification = live && !isMetricStreamEvent(live) && live.kind === 'record' ? (live.certified ? live.certification : null) : undefined;
     if (writtenCertificationSettled(written, liveCertification)) clearWritten();
   }, [stream.items, written, clearWritten]);
 
@@ -130,6 +137,10 @@ export function GroupStreamList({
 
   const renderItem = ({ item }: { item: StreamItemViewModel }) => {
     switch (item.kind) {
+      case 'metric_event':
+        return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames}
+          onPress={item.event.kind === 'record' ? () => { if (item.event.kind === 'record') setMetricSnapshot(item.event); } : undefined}
+          pressHint={item.event.kind === 'record' ? 'Opens the recorded performance and certification' : undefined} />;
       case 'session':
         return <GroupStreamSessionCard card={item} onPress={onPressSession} showGroupNames={showGroupNames} />;
       case 'membership':
@@ -169,6 +180,8 @@ export function GroupStreamList({
         style={groupScreenStyles.screen}
         testID={testID}
       />
+      {liveMetric ? <GroupMetricStreamRecordSheet record={liveMetric} userId={userId}
+        myRole={roleForGroup(liveMetric.group.group_id)} onClose={() => setMetricSnapshot(null)} onChanged={refreshMetric} /> : null}
       <RecordSetSheet
         certification={certification}
         detail={sheetDetail}

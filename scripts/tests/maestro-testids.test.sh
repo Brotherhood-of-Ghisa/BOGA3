@@ -18,7 +18,8 @@
 # prop-supplied prefix can't make any `*-row` id resolve; a text-free join
 # (`${prefix}-${value}`) needs its head to be a value the source passes as a
 # `…testIDPrefix` prop. A flow-side slot
-# (`${output.id}`) must line up with a source-side slot.
+# (`${output.id}`) must line up with a source-side slot. Optional leading `^`
+# and trailing `$` anchors make a selector exact; they are not part of its id.
 #
 # Limits: literal-level, not render-level — an id that exists in source but is
 # no longer rendered on that screen passes. Ids built by a text-free join
@@ -123,7 +124,12 @@ for flow in flows:
         if m.start(1) in negated:
             continue
         checked += 1
-        if not resolves(SLOT.sub("X", m.group(1))):
+        selector = m.group(1)
+        if selector.startswith("^"):
+            selector = selector[1:]
+        if selector.endswith("$") and not selector.endswith(r"\$"):
+            selector = selector[:-1]
+        if not resolves(SLOT.sub("X", selector)):
             missing.append(f"{os.path.basename(flow)}: {m.group(1)}")
 if missing:
     print("  flow ids with no matching testID in app source (renamed or removed?):", file=sys.stderr)
@@ -190,6 +196,14 @@ expect_check pass "a join under a prefix built from a local template" "${TMP}/lo
 make_tree "${TMP}/flow-slot"
 printf -- '- tapOn:\n    id: "set-${output.n}-toggle"\n' >>"${TMP}/flow-slot/.maestro/flows/a.yaml"
 expect_check pass "a flow-side \${output} slot over a source template slot" "${TMP}/flow-slot"
+
+make_tree "${TMP}/anchored-flow-slot"
+printf -- '- tapOn:\n    id: "^set-${output.n}-toggle$"\n' >>"${TMP}/anchored-flow-slot/.maestro/flows/a.yaml"
+expect_check pass "exact anchors around a flow-side template" "${TMP}/anchored-flow-slot"
+
+make_tree "${TMP}/anchored-missing"
+printf -- '- tapOn:\n    id: "^gone-${output.n}-toggle$"\n' >>"${TMP}/anchored-missing/.maestro/flows/a.yaml"
+expect_check fail "exact anchors do not excuse a missing id" "${TMP}/anchored-missing"
 
 # --- the real repo ---------------------------------------------------------------
 

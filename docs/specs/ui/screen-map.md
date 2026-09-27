@@ -672,6 +672,23 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - reloads the gyms on every focus; name and archive changes close the editor, location changes keep it open
 
+23. `/body-weight`
+- File: `apps/mobile/app/body-weight.tsx`; composition: `components/bodyweight/`
+- Purpose: private weight readings and their history, reached from Settings.
+- States: current value with explicit unit and measurement date; empty history;
+  loading/retryable error; Add/Edit sheet with positive weight, kg/lb and local
+  date/time; inline invalid/future date or save failure retaining input; delete
+  confirmation that saved sessions stay unchanged. Saves are local/offline.
+- Native back returns to Settings. History orders by measurement time, then id,
+  not last edit. Session detail/edit shows the frozen kg and source date through
+  `SessionBodyWeight`; its correction sheet changes only that session. Deleted
+  session detail is read-only.
+- Fill missing session weights opens an in-route sheet: optional From/Through
+  dates, default eligible selection, source/estimate preview, atomic Apply and
+  filled/skipped result. Cancel writes nothing; stale inputs require refresh.
+  No reading offers entry after the fill sheet dismisses. Existing snapshots
+  remain unchanged, including on repeat; later source edits never rerun fill.
+
 ## Route shell (not a user-facing screen)
 
 1. `apps/mobile/app/_layout.tsx`
@@ -708,3 +725,40 @@ Brief entrypoint map of the current mobile screens.
 - Keep this doc brief and route-oriented.
 - Do not duplicate detailed section breakdowns, component trees, or render logic from route files.
 - If route purpose or screen-level state set changes materially, update this doc in the same task.
+
+
+### Bodyweight load overlays on existing exercise routes
+
+The exercise editor adds contribution, movement standard and loading method.
+The session exercise page adds explicit added/assisted/unquantified meaning and
+units, effective-load context and the session-only weight correction control.
+`LegacyLoadReviewSheet` is reached after saving an exercise with unresolved loads
+or from its exercise options/logger. It selects actual/planned originals,
+requires a source unit and interpretation, previews, then applies or leaves them
+unresolved. These are overlays on existing routes, not additional destinations.
+
+### Personal loading estimate overlay
+
+Exercise page → records → Loading estimate uses
+`components/bodyweight/loading-estimate-sheet.tsx`. Source selection stays inside
+the same sheet. Target reps, saved/explicit current B and output unit produce a
+transient added/assistance estimate. Loading, retry, no-source, invalid input,
+source provenance and one-rep/high-rep states use existing UI primitives.
+Exercise history, Stats/heatmaps and session/share projections use the same
+effective-load boundary and expose incomplete volume.
+
+
+## M27 group comparison extension (native acceptance in progress)
+
+The group exercise routes now include bodyweight contribution, declared movement
+and loading method, and default ranking. Calculation edits require review and
+an expected revision; stale forms retain edits until explicit reload. New local
+exercises can copy reviewed group rules; linking existing exercises never
+changes their personal metadata.
+
+The existing board/history routes select their implementation from the versioned
+catalogue. Metric boards carry reps/×BW/kg, Certified/All, rebuilding and archived
+states. Record details show raw load, saved B/provenance and attestation coverage.
+History selects a revision and its events or scores, preserving legacy retirement
+rows. Podiums and group activity use versioned cache payloads. T10's task card
+records outstanding native and stream-certification acceptance.

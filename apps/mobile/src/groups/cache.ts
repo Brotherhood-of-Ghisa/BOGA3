@@ -16,13 +16,13 @@ export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof sche
 export const groupCacheKeys = {
   mine: 'groups:mine',
   group: (groupId: string) => `group:${groupId}`,
-  streamAll: 'stream:all',
-  stream: (groupId: string) => `stream:${groupId}`,
-  session: (memberUserId: string, sessionId: string) => `session:${memberUserId}:${sessionId}`,
-  /** `group_exercise_list` payload (M25 design §7). */
-  groupExercises: (groupId: string) => `group-exercises:${groupId}`,
-  /** `group_board_podiums` payload on Certified · e1RM (M25 design §7). Full boards and history are never cached. */
-  boards: (groupId: string) => `boards:${groupId}`,
+  streamAll: 'stream:v2:all',
+  stream: (groupId: string) => `stream:v2:${groupId}`,
+  session: (memberUserId: string, sessionId: string) => `session:v2:${memberUserId}:${sessionId}`,
+  /** Versioned comparison catalogue; v1 cache entries are not reused. */
+  groupExercises: (groupId: string) => `group-exercises:v2:${groupId}`,
+  /** Versioned podium payload. Full boards and history are never cached. */
+  boards: (groupId: string) => `boards:v2:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
@@ -97,6 +97,7 @@ export const evictGroup = (database: GroupCacheDatabase, groupId: string): void 
           groupCacheKeys.stream(groupId),
           groupCacheKeys.groupExercises(groupId),
           groupCacheKeys.boards(groupId),
+          `stream:${groupId}`, `group-exercises:${groupId}`, `boards:${groupId}`,
         ]),
         like(groupCache.cacheKey, SESSION_KEY_PATTERN),
       ),

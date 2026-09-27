@@ -56,6 +56,35 @@ This is the shortest operational summary. Use the "Further reading" section when
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
   - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
 
+## Versioned group projections (M27)
+
+Versioned group RPCs retain rules 15–19, with metric-specific certifications
+and expected revision/performance checks described in
+[`groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).
+Group rules, score projections and queues have no direct client privileges.
+Shared-session context exposes the saved tuple, never the owner's reading
+timeline. Worker-only claim/prepare/publish/fail RPCs require service-role access;
+the public Edge endpoint still requires its Vault-held secret.
+
+## Read-only coaching projections (M27)
+
+`agent-api` batches owner-filtered exercise rules, saved session-weight tuples
+and entered set metadata, then uses the same effective-load boundary as mobile.
+The saved snapshot supplies only the context needed for authorized training
+responses; the API does not read or expose the body-weight measurement timeline.
+Its `training-metrics.ts` adapter adds no authorization paths. Live OAuth grant
+validation, non-member/nonexistent exercise equivalence, read-only routes,
+direct-table denial and the four existing MCP tools remain enforced.
+
+Raw entered unit/mode, effective resistance, metric basis, estimated provenance
+and volume coverage are distinct fields. Unknown totals are null; known
+subtotals are explicitly incomplete. Additive API-v1 evolution is identified
+by `metric_revision: effective_load_v1`; conventional external `load` remains
+kg-normalized. Full response semantics live in
+[`agent-api/README.md`](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
+Local parity/authorization and real OAuth-to-MCP gates are required; this
+implementation does not claim hosted rollout.
+
 ## Practical guidance for API consumers (mobile/app)
 
 - Use client-safe Supabase credentials only (`anon` key), plus the authenticated user session token.
