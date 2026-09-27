@@ -27,7 +27,7 @@ export type IconProps = {
 const DEFAULT_COLORS: Partial<Record<IconName, string>> = {
   'set-done': uiRoles.ink,
   'set-current': uiRoles.accent,
-  'set-planned': uiRoles.planned,
+  'set-planned': uiRoles.inkGhost,
 };
 
 // What a `knockout` mark is drawn in: the card ground it cuts back to.

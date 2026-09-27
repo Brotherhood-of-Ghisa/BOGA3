@@ -113,7 +113,7 @@ export function ExerciseListContent({
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
                 <Icon
-                  color={empty ? uiRoles.disabled : uiRoles.inkMuted}
+                  color={empty ? uiRoles.inkGhost : uiRoles.inkMuted}
                   name={isExpanded ? 'chevron-down' : 'chevron-right'}
                   size="sm"
                 />
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   familyCountEmpty: {
-    color: uiRoles.disabled,
+    color: uiRoles.inkGhost,
   },
   rowText: {
     paddingVertical: uiSpace.sm,

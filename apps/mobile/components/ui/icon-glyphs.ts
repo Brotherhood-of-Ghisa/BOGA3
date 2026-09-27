@@ -123,7 +123,7 @@ export const ICON_GLYPHS = {
   'set-done': [circle(12, 12, 10, 'solid'), path('m8 12 3 3 5-6', 'knockout')],
   // Current: a plain ring, coloured `accent` by default.
   'set-current': [circle(12, 12, 10)],
-  // Planned: Lucide `circle-dashed`, coloured `planned` by default.
+  // Planned: Lucide `circle-dashed`, coloured `inkGhost` by default.
   'set-planned': DASHED_RING,
 
   // --- Destinations ---

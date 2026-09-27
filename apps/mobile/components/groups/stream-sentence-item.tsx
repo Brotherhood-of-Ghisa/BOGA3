@@ -40,7 +40,7 @@ export const streamRowStyles = StyleSheet.create({
     borderLeftColor: uiRoles.rule,
   },
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   sentence: {
     fontFamily: uiFonts.body.family,

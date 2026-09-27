@@ -17,7 +17,7 @@ built from the vocabulary `exercise-session-v5.md` already governs.
   tray, with four plain Archivo labels. The active tab is `ink` 700 over a 2pt
   `ink` underline, and the others are `ink-muted` 600. Tabs are navigation, so
   they are never `accent`.
-- The tray handle is the sheet handle's recipe (38×4, `rule-strong`). The tray
+- The tray handle is the sheet handle's recipe (38×4, `rule`). The tray
   still drags and snaps, and collapsing it leaves only the handle.
 - Every native stack header has a `surface` background, an Archivo 700 `ink`
   title and an `ink` back arrow, which matches the top bars the session view,

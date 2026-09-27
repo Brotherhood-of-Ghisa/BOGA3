@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     marginLeft: uiSpace.md,
   },
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   band: {
     flexDirection: 'row',

@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     backgroundColor: uiRoles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.pill,
   },
   toggleOn: {
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     borderColor: uiRoles.ink,
   },
   pressed: {
-    backgroundColor: uiRoles.surfaceSubtle,
+    backgroundColor: uiRoles.paper,
   },
   toggleLabel: {
     fontFamily: uiFonts.display.family,

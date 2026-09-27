@@ -1,28 +1,30 @@
 // The colour roles (`docs/specs/ui/design-language.md` §2). A screen names the
-// role, never the hex.
+// role, never the hex. One value per role: two roles that cannot be told apart
+// are one role, and the neutrals share one warm hue (rationalised 2026-09-27;
+// gated by `ui-design-tokens.test.ts`).
 export const uiRoles = {
-  // Text and realised values.
-  ink: '#15181D',
+  // Text and realised values. A warm near-black, on the neutrals' hue.
+  ink: '#1B1712',
   inkMuted: '#6B6358',
   // Mini legends, tertiary labels, and not-yet-realised values.
   inkFaint: '#9B948A',
-  // The legends of not-yet-realised values; the values themselves use
-  // `inkFaint` (`design-language.md` §6).
-  planned: '#B3ABA0',
-  // Absent values and the faintest labels.
-  disabled: '#C4BDB0',
-  // Grounds.
+  // The faintest ink: legends of not-yet-realised values (the values
+  // themselves use `inkFaint`, `design-language.md` §6), absent values,
+  // placeholders and disabled controls.
+  inkGhost: '#BAB2A7',
+  // Grounds. `paper` is the page, and also a pressed control and an action
+  // strip inside a `surface` card.
   paper: '#F6F4EF',
   surface: '#FFFFFF',
-  surfaceSubtle: '#FBF9F5',
-  // Hairlines. Depth is a rule plus a ground change — never a shadow.
+  // Hairlines. Depth is a rule plus a ground change — never a shadow. `rule`
+  // borders cards and controls and draws the sheet handle; `ruleSoft` divides
+  // rows inside a card or panel.
   rule: '#E2DCD0',
   ruleSoft: '#EFEAE0',
-  ruleFaint: '#F3EFE6',
-  ruleStrong: '#DDD6C8',
   // The one primary action on a screen, and the row or field being edited.
   accent: '#C2410C',
-  accentWash: '#FDF6EE',
+  // `accent`'s hue at L* 97: a tint of the accent, not a neutral.
+  accentWash: '#FFF4EF',
   // An all-time best, and the band that announces one. Brass, deliberately a
   // different hue from `accent` (41° vs 17°) so "your best ever" and "the
   // button that commits" do not read as the same mark. Decided 2026-09-22.
@@ -44,7 +46,7 @@ export const uiRoles = {
   viz4: '#A4866B',
   // The dimmed backdrop behind a sheet: `ink` at 42%, so the page behind reads
   // as the same warm ground gone dark rather than as a neutral grey.
-  scrim: 'rgba(21, 24, 29, 0.42)',
+  scrim: 'rgba(27, 23, 18, 0.42)',
 } as const;
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed

@@ -23,7 +23,7 @@ export type StatProps = {
   // figure in a row of a list (a Progress muscle row).
   rank?: StatRank;
   // A planned value is not yet realised: it is shown, but faded — the value in
-  // `ink-faint`, the legend in `planned`.
+  // `ink-faint`, the legend in `inkGhost`.
   state?: StatState;
   // `record`: bold `record`, an all-time best — the one superlative. Ignored
   // for planned values, which cannot be one (`design-language.md` §5).
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     color: uiRoles.inkFaint,
   },
   legendPlanned: {
-    color: uiRoles.planned,
+    color: uiRoles.inkGhost,
   },
   legendOnViz: {
     color: uiRoles.ink,

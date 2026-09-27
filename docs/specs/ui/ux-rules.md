@@ -502,6 +502,11 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    cannot be named, there is only one radius.
 6. **No elevation.** There is no elevation token: depth is a hairline plus a
    ground change (`ui/design-language.md` §4), and no screen draws a shadow.
+6a. **Colour: one value per role.** As with radii, if two colour roles sit
+   side by side and the difference cannot be named, there is only one role. No
+   two roles share a value, the neutrals share one hue, and a wash is a tint of
+   its role (`ui/design-language.md` §2, rationalised 2026-09-27;
+   `ui-design-tokens.test.ts`).
 
 7. **Fixed font sizes.** App-owned text and inputs do not follow the device's
    text-size setting (decided 2026-09-25). Every React Native `Text` and
@@ -716,7 +721,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    - Linked rows also offer `Unlink…` to every member, independently of admin row actions. One personal mapping confirms directly; multiple mappings open `Your linked exercises` with individually labelled actions and distinguishable IDs for duplicate/missing names. Never unlink all mappings implicitly. Dismiss the chooser before confirmation (the confirmation opens from `Sheet.onDismissed`, once the sheet has gone); restore focus to the launching row, wrap long names, and use 44 pt minimum unlink targets.
    - Group-row and Link-screen confirmations share `describeUnlinkConfirm`: identify the personal exercise, group exercise and group; explain All/Certified eligibility after sync and preservation of past activity and existing certifications. Archived/inactive targets explain unarchive/rejoin conditions, including both when known. Existing record-card certification eligibility is unchanged; unlink never requires or creates a new certification.
    - Unlink uses the guarded local repository write, including offline, with a reconnect/sync notice. Cancellation writes nothing; a stale target refreshes without mutation; failed writes keep the link and permit retry; pending writes disable repeat taps. Loading/failed local reads offer no link actions or false `Not linked`; failed reads have a retry independent of server refresh. A successful write followed by a failed read retains success alongside the unknown-status read error.
-12. Leaderboards (M25-T09). The segment shows one podium card per group exercise on `Certified · 1RM`, cached like the other group screens (rule 2); the whole card opens the full board. State is text, never color alone: my rows read `You` (in bold on a podium; on a board also on `surface-subtle`, DLM-T12-D1), a former member `(former)`, archived exercises an `Archived` `Tag`, and on All each row a check icon (certified, `ink`) or a ring icon with `uncertified`; the row's accessibility label says `certified` / `uncertified`. The metric reads `1RM`, never `e1RM`, and a value is a Plex Mono figure with no unit (`142.5`, `140.0 × 1`); a history sentence is prose and keeps `kg` (DLM-T12-D2). An empty Certified podium reads `No certified sets yet · N uncertified`; an empty Certified board offers `See all sets` (an outline).
+12. Leaderboards (M25-T09). The segment shows one podium card per group exercise on `Certified · 1RM`, cached like the other group screens (rule 2); the whole card opens the full board. State is text, never color alone: my rows read `You` (in bold on a podium; on a board also on `paper`, DLM-T12-D1), a former member `(former)`, archived exercises an `Archived` `Tag`, and on All each row a check icon (certified, `ink`) or a ring icon with `uncertified`; the row's accessibility label says `certified` / `uncertified`. The metric reads `1RM`, never `e1RM`, and a value is a Plex Mono figure with no unit (`142.5`, `140.0 × 1`); a history sentence is prose and keeps `kg` (DLM-T12-D2). An empty Certified podium reads `No certified sets yet · N uncertified`; an empty Certified board offers `See all sets` (an outline).
 13. Full boards and their history are online-only reads, each drawn as one `Card` of rows (the board's under its `Weight` | `1RM` and `Certified` | `All` `SegmentedControl`s and a `History` text button): never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail `Sheet` (08 pattern 11), titled with the lifter and the exercise, with no Close: the backdrop dismisses it. Its figures (the set, the 1RM) are `record` Plex Mono `Stat`s; `Certify` is its one `accent`, `Remove my certification` / `Cancel certification` are `danger` rows, and `View full session` is a row with a chevron. `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
 
@@ -762,7 +767,7 @@ unchanged. What differs is presentation:
    disabled until the values are a valid set — performs it and moves the logger
    on. Tapping effort cycles W-Up → blank → RIR 3 → RIR 2 → RIR 1 → RIR 0 → W-Up; long press opens the configured options in a scrolling sheet. The highest selectable RIR comes from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`). Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
 4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
-   volume; planned values `ink-faint`, legends `planned`. Warm-ups show a 1RM
+   volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
    like any set. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests, matching the session view
    (§14b.4; aligned 2026-09-23). The one highlight is a performed weight or 1RM
@@ -808,7 +813,7 @@ unchanged. What differs is presentation:
    soft delete as the Sessions list's delete; the sheet's backdrop, Android
    back and the VoiceOver escape dismiss it.
 4. A card row shows every set: done rows in `ink`, everything else faded
-   (values `inkFaint`, legends `planned`), a planned row showing its
+   (values `inkFaint`, legends `inkGhost`), a planned row showing its
    prescription. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests (tried on device 2026-09-23:
    too noisy). The one highlight is a done set whose 1RM beats the exercise's

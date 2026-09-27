@@ -348,7 +348,7 @@ export default function ExerciseCatalogScreen() {
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}
           label="Edit"
-          leading={<Icon color={isActionTargetDeleted ? uiRoles.disabled : uiRoles.ink} name="pencil" size="md" />}
+          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="pencil" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget && !actionTarget.deletedAt) {
@@ -363,7 +363,7 @@ export default function ExerciseCatalogScreen() {
             // A soft-deleted exercise is never linked from the UI (M25-T07 (b)).
             disabled={isActionTargetDeleted}
             label="Link to group exercise…"
-            leading={<Icon color={isActionTargetDeleted ? uiRoles.disabled : uiRoles.ink} name="link" size="md" />}
+            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="link" size="md" />}
             onPress={() => {
               setExerciseActionMenuTarget(null);
               if (actionTarget && !actionTarget.deletedAt) {

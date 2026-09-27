@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   recordDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleFaint,
+    borderTopColor: uiRoles.ruleSoft,
   },
   recordLabel: {
     width: uiGeometry.tapTarget,

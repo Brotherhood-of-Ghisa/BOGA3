@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   countMuted: {
-    color: uiRoles.planned,
+    color: uiRoles.inkGhost,
   },
   rows: {
     paddingHorizontal: uiSpace.md,

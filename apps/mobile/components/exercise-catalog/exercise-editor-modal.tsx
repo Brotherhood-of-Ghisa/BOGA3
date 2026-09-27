@@ -621,12 +621,12 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   // The primary-muscle trigger is framed like a field (`FormField`): a
-  // `rule-strong` hairline at the control radius that turns `danger` when
+  // `rule` hairline at the control radius that turns `danger` when
   // the choice is missing.
   triggerFrame: {
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleStrong,
+    borderColor: uiRoles.rule,
     borderRadius: uiGeometry.radius.control,
     backgroundColor: uiRoles.surface,
   },
