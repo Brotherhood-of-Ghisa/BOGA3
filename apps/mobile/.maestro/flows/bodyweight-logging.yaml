@@ -151,11 +151,13 @@ appId: com.dinoderek.mobile
 - assertVisible:
     text: "Review both actual and planned loads for this set before replacing unavailable saved metadata."
 - takeScreenshot: "BWO01-partial-review-refused"
+# On phones where the error and meaning rows already fit, centering scrolls
+# this row behind the fixed sheet title. Scroll only as far as visibility needs.
 - scrollUntilVisible:
     element:
       id: "legacy-load-meaning-assistance"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 4000
