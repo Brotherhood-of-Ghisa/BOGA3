@@ -387,6 +387,22 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-06-completed-edited-card"
 
 # --- 7. The friend's view: exercises and performed sets, no owner actions -------
+# The native back arrow returns to the stream on every visit, not just the first:
+# react-native-screens 4.16 on iOS 26 left it dead from the second visit on.
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          id: "group-stream-session-card-${output.groupsCardKey}"
+      - extendedWaitUntil:
+          visible:
+            id: "group-session-header"
+          timeout: 15000
+      - tapOn: "Back"
+      - extendedWaitUntil:
+          visible:
+            id: "groups-stream-list"
+          timeout: 10000
 - tapOn:
     id: "group-stream-session-card-${output.groupsCardKey}"
 - extendedWaitUntil:
@@ -456,6 +472,21 @@ appId: com.dinoderek.mobile
 - assertVisible:
     text: "Barbell Bench Press, archived, Certified · 1RM, No sets yet"
 - takeScreenshot: "groups-07b-1-podiums"
+# Back from a board returns to the podiums on every visit (see step 7).
+- repeat:
+    times: 2
+    commands:
+      - tapOn:
+          text: "Prowler Push, Certified · 1RM, No certified sets yet · 1 uncertified"
+      - extendedWaitUntil:
+          visible:
+            id: "group-board-see-all-button"
+          timeout: 15000
+      - tapOn: "Back"
+      - extendedWaitUntil:
+          visible:
+            id: "group-leaderboards-page"
+          timeout: 10000
 - tapOn:
     text: "Prowler Push, Certified · 1RM, No certified sets yet · 1 uncertified"
 - extendedWaitUntil:

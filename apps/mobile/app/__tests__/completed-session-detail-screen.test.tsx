@@ -700,7 +700,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
     expect(hardwareBackHandler).not.toBeNull();
     act(() => {
-      expect(hardwareBackHandler?.()).toBe(true);
+      expect(hardwareBackHandler?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(true);
     });
     expect(mockReplace).toHaveBeenCalledWith('/progress');
 

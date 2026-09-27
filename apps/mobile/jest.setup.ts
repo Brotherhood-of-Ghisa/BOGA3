@@ -11,6 +11,10 @@ afterEach(() => {
   cleanup();
 });
 
+// Worklets 0.10 installs its native runtime on import; Jest has none, so any suite
+// that loads reanimated (the root layout does) uses the library's own mock.
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const { View } = require('react-native');

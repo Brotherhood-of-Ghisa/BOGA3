@@ -417,6 +417,30 @@ boga_supabase_cli_version() {
 
 # boga_version_at_least <version> <minimum>: numeric major.minor.patch compare
 # (a -beta.N suffix is ignored). Non-semver input such as "latest" fails.
+# Xcode floor for the iOS dev client and every Maestro lane: the minimum the
+# app's Expo SDK supports (docs.expo.dev/versions; SDK 57 needs 26.4).
+BOGA_XCODE_MIN_VERSION="26.4.0"
+
+# Installed Xcode as x.y.z ("Xcode 26.2" -> 26.2.0); empty when xcodebuild is
+# absent or fails (no Xcode selected).
+boga_xcode_version() {
+  local version
+  version="$(xcodebuild -version 2>/dev/null | sed -n -E 's/^Xcode ([0-9]+(\.[0-9]+)*).*/\1/p' | head -n 1)"
+  [[ -n "$version" ]] || return 0
+  case "$version" in
+    *.*.*) ;;
+    *.*) version="$version.0" ;;
+    *) version="$version.0.0" ;;
+  esac
+  printf '%s\n' "$version"
+}
+
+boga_xcode_at_least_min() {
+  local version
+  version="$(boga_xcode_version)"
+  [[ -n "$version" ]] && boga_version_at_least "$version" "$BOGA_XCODE_MIN_VERSION"
+}
+
 boga_version_at_least() {
   local -a have want
   local i

@@ -79,7 +79,6 @@ export default ({ config }: { config: ExpoConfig }) => ({
     // keeps that chrome consistent with the tokens in
     // components/ui/tokens.ts, which have no dark variants.
     userInterfaceStyle: "light",
-    newArchEnabled: true,
 
     ios: {
         supportsTablet: true,
@@ -98,7 +97,6 @@ export default ({ config }: { config: ExpoConfig }) => ({
             backgroundImage: "./assets/images/android-icon-background.png",
             monochromeImage: "./assets/images/android-icon-monochrome.png"
         },
-        edgeToEdgeEnabled: true,
         predictiveBackGestureEnabled: false
     },
 
