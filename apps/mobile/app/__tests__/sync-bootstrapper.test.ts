@@ -586,7 +586,7 @@ describe('runBootstrapper progress emission', () => {
     const finalSnapshot = getSyncProgress();
     // Final state: done, all four layers reported drained, the gym rows counted.
     expect(finalSnapshot.phase).toBe('done');
-    expect(finalSnapshot.layersCompleted).toBe(4);
+    expect(finalSnapshot.layersCompleted).toBe(5);
 
     // The 'pull' phase was observed and its row counter advanced monotonically
     // across the two pages on layer 0.
@@ -616,7 +616,7 @@ describe('runBootstrapper progress emission', () => {
     const finalSnapshot = getSyncProgress();
     expect(finalSnapshot.phase).toBe('done');
     expect(finalSnapshot.rowsApplied).toBe(0);
-    expect(finalSnapshot.layersCompleted).toBe(4);
+    expect(finalSnapshot.layersCompleted).toBe(5);
     expect(seededDefinitionCount()).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
   });
 });

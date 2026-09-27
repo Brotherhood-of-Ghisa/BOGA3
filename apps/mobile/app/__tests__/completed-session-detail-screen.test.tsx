@@ -700,7 +700,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
     expect(hardwareBackHandler).not.toBeNull();
     act(() => {
-      expect(hardwareBackHandler?.()).toBe(true);
+      expect(hardwareBackHandler?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(true);
     });
     expect(mockReplace).toHaveBeenCalledWith('/progress');
 
@@ -871,7 +871,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
   });
 
-  it('shows only confirmed sets with valid values and leaves out an exercise with none', async () => {
+  it('shows confirmed sets including blank-as-zero and leaves out exercises with none', async () => {
     await renderDetail(
       detailClient({
         loadCompletedSession: jest.fn().mockResolvedValue({
@@ -881,7 +881,8 @@ describe('CompletedSessionDetailScreenShell', () => {
               ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0],
               sets: [
                 ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0].sets,
-                { id: 'set-invalid', weight: '', reps: '5', setType: 'rir_0' as const },
+                { id: 'set-zero', weight: '', reps: '5', setType: 'rir_0' as const },
+                { id: 'set-invalid', weight: '-1', reps: '5', setType: 'rir_0' as const },
                 {
                   id: 'set-unconfirmed',
                   weight: '500',
@@ -900,10 +901,12 @@ describe('CompletedSessionDetailScreenShell', () => {
       })
     );
 
-    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1-count')).toHaveTextContent('4 sets');
+    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1-count')).toHaveTextContent('5 sets');
+    expect(screen.getByText('0.0 × 5')).toBeTruthy();
+    expect(screen.queryByText('-1.0 × 5')).toBeNull();
     expect(screen.queryByText('500.0 × 10')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2')).toBeNull();
-    expect(screen.getByTestId('completed-session-detail-sets').props.accessibilityLabel).toBe('Sets 4');
+    expect(screen.getByTestId('completed-session-detail-sets').props.accessibilityLabel).toBe('Sets 5');
   });
 
   it('says so when no exercise was performed', async () => {

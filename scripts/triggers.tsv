@@ -26,7 +26,10 @@
 apps/mobile/app/**	fast,frontend-ui	UI screens / routes
 apps/mobile/components/**	fast,frontend-ui	UI components
 apps/mobile/app/__tests__/**	-frontend-ui	jest suites (fast gate; no simulator)
-apps/mobile/app/_layout.tsx	frontend	root layout: boot, auth route guard, sync gate (every lane boots through it)
+apps/mobile/app/_layout.tsx	frontend	root layout: boot effects (every lane boots through it)
+apps/mobile/components/navigation/root-stack.tsx	frontend	root stack: route access groups (every lane boots through it)
+apps/mobile/components/navigation/auth-route-guard.tsx	frontend	boot restore guard (every lane boots through it)
+apps/mobile/src/navigation/root-route-access.ts	frontend	root route access (every lane boots through it)
 apps/mobile/app/maestro-harness.tsx	frontend	Maestro harness deep link (every lane drives it)
 apps/mobile/app/sign-in.tsx	ios-auth-profile	sign-in screen (auth-profile e2e)
 apps/mobile/app/profile.tsx	ios-auth-profile	profile screen (auth-profile e2e)
@@ -65,6 +68,10 @@ apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-ui-regression	s
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view-abandon.yaml	-frontend,ios-session-view	single flow → the lane that runs it
+apps/mobile/.maestro/flows/bodyweight-entry.yaml	-frontend,ios-bodyweight	single flow → the lane that runs it
+apps/mobile/.maestro/flows/bodyweight-logging.yaml	-frontend,ios-bodyweight	single flow → the lane that runs it
+apps/mobile/.maestro/flows/bodyweight-backfill.yaml	-frontend,ios-bodyweight	single flow → the lane that runs it
+apps/mobile/.maestro/flows/bodyweight-analytics.yaml	-frontend,ios-bodyweight	single flow → the lane that runs it
 apps/mobile/.maestro/flows/auth-profile-happy-path.yaml	-frontend,ios-auth-profile	single flow → the lane that runs it
 apps/mobile/.maestro/flows/sync-first-run-log-and-roundtrip.yaml	-frontend,ios-sync-e2e	single flow → the lane that runs it
 apps/mobile/.maestro/flows/groups-two-user-stream.yaml	-frontend,ios-groups-e2e	single flow → the lane that runs it

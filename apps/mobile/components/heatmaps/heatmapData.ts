@@ -4,6 +4,7 @@
 // bucket helpers so the heat ramp matches the rest of the stats screen.
 // No React / react-native imports — safe to unit-test in isolation.
 
+import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 
 import {
@@ -21,6 +22,9 @@ export interface DayCell {
   isToday: boolean;
   level: CalendarHeatmapBucket;
   value: number;
+  unavailable?: boolean;
+  knownValue?: number | null;
+  hasTraining?: boolean;
 }
 
 export interface WeekCell {
@@ -31,6 +35,9 @@ export interface WeekCell {
   sessions: number;
   level: CalendarHeatmapBucket;
   value: number;
+  unavailable?: boolean;
+  knownValue?: number | null;
+  hasTraining?: boolean;
 }
 
 export interface HeatmapData {
@@ -110,6 +117,7 @@ export function buildHeatmapData(
 
   // dateKey → selected-metric value (0 when the metric has nothing to show)
   const valueByDateKey = new Map<string, number>();
+  const sourceByDateKey = new Map(dailyMetrics.map(day => [day.dateKey, day]));
   for (const day of dailyMetrics) {
     valueByDateKey.set(day.dateKey, getMetricValue(day, metric) ?? 0);
   }
@@ -131,7 +139,11 @@ export function buildHeatmapData(
   for (let d = new Date(gridStart); d <= today; d = addUtcDays(d, 1)) {
     const dateKey = formatUtcDateKey(d);
     const value = valueByDateKey.get(dateKey) ?? 0;
+    const source = sourceByDateKey.get(dateKey);
+    const unavailable = source !== undefined && getMetricValue(source, metric) === null;
     daily.push({
+      unavailable, hasTraining: source !== undefined,
+      knownValue: unavailable && metric === 'totalVolume' ? source?.knownVolume : value,
       dateKey,
       weekStartDateKey: formatUtcDateKey(startOfMondayWeek(d)),
       dow: mondayIndex(d),
@@ -144,18 +156,29 @@ export function buildHeatmapData(
   // Group days → weeks, aggregating the metric the way the weekly effort does.
   const additive = isAdditiveMetric(metric);
   const weekOrder: string[] = [];
-  const weekAcc = new Map<string, { value: number; sessions: number; monday: Date }>();
+  const weekAcc = new Map<string, { value: number; sessions: number; monday: Date; unavailable: boolean; hasKnown: boolean; knownValue: number | null }>();
   for (const day of daily) {
     let acc = weekAcc.get(day.weekStartDateKey);
     if (!acc) {
-      acc = { value: 0, sessions: 0, monday: dateKeyToUtcDate(day.weekStartDateKey) };
+      acc = { value: 0, sessions: 0, unavailable: false, hasKnown: false, knownValue: 0, monday: dateKeyToUtcDate(day.weekStartDateKey) };
       weekAcc.set(day.weekStartDateKey, acc);
       weekOrder.push(day.weekStartDateKey);
     }
+    if (day.hasTraining) acc.sessions++;
+    if (metric === 'totalVolume' && day.unavailable) acc.unavailable = true;
+    if (day.hasTraining && !day.unavailable) acc.hasKnown = true;
+    const knownDay = day.knownValue === undefined ? day.value : day.knownValue;
+    acc.knownValue = additive ? addFiniteVolume(acc.knownValue, knownDay) : Math.max(acc.knownValue ?? 0, knownDay ?? 0);
     if (day.value > 0) {
-      acc.sessions += 1;
-      acc.value = additive ? acc.value + day.value : Math.max(acc.value, day.value);
+      const next = additive ? addFiniteVolume(acc.value, day.value) : Math.max(acc.value, day.value);
+      if (next === null) acc.unavailable = true;
+      acc.value = next ?? 0;
     }
+  }
+
+  for (const acc of weekAcc.values()) {
+    if (acc.sessions > 0 && !acc.hasKnown) acc.unavailable = true;
+    if (acc.unavailable) acc.value = 0;
   }
 
   let maxWeekly = 0;
@@ -178,6 +201,7 @@ export function buildHeatmapData(
       sessions: acc.sessions,
       level: getCalendarHeatmapBucket(acc.value, minWeekly, maxWeekly),
       value: acc.value,
+      unavailable: acc.unavailable, knownValue: acc.knownValue, hasTraining: acc.sessions > 0,
     };
   });
 

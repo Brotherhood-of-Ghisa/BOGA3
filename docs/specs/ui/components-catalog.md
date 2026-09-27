@@ -96,7 +96,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `Sheet` — bottom-anchored panel over a `scrim` backdrop, sheet radius,
     38×4 handle, optional title; the backdrop tap, Android back and the
     VoiceOver escape gesture dismiss it — there is no Cancel button. It never
-    grows past the top of the screen (a taller body shrinks to fit). DLM-T06
+    grows past the top of the screen; a taller body shrinks to fit while leaving
+    a full 44pt dismissal target below the status bar. DLM-T06
     added `headerActions` (controls on the title's row, `<testID>-header`) and
     `keyboardAvoiding` (lifts the panel above the keyboard), for the exercise
     picker. DLM-T07 added `headerLeading` (one control before the title): the
@@ -541,6 +542,65 @@ Brief entrypoint inventory of the current reusable UI component set.
     `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
     `ios-session-view` lane
 
+### Bodyweight reading and snapshot controls
+
+- `components/bodyweight/weight-entry-sheet.tsx`: `WeightEntrySheet` uses a
+  keyboard-avoiding, scrollable `Sheet`, `FormField` and kg/lb
+  `SegmentedControl`. `initial` supplies raw value/unit; optional `measuredAt`
+  adds the local date field. `onSave` and optional `onDelete` are async; failure
+  retains input, in-flight writes block dismissal and duplicate submission.
+  Delete confirms with an Alert. `onDismiss` closes after success or cancellation;
+  the controlled `visible` flag keeps the native modal mounted while dismissing.
+  Reopening resets cancelled input to the chosen reading. The unit control has
+  a 44pt minimum height.
+  TestIDs: `weight-entry-sheet`, `weight-entry-value`, `weight-entry-unit-*`,
+  `weight-entry-date`, `weight-entry-save`, `weight-entry-delete`.
+- `SessionBodyWeight`: session id, snapshot, optional metadata-known/read-only
+  flags and `onSaved`; a `Card`/`ListRow`/`Stat` shows kg and source date, and
+  opens an explicit session-only correction. A restored incomplete tuple is
+  unknown; estimated provenance is visible. No measurement lookup is needed.
+  A containing scroll view must use `keyboardShouldPersistTaps="handled"` so
+  the modal's Save receives the first tap while its keyboard is open.
+- `BodyWeightSettingsRow` reloads current value/unit/date on focus and navigates
+  to `/body-weight`; no primary accent on the Settings overview.
+- `BodyWeightScreen` composes current reading, Add and history with edit/delete;
+  history and saves stay in the owner-private local/sync domain. Covered by
+  `bodyweight-entry.test.ts`, `bodyweight-screen.test.tsx` and the bodyweight
+  flow in `ios-bodyweight`.
+
+### Historical weight fill controls
+
+- `SessionWeightBackfillSheet` composes `Sheet`, `FormField`, `Card`/`ListRow`,
+  `Notice` and action controls. It owns range/selection, source preview,
+  applying/result and stale-refresh states. Pending writes guard dismissal and
+  duplicate submission; cancellation never calls the apply repository.
+- The containing scroll view uses handled keyboard taps and on-drag dismissal.
+  Source descriptions wrap; estimated provenance retains the reading's date.
+- `Sheet.onDismissed` optionally receives dismissal completion,
+  distinct from the request callback `onDismiss`. The no-source reading editor
+  waits for it, avoiding overlapping native modal presentations. The shared
+  sheet invokes it on non-iOS platforms when visibility changes to false.
+- `bodyweight-backfill.test.ts` covers planner/transaction/sync restoration;
+  `bodyweight-backfill-ui.test.tsx` covers selection, stale/retry, busy guards and
+  the native-dismissal handoff. `bodyweight-backfill.yaml` provides device proof.
+
+### Bodyweight load controls
+
+- `ExerciseCoreFields.loadRules` is optional so conventional group callers can
+  retain their current contract until group rule adoption. It contains percentage,
+  movement and loading text, a change callback, known-metadata status and inline
+  error. The personal editor validates the complete tuple before saving.
+- `SetLogger` accepts frozen `loadContext`, unit/mode, metadata-known status,
+  explicit review state and callbacks. Unit/mode segments have 44pt minimum
+  height. A legacy row opens review before its load meaning becomes eligible.
+- `LegacyLoadReviewSheet` composes Sheet, Card/ListRow selection, unit segments,
+  preview and one primary Apply action. No unit or interpretation is preselected.
+  It guards duplicate writes and retains a failed preview. Source date and
+  estimated provenance are human-readable. Test IDs use `legacy-load-*`.
+- Pure/data coverage: `bodyweight-load-review.test.ts`, `bodyweight-import.test.ts`;
+  interaction coverage: `bodyweight-logging-ui.test.tsx`. New rendered evidence
+  is required by `design-targets/bodyweight.md` before UI closeout.
+
 ### UI-supporting shared module (non-visual)
 
 1. `session-recorder/types.ts`
@@ -582,3 +642,46 @@ from the tokens in entry 1.
 ## Maintenance rule
 
 If a task adds/removes/renames reusable UI components or changes their role, update this doc in the same session.
+
+### Personal load projections and calculator
+
+- `LoadingEstimateSheet`: stable `Sheet`, scrollable `FormField`s, unit segments,
+  source `ListRow`s, `Stat` result and validation/convention `Notice`s. Target
+  changes clear results and source selection returns the scroll position to top.
+- `SetSummaryRow`: bodyweight rows separate raw context and Total 1RM/volume so
+  coefficient, units and assistance do not squeeze a conventional-width row.
+- `RecordsPanel`: Top added / Total 1RM, historical B/effective resistance and
+  explicitly incomplete previous-session volume. Loading estimate is a text
+  action beside the existing history entry.
+- Stats and `HistorySheet`: named total strength/top added, coverage notes and
+  missing-metric heatmap states; no complete total or comparison from a subtotal.
+- Coverage: `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
+  `bodyweight-analytics-formatting.test.ts`, `bodyweight-loading-estimate-ui.test.tsx`
+  and existing screen tests. `bodyweight-analytics.yaml` extends ios-bodyweight
+  with records/history/calculator/correction/Stats/share device evidence.
+
+The bodyweight logger’s fixed-height amount field uses `Added · kg/lb` or
+`Assist · kg/lb` so the legend stays on one line at 375pt. Its accessibility
+label spells out added weight or assistance and the selected unit. The mode
+selector retains the full accessible meaning; labels never crowd the number.
+
+
+### Versioned group comparisons (M27; native acceptance pending)
+
+- `GroupComparisonForm` composes the shared exercise fields in a `Card`, a
+  label-sized default-metric selector, revision preview and retained stale-edit
+  state. Apply is the one primary `ActionButton`; Reload is an outline.
+- `GroupComparisonBoundary` resolves direct links using the versioned catalogue.
+- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` reuse
+  group paging/state recipes, unit-aware rows, revision history and input-pinned
+  certification. History selects revisions with neutral, wrapping chips. Legacy
+  board components remain for original comparisons.
+- `GroupMetricStreamCard` preserves the recorded metric/unit/revision and gives
+  rules, voids and link changes light explanatory rows behind hairlines. Standing
+  records retain the indented record band, mono figures, tags and a separate
+  certification state for each achieved metric; voided records fade without a
+  band. Record cards open
+  `GroupMetricStreamRecordSheet`, which selects each achieved metric and adapts
+  the current attestation context into the shared record sheet.
+- `metric-view-model.ts` owns metric labels, saved-B provenance, raw performance,
+  accessibility summaries and mixed legacy/metric podium formatting.

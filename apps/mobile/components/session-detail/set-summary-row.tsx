@@ -10,6 +10,18 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // out, in `record` (decided on device 2026-09-23: per-column bests read as noise).
 export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string }) {
   const state = row.done ? 'realised' : 'planned';
+  if (row.bodyweight) return (
+    <View style={styles.bodyweightRow} testID={testID}>
+      <View style={styles.setRow}>
+        <Text allowFontScaling={false} style={[styles.type, row.done ? null : styles.typePlanned]}>{row.typeLabel}</Text>
+        <Text allowFontScaling={false} style={[styles.weightReps, row.done ? null : styles.valuePlanned]} testID={`${testID}-values`}>{row.weightReps}</Text>
+      </View>
+      <View style={styles.bodyweightMetrics}>
+        <Stat emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'} label="Total 1RM" layout="inline" rank="primary" state={state} testID={`${testID}-1rm`} value={row.oneRepMax} />
+        <Stat label="Vol" layout="inline" rank="primary" state={state} testID={`${testID}-vol`} value={row.volume} />
+      </View>
+    </View>
+  );
   return (
     <View style={styles.setRow} testID={testID}>
       <Text allowFontScaling={false} numberOfLines={1} style={[styles.type, row.done ? null : styles.typePlanned]}>
@@ -44,6 +56,8 @@ export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID:
 }
 
 const styles = StyleSheet.create({
+  bodyweightRow: { gap: uiSpace.xs },
+  bodyweightMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.md, paddingLeft: uiGeometry.tapTarget + uiSpace.sm },
   setRow: {
     flexDirection: 'row',
     alignItems: 'baseline',

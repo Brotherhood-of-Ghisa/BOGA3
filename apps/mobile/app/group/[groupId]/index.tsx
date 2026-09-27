@@ -19,9 +19,7 @@ import {
   Icon,
   ListRow,
   uiFonts,
-  uiGeometry,
   uiRoles,
-  uiSpace,
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';

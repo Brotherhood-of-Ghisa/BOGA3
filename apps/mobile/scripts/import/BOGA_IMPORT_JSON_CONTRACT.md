@@ -6,10 +6,11 @@ rows into BOGA SQLite.
 
 ## Schema
 
-Current schema identifier:
+Supported schema identifiers (GymBook digestion remains v1 until its source meaning is explicitly reviewed):
 
 ```text
 boga.session-import.v1
+boga.session-import.v2
 ```
 
 The package is importer-ready only when:
@@ -151,3 +152,45 @@ Non-empty source notes are preserved under set `source.note` and summarized in
 - Missing exercises require an explicit decision file or draft mode.
 - Gym bucket choices must be explicit: midday, weekday evening, and weekend;
   pass `none` for buckets that should produce no gym assignment.
+
+
+## V2 explicit load context
+
+V2 retains the structure above and adds the following required context. The
+serializer `serializeBogaSessionImportPackage` validates before exporting JSON;
+both local and `sync_push` import paths preserve the same fields. V1 remains
+supported and never infers added/assisted meaning, even for zero. Adding v2 fields
+to a v1-labelled package is rejected rather than silently discarding them.
+
+- Top-level `bodyWeightMeasurements` is an array (empty is allowed) of `id`,
+  positive decimal `weightValue`, `weightUnit` (`kg`/`lb`), matching normalized
+  `weightKg` and UTC ISO `measuredAt`. Exactly 1 lb = 0.45359237 kg. Readings
+  cannot be later than export generation or the importer's current time.
+  They remain owner-private, never group data. This is opt-in package content,
+  not a requirement to export unrelated weigh-ins with a workout.
+- Each session supplies `bodyWeightKg`, `bodyWeightSource`,
+  `bodyWeightMeasurementId`, `bodyWeightMeasuredAt`: all null, or positive kg
+  with `manual` and null provenance, or `reading`/`historical_estimate` with id
+  and UTC ISO reading time. Source readings may be absent from the package;
+  no FK or present-day reading lookup is needed. Snapshot kg stays frozen.
+- A `create_new` exercise decision supplies `loadInputMode` and complete
+  `loadRules` (`bodyweightCoefficient`, `movementStandard`, `loadingMethod`).
+  Positive contribution requires explicit descriptions. `map_existing` never
+  overwrites that exercise's personal rules.
+- Each set supplies `weightUnit`, nullable `externalLoadMode`,
+  `plannedWeightValue`, `plannedWeightUnit`, `plannedExternalLoadMode`,
+  `plannedRepsValue`, `plannedSetType`, and `performanceStatus`. An absent plan
+  has null values; unresolved old meaning stays null. A known planned mode
+  requires a known unit. Status is null (confirmed), `planned`, or `unperformed`;
+  importing values never implicitly confirms planned/unperformed rows.
+- Added/assistance amounts remain raw, positive numeric text. Bands use
+  `unquantified_assistance`, with no invented equivalent load. Totals must be
+  explicitly reviewed/converted before setting an added/assistance mode.
+
+Generated exercise/session IDs use the original v1 identity namespace for both
+versions. Reimport does not duplicate a workout merely because its package
+schema changed; local already-imported rows are left unchanged. Use the app's
+review flow for legacy conversion. Reading ids use a deterministic import
+namespace, and snapshot references are remapped consistently even if the source
+reading is absent. V1 remote writes omit new fields so they cannot clear a newer
+client's context under the compatible sync writer.

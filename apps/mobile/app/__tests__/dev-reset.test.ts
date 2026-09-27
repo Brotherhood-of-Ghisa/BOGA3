@@ -7,6 +7,7 @@ import {
   seedSystemExerciseCatalog,
 } from '@/src/data/exercise-catalog-seeds';
 import {
+  bodyWeightMeasurements,
   exerciseDefinitions,
   exerciseGroupLinks,
   exerciseMuscleMappings,
@@ -23,6 +24,7 @@ import {
 type FakeRow = Record<string, unknown>;
 
 type FakeState = {
+  bodyWeightMeasurements: FakeRow[];
   muscleGroups: FakeRow[];
   exerciseDefinitions: FakeRow[];
   exerciseGroupLinks: FakeRow[];
@@ -40,6 +42,7 @@ const cloneRow = <T extends Record<string, unknown>>(row: T) => ({ ...row }) as 
 
 const createFakeDatabase = () => {
   const state: FakeState = {
+    bodyWeightMeasurements: [],
     muscleGroups: [],
     exerciseDefinitions: [],
     exerciseGroupLinks: [],
@@ -54,6 +57,7 @@ const createFakeDatabase = () => {
   };
 
   const tableRows = new Map<object, FakeRow[]>([
+    [bodyWeightMeasurements, state.bodyWeightMeasurements],
     [muscleGroups, state.muscleGroups],
     [exerciseDefinitions, state.exerciseDefinitions],
     [exerciseGroupLinks, state.exerciseGroupLinks],
@@ -190,6 +194,7 @@ describe('resetLocalDataAndReseed (dev reset path)', () => {
     seedSystemExerciseCatalog(fake.database, new Date('2026-03-01T00:00:00.000Z'));
     fake.state.gyms.push({ id: 'gym-1', name: 'Local Gym' });
     fake.state.sessions.push({ id: 'session-1', gymId: 'gym-1' });
+    fake.state.bodyWeightMeasurements.push({ id: 'reading-1', weightKg: 80 });
     fake.state.sessionExercises.push({ id: 'sx-1', sessionId: 'session-1' });
     fake.state.exerciseSets.push({ id: 'set-1', sessionExerciseId: 'sx-1' });
     fake.state.exerciseGroupLinks.push({ id: 'grp-1:def-1', exerciseDefinitionId: 'def-1' });
@@ -209,6 +214,7 @@ describe('resetLocalDataAndReseed (dev reset path)', () => {
     // User-mutable tables are empty after the wipe.
     expect(fake.state.gyms.length).toBe(0);
     expect(fake.state.sessions.length).toBe(0);
+    expect(fake.state.bodyWeightMeasurements.length).toBe(0);
     expect(fake.state.sessionExercises.length).toBe(0);
     expect(fake.state.exerciseSets.length).toBe(0);
     expect(fake.state.sessionExerciseTags.length).toBe(0);

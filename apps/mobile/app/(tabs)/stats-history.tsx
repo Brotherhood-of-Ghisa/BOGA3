@@ -1,3 +1,4 @@
+import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -73,14 +74,17 @@ export type MuscleHistoryTarget = {
 export type ExerciseHeatmapTarget = {
   exerciseDefinitionId: string;
   displayName: string;
+  bodyweight?: boolean;
 };
 
 export type ExerciseListItem = {
   id: string;
   name: string;
+  bodyweight?: boolean;
   setCount: number;
   nearFailureCount: number;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   estimatedOneRepMax: number | null;
   lastCompletedAt: Date | null;
 };
@@ -169,7 +173,8 @@ export const formatSetCountPairDelta = (
   };
 };
 
-export const formatVolumeDelta = (current: number, previous: number): DeltaDisplay => {
+export const formatVolumeDelta = (current: number | null, previous: number | null): DeltaDisplay => {
+  if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) return { text: 'Incomplete', tone: 'neutral' };
   if (current === 0 && previous === 0) {
     return { text: '—', tone: 'neutral' };
   }
@@ -178,6 +183,7 @@ export const formatVolumeDelta = (current: number, previous: number): DeltaDispl
   }
 
   const percentDifference = Math.round(((current - previous) / previous) * 100);
+  if (!Number.isFinite(percentDifference)) return { text: 'Increased', tone: 'positive' };
   if (percentDifference === 0) {
     return { text: '±0%', tone: 'neutral' };
   }
@@ -208,6 +214,8 @@ const describeCountDifference = (difference: number, label: string): string => {
 };
 
 const describeVolumeDifference = (delta: DeltaDisplay): string => {
+  if (delta.text === 'Increased') return 'increased volume; percentage exceeds numeric range';
+  if (delta.text === 'Incomplete') return 'incomplete volume; comparison unavailable';
   if (delta.text === '—') return 'no volume in either period';
   if (delta.text === 'new') return 'new volume this period';
   if (delta.text === '±0%') return 'no percentage change in volume';
@@ -229,7 +237,7 @@ const buildMuscleRowAccessibilityLabel = ({
   nearFailureCount: number;
   previousSetCount: number;
   previousNearFailureCount: number;
-  volume: number;
+  volume: number | null;
   volumeDelta: DeltaDisplay;
   periodDays: StatsPeriodDays;
 }): string =>
@@ -333,10 +341,10 @@ export const sortExerciseListItems = (
         comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, false);
         break;
       case 'volume-desc':
-        comparison = compareNumbers(left.totalVolume, right.totalVolume, true);
+        comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, true);
         break;
       case 'volume-asc':
-        comparison = compareNumbers(left.totalVolume, right.totalVolume, false);
+        comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, false);
         break;
     }
     return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
@@ -351,7 +359,7 @@ const formatNumber = (value: number): string => {
 
 // Full integers in Plex Mono, never `2.5k`: the numbers are the point
 // (`design-language.md` §6, DLM-T08-D2).
-const formatTotalWeight = (value: number): string => String(Math.round(value));
+const formatTotalWeight = (value: number | null): string => value === null ? '— · incomplete' : String(Math.round(value));
 
 export type StatsScreenShellProps = {
   summary: StatsSummary | null;
@@ -646,7 +654,9 @@ export function StatsScreenShell({
           isLoading={isExerciseHistoryLoading}
           kind="exercise"
           metric={exerciseHistoryMetric}
-          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
+          metricOptions={selectedExercise.bodyweight ? EXERCISE_HISTORY_METRIC_OPTIONS.map(option => ({ ...option,
+            label: option.value === 'estimatedRM1' ? 'Total 1RM' : option.value === 'highestWeight' ? 'Top added' : option.label,
+          })) : EXERCISE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissExerciseHistory}
           onSelectMetric={onSelectExerciseHistoryMetric}
           onSelectView={onSelectExerciseHistoryView}
@@ -717,6 +727,7 @@ function MuscleRow({
   setsDelta,
   setsTestID,
   volume,
+  volumeIncomplete,
   volumeDelta,
   volumeTestID,
   accessibilityLabel,
@@ -733,6 +744,7 @@ function MuscleRow({
   setsDelta: DeltaDisplay;
   setsTestID: string;
   volume: string;
+  volumeIncomplete: boolean;
   volumeDelta: DeltaDisplay;
   volumeTestID: string;
   accessibilityLabel: string;
@@ -753,7 +765,7 @@ function MuscleRow({
         meta={
           <View style={styles.rowMetrics}>
             <RowMetric delta={setsDelta} label="Sets" onViz={onViz} testID={setsTestID} value={sets} />
-            <RowMetric delta={volumeDelta} label="Volume" onViz={onViz} testID={volumeTestID} value={volume} />
+            <RowMetric delta={volumeDelta} label={volumeIncomplete && volume !== '—' ? 'Known vol' : 'Volume'} onViz={onViz} testID={volumeTestID} value={volume} />
           </View>
         }
         onPress={onPress}
@@ -830,7 +842,7 @@ function MuscleFamilyCard({
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
-  const volumeDelta = formatVolumeDelta(family.totalVolume, previousFamily?.totalVolume ?? 0);
+  const volumeDelta = formatVolumeDelta(family.totalVolume, previousFamily ? previousFamily.totalVolume : 0);
   const collapsed = isFamilyCollapsible(family);
   const collapsedMuscle = collapsed ? family.muscles[0] : null;
 
@@ -871,7 +883,8 @@ function MuscleFamilyCard({
             : `stats-family-header-${testIdSlug}`
         }
         untrained={family.setCount === 0 && family.totalVolume === 0}
-        volume={formatTotalWeight(family.totalVolume)}
+        volume={compactVolumeFigure(family.totalVolume, family.knownVolume)}
+        volumeIncomplete={family.totalVolume === null}
         volumeDelta={volumeDelta}
         volumeTestID={`stats-family-volume-${testIdSlug}`}
       />
@@ -881,7 +894,7 @@ function MuscleFamilyCard({
             const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
             const muscleVolumeDelta = formatVolumeDelta(
               muscle.totalVolume,
-              previousMuscle?.totalVolume ?? 0
+              previousMuscle ? previousMuscle.totalVolume : 0
             );
             return (
               <MuscleRow
@@ -913,7 +926,8 @@ function MuscleFamilyCard({
                 )}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}
                 untrained={muscle.setCount === 0 && muscle.totalVolume === 0}
-                volume={formatTotalWeight(muscle.totalVolume)}
+                volume={compactVolumeFigure(muscle.totalVolume, muscle.knownVolume)}
+                volumeIncomplete={muscle.totalVolume === null}
                 volumeDelta={muscleVolumeDelta}
                 volumeTestID={`stats-muscle-volume-${muscle.muscleGroupId}`}
               />
@@ -1002,12 +1016,12 @@ function ExerciseListView({
           key={item.id}
           accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
             item.setCount
-          )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatTotalWeight(
-            item.totalVolume
+          )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatVolumeWithCoverage(
+            item.totalVolume, item.knownVolume
           )}${
             item.estimatedOneRepMax === null
               ? '. Estimated one rep max unavailable'
-              : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)}`
+              : `. Estimated ${item.bodyweight ? 'total ' : ''}one rep max ${formatTotalWeight(item.estimatedOneRepMax)} kg`
           }`}
           density="list"
           meta={
@@ -1022,7 +1036,7 @@ function ExerciseListView({
                 allowFontScaling={false}
                 style={[styles.tableFigure, styles.volumeColumn]}
                 testID={`stats-exercise-volume-${item.id}`}>
-                {formatTotalWeight(item.totalVolume)}
+                {item.totalVolume !== null ? formatTotalWeight(item.totalVolume) : item.knownVolume != null && item.knownVolume > 0 ? formatTotalWeight(item.knownVolume) : '—'}
               </Text>
               <Text
                 allowFontScaling={false}
@@ -1032,11 +1046,15 @@ function ExerciseListView({
               </Text>
             </View>
           }
-          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })}
+          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name,
+            ...(item.bodyweight ? { bodyweight: true } : {}) })}
           testID={`stats-exercise-row-${item.id}`}>
           <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
           </Text>
+          {item.totalVolume === null ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}
+            testID={`stats-exercise-coverage-${item.id}`}>Volume incomplete</Text> : null}
+          {item.bodyweight ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}>Total 1RM · kg</Text> : null}
         </ListRow>
       ))}
     </Card>
@@ -1326,9 +1344,11 @@ export default function StatsRoute() {
         return {
           id: ex.id,
           name: ex.name,
+          bodyweight: (ex.bodyweightCoefficient ?? 0) > 0,
           setCount: agg?.setCount ?? 0,
           nearFailureCount: agg?.nearFailureCount ?? 0,
-          totalVolume: agg?.totalVolume ?? 0,
+          totalVolume: agg ? agg.totalVolume : 0,
+          knownVolume: agg ? agg.knownVolume : 0,
           estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
           lastCompletedAt: lastCompletedAtById.get(ex.id) ?? null,
         };
@@ -1556,6 +1576,12 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
     paddingVertical: uiSpace.xs,
+  },
+  exerciseMetricNote: {
+    fontFamily: uiFonts.body.family,
+    fontSize: uiTypography.size.xs,
+    lineHeight: uiTypography.lineHeight.xs,
+    color: uiRoles.inkMuted,
   },
   tableFigure: {
     fontFamily: uiFonts.figure.family,

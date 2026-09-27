@@ -29,10 +29,11 @@ jest.mock('@/src/sync/sync-gate-state-bridge', () => ({
   stopSyncGateStateBridge: (...args: unknown[]) => mockStopSyncGateStateBridge(...args),
 }));
 
-// The sync gate is covered by its own spec; here it is a pass-through so this
-// test stays focused on the boot-effect wiring.
-jest.mock('@/src/sync/SyncGate', () => ({
-  SyncGate: ({ children }: { children: ReactNode }) => children,
+// Route access is covered by its own specs (root-route-access, root-stack-routing);
+// here every app route is open so this test stays focused on the boot-effect
+// wiring and the stack's screen options.
+jest.mock('@/src/navigation/root-route-access', () => ({
+  useRootRouteAccess: () => 'app',
 }));
 
 // Mocking the background-task module also avoids loading the real native task
@@ -48,11 +49,12 @@ jest.mock('@/src/auth', () => {
   return {
     AuthProvider,
     bootstrapAuthState: (...args: unknown[]) => mockBootstrapAuthState(...args),
+    useAuth: () => ({ isConfigured: true }),
   };
 });
 
-// The route-layer auth guard is covered by its own spec; here it is a pass-
-// through so this test stays focused on the boot-effect wiring.
+// The restore guard is covered by its own spec; here it is a pass-through so
+// this test stays focused on the boot-effect wiring.
 jest.mock('@/components/navigation/auth-route-guard', () => ({
   AuthRouteGuard: ({ children }: { children: ReactNode }) => children,
 }));
@@ -86,9 +88,15 @@ jest.mock('expo-router', () => {
     return <MockView testID={`screen-${name}`} />;
   };
 
+  // Renders only the groups whose guard is on, as the real navigator does.
+  const StackProtected = ({ children, guard }: { children: ReactNode; guard: boolean }) =>
+    guard ? <>{children}</> : null;
+
   Stack.displayName = 'MockStack';
   StackScreen.displayName = 'MockStackScreen';
+  StackProtected.displayName = 'MockStackProtected';
   Stack.Screen = StackScreen;
+  Stack.Protected = StackProtected;
 
   return {
     Stack,

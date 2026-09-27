@@ -8,7 +8,7 @@ const hashId = (prefix: string, ...parts: string[]) =>
 export const generatedSessionId = (pkg: BogaSessionImportPackage, session: BogaImportSession) =>
   hashId(
     'import-session',
-    pkg.schema,
+    'boga.session-import.v1',
     pkg.source.app,
     pkg.source.exportFile.sha256 ?? pkg.source.exportFile.path ?? 'source',
     session.importSessionKey
@@ -24,8 +24,13 @@ export const generatedExerciseDefinitionId = (pkg: BogaSessionImportPackage, dec
   if (decision.decision !== 'create_new') {
     throw new Error('Internal error: cannot generate an exercise id for a map_existing decision');
   }
-  return hashId('import-exercise-definition', pkg.schema, pkg.source.app, decision.importExerciseKey);
+  return hashId('import-exercise-definition', 'boga.session-import.v1', pkg.source.app, decision.importExerciseKey);
 };
 
 export const generatedExerciseMuscleMappingId = (exerciseDefinitionId: string, muscleGroupId: string) =>
   hashId('import-exercise-muscle', exerciseDefinitionId, muscleGroupId);
+
+
+/** Stable across v1/v2 so upgrading an import does not duplicate its identities. */
+export const generatedBodyWeightMeasurementId = (pkg: BogaSessionImportPackage, originalId: string) =>
+  hashId('import-bodyweight-reading', pkg.source.app, originalId);

@@ -1,7 +1,7 @@
 ---
 task_id: M27-T06-Backfill_and_correct_historical_session_weight
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/bodyweight-load-cont
 
 # M27-T06 — Backfill and correct historical session weight
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T04, M27-T05.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D3–D6, D9, D10.
@@ -69,3 +69,45 @@ retry, re-run and sync/restore. Run `./boga test fast`, `./boga test backend`,
 `./boga test frontend` plus actual-diff requirements from `./boga test for`.
 Graduate backfill/UX rules, attach evidence, mark the milestone entry complete
 and delete this card when shipped.
+
+
+## Local implementation checkpoint
+
+The planner, atomic repository, range/selection preview and native reading-entry
+handoff are implemented. The fixture and third `ios-bodyweight` flow are wired.
+Full `./boga test fast` passed (173 suites / 2,067 tests); the final
+`fast-frontend` rerun and all 11 meta-test files passed. All backend lanes passed,
+including real sync round trips and schema drift. Logs:
+`/tmp/boga-m27-backfill-fast-final.log`,
+`/tmp/boga-m27-backfill-fast-frontend-final.log`,
+`/tmp/boga-m27-backfill-meta-tests.log`,
+`/tmp/boga-m27-backfill-backend.log`.
+
+All three `ios-bodyweight` flows passed at `5a5892b` on both iPhone SE 3
+(375×667pt) and iPhone 17 Pro Max (440×956pt), iOS 26.4. Evidence under
+`apps/mobile/artifacts/maestro/`:
+- `M27-backfill-small-final/20260927-005519-1889/`
+- `M27-backfill-large-final/20260927-010457-4564/`
+
+The BWF captures cover invalid/valid ranges, mixed prior/estimated sources,
+partial selection, restart/repeat, a manual 79 kg correction, preserved original
+override, no readings and native handoff to Add reading. Source dates,
+estimated labels and correction provenance were visually compared with T01's
+sheet/session targets; no horizontal clipping was found. The initial small run
+saved the selected sessions but its Maestro centering swipe dismissed the short
+result sheet; `5a5892b` waits and taps the already-visible Done action. The app
+and assertions were unchanged; the final small/large flows passed in full.
+
+Logs: `/tmp/boga-m27-backfill-{small,large}-final.log`.
+The default-device bodyweight flow also passed at the same revision; its
+preview, estimated provenance and explicit correction captures were visually
+reviewed: `M27-backfill-frontend-final/20260927-013228-14921/`.
+The full `frontend` gate passed every lane at `5a5892b`, including auth/profile,
+UI/server sync and both group flows. Groups evidence:
+`M27-backfill-frontend-final/20260927-014840-23279/` and
+`M27-backfill-frontend-final/20260927-015227-24879/`. Log:
+`/tmp/boga-m27-backfill-frontend-final.log`. No shipping completion is claimed.
+`./boga test for`, `./boga timings` and the final docs check ran; the required
+lane union is covered. No assertion or lane was waived.
+`./boga doctor` passed again; completed task-only small/large simulator data was
+reset after preserving captures/reports to recover disk space.

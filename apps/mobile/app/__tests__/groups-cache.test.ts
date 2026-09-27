@@ -43,11 +43,11 @@ describe('group cache', () => {
   it('builds the contract cache keys', () => {
     expect(groupCacheKeys.mine).toBe('groups:mine');
     expect(groupCacheKeys.group('g1')).toBe('group:g1');
-    expect(groupCacheKeys.streamAll).toBe('stream:all');
-    expect(groupCacheKeys.stream('g1')).toBe('stream:g1');
-    expect(groupCacheKeys.session('u2', 's1')).toBe('session:u2:s1');
-    expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:g1');
-    expect(groupCacheKeys.boards('g1')).toBe('boards:g1');
+    expect(groupCacheKeys.streamAll).toBe('stream:v2:all');
+    expect(groupCacheKeys.stream('g1')).toBe('stream:v2:g1');
+    expect(groupCacheKeys.session('u2', 's1')).toBe('session:v2:u2:s1');
+    expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:v2:g1');
+    expect(groupCacheKeys.boards('g1')).toBe('boards:v2:g1');
   });
 
   it('round-trips a payload and its fetch time for the owning user', () => {
@@ -75,7 +75,7 @@ describe('group cache', () => {
 
     expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-1')).toBeNull();
     expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-2')).toEqual({ payload: { v: 2 }, fetchedAtMs: 2_000 });
-    expect(allKeys()).toEqual(['stream:all']);
+    expect(allKeys()).toEqual(['stream:v2:all']);
   });
 
   it('throws on a corrupt payload instead of reading it as a miss', () => {
@@ -100,7 +100,19 @@ describe('group cache', () => {
 
     evictGroup(db(), 'g1');
 
-    expect(allKeys()).toEqual(['boards:g2', 'group-exercises:g2', 'group:g2', 'groups:mine', 'stream:all', 'stream:g2']);
+    expect(allKeys()).toEqual(['boards:v2:g2', 'group-exercises:v2:g2', 'group:g2', 'groups:mine', 'stream:v2:all', 'stream:v2:g2']);
+  });
+
+  it('never reads a v1 payload under a v2 key and evicts both generations on access loss', () => {
+    put('stream:g1', 'user-1', { old: true });
+    put('group-exercises:g1');
+    put('boards:g1');
+    put('session:u2:s1');
+    put('stream:g2');
+    expect(readGroupCache(db(), groupCacheKeys.stream('g1'), 'user-1')).toBeNull();
+    put(groupCacheKeys.stream('g1'), 'user-1', { contract_version: 2 });
+    evictGroup(db(), 'g1');
+    expect(allKeys()).toEqual(['stream:g2']);
   });
 
   it('deleteGroupCacheEntry removes exactly one key', () => {

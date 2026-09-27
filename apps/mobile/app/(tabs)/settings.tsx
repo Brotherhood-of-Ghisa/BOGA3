@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
 import {
@@ -187,6 +188,11 @@ export default function SettingsScreen() {
             trailing={<RowChevron />}
           />
         </Card>
+      </View>
+
+      <View style={styles.section} testID="settings-section-body-weight">
+        <SectionLabel title="Training" />
+        <Card><BodyWeightSettingsRow /></Card>
       </View>
 
       <View style={styles.section} testID="settings-section-ai-coaching">

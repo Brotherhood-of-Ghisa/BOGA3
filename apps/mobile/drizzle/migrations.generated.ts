@@ -49,6 +49,18 @@ export const generatedMigrationBundle = {
     tag: "0006_misty_firebird",
     breakpoints: true,
   },
+  {
+    idx: 7,
+    when: 1790446284269,
+    tag: "0007_tranquil_kate_bishop",
+    breakpoints: true,
+  },
+  {
+    idx: 8,
+    when: 1790446570177,
+    tag: "0008_ordinary_bill_hollister",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -292,6 +304,55 @@ DELETE FROM \`group_cache\`;
 CREATE INDEX \`exercise_group_links_exercise_definition_id_idx\` ON \`exercise_group_links\` (\`exercise_definition_id\`);--> statement-breakpoint
 CREATE INDEX \`exercise_group_links_group_exercise_id_idx\` ON \`exercise_group_links\` (\`group_exercise_id\`);--> statement-breakpoint
 CREATE INDEX \`exercise_group_links_deleted_at_idx\` ON \`exercise_group_links\` (\`deleted_at\`);`,
+  m0007: `CREATE TABLE \`body_weight_measurements\` (
+	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
+	\`weight_value\` text NOT NULL,
+	\`weight_unit\` text NOT NULL,
+	\`weight_kg\` real NOT NULL,
+	\`measured_at\` integer NOT NULL,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
+	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX \`body_weight_measurements_measured_at_idx\` ON \`body_weight_measurements\` (\`measured_at\`);--> statement-breakpoint
+CREATE INDEX \`body_weight_measurements_deleted_at_idx\` ON \`body_weight_measurements\` (\`deleted_at\`);--> statement-breakpoint
+ALTER TABLE \`exercise_definitions\` ADD \`bodyweight_coefficient\` real DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE \`exercise_definitions\` ADD \`movement_standard\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_definitions\` ADD \`loading_method\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`weight_unit\` text DEFAULT 'kg' NOT NULL;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`external_load_mode\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`planned_weight_unit\` text;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`planned_external_load_mode\` text;--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`body_weight_kg\` real;--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`body_weight_source\` text;--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`body_weight_measurement_id\` text;--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`body_weight_measured_at\` integer;`,
+  m0008: `ALTER TABLE \`exercise_definitions\` ADD \`local_bodyweight_metadata_known\` integer DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`local_bodyweight_metadata_known\` integer DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`local_bodyweight_metadata_known\` integer DEFAULT true NOT NULL;--> statement-breakpoint
+-- Existing rows came from a client that could ignore M27 fields while still
+-- advancing its cursors. Mark only those pre-upgrade rows unknown. New inserts
+-- use the schema default true. No dirty bit or LWW clock is changed.
+UPDATE \`exercise_definitions\` SET \`local_bodyweight_metadata_known\` = false;
+--> statement-breakpoint
+UPDATE \`exercise_sets\` SET \`local_bodyweight_metadata_known\` = false;
+--> statement-breakpoint
+UPDATE \`sessions\` SET \`local_bodyweight_metadata_known\` = false;
+--> statement-breakpoint
+-- Replay affected projections once, preserving unrelated cursor 2 and all
+-- runtime bookkeeping. A separate, initially absent cursor covers readings.
+UPDATE \`sync_runtime_state\` SET \`pull_cursor\` = json_remove(
+  CASE
+    WHEN NOT json_valid(\`pull_cursor\`) THEN '{}'
+    WHEN json_type(\`pull_cursor\`) = 'text' THEN json_extract(\`pull_cursor\`, '$')
+    ELSE \`pull_cursor\`
+  END,
+  '$."0"', '$."1"', '$."3"'
+);
+`,
   },
 } as const;
 

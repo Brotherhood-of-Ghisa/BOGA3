@@ -14,7 +14,7 @@
  *   2. No inline layer-array literal (e.g. a hardcoded `['gyms', ...]` block)
  *      duplicates the partition.
  *
- * It also checks the real exported partition has the expected four-layer shape
+ * It also checks the real exported partition has the expected five-layer shape
  * so a structural regression in the single source is caught here too.
  */
 
@@ -62,10 +62,12 @@ describe('the cycle and scheduler import the layer partition, never redefine it'
 });
 
 describe('the single source of truth has the expected shape', () => {
-  it('declares exactly four layers spanning the ten entity types', () => {
-    expect(TOPO_LAYERS).toHaveLength(4);
+  it('declares five layers spanning eleven entity types', () => {
+    expect(TOPO_LAYERS).toHaveLength(5);
     const flat = TOPO_LAYERS.flat();
-    expect(new Set(flat).size).toBe(10);
+    expect(new Set(flat).size).toBe(11);
+    // New readers get a fresh cursor without replaying the legacy layers.
+    expect(TOPO_LAYERS[4]).toEqual(['body_weight_measurements']);
     // exercise_group_links sits in Layer 1, after its exercise_definitions parent.
     expect(TOPO_LAYERS[1]).toContain('exercise_group_links');
     // Layer 0 anchors the FK graph (no outbound entity FKs).

@@ -22,7 +22,14 @@ function main() {
 
   const requireContextPonyfill = require('expo-router/build/testing-library/require-context-ponyfill').default;
   const { EXPO_ROUTER_CTX_IGNORE } = require('expo-router/_ctx-shared');
-  const { getTypedRoutesDeclarationFile } = require('expo-router/build/typed-routes/generate');
+  // Since SDK 57 the generator lives in `@expo/router-server`, a dependency of `@expo/cli`
+  // (itself nested under `expo`), so resolve it the way the CLI does.
+  const expoCliDir = path.dirname(
+    require.resolve('@expo/cli/package.json', { paths: [path.dirname(require.resolve('expo/package.json'))] }),
+  );
+  const { getTypedRoutesDeclarationFile } = require(
+    require.resolve('@expo/router-server/build/typed-routes/generate', { paths: [expoCliDir] }),
+  );
 
   const ctx = requireContextPonyfill(appRoot, true, EXPO_ROUTER_CTX_IGNORE);
   const declaration = getTypedRoutesDeclarationFile(ctx, {});

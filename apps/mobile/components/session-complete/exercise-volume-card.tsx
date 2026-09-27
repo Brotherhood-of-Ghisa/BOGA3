@@ -1,3 +1,4 @@
+import { compactVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -12,15 +13,17 @@ type ExerciseVolumeCardProps = {
 };
 
 // No thousands separators and no unit on a figure (`design-language.md` §6).
-export const formatVolumeFigure = (value: number): string => String(Math.round(value * 10) / 10);
+export const formatVolumeFigure = (value: number): string => String(Math.abs(value) > Number.MAX_VALUE / 10 ? value : Math.round(value * 10) / 10);
 
 // The spoken form keeps the unit: a screen reader has no legend to lean on.
-const formatSpokenVolume = (value: number): string => `${formatVolumeFigure(value)} kg`;
+const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable or incomplete' : `${formatVolumeFigure(value)} kg reps`;
 
 export const formatExerciseSetCounts = (setCount: number, workingSetCount: number): string =>
   `${setCount} ${setCount === 1 ? 'set' : 'sets'} · ${workingSetCount} working`;
 
 export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeComparison): string => {
+  if (comparison.currentVolume === null) return 'Incomplete · comparison unavailable';
+  if (comparison.medianVolume === null && (comparison.excludedHistoricalSessionCount ?? 0) > 0) return 'No complete comparison history';
   if (comparison.medianVolume === null) return 'No comparison history yet';
   const delta = comparison.currentVolume - comparison.medianVolume;
   if (delta === 0) return 'At median';
@@ -29,20 +32,23 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
   }
 
   const percentage = Math.round((Math.abs(delta) / comparison.medianVolume) * 100);
+  if (!Number.isFinite(percentage)) return delta > 0 ? 'Above median' : 'Below median';
   return `${percentage}% ${delta > 0 ? 'above' : 'below'} median`;
 };
 
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
+  const excluded = comparison.excludedHistoricalSessionCount ?? 0;
   const base = `${comparison.exerciseName}, ${formatExerciseSetCounts(
     comparison.setCount,
     comparison.workingSetCount
-  )}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.`;
+  )}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.${excluded > 0 ? ` ${excluded} earlier ${excluded === 1 ? 'session excluded' : 'sessions excluded'} because volume is incomplete.` : ''}`;
+  if (comparison.currentVolume === null) return `${base} Missing load context prevents comparison. Reps and set counts remain available.`;
   if (
     comparison.medianVolume === null ||
     comparison.percentile5Volume === null ||
     comparison.percentile95Volume === null
   ) {
-    return `${base} No comparison history yet.`;
+    return `${base} ${formatExerciseVolumeComparison(comparison)}.`;
   }
 
   return `${base} ${formatExerciseVolumeComparison(comparison)}. Historical median ${formatSpokenVolume(
@@ -57,7 +63,7 @@ const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string =
 const markerPosition = (comparison: ExerciseVolumeComparison): number => {
   const low = comparison.percentile5Volume;
   const high = comparison.percentile95Volume;
-  if (low === null || high === null || low === high) return 0.5;
+  if (comparison.currentVolume === null || low === null || high === null || low === high) return 0.5;
   return Math.max(0, Math.min(1, (comparison.currentVolume - low) / (high - low)));
 };
 
@@ -78,16 +84,16 @@ function Legend({ label, value }: { label: string; value: string }) {
  */
 export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: ExerciseVolumeCardProps) {
   const hasDistribution =
-    comparison.state === 'distribution' &&
+    comparison.currentVolume !== null && comparison.state === 'distribution' &&
     comparison.medianVolume !== null &&
     comparison.percentile5Volume !== null &&
     comparison.percentile95Volume !== null;
   const hasBaseline =
-    comparison.medianVolume !== null &&
+    comparison.currentVolume !== null && comparison.medianVolume !== null &&
     (comparison.state === 'single-baseline' || comparison.state === 'constant-baseline');
   const position = markerPosition(comparison);
   const outsideRange =
-    hasDistribution &&
+    hasDistribution && comparison.currentVolume !== null &&
     (comparison.currentVolume < (comparison.percentile5Volume as number) ||
       comparison.currentVolume > (comparison.percentile95Volume as number));
 
@@ -102,8 +108,8 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
         </View>
         <View style={styles.valueRow}>
           <View style={styles.legend}>
-            <Text allowFontScaling={false} style={styles.microLabel}>Vol</Text>
-            <Text allowFontScaling={false} style={styles.volume}>{formatVolumeFigure(comparison.currentVolume)}</Text>
+            <Text allowFontScaling={false} style={styles.microLabel}>{comparison.currentVolume === null && (comparison.knownVolume ?? 0) > 0 ? 'Known vol' : 'Vol'}</Text>
+            <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? compactVolumeFigure(null, comparison.knownVolume) : formatVolumeFigure(comparison.currentVolume)}</Text>
           </View>
           <Text allowFontScaling={false} style={comparison.medianVolume === null ? styles.deltaMuted : styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
@@ -128,7 +134,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
               <Text allowFontScaling={false} style={styles.history}>{`${comparison.historicalSessionCount} prior sessions`}</Text>
               {outsideRange ? (
                 <Text allowFontScaling={false} style={styles.microLabel}>
-                  {comparison.currentVolume < (comparison.percentile5Volume as number) ? 'Below P5' : 'Above P95'}
+                  {comparison.currentVolume !== null && comparison.currentVolume < (comparison.percentile5Volume as number) ? 'Below P5' : 'Above P95'}
                 </Text>
               ) : null}
             </View>
@@ -148,8 +154,11 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
             </Text>
           </View>
         ) : (
-          <Text allowFontScaling={false} style={styles.history}>This is the first comparable completed session.</Text>
+          <Text allowFontScaling={false} style={styles.history}>{comparison.currentVolume === null ? 'Missing load context. This session is excluded from volume comparisons until corrected.' : 'This is the first comparable completed session.'}</Text>
         )}
+        {(comparison.excludedHistoricalSessionCount ?? 0) > 0 ? <Text allowFontScaling={false} style={styles.history}>
+          {`${comparison.excludedHistoricalSessionCount} earlier ${comparison.excludedHistoricalSessionCount === 1 ? 'session excluded' : 'sessions excluded'} · incomplete volume`}
+        </Text> : null}
       </View>
     </Card>
   );
@@ -225,6 +234,7 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   delta: {
+    flexShrink: 1, textAlign: 'right',
     fontFamily: uiFonts.body.family,
     fontWeight: '600',
     fontSize: uiTypography.size.sm,
@@ -232,6 +242,7 @@ const styles = StyleSheet.create({
     color: uiRoles.ink,
   },
   deltaMuted: {
+    flexShrink: 1, textAlign: 'right',
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.sm,

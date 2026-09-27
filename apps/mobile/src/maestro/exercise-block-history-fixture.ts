@@ -239,7 +239,8 @@ const sessionInputs: FixtureSessionInput[] = [
           {
             id: 'maestro_exercise_block_history_squat_4_a_invalid',
             orderIndex: 1,
-            weightValue: '',
+            // Blank with valid reps means zero; use malformed text for rejection.
+            weightValue: 'invalid',
             repsValue: '5',
             setType: 'rir_1',
           },

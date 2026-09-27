@@ -1,3 +1,4 @@
+import { sessionBodyWeightForCalculation, type SessionWeightContext } from '@/src/bodyweight/snapshot';
 import type { Session, SessionExercise, SessionSet } from '@/components/session-recorder/types';
 import type { ExerciseBlockHistorySuggestedSet, SessionDraftSnapshot } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
@@ -67,20 +68,27 @@ export function parseSessionDateTime(dateTime: string): Date | null {
 
 // Reads an active draft or a completed session graph alike.
 export function mapDraftSnapshotToSession(
-  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'>
+  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'> & SessionWeightContext
 ): Session {
   return {
     dateTime: formatCurrentDateTime(snapshot.startedAt),
+    bodyWeightKg: snapshot.bodyWeightKg === undefined ? undefined : sessionBodyWeightForCalculation(snapshot),
     locationId: snapshot.gymId,
     exercises: snapshot.exercises.map((exercise) => ({
       id: exercise.id,
       exerciseDefinitionId: exercise.exerciseDefinitionId,
       name: exercise.name,
       machineName: exercise.machineName ?? '',
+      loadContext: exercise.loadContext,
       sets: exercise.sets.map((set) => ({
         id: set.id,
         reps: set.repsValue,
         weight: set.weightValue,
+        localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
+        weightUnit: set.weightUnit,
+        externalLoadMode: set.externalLoadMode,
+        plannedWeightUnit: set.plannedWeightUnit,
+        plannedExternalLoadMode: set.plannedExternalLoadMode,
         setType: normalizeSessionSetType(set.setType),
         plannedReps: set.plannedRepsValue ?? null,
         plannedWeight: set.plannedWeightValue ?? null,
@@ -103,6 +111,11 @@ export const toPersistDraftExercises = (session: Session) =>
         id: committedSet.id,
         repsValue: committedSet.reps,
         weightValue: committedSet.weight,
+        localBodyweightMetadataKnown: committedSet.localBodyweightMetadataKnown,
+        weightUnit: committedSet.weightUnit,
+        externalLoadMode: committedSet.externalLoadMode,
+        plannedWeightUnit: committedSet.plannedWeightUnit,
+        plannedExternalLoadMode: committedSet.plannedExternalLoadMode,
         setType: committedSet.setType,
         plannedRepsValue: committedSet.plannedReps,
         plannedWeightValue: committedSet.plannedWeight,
@@ -148,6 +161,8 @@ function createEmptySet(): SessionSet {
     id: createSetId(),
     reps: '',
     weight: '',
+    weightUnit: 'kg', externalLoadMode: 'added', plannedWeightUnit: null, plannedExternalLoadMode: null,
+    localBodyweightMetadataKnown: true,
     setType: defaultSessionSetType(undefined),
     plannedReps: null,
     plannedWeight: null,
@@ -164,6 +179,9 @@ function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet)
     setType: null,
     plannedReps: set.repsValue,
     plannedWeight: set.weightValue,
+    weightUnit: 'kg', externalLoadMode: null,
+    plannedWeightUnit: set.weightUnit ?? 'kg', plannedExternalLoadMode: set.externalLoadMode ?? null,
+    localBodyweightMetadataKnown: true,
     plannedSetType: normalizeSessionSetType(set.setType),
     performanceStatus: 'planned',
   };
@@ -516,6 +534,7 @@ export const toSessionInsightExercises = (
   session.exercises.map((exercise, exerciseIndex) => ({
     id: exercise.id,
     orderIndex: exerciseIndex,
+    loadContext: exercise.loadContext,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     exerciseName:
       currentExerciseNameByDefinitionId.get(exercise.exerciseDefinitionId) ?? exercise.name,
@@ -523,6 +542,7 @@ export const toSessionInsightExercises = (
       id: set.id,
       orderIndex: setIndex,
       weightValue: set.weight,
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
       repsValue: set.reps,
       setType: set.setType,
       performanceStatus: set.performanceStatus,

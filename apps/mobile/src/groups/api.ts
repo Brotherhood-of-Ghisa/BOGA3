@@ -1,3 +1,11 @@
+import { validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from './metric-contract';
+import { isGroupMetricBoardWire, isGroupMetricCertificationWire, isGroupMetricExerciseWire,
+  isGroupMetricHistoryWire, isGroupMetricPodiumWire, isGroupMetricRevisionWire,
+  isGroupMetricStreamCursor, isGroupMetricStreamItem, isRenderedGroupMetricStreamKind } from './metric-wire-guards';
+import type { GroupMetricBoardWire, GroupMetricCertificationResultWire, GroupMetricExerciseListWire,
+  GroupMetricExerciseWriteWire, GroupMetricHistoryWire, GroupMetricPodiumWire, GroupMetricRevisionsWire,
+  GroupMetricStreamWire, GroupMetricStreamCursor } from './metric-wire';
+
 // The typed group RPC client (`docs/specs/tech/groups-contract.md` §4, §6.1).
 // It is the ONLY code that calls Supabase for groups. Every failure leaves this
 // module as a `GroupApiError` with a contract code:
@@ -122,7 +130,20 @@ export type GroupRpcName =
   | 'group_board_history'
   | 'group_certify'
   | 'group_certification_withdraw'
-  | 'group_certification_cancel';
+  | 'group_certification_cancel'
+  | 'group_stream_v2'
+  | 'group_exercise_list_v2'
+  | 'group_exercise_create_v2'
+  | 'group_exercise_update_v2'
+  | 'group_exercise_archive_v2'
+  | 'group_exercise_unarchive_v2'
+  | 'group_metric_board'
+  | 'group_metric_podiums'
+  | 'group_metric_revisions'
+  | 'group_metric_history'
+  | 'group_metric_certify'
+  | 'group_metric_certification_get'
+  | 'group_metric_certification_end';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -320,10 +341,9 @@ const requireExerciseCore = (core: ExerciseCore): ExerciseCore => {
 const isExerciseWritePayload = (r: Record<string, unknown>): boolean =>
   isRecord(r.exercise) && isString(r.exercise.group_exercise_id);
 
+// All current catalogue consumers use the versioned reader, including legacy exercises.
 export const listGroupExercises = async (groupId: string): Promise<GroupExerciseListResult> =>
-  expectShape('group_exercise_list', await callGroupRpc('group_exercise_list', { p_group_id: groupId }), (r) =>
-    Array.isArray(r.exercises),
-  );
+  listGroupComparisons(groupId);
 
 export type CreateGroupExerciseInput = ExerciseCore & {
   /** The standard-catalogue id this copies (its name and load mode come from the client's seed data); null = custom. */
@@ -367,18 +387,10 @@ export const updateGroupExercise = async (
 };
 
 export const archiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
-  expectShape(
-    'group_exercise_archive',
-    await callGroupRpc('group_exercise_archive', { p_group_id: groupId, p_exercise_id: groupExerciseId }),
-    isExerciseWritePayload,
-  );
+  archiveGroupComparison(groupId, groupExerciseId);
 
 export const unarchiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
-  expectShape(
-    'group_exercise_unarchive',
-    await callGroupRpc('group_exercise_unarchive', { p_group_id: groupId, p_exercise_id: groupExerciseId }),
-    isExerciseWritePayload,
-  );
+  unarchiveGroupComparison(groupId, groupExerciseId);
 
 // ---- Boards (M25-T05, contract §4.5) --------------------------------------------
 
@@ -530,3 +542,91 @@ export const cancelGroupCertification = async (
     await callGroupRpc('group_certification_cancel', { p_group_id: groupId, p_certification_id: certificationId }),
     isCertificationPayload,
   );
+
+
+// Versioned comparisons: no ratio/reps value passes through a kg-only reader.
+const checkedMetricRulesArgs = (input: GroupExerciseRules) => {
+  const result = validateGroupExerciseRules(input);
+  if (!result.ok) throw new GroupApiError('VALIDATION', result.message);
+  const rule = result.value;
+  return { p_name: rule.name, p_load_input_mode: rule.loadInputMode,
+    p_bodyweight_coefficient: rule.bodyweightCoefficient, p_movement_standard: rule.movementStandard,
+    p_loading_method: rule.loadingMethod, p_default_metric: rule.defaultMetric };
+};
+const isMetricExerciseWrite = (value: Record<string, unknown>) =>
+  value.contract_version === 2 && isGroupMetricExerciseWire(value.exercise);
+const isMetricCertificationResult = (value: Record<string, unknown>) =>
+  value.contract_version === 2 && isGroupMetricCertificationWire(value.certification);
+
+export const listGroupComparisons = async (groupId: string): Promise<GroupMetricExerciseListWire> =>
+  expectShape('group_exercise_list_v2', await callGroupRpc('group_exercise_list_v2', { p_group_id: groupId }),
+    value => value.contract_version === 2 && Array.isArray(value.exercises) && value.exercises.every(isGroupMetricExerciseWire));
+export const createGroupComparison = async (
+  groupId: string, input: GroupExerciseRules & { sourceExerciseId: string | null },
+): Promise<GroupMetricExerciseWriteWire> => expectShape('group_exercise_create_v2',
+  await callGroupRpc('group_exercise_create_v2', { p_group_id: groupId,
+    ...checkedMetricRulesArgs(input), p_source_exercise_id: input.sourceExerciseId }), isMetricExerciseWrite);
+export const updateGroupComparison = async (
+  groupId: string, exerciseId: string, expectedRevision: number, input: GroupExerciseRules,
+): Promise<GroupMetricExerciseWriteWire> => expectShape('group_exercise_update_v2',
+  await callGroupRpc('group_exercise_update_v2', { p_group_id: groupId, p_exercise_id: exerciseId,
+    p_expected_revision: expectedRevision, ...checkedMetricRulesArgs(input) }), isMetricExerciseWrite);
+export const archiveGroupComparison = async (groupId: string, exerciseId: string): Promise<GroupMetricExerciseWriteWire> =>
+  expectShape('group_exercise_archive_v2', await callGroupRpc('group_exercise_archive_v2', {
+    p_group_id: groupId, p_exercise_id: exerciseId }), isMetricExerciseWrite);
+export const unarchiveGroupComparison = async (groupId: string, exerciseId: string): Promise<GroupMetricExerciseWriteWire> =>
+  expectShape('group_exercise_unarchive_v2', await callGroupRpc('group_exercise_unarchive_v2', {
+    p_group_id: groupId, p_exercise_id: exerciseId }), isMetricExerciseWrite);
+
+export type GroupMetricView = {
+  groupId: string; groupExerciseId: string; metric: GroupMetric; certified: boolean; revision?: number | null;
+};
+export const getGroupMetricBoard = async (view: GroupMetricView & { after?: string | null; limit?: number }): Promise<GroupMetricBoardWire> =>
+  expectShape('group_metric_board', await callGroupRpc('group_metric_board', {
+    p_group_id: view.groupId, p_group_exercise_id: view.groupExerciseId, p_metric: view.metric,
+    p_certified: view.certified, p_revision: view.revision ?? null, p_after: view.after ?? null, p_limit: view.limit ?? 50,
+  }), value => isGroupMetricBoardWire(value) && value.exercise.group_exercise_id === view.groupExerciseId &&
+    value.metric === view.metric && value.certified === view.certified && (view.revision == null || value.rules_revision === view.revision));
+export const getGroupMetricPodiums = async (groupId: string, certified = true): Promise<GroupMetricPodiumWire> =>
+  expectShape('group_metric_podiums', await callGroupRpc('group_metric_podiums', { p_group_id: groupId, p_certified: certified }), isGroupMetricPodiumWire);
+export const getGroupMetricHistory = async (view: GroupMetricView & { before?: string | null; limit?: number }): Promise<GroupMetricHistoryWire> =>
+  expectShape('group_metric_history', await callGroupRpc('group_metric_history', {
+    p_group_id: view.groupId, p_group_exercise_id: view.groupExerciseId, p_metric: view.metric,
+    p_certified: view.certified, p_revision: view.revision ?? null, p_before: view.before ?? null, p_limit: view.limit ?? 20,
+  }), value => isGroupMetricHistoryWire(value) && isRecord(value.exercise) && isRecord(value.revision) && isRecord(value.revision.rules) &&
+    value.exercise.group_exercise_id === view.groupExerciseId && value.metric === view.metric && value.certified === view.certified &&
+    (view.revision == null || value.revision.rules.rules_revision === view.revision));
+export const getGroupMetricRevisions = async (groupId: string, exerciseId: string): Promise<GroupMetricRevisionsWire> =>
+  expectShape('group_metric_revisions', await callGroupRpc('group_metric_revisions', { p_group_id: groupId, p_group_exercise_id: exerciseId }),
+    value => value.contract_version === 2 && isGroupMetricExerciseWire(value.exercise) && value.exercise.group_exercise_id === exerciseId &&
+      Array.isArray(value.revisions) && value.revisions.every(isGroupMetricRevisionWire));
+
+export const certifyGroupMetric = async (input: GroupMetricView & {
+  memberUserId: string; setId: string; expectedRevision: number; expectedFingerprint: string;
+}): Promise<GroupMetricCertificationResultWire> => expectShape('group_metric_certify',
+  await callGroupRpc('group_metric_certify', { p_group_id: input.groupId, p_group_exercise_id: input.groupExerciseId,
+    p_member_user_id: input.memberUserId, p_set_id: input.setId, p_metric: input.metric,
+    p_expected_revision: input.expectedRevision, p_expected_fingerprint: input.expectedFingerprint }),
+  value => isMetricCertificationResult(value) && isGroupMetricCertificationWire(value.certification) &&
+    value.certification.metric === input.metric && value.certification.performance.set_id === input.setId);
+export const getGroupMetricCertification = async (groupId: string, certificationId: string): Promise<GroupMetricCertificationResultWire> =>
+  expectShape('group_metric_certification_get', await callGroupRpc('group_metric_certification_get', {
+    p_group_id: groupId, p_certification_id: certificationId }), value => isMetricCertificationResult(value) &&
+    isGroupMetricCertificationWire(value.certification) && value.certification.certification_id === certificationId);
+export const endGroupMetricCertification = async (
+  groupId: string, certificationId: string, action: 'withdraw' | 'cancel',
+): Promise<GroupMetricCertificationResultWire> => expectShape('group_metric_certification_end',
+  await callGroupRpc('group_metric_certification_end', { p_group_id: groupId,
+    p_certification_id: certificationId, p_action: action }), value => isMetricCertificationResult(value) &&
+    isGroupMetricCertificationWire(value.certification) && value.certification.certification_id === certificationId);
+
+
+export const getGroupMetricStream = async ({ groupId, before = null, limit = GROUP_STREAM_DEFAULT_LIMIT }:
+  Omit<GroupStreamRequest, 'before'> & { before?: GroupMetricStreamCursor | null }): Promise<GroupMetricStreamWire> => {
+  const raw = await callGroupRpc('group_stream_v2', { p_group_id: groupId, p_before: before, p_limit: limit });
+  const page = expectShape<GroupMetricStreamWire>('group_stream_v2', raw, value =>
+    value.contract_version === 2 && typeof value.has_more === 'boolean' && isGroupMetricStreamCursor(value.next_cursor) &&
+    Array.isArray(value.items) && value.items.every(item => isRecord(item) &&
+      (!isRenderedGroupMetricStreamKind(item.kind) || isGroupMetricStreamItem(item))));
+  return { ...page, items: page.items.filter(item => isRenderedGroupMetricStreamKind(item.kind)) };
+};

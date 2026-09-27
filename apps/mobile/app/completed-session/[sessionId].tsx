@@ -1,3 +1,6 @@
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
+import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
@@ -28,7 +31,7 @@ import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 import { loadHistoricalBestsExcluding } from '@/src/session-recorder/historical-bests';
-import {
+import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
@@ -53,16 +56,19 @@ export type CompletedSessionDetailSet = {
   reps: string;
   setType: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
 };
 
 export type CompletedSessionDetailExercise = {
   id: string;
   exerciseDefinitionId?: string | null;
   name: string;
+  loadContext?: LoadContext;
   sets: CompletedSessionDetailSet[];
 };
 
-export type CompletedSessionDetailRecord = {
+export type CompletedSessionDetailRecord = SessionBodyWeightSnapshot & {
   id: string;
   startedAt: string;
   completedAt: string;
@@ -134,7 +140,7 @@ const getCompletedPerformedSets = (
     (set) =>
       isConfirmedPerformedSet(set) &&
       parseCalculationSet({
-        weightValue: set.weight,
+        weightValue: canonicalizeWeightForReps(set.weight, set.reps),
         repsValue: set.reps,
         setType: set.setType,
       }) !== null
@@ -199,6 +205,11 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
       const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
       return {
         id: sessionGraph.sessionId,
+        bodyWeightKg: sessionGraph.bodyWeightKg,
+        bodyWeightSource: sessionGraph.bodyWeightSource,
+        bodyWeightMeasurementId: sessionGraph.bodyWeightMeasurementId,
+        bodyWeightMeasuredAt: sessionGraph.bodyWeightMeasuredAt,
+        localBodyweightMetadataKnown: sessionGraph.localBodyweightMetadataKnown,
         startedAt: sessionGraph.startedAt.toISOString(),
         completedAt: completedAt.toISOString(),
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
@@ -208,9 +219,11 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
           id: exercise.id,
           exerciseDefinitionId: exercise.exerciseDefinitionId,
           name: exercise.name,
+          loadContext: exercise.loadContext,
           sets: exercise.sets.map((set) => ({
             id: set.id,
             weight: set.weightValue,
+            localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
             reps: set.repsValue,
             setType: normalizeSessionSetType(set.setType),
             performanceStatus: set.performanceStatus,
@@ -247,6 +260,7 @@ export function CompletedSessionDetailScreenShell({
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [weightRevision, setWeightRevision] = useState(0);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -318,7 +332,9 @@ export function CompletedSessionDetailScreenShell({
     return () => {
       cancelled = true;
     };
-  }, [dataClient, presentation, sessionId]);
+  // A saved weight invalidates this read without changing the route.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataClient, presentation, sessionId, weightRevision]);
 
   useFocusEffect(
     useCallback(() => {
@@ -361,7 +377,9 @@ export function CompletedSessionDetailScreenShell({
       }
 
       return () => { cancelled = true; };
-    }, [dataClient, sessionId, isDeleted, maestroInsights])
+    // Weight corrections invalidate the derived comparisons too.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dataClient, sessionId, isDeleted, maestroInsights, weightRevision])
   );
 
   const formattedStartedAt = useMemo(
@@ -403,15 +421,18 @@ export function CompletedSessionDetailScreenShell({
     return summarizeCurrentSessionMuscleLoad({
       sessionId: session.id,
       sessionAt: new Date(session.completedAt),
+      bodyWeightKg: session.localBodyweightMetadataKnown === false ? null : session.bodyWeightKg,
       exercises: session.exercises.map((exercise, exerciseIndex) => ({
         id: exercise.id,
         orderIndex: exerciseIndex,
         exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
         exerciseName: exercise.name,
+        loadContext: exercise.loadContext,
         sets: exercise.sets.map((set, setIndex) => ({
           id: set.id,
           orderIndex: setIndex,
           weightValue: set.weight,
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
           repsValue: set.reps,
           setType: set.setType,
           performanceStatus: set.performanceStatus,
@@ -420,6 +441,7 @@ export function CompletedSessionDetailScreenShell({
       exerciseDefinitions: exerciseCatalog.exercises.map((exercise) => ({
         id: exercise.id,
         loadInputMode: exercise.loadInputMode ?? 'total_load',
+        bodyweightCoefficient: exercise.bodyweightCoefficient, localBodyweightMetadataKnown: exercise.localBodyweightMetadataKnown,
       })),
       muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>
         exercise.mappings.map((mapping) => ({
@@ -446,10 +468,12 @@ export function CompletedSessionDetailScreenShell({
           orderIndex: exerciseIndex,
           exerciseDefinitionId: exercise.exerciseDefinitionId ?? null,
           exerciseName: exercise.name,
+        loadContext: exercise.loadContext,
           sets: exercise.sets.map((set, setIndex) => ({
             id: set.id,
             orderIndex: setIndex,
             weightValue: set.weight,
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
             repsValue: set.reps,
             setType: set.setType,
             performanceStatus: set.performanceStatus,
@@ -632,6 +656,9 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <ViewSessionScreen
+        bodyWeightContent={<SessionBodyWeight sessionId={session.id} snapshot={session}
+          metadataKnown={session.localBodyweightMetadataKnown} editable={!isDeleted}
+          onSaved={() => setWeightRevision(value => value + 1)} />}
         section={section}
         onSectionChange={setSection}
         summaryContent={

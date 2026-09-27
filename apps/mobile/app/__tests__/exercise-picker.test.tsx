@@ -651,6 +651,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
         id: undefined,
         name: 'Custom Press',
         loadInputMode: 'total_load',
+        loadRules: { bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null },
         mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
       });
     });

@@ -5,7 +5,20 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { LOAD_INPUT_MODES, LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
+export type ExerciseLoadFieldsValue = {
+  percentage: string;
+  movementStandard: string;
+  loadingMethod: string;
+};
+
 type ExerciseCoreFieldsProps = {
+  loadRules?: {
+    value: ExerciseLoadFieldsValue;
+    scope?: 'personal' | 'group';
+    onChange: (value: ExerciseLoadFieldsValue) => void;
+    error?: string | null;
+    metadataKnown?: boolean;
+  };
   name: string;
   onChangeName: (name: string) => void;
   loadInputMode: LoadInputMode;
@@ -40,6 +53,7 @@ export function ExerciseCoreFields({
   testIDPrefix,
   editable = true,
   autoFocus = false,
+  loadRules,
 }: ExerciseCoreFieldsProps) {
   return (
     <View style={styles.root}>
@@ -71,9 +85,55 @@ export function ExerciseCoreFields({
           value={loadInputMode}
         />
         <Text allowFontScaling={false} style={styles.helperText}>
-          Choose whether the weight you enter is shared across both sides or already represents one side.
+          {loadRules?.scope === 'group'
+            ? 'Declare total or per-side external weight for this comparison. Body weight is always counted once.'
+            : 'Choose whether the weight you enter is shared across both sides or already represents one side.'}
         </Text>
       </View>
+      {loadRules ? (
+        <View style={styles.group}>
+          <FormField
+            accessibilityLabel="Bodyweight contribution percent"
+            editable={editable}
+            face="figure"
+            keyboardType="decimal-pad"
+            label="Bodyweight contribution (%)"
+            onChangeText={(percentage) => loadRules.onChange({ ...loadRules.value, percentage })}
+            testID={`${testIDPrefix}-bodyweight-percentage`}
+            value={loadRules.value.percentage}
+          />
+          {loadRules.metadataKnown === false ? (
+            <Text allowFontScaling={false} style={styles.helperText}>
+              Saved load settings have not synced yet. Leave these fields unchanged to preserve them, or configure them explicitly.
+            </Text>
+          ) : null}
+          <Text allowFontScaling={false} style={styles.helperText}>
+            0% uses external weight only. A bodyweight exercise uses this share of the weight saved on each session, plus added weight or minus assistance.
+          </Text>
+          {(Number(loadRules.value.percentage) > 0 || loadRules.value.movementStandard || loadRules.value.loadingMethod) ? (
+            <>
+              <FormField accessibilityLabel="Movement standard" editable={editable} face="text"
+                label="Movement standard" placeholder="e.g. Standard floor push-up"
+                onChangeText={(movementStandard) => loadRules.onChange({ ...loadRules.value, movementStandard })}
+                testID={`${testIDPrefix}-movement-standard`} value={loadRules.value.movementStandard} />
+              <FormField accessibilityLabel="Loading method" editable={editable} face="text"
+                label="Loading method" placeholder="e.g. Vest"
+                onChangeText={(loadingMethod) => loadRules.onChange({ ...loadRules.value, loadingMethod })}
+                testID={`${testIDPrefix}-loading-method`} value={loadRules.value.loadingMethod} />
+              <Text allowFontScaling={false} style={styles.helperText}>
+                Percentages and added mass are accounting approximations. Per side applies only to equal external loads on both sides. Use a separate exercise for a different movement.
+              </Text>
+            </>
+          ) : null}
+          <Text allowFontScaling={false} style={styles.helperText}>
+            {loadRules.scope === 'group'
+              ? 'These rules score shared performances for this group. Personal exercise settings are independent. Different movements need different group exercises.'
+              : 'Changes recalculate personal history using each session’s saved weight. Group rules stay unchanged. Old loads require review before bodyweight calculations can use them.'}
+          </Text>
+          {loadRules.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
+            style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{loadRules.error}</Text> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -97,6 +157,12 @@ const styles = StyleSheet.create({
   // The segments carry micro-labels, so the frame sets a field-like height.
   loadMode: {
     minHeight: uiGeometry.tapTarget,
+  },
+  errorText: {
+    color: uiRoles.danger,
+    fontFamily: uiFonts.body.family,
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
   },
   helperText: {
     fontFamily: uiFonts.body.family,

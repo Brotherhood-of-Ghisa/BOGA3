@@ -1,26 +1,26 @@
+import { exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import {
-  computeExerciseVolume,
-  computeMaxRepsByWeight,
-  estimateExerciseOneRepMax,
   parseCalculationSet,
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
-import {
+import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
-import { exerciseSets, sessionExercises, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions } from './schema';
 import { isWorkingSessionSetType, normalizeSessionSetType } from './set-types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type ExerciseBlockHistorySessionRow = {
+  loadContext?: LoadContext;
   sessionId: string;
   completedAt: Date;
 };
@@ -36,6 +36,9 @@ export type ExerciseBlockHistorySetRow = {
   sessionExerciseId: string;
   orderIndex: number;
   weightValue: string;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
@@ -47,7 +50,8 @@ export type ExerciseBlockHistoryBlock = {
   daysAgo: number;
   sessionExerciseIds: string[];
   estimatedOneRepMax: number | null;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   highestWeight: number | null;
   workingSetCount: number;
 };
@@ -62,11 +66,15 @@ export type ExerciseBlockHistorySuggestedSet = {
   setId: string;
   sessionExerciseId: string;
   weightValue: string;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string;
+  externalLoadMode?: string | null;
   repsValue: string;
   setType: string | null;
 };
 
 export type ExerciseBlockHistorySuggestedPlan = {
+  loadContext?: LoadContext;
   sessionId: string;
   completedAt: Date;
   sessionExerciseIds: string[];
@@ -175,7 +183,7 @@ const countWorkingSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
   for (const row of setRows) {
     const setType = normalizeSessionSetType(row.setType);
     if (!isWorkingSessionSetType(setType)) continue;
-    if (parseCalculationSet(row) === null) continue;
+    if (parseCalculationSet({ ...row, weightValue: canonicalizeWeightForReps(row.weightValue, row.repsValue) }) === null) continue;
     count += 1;
   }
   return count;
@@ -186,7 +194,7 @@ const isValidSuggestedPlanSet = (row: ExerciseBlockHistorySetRow): boolean =>
     reps: row.repsValue,
     weight: row.weightValue,
     performanceStatus: row.performanceStatus,
-  }) && parseSetWeight(row.weightValue) !== null && parseSetReps(row.repsValue) !== null;
+  }) && parseSetWeight(canonicalizeWeightForReps(row.weightValue, row.repsValue)) !== null && parseSetReps(row.repsValue) !== null;
 
 export const aggregateExerciseBlockHistory = (
   input: ExerciseBlockHistoryAggregationInput
@@ -219,19 +227,22 @@ export const aggregateExerciseBlockHistory = (
 
     const calculationSets = setRows.map((row) => ({
       weightValue: row.weightValue,
+      localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit ?? 'kg',
+      externalLoadMode: row.externalLoadMode ?? null,
       repsValue: row.repsValue,
       setType: row.setType,
     }));
-    const maxRepsByWeight = computeMaxRepsByWeight(calculationSets);
+    const summary = summarizeExerciseLoad(calculationSets, session.loadContext ?? exerciseLoadContext());
 
     blocks.push({
       sessionId: session.sessionId,
       completedAt: session.completedAt,
       daysAgo: computeDaysAgo(session.completedAt, input.now),
       sessionExerciseIds: matchingSessionExercises.map((row) => row.sessionExerciseId),
-      estimatedOneRepMax: estimateExerciseOneRepMax(calculationSets),
-      totalVolume: computeExerciseVolume(calculationSets),
-      highestWeight: maxRepsByWeight[0]?.weight ?? null,
+      estimatedOneRepMax: summary.estimatedOneRepMax,
+      totalVolume: summary.volumeCoverage.totalVolumeKgReps,
+      knownVolume: summary.volumeCoverage.knownVolumeKgReps,
+      highestWeight: summary.topWeightSet?.weight ?? null,
       workingSetCount: countWorkingSets(setRows),
     });
   }
@@ -266,6 +277,8 @@ export const selectSuggestedExercisePlanFromHistory = (input: {
           setId: set.setId,
           sessionExerciseId: set.sessionExerciseId,
           weightValue: set.weightValue,
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit ?? 'kg',
+          externalLoadMode: set.externalLoadMode ?? null,
           repsValue: set.repsValue,
           setType: normalizeSessionSetType(set.setType),
         }))
@@ -278,6 +291,7 @@ export const selectSuggestedExercisePlanFromHistory = (input: {
       completedAt: session.completedAt,
       sessionExerciseIds: matchingSessionExercises.map((row) => row.sessionExerciseId),
       sets: suggestedSets,
+      loadContext: session.loadContext,
     };
   }
 
@@ -307,9 +321,14 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       .select({
         sessionId: sessions.id,
         completedAt: sessions.completedAt,
+        bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt, sessionMetadataKnown: sessions.localBodyweightMetadataKnown,
+        bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
+        loadInputMode: exerciseDefinitions.loadInputMode,
+        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
       })
       .from(sessionExercises)
       .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+      .leftJoin(exerciseDefinitions, eq(sessionExercises.exerciseDefinitionId, exerciseDefinitions.id))
       .where(
         and(
           eq(sessionExercises.exerciseDefinitionId, exerciseDefinitionId),
@@ -326,11 +345,13 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
 
     return rows
       .filter(
-        (row): row is { sessionId: string; completedAt: Date } => row.completedAt !== null
+        (row): row is typeof row & { completedAt: Date } => row.completedAt !== null
       )
       .map((row) => ({
         sessionId: row.sessionId,
         completedAt: row.completedAt,
+        loadContext: exerciseLoadContext({ bodyweightCoefficient: row.bodyweightCoefficient ?? 0,
+          loadInputMode: row.loadInputMode ?? 'total_load', localBodyweightMetadataKnown: row.localBodyweightMetadataKnown ?? undefined }, { bodyWeightKg: row.bodyWeightKg, bodyWeightSource: row.bodyWeightSource, bodyWeightMeasurementId: row.bodyWeightMeasurementId, bodyWeightMeasuredAt: row.bodyWeightMeasuredAt, localBodyweightMetadataKnown: row.sessionMetadataKnown }),
       }));
   },
   async loadSessionExercisesForSessions({ exerciseDefinitionId, sessionIds }) {
@@ -369,6 +390,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit,
+        externalLoadMode: exerciseSets.externalLoadMode,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,
@@ -389,6 +412,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       weightValue: row.weightValue,
+      localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit ?? 'kg',
+      externalLoadMode: row.externalLoadMode ?? null,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
       performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),

@@ -15,6 +15,19 @@ appId: com.dinoderek.mobile
 # The Sheet backdrop is hidden from VoiceOver while the sheet is modal, so the
 # flow taps the dimmed page above the panel by point.
 
+# Each Maestro invocation may return to the development-client launcher.
+# Establish the JS runtime before sending the reset/fixture link; do not retry
+# fixture mutations as a readiness workaround.
+- stopApp
+- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- retry:
+    maxRetries: 2
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 4000
+      - extendedWaitUntil:
+          visible: { id: "today-screen" }
+          timeout: 30000
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
 - tapOn:
     text: "Open"

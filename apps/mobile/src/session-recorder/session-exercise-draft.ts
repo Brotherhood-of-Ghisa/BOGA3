@@ -5,6 +5,7 @@ import {
   type SessionDraftExerciseSnapshot,
   type SessionDraftExerciseInput,
   type SessionGraphSnapshot,
+  type SessionBodyWeightSnapshot,
 } from '@/src/data/session-drafts';
 
 /**
@@ -37,6 +38,7 @@ export type SessionExerciseDraftLoad =
       status: 'ready';
       exercise: SessionDraftExerciseSnapshot;
       sessionStatus: SessionGraphSnapshot['status'];
+      bodyWeight: SessionBodyWeightSnapshot;
       gymId: string | null;
     }
   | { status: SessionExerciseDraftLoadError };
@@ -60,9 +62,11 @@ export const loadSessionExerciseDraft = async (
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
-  return exercise
-    ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId }
-    : { status: 'missing-exercise' };
+  return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, bodyWeight: {
+    bodyWeightKg: session.bodyWeightKg, bodyWeightSource: session.bodyWeightSource,
+    bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
+    localBodyweightMetadataKnown: session.localBodyweightMetadataKnown,
+  } } : { status: 'missing-exercise' };
 };
 
 export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDraftExerciseInput => ({
@@ -73,6 +77,11 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
   sets: exercise.sets.map((set) => ({
     id: set.id,
     weightValue: set.weightValue,
+    localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
+    weightUnit: set.weightUnit,
+    externalLoadMode: set.externalLoadMode,
+    plannedWeightUnit: set.plannedWeightUnit,
+    plannedExternalLoadMode: set.plannedExternalLoadMode,
     repsValue: set.repsValue,
     setType: set.setType,
     plannedWeightValue: set.plannedWeightValue,

@@ -114,22 +114,21 @@ Brief entrypoint map of the current mobile screens.
 2. `/sign-in`
 - File: `apps/mobile/app/sign-in.tsx`
 - Purpose:
-  - dedicated sign-in entry point enforcing login-on-start; the route-layer auth guard redirects an unauthenticated user here before any data screen renders
+  - dedicated sign-in entry point enforcing login-on-start: while auth is configured and the user must sign in, it is the only route the root stack declares, so no data screen renders
 - Key states (high level):
   - configured signed-out email/password form with inline auth error feedback (reuses the `/profile` signed-out credential pattern)
   - auth-unconfigured disabled-reason message instead of a form
-  - already-signed-in redirect to `/`
 - Presentation (design language, DLM-T05): `paper`, centred, no header. A
   `PageHeader` over one `Card` of `FormField`s with `Sign in` as the one
   `accent`; a failure is a `danger` `Notice`, and an auth-unconfigured build a
   `Notice` with the `warning` glyph ("Sign-in unavailable") instead of the form
 - Key exits:
-  - app proceeds to the normal route once a session exists (guard stops redirecting); no explicit navigation on success
+  - the root stack removes this route once a session exists and the router moves on to `/sync-setup` or `/`; no explicit navigation on success
 
-2b. First-sync block (route-layer render state, not a route)
-- File: `apps/mobile/src/sync/SyncGate.tsx`
+2b. `/sync-setup` (first-sync block)
+- File: `apps/mobile/app/sync-setup.tsx` (renders `SyncSetupScreen` from `apps/mobile/src/sync/SyncGate.tsx`)
 - Purpose:
-  - the device-recovery waiting room a signed-in user sees while the first sync cycle drains; renders a full-screen "Setting up your data…" block in place of the navigator until `sync_runtime_state.bootstrap_completed_at` is set, so no data screen is reachable before the user's data is restored
+  - the device-recovery waiting room a signed-in user sees while the first sync cycle drains: a full-screen "Setting up your data…" block. Until `sync_runtime_state.bootstrap_completed_at` is set it is the only route the root stack declares (besides the dev/test harness), so no data screen is reachable before the user's data is restored; once set, the root stack removes it and the router moves on to `/`
 - Key states (high level):
   - in-progress: a phase label plus an advancing activity/progress indicator ("layer K of N", "N items") that visibly moves while work happens
   - offline: an offline message instead of an indefinite spinner, shown only once NetInfo has reported `isConnected === false`; before NetInfo's first determined report the network is unknown and the block shows the in-progress state, never the offline copy
@@ -672,15 +671,32 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - reloads the gyms on every focus; name and archive changes close the editor, location changes keep it open
 
+23. `/body-weight`
+- File: `apps/mobile/app/body-weight.tsx`; composition: `components/bodyweight/`
+- Purpose: private weight readings and their history, reached from Settings.
+- States: current value with explicit unit and measurement date; empty history;
+  loading/retryable error; Add/Edit sheet with positive weight, kg/lb and local
+  date/time; inline invalid/future date or save failure retaining input; delete
+  confirmation that saved sessions stay unchanged. Saves are local/offline.
+- Native back returns to Settings. History orders by measurement time, then id,
+  not last edit. Session detail/edit shows the frozen kg and source date through
+  `SessionBodyWeight`; its correction sheet changes only that session. Deleted
+  session detail is read-only.
+- Fill missing session weights opens an in-route sheet: optional From/Through
+  dates, default eligible selection, source/estimate preview, atomic Apply and
+  filled/skipped result. Cancel writes nothing; stale inputs require refresh.
+  No reading offers entry after the fill sheet dismisses. Existing snapshots
+  remain unchanged, including on repeat; later source edits never rerun fill.
+
 ## Route shell (not a user-facing screen)
 
 1. `apps/mobile/app/_layout.tsx`
 - Purpose:
   - root stack registration and local data bootstrap on app mount
 - Notes:
-  - wraps the whole navigator in the route-layer auth guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which enforces login-on-start for configured signed-out sessions (neutral loading view while restoring, redirect to `/sign-in` when configured-but-signed-out, stand aside when auth is unconfigured, while allowing `/sign-in` and the dev/test-gated `/maestro-harness` route to render through)
-  - immediately below the auth guard, wraps the navigator in the first-sync gate (`apps/mobile/src/sync/SyncGate.tsx`), which blocks a signed-in user behind a full-screen "Setting up your data…" block until `sync_runtime_state.bootstrap_completed_at` is set (then dismisses in place), and observes sync runtime state through the single shared scheduler-state accessor
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` screen and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page))
+  - wraps the root stack in the restore guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which shows a neutral loading view instead of the navigator while the session restore is in flight (boot only)
+  - the root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under one `Stack.Protected` group per access level — `sign-in`, `sync-setup`, the app — and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one at a time, so login-on-start and the first-sync block are enforced by the navigator without unmounting it; see `navigation-contract.md` "Router baseline"
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page))
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only
@@ -708,3 +724,40 @@ Brief entrypoint map of the current mobile screens.
 - Keep this doc brief and route-oriented.
 - Do not duplicate detailed section breakdowns, component trees, or render logic from route files.
 - If route purpose or screen-level state set changes materially, update this doc in the same task.
+
+
+### Bodyweight load overlays on existing exercise routes
+
+The exercise editor adds contribution, movement standard and loading method.
+The session exercise page adds explicit added/assisted/unquantified meaning and
+units, effective-load context and the session-only weight correction control.
+`LegacyLoadReviewSheet` is reached after saving an exercise with unresolved loads
+or from its exercise options/logger. It selects actual/planned originals,
+requires a source unit and interpretation, previews, then applies or leaves them
+unresolved. These are overlays on existing routes, not additional destinations.
+
+### Personal loading estimate overlay
+
+Exercise page → records → Loading estimate uses
+`components/bodyweight/loading-estimate-sheet.tsx`. Source selection stays inside
+the same sheet. Target reps, saved/explicit current B and output unit produce a
+transient added/assistance estimate. Loading, retry, no-source, invalid input,
+source provenance and one-rep/high-rep states use existing UI primitives.
+Exercise history, Stats/heatmaps and session/share projections use the same
+effective-load boundary and expose incomplete volume.
+
+
+## M27 group comparison extension (native acceptance in progress)
+
+The group exercise routes now include bodyweight contribution, declared movement
+and loading method, and default ranking. Calculation edits require review and
+an expected revision; stale forms retain edits until explicit reload. New local
+exercises can copy reviewed group rules; linking existing exercises never
+changes their personal metadata.
+
+The existing board/history routes select their implementation from the versioned
+catalogue. Metric boards carry reps/×BW/kg, Certified/All, rebuilding and archived
+states. Record details show raw load, saved B/provenance and attestation coverage.
+History selects a revision and its events or scores, preserving legacy retirement
+rows. Podiums and group activity use versioned cache payloads. T10's task card
+records outstanding native and stream-certification acceptance.

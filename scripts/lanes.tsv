@@ -23,7 +23,7 @@ mcp-unit	fast-repo	none	yes	.	./scripts/test-boga-mcp.sh
 backend-fast	fast-backend	supabase	no	.	./supabase/scripts/run-suite.sh --no-baseline local-runtime-smoke.sh
 auth-authz	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh auth-authz-contract.sh
 groups-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-contract.sh
-groups-leaderboards	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-leaderboards.sh groups-boards.sh groups-certification.sh
+groups-leaderboards	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh groups-leaderboards.sh groups-boards.sh groups-certification.sh groups-bodyweight.sh
 agent-api	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh agent-api-contract.sh
 sync-v2-schema	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-v2-schema-smoke.sh
 sync-push-contract	slow-backend	supabase	no	.	./supabase/scripts/run-suite.sh sync-push-contract.sh
@@ -38,6 +38,7 @@ ios-data-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh da
 ios-ui-regression	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh ui-regression
 ios-exercise-page	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh exercise-page
 ios-session-view	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh session-view
+ios-bodyweight	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh bodyweight
 ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile
 ios-sync-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh sync-e2e
 ios-groups-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh groups-e2e

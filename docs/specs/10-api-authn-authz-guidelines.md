@@ -56,6 +56,35 @@ This is the shortest operational summary. Use the "Further reading" section when
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
   - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
 
+## Versioned group projections (M27)
+
+Versioned group RPCs retain rules 15–19, with metric-specific certifications
+and expected revision/performance checks described in
+[`groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).
+Group rules, score projections and queues have no direct client privileges.
+Shared-session context exposes the saved tuple, never the owner's reading
+timeline. Worker-only claim/prepare/publish/fail RPCs require service-role access;
+the public Edge endpoint still requires its Vault-held secret.
+
+## Read-only coaching projections (M27)
+
+`agent-api` batches owner-filtered exercise rules, saved session-weight tuples
+and entered set metadata, then uses the same effective-load boundary as mobile.
+The saved snapshot supplies only the context needed for authorized training
+responses; the API does not read or expose the body-weight measurement timeline.
+Its `training-metrics.ts` adapter adds no authorization paths. Live OAuth grant
+validation, non-member/nonexistent exercise equivalence, read-only routes,
+direct-table denial and the four existing MCP tools remain enforced.
+
+Raw entered unit/mode, effective resistance, metric basis, estimated provenance
+and volume coverage are distinct fields. Unknown totals are null; known
+subtotals are explicitly incomplete. Additive API-v1 evolution is identified
+by `metric_revision: effective_load_v1`; conventional external `load` remains
+kg-normalized. Full response semantics live in
+[`agent-api/README.md`](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
+Local parity/authorization and real OAuth-to-MCP gates are required; this
+implementation does not claim hosted rollout.
+
 ## Practical guidance for API consumers (mobile/app)
 
 - Use client-safe Supabase credentials only (`anon` key), plus the authenticated user session token.
@@ -85,12 +114,12 @@ flowchart TD
   auth_boot --> config{Supabase mobile env configured?}
 
   config -- No --> missing_env[Auth snapshot: ready, no session, disabledReason]
-  missing_env --> guard_no_env[Route guard sees no session]
+  missing_env --> guard_no_env[Root stack: app access, sign-in still reachable]
   guard_no_env --> sign_in_disabled[/sign-in: show sign-in unavailable + missing env]
 
   config -- Yes --> restore[Supabase auth.getSession from persisted auth storage]
   restore --> restoring{Restore in flight?}
-  restoring -- Yes --> loading[Route guard shows neutral Loading state]
+  restoring -- Yes --> loading[Restore guard shows neutral Loading state]
   loading --> restore
   restoring -- No --> session{Restored session?}
 
@@ -125,8 +154,9 @@ flowchart TD
 
 - `apps/mobile/src/auth/supabase.ts` owns mobile Supabase client config and persisted-session options.
 - `apps/mobile/src/auth/service.ts` owns bootstrapping/restoring the Supabase Auth session and publishing the shared auth snapshot.
-- `apps/mobile/src/sync/use-auth-required-redirect.ts` owns the pure "should route to sign-in?" selector shared by the route guard and sync gate.
-- `apps/mobile/components/navigation/auth-route-guard.tsx` owns the top-level redirect/loading decision before app screens render.
+- `apps/mobile/src/sync/use-auth-required-redirect.ts` owns the pure "should route to sign-in?" selector.
+- `apps/mobile/src/navigation/root-route-access.ts` owns the root access level (`sign-in` / `sync-setup` / `app`) built on it, and `apps/mobile/components/navigation/root-stack.tsx` enforces it with one `Stack.Protected` group per level (`docs/specs/ui/navigation-contract.md` "Router baseline").
+- `apps/mobile/components/navigation/auth-route-guard.tsx` owns the neutral loading view while the session restore is in flight.
 - `apps/mobile/app/sign-in.tsx` owns credential entry, inline auth errors, and the missing-auth-config disabled state.
 
 ## Local development / test expectations

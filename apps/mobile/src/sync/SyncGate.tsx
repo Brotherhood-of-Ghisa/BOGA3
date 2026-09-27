@@ -1,5 +1,3 @@
-import { Redirect, usePathname } from 'expo-router';
-import type { PropsWithChildren } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -13,19 +11,11 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import { SIGN_IN_ROUTE, isMaestroHarnessRoutePathname, isSignInRoutePathname } from '@/src/navigation/routes';
 import { PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/progress';
 import { requestSync } from '@/src/sync/scheduler';
 import { selectSyncGateMode } from '@/src/sync/sync-gate-decision';
 import { useSyncGateState } from '@/src/sync/use-sync-gate-state';
 
-/**
- * The dev/test harness route is exempt from the block. It is the deterministic
- * driver tests use to flip the first-sync state on and off, so it must stay
- * reachable even while the gate is up — otherwise the very screen that would
- * lift the block can never mount behind it. The route is dev-gated and has no
- * production reachability, so exempting it never weakens the gate for real users.
- */
 /** Stable testIDs for the gate's surfaces, so tests and Maestro flows can target them. */
 export const SYNC_GATE_TEST_IDS = {
   block: 'sync-gate-block',
@@ -56,13 +46,12 @@ const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL',
 };
 
 /**
- * First-sync gate. Sits below the route-layer auth guard, so it only renders for
- * a signed-in user. While the device has not yet drained its first sync cycle
- * (the persisted bootstrap flag is null) it shows a full-screen "Setting up your
- * data…" block in place of the app's normal routes; once the flag is set it
- * renders its children untouched.
- *
- * While the block is up it surfaces, so a stalled gate is self-explanatory:
+ * The first-sync block, the `/sync-setup` route. The root stack
+ * (`components/navigation/root-stack.tsx`) makes it the only data-free route a
+ * signed-in user can reach while the device has not drained its first sync cycle
+ * (the persisted bootstrap flag is null), and removes it once the flag is set, so
+ * the router moves on to the app. It shows "Setting up your data…" and surfaces,
+ * so a stalled gate is self-explanatory:
  *   - the current phase of the first sync,
  *   - an activity indicator plus advancing counters ("layer K of N", "M items")
  *     as the liveness proof that work is happening, and
@@ -70,34 +59,13 @@ const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL',
  *     network.
  *
  * On a cycle error it shows the error and a single Retry that fires exactly one
- * cycle. When the latest cycle reported "no signed-in user" it routes to the
- * sign-in screen and renders no Retry — a retry would only re-hit the same
- * outcome; the user must sign in first.
+ * cycle. A "no signed-in user" outcome is not shown here: it routes to sign-in,
+ * where a retry could not help.
  */
-export function SyncGate({ children }: PropsWithChildren) {
+export function SyncSetupScreen() {
   const { isConfigured, session } = useAuth();
   const snapshot = useSyncGateState();
-  const pathname = usePathname();
   const mode = selectSyncGateMode({ isConfigured, session }, snapshot);
-
-  if (mode.kind === 'pass') {
-    return <>{children}</>;
-  }
-
-  // The sign-in route is exempt: render it through rather than blocking or
-  // redirecting onto it, so a "no signed-in user" outcome cannot trap the user
-  // behind the gate (or loop the redirect) before they can sign in.
-  //
-  // The dev/test harness route is exempt for the same shape of reason: it is the
-  // screen that flips the first-sync state, so it must render through the block
-  // to be able to lift it.
-  if (isSignInRoutePathname(pathname) || isMaestroHarnessRoutePathname(pathname)) {
-    return <>{children}</>;
-  }
-
-  if (mode.kind === 'route-to-sign-in') {
-    return <Redirect href={SIGN_IN_ROUTE} />;
-  }
 
   return (
     <Screen style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>

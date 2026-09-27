@@ -53,17 +53,22 @@ jest.mock('expo-router', () => ({
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
-jest.mock('@/src/groups/api', () => ({
+jest.mock('@/src/groups/api', () => {
+  const streamRead = jest.fn();
+  return {
   ...jest.requireActual('@/src/groups/api'),
   getGroup: jest.fn(),
-  getGroupStream: jest.fn(),
+  getGroupStream: streamRead,
+  getGroupMetricStream: streamRead,
   listGroupExercises: jest.fn(),
+  listGroupComparisons: jest.fn(),
   getGroupBoardPodiums: jest.fn(),
-  createGroupExercise: jest.fn(),
-  updateGroupExercise: jest.fn(),
+  createGroupComparison: jest.fn(),
+  updateGroupComparison: jest.fn(),
   archiveGroupExercise: jest.fn(),
   unarchiveGroupExercise: jest.fn(),
-}));
+  };
+});
 
 // Link writes are the real repository on the fixture; only the sync nudge and
 // the Add-as-new graph write (covered by exercise-group-links-add-as-new.test.ts) are stubbed.
@@ -89,12 +94,11 @@ import {
   groupCacheKeys,
   readGroupCache,
   writeGroupCache,
-  type GroupExercise,
-  type GroupExerciseListResult,
   type GroupGetResult,
   type GroupRole,
 } from '@/src/groups';
 import * as groupsApi from '@/src/groups/api';
+import type { GroupMetricExerciseWire, GroupMetricExerciseListWire } from '@/src/groups/metric-wire';
 
 import EditGroupExerciseRoute from '../group/[groupId]/exercises/[exerciseId]/edit';
 import NewGroupExerciseRoute from '../group/[groupId]/exercises/new';
@@ -107,12 +111,14 @@ const GROUP_ID = 'group-a';
 /** 09:05 local, so "last updated 09:05" holds in any time zone. */
 const T0 = new Date(2026, 8, 11, 9, 5).getTime();
 
-const exercise = (id: string, name: string, overrides: Partial<GroupExercise> = {}): GroupExercise => ({
+const exercise = (id: string, name: string, overrides: Partial<GroupMetricExerciseWire> = {}): GroupMetricExerciseWire => ({
   group_exercise_id: id,
   name,
   load_input_mode: 'total_load',
   source_exercise_id: null,
   archived_at_ms: null,
+  bodyweight_coefficient: 0, movement_standard: null, loading_method: null, default_metric: 'e1rm',
+  rules_revision: 1, published_revision: 1, rebuilding: false, legacy: true,
   ...overrides,
 });
 
@@ -120,7 +126,7 @@ const BENCH = exercise('ge-bench', 'Bench Press', { source_exercise_id: 'seed_ba
 const ROW = exercise('ge-row', 'Cable Row', { load_input_mode: 'per_side_load' });
 const OLD = exercise('ge-old', 'Old Squat', { archived_at_ms: T0 });
 /** Server order (contract §4.4): active first, then by name. */
-const LIST: GroupExerciseListResult = { exercises: [BENCH, ROW, OLD] };
+const LIST: GroupMetricExerciseListWire = { contract_version: 2, exercises: [BENCH, ROW, OLD] };
 
 const META: Record<GroupRole, string> = {
   owner: "3 members · You're the owner",
@@ -203,6 +209,7 @@ beforeEach(() => {
   api.getGroup.mockResolvedValue(detailFor('owner'));
   api.getGroupStream.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
   api.listGroupExercises.mockResolvedValue(LIST);
+  api.listGroupComparisons.mockResolvedValue(LIST);
   __resetExerciseCatalogCacheForTests();
 });
 
@@ -407,7 +414,7 @@ describe('Add exercise route', () => {
 
   it('copies a standard exercise: its seed id, name, and weight entry', async () => {
     const seed = SYSTEM_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
-    api.createGroupExercise.mockResolvedValue({ exercise: BENCH });
+    api.createGroupComparison.mockResolvedValue({ contract_version: 2, exercise: BENCH });
     await renderNew();
     expect(screen.getByTestId('group-exercise-pick-hint')).toBeTruthy();
 
@@ -417,22 +424,23 @@ describe('Add exercise route', () => {
     expect(screen.getByTestId('group-exercise-form-note')).toHaveTextContent(seed.name, { exact: false });
 
     await submit();
-    expect(api.createGroupExercise).toHaveBeenCalledWith(GROUP_ID, {
+    expect(api.createGroupComparison).toHaveBeenCalledWith(GROUP_ID, {
       name: seed.name,
       loadInputMode: seed.loadInputMode,
       sourceExerciseId: seed.id,
+      bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null, defaultMetric: 'e1rm',
     });
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
   it('keeps the seed id when the copied name is changed', async () => {
-    api.createGroupExercise.mockResolvedValue({ exercise: BENCH });
+    api.createGroupComparison.mockResolvedValue({ contract_version: 2, exercise: BENCH });
     await renderNew();
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
     fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Comp Bench');
     await submit();
-    expect(api.createGroupExercise).toHaveBeenCalledWith(
+    expect(api.createGroupComparison).toHaveBeenCalledWith(
       GROUP_ID,
       expect.objectContaining({ name: 'Comp Bench', sourceExerciseId: 'seed_barbell_bench_press' }),
     );
@@ -445,16 +453,17 @@ describe('Add exercise route', () => {
   });
 
   it('creates a custom exercise with a trimmed name, the chosen weight entry, and no source', async () => {
-    api.createGroupExercise.mockResolvedValue({ exercise: ROW });
+    api.createGroupComparison.mockResolvedValue({ contract_version: 2, exercise: ROW });
     await renderNew();
     fireEvent.press(screen.getByTestId('group-exercise-source-custom'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), '  Sled Push ');
     fireEvent.press(screen.getByTestId('group-exercise-form-load-mode-per_side_load'));
     await submit();
-    expect(api.createGroupExercise).toHaveBeenCalledWith(GROUP_ID, {
+    expect(api.createGroupComparison).toHaveBeenCalledWith(GROUP_ID, {
       name: 'Sled Push',
       loadInputMode: 'per_side_load',
       sourceExerciseId: null,
+      bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null, defaultMetric: 'e1rm',
     });
     expect(mockRouter.back).toHaveBeenCalled();
   });
@@ -465,7 +474,7 @@ describe('Add exercise route', () => {
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), ' \t ');
     await submit();
     expect(screen.getByTestId('group-exercise-form-name-error')).toHaveTextContent('Exercise name is required');
-    expect(api.createGroupExercise).not.toHaveBeenCalled();
+    expect(api.createGroupComparison).not.toHaveBeenCalled();
   });
 
   it('refuses offline with no RPC and keeps the draft', async () => {
@@ -474,14 +483,14 @@ describe('Add exercise route', () => {
     fireEvent.press(screen.getByTestId('group-exercise-source-custom'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Sled Push');
     await submit();
-    expect(api.createGroupExercise).not.toHaveBeenCalled();
+    expect(api.createGroupComparison).not.toHaveBeenCalled();
     expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
     expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('Sled Push');
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   it('shows a transport failure as "nothing changed" and stays', async () => {
-    api.createGroupExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    api.createGroupComparison.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     await renderNew();
     fireEvent.press(screen.getByTestId('group-exercise-source-custom'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Sled Push');
@@ -510,7 +519,7 @@ describe('Edit exercise route', () => {
   };
 
   it('prefills the shared form from the list and saves the new name and weight entry', async () => {
-    api.updateGroupExercise.mockResolvedValue({ exercise: { ...ROW, name: 'Seated Cable Row' } });
+    api.updateGroupComparison.mockResolvedValue({ contract_version: 2, exercise: { ...ROW, name: 'Seated Cable Row' } });
     renderEdit('ge-row');
     const nameInput = await screen.findByTestId('group-exercise-form-name-input');
     expect(nameInput.props.value).toBe('Cable Row');
@@ -520,15 +529,16 @@ describe('Edit exercise route', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     });
-    expect(api.updateGroupExercise).toHaveBeenCalledWith(GROUP_ID, 'ge-row', {
+    expect(api.updateGroupComparison).toHaveBeenCalledWith(GROUP_ID, 'ge-row', 1, {
       name: 'Seated Cable Row',
       loadInputMode: 'per_side_load',
+      bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null, defaultMetric: 'e1rm',
     });
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
   it('shows a server VALIDATION refusal next to the form and stays', async () => {
-    api.updateGroupExercise.mockRejectedValue(
+    api.updateGroupComparison.mockRejectedValue(
       new GroupApiError('VALIDATION', 'an archived group exercise is read-only; unarchive it first'),
     );
     renderEdit('ge-bench');
@@ -617,13 +627,13 @@ describe('Every exercise write: offline refusal and server failure (AC6)', () =>
     emitNetInfo(false);
     pickBench();
     await pressSubmit();
-    expect(api.createGroupExercise).not.toHaveBeenCalled();
+    expect(api.createGroupComparison).not.toHaveBeenCalled();
     expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
     expect(screen.getByTestId('group-exercise-form-note')).toBeTruthy();
   });
 
   it('catalogue add: a server failure shows "nothing changed" and stays', async () => {
-    api.createGroupExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    api.createGroupComparison.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     render(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     pickBench();
@@ -645,13 +655,13 @@ describe('Every exercise write: offline refusal and server failure (AC6)', () =>
       emitNetInfo(false);
       fireEvent.changeText(nameInput, 'Seated Cable Row');
       await pressSubmit();
-      expect(api.updateGroupExercise).not.toHaveBeenCalled();
+      expect(api.updateGroupComparison).not.toHaveBeenCalled();
       expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
       expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('Seated Cable Row');
     });
 
     it('shows a transport failure as "nothing changed" and stays', async () => {
-      api.updateGroupExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+      api.updateGroupComparison.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
       render(<EditGroupExerciseRoute />);
       await screen.findByTestId('group-exercise-form');
       await pressSubmit();
@@ -803,25 +813,25 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
     return { promise, resolve };
   };
 
-  const FRESH_ROW: GroupExercise = { ...ROW, name: 'Seated Row', load_input_mode: 'total_load' };
+  const FRESH_ROW: GroupMetricExerciseWire = { ...ROW, name: 'Seated Row', load_input_mode: 'total_load' };
 
   const renderEditWithPendingList = () => {
     seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
     seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
-    const fresh = deferred<GroupExerciseListResult>();
-    api.listGroupExercises.mockReturnValue(fresh.promise);
+    const fresh = deferred<GroupMetricExerciseListWire>();
+    api.listGroupComparisons.mockReturnValue(fresh.promise);
     mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
     render(<EditGroupExerciseRoute />);
     return fresh;
   };
 
   it('the rename form adopts a fresher list that lands after the cached render, so Save sends the fresh fields', async () => {
-    api.updateGroupExercise.mockResolvedValue({ exercise: FRESH_ROW });
+    api.updateGroupComparison.mockResolvedValue({ contract_version: 2, exercise: FRESH_ROW });
     const fresh = renderEditWithPendingList();
     expect((await screen.findByTestId('group-exercise-form-name-input')).props.value).toBe('Cable Row');
 
     await act(async () => {
-      fresh.resolve({ exercises: [BENCH, FRESH_ROW, OLD] });
+      fresh.resolve({ contract_version: 2, exercises: [BENCH, FRESH_ROW, OLD] });
     });
     await waitFor(() => expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('Seated Row'));
     expect(screen.getByTestId('group-exercise-form-load-mode-total_load').props.accessibilityState).toMatchObject({ selected: true });
@@ -829,48 +839,48 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
     await act(async () => {
       fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     });
-    expect(api.updateGroupExercise).toHaveBeenCalledWith(GROUP_ID, 'ge-row', { name: 'Seated Row', loadInputMode: 'total_load' });
+    expect(api.updateGroupComparison).toHaveBeenCalledWith(GROUP_ID, 'ge-row', 1, { name: 'Seated Row', loadInputMode: 'total_load', bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null, defaultMetric: 'e1rm' });
   });
 
   it('keeps what the user typed when a fresher list lands afterwards', async () => {
     const fresh = renderEditWithPendingList();
     fireEvent.changeText(await screen.findByTestId('group-exercise-form-name-input'), 'My Row');
     await act(async () => {
-      fresh.resolve({ exercises: [BENCH, FRESH_ROW, OLD] });
+      fresh.resolve({ contract_version: 2, exercises: [BENCH, FRESH_ROW, OLD] });
     });
     expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('My Row');
   });
 
   it('add: a save that finishes after the user left does not navigate back again', async () => {
-    const pending = deferred<{ exercise: GroupExercise }>();
-    api.createGroupExercise.mockReturnValue(pending.promise);
+    const pending = deferred<{ contract_version: 2; exercise: GroupMetricExerciseWire }>();
+    api.createGroupComparison.mockReturnValue(pending.promise);
     render(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     fireEvent.press(screen.getByTestId('group-exercise-source-custom'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Sled Push');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
-    expect(api.createGroupExercise).toHaveBeenCalled();
+    expect(api.createGroupComparison).toHaveBeenCalled();
     // The user taps the header Back while the request is in flight.
     screen.unmount();
     await act(async () => {
-      pending.resolve({ exercise: ROW });
+      pending.resolve({ contract_version: 2, exercise: ROW });
     });
     expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   it('rename: a save that finishes after the user left does not navigate back again', async () => {
-    const pending = deferred<{ exercise: GroupExercise }>();
-    api.updateGroupExercise.mockReturnValue(pending.promise);
+    const pending = deferred<{ contract_version: 2; exercise: GroupMetricExerciseWire }>();
+    api.updateGroupComparison.mockReturnValue(pending.promise);
     seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
     seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
     mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
     render(<EditGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-form');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
-    expect(api.updateGroupExercise).toHaveBeenCalled();
+    expect(api.updateGroupComparison).toHaveBeenCalled();
     screen.unmount();
     await act(async () => {
-      pending.resolve({ exercise: ROW });
+      pending.resolve({ contract_version: 2, exercise: ROW });
     });
     expect(mockRouter.back).not.toHaveBeenCalled();
   });

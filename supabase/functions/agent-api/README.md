@@ -35,8 +35,8 @@ Error envelope:
 ```
 
 All responses are JSON with `Cache-Control: no-store` and `x-request-id`.
-Timestamps below are ISO 8601 strings. Loads use `kg`; load-volume uses
-`kg_reps`. The entire serialized success response is limited to 256 KiB and a
+Timestamps below are ISO 8601 strings. Normalized loads use `kg`; load-volume
+uses `kg_reps`; `entered_load` retains its original `kg` or `lb` unit. The entire serialized success response is limited to 256 KiB and a
 validated user/client pair is limited to 120 requests per minute per function
 instance.
 
@@ -198,6 +198,92 @@ semantics.
 
 At most 50 compact exercise blocks are embedded per workout; `truncated` makes
 any internal safety cap explicit.
+
+## Effective-load response evolution
+
+Exercise-context and workout responses carry `metric_revision:
+"effective_load_v1"`. Routes, arguments, authorization, envelopes and existing
+field names stay at API v1. Added fields are additive; callers must tolerate
+unknown fields and nullable unavailable metrics. Existing conventional kg
+performances keep their numeric meaning. The existing set `load` remains the
+normalized **external amount** in kg, never effective bodyweight resistance.
+
+Exercise search/context includes `bodyweight_coefficient`, `movement_standard`,
+`loading_method` and `resistance_basis`. Workout exercises include the same
+`load_rules`, or null when their source definition is unavailable. Calculations
+use current personal rules and each session's frozen weight tuple. The API does
+not read measurement history or substitute today's weight.
+
+Each performance and workout includes `session_body_weight`:
+
+```json
+{
+  "status": "known",
+  "value": 80,
+  "unit": "kg",
+  "source": "historical_estimate",
+  "measurement_id": "reading-id",
+  "measured_at": "2026-07-25T08:00:00.000Z",
+  "estimated": true
+}
+```
+
+Sources are `manual`, `reading`, or `historical_estimate`. Missing and malformed
+tuples have `status: "missing"` or `"invalid"` and null value. A manual tuple
+has no source reading ID/date. Estimated provenance describes a saved historical
+fallback; it is not proof of a measurement on the workout date.
+
+Performed sets retain raw and effective values separately:
+
+```json
+{
+  "load": { "value": 20, "unit": "kg" },
+  "entered_load": { "raw_value": "20", "value": 20, "unit": "kg", "mode": "added" },
+  "effective_load": {
+    "status": "known", "reason": null, "value": 100,
+    "unit": "kg", "basis": "total_resistance"
+  },
+  "estimated_one_rep_max": { "value": 127.67141908045373, "unit": "kg", "basis": "total_resistance" },
+  "volume": { "value": 800, "unit": "kg_reps" }
+}
+```
+
+Raw mode is `added`, `assistance`, `unquantified_assistance`, or null for legacy
+interpretation. Unknown/invalid effective loads retain their raw values and
+performed reps, with null dependent metrics and a resolver `reason`. Blank
+entered amount plus valid performed reps follows the app's canonical-zero rule;
+`raw_value` still preserves the blank. Planned/skipped/unperformed rows do not
+contribute. The existing `estimated_one_rep_max` fields use total resistance
+for positive coefficients, identified by `basis`; conventional per-side
+exercise metrics retain entered-load semantics. `top_weight` remains a Top
+added external-load record, normalized to kg; assistance never wins it.
+
+Performance volumes, workout totals, per-exercise workout volumes and
+`volume_series` values include coverage:
+
+```json
+{
+  "value": null, "unit": "kg_reps", "known_subtotal": 500, "complete": false,
+  "eligible_set_count": 2, "known_set_count": 1,
+  "missing_set_count": 1, "invalid_set_count": 0,
+  "overflow": false, "input_truncated": false
+}
+```
+
+A null value is unavailable, never zero. `known_subtotal` is not a complete total.
+An entirely unknown load has zero known sets and may have a zero subtotal;
+that zero is not a known workout volume. Numeric overflow and truncated input
+also prevent a complete total. Counts remain useful independently of load.
+`max_session_volume` excludes incomplete sessions, with
+`excluded_incomplete_volume_sessions` documenting the exclusion. Records are
+bounded by the response's `history_truncated` flag and never imply unbounded
+lifetime coverage when that flag is true.
+
+The pure `training-metrics.ts` adapter imports the mobile analytics/snapshot
+boundary. Definitions, sessions and sets are owner-filtered and batched, with
+no per-set queries and no measurement timeline read. New readings and source
+reading edits/deletion leave historical metrics unchanged; explicit saved
+session corrections and current rule changes recompute them.
 
 ## Status contract
 

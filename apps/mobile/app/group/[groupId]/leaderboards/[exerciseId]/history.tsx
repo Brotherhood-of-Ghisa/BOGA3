@@ -1,3 +1,5 @@
+import { GroupComparisonBoundary } from '@/components/groups/group-comparison-boundary';
+import { GroupMetricHistory } from '@/components/groups/group-metric-history';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
@@ -35,6 +37,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 type HistoryParams = {
+  revision?: string | string[];
   groupId?: string | string[];
   exerciseId?: string | string[];
   metric?: string | string[];
@@ -61,15 +64,19 @@ export default function GroupBoardHistoryRoute() {
       </View>
     );
   }
-  return (
-    <GroupBoardHistoryContent
+  const requestedRevision = Number(firstParam(params.revision));
+  return <GroupComparisonBoundary userId={user.id} groupId={groupId} exerciseId={exerciseId} history
+    legacy={<GroupBoardHistoryContent
       exerciseId={exerciseId}
       groupId={groupId}
       metric={parseBoardMetricParam(params.metric)}
       scope={parseBoardScopeParam(params.scope)}
       userId={user.id}
-    />
-  );
+    />}>
+    {exercise => <GroupMetricHistory userId={user.id} groupId={groupId} exercise={exercise}
+      initialMetric={firstParam(params.metric)} initialScope={parseBoardScopeParam(params.scope)}
+      initialRevision={Number.isSafeInteger(requestedRevision) && requestedRevision > 0 ? requestedRevision : null} />}
+  </GroupComparisonBoundary>;
 }
 
 const selectItems = (page: GroupBoardHistoryResult) => page.items;

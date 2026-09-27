@@ -27,6 +27,7 @@ type ViewSessionScreenProps = {
   section: ViewSessionSection;
   onSectionChange: (section: ViewSessionSection) => void;
   summaryContent: ReactNode;
+  bodyWeightContent?: ReactNode;
   summary: ViewSessionSummary;
   model: CompletedSessionDetailModel;
   // A failed write (delete, undelete, append), shown until the next action.
@@ -50,6 +51,7 @@ export function ViewSessionScreen({
   section,
   onSectionChange,
   summaryContent,
+  bodyWeightContent,
   model,
   error,
   onBack,
@@ -67,7 +69,7 @@ export function ViewSessionScreen({
         onEdit={summary.deleted ? undefined : onEdit}
         onOpenOptions={() => setIsOptionsVisible(true)}
       />
-      <ScreenScroll testID="completed-session-detail-screen">
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID="completed-session-detail-screen">
         {summary.deleted ? (
           <View style={styles.band} testID="completed-session-detail-deleted-band">
             <Icon color={uiRoles.inkMuted} name="trash" size="xs" />
@@ -89,11 +91,13 @@ export function ViewSessionScreen({
               testID: 'completed-session-detail-gym',
             },
             { label: 'Sets', value: String(model.performedSetCount), testID: 'completed-session-detail-sets' },
-            { label: 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
+            { label: model.volumeNote && model.volume !== '—' ? 'Known vol' : 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
           ]}
+          note={model.volumeNote}
           testID="completed-session-detail-summary"
           times={{ start: summary.start, end: summary.end, testID: 'completed-session-detail-times' }}
         />
+        {bodyWeightContent}
         <SegmentedControl
           accessibilityLabel="Session review section"
           options={[{ value: 'summary', label: 'Summary' }, { value: 'sets', label: 'Sets' }]}

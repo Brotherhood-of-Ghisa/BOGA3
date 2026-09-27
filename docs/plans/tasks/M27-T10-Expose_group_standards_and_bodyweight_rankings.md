@@ -1,7 +1,7 @@
 ---
 task_id: M27-T10-Expose_group_standards_and_bodyweight_rankings
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "frontend|cross-stack"
 runtimes: "node|expo|maestro|supabase"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/ui/ux-rules.md, do
 
 # M27-T10 — Expose group standards and bodyweight rankings
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T07, M27-T09.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D7–D9.
@@ -70,3 +70,27 @@ group coefficient authority, backfill and correction invalidation. Run
 `ios-groups-e2e` is included and resolve additional diff requirements with
 `./boga test for`. Graduate UX/group contracts, attach evidence, mark the
 milestone entry complete and delete this card when shipped.
+
+
+## Current execution checkpoint (2026-09-27)
+
+Implementation is integrated with `origin/main` at `8b5c47c1`; app/server source
+is `b636f234`. The milestone's [current acceptance table](../milestones/M27-bodyweight-load-and-group-comparisons.md#current-execution-checkpoint-2026-09-27)
+owns the latest gate results and remaining work, replacing earlier partial-run
+checkpoints here. Full fast (183 suites / 2,243 tests), backend and handles are
+green. Every required baseline frontend constituent lane is now green on this
+integrated source; failed aggregates are not counted as passes. No assertion
+has been waived.
+
+Baseline two-user proof covers ranking reversal, estimated/missing weight,
+100%→70% rules publication, preserved attestation, correction invalidation,
+legacy unlink/relink, former-member read-only details and removed-member denial.
+Group layouts passed at 375×667pt, 402×874pt and 440×956pt.
+Actual local API-gateway outages at all three sizes verify cached boards,
+retained failed-publication input and unchanged server rules revisions. The sync
+flow now checks two frozen weights across a local wipe and real bootstrap; its fresh native run passed, including restored readings
+and both original snapshot values/provenance.
+
+`RUNBOOK.md` contains the exact server-first migration/function order, hosted
+acceptance and forward-repair boundaries. Hosted deployment and client
+activation remain pending; do not retire this card until its work ships.

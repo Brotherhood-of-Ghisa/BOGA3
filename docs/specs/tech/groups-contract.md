@@ -1,5 +1,11 @@
 # Groups Contract
 
+M27's implemented server/client boundary is specified in §11 and the
+[bodyweight contract](bodyweight-load-contract.md). The M25 sections below
+continue to describe legacy comparisons; §11 overrides their kg-only assumptions
+for versioned comparisons. Group-screen integration and hosted rollout remain
+in progress; this document does not claim that the feature is deployed.
+
 > **Status: As-built (M22 and M25 shipped).**
 >
 > - §2–§5, the server half: the membership/invite RPCs (M22-T01,
@@ -1283,17 +1289,19 @@ Group reads return raw set rows (§4.2). Every set rule runs on the viewing
 device, in `apps/mobile/src/groups/session-metrics.ts`, through the canonical
 TS the session screens use. Nothing is mirrored in SQL.
 
-- **Performed.** A set is performed when `isConfirmedPerformedSet`
-  (`apps/mobile/src/session-recorder/set-semantics.ts`) holds for its raw
-  values and its status after `normalizeSessionSetPerformanceStatus`, and
-  `parseCalculationSet` (`apps/mobile/src/exercise-calculations/index.ts`)
-  parses it after `canonicalizeWeightForReps`. So a blank weight with valid
-  reps is 0 kg, an unknown status counts as performed, and a value the
-  set logger cannot produce (for example `1e3`) does not.
+- **Performed.** Only null `performance_status` confirms a shared set. Planned,
+  skipped and unrecognized non-null statuses do not count. The shared parser
+  canonicalizes blank weight with valid reps to zero; invalid decimal amounts
+  (for example `1e3`) do not produce a performed row.
 - **Sets** — the count of performed sets.
-- **Volume** — Σ `computeSetVolume(weight, reps)` over performed sets. Warm-ups
-  are included. The value is the entered scalar with no per-side normalization
-  (spec 05 Sync v2 #5, #10).
+- **Volume** — the effective-load kernel uses the member's current personal
+  coefficient/distribution and the saved session body-weight tuple. Warm-ups
+  are included. `metric_revision: effective_load_v1` and `metric_scope: personal`
+  distinguish this projection from the group's ranked score. Missing/invalid
+  context preserves sets and reps but makes complete volume unavailable; the
+  known subtotal and coverage remain explicit. Old payloads without that
+  revision retain their entered-load fallback. Raw entered units/modes remain
+  visible in the friend's session detail.
 - **Exercises** — live session exercises with at least one performed set.
 - **Friend's session view** — the same performed sets; exercises with none are
   omitted.
@@ -1509,7 +1517,8 @@ join, edit, and invite routes, and every action, are M22-T05.
 - **Tab.** `TopLevelTabs` gains `groups` after Exercises and before the cog.
   `resolveActiveTab` is exported from `app/(tabs)/_layout.tsx` and
   unit-tested. Titles `My groups`, `Group` (replaced by the group name once
-  loaded), and `Session` are registered in `app/_layout.tsx`.
+  loaded), and `Session` are registered in the root stack
+  (`components/navigation/root-stack.tsx`).
 - **UI.** `apps/mobile/components/groups/*` (catalogued in
   `ui/components-catalog.md`).
   - `src/groups/use-group-stream.ts` (`useGroupStream`) pages the stream. The
@@ -2288,3 +2297,169 @@ the diff plus the cause (T7; rules in §2.11).
 | R8 | Member leaves | none (P7) | — |
 | R9 | Group exercise archived | entries frozen (D8) | — |
 | R10 | `rules_version` bump | recompute | none (silent) |
+
+## 11. Versioned comparisons (M27)
+
+Implemented by `supabase/migrations/20260927073000_m27_group_metrics.sql`,
+the existing `group-eval` function, and `apps/mobile/src/groups/metric-*` /
+`performance-score.ts`. Local integration verification is in progress. The
+mobile rule/board/record flows and hosted rollout are separate remaining work.
+The load equation, units and eligibility are owned by
+[`bodyweight-load-contract.md` §6](bodyweight-load-contract.md#6-group-metrics-revisions-and-certification).
+
+### 11.1 Rules and compatibility
+
+`group_exercises` adds coefficient, movement standard, loading method, default
+metric, `rules_revision` and `published_rules_revision`. Rules are copied into
+`group_rule_revisions`; they are server-authoritative and outside Sync v2.
+Descriptions share the personal editor's trimmed, single-line, 120-character
+limit. Positive coefficients require both descriptions. The default metric
+must belong to the conventional or bodyweight family selected by the rules.
+
+Owners/admins use `group_exercise_create_v2` / `group_exercise_update_v2`.
+Updates require `p_expected_revision`; stale rules return `CONFLICT`. Changes
+to coefficient, distribution, movement declaration or loading method increment
+the calculation revision and rebuild the whole comparison. An established
+movement standard cannot be replaced: create another comparison for a different
+movement. Name/default-view changes keep the same revision and do not generate
+performed records. Archived comparisons must first be unarchived to edit.
+
+Existing comparisons remain `legacy: true` and keep the M25 engine until an
+explicit calculation edit. New v2 comparisons use the generic engine, including
+conventional comparisons. At legacy retirement, copy its then-current kg-only
+entries, member labels and revision into `legacy_entries`. Preserve the old
+event log and certification coverage; no legacy attestation acquires a body
+weight dependency automatically.
+
+V1 list/podium/stream RPCs exclude generic comparisons/events. Direct v1 board,
+history and certification calls for them return an update-app validation error.
+The v1 rule writer permits a legacy name edit but rejects calculation changes;
+v2 must declare the complete rules and expected revision. V1-created exercises
+still get a legacy initial revision. V2 readers explicitly tag legacy payloads,
+so a ratio or rep score can never be mistaken for `value_kg`.
+
+Legacy facts version 2 recognizes kg/lb and explicit added/assistance meaning
+through the shared kernel with coefficient zero. Original kg + added/null pins
+stay byte-for-byte compatible; other meanings use an explicit dependency hash.
+Unknown non-null performance statuses are ineligible, matching v2 scoring.
+
+### 11.2 Evaluation and coherent publication
+
+The existing failure-isolated source queue resolves changed sessions/links into
+targets. Legacy targets use the M25 apply; generic targets coalesce into
+`group_metric_eval_queue`, one job per comparison. Personal coefficient-only
+edits and measurement-history changes do not enqueue comparison work. Source
+distribution/standard/method, raw performance, session snapshot, membership,
+link and group-rule changes do.
+
+The Edge worker drains source jobs first, then metric jobs. Each metric claim
+has a generation, claim UUID and expiring lease. Preparation returns the complete
+shared graph of current members, raw sets, frozen session snapshots, links and
+rules. Valid observation and current counting eligibility are separate: an
+unlinked set can still invalidate an earlier attestation if it is later edited.
+No private weigh-in timeline or personal coefficient enters this graph.
+
+`evaluateGroupMetricGraph` runs the shared TypeScript scorer. SQL performs no
+effective-load or Wathan calculation. Publication locks group row, group advisory
+lock, queue row and then projections/certifications; it rechecks the generation,
+claim, revision and deterministic source hash. A stale result writes no scores
+and releases only its own claim for a new read. Failure backoff is bounded;
+an old failure cannot overwrite a newer lease.
+
+Publication replaces all current-member scores and applies their board/event
+diffs in one transaction. `group_metric_set_scores` stores eligible observations,
+`group_metric_board_entries` the best rows, and `group_metric_board_state` the
+last attribution inputs. Readers return `rebuilding` with no current rows until
+the entire revision is published. Retired revisions remain readable, with their
+own rules and publication metadata. Former members retain frozen rows in the
+old revision; new revisions exclude them. A new membership period requires
+catch-up before its previous rows can count. Archive freezes the comparison;
+unarchive reconciles missed edits and certifications before serving current rows.
+
+The first publication of a changed calculation revision emits one `rules_change`
+event, without performed PR/void events. Ordinary evaluations preserve the M25
+provisional/final record lifecycle, carry, link/unlink attribution and lead-change
+history, with explicit units/revision. All use the existing `group_events` log
+with `contract_version: 2`; no parallel stream or personal achievement ledger.
+
+### 11.3 Metric attestations
+
+`group_metric_certifications` attests one metric per row. Its raw fingerprint
+includes amount/unit/mode, reps/status and source distribution/compatibility.
+Bodyweight strength additionally includes the saved B tuple and its provenance;
+reps-only excludes it. Group coefficient/revision, personal coefficient,
+membership/link state, session status/order and the weigh-in timeline are not
+observed-performance dependencies.
+
+`group_metric_certify` requires a current eligible board/record set, expected
+revision and fingerprint. It refreshes the live source graph before attesting;
+stale rules or performance return `CONFLICT`. A current member may attest another
+current member's set. Only the witness may withdraw; owner/admin may cancel.
+Both actions are idempotent and stop Certified visibility immediately. The
+evaluator voids changed observations. Rules-only rescoring preserves valid
+coverage, while a changed metric/dependency requires its own certification.
+Estimated historical B is included visibly in the returned performance context.
+
+V2 stream records include a current `record_context`: comparison publication
+state, former-member status and per-metric eligibility, derived load facts and
+matching active attestation. This context enables the same certify/withdraw/
+cancel sheet as a board row, including selection of each record metric. Cached
+records without this context remain readable but cannot enable writes. Retired,
+voided, archived, former-member or changed-input records are read-only. The
+write RPC still rechecks the live graph and expected revision/fingerprint.
+
+An equal-score input correction can refresh the existing record's raw tuple and
+fingerprint without creating a new performed PR; changed attested inputs still
+void the old certification. Reps context omits bodyweight-derived resistance
+and percent values because its fingerprint does not attest B. Late reads cannot
+replace a newer write or a refreshed performance snapshot in the client sheet.
+
+Enqueue failure is isolated from certification and personal-sync commits. A
+publication error rolls back the entire projection transaction and retains the
+job for retry. No backend evaluation error may roll back a workout push.
+
+### 11.4 Readers, privacy and client boundary
+
+| RPC | Response / purpose |
+| --- | --- |
+| `group_exercise_list_v2` | Complete catalogue with explicit legacy/rules/publication metadata |
+| `group_metric_board` | Metric/unit/revision, ready/rebuilding/archived state, ranked `entries`, `me`, count and opaque cursor |
+| `group_metric_podiums` | One card per comparison using its default metric; explicit legacy union |
+| `group_metric_history` | Revision/metric/scope-bound history; cursor cannot cross any of these dimensions |
+| `group_metric_revisions` | Immutable prior rule labels and legacy retirement snapshot |
+| `group_stream_v2` | Existing session/membership/legacy items plus typed versioned record, void, link and rules-change events |
+| `group_metric_certification_get` | Attested score, unit, rules revision, saved performance context and end state |
+
+Every public RPC independently checks app authentication, rejects OAuth `client_id`
+credentials, and checks active membership/role. Nonexistent and inaccessible
+groups remain indistinguishable. Projection/revision/queue/certification tables
+have RLS and no direct client grants; only the worker can call its claim/prepare/
+publish/failure RPCs. Shared readers expose only the saved session tuple, never
+the member's measurement history or gym coordinates.
+
+`metric-wire.ts` carries the discriminated units and `metric-wire-guards.ts`
+checks them at the sole mobile RPC boundary (`api.ts`). Guards reject mixed
+revisions, mismatched metric/unit/scope, malformed snapshots and invalid
+certification dependencies. Unknown future stream item kinds can be skipped
+while preserving the server pagination cursor. Known malformed items fail the
+read instead of entering cache.
+
+Group cache keys use a `v2` namespace. Eviction removes both old/new group keys
+and shared-session entries; the existing global-stream retention policy remains.
+Shared-session reads separately carry the member's personal load context (§5),
+so an as-logged session summary cannot masquerade as a group-authoritative score.
+
+### 11.5 Verification ownership
+
+`groups-bodyweight.sh` is the fourth body of the existing `groups-leaderboards`
+lane, after legacy evaluator, board and certification bodies. It exercises real
+pushes and Edge drains for per-side relative/absolute ranking, absent/invalid B,
+units/modes, rules CAS/publication, cursor scopes, private readings, per-metric
+certification, archive/rejoin, legacy retirement, provisional/final events,
+link/carry behavior, claim fences and failure isolation. Its anonymous/OAuth/
+outsider matrix covers every new public RPC and direct-table denial. The lane
+restores its runtime settings and removes only its per-run fixtures.
+
+Mobile tests cover pure scoring/graph vectors, wire guards, cache upgrades and
+personal shared-session projections. Full fast/backend plus device frontend
+and two-user groups gates remain required for the integrated milestone.

@@ -6,7 +6,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Card, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import { HEAT_MARK, heatmapStyles } from './heatmap-style';
@@ -38,6 +38,7 @@ const formatDayTitle = (dateKey: string): string => {
 const cellBorder = (day: DayCell, selected: boolean) => {
   if (selected) return { borderWidth: HEAT_MARK.selectedWidth, borderColor: HEAT_MARK.color };
   if (day.isToday) return { borderWidth: HEAT_MARK.todayWidth, borderColor: HEAT_MARK.color };
+  if (day.unavailable) return { borderWidth: uiBorder.width, borderColor: uiRoles.inkMuted };
   if (day.level === 0) return { borderWidth: StyleSheet.hairlineWidth, ...heatmapStyles.restCell };
   return null;
 };
@@ -161,6 +162,7 @@ export function DailyHeatmap({
                       <Pressable
                         key={r}
                         accessibilityRole="button"
+                        accessibilityLabel={`${d.dateKey}, ${d.unavailable ? `${metricLabel} unavailable or incomplete` : d.hasTraining || d.level ? `${metricLabel} ${formatValue(d.value)}` : 'Rest day'}`}
                         accessibilityState={{ selected }}
                         onPress={() => setPickedDateKey(d.dateKey)}
                         testID={`${heatmapTestID}-cell-${d.dateKey}`}
@@ -173,6 +175,7 @@ export function DailyHeatmap({
                             backgroundColor: HEAT_RAMP[d.level],
                           },
                           cellBorder(d, selected),
+                          d.unavailable ? styles.unavailable : null,
                         ]}
                       />
                     );
@@ -204,7 +207,7 @@ export function DailyHeatmap({
               ]}
             />
             <Text allowFontScaling={false} style={styles.detailLabel} testID={`${heatmapTestID}-day-detail-value`}>
-              {selectedDay.level ? (
+              {selectedDay.unavailable ? `${metricLabel}: ${(selectedDay.knownValue ?? 0) > 0 ? `${formatValue(selectedDay.knownValue!)} · incomplete` : 'Unavailable'}` : selectedDay.hasTraining || selectedDay.level ? (
                 <>
                   {metricLabel}: <Text allowFontScaling={false} style={styles.detailFigure}>{formatValue(selectedDay.value)}</Text>
                 </>
@@ -217,11 +220,15 @@ export function DailyHeatmap({
       ) : null}
 
       <HeatmapLegend label={legendLabel} />
+      {data.daily.some(day => day.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
+        Dashed cells: unavailable or incomplete load
+      </Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  unavailable: { borderStyle: 'dashed' },
   body: { flexDirection: 'row' },
   scroll: { flex: 1 },
   weekday: { textAlign: 'center' },

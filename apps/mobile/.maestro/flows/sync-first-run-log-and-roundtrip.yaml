@@ -26,7 +26,8 @@ appId: com.dinoderek.mobile
 #      runs against the provisioned Supabase and lifts the first-sync gate on its
 #      own (NO `bootstrap=complete` harness stamp). Landing on the data screen
 #      proves: logged in + all bootstrap data seeded locally.
-#   B. Log exactly ONE exercise (Barbell Back Squat, 1 set) in a session.
+#   B. Save 80 kg and log one exercise; save 82 kg and log a second session.
+#      Each session captures its own reading and neither follows later readings.
 #   C. Force a sync from the Settings sync-status surface and wait for "Pending
 #      changes" to reach 0. This is the run-SPECIFIC upload proof: the dirty rows
 #      were created THIS run in (B) on a freshly-bootstrapped local DB, so
@@ -34,7 +35,8 @@ appId: com.dinoderek.mobile
 #   D. Fully wipe the device (clearState wipes BOTH the SQLite data AND the
 #      SecureStore session — see src/auth/storage.ts) and sign in again. The
 #      bootstrapper now PULLS from the (non-empty) server, so the logged workout
-#      reappears in history. After a full local wipe the ONLY source of any
+#      reappears in history with both frozen weights and the readings.
+#      After a full local wipe the ONLY source of any
 #      session is the remote DB — so a restored session proves the data is in the
 #      remote database.
 #
@@ -122,7 +124,35 @@ appId: com.dinoderek.mobile
     id: "sync-gate-block"
 - takeScreenshot: "17-first-run-roundtrip-bootstrapped"
 
-# === Phase B: log exactly one exercise in a session ===
+# Record a new weight through the real editor; leave its precise default date.
+# A later run's reading sorts after earlier fixture readings without deleting
+# any server data or bypassing the sync/bootstrap lifecycle.
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible: { id: "body-weight-add" }
+    timeout: 30000
+- tapOn: { id: "body-weight-add" }
+- extendedWaitUntil:
+    visible: { id: "weight-entry-value" }
+    timeout: 15000
+- tapOn: { id: "weight-entry-value" }
+- eraseText
+- inputText: "80"
+- scrollUntilVisible:
+    element: { id: "weight-entry-save" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "weight-entry-save" }
+- extendedWaitUntil:
+    notVisible: { id: "weight-entry-sheet" }
+    timeout: 15000
+- assertVisible: "Reading saved. Existing sessions are unchanged."
+- openLink: "boga3://train"
+- extendedWaitUntil:
+    visible: { id: "train-start-empty-button" }
+    timeout: 30000
+
+# === Phase Ba: log one exercise with a frozen 80 kg snapshot ===
 # Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
 # DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
 # session view, `+ Add exercise` the picker, the card the exercise page, whose
@@ -144,6 +174,9 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-add-exercise"
     timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 80 kg, Reading from .*"
 - tapOn:
     id: "session-view-add-exercise"
 - tapOn: "Exercise filter input"
@@ -207,7 +240,125 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-- takeScreenshot: "18-first-run-roundtrip-logged"
+- takeScreenshot: "18a-first-run-roundtrip-logged-80kg"
+
+# Record a new weight through the real editor; leave its precise default date.
+# A later run's reading sorts after earlier fixture readings without deleting
+# any server data or bypassing the sync/bootstrap lifecycle.
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible: { id: "body-weight-add" }
+    timeout: 30000
+- tapOn: { id: "body-weight-add" }
+- extendedWaitUntil:
+    visible: { id: "weight-entry-value" }
+    timeout: 15000
+- tapOn: { id: "weight-entry-value" }
+- eraseText
+- inputText: "82"
+- scrollUntilVisible:
+    element: { id: "weight-entry-save" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "weight-entry-save" }
+- extendedWaitUntil:
+    notVisible: { id: "weight-entry-sheet" }
+    timeout: 15000
+- assertVisible: "Reading saved. Existing sessions are unchanged."
+- openLink: "boga3://train"
+- extendedWaitUntil:
+    visible: { id: "train-start-empty-button" }
+    timeout: 30000
+
+# === Phase Bb: log one exercise with a frozen 82 kg snapshot ===
+# Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
+# DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
+# session view, `+ Add exercise` the picker, the card the exercise page, whose
+# logger confirms the set; back on the session view, Finish completes it.
+- waitForAnimationToEnd:
+    timeout: 4000
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: "top-level-tab-train"
+      - extendedWaitUntil:
+          visible:
+            id: "train-start-empty-button"
+          timeout: 15000
+- tapOn:
+    id: "train-start-empty-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-add-exercise"
+    timeout: 30000
+- assertVisible:
+    id: "session-body-weight"
+    text: "Session body weight, 82 kg, Reading from .*"
+- tapOn:
+    id: "session-view-add-exercise"
+- tapOn: "Exercise filter input"
+- inputText: "Barbell Back Squat"
+- pressKey: Enter
+# Selecting the seeded "Barbell Back Squat" here also implicitly proves the
+# catalog bootstrapped in Phase A: the row only exists if the seed landed. The
+# search expands matching families; collapse/search behavior is
+# covered by focused tests.
+- extendedWaitUntil:
+    visible:
+      text: "Select exercise Barbell Back Squat"
+    timeout: 15000
+- tapOn:
+    text: "Select exercise Barbell Back Squat"
+- tapOn:
+    id: "exercise-picker-add-empty-set-button"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Back Squat, 0 of 1 sets done"
+    timeout: 15000
+- tapOn:
+    text: "Barbell Back Squat, 0 of 1 sets done"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-logger"
+    timeout: 15000
+- tapOn:
+    id: "exercise-set-logger-weight"
+- inputText: "135"
+- tapOn:
+    id: "exercise-set-logger-reps"
+- inputText: "8"
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: "exercise-set-logger-commit"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-set-1-toggle"
+      text: "Mark set 1 not performed"
+    timeout: 10000
+- tapOn:
+    id: "exercise-page-back"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Back Squat, 1 of 1 sets done"
+    timeout: 15000
+# One explicitly confirmed set finishes straight through with no cleanup dialog.
+- tapOn:
+    id: "session-view-finish-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 30000
+# M24 inserts a durable completion presentation before returning to Stats. Use
+# its explicit exit so the sync round-trip remains realistic after submission.
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 30000
+- takeScreenshot: "18b-first-run-roundtrip-logged-82kg"
 
 # === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
 # Open More, then poll for Settings rather than asserting it immediately:
@@ -378,3 +529,26 @@ appId: com.dinoderek.mobile
       text: "1 exercise"
     timeout: 30000
 - takeScreenshot: "20-first-run-roundtrip-restored-from-remote"
+
+# The two newest completed rows were logged above. Both frozen snapshots must
+# survive the full local wipe independently of the latest 82 kg reading.
+- tapOn: { id: "completed-session-open-button-.*", index: 0 }
+- extendedWaitUntil:
+    visible: { id: "session-body-weight", text: "Session body weight, 82 kg, Reading from .*" }
+    timeout: 30000
+- takeScreenshot: "21-roundtrip-newer-snapshot-82kg"
+- tapOn: { id: "completed-session-detail-back" }
+- extendedWaitUntil:
+    visible: { id: "completed-history-scroll" }
+    timeout: 15000
+- tapOn: { id: "completed-session-open-button-.*", index: 1 }
+- extendedWaitUntil:
+    visible: { id: "session-body-weight", text: "Session body weight, 80 kg, Reading from .*" }
+    timeout: 30000
+- takeScreenshot: "22-roundtrip-older-snapshot-still-80kg"
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible: { id: "body-weight-reading-.*", text: "Edit 82 kg, .*" }
+    timeout: 30000
+- assertVisible: { id: "body-weight-reading-.*", text: "Edit 80 kg, .*" }
+- takeScreenshot: "23-roundtrip-private-readings-restored"

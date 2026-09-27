@@ -1,5 +1,4 @@
-import { useIsFocused } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 

@@ -9,6 +9,8 @@ import { LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core'
 
 import type { GroupApiError } from './api';
 import type { GroupExercise, GroupRole } from './types';
+import { isGroupMetricExerciseWire } from './metric-wire-guards';
+import { describeGroupRules } from './metric-view-model';
 import { canManageGroup, describeGroupWriteError } from './write-view-model';
 
 // ---- Rows ---------------------------------------------------------------------
@@ -95,7 +97,8 @@ export const buildGroupExerciseRows = (
     return {
       groupExerciseId: exercise.group_exercise_id,
       name: exercise.name,
-      loadInputModeLabel: LOAD_INPUT_MODE_LABELS[exercise.load_input_mode],
+      loadInputModeLabel: isGroupMetricExerciseWire(exercise) && !exercise.legacy
+        ? describeGroupRules(exercise) : LOAD_INPUT_MODE_LABELS[exercise.load_input_mode],
       archived,
       linkStatus: links === null ? null : formatGroupExerciseLinkStatus(linkedNames),
       linkable: links !== null && !archived && linkedNames.length === 0,

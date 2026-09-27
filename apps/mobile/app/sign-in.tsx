@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,22 +12,23 @@ const INVALID_EMAIL_ERROR = 'Enter a valid email address.';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Dedicated sign-in entry point the route-layer auth guard sends an
- * unauthenticated user to before any data screen renders. It reuses the
+ * Dedicated sign-in entry point: while auth is configured and the user must sign
+ * in, it is the only route the root stack declares, so no data screen renders. It
+ * reuses the
  * signed-out credential pattern from the Profile screen (email + password +
  * inline error), so the launch gate introduces no new interaction pattern.
  *
  * On a successful sign-in the shared auth snapshot flips to a live session; the
- * guard re-renders and lets the app proceed to its normal route, so this screen
- * needs no explicit navigation on success.
+ * root stack then removes this route and the router moves on to the first-sync
+ * block or the app, so this screen needs no explicit navigation on success.
  *
  * When auth is unconfigured there is no working credential path, so the screen
  * shows the disabled-reason message instead of a form that cannot succeed. The
- * route guard stands aside in that local-only state; this screen still documents
- * the missing credential path when opened directly.
+ * app routes stay open in that local-only state; this screen still documents the
+ * missing credential path when opened directly.
  */
 export default function SignInScreen() {
-  const { clearAuthError, disabledReason, isConfigured, lastError, session, signInWithPassword, status } = useAuth();
+  const { clearAuthError, disabledReason, isConfigured, lastError, signInWithPassword, status } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,12 +39,6 @@ export default function SignInScreen() {
   const isBusy = isSubmitting || isAuthRestoring;
   const inlineError = formError ?? lastError ?? null;
   const authDisabledMessage = !isConfigured ? disabledReason ?? 'Supabase mobile auth is not configured.' : null;
-
-  // Already signed in: nothing to do here. Leave the gate so the normal route
-  // takes over (covers a back-navigation onto this route while authenticated).
-  if (isConfigured && session) {
-    return <Redirect href="/" />;
-  }
 
   const resetInlineError = () => {
     setFormError(null);
@@ -83,7 +78,7 @@ export default function SignInScreen() {
     try {
       await signInWithPassword({ email: trimmedEmail, password });
       // A live session now exists; lower any stale "no signed-in user" flag a
-      // prior cycle raised so the guard stops routing back here immediately.
+      // prior cycle raised so the root stack leaves sign-in immediately.
       clearAuthRequired();
       setEmail(trimmedEmail);
     } catch (error) {
