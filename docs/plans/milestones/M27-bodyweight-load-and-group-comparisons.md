@@ -312,7 +312,8 @@ activation has occurred.
 | Native bodyweight entry, logging, backfill and analytics | All four green in `M27-review-viewport/20260927-112539-413`; `/tmp/boga-m27-review-viewport-frontend.log` |
 | Native auth and two-user groups | Auth and both groups flows green on integrated source; `M27-review-viewport/20260927-114553-6692`, `20260927-115139-11377`, `20260927-115956-13621`; same resumed frontend log |
 | Native wipe/sign-in with two frozen weights | Green: real editor saves 80/82 kg and two workouts; real sync/bootstrap restores both frozen snapshots, provenance and private readings; `M27-review-viewport/20260927-114819-8825` |
-| Small/large and offline group UI | Earlier personal captures predate the merged Sheet; fresh bodyweight/groups runs and actual gateway-outage captures remain pending |
+| Baseline real API outage | Green: cached board, former-member read-only details, failed publication/retained input and unchanged server revision; `M27-network-baseline/20260927-120516-16517`, `/tmp/boga-m27-network-baseline.log` |
+| Small/large group and personal UI | Fresh groups → outage → bodyweight matrix is running; `/tmp/boga-m27-size-matrix.log` |
 | Hosted rollout | Server-first migration/function/smoke/activation procedure prepared in RUNBOOK; not executed |
 
 Native artifact paths above are relative to `apps/mobile/artifacts/maestro/`.
@@ -326,7 +327,7 @@ records were imported into the machine store and verified byte-for-byte before
 removal from the branch, matching current spec 02; `./boga timings` reads them.
 All required frontend constituent lanes are now green across the aggregate and
 resumed runs, on unchanged app source `b636f234`. Remaining work: compare dense
-states on the small/large phones, finish real outage/error proof, validate the
+states and repeat outage/error proof on the small/large phones, validate the
 PR gate table, then perform
 authorised hosted smoke before client activation. Do not retire the plan early.
 
