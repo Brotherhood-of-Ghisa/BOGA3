@@ -80,3 +80,12 @@ The actual `./boga test mcp-unit` lane passed (5 tests, typecheck and build):
 the installed pinned Supabase types and a minimal Deno-global declaration;
 this does not replace the pending real Edge Function backend contracts.
 `docs-check` and `git diff --check` passed.
+
+Actual API verification (2026-09-27): `./boga test agent-api` passed all new
+bodyweight/parity/completeness vectors and the existing owner/OAuth/write-denial/
+revocation cases. Log: `/tmp/boga-m27-coaching-agent-api-fix.log`. The initial
+aggregate stopped when a fixture update lacked its owner database identity; the
+fixture now sets that identity and keeps ownership triggers enabled. The full
+fast aggregate also passed, including five MCP tests and build, at `5f9e3f6`
+(`/tmp/boga-m27-offline-fast-final.log`). Remaining backend lanes/MCP smoke run
+sequentially before native verification; no full backend completion claimed yet.

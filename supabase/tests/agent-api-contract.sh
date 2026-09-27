@@ -446,6 +446,15 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
   ' >/dev/null || fail "recent workout response is not compact and explicit"
 
 # M27: exercise and workout projections share the mobile effective-load kernel.
+# Updates use the owner's database identity, as ordinary sync writes do.
+# Keep ownership triggers active throughout every parity vector.
+update_training_fixture() {
+  run_psql "begin;
+    select set_config('request.jwt.claims', json_build_object('sub', '${USER_A_UUID}', 'role', 'authenticated')::text, true);
+    $1
+    commit;"
+}
+
 assert_training_payload() {
   local expression="$1"
   local context="$2"
@@ -466,7 +475,7 @@ assert_training_payload '
 ' 'conventional fields retain numeric values and kg units'
 
 echo "[agent-api-test] verifying saved B, added load and bodyweight-only parity"
-run_psql "
+update_training_fixture "
   update app_public.exercise_definitions set bodyweight_coefficient=1,
     movement_standard='strict_pull_up',loading_method='free_weight'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
@@ -501,7 +510,7 @@ assert_training_payload '.data.workouts[0].total_volume.value == 1440
 ' 'workout and exercise totals agree'
 
 echo "[agent-api-test] verifying quantified pound assistance and raw units"
-run_psql "
+update_training_fixture "
   update app_public.exercise_sets set weight_unit='lb',external_load_mode='assistance'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
   update app_public.exercise_sets set performance_status='unperformed'
@@ -518,7 +527,7 @@ assert_training_payload '
 ' 'pound assistance uses saved B and never wins a Top added record'
 
 echo "[agent-api-test] verifying per-side adjustment and current personal coefficient"
-run_psql "
+update_training_fixture "
   update app_public.exercise_definitions set bodyweight_coefficient=0.7,load_input_mode='per_side_load'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
   update app_public.exercise_sets set weight_unit='kg',weight_value='10',external_load_mode='added'
@@ -531,7 +540,7 @@ assert_training_payload '.data.recent_performances[0].sets[0].effective_load.val
 ' 'body contribution is counted once before the per-side external adjustment'
 
 echo "[agent-api-test] verifying unknown B, partial volume and independent performed counts"
-run_psql "
+update_training_fixture "
   update app_public.sessions set body_weight_kg=null,body_weight_source=null
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
   insert into app_public.session_exercises
@@ -566,7 +575,7 @@ assert_training_payload '.data.workouts[0].completed_set_count == 2
 ' 'partial known volume is explicitly incomplete across exercises'
 
 echo "[agent-api-test] verifying saved estimates, malformed provenance and later readings"
-run_psql "
+update_training_fixture "
   update app_public.exercise_definitions set bodyweight_coefficient=1,load_input_mode='total_load'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
   update app_public.exercise_sets set weight_value='20'
@@ -587,7 +596,7 @@ assert_training_payload '.data.recent_performances[0].session_body_weight.estima
   and .data.recent_performances[0].volume.value == 800
   and (tostring | contains("weight_measurements") | not)
 ' 'estimated B is identifiable and current reading does not replace it'
-run_psql "
+update_training_fixture "
   update app_public.body_weight_measurements set weight_value='95',weight_kg=95,deleted_at=${NOW_MS}
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-reading';
 " >/dev/null
@@ -595,7 +604,7 @@ agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].volume.value == 800
   and .data.recent_performances[0].session_body_weight.value == 80
 ' 'editing or deleting the source reading does not rescore history'
-run_psql "
+update_training_fixture "
   update app_public.sessions set body_weight_kg=82,body_weight_source='manual',
     body_weight_measurement_id=null,body_weight_measured_at=null
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
@@ -604,7 +613,7 @@ agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].volume.value == 816
   and .data.recent_performances[0].session_body_weight.estimated == false
 ' 'explicit saved-session correction refreshes metrics'
-run_psql "
+update_training_fixture "
   update app_public.sessions set body_weight_source=null
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
 " >/dev/null
@@ -615,7 +624,7 @@ assert_training_payload '.data.recent_performances[0].volume.value == null
 ' 'positive B with malformed provenance cannot establish valid context'
 
 echo "[agent-api-test] verifying unresolved modes and unquantified assistance"
-run_psql "
+update_training_fixture "
   update app_public.sessions set body_weight_source='manual'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
   update app_public.exercise_sets set external_load_mode='unquantified_assistance'
@@ -626,7 +635,7 @@ assert_training_payload '.data.recent_performances[0].sets[0].effective_load.rea
   and .data.recent_performances[0].volume.value == null
   and .data.personal_records.top_weight == null
 ' 'unquantified assistance does not invent resistance'
-run_psql "
+update_training_fixture "
   update app_public.exercise_sets set external_load_mode=null,weight_value='0'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
 " >/dev/null
