@@ -374,9 +374,15 @@ is complete merely because a downstream closeout card lists its tests.
   rerun passed, and all backend and meta-test lanes passed. Logs:
   `/tmp/boga-m27-backfill-fast-final.log`,
   `/tmp/boga-m27-backfill-fast-frontend-final.log`,
-  `/tmp/boga-m27-backfill-backend.log`. Full frontend and three-size device
-  checks remain pending. T07 analytics/calculator remains a separate draft
-  with typecheck evidence only; neither task is claimed shipped.
+  `/tmp/boga-m27-backfill-backend.log`. All three bodyweight flows passed at
+  `5a5892b` on small and large phones; their BWF captures were visually reviewed
+  and are linked from the T06 card. Default-device bodyweight also passed;
+  full frontend passed every lane at `5a5892b`, including auth/profile,
+  UI/server sync and both group flows. Final log:
+  `/tmp/boga-m27-backfill-frontend-final.log`. Timings, trigger rules and docs
+  checks ran; no gate was waived.
+  T07 analytics/calculator remains a separate draft with typecheck evidence
+  only; neither task is claimed shipped.
 
 ## Milestone acceptance
 

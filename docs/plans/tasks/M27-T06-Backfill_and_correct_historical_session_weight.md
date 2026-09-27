@@ -83,5 +83,31 @@ including real sync round trips and schema drift. Logs:
 `/tmp/boga-m27-backfill-meta-tests.log`,
 `/tmp/boga-m27-backfill-backend.log`.
 
-Three-size bodyweight captures and the full frontend gate are pending. No
-device verification or shipping completion is claimed yet.
+All three `ios-bodyweight` flows passed at `5a5892b` on both iPhone SE 3
+(375×667pt) and iPhone 17 Pro Max (440×956pt), iOS 26.4. Evidence under
+`apps/mobile/artifacts/maestro/`:
+- `M27-backfill-small-final/20260927-005519-1889/`
+- `M27-backfill-large-final/20260927-010457-4564/`
+
+The BWF captures cover invalid/valid ranges, mixed prior/estimated sources,
+partial selection, restart/repeat, a manual 79 kg correction, preserved original
+override, no readings and native handoff to Add reading. Source dates,
+estimated labels and correction provenance were visually compared with T01's
+sheet/session targets; no horizontal clipping was found. The initial small run
+saved the selected sessions but its Maestro centering swipe dismissed the short
+result sheet; `5a5892b` waits and taps the already-visible Done action. The app
+and assertions were unchanged; the final small/large flows passed in full.
+
+Logs: `/tmp/boga-m27-backfill-{small,large}-final.log`.
+The default-device bodyweight flow also passed at the same revision; its
+preview, estimated provenance and explicit correction captures were visually
+reviewed: `M27-backfill-frontend-final/20260927-013228-14921/`.
+The full `frontend` gate passed every lane at `5a5892b`, including auth/profile,
+UI/server sync and both group flows. Groups evidence:
+`M27-backfill-frontend-final/20260927-014840-23279/` and
+`M27-backfill-frontend-final/20260927-015227-24879/`. Log:
+`/tmp/boga-m27-backfill-frontend-final.log`. No shipping completion is claimed.
+`./boga test for`, `./boga timings` and the final docs check ran; the required
+lane union is covered. No assertion or lane was waived.
+`./boga doctor` passed again; completed task-only small/large simulator data was
+reset after preserving captures/reports to recover disk space.
