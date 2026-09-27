@@ -6,7 +6,7 @@
 # migration in supabase/migrations/<ts>_sync_v2_clean_room.sql produced exactly
 # the shape docs/specs/tech/sync-v2-server-contract.md Part A prescribes:
 #
-#   - All ten v2 entity tables exist in app_public.
+#   - All eleven v2 entity tables exist in app_public.
 #   - Every v1 sync server object name is absent from information_schema /
 #     pg_catalog.
 #   - RLS is enabled on every entity table and the four named policies are
@@ -90,7 +90,7 @@ pass() {
 }
 
 # -----------------------------------------------------------------------------
-# 1. All ten v2 entity tables exist in app_public.
+# 1. All eleven v2 entity tables exist in app_public.
 # -----------------------------------------------------------------------------
 
 ENTITIES=(
@@ -104,6 +104,7 @@ ENTITIES=(
   exercise_sets
   session_exercise_tags
   exercise_group_links
+  body_weight_measurements
 )
 
 for entity in "${ENTITIES[@]}"; do
@@ -117,7 +118,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "all ten v2 entity tables present"
+pass "all eleven v2 entity tables present"
 
 # -----------------------------------------------------------------------------
 # 2. Every v1 sync server object name is absent.

@@ -1,3 +1,4 @@
+import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
@@ -40,7 +41,8 @@ export type StatsMusclePerformance = {
   sortOrder: number;
   setCount: number;
   nearFailureCount: number;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
 };
 
 export type StatsMuscleFamilyPerformance = {
@@ -48,7 +50,8 @@ export type StatsMuscleFamilyPerformance = {
   sortOrder: number;
   setCount: number;
   nearFailureCount: number;
-  totalVolume: number;
+  totalVolume: number | null;
+  knownVolume?: number | null;
   muscles: StatsMusclePerformance[];
 };
 
@@ -113,7 +116,8 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   type MuscleAccumulator = {
     setIdentities: Set<string>;
     nearFailureSetIdentities: Set<string>;
-    totalVolume: number;
+    totalVolume: number | null;
+  knownVolume?: number | null;
   };
   const accumulatorsByMuscleId = new Map<string, MuscleAccumulator>();
 
@@ -122,12 +126,14 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       setIdentities: new Set<string>(),
       nearFailureSetIdentities: new Set<string>(),
       totalVolume: 0,
+      knownVolume: 0,
     };
     accumulator.setIdentities.add(contribution.setIdentity);
     if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
       accumulator.nearFailureSetIdentities.add(contribution.setIdentity);
     }
-    accumulator.totalVolume += contribution.weightedVolume;
+    accumulator.knownVolume = addFiniteVolume(accumulator.knownVolume, contribution.weightedVolume ?? 0);
+    accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume);
     accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
   }
 
@@ -141,7 +147,8 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       sortOrder: group.sortOrder,
       setCount: accumulator?.setIdentities.size ?? 0,
       nearFailureCount: accumulator?.nearFailureSetIdentities.size ?? 0,
-      totalVolume: accumulator?.totalVolume ?? 0,
+      totalVolume: accumulator ? accumulator.totalVolume : 0,
+      knownVolume: accumulator ? accumulator.knownVolume : 0,
     };
     const bucket = musclesByFamily.get(group.familyName) ?? [];
     bucket.push(muscle);
@@ -152,10 +159,12 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
     .map(([familyName, muscles]) => {
       const familySetIdentities = new Set<string>();
       const familyNearFailureSetIdentities = new Set<string>();
-      let familyTotalVolume = 0;
+      let familyTotalVolume: number | null = 0;
+      let familyKnownVolume: number | null = 0;
       let familySortOrder = Number.POSITIVE_INFINITY;
       for (const muscle of muscles) {
-        familyTotalVolume += muscle.totalVolume;
+        familyKnownVolume = addFiniteVolume(familyKnownVolume, muscle.knownVolume === undefined ? muscle.totalVolume : muscle.knownVolume);
+        familyTotalVolume = addFiniteVolume(familyTotalVolume, muscle.totalVolume);
         if (muscle.sortOrder < familySortOrder) familySortOrder = muscle.sortOrder;
         const accumulator = accumulatorsByMuscleId.get(muscle.muscleGroupId);
         if (accumulator) {
@@ -176,7 +185,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
         sortOrder: Number.isFinite(familySortOrder) ? familySortOrder : 0,
         setCount: familySetIdentities.size,
         nearFailureCount: familyNearFailureSetIdentities.size,
-        totalVolume: familyTotalVolume,
+        totalVolume: familyTotalVolume, knownVolume: familyKnownVolume,
         muscles: sortedMuscles,
       };
     })
@@ -201,6 +210,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
       .select({
         id: sessions.id,
         completedAt: sessions.completedAt,
+        localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt,
       })
       .from(sessions)
       .where(
@@ -214,8 +224,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
       .all();
 
     const sessionsInPeriod = sessionRows
-      .filter((row): row is { id: string; completedAt: Date } => row.completedAt !== null)
-      .map((row) => ({ id: row.id, completedAt: row.completedAt }));
+      .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)
+      .map((row) => ({ ...row, completedAt: row.completedAt }));
 
     const sessionIds = sessionsInPeriod.map((session) => session.id);
     const sessionExerciseRows =
@@ -256,6 +266,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               orderIndex: exerciseSets.orderIndex,
               setType: exerciseSets.setType,
               weightValue: exerciseSets.weightValue,
+              localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
               repsValue: exerciseSets.repsValue,
               performanceStatus: exerciseSets.performanceStatus,
             })
@@ -306,6 +317,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
             .select({
               id: exerciseDefinitions.id,
               loadInputMode: exerciseDefinitions.loadInputMode,
+              bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient, localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
             })
             .from(exerciseDefinitions)
             .where(inArray(exerciseDefinitions.id, exerciseDefinitionIds))

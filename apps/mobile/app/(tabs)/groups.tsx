@@ -1,3 +1,5 @@
+import { getGroupMetricPodiums } from '@/src/groups/api';
+import type { GroupMetricPodiumWire } from '@/src/groups/metric-wire';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
@@ -20,7 +22,6 @@ import {
 import { ActionButton, PageHeader, ScreenScroll, SegmentedControl, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
-  getGroupBoardPodiums,
   getLastViewedGroupId,
   groupCacheKeys,
   listMyGroups,
@@ -28,7 +29,6 @@ import {
   setLastViewedGroupId,
   useGroupResource,
   useGroupStream,
-  type GroupBoardPodiumsResult,
   type GroupListMineResult,
 } from '@/src/groups';
 
@@ -77,9 +77,9 @@ function GroupsTabContent({ userId }: { userId: string }) {
 
   // No group selected (My groups loading or empty): read nothing.
   const stream = useGroupStream({ userId: selectedGroupId ? userId : null, groupId: selectedGroupId });
-  const boardsFetcher = useCallback(() => getGroupBoardPodiums(selectedGroupId ?? ''), [selectedGroupId]);
+  const boardsFetcher = useCallback(() => getGroupMetricPodiums(selectedGroupId ?? ''), [selectedGroupId]);
   // Cache-first, read only while the Leaderboards segment is open.
-  const boards = useGroupResource<GroupBoardPodiumsResult>({
+  const boards = useGroupResource<GroupMetricPodiumWire>({
     userId,
     cacheKey: selectedGroupId && segment === 'leaderboards' ? groupCacheKeys.boards(selectedGroupId) : null,
     fetcher: boardsFetcher,

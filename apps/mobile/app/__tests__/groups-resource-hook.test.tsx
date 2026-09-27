@@ -344,7 +344,7 @@ describe('useGroupResource', () => {
 
     expect(result.current).toMatchObject({ lostAccess: true, data: null, lastUpdatedAtMs: null, offline: false });
     expect(result.current.error?.code).toBe('NOT_FOUND');
-    expect(cachedKeys()).toEqual(['groups:mine', 'stream:all']);
+    expect(cachedKeys()).toEqual(['groups:mine', 'stream:v2:all']);
   });
 
   it('on NOT_FOUND without a group id evicts only its own entry', async () => {
@@ -356,7 +356,7 @@ describe('useGroupResource', () => {
     await flush();
 
     expect(result.current.lostAccess).toBe(true);
-    expect(cachedKeys()).toEqual(['session:u3:s2']);
+    expect(cachedKeys()).toEqual(['session:v2:u3:s2']);
   });
 
   it('never throws into render: unexpected failures and a corrupt cache become INTERNAL error states', async () => {

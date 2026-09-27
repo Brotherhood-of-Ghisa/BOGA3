@@ -346,7 +346,7 @@ describe('selectSuggestedExercisePlanFromHistory', () => {
         sessionExerciseRow({ sessionId: 'invalid-only', sessionExerciseId: 'se-1' }),
       ],
       setsBySessionExerciseId: groupBySessionExerciseId([
-        setRow({ setId: 'blank', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '', repsValue: '5' }),
+        setRow({ setId: 'blank', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '', repsValue: '' }),
         setRow({ setId: 'fractional-reps', sessionExerciseId: 'se-1', orderIndex: 1, weightValue: '100', repsValue: '5.5' }),
       ]),
     });

@@ -15,9 +15,11 @@ import {
   type BogaImportWarning,
   type BogaSessionImportPackage,
 } from './boga-import-contract';
+import { BOGA_SESSION_IMPORT_SCHEMA_V2, importedSessionWeight, importedSetMeaning, validateImportedWeightReading, type ImportedWeightReading, type ImportedExerciseRules } from './bodyweight-import-context';
 import { nowMonotonic } from '../../src/data/clock';
 import * as schema from '../../src/data/schema';
 import {
+  bodyWeightMeasurements,
   exerciseDefinitions,
   exerciseMuscleMappings,
   exerciseSets,
@@ -27,6 +29,7 @@ import {
   sessions,
 } from '../../src/data/schema';
 import {
+  generatedBodyWeightMeasurementId,
   generatedExerciseDefinitionId,
   generatedExerciseMuscleMappingId,
   generatedSessionExerciseId,
@@ -63,6 +66,7 @@ export type BogaLocalImportReport = {
     generatedAt: string;
   };
   tableRowCountsBefore: Record<
+    | 'bodyWeightMeasurements'
     | 'gyms'
     | 'exerciseDefinitions'
     | 'exerciseMuscleMappings'
@@ -72,6 +76,8 @@ export type BogaLocalImportReport = {
     number
   >;
   counts: {
+    bodyWeightMeasurementsToInsert: number;
+    bodyWeightMeasurementsInserted: number;
     packageSessions: number;
     packageSessionExercises: number;
     packageExerciseSets: number;
@@ -100,7 +106,10 @@ export type BogaLocalImportPlan = {
   validation: BogaLocalImportValidation;
   report: BogaLocalImportReport;
   rows: {
+    bodyWeightMeasurements: { id: string; source: ImportedWeightReading }[];
     exerciseDefinitions: {
+      loadInputMode?: ImportedExerciseRules['loadInputMode'];
+      loadRules?: ImportedExerciseRules['loadRules'];
       id: string;
       name: string;
       createdAt: Date;
@@ -155,6 +164,7 @@ type CliFlags = {
 };
 
 const EMPTY_INSERT_COUNTS = {
+  bodyWeightMeasurementsInserted: 0,
   gymsInserted: 0,
   exerciseDefinitionsInserted: 0,
   exerciseMuscleMappingsInserted: 0,
@@ -203,6 +213,7 @@ const countTable = (database: BogaLocalImportDatabase, table: typeof gyms): numb
   Number(database.select({ count: sql<number>`count(*)` }).from(table).get()?.count ?? 0);
 
 const tableRowCounts = (database: BogaLocalImportDatabase): BogaLocalImportReport['tableRowCountsBefore'] => ({
+  bodyWeightMeasurements: countTable(database, bodyWeightMeasurements as unknown as typeof gyms),
   gyms: countTable(database, gyms),
   exerciseDefinitions: countTable(database, exerciseDefinitions as unknown as typeof gyms),
   exerciseMuscleMappings: countTable(database, exerciseMuscleMappings as unknown as typeof gyms),
@@ -450,6 +461,7 @@ export const planBogaLocalImport = (
       generatedExerciseRows.push({
         id: exerciseDefinitionId,
         name: decision.exerciseName,
+        ...(pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2 ? { loadInputMode: decision.loadInputMode, loadRules: decision.loadRules } : {}),
         createdAt: generatedAt,
         updatedAt: generatedAt,
       });
@@ -583,6 +595,12 @@ export const planBogaLocalImport = (
 
   ensureUnique('generated import row id', generatedIds, errors);
 
+  const readingRows = pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2 && Array.isArray(pkg.bodyWeightMeasurements) ? pkg.bodyWeightMeasurements
+    .filter(validateImportedWeightReading)
+    .map(source => ({ id: generatedBodyWeightMeasurementId(pkg, source.id), source }))
+    .filter(row => !database.select({ id: bodyWeightMeasurements.id }).from(bodyWeightMeasurements)
+      .where(eq(bodyWeightMeasurements.id, row.id)).get()) : [];
+
   const report: BogaLocalImportReport = {
     target: {
       importingProfileLabel: options.importingProfileLabel,
@@ -598,6 +616,7 @@ export const planBogaLocalImport = (
     },
     tableRowCountsBefore: tableRowCounts(database),
     counts: {
+      bodyWeightMeasurementsToInsert: readingRows.length,
       packageSessions: pkg.sessions.length,
       packageSessionExercises: pkg.sessions.reduce((sum, session) => sum + session.exercises.length, 0),
       packageExerciseSets: pkg.sessions.reduce(
@@ -628,6 +647,7 @@ export const planBogaLocalImport = (
     },
     report,
     rows: {
+      bodyWeightMeasurements: readingRows,
       exerciseDefinitions: generatedExerciseRows,
       exerciseMuscleMappings: mappingRowsToInsert,
       sessions: sessionRows,
@@ -652,11 +672,19 @@ export const importBogaSessionPackageToLocalDb = (
 
   const inserted = { ...EMPTY_INSERT_COUNTS };
   database.transaction((tx) => {
+    for (const row of plan.rows.bodyWeightMeasurements) {
+      tx.insert(bodyWeightMeasurements).values({ id: row.id, weightValue: row.source.weightValue,
+        weightUnit: row.source.weightUnit, weightKg: row.source.weightKg, measuredAt: new Date(row.source.measuredAt),
+        createdAt: new Date(pkg.generatedAt), updatedAt: new Date(pkg.generatedAt), localDirty: true,
+        localUpdatedAtMs: nowMonotonic(tx) }).run();
+      inserted.bodyWeightMeasurementsInserted++;
+    }
     for (const row of plan.rows.exerciseDefinitions) {
       tx.insert(exerciseDefinitions)
         .values({
           id: row.id,
           name: row.name,
+          ...(row.loadRules ? { ...row.loadRules, loadInputMode: row.loadInputMode } : {}),
           deletedAt: null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
@@ -690,6 +718,9 @@ export const importBogaSessionPackageToLocalDb = (
         .values({
           id: row.id,
           gymId: row.source.gymId,
+          ...importedSessionWeight(pkg.schema, row.source),
+          ...(pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2 && row.source.bodyWeightMeasurementId
+            ? { bodyWeightMeasurementId: generatedBodyWeightMeasurementId(pkg, row.source.bodyWeightMeasurementId) } : {}),
           status: 'completed',
           startedAt: row.startedAt,
           completedAt: row.completedAt,
@@ -729,6 +760,7 @@ export const importBogaSessionPackageToLocalDb = (
           id: row.id,
           sessionExerciseId: row.sessionExerciseId,
           orderIndex: row.source.orderIndex,
+          ...importedSetMeaning(pkg.schema, row.source),
           weightValue: row.source.weightValue,
           repsValue: row.source.repsValue,
           setType: row.source.setType,

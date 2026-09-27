@@ -51,7 +51,7 @@ export function WeeklyHeatmap({
   // Bar heights + the average baseline are normalized across the *observed* activity
   // band [min, max], matching the color scale. Without this, high-floor metrics (1RM,
   // top weight) pin every bar to the top and the avg line lands off-screen above them.
-  const activeValues = weeks.map((w) => w.value).filter((v) => v > 0);
+  const activeValues = weeks.filter((w) => !w.unavailable && (w.hasTraining ?? w.value > 0)).map((w) => w.value);
   const minValue = activeValues.length ? Math.min(...activeValues) : 0;
   const span = maxValue - minValue;
   const BAR_FLOOR = MAXH * 0.12; // keep the smallest logged bar (and the avg line) visible
@@ -61,13 +61,13 @@ export function WeeklyHeatmap({
     return BAR_FLOOR + t * (MAXH - BAR_FLOOR);
   };
 
-  // 12-week average over weeks that actually logged activity — rest weeks (value 0)
-  // would otherwise drag the baseline down and misrepresent typical training load.
+  // Average over known training weeks, including a genuine zero-resistance workout.
+  // Rest weeks and unavailable metrics do not contribute observations.
   // Only meaningful with enough observations, so require at least 6 active weeks.
   const MIN_AVG_WEEKS = 6;
-  const recentActive = weeks.slice(-12).filter((w) => w.value > 0);
+  const recentActive = weeks.slice(-12).filter((w) => !w.unavailable && (w.hasTraining ?? w.value > 0));
   const showAvg = recentActive.length >= MIN_AVG_WEEKS;
-  const avg = recentActive.reduce((s, w) => s + w.value, 0) / Math.max(1, recentActive.length);
+  const avg = recentActive.reduce((mean, w, index) => mean + (w.value - mean) / (index + 1), 0);
   const avgY = MAXH - barHeight(avg);
 
   const cell = chartW > 0 ? Math.max(MIN_CELL, chartW / WEEKS_VISIBLE - GAP) : MIN_CELL;
@@ -115,18 +115,20 @@ export function WeeklyHeatmap({
                     <Pressable
                       key={w.weekStartDateKey}
                       accessibilityRole="button"
+                      accessibilityLabel={`Week of ${w.weekStartDateKey}, ${w.unavailable ? 'metric unavailable or incomplete' : w.hasTraining || w.value > 0 ? `value ${w.value}` : 'Rest week'}`}
                       accessibilityState={{ selected: on }}
                       onPress={() => onSelectWeek(on ? null : w.weekStartDateKey)}
                       testID={`${heatmapTestID}-cell-${w.weekStartDateKey}`}
                       style={[styles.column, { width: colW }]}>
-                      <View
+                      {w.unavailable ? <Text allowFontScaling={false} style={heatmapStyles.legendText}
+                        testID={`${heatmapTestID}-bar-${w.weekStartDateKey}`}>?</Text> : <View
                         style={[
                           styles.bar,
                           { width: cell, height: h, backgroundColor: HEAT_RAMP[w.level] },
                           barBorder(w, on),
                         ]}
                         testID={`${heatmapTestID}-bar-${w.weekStartDateKey}`}
-                      />
+                      />}
                     </Pressable>
                   );
                 })}
@@ -139,7 +141,9 @@ export function WeeklyHeatmap({
                   pixel. When near the top, the label flips below the line. */}
               {showAvg ? (
                 <>
-                  <View style={[styles.baseline, { top: Math.round(avgY) }]}>
+                  <View style={[styles.baseline, { top: Math.round(avgY) }]}
+                    accessibilityLabel={`12-week average ${avg}`}
+                    testID={`${heatmapTestID}-average`}>
                     {Array.from({ length: dashCount }).map((_, i) => (
                       <View key={i} style={styles.dash} />
                     ))}
@@ -185,6 +189,9 @@ export function WeeklyHeatmap({
       </View>
 
       <HeatmapLegend label={legendLabel} />
+      {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
+        ?: unavailable or incomplete load; excluded from the average
+      </Text> : null}
     </View>
   );
 }

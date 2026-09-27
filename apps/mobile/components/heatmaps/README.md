@@ -30,16 +30,22 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: 'all' });
 ```
 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
-highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
+highestWeight, knownVolume? }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screen already loads powers the sheet's week banner.
 Muscle history offers per-side, role-weighted `totalVolume` and
-`workingSetCount`; exercise history offers all four metrics with entered-load
-semantics.
+`workingSetCount`; exercise volume and Total 1RM use effective load from each
+session’s saved body weight and the current personal rules. Top added remains
+external load in kg; conventional exercise labels/results stay unchanged.
 
 **Buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
-smallest positive value is bucket 1, the largest bucket 4, and zero is 0 (rest).
+smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
+`hasTraining` distinguishes a known zero from rest in details and accessibility;
+`unavailable` preserves missing or incomplete load instead of treating it as zero.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
-(max). The weekly bar heights use the same min–max band.
+(max). The weekly bar heights include known zero training in the observed band.
+Only known training weeks contribute to the 12-week average (including zeros);
+rest and unavailable weeks do not. Incomplete volume is never plotted as a full
+total: daily cells are dashed, weekly cells show `?`, and details label coverage.
 
 ## Props & selection
 

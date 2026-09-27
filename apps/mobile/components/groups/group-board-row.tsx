@@ -11,7 +11,7 @@ type GroupBoardRowProps = {
   /** Its place in the board's one card (the list draws the card across its cells). */
   index: number;
   count: number;
-  onPress: (row: BoardRowViewModel) => void;
+  onPress?: (row: BoardRowViewModel) => void;
 };
 
 /**
@@ -26,7 +26,7 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
   return (
     <View style={[cardListItemStyles(index, count), row.isMe ? styles.mine : null]}>
       <ListRow
-        accessibilityHint="Opens the set"
+        accessibilityHint={onPress ? "Opens the set" : undefined}
         accessibilityLabel={row.accessibilityLabel}
         density="list"
         divider={index > 0}
@@ -57,7 +57,7 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
             </View>
           </View>
         }
-        onPress={() => onPress(row)}
+        onPress={onPress ? () => onPress(row) : undefined}
         testID={testID}>
         <View style={styles.body}>
           <Text

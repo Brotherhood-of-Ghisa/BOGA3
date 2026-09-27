@@ -19,25 +19,29 @@ type PersonalRecordCardProps = {
  */
 export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCardProps) {
   const oneRepMax = formatOneRepMaxFigure(personalRecord.estimatedOneRepMax);
-  const set = `${formatWeightFigure(personalRecord.weight)} × ${personalRecord.reps}`;
+  const metricLabel = personalRecord.bodyWeightKg != null ? 'Total 1RM' : '1RM';
+  const set = `${personalRecord.loadLabel ?? formatWeightFigure(personalRecord.weight)} × ${personalRecord.reps}`;
 
   return (
     <Card testID={testID}>
       <View
-        accessibilityLabel={`New 1RM record for ${personalRecord.exerciseName}: ${set}, 1RM ${oneRepMax}`}
+        accessibilityLabel={`New ${metricLabel} record for ${personalRecord.exerciseName}: ${set}, ${metricLabel} ${oneRepMax}${personalRecord.bodyWeightKg != null ? `, saved session weight ${personalRecord.bodyWeightKg} kg` : ''}`}
         accessible>
         <View style={styles.band}>
           <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} style={styles.bandLabel}>{`New 1RM record · ${oneRepMax}`}</Text>
+          <Text allowFontScaling={false} style={styles.bandLabel}>{`New ${metricLabel} record · ${oneRepMax}`}</Text>
         </View>
         <View style={styles.body}>
           <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {personalRecord.exerciseName}
           </Text>
-          <View style={styles.row}>
+          <View style={personalRecord.bodyWeightKg != null ? styles.bodyweightRow : styles.row}>
             <Text allowFontScaling={false} style={styles.set}>{set}</Text>
-            <Stat emphasis="record" label="1RM" layout="inline" value={oneRepMax} />
+            <Stat emphasis="record" label={metricLabel} layout="inline" value={oneRepMax} />
           </View>
+          {personalRecord.bodyWeightKg != null ? <Text allowFontScaling={false} style={styles.set}>
+            {`Session weight ${formatWeightFigure(personalRecord.bodyWeightKg)} kg · Effective load ${personalRecord.effectiveResistanceKg == null ? '—' : formatWeightFigure(personalRecord.effectiveResistanceKg)} kg`}
+          </Text> : null}
         </View>
       </View>
     </Card>
@@ -82,6 +86,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: uiSpace.sm,
   },
+  bodyweightRow: { alignItems: 'flex-start', gap: uiSpace.sm },
   set: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '500',

@@ -147,6 +147,7 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(summary).toEqual({
       state: "empty",
+      volumeComplete: true,
       performedSetCount: 0,
       workingSetCount: 0,
       mappedSetCount: 0,
@@ -498,6 +499,7 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         setCount: 2,
         workingSetCount: 1,
         currentVolume: 1100,
+        knownVolume: 1100,
         historicalSessionCount: 3,
         medianVolume: 700,
         percentile5Volume: 520,

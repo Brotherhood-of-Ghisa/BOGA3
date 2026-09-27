@@ -36,7 +36,8 @@ export type SheetProps = {
 
 // A design-language bottom sheet: anchored to the bottom edge over a dimmed
 // backdrop, with a handle and an optional title. It never grows past the top of
-// the screen: a taller body shrinks to fit, so a tall body should scroll.
+// the screen: a taller body shrinks to fit, so a tall body should scroll. The
+// backdrop keeps a full tap target below the status bar even for a tall panel.
 export function Sheet({
   visible,
   onDismiss,
@@ -125,10 +126,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
+    backgroundColor: uiRoles.scrim,
   },
   backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: uiRoles.scrim,
+    flex: 1,
+    minHeight: uiGeometry.tapTarget,
   },
   panel: {
     flexShrink: 1,

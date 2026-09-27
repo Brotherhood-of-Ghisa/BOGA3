@@ -129,7 +129,7 @@ describe('domain schema and runtime migrations', () => {
     // quarantine table; planned set targets append after that; the M22 local
     // group cache is m0004, m0005 empties it for the raw-set payload shape, and
     // the M25 exercise_group_links synced entity is m0006.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(7);
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(9);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -166,6 +166,8 @@ describe('domain schema and runtime migrations', () => {
       'm0004',
       'm0005',
       'm0006',
+      'm0007',
+      'm0008',
     ]);
   });
 

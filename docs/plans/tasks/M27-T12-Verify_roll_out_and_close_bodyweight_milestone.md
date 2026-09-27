@@ -1,7 +1,7 @@
 ---
 task_id: M27-T12-Verify_roll_out_and_close_bodyweight_milestone
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "yes"
 areas: "cross-stack"
 runtimes: "node|expo|maestro|supabase|deno|sql"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/00-product.md, docs/specs/03-technical-architecture.md
 
 # M27-T12 — Verify, roll out and close the bodyweight milestone
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T01 through M27-T11.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: all M27 decisions and milestone acceptance criteria.
@@ -92,3 +92,27 @@ or lane responsibilities changed (02/registry too if lane definitions changed).
 Mark delivered task entries completed as their cards are deleted; then delete
 this milestone and remaining shipped cards in the closing PR. Evidence remains
 in those PRs and history. Follow AGENTS.md worktree/PR lifecycle to merge/release.
+
+
+## Current execution checkpoint (2026-09-27)
+
+Implementation is integrated with `origin/main` at `8b5c47c1`; app/server source
+is `b636f234`. The milestone's [current acceptance table](../milestones/M27-bodyweight-load-and-group-comparisons.md#current-execution-checkpoint-2026-09-27)
+owns the latest gate results and remaining work, replacing earlier partial-run
+checkpoints here. Full fast (183 suites / 2,243 tests), backend and handles are
+green. Every required baseline frontend constituent lane is now green on this
+integrated source; failed aggregates are not counted as passes. No assertion
+has been waived.
+
+Baseline two-user proof covers ranking reversal, estimated/missing weight,
+100%→70% rules publication, preserved attestation, correction invalidation,
+legacy unlink/relink, former-member read-only details and removed-member denial.
+Group layouts passed at 375×667pt, 402×874pt and 440×956pt.
+Actual local API-gateway outages at all three sizes verify cached boards,
+retained failed-publication input and unchanged server rules revisions. The sync
+flow now checks two frozen weights across a local wipe and real bootstrap; its fresh native run passed, including restored readings
+and both original snapshot values/provenance.
+
+`RUNBOOK.md` contains the exact server-first migration/function order, hosted
+acceptance and forward-repair boundaries. Hosted deployment and client
+activation remain pending; do not retire this card until its work ships.

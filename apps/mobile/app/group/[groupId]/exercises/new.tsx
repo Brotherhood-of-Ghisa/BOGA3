@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
 import {
-  GroupExerciseForm,
   GroupLostAccessState,
   GroupMissingDataState,
   GroupStateView,
@@ -13,17 +12,18 @@ import {
 } from '@/components/groups';
 import { ScreenScroll, SegmentedControl, uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import type { ExerciseCore } from '@/src/exercise-core';
+import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
+import { BODYWEIGHT_SEED_RULES, CONVENTIONAL_LOAD_RULES } from '@/src/exercise-core/load-rules';
+import type { GroupExerciseRules } from '@/src/groups/metric-contract';
+import { createGroupComparison } from '@/src/groups/api';
 import {
   canManageGroup,
-  createGroupExercise,
   describeGroupExerciseWriteError,
   getGroup,
   groupCacheKeys,
   useGroupAction,
   useGroupResource,
   useMountedRef,
-  type CreateGroupExerciseInput,
   type GroupGetResult,
   type StandardExerciseOption,
 } from '@/src/groups';
@@ -66,10 +66,10 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   });
   const [source, setSource] = useState<ExerciseSource>('catalogue');
   const [picked, setPicked] = useState<StandardExerciseOption | null>(null);
-  const create = useGroupAction((input: CreateGroupExerciseInput) => createGroupExercise(groupId, input));
+  const create = useGroupAction((input: GroupExerciseRules & { sourceExerciseId: string | null }) => createGroupComparison(groupId, input));
   const mounted = useMountedRef();
 
-  const onSubmit = async (core: ExerciseCore) => {
+  const onSubmit = async (core: GroupExerciseRules) => {
     const sourceExerciseId = source === 'catalogue' ? (picked?.sourceExerciseId ?? null) : null;
     const result = await create.run({ ...core, sourceExerciseId });
     // Back during a slow save already left this screen: going back again would pop the group screen.
@@ -87,7 +87,7 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   const errorMessage = create.error ? describeGroupExerciseWriteError(create.error) : null;
   const formProps = {
     errorMessage,
-    onSubmit: (core: ExerciseCore) => void onSubmit(core),
+    onSubmit: (core: GroupExerciseRules) => void onSubmit(core),
     pending: create.pending,
     pendingLabel: 'Adding…',
     submitLabel: 'Add exercise',
@@ -127,7 +127,7 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
           value={source}
         />
         {source === 'custom' ? (
-          <GroupExerciseForm key="custom" {...formProps} />
+          <GroupComparisonForm key="custom" {...formProps} />
         ) : (
           <>
             <StandardExercisePicker
@@ -138,8 +138,12 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
               selectedId={picked?.sourceExerciseId ?? null}
             />
             {picked ? (
-              <GroupExerciseForm
-                initialCore={{ name: picked.name, loadInputMode: picked.loadInputMode }}
+              <GroupComparisonForm
+                initialRules={{ name: picked.name, loadInputMode: picked.loadInputMode,
+                  ...(BODYWEIGHT_SEED_RULES[picked.sourceExerciseId] ?? CONVENTIONAL_LOAD_RULES),
+                  defaultMetric: BODYWEIGHT_SEED_RULES[picked.sourceExerciseId]
+                    ? picked.sourceExerciseId === 'seed_push_up' ? 'bodyweight_reps' : 'relative_strength'
+                    : 'e1rm' }}
                 key={picked.sourceExerciseId}
                 note={`Copies the standard exercise "${picked.name}". You can change its name.`}
                 {...formProps}
@@ -156,7 +160,7 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   }
 
   return (
-    <ScreenScroll keyboardShouldPersistTaps="handled" testID="group-exercise-new-screen">
+    <ScreenScroll automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" testID="group-exercise-new-screen">
       {body}
     </ScreenScroll>
   );

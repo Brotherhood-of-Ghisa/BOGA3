@@ -1,3 +1,4 @@
+import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
@@ -82,7 +83,7 @@ const formatWeekDateRange = (weekStartDateKey: string): string => {
 
 const formatWeekValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
-    case 'totalVolume': return formatFigure(week.totalVolume);
+    case 'totalVolume': return formatVolumeWithCoverage(week.totalVolume, week.knownVolume);
     case 'workingSetCount': return String(week.workingSetCount);
     case 'estimatedRM1': return week.estimatedRM1 !== null ? formatFigure(week.estimatedRM1) : '—';
     case 'highestWeight': return week.highestWeight !== null ? formatFigure(week.highestWeight) : '—';
@@ -98,11 +99,13 @@ function WeekSelectionBanner({
   weeklyEffort,
   selectedWeekKey,
   metric,
+  metricLabel,
   testID,
 }: {
   weeklyEffort: SelectedMuscleWeeklyEffort[];
   selectedWeekKey: string | null;
   metric: CalendarHeatmapMetric;
+  metricLabel: string;
   testID: string;
 }) {
   const week =
@@ -118,7 +121,7 @@ function WeekSelectionBanner({
             {formatWeekDateRange(selectedWeekKey)}
           </Text>
           <Text allowFontScaling={false} style={styles.bannerLabel} testID={`${testID}-value`}>
-            {METRIC_LABELS[metric]}:{' '}
+            {metricLabel}:{' '}
             <Text allowFontScaling={false} style={styles.bannerFigure}>{week !== null ? formatWeekValue(week, metric) : '—'}</Text>
           </Text>
         </>
@@ -134,6 +137,7 @@ function WeekSelectionBanner({
 function HistoryHeatmap({
   dailyMetrics,
   metric,
+  metricLabel,
   view,
   selectedWeekKey,
   onSelectWeek,
@@ -142,6 +146,7 @@ function HistoryHeatmap({
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
+  metricLabel: string;
   view: HeatmapView;
   selectedWeekKey: string | null;
   onSelectWeek: (weekKey: string | null) => void;
@@ -159,12 +164,12 @@ function HistoryHeatmap({
       <DailyHeatmap
         data={data}
         testIDPrefix={testIDPrefix}
-        metricLabel={METRIC_LABELS[metric]}
+        metricLabel={metricLabel}
         formatValue={formatDailyValue}
-        legendLabel={`${METRIC_LABELS[metric]} per day`}
+        legendLabel={`${metricLabel} per day`}
       />
     ),
-    [data, formatDailyValue, metric, testIDPrefix]
+    [data, formatDailyValue, metricLabel, testIDPrefix]
   );
   const weeklyHeatmap = useMemo(
     () => (
@@ -250,6 +255,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 }: HistorySheetProps<TMetric>) {
   const { height } = useWindowDimensions();
   const prefix = `stats-${kind}-history`;
+  const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
 
   return (
     <Sheet dismissLabel={`Dismiss ${kind} history`} onDismiss={onDismiss} testID={prefix} visible>
@@ -303,6 +309,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
         {view === 'weekly' ? (
           <WeekSelectionBanner
             metric={metric}
+            metricLabel={metricLabel}
             selectedWeekKey={selectedWeekKey}
             testID={`${prefix}-week-banner`}
             weeklyEffort={weeklyEffort}
@@ -342,6 +349,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
               <HistoryHeatmap
                 dailyMetrics={dailyMetrics}
                 metric={metric}
+                metricLabel={metricLabel}
                 onSelectWeek={onSelectWeek}
                 selectedWeekKey={selectedWeekKey}
                 testIDPrefix={prefix}

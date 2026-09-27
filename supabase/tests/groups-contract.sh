@@ -742,14 +742,18 @@ card() {
 }
 
 card "active card: training now, its one live set as raw synced text" \
-  '.status == "active" and .completed_at_ms == null and .duration_sec == null
+  '.metric_revision == "effective_load_v1" and .metric_scope == "personal"
+   and .body_weight_kg == null and .body_weight_source == null and .body_weight_measurement_id == null and .body_weight_measured_at_ms == null
+   and .status == "active" and .completed_at_ms == null and .duration_sec == null
    and .started_at_ms == $s and .sort_at_ms == $s and .session_id == $sid
    and .member == {user_id: $u, username: $un} and .gym_name == $gym
    and .exercises == [{session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
+                       exercise_definition_id: $def, load_input_mode: "total_load", bodyweight_coefficient: 0,
+                       movement_standard: null, loading_method: null,
                        order_index: 0,
                        sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_value: "100", reps_value: "5",
-                               set_type: "working", performance_status: null}]}]' \
-  --argjson s "${S1_START}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" \
+                               weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: null}]}]' \
+  --arg def "${DEF_A}" --argjson s "${S1_START}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" \
   --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}" --arg bench "Athlete Bench ${RUN_TAG}"
 
 next_cuam
@@ -825,24 +829,26 @@ check "detail: every live set as raw synced text, tombstoned sets and exercises 
    and (.exercises | map(.name)) == [$bench, "Athlete Row", "Athlete Squat", "Athlete Freeform", "Athlete Planned Only"]
    and (.exercises | map(.order_index)) == [0, 1, 2, 3, 4]
    and .exercises[0] == {session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
+                       exercise_definition_id: $def, load_input_mode: "total_load", bodyweight_coefficient: 0,
+                       movement_standard: null, loading_method: null,
                          order_index: 0,
                          sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_value: "102.5", reps_value: "5",
-                                 set_type: "working", performance_status: null},
+                                 weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: null},
                                 {set_id: ($sid + "-a2"), order_index: 1, weight_value: "110", reps_value: "5",
-                                 set_type: "working", performance_status: "planned"},
+                                 weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: "planned"},
                                 {set_id: ($sid + "-a3"), order_index: 2, weight_value: "110", reps_value: "",
-                                 set_type: "working", performance_status: null}]}
+                                 weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: null}]}
    and .exercises[1].sets == [{set_id: ($sid + "-b1"), order_index: 0, weight_value: "80", reps_value: "5",
-                               set_type: "warm_up", performance_status: null}]
+                               weight_unit: "kg", external_load_mode: null, set_type: "warm_up", performance_status: null}]
    and (.exercises | map(.sets | length)) == [3, 1, 1, 1, 1]' \
-  --arg sid "${S1}" --arg u "${ATHLETE_UID}" --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}" \
+  --arg def "${DEF_A}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}" \
   --argjson s "${S1_START}" --arg bench "Athlete Bench ${RUN_TAG}"
 check "detail carries no GPS field at any depth" \
   '[.. | objects | keys[]] | map(select(test("lat|lon|coordinate|accuracy"))) == []'
 check "detail keys are exactly the contract shape" \
-  '(.session | keys) == ["completed_at_ms","duration_sec","exercises","gym_name","member","session_id","started_at_ms","status"]
-   and (.session.exercises[0] | keys) == ["machine_name","name","order_index","session_exercise_id","sets"]
-   and (.session.exercises[0].sets[0] | keys) == ["order_index","performance_status","reps_value","set_id","set_type","weight_value"]'
+  '(.session | keys) == ["body_weight_kg","body_weight_measured_at_ms","body_weight_measurement_id","body_weight_source","completed_at_ms","duration_sec","exercises","gym_name","member","metric_revision","metric_scope","session_id","started_at_ms","status"]
+   and (.session.exercises[0] | keys) == ["bodyweight_coefficient","exercise_definition_id","load_input_mode","loading_method","machine_name","movement_standard","name","order_index","session_exercise_id","sets"]
+   and (.session.exercises[0].sets[0] | keys) == ["external_load_mode","order_index","performance_status","reps_value","set_id","set_type","weight_unit","weight_value"]'
 stream "${VIEWER_TOKEN}" "" null 50
 expect_ok "viewer stream for the GPS check"
 check "stream carries no GPS field at any depth" \
@@ -974,8 +980,8 @@ check "All: membership items for joined and left, keyed <membership_id>:joined|e
     and ($ms[0] | keys) == ["event","group","key","kind","member","sort_at_ms"]' \
   --arg ath "${ATHLETE_UID}" --arg a "${GA}" --arg b "${GB}"
 check "session card keys are exactly the contract shape" '
-  [.items[] | select(.kind == "session")][0] | keys == ["completed_at_ms","duration_sec","exercises","groups",
-    "gym_name","key","kind","member","session_id","sort_at_ms","started_at_ms","status"]'
+  [.items[] | select(.kind == "session")][0] | keys == ["body_weight_kg","body_weight_measured_at_ms","body_weight_measurement_id","body_weight_source","completed_at_ms","duration_sec","exercises","groups",
+    "gym_name","key","kind","member","metric_revision","metric_scope","session_id","sort_at_ms","started_at_ms","status"]'
 
 rpc "${VIEWER_TOKEN}" group_stream '{}'
 expect_ok "viewer stream with every argument defaulted"
@@ -1288,21 +1294,25 @@ rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GRO
 expect_error VALIDATION "input is validated before the target"
 pass "targets: another group's exercise ≡ nonexistent (NOT_FOUND: group exercise not found)"
 
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" " Bench (comp) ${RUN_TAG} " per_side_load)"
-expect_ok "admin renames and changes the load mode"
-check "update replaces the trimmed name and the load mode, keeping id and source" \
-  '.exercise == {group_exercise_id: $id, name: $n, load_input_mode: "per_side_load",
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Unexpected change" per_side_load)"
+expect_error VALIDATION "legacy writer must upgrade for calculation changes"
+rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" " Bench (comp) ${RUN_TAG} " total_load)"
+expect_ok "admin renames without changing legacy rules"
+check "update replaces the trimmed name, keeping load mode, id and source" \
+  '.exercise == {group_exercise_id: $id, name: $n, load_input_mode: "total_load",
                  source_exercise_id: null, archived_at_ms: null}' \
   --arg id "${GX_BENCH}" --arg n "Bench (comp) ${RUN_TAG}"
 rpc "${OWNER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_SQUAT}" "Barbell Back Squat" total_load)"
-expect_ok "owner changes the copy's load mode"
-check "a copy keeps its standard id through an update" \
-  '.exercise.source_exercise_id == "seed_barbell_back_squat" and .exercise.load_input_mode == "total_load"'
+expect_error VALIDATION "owner also upgrades before changing calculation rules"
+rpc "${OWNER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_SQUAT}" "Barbell Back Squat" per_side_load)"
+expect_ok "owner updates the legacy copy without changing its rules"
+check "a copy keeps its standard id and original rules through an update" \
+  '.exercise.source_exercise_id == "seed_barbell_back_squat" and .exercise.load_input_mode == "per_side_load"'
 rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" $' \t' total_load)"
 expect_error VALIDATION "update with a blank name"
 rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Bench" per_side)"
 expect_error VALIDATION "update with an unknown load mode"
-pass "update: rename and load-mode change by owner and admin; VALIDATION for bad input"
+pass "update: owner/admin rename; legacy rule-change refusal and VALIDATION for bad input"
 
 rpc "${ADMIN_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_ROW}")"
 expect_ok "admin archives"

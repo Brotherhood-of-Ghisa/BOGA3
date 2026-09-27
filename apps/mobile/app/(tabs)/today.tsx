@@ -1,3 +1,5 @@
+import type { CurrentGroupStreamItem as StreamItem } from '@/src/groups/metric-wire';
+import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
 import { useIsFocused, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -44,7 +46,6 @@ import {
   groupsStreamPath,
   useGroupStream,
   type GroupApiError,
-  type StreamItem,
 } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import {
@@ -441,6 +442,7 @@ function TodaySocialSnapshot({
         </Card>
       ) : (
         viewModels.map((item) => {
+          if (item.kind === 'metric_event') return <GroupMetricStreamCard key={item.key} item={item.event} userId={null} showGroupName onPress={() => onOpenGroup(item.event.group.group_id)} pressHint="Opens the group" />;
           if (item.kind === 'session') {
             return (
               <GroupStreamSessionCard

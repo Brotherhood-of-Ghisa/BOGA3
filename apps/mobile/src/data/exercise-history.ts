@@ -1,10 +1,8 @@
+import type { SessionBodyWeightSnapshot } from './session-drafts';
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
-import {
-  computeExerciseVolume,
-  computeMaxRepsByWeight,
-  estimateExerciseOneRepMax,
-} from '@/src/exercise-calculations';
+import { exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import type { LoadContext, VolumeCoverage } from '@/src/exercise-calculations/effective-load';
 import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
@@ -37,9 +35,12 @@ export type ExerciseHistorySetEntry = {
   repsValue: string;
   setType: SessionSetTypeValue;
   isWorking: boolean;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null;
+  externalLoadMode?: string | null;
 };
 
-export type ExerciseHistorySessionEntry = {
+export type ExerciseHistorySessionEntry = SessionBodyWeightSnapshot & {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
@@ -49,7 +50,9 @@ export type ExerciseHistorySessionEntry = {
   sets: ExerciseHistorySetEntry[];
   workingSetCount: number;
   estimatedOneRepMax: number | null;
-  totalVolume: number;
+  totalVolume: number | null;
+  volumeCoverage?: VolumeCoverage;
+  loadContext?: LoadContext;
   topWeightSet: { weight: number; reps: number } | null;
 };
 
@@ -84,6 +87,7 @@ export type ExerciseHistorySummary = {
   exerciseDefinitionId: string;
   exerciseName: string;
   exerciseDeletedAt: Date | null;
+  bodyweightCoefficient?: number;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
   appliedGymId: string | null;
@@ -93,12 +97,13 @@ export type ExerciseHistorySummary = {
   allTimeBest: ExerciseHistoryBest;
 };
 
-export type ExerciseHistorySessionRow = {
+export type ExerciseHistorySessionRow = SessionBodyWeightSnapshot & {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
   gymId?: string | null;
   gymName: string | null;
+  bodyWeightKg?: number | null;
 };
 
 export type ExerciseHistorySetRow = {
@@ -109,6 +114,9 @@ export type ExerciseHistorySetRow = {
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null;
+  externalLoadMode?: string | null;
 };
 
 export type ExerciseHistoryTagRow = {
@@ -122,6 +130,9 @@ export type ExerciseHistoryDefinitionRow = {
   id: string;
   name: string;
   deletedAt: Date | null;
+  bodyweightCoefficient?: number;
+  loadInputMode?: string;
+  localBodyweightMetadataKnown?: boolean;
 };
 
 export type ExerciseHistoryAggregationInput = {
@@ -201,7 +212,8 @@ const compareCompletedDesc = (
 const buildSessionEntry = (
   sessionRow: ExerciseHistorySessionRow,
   setRows: ExerciseHistorySetRow[],
-  tagRows: ExerciseHistoryTagRow[]
+  tagRows: ExerciseHistoryTagRow[],
+  definition: ExerciseHistoryDefinitionRow
 ): ExerciseHistorySessionEntry => {
   const orderedSets = setRows
     .filter((set) =>
@@ -219,21 +231,13 @@ const buildSessionEntry = (
     repsValue: row.repsValue,
     setType: normalizeSessionSetType(row.setType),
     isWorking: isWorkingSessionSetType(row.setType),
+    localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit, externalLoadMode: row.externalLoadMode,
   }));
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
-  const calculationInputs = orderedSets.map((row) => ({
-    weightValue: row.weightValue,
-    repsValue: row.repsValue,
-    setType: row.setType,
-  }));
-
-  const estimatedOneRepMax = estimateExerciseOneRepMax(calculationInputs);
-  const totalVolume = computeExerciseVolume(calculationInputs);
-  const topByWeight = computeMaxRepsByWeight(calculationInputs);
-  const topWeightSet = topByWeight.length > 0
-    ? { weight: topByWeight[0].weight, reps: topByWeight[0].maxReps }
-    : null;
+  const loadContext = exerciseLoadContext(definition, sessionRow);
+  const { estimatedOneRepMax, volumeCoverage, topWeightSet } = summarizeExerciseLoad(orderedSets, loadContext);
+  const totalVolume = volumeCoverage.totalVolumeKgReps;
 
   const tagIds = tagRows.map((row) => row.tagDefinitionId);
 
@@ -243,11 +247,13 @@ const buildSessionEntry = (
     completedAt: sessionRow.completedAt,
     gymId: sessionRow.gymId,
     gymName: sessionRow.gymName,
+    bodyWeightKg: sessionRow.bodyWeightKg, bodyWeightSource: sessionRow.bodyWeightSource,
+    bodyWeightMeasurementId: sessionRow.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessionRow.bodyWeightMeasuredAt,
     tagIds,
     sets,
     workingSetCount,
     estimatedOneRepMax,
-    totalVolume,
+    totalVolume, volumeCoverage, loadContext,
     topWeightSet,
   };
 };
@@ -374,7 +380,8 @@ export const aggregateExerciseHistory = (
       buildSessionEntry(
         row,
         input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
-        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []
+        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? [],
+        input.exerciseDefinition
       )
     )
     .filter((entry) => entry.sets.length > 0);
@@ -390,7 +397,8 @@ export const aggregateExerciseHistory = (
       buildSessionEntry(
         row,
         input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
-        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? []
+        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? [],
+        input.exerciseDefinition
       )
     )
     .filter((entry) => entry.sets.length > 0);
@@ -399,6 +407,7 @@ export const aggregateExerciseHistory = (
     exerciseDefinitionId: input.exerciseDefinition.id,
     exerciseName: input.exerciseDefinition.name,
     exerciseDeletedAt: input.exerciseDefinition.deletedAt,
+    bodyweightCoefficient: input.exerciseDefinition.bodyweightCoefficient ?? 0,
     period: input.period,
     appliedTagDefinitionId: input.appliedTagDefinitionId,
     appliedGymId,
@@ -417,13 +426,16 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         id: exerciseDefinitions.id,
         name: exerciseDefinitions.name,
         deletedAt: exerciseDefinitions.deletedAt,
+        bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
+        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
+        loadInputMode: exerciseDefinitions.loadInputMode,
       })
       .from(exerciseDefinitions)
       .where(eq(exerciseDefinitions.id, exerciseDefinitionId))
       .get();
 
     if (!row) return null;
-    return { id: row.id, name: row.name, deletedAt: row.deletedAt ?? null };
+    return { ...row, deletedAt: row.deletedAt ?? null };
   },
   async loadSessionsForExercise({ exerciseDefinitionId, start, end }) {
     const database = await bootstrapLocalDataLayer();
@@ -449,6 +461,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         completedAt: sessions.completedAt,
         gymId: sessions.gymId,
         gymName: gyms.name,
+        localBodyweightMetadataKnown: sessions.localBodyweightMetadataKnown, bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource,
+        bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt,
       })
       .from(sessionExercises)
       .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
@@ -459,13 +473,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
 
     return rows
       .filter(
-        (row): row is {
-          sessionId: string;
-          sessionExerciseId: string;
-          completedAt: Date;
-          gymId: string | null;
-          gymName: string | null;
-        } => row.completedAt !== null
+        (row): row is typeof row & { completedAt: Date } =>
+          row.completedAt !== null
       )
       .map((row) => ({
         sessionId: row.sessionId,
@@ -473,6 +482,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         completedAt: row.completedAt,
         gymId: row.gymId ?? null,
         gymName: row.gymName ?? null,
+        localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, bodyWeightKg: row.bodyWeightKg, bodyWeightSource: row.bodyWeightSource,
+        bodyWeightMeasurementId: row.bodyWeightMeasurementId, bodyWeightMeasuredAt: row.bodyWeightMeasuredAt,
       }));
   },
   async loadSetsForSessionExercises({ sessionExerciseIds }) {
@@ -484,6 +495,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,
@@ -503,6 +515,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       weightValue: row.weightValue,
+      localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit, externalLoadMode: row.externalLoadMode,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
       performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),

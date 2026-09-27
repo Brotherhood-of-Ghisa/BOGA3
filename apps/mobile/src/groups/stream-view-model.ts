@@ -1,3 +1,4 @@
+import { isMetricStreamEvent, type CurrentGroupStreamItem as StreamItem, type GroupMetricStreamItemWire } from './metric-wire';
 // Pure presentation for the group stream (`docs/specs/tech/groups-contract.md`
 // §6.1): card status, card metrics (computed on the device, §5) and their kg
 // formatting, membership sentences, record cards and record-removed / link
@@ -7,13 +8,13 @@ import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
 
 import { computeGroupSessionMetrics } from './session-metrics';
+import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
 import type {
   GroupBoardMetric,
   GroupMemberRef,
   GroupMembershipEvent,
   GroupRole,
   GroupSummary,
-  StreamItem,
   StreamLinkItem,
   StreamMembershipItem,
   StreamRecordItem,
@@ -144,6 +145,7 @@ export type StreamSessionCardViewModel = {
   groupNames: string[];
   setsLabel: string;
   volumeLabel: string;
+  metricsNote: string;
   exercisesLabel: string;
   /** "1 record" / "N records": the session's non-voided record sets among the loaded items. Null when none. */
   recordsLabel: string | null;
@@ -197,10 +199,12 @@ export type StreamItemViewModel =
   | StreamSessionCardViewModel
   | StreamMembershipViewModel
   | StreamRecordCardViewModel
-  | StreamSentenceViewModel;
+  | StreamSentenceViewModel
+  | { kind: 'metric_event'; key: string; event: GroupMetricStreamItemWire };
 
 const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel => {
-  const metrics = computeGroupSessionMetrics(item.exercises);
+  const metrics = computeGroupSessionMetrics(item.exercises, item);
+  const summary = sessionVolumeSummary(metrics.coverage);
   return {
     kind: 'session',
     key: item.key,
@@ -213,7 +217,11 @@ const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel =
     gymName: item.gym_name,
     groupNames: item.groups.map((group) => group.name),
     setsLabel: formatSetCount(metrics.performedSets),
-    volumeLabel: formatVolumeKg(metrics.totalVolumeKg),
+    volumeLabel: metrics.totalVolumeKg === null
+      ? `${summary.volume} kg · ${metrics.coverage.knownSetCount > 0 ? 'incomplete' : 'unavailable'}`
+      : formatVolumeKg(metrics.totalVolumeKg),
+    metricsNote: [metrics.basis === 'personal' ? 'Personal metrics' : 'Original entered-load metrics',
+      summary.volumeNote].filter(Boolean).join(' · '),
     exercisesLabel: formatExerciseCount(metrics.exerciseCount),
     recordsLabel: null,
   };
@@ -380,6 +388,7 @@ const buildSentenceItem = (item: StreamRecordVoidedItem | StreamLinkItem, myUser
 
 /** One item on its own; a session card's `recordsLabel` needs the whole list (`buildStreamViewModel`). */
 export const buildStreamItemViewModel = (item: StreamItem, myUserId: string | null = null): StreamItemViewModel => {
+  if (isMetricStreamEvent(item)) return { kind: 'metric_event', key: item.key, event: item };
   switch (item.kind) {
     case 'session':
       return buildSessionCard(item);
@@ -398,7 +407,8 @@ export const buildStreamItemViewModel = (item: StreamItem, myUserId: string | nu
 };
 
 /** A session item's key and a record's session identity share one shape: `<member_user_id>:<session_id>`. */
-const recordSessionKey = (record: StreamRecordItem): string => `${record.member.user_id}:${record.session_id}`;
+type AnyRecord = StreamRecordItem | Extract<GroupMetricStreamItemWire, { kind: 'record' }>;
+const recordSessionKey = (record: AnyRecord): string => `${record.member?.user_id ?? ''}:${record.session_id}`;
 
 /**
  * Server order, except that a record whose session card is among the items
@@ -408,7 +418,7 @@ const recordSessionKey = (record: StreamRecordItem): string => `${record.member.
  */
 export const buildStreamViewModel = (items: StreamItem[], myUserId: string | null = null): StreamItemViewModel[] => {
   const loadedSessions = new Set(items.filter((item) => item.kind === 'session').map((item) => item.key));
-  const attached = new Map<string, StreamRecordItem[]>();
+  const attached = new Map<string, AnyRecord[]>();
   for (const item of items) {
     if (item.kind === 'record' && loadedSessions.has(recordSessionKey(item))) {
       attached.set(recordSessionKey(item), [...(attached.get(recordSessionKey(item)) ?? []), item]);
@@ -425,9 +435,9 @@ export const buildStreamViewModel = (items: StreamItem[], myUserId: string | nul
       continue;
     }
     const records = attached.get(item.key) ?? [];
-    const recordSets = new Set(records.filter((record) => record.voided === null).map((record) => record.set_id));
+    const recordSets = new Set(records.filter((record) => isMetricStreamEvent(record) ? !record.voided : record.voided === null).map((record) => record.set_id));
     models.push({ ...buildSessionCard(item), recordsLabel: recordSets.size > 0 ? formatRecordCount(recordSets.size) : null });
-    models.push(...records.map((record) => buildRecordCard(record, myUserId)));
+    models.push(...records.map((record) => buildStreamItemViewModel(record, myUserId)));
   }
   return models;
 };

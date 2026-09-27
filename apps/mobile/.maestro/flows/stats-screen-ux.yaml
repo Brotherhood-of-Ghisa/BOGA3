@@ -136,7 +136,7 @@ appId: com.dinoderek.mobile
 # --- 02: the period chip re-queries; the same fixture rescales to 30 days ---
 # 30 days adds the sessions at daysAgo 8/9/12/18/26 for 11 sessions and 16 more
 # rows -- but one of them is the fixture's deliberately invalid set
-# (maestro_exercise_block_history_squat_4_a_invalid, weightValue ''), which the
+# (maestro_exercise_block_history_squat_4_a_invalid, weightValue 'invalid'), which the
 # stats aggregation must drop: hence 15 (11), not 16 (12). This assertion is
 # therefore two proofs in one -- the period chip re-queries, and an invalid set
 # never reaches a total. If it fails while "10 (8)" above passes, look at the

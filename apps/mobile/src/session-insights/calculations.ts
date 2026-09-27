@@ -1,3 +1,5 @@
+import { type LoadContext } from '@/src/exercise-calculations/effective-load';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, exerciseLoadContext, summarizeExerciseLoad, formatEnteredLoad } from '@/src/exercise-calculations/analytics';
 import { isWorkingSessionSetType } from "@/src/data/set-types";
 import {
   collectMuscleSetContributions,
@@ -8,11 +10,10 @@ import {
   type MuscleContributionRole,
 } from "@/src/data/muscle-analytics";
 import {
-  estimateOneRepMax,
   parseSetReps,
   parseSetWeight,
 } from "@/src/exercise-calculations";
-import {
+import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from "@/src/session-recorder/set-semantics";
@@ -24,6 +25,8 @@ export type SessionInsightSetInput = {
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null; externalLoadMode?: string | null;
   deletedAt?: Date | null;
 };
 
@@ -33,12 +36,14 @@ export type SessionInsightExerciseInput = {
   exerciseDefinitionId: string | null;
   exerciseName: string;
   sets: SessionInsightSetInput[];
+  loadContext?: LoadContext;
   deletedAt?: Date | null;
 };
 
 export type SessionInsightExerciseDefinition = {
   id: string;
   loadInputMode: "total_load" | "per_side_load";
+  bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean;
 };
 
 export type SessionInsightMuscleMapping = {
@@ -58,6 +63,7 @@ export type SessionInsightMuscleGroup = {
 export type CurrentSessionMuscleSummaryInput = {
   sessionId: string;
   sessionAt: Date;
+  bodyWeightKg?: number | null;
   exercises: SessionInsightExerciseInput[];
   exerciseDefinitions: SessionInsightExerciseDefinition[];
   muscleMappings: SessionInsightMuscleMapping[];
@@ -81,6 +87,7 @@ export type CurrentSessionMuscleSummary = {
   mappedSetCount: number;
   unmappedSetCount: number;
   contributingMuscleCount: number;
+  volumeComplete?: boolean;
   muscles: SessionMuscleLoadEntry[];
   workingSetsByMuscle: SessionMuscleWorkingSetEntry[];
 };
@@ -102,12 +109,16 @@ export type ExercisePersonalRecord = {
   reps: number;
   estimatedOneRepMax: number;
   historicalBestEstimatedOneRepMax: number;
+  loadLabel?: string;
+  bodyWeightKg?: number | null;
+  effectiveResistanceKg?: number | null;
 };
 
 export type PersonalRecordSessionInput = {
   sessionId: string;
   status: "active" | "completed";
   completedAt: Date | null;
+  bodyWeightKg?: number | null;
   deletedAt?: Date | null;
   exercises: SessionInsightExerciseInput[];
 };
@@ -118,6 +129,7 @@ export type SessionPersonalRecordsInput = {
 };
 
 export type ExerciseVolumeComparisonState =
+  | "incomplete"
   | "no-history"
   | "single-baseline"
   | "constant-baseline"
@@ -130,8 +142,10 @@ export type ExerciseVolumeComparison = {
   sessionExerciseOrderIndex: number;
   setCount: number;
   workingSetCount: number;
-  currentVolume: number;
+  currentVolume: number | null;
+  knownVolume?: number | null;
   historicalSessionCount: number;
+  excludedHistoricalSessionCount?: number;
   medianVolume: number | null;
   percentile5Volume: number | null;
   percentile95Volume: number | null;
@@ -186,7 +200,7 @@ const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
   }) &&
-  parseSetWeight(set.weightValue) !== null &&
+  parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)) !== null &&
   parseSetReps(set.repsValue) !== null;
 
 const isWorkingSetType = isWorkingSessionSetType;
@@ -225,7 +239,7 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
     .sort(compareExerciseOrder);
 
   return {
-    sessions: [{ id: input.sessionId, completedAt: input.sessionAt }],
+    sessions: [{ id: input.sessionId, completedAt: input.sessionAt, bodyWeightKg: input.bodyWeightKg ?? exercises[0]?.loadContext?.bodyWeightKg }],
     exerciseDefinitions: input.exerciseDefinitions,
     sessionExercises: exercises.map((exercise) => ({
       id: exercise.id,
@@ -243,6 +257,7 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
           orderIndex: set.orderIndex,
           setType: set.setType,
           weightValue: set.weightValue,
+          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
           repsValue: set.repsValue,
           performanceStatus: set.performanceStatus,
         })),
@@ -267,15 +282,14 @@ export const summarizeCurrentSessionMuscleLoad = (
       .filter((contribution) => muscleGroupById.has(contribution.muscleGroupId))
       .map((contribution) => contribution.setIdentity),
   );
-  const weightedVolumeByMuscle = new Map<string, number>();
+  const weightedVolumeByMuscle = new Map<string, number | null>();
   const workingSetIdentitiesByMuscle = new Map<string, Set<string>>();
 
   for (const contribution of contributions) {
     if (!muscleGroupById.has(contribution.muscleGroupId)) continue;
     weightedVolumeByMuscle.set(
       contribution.muscleGroupId,
-      (weightedVolumeByMuscle.get(contribution.muscleGroupId) ?? 0) +
-        contribution.weightedVolume,
+      addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
     );
 
     if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
@@ -298,7 +312,8 @@ export const summarizeCurrentSessionMuscleLoad = (
       ) as SessionInsightMuscleGroup,
       weightedVolume,
     }),
-  ).filter((entry) => entry.weightedVolume > 0);
+  ).flatMap((entry) => entry.weightedVolume !== null && entry.weightedVolume > 0
+    ? [{ ...entry, weightedVolume: entry.weightedVolume }] : []);
   const largestWeightedVolume = positiveMuscles.reduce(
     (largest, entry) => Math.max(largest, entry.weightedVolume),
     0,
@@ -358,7 +373,7 @@ export const summarizeCurrentSessionMuscleLoad = (
     state:
       performedSetCount === 0
         ? "empty"
-        : muscles.length === 0
+        : mappedSetCount === 0
           ? "unmapped"
           : "mapped",
     performedSetCount,
@@ -366,6 +381,7 @@ export const summarizeCurrentSessionMuscleLoad = (
     mappedSetCount,
     unmappedSetCount: Math.max(0, performedSetCount - mappedSetCount),
     contributingMuscleCount: muscles.length,
+    volumeComplete: Array.from(weightedVolumeByMuscle.values()).every(volume => volume !== null),
     muscles,
     workingSetsByMuscle,
   };
@@ -401,11 +417,12 @@ const findBestPersonalRecordCandidate = (
 
   let best: PersonalRecordCandidate | null = null;
   for (const { exercise, set } of candidates) {
-    const weight = parseSetWeight(set.weightValue);
+    const weight = parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue));
     const reps = parseSetReps(set.repsValue);
     if (weight === null || reps === null) continue;
 
-    const estimatedOneRepMax = estimateOneRepMax(weight, reps);
+    const metric = calculateAnalyticsSetMetrics({ ...set, ...(exercise.loadContext ?? exerciseLoadContext()) });
+    const estimatedOneRepMax = metric.estimatedOneRepMaxKg;
     if (estimatedOneRepMax === null) continue;
     if (best !== null && estimatedOneRepMax <= best.estimatedOneRepMax)
       continue;
@@ -417,9 +434,12 @@ const findBestPersonalRecordCandidate = (
       sessionExerciseOrderIndex: groupOrderIndex,
       setId: set.id,
       setOrderIndex: set.orderIndex,
-      weight,
+      weight: metric.eligible && metric.load.status === 'known' ? metric.load.enteredWeightKg : weight,
       reps,
       estimatedOneRepMax,
+      loadLabel: formatEnteredLoad(weight, exercise.loadContext ?? exerciseLoadContext(), set.externalLoadMode, set.weightUnit),
+      bodyWeightKg: (exercise.loadContext?.bodyweightCoefficient ?? 0) > 0 ? exercise.loadContext?.bodyWeightKg : null,
+      effectiveResistanceKg: metric.eligible && metric.load.status === 'known' ? metric.load.resistanceKg : null,
     };
   }
 
@@ -550,7 +570,8 @@ type ExerciseVolumeObservation = {
   sessionExerciseOrderIndex: number;
   setCount: number;
   workingSetCount: number;
-  volume: number;
+  volume: number | null;
+  knownVolume: number | null;
 };
 
 const collectExerciseVolumeObservations = (
@@ -577,6 +598,7 @@ const collectExerciseVolumeObservations = (
       setCount: 0,
       workingSetCount: 0,
       volume: 0,
+      knownVolume: 0,
     };
 
     current.sessionExerciseIds.push(exercise.id);
@@ -584,11 +606,9 @@ const collectExerciseVolumeObservations = (
     current.workingSetCount += eligibleSets.filter((set) =>
       isWorkingSetType(set.setType),
     ).length;
-    current.volume += eligibleSets.reduce((sum, set) => {
-      const weight = parseSetWeight(set.weightValue);
-      const reps = parseSetReps(set.repsValue);
-      return weight === null || reps === null ? sum : sum + weight * reps;
-    }, 0);
+    const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? exerciseLoadContext()).volumeCoverage;
+    current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
+    current.volume = addFiniteVolume(current.volume, coverage.totalVolumeKgReps);
     observationsByIdentity.set(identity, current);
   }
 
@@ -618,6 +638,7 @@ export const deriveSessionExerciseVolumeComparisons = (
   ensureValidDate(target.completedAt, "target completedAt");
 
   const historicalVolumesByDefinition = new Map<string, number[]>();
+  const excludedByDefinition = new Map<string, number>();
   for (const session of input.historicalSessions) {
     if (
       session.status !== "completed" ||
@@ -633,6 +654,10 @@ export const deriveSessionExerciseVolumeComparisons = (
       session.exercises,
     )) {
       if (!observation.exerciseDefinitionId) continue;
+      if (observation.volume === null) {
+        excludedByDefinition.set(observation.exerciseDefinitionId, (excludedByDefinition.get(observation.exerciseDefinitionId) ?? 0) + 1);
+        continue;
+      }
       const bucket =
         historicalVolumesByDefinition.get(observation.exerciseDefinitionId) ??
         [];
@@ -647,6 +672,8 @@ export const deriveSessionExerciseVolumeComparisons = (
   return collectExerciseVolumeObservations(target.exercises).map(
     (observation) => {
       const { volume, ...exerciseSummary } = observation;
+      const excluded = observation.exerciseDefinitionId ? excludedByDefinition.get(observation.exerciseDefinitionId) ?? 0 : 0;
+      const excludedCoverage = excluded > 0 ? { excludedHistoricalSessionCount: excluded } : {};
       const historicalVolumes = observation.exerciseDefinitionId
         ? [
             ...(historicalVolumesByDefinition.get(
@@ -654,15 +681,16 @@ export const deriveSessionExerciseVolumeComparisons = (
             ) ?? []),
           ].sort((left, right) => left - right)
         : [];
-      if (historicalVolumes.length === 0) {
+      if (volume === null || historicalVolumes.length === 0) {
         return {
           ...exerciseSummary,
+          ...excludedCoverage,
           currentVolume: volume,
           historicalSessionCount: 0,
           medianVolume: null,
           percentile5Volume: null,
           percentile95Volume: null,
-          state: "no-history" as const,
+          state: volume === null ? "incomplete" as const : "no-history" as const,
         };
       }
 
@@ -684,6 +712,7 @@ export const deriveSessionExerciseVolumeComparisons = (
 
       return {
         ...exerciseSummary,
+        ...excludedCoverage,
         currentVolume: volume,
         historicalSessionCount: historicalVolumes.length,
         medianVolume,
@@ -720,6 +749,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       adaptCurrentSessionToMuscleAnalyticsInput({
         sessionId: session.sessionId,
         sessionAt: session.completedAt ?? (target.completedAt as Date),
+        bodyWeightKg: session.bodyWeightKg,
         exercises: session.exercises,
         exerciseDefinitions,
         muscleMappings,
@@ -727,7 +757,8 @@ export const deriveSessionMuscleVolumeComparisons = (
       }),
     );
     const byMuscle = new Map<string, {
-      weightedVolume: number;
+      weightedVolume: number | null;
+      knownVolume: number | null;
       setIds: Set<string>;
       workingSetIds: Set<string>;
     }>();
@@ -735,10 +766,12 @@ export const deriveSessionMuscleVolumeComparisons = (
       if (!groupById.has(contribution.muscleGroupId)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
         weightedVolume: 0,
+        knownVolume: 0,
         setIds: new Set<string>(),
         workingSetIds: new Set<string>(),
       };
-      observation.weightedVolume += contribution.weightedVolume;
+      observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
+      observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
       observation.setIds.add(contribution.setIdentity);
       if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
         observation.workingSetIds.add(contribution.setIdentity);
@@ -748,16 +781,18 @@ export const deriveSessionMuscleVolumeComparisons = (
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,
       weightedVolume: observation.weightedVolume,
+      knownVolume: observation.knownVolume,
       setCount: observation.setIds.size,
       workingSetCount: observation.workingSetIds.size,
     })).sort((left, right) =>
-      right.weightedVolume - left.weightedVolume ||
+      (right.knownVolume ?? -1) - (left.knownVolume ?? -1) ||
       left.sortOrder - right.sortOrder ||
       left.displayName.localeCompare(right.displayName) ||
       left.id.localeCompare(right.id),
     );
   };
   const historyByMuscle = new Map<string, number[]>();
+  const excludedByMuscle = new Map<string, number>();
   for (const session of input.historicalSessions) {
     if (
       session.status !== "completed" ||
@@ -767,6 +802,10 @@ export const deriveSessionMuscleVolumeComparisons = (
     )
       continue;
     for (const muscle of observe(session)) {
+      if (muscle.weightedVolume === null) {
+        excludedByMuscle.set(muscle.id, (excludedByMuscle.get(muscle.id) ?? 0) + 1);
+        continue;
+      }
       const values = historyByMuscle.get(muscle.id) ?? [];
       values.push(muscle.weightedVolume);
       historyByMuscle.set(muscle.id, values);
@@ -774,7 +813,7 @@ export const deriveSessionMuscleVolumeComparisons = (
   }
 
   return observe(target).map((muscle, index) => {
-    const history = [...(historyByMuscle.get(muscle.id) ?? [])].sort(
+    const history = (muscle.weightedVolume === null ? [] : [...(historyByMuscle.get(muscle.id) ?? [])]).sort(
       (a, b) => a - b,
     );
     const median = history.length
@@ -794,12 +833,14 @@ export const deriveSessionMuscleVolumeComparisons = (
       setCount: muscle.setCount,
       workingSetCount: muscle.workingSetCount,
       currentVolume: muscle.weightedVolume,
+      knownVolume: muscle.knownVolume,
+      ...((excludedByMuscle.get(muscle.id) ?? 0) > 0 ? { excludedHistoricalSessionCount: excludedByMuscle.get(muscle.id) } : {}),
       historicalSessionCount: history.length,
       medianVolume: median,
       percentile5Volume: low,
       percentile95Volume: high,
       state:
-        history.length === 0
+        muscle.weightedVolume === null ? "incomplete" : history.length === 0
           ? "no-history"
           : history.length === 1
             ? "single-baseline"

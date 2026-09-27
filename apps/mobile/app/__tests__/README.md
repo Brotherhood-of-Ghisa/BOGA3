@@ -87,3 +87,76 @@
   scales and the `UiText` / `UiSurface` / `UiButton` / `SegmentedChips`
   primitives, removed 2026-09-26) is blocked by the `legacyVocabulary` rule in
   `scripts/check-ui-guardrails.js`, proven by `ui-guardrails-script.test.ts`.
+
+
+## Historical bodyweight fill coverage (M27)
+
+`bodyweight-backfill.test.ts` must retain pure prior/earliest-later selection,
+local calendar bounds, SQLite-compatible same-time ID ties, unknown/invalid
+context, stale reading/session membership, explicit-override preservation,
+selected soft/hard deletion, repeat no-ops and transaction rollback/retry.
+Its real serializer/pull restoration case keeps source IDs as provenance and
+proves later source deletion and ordinary row LWW cannot refresh a frozen tuple.
+`bodyweight-backfill-ui.test.tsx` covers nonwriting preview/cancel, stale refresh,
+busy/dismiss guards and waiting for native iOS dismissal before Add reading.
+Device behavior belongs to the third flow in `ios-bodyweight`, including small
+and large phone evidence; these unit tests do not replace that gate.
+
+
+## Offline legacy load review coverage (M27)
+
+`bodyweight-load-review.test.ts` runs the real old-schema upgrade, explicit
+rule/session setup, independent actual/planned review, ordinary draft save and
+wire/pull restoration. Preserve no-write preview/cancel, partial-review refusal,
+concurrent hydration rejection, conventional unknown units and empty counterpart
+coverage. Missing sync bookkeeping must never be treated as proof of local-only
+data. `bodyweight-logging-ui.test.tsx` verifies queued choices and explicit Apply;
+the logging Maestro flow captures the offline review on all three phone sizes.
+
+## Personal bodyweight analytics coverage (M27)
+
+`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/assisted, unit,
+coefficient/per-side, missing/invalid/legacy and hydration vectors through the
+logger, rows, records, exercise/muscle/catalogue/weekly projections and session
+models. Retain aggregate overflow and independent zero/count distinctions.
+`bodyweight-analytics-data.test.ts` uses real migrated SQLite to prove repository
+context parity (including positive B with malformed provenance), frozen
+historical B after a new reading and refresh after
+explicit B/coefficient/mode changes. Formatter tests cover incomplete totals
+and nonfinite percentage output. Existing History/Stats/heatmap tests retain
+coverage and raw-versus-total labels.
+
+`bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
+B, explicit current reading, positive assistance/lb, validation, one-rep/high-rep
+notes, retry, dismissed reads and invalid restored reading context. Numerical
+forward/inverse vectors remain in the kernel tests. Device evidence belongs to
+the fourth ios-bodyweight flow on all three phone sizes, plus the full frontend
+gate; unit/typecheck success never substitutes for rendered evidence.
+
+## Target-specific group score coverage (M27)
+
+`groups-metric-contract.test.ts`, `groups-performance-score.test.ts` and
+`groups-metric-evaluation.test.ts` cover explicit metric/default/unit families,
+movement/loading compatibility, source distribution and group coefficient
+independence, the 60+20 versus 90+20 ranking reversal, strict performed eligibility,
+assistance, missing/invalid B and historical-estimate provenance. Preserve the
+separate source counting flag, duplicate/missing-pin refusal and explicit invalid
+weight payloads. These pure tests do not replace backend queue/publication,
+certification, legacy-reader or two-user device proofs.
+
+`groups-metric-api.test.ts` checks the v2 RPC request/response boundary:
+metric/unit/revision and requested-scope coherence, malformed known stream
+items, future-kind pagination, rebuilding emptiness and attestation dependency
+coverage. Cache tests retain upgrade eviction of both old and versioned keys.
+`groups-session-metrics.test.ts` separately proves the personal shared-session
+projection, raw units/modes, incomplete volume, strict performed status and
+malformed frozen-snapshot handling. Never substitute that personal coefficient
+for the target group's coefficient in ranking tests.
+
+`groups-comparison-form.test.tsx` covers review/stale-edit behavior.
+`groups-metric-screens.test.tsx` runs the real cache/paging hooks around mocked
+RPCs for unit/scope switching, rebuilding, missing/estimated B, revision history,
+self/former/archive restrictions, stale certification refusal and offline stream
+reopen. Linking tests preserve personal coefficient independence and reject
+incompatible reviewed new-exercise inputs. These tests do not replace three-size
+render comparisons or two-user Maestro proof.

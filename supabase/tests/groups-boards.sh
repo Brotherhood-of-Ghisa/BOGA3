@@ -658,7 +658,7 @@ echo "[${LANE_LABEL}] R10 — a rules_version bump recomputes silently"
 run_psql "update app_public.group_board_entries set value_kg = 1
            where group_exercise_id = '${GX1}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" >/dev/null
 mark
-expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(2, 1000) >= 1;" "t"
+expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(3, 1000) >= 1;" "t"
 drain "R10 rules"
 expect_entry "${GX1}" A weight "105@r1c1" "R10 the recompute corrects entries"
 expect_sql "R10 the recompute writes no event in the group" \

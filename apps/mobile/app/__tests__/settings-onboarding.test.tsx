@@ -8,6 +8,9 @@ jest.mock('expo-linking', () => ({
   openURL: (...args: unknown[]) => mockOpenUrl(...args),
 }));
 
+// Reading entry/navigation is covered by bodyweight-screen.test.tsx.
+jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
+
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
@@ -70,6 +73,7 @@ describe('settings onboarding surface', () => {
     const tree = JSON.stringify(result.toJSON());
     const orderedSectionIds = [
       'settings-section-account',
+      'settings-section-body-weight',
       'settings-section-ai-coaching',
       'settings-section-preferences',
       'settings-section-data-sync',

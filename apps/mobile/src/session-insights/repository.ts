@@ -1,3 +1,5 @@
+import { sessionBodyWeightForCalculation } from '@/src/bodyweight/snapshot';
+import { exerciseLoadContext } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
@@ -51,6 +53,7 @@ export type SessionInsightsStore = {
     definitions: {
       id: string;
       loadInputMode: "total_load" | "per_side_load";
+      bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean;
     }[];
     mappings: {
       exerciseDefinitionId: string;
@@ -83,6 +86,7 @@ const toSessionRow = (
   sessionId: row.id,
   status: row.status === "completed" ? "completed" : "active",
   completedAt: row.completedAt,
+  bodyWeightKg: sessionBodyWeightForCalculation(row),
   deletedAt: row.deletedAt,
 });
 
@@ -94,6 +98,8 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         .select({
           id: exerciseDefinitions.id,
           loadInputMode: exerciseDefinitions.loadInputMode,
+          bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
+        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
         })
         .from(exerciseDefinitions)
         .all(),
@@ -163,9 +169,14 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
         capturedExerciseName: sessionExercises.name,
         currentExerciseName: exerciseDefinitions.name,
+        bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
+        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
+        loadInputMode: exerciseDefinitions.loadInputMode,
+        bodyWeightKg: sessions.bodyWeightKg, bodyWeightSource: sessions.bodyWeightSource, bodyWeightMeasurementId: sessions.bodyWeightMeasurementId, bodyWeightMeasuredAt: sessions.bodyWeightMeasuredAt, sessionMetadataKnown: sessions.localBodyweightMetadataKnown,
         deletedAt: sessionExercises.deletedAt,
       })
       .from(sessionExercises)
+      .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
       .leftJoin(
         exerciseDefinitions,
         eq(sessionExercises.exerciseDefinitionId, exerciseDefinitions.id),
@@ -178,9 +189,10 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       )
       .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
       .all()
-      .map(({ capturedExerciseName, currentExerciseName, ...row }) => ({
+      .map(({ capturedExerciseName, currentExerciseName, bodyweightCoefficient, loadInputMode, bodyWeightKg, bodyWeightSource, bodyWeightMeasurementId, bodyWeightMeasuredAt, localBodyweightMetadataKnown, sessionMetadataKnown, ...row }) => ({
         ...row,
         exerciseName: currentExerciseName ?? capturedExerciseName,
+        loadContext: exerciseLoadContext({ bodyweightCoefficient: bodyweightCoefficient ?? 0, loadInputMode: loadInputMode ?? 'total_load', localBodyweightMetadataKnown: localBodyweightMetadataKnown ?? undefined }, { bodyWeightKg, bodyWeightSource, bodyWeightMeasurementId, bodyWeightMeasuredAt, localBodyweightMetadataKnown: sessionMetadataKnown }),
       }));
   },
 
@@ -193,6 +205,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,

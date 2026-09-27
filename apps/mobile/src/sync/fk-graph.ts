@@ -90,6 +90,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
 
 /** Drizzle table object for each entity type that appears as an FK parent. */
 const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
+  body_weight_measurements: schema.bodyWeightMeasurements,
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
   muscle_groups: schema.muscleGroups,

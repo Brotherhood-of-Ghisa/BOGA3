@@ -96,9 +96,8 @@ describe('bundle-migration runtime loop', () => {
     fixture.close();
   });
 
-  it('ships the M19 load-mode backfill as generation 2', () => {
-    expect(BUNDLE_MIGRATIONS).toHaveLength(1);
-    expect(BUNDLE_MIGRATIONS[0]?.appVersion).toBe(2);
+  it('ships the M19 load-mode and M27 bodyweight migrations in order', () => {
+    expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3]);
   });
 
   describe('shipped migration behaviour', () => {
@@ -142,7 +141,7 @@ describe('bundle-migration runtime loop', () => {
         loadInputMode: 'per_side_load',
         localDirty: true,
       });
-      expect(readMarker(fixture)).toBe(2);
+      expect(readMarker(fixture)).toBe(CURRENT_APP_VERSION);
     });
   });
 

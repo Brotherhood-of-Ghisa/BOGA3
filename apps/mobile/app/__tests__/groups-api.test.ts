@@ -57,6 +57,10 @@ const groupExercise = {
   archived_at_ms: null,
 };
 
+const comparison = { ...groupExercise, legacy: true, bodyweight_coefficient: 0,
+  movement_standard: null, loading_method: null, default_metric: 'e1rm' as const,
+  rules_revision: 1, published_revision: 1, rebuilding: false };
+
 describe('groups api client', () => {
   const mockRpc = jest.fn();
   const mockSchema = jest.fn();
@@ -214,11 +218,11 @@ describe('groups api client', () => {
         expected: groupGetPayload,
       },
       {
-        rpc: 'group_exercise_list',
+        rpc: 'group_exercise_list_v2',
         invoke: () => listGroupExercises('g1'),
         args: { p_group_id: 'g1' },
-        data: { exercises: [groupExercise] },
-        expected: { exercises: [groupExercise] },
+        data: { contract_version: 2, exercises: [comparison] },
+        expected: { contract_version: 2, exercises: [comparison] },
       },
       {
         rpc: 'group_exercise_create',
@@ -252,18 +256,18 @@ describe('groups api client', () => {
         expected: { exercise: groupExercise },
       },
       {
-        rpc: 'group_exercise_archive',
+        rpc: 'group_exercise_archive_v2',
         invoke: () => archiveGroupExercise('g1', 'ge1'),
         args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
-        data: { exercise: { ...groupExercise, archived_at_ms: 1757500000000 } },
-        expected: { exercise: { ...groupExercise, archived_at_ms: 1757500000000 } },
+        data: { contract_version: 2, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
+        expected: { contract_version: 2, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
       },
       {
-        rpc: 'group_exercise_unarchive',
+        rpc: 'group_exercise_unarchive_v2',
         invoke: () => unarchiveGroupExercise('g1', 'ge1'),
         args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
-        data: { exercise: groupExercise },
-        expected: { exercise: groupExercise },
+        data: { contract_version: 2, exercise: comparison },
+        expected: { contract_version: 2, exercise: comparison },
       },
     ];
 
@@ -397,10 +401,10 @@ describe('groups api client', () => {
 
     it('fails loud with INTERNAL when an exercise payload is missing its contract keys', async () => {
       respond({ exercises: null });
-      await expectRejectsWith(listGroupExercises('g1'), 'INTERNAL', 'group_exercise_list returned an unexpected payload.');
+      await expectRejectsWith(listGroupExercises('g1'), 'INTERNAL', 'group_exercise_list_v2 returned an unexpected payload.');
 
       respond({ exercise: {} });
-      await expectRejectsWith(archiveGroupExercise('g1', 'ge1'), 'INTERNAL', 'group_exercise_archive returned an unexpected payload.');
+      await expectRejectsWith(archiveGroupExercise('g1', 'ge1'), 'INTERNAL', 'group_exercise_archive_v2 returned an unexpected payload.');
 
       respond({ group_exercise_id: 'ge1' });
       await expectRejectsWith(

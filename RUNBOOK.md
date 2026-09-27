@@ -807,6 +807,52 @@ deploy and one setting per hosted project:
 Locally, the shared baseline sets the URL for you
 (`supabase/scripts/group-eval-configure.sh`).
 
+## Bodyweight feature rollout (M27)
+
+This is the server-first release procedure, not a record of a hosted deployment.
+Record local gate and native acceptance evidence alongside the deployed commit,
+migration versions, function versions and hosted smoke evidence in the release
+PR before activating the new client.
+
+1. From the reviewed release checkout, apply the complete migration chain,
+   including `20260926181114_m27_bodyweight_sync.sql` and
+   `20260927073000_m27_group_metrics.sql`, to the intended hosted project.
+   Do not reset a populated hosted database. The first migration adds the
+   owner-private reading entity, omission-preserving writers and capability-gated
+   layer 4; the second adds versioned group rules, projections and attestations.
+2. Deploy the matching `agent-api` and `group-eval` functions from the full
+   checkout using the existing hosted procedures above. The evaluator imports
+   the shared TypeScript load resolver/scorer from `apps/mobile/src/**`; deploy
+   that source together with the function. Retain the existing Vault secret and
+   verify the configured evaluator URL targets this project's deployment.
+3. Before releasing the mobile client, verify hosted old-client reads of layers
+   0–3 and an unrelated old-writer edit against populated bodyweight metadata;
+   then use an upgraded test client to restore layer 4 and the complete frozen
+   session tuple. Confirm cross-owner measurement reads are denied. Use only
+   dedicated test accounts and keep credentials out of evidence.
+4. With two hosted test members, verify missing-weight reps, relative/absolute
+   ranking reversal, a rule revision publishing as one board, estimated-weight
+   attestation and its invalidation after an explicit snapshot correction.
+   Inspect both `group_eval_queue` and `group_metric_eval_queue` for successful
+   drainage. A revision still rebuilding must not expose mixed scores.
+5. Verify the deployed coaching API and MCP against the same owned session:
+   raw external amount, effective resistance, saved weight/source and partial
+   coverage must agree with the app. Run the hosted OAuth/discovery/revocation
+   checks in the MCP procedure above against the deployed URLs.
+6. Release/enable the upgraded client only after those checks pass. Reading
+   entry, session correction, legacy-load review and historical backfill remain
+   explicit user operations. No deployment script fills historical weights or
+   interprets old entered loads automatically.
+
+If hosted validation fails, hold the client release and repair the server.
+Keep the additive schema and saved tuples; do not drop bodyweight columns or
+restore an older full-row writer that loses them. If the new evaluator must be
+stopped, preserve its queued work and mark the release blocked: personal sync
+continues, but group projections are not current. Existing published revisions
+and old kg-only history retain their original meaning. Restore the compatible
+worker and verify drainage/publication before resuming activation. This is a
+forward-repair procedure, not a destructive data rollback.
+
 ## Upgrading from v1 sync (one-time wipe)
 
 If you are picking up a v2 sync build against an installation that

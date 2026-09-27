@@ -1,11 +1,13 @@
+import { summarizeEffectiveVolume, type EffectiveSetMetrics, type LoadContext } from '@/src/exercise-calculations/effective-load';
+import { calculateAnalyticsSetMetrics, exerciseLoadContext, sessionVolumeSummary, formatEnteredLoad } from '@/src/exercise-calculations/analytics';
 import type { Session, SessionSet } from '@/components/session-recorder/types';
 import type { ExerciseBlockHistoryBlock } from '@/src/data';
 import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
-import { computeSetVolume, estimateOneRepMax, parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord } from '@/src/session-insights';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
-import { hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
+import { canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 
 /**
  * The read-only session view's presentation model (`ux-rules` §14b): one
@@ -17,6 +19,7 @@ import { hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
 export const EMPTY_FIGURE = '—';
 
 export type SessionViewSetRow = {
+  bodyweight?: boolean;
   id: string;
   // `W-Up`, `RIR 2`; the em dash when no effort is set.
   typeLabel: string;
@@ -43,6 +46,7 @@ export type SessionViewModel = {
   cards: SessionViewExerciseCard[];
   performedSetCount: number;
   volume: string;
+  volumeNote?: string;
 };
 
 // Weights keep what was entered, with one decimal on whole numbers so a column
@@ -62,6 +66,10 @@ export type SetRowInput = {
   setType: unknown;
   done: boolean;
   oneRepMaxRecord?: boolean;
+  loadContext?: LoadContext;
+  localBodyweightMetadataKnown?: boolean;
+  weightUnit?: string | null;
+  externalLoadMode?: string | null;
 };
 
 /**
@@ -69,19 +77,22 @@ export type SetRowInput = {
  * from plain values: the session view, View Session and the group session view
  * all format a row here, so a set reads the same on each.
  */
-export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord = false }: SetRowInput): SessionViewSetRow => {
+export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord = false, loadContext = exerciseLoadContext(), weightUnit, externalLoadMode, localBodyweightMetadataKnown }: SetRowInput): SessionViewSetRow => {
   let oneRepMax = EMPTY_FIGURE;
   let volume = EMPTY_FIGURE;
   if (weight !== null && reps !== null) {
     // A zero-weight set has a volume but no 1RM.
-    const estimate = estimateOneRepMax(weight, reps);
+    const metric = calculateAnalyticsSetMetrics({ ...loadContext, weightValue: String(weight), repsValue: String(reps), weightUnit, externalLoadMode, localBodyweightMetadataKnown });
+    const estimate = metric.estimatedOneRepMaxKg;
     oneRepMax = estimate === null ? EMPTY_FIGURE : formatOneRepMaxFigure(estimate);
-    volume = formatVolumeFigure(computeSetVolume(weight, reps));
+    volume = metric.volumeKgReps === null ? EMPTY_FIGURE : formatVolumeFigure(metric.volumeKgReps);
   }
+  const loadFigure = formatEnteredLoad(weight, loadContext, externalLoadMode, weightUnit, formatWeightFigure);
   return {
     id,
     typeLabel: formatSessionSetType(setType) ?? EMPTY_FIGURE,
-    weightReps: `${weight === null ? EMPTY_FIGURE : formatWeightFigure(weight)} × ${reps === null ? EMPTY_FIGURE : reps}`,
+    ...(loadContext.bodyweightCoefficient > 0 ? { bodyweight: true } : {}),
+    weightReps: `${loadFigure} × ${reps === null ? EMPTY_FIGURE : reps}`,
     oneRepMax,
     volume,
     done,
@@ -89,20 +100,22 @@ export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord 
   };
 };
 
-type ShownValues = { weight: number | null; reps: number | null; setType: string | null };
+type ShownValues = { localBodyweightMetadataKnown?: boolean; weight: number | null; reps: number | null; setType: string | null; weightUnit?: string | null; externalLoadMode?: string | null };
 
 // A done or entered row shows what was lifted; an untouched planned row its
 // prescription; a blank row nothing.
 const shownValues = (set: SessionSet): ShownValues => {
   if (hasValidActualValues(set) || !hasPlannedTarget(set)) {
     return {
-      weight: parseSetWeight(set.weight),
+      weight: parseSetWeight(canonicalizeWeightForReps(set.weight, set.reps)),
+      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
       reps: parseSetReps(set.reps),
       setType: normalizeSessionSetType(set.setType),
     };
   }
   return {
-    weight: parseSetWeight(set.plannedWeight),
+    weight: parseSetWeight(canonicalizeWeightForReps(set.plannedWeight ?? '', set.plannedReps ?? '')),
+    localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.plannedWeightUnit ?? set.weightUnit ?? 'kg', externalLoadMode: set.plannedExternalLoadMode,
     reps: parseSetReps(set.plannedReps),
     setType: normalizeSessionSetType(set.plannedSetType),
   };
@@ -112,17 +125,16 @@ type RowFigures = {
   set: SessionSet;
   done: boolean;
   shown: ShownValues;
-  volume: number | null;
+  metric: EffectiveSetMetrics;
 };
 
-const toRowFigures = (set: SessionSet): RowFigures => {
+const toRowFigures = (set: SessionSet, context: LoadContext): RowFigures => {
   const shown = shownValues(set);
-  const computable = shown.weight !== null && shown.reps !== null;
   return {
     set,
     done: isConfirmedPerformedSet(set),
     shown,
-    volume: computable ? computeSetVolume(shown.weight as number, shown.reps as number) : null,
+    metric: calculateAnalyticsSetMetrics({ ...context, weightValue: set.weight, repsValue: set.reps, localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode, performanceStatus: set.performanceStatus }),
   };
 };
 
@@ -142,10 +154,11 @@ export const buildSessionViewModel = (
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
   let performedSetCount = 0;
-  let volume = 0;
+  const performedMetrics: EffectiveSetMetrics[] = [];
 
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
-    const figures = exercise.sets.map(toRowFigures);
+    const context = exercise.loadContext ?? exerciseLoadContext(undefined, session);
+    const figures = exercise.sets.map(set => toRowFigures(set, context));
     const historicalBest = historicalBestByDefinitionId.get(exercise.exerciseDefinitionId);
     const record =
       historicalBest === undefined
@@ -160,11 +173,12 @@ export const buildSessionViewModel = (
     const rows = figures.map((row): SessionViewSetRow => {
       if (row.done) {
         performedSetCount += 1;
-        volume += row.volume ?? 0;
+        performedMetrics.push(row.metric);
       }
       return formatSetRow({
         id: row.set.id,
         ...row.shown,
+        loadContext: context,
         done: row.done,
         oneRepMaxRecord: row.set.id === recordSetId,
       });
@@ -180,7 +194,7 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, performedSetCount, volume: formatVolumeFigure(volume) };
+  return { cards, performedSetCount, ...sessionVolumeSummary(summarizeEffectiveVolume(performedMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */

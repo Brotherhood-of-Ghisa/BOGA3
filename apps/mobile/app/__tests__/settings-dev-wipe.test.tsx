@@ -13,6 +13,9 @@ const mockWipeLocalAndReBootstrap = jest.fn();
 const mockWipeRemoteForCurrentUser = jest.fn();
 const mockAlert = jest.fn();
 
+// Reading entry/navigation is covered by bodyweight-screen.test.tsx.
+jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
+
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),

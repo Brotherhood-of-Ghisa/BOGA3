@@ -143,8 +143,8 @@ describe('SyncSetupScreen', () => {
     publish({ progress: { phase: 'pull', layersCompleted: 2, rowsApplied: 17, offline: false } });
     const advanced = screen.getByTestId(SYNC_GATE_TEST_IDS.activityDetail).props.children;
 
-    expect(initial).toBe('Layer 1 of 4');
-    expect(advanced).toBe('Layer 3 of 4 · 17 items');
+    expect(initial).toBe('Layer 1 of 5');
+    expect(advanced).toBe('Layer 3 of 5 · 17 items');
     expect(advanced).not.toBe(initial);
   });
 

@@ -54,17 +54,22 @@ jest.mock('expo-router', () => ({
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
-jest.mock('@/src/groups/api', () => ({
+jest.mock('@/src/groups/api', () => {
+  const streamRead = jest.fn();
+  return {
   ...jest.requireActual('@/src/groups/api'),
   getGroup: jest.fn(),
-  getGroupStream: jest.fn(),
+  getGroupStream: streamRead,
+  getGroupMetricStream: streamRead,
   getGroupSessionDetail: jest.fn(),
   getGroupBoard: jest.fn(),
+  listGroupExercises: jest.fn(),
   listMyGroups: jest.fn(),
   certifyGroupSet: jest.fn(),
   withdrawGroupCertification: jest.fn(),
   cancelGroupCertification: jest.fn(),
-}));
+  };
+});
 
 import { uiRoles } from '@/components/ui';
 import { groupCache } from '@/src/data/schema';
@@ -140,6 +145,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: ME } });
   setLastViewedGroupId(null);
   mockMyRole('member');
+  api.listGroupExercises.mockResolvedValue({ exercises: [{ group_exercise_id: 'ge-bench', name: 'Bench Press', load_input_mode: 'per_side_load', source_exercise_id: null, archived_at_ms: null }] });
   api.getGroupStream.mockResolvedValue(page([linkItem(), recordItem(), sessionCardItem()]));
   api.getGroupSessionDetail.mockResolvedValue({ session: sessionCardItem() });
   api.getGroupBoard.mockResolvedValue({

@@ -56,11 +56,18 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    recent_performances: [],
+    metric_revision: 'effective_load_v1',
+    recent_performances: [{
+      session_body_weight: { status: 'known', value: 80, unit: 'kg', source: 'historical_estimate', estimated: true },
+      volume: { value: null, unit: 'kg_reps', known_subtotal: 500, complete: false },
+      sets: [{ entered_load: { raw_value: '20', value: 20, unit: 'lb', mode: 'assistance' },
+        effective_load: { value: 70.9281526, unit: 'kg', status: 'known', basis: 'total_resistance' } }],
+    }],
   },
   '/functions/v1/agent-api/v1/agent/workouts/recent': {
     next_cursor: null,
-    workouts: [{ id: 'workout-a' }],
+    metric_revision: 'effective_load_v1',
+    workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
 };
 
@@ -189,6 +196,11 @@ describe('BoGa MCP server', () => {
     expect(workouts.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/workouts/recent'
     ]);
+
+    const contextText = (context.content as Array<{ type: string; text?: string }>).find(row => row.type === 'text')?.text;
+    expect(JSON.parse(contextText!)).toEqual(context.structuredContent);
+    const workoutText = (workouts.content as Array<{ type: string; text?: string }>).find(row => row.type === 'text')?.text;
+    expect(JSON.parse(workoutText!)).toEqual(workouts.structuredContent);
 
     const called = running.requests.map((url) => `${url.pathname}${url.search}`);
     expect(called).toContain(

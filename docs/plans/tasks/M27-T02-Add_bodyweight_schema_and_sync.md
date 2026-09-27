@@ -1,7 +1,7 @@
 ---
 task_id: M27-T02-Add_bodyweight_schema_and_sync
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "node|expo|supabase|sql"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/sync-v2-server-contr
 
 # M27-T02 — Add bodyweight schema and sync
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T01.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D1–D5, D10.

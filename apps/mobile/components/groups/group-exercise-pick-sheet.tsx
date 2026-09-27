@@ -16,7 +16,8 @@ import {
 import {
   buildPickSheetModel,
   describeLinkRetroactivity,
-  describeLoadModeNote,
+  describeGroupLinkLoadNote,
+  describeGroupLinkIncompatibility,
   filterPickSheetChoices,
   type GroupExercise,
   type LinkRef,
@@ -108,7 +109,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
       : option.kind === 'other'
         ? exercises.find((exercise) => exercise.id === option.exerciseId) ?? null
         : null;
-  const loadModeNote = chosen ? describeLoadModeNote(chosen.loadInputMode, target.groupExercise.load_input_mode) : null;
+  const loadModeNote = chosen ? describeGroupLinkLoadNote(chosen, target.groupExercise) : null;
   const title = `${target.groupExercise.name} · ${target.groupName}`;
 
   const confirm = async () => {
@@ -117,6 +118,11 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
       return;
     }
     if (!chosen) {
+      return;
+    }
+    const incompatible = describeGroupLinkIncompatibility(chosen, target.groupExercise);
+    if (incompatible) {
+      setError(incompatible);
       return;
     }
     setPending(true);
