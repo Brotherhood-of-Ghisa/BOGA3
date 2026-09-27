@@ -101,7 +101,8 @@ appId: com.dinoderek.mobile
 - eraseText
 - inputText: "${output.bodyweightFuture}"
 # The date keyboard has a prediction row and covers Save on the small phone.
-# A neutral content tap dismisses it before scrolling to the action.
+# A neutral content tap dismisses it before locating the action. Do not
+# center Save: on the large phone the resulting short sheet is below screen center.
 - tapOn:
     text: "Local time · YYYY-MM-DD HH:mm"
 - waitForAnimationToEnd:
@@ -110,7 +111,7 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-save"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-save"
@@ -128,7 +129,8 @@ appId: com.dinoderek.mobile
 - eraseText
 - inputText: "${output.bodyweightPast}"
 # The date keyboard has a prediction row and covers Save on the small phone.
-# A neutral content tap dismisses it before scrolling to the action.
+# A neutral content tap dismisses it before locating the action. Do not
+# center Save: on the large phone the resulting short sheet is below screen center.
 - tapOn:
     text: "Local time · YYYY-MM-DD HH:mm"
 - waitForAnimationToEnd:
@@ -137,7 +139,7 @@ appId: com.dinoderek.mobile
     element:
       id: "weight-entry-save"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: "weight-entry-save"

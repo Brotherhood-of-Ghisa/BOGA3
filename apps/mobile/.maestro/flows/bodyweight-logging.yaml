@@ -69,11 +69,11 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
-# The replacement notice puts Total resistance below the small-phone viewport.
-# iOS exposes the clipped row to accessibility before its centre is tappable.
+# Bring the choice into the scroll view without moving it behind the fixed
+# header on a tall phone. iOS exposes clipped rows in the accessibility tree.
 - swipe:
     start: "50%,80%"
-    end: "50%,45%"
+    end: "50%,60%"
     duration: 500
 - waitForAnimationToEnd:
     timeout: 4000
@@ -81,7 +81,7 @@ appId: com.dinoderek.mobile
     element:
       id: "legacy-load-meaning-total"
     direction: DOWN
-    centerElement: true
+    centerElement: false
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 4000
@@ -367,6 +367,16 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-editor-bodyweight-error"
     timeout: 30000
+# The native AX tree can report the error before it clears the fixed footer.
+# Scroll the form itself and capture the settled, readable validation state.
+- swipe:
+    start: "50%,75%"
+    end: "50%,45%"
+    duration: 600
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    text: "Bodyweight contribution must be from 0% to 100%."
 - takeScreenshot: "BWL00-invalid-coefficient"
 - scrollUntilVisible:
     element:
