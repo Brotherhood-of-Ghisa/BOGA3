@@ -49,7 +49,8 @@ const PHASE_LABELS: Record<SyncPhase, string> = {
  * A short human description of the kind of failure, so the block explains what
  * went wrong without leaking internal error tokens.
  */
-const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL', string> = {
+const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL', string> = {
+  UPDATE_REQUIRED: 'Update BoGa to continue syncing. Your data remains on this device.',
   INTERNAL: 'We could not finish setting up your data. Check your connection and try again.',
   FK_VIOLATION: 'Something went wrong while setting up your data. Please try again.',
   LOCAL_FK_VIOLATION: 'Something went wrong while setting up your data. Please try again.',
@@ -103,7 +104,7 @@ export function SyncGate({ children }: PropsWithChildren) {
     <Screen style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>
       <Card style={styles.card}>
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
-          Setting up your data…
+          {mode.kind === 'error' && mode.errorCode === 'UPDATE_REQUIRED' ? 'App update required' : 'Setting up your data…'}
         </Text>
 
         {mode.kind === 'error' ? (
@@ -152,13 +153,13 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
 }
 
 /** The error body: a human message plus a single Retry that fires one cycle. */
-function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL' }) {
+function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL' }) {
   return (
     <View style={styles.body}>
       <Text allowFontScaling={false} accessibilityRole="alert" style={styles.errorMessage} testID={SYNC_GATE_TEST_IDS.errorMessage}>
         {ERROR_MESSAGES[errorCode]}
       </Text>
-      <ActionButton
+      {errorCode !== 'UPDATE_REQUIRED' ? <ActionButton
         accessibilityLabel="Retry"
         label="Retry"
         onPress={() => {
@@ -168,7 +169,7 @@ function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLAT
         }}
         testID={SYNC_GATE_TEST_IDS.retryButton}
         variant="primary"
-      />
+      /> : null}
     </View>
   );
 }

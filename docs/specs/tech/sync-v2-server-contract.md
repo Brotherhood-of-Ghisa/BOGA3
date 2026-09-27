@@ -860,6 +860,7 @@ too). **No `extras` blob, no top-level `deleted` flag** — deletion is
 | --- | --- | --- |
 | `AUTH_REQUIRED` | No/expired JWT, RLS denies the row. | Refresh token; if it fails, keep dirty bits, surface "Sign in again." |
 | `FK_VIOLATION` | Deferrable-FK check failed at COMMIT (A.5). Structural bug. | **Non-retriable.** Log; leave dirty bits; surface non-recoverable error. Fix lands by app update. |
+| `UPDATE_REQUIRED` | Server minimum sync protocol exceeds this build. | Preserve dirty rows/cursors; show “Update BoGa to continue syncing” in setup and Settings. Setup offers no retry. |
 | `INTERNAL` | Anything else (transport, 5xx, malformed payload). | Cycle returns with error; dirty bits stay set; next scheduler tick re-pushes. No backoff. |
 
 **The server validates hierarchy (FKs) only** — no enum/range/length/format/

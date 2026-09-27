@@ -16,7 +16,7 @@
 // user data — just the latest code, or null when the last cycle was clean.
 
 /** The non-auth failure classifications a cycle can report. */
-export type CycleErrorCode = 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
+export type CycleErrorCode = 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
 
 type CycleErrorListener = () => void;
 

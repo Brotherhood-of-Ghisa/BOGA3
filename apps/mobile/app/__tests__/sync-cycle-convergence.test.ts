@@ -572,3 +572,20 @@ describe('structured cycle-result logging', () => {
     await expect(runSyncCycle()).resolves.toBe('converged');
   });
 });
+
+
+describe('required app update', () => {
+  it.each(['transport', 'envelope'])('preserves pending writes and cursors for a %s rejection', async kind => {
+    markBootstrapDone();
+    database.insert(gyms).values({ id: 'update-pending', name: 'Offline gym', localDirty: true, localUpdatedAtMs: 50 }).run();
+    const before = database.select().from(syncRuntimeState).get();
+    mockRpc.mockResolvedValue(kind === 'transport'
+      ? { data: null, error: { message: 'UPDATE_REQUIRED: Update BoGa to continue syncing.' } }
+      : { data: { error: { code: 'UPDATE_REQUIRED', message: 'Update BoGa to continue syncing.' } }, error: null });
+    await expect(runSyncCycle()).resolves.toBe('update-required');
+    expect(getCycleErrorCode()).toBe('UPDATE_REQUIRED');
+    expect(database.select().from(gyms).where(eq(gyms.id, 'update-pending')).get()?.localDirty).toBe(true);
+    expect(database.select().from(syncRuntimeState).get()?.pullCursor).toEqual(before?.pullCursor);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+});

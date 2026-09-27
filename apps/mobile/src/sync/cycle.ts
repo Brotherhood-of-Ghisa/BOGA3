@@ -106,7 +106,7 @@ interface ErrorEnvelope {
 // Error classification
 // -----------------------------------------------------------------------------
 
-export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'INTERNAL';
+export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
@@ -131,7 +131,7 @@ export class SyncCycleError extends Error {
  * classified into one of these values so the gate, scheduler, background task,
  * and status surfaces derive their view from the same result.
  */
-export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'internal';
+export type SyncCycleOutcome = 'converged' | 'auth-required' | 'fk-violation' | 'update-required' | 'internal';
 
 /**
  * Maps a server response into a sync error code, or null when the response is a
@@ -153,6 +153,7 @@ export const classifyRpcResult = (
 ): SyncErrorCode | null => {
   if (rpcError) {
     const message = rpcError.message ?? '';
+    if (message.includes('UPDATE_REQUIRED')) return 'UPDATE_REQUIRED';
     if (message.includes('AUTH_REQUIRED')) {
       return 'AUTH_REQUIRED';
     }
@@ -164,6 +165,7 @@ export const classifyRpcResult = (
 
   const envelope = (data ?? null) as ErrorEnvelope | null;
   const code = envelope?.error?.code;
+  if (code === 'UPDATE_REQUIRED') return 'UPDATE_REQUIRED';
   if (code === 'AUTH_REQUIRED') {
     return 'AUTH_REQUIRED';
   }
@@ -1285,6 +1287,11 @@ const markConverged = (): SyncCycleOutcome => {
  * in-progress with nothing to lift it.
  */
 const classifyThrow = (error: unknown): SyncCycleOutcome => {
+  if (error instanceof SyncCycleError && error.code === 'UPDATE_REQUIRED') {
+    markCycleError('UPDATE_REQUIRED');
+    logCycleOutcome('update-required', 'UPDATE_REQUIRED', error);
+    return 'update-required';
+  }
   if (error instanceof SyncCycleError && error.code === 'AUTH_REQUIRED') {
     // The server reports no signed-in user. This is not an error to surface — it
     // is the route signal that the app needs a session. Raise the observable flag

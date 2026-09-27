@@ -228,6 +228,14 @@ describe('SyncGate', () => {
     expect(screen.queryByTestId(childTestId)).toBeNull();
   });
 
+  it('explains a required update without offering a futile retry', () => {
+    renderGate();
+    publish({ lastCycleErrorCode: 'UPDATE_REQUIRED' });
+    expect(screen.getByText('App update required')).toBeTruthy();
+    expect(screen.getByText('Update BoGa to continue syncing. Your data remains on this device.')).toBeTruthy();
+    expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeNull();
+  });
+
   it('shows the error message and a single Retry on a non-auth cycle error', () => {
     renderGate();
 
