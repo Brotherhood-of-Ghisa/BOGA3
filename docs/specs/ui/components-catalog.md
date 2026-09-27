@@ -258,7 +258,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - source-aware `Back to More` action shared by the tab-owned Exercise
     Catalog and Settings destinations; renders only for `source=more` and
-    replaces to the hub (Groups does not use it); a caps text `ActionButton`
+    replaces to the hub (Groups does not use it); a `chevron-left` `IconButton`
     (`back-to-more-button`) at the top left
 
 4. `ExerciseEditorModal`

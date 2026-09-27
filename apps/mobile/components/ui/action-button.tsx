@@ -101,6 +101,7 @@ const styles = StyleSheet.create({
   // Depth is a ground change, never an elevation.
   pressed: {
     backgroundColor: uiRoles.surfaceSubtle,
+    opacity: 0.7,
   },
   label: {
     fontFamily: uiFonts.display.family,
