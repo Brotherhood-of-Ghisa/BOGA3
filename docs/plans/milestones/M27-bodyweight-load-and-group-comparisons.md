@@ -460,3 +460,17 @@ cards when shipped, marking their task-table entries completed.
   `/tmp/boga-m27-group-score-jest-probe.log` retains the diagnostic green run.
   Small, large and full frontend runs are continuing with the fixture fix;
   database rule publication and certification remain pending implementation.
+
+- **Native restart follow-up:** at `19fc54d`, offline review/logging, backfill
+  and the complete analytics flow passed on the small phone in
+  `M27-group-score-verified-small/20260927-035332-13411/`; BWO03–BWO05 were
+  visually checked, including 20 kg added / B=80 / total 1RM 127.7 / volume 800
+  surviving reload. Entry failed on an XCTest hierarchy HTTP 500 immediately
+  after cold restart, with the expected Today screen visible. An unchanged
+  repeat (`M27-group-score-native-small/20260927-041047-17338/`) passed entry,
+  backfill and analytics but hit the same HTTP 500 in logging's restart check.
+  Logs: `/tmp/boga-m27-group-score-{verified,native}-small.log`. The aggregate
+  was not green in either attempt. Entry/logging now retry only the read-only
+  post-restart readiness assertion (bounded to two retries with animation
+  settling); every saved-data assertion remains required. Fresh device gates
+  are pending. No product runtime code changed in this follow-up.

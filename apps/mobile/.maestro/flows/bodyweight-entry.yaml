@@ -470,10 +470,17 @@ appId: com.dinoderek.mobile
 # reopening that URL can tear down the bridge while its WebSocket opens.
 - stopApp
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- extendedWaitUntil:
-    visible:
-      id: "today-screen"
-    timeout: 30000
+# XCTest can briefly invalidate its accessibility root after a process restart.
+# Retry only this read-only readiness check; persisted-data assertions follow.
+- retry:
+    maxRetries: 2
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 4000
+      - extendedWaitUntil:
+          visible:
+            id: "today-screen"
+          timeout: 30000
 - extendedWaitUntil:
     notVisible:
       text: '(Loading from Metro|Downloading|Bundling).*'
