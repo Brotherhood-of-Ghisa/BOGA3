@@ -565,8 +565,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   to `/body-weight`; no primary accent on the Settings overview.
 - `BodyWeightScreen` composes current reading, Add and history with edit/delete;
   history and saves stay in the owner-private local/sync domain. Covered by
-  `bodyweight-entry.test.ts`, `bodyweight-screen.test.tsx` and the bodyweight
-  flow in `ios-bodyweight`.
+  `bodyweight-entry.test.ts` and `bodyweight-screen.test.tsx`; `ios-sync-e2e`
+  drives the real weight editor on device.
 
 ### Historical weight fill controls
 
@@ -582,7 +582,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   sheet invokes it on non-iOS platforms when visibility changes to false.
 - `bodyweight-backfill.test.ts` covers planner/transaction/sync restoration;
   `bodyweight-backfill-ui.test.tsx` covers selection, stale/retry, busy guards and
-  the native-dismissal handoff. `bodyweight-backfill.yaml` provides device proof.
+  the native-dismissal handoff.
 
 ### Bodyweight load controls
 
@@ -657,8 +657,7 @@ If a task adds/removes/renames reusable UI components or changes their role, upd
   missing-metric heatmap states; no complete total or comparison from a subtotal.
 - Coverage: `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
   `bodyweight-analytics-formatting.test.ts`, `bodyweight-loading-estimate-ui.test.tsx`
-  and existing screen tests. `bodyweight-analytics.yaml` extends ios-bodyweight
-  with records/history/calculator/correction/Stats/share device evidence.
+  and existing screen tests.
 
 The bodyweight logger’s fixed-height amount field uses `Added · kg/lb` or
 `Assist · kg/lb` so the legend stays on one line at 375pt. Its accessibility

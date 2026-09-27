@@ -99,8 +99,6 @@ Its real serializer/pull restoration case keeps source IDs as provenance and
 proves later source deletion and ordinary row LWW cannot refresh a frozen tuple.
 `bodyweight-backfill-ui.test.tsx` covers nonwriting preview/cancel, stale refresh,
 busy/dismiss guards and waiting for native iOS dismissal before Add reading.
-Device behavior belongs to the third flow in `ios-bodyweight`, including small
-and large phone evidence; these unit tests do not replace that gate.
 
 
 ## Offline legacy load review coverage (M27)
@@ -110,8 +108,7 @@ rule/session setup, independent actual/planned review, ordinary draft save and
 wire/pull restoration. Preserve no-write preview/cancel, partial-review refusal,
 concurrent hydration rejection, conventional unknown units and empty counterpart
 coverage. Missing sync bookkeeping must never be treated as proof of local-only
-data. `bodyweight-logging-ui.test.tsx` verifies queued choices and explicit Apply;
-the logging Maestro flow captures the offline review on all three phone sizes.
+data. `bodyweight-logging-ui.test.tsx` verifies queued choices and explicit Apply.
 
 ## Personal bodyweight analytics coverage (M27)
 
@@ -129,9 +126,7 @@ coverage and raw-versus-total labels.
 `bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
 B, explicit current reading, positive assistance/lb, validation, one-rep/high-rep
 notes, retry, dismissed reads and invalid restored reading context. Numerical
-forward/inverse vectors remain in the kernel tests. Device evidence belongs to
-the fourth ios-bodyweight flow on all three phone sizes, plus the full frontend
-gate; unit/typecheck success never substitutes for rendered evidence.
+forward/inverse vectors remain in the kernel tests.
 
 ## Target-specific group score coverage (M27)
 
