@@ -1509,7 +1509,8 @@ join, edit, and invite routes, and every action, are M22-T05.
 - **Tab.** `TopLevelTabs` gains `groups` after Exercises and before the cog.
   `resolveActiveTab` is exported from `app/(tabs)/_layout.tsx` and
   unit-tested. Titles `My groups`, `Group` (replaced by the group name once
-  loaded), and `Session` are registered in `app/_layout.tsx`.
+  loaded), and `Session` are registered in the root stack
+  (`components/navigation/root-stack.tsx`).
 - **UI.** `apps/mobile/components/groups/*` (catalogued in
   `ui/components-catalog.md`).
   - `src/groups/use-group-stream.ts` (`useGroupStream`) pages the stream. The

@@ -13,8 +13,9 @@
 //      no session, or a sync cycle reported "no signed-in user"
 //      (`selectShouldRouteToSignIn`).
 //   2. `sync-setup` — a signed-in user whose first sync cycle has not drained:
-//      only the first-sync block (`/sync-setup`) is reachable
-//      (`selectSyncGateMode`).
+//      only the first-sync block (`/sync-setup`) is reachable. Anything short of a
+//      set bootstrap flag keeps the block, so an unexpected gate state fails
+//      closed rather than opening data routes.
 //   3. `app` — everything else, including an unconfigured local-only build, where
 //      no session or first sync can ever exist.
 
@@ -22,24 +23,37 @@ import { useSyncExternalStore } from 'react';
 
 import { useAuth } from '@/src/auth';
 import { getAuthRequiredSignal, subscribeToAuthRequiredSignal } from '@/src/sync/auth-required-signal';
-import { selectSyncGateMode, type SyncGateDecisionSnapshot } from '@/src/sync/sync-gate-decision';
+import {
+  getSyncGateStateSnapshot,
+  subscribeToSyncGateState,
+  type SyncGateStateSnapshot,
+} from '@/src/sync/sync-gate-state';
 import { selectShouldRouteToSignIn, type AuthGateSnapshot } from '@/src/sync/use-auth-required-redirect';
-import { useSyncGateState } from '@/src/sync/use-sync-gate-state';
 
 export type RootRouteAccess = 'sign-in' | 'sync-setup' | 'app';
+
+/**
+ * Whether the first sync has drained, as the first-sync block sees it: the
+ * harness's pinned in-progress state counts as not drained.
+ */
+export const selectFirstSyncDrained = (gate: SyncGateStateSnapshot): boolean =>
+  !gate.forcedProgress && gate.bootstrapCompletedAt !== null;
 
 export const selectRootRouteAccess = (
   auth: AuthGateSnapshot,
   authRequiredSignal: boolean,
-  gate: SyncGateDecisionSnapshot,
+  firstSyncDrained: boolean,
 ): RootRouteAccess => {
   if (selectShouldRouteToSignIn(auth, authRequiredSignal)) {
     return 'sign-in';
   }
-  const mode = selectSyncGateMode(auth, gate);
-  // `route-to-sign-in` mirrors the auth-required signal, already handled above.
-  return mode.kind === 'in-progress' || mode.kind === 'error' ? 'sync-setup' : 'app';
+  if (!auth.isConfigured || !auth.session || firstSyncDrained) {
+    return 'app';
+  }
+  return 'sync-setup';
 };
+
+const getFirstSyncDrained = (): boolean => selectFirstSyncDrained(getSyncGateStateSnapshot());
 
 export const useRootRouteAccess = (): RootRouteAccess => {
   const { isConfigured, session } = useAuth();
@@ -48,8 +62,9 @@ export const useRootRouteAccess = (): RootRouteAccess => {
     getAuthRequiredSignal,
     getAuthRequiredSignal,
   );
-  // The same composed gate snapshot the first-sync block renders (it honours the
-  // harness's pinned in-progress state), so access and the block always agree.
-  const gate = useSyncGateState();
-  return selectRootRouteAccess({ isConfigured, session }, authRequiredSignal, gate);
+  // A boolean, not the snapshot: the bridge republishes the snapshot every poll
+  // tick while the flag is null, and the root stack should re-render only when
+  // access changes.
+  const firstSyncDrained = useSyncExternalStore(subscribeToSyncGateState, getFirstSyncDrained, getFirstSyncDrained);
+  return selectRootRouteAccess({ isConfigured, session }, authRequiredSignal, firstSyncDrained);
 };

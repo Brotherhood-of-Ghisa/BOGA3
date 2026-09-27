@@ -41,6 +41,8 @@ let pollHandle: ReturnType<typeof setInterval> | null = null;
 let authRequiredUnsubscribe: (() => void) | null = null;
 let cycleErrorUnsubscribe: (() => void) | null = null;
 let database: LocalDatabase | null = null;
+// Set once the persisted flag has been read, or the data layer failed to come up.
+let bootstrapFlagKnown = false;
 
 /**
  * Reads the persisted `bootstrap_completed_at` value from the runtime-state
@@ -102,6 +104,7 @@ const refresh = (): void => {
     // owns only the bootstrap flag + error code, never the pin (the harness sets
     // and clears it). Dropping it here would let the 1s poll erase the pin.
     forcedProgress: current.forcedProgress,
+    bootstrapFlagKnown,
   });
 
   if (bootstrapCompletedAt !== null) {
@@ -138,12 +141,16 @@ export const startSyncGateStateBridge = (): void => {
   void bootstrapLocalDataLayer()
     .then((db) => {
       database = db;
+      bootstrapFlagKnown = true;
       refresh();
     })
     .catch(() => {
       // The data layer failed to come up. Leave `database` null so reads stay
       // conservative (the gate keeps the block up); the data-layer bootstrap
-      // surfaces its own failure elsewhere.
+      // surfaces its own failure elsewhere. The flag counts as known (not
+      // synced) so boot does not wait on a read that will never happen.
+      bootstrapFlagKnown = true;
+      refresh();
     });
 };
 
@@ -162,6 +169,7 @@ export const stopSyncGateStateBridge = (): void => {
   }
 
   database = null;
+  bootstrapFlagKnown = false;
 };
 
 /** Test-only reset so suites start from a known clean bridge. */

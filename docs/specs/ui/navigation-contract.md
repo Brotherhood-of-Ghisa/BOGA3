@@ -15,18 +15,18 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 ## Router baseline (current)
 
 - Router system: `expo-router` (file-based routes in `apps/mobile/app/`)
-- Root stack/layout: `apps/mobile/app/_layout.tsx`
+- Root layout: `apps/mobile/app/_layout.tsx`; root stack and its screen declarations: `apps/mobile/components/navigation/root-stack.tsx`
 - Root route access is enforced by the navigator itself. The root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under exactly one `Stack.Protected` group per access level, and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one level at a time:
   - `sign-in` — auth is configured and there is no session, or a sync cycle reported "no signed-in user": only `/sign-in` exists, so a configured-but-signed-out launch never reaches a data screen;
   - `sync-setup` — a signed-in user whose first sync has not drained (`sync_runtime_state.bootstrap_completed_at` is null): only the first-sync block `/sync-setup` exists (a phase label plus an advancing activity/progress indicator; an offline message instead of an indefinite spinner when the device is offline; on a non-`AUTH_REQUIRED` cycle error, the message and a single Retry that fires exactly one cycle);
   - `app` — everything else, including an unconfigured build (no working credential path), where no session or first sync can ever exist; `/sign-in` stays reachable there to show the disabled credential path when opened directly.
 - When the level changes, the routes of the old level leave the stack and the router lands on the first route still declared: `/sign-in`, `/sync-setup`, or `index` (which redirects to `/today`). A deep link to a route of another level lands the same way.
-- The navigator is never unmounted or swapped out to gate access: on expo-router 57, unmounting it reverts the route, so a gate that renders a `<Redirect>` or a block in its place loops ("Maximum update depth exceeded"). The only thing rendered instead of the navigator is the restore guard's neutral loading view (`apps/mobile/components/navigation/auth-route-guard.tsx`), before the navigator first mounts, while the session restore is in flight.
+- The navigator is never unmounted or swapped out to gate access: on expo-router 57, unmounting it reverts the route, so a gate that renders a `<Redirect>` or a block in its place loops ("Maximum update depth exceeded"). The only thing rendered instead of the navigator is the restore guard's neutral loading view (`apps/mobile/components/navigation/auth-route-guard.tsx`), and only before the navigator first mounts: until the session restore resolves and, for a signed-in user, the persisted first-sync flag has been read, so a cold launch (and its deep link) lands on the right level the first time.
 - Every root route file must be declared in the root stack: Expo Router appends an undeclared one outside every `Stack.Protected` group (`app/__tests__/root-stack-routes.test.ts` fails on one).
 - `/maestro-harness` (dev/test self-gated) is declared last and exists at every level except `sign-in`: it is what lifts the first-sync block in tests, and it must never be where the router lands.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/stats-history` resolves to `app/(tabs)/stats-history.tsx`).
 - Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior (except `completed-session/[sessionId]`, which draws its own top bar).
-- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `MAESTRO_HARNESS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
+- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `GYMS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
 - The production shell is the typed four-tab model in
   `apps/mobile/src/navigation/main-tabs.ts`: `Today / Train / Progress / More`.
   `MainTabs`, inside the existing collapsible `BottomTray`, renders exactly
@@ -124,11 +124,20 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - dedicated sign-in entry point the route-layer auth guard redirects to when auth is configured and there is no session (login-on-start enforcement)
+  - dedicated sign-in entry point: the only route while auth is configured and the user must sign in (login-on-start enforcement; `sign-in` access, see "Router baseline")
   - reuses the signed-out email/password credential pattern from `/profile` (no new interaction pattern) with inline auth error feedback
-  - on a successful sign-in the shared auth snapshot flips to a live session and the guard lets the app proceed; the screen itself does not navigate on success
-  - already-signed-in render of this route redirects to `/`
+  - on a successful sign-in the shared auth snapshot flips to a live session; the root stack removes this route and the router lands on `/sync-setup` or `/`. The screen itself never navigates
   - auth-unconfigured render shows the disabled-reason message instead of a form that cannot succeed
+  - `headerShown: false`
+
+2b. `/sync-setup`
+- File: `apps/mobile/app/sync-setup.tsx` (`SyncSetupScreen`, `apps/mobile/src/sync/SyncGate.tsx`)
+- Params:
+  - none
+- Behavior:
+  - the first-sync block: the only route (besides the dev/test harness) while a signed-in user's first sync has not drained (`sync-setup` access, see "Router baseline")
+  - phase label and advancing activity line; offline message once NetInfo reports offline; on a non-`AUTH_REQUIRED` cycle error, the message and a single Retry
+  - never navigates itself: the root stack removes it once the first sync drains, and the router lands on `/`
   - `headerShown: false`
 
 3. `/stats-history`
@@ -508,17 +517,17 @@ Note:
   titles in `apps/mobile/app/(tabs)/_layout.tsx` are declared for completeness.
   The visible shell is `BottomTray` composing `MainTabs`. `exercise-history` keeps its native stack header and
   renders `MainTabs` with Progress selected.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/app/_layout.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver. The same `screenOptions` give every native header one design-language style (DLM-T02): a `surface` background, an Archivo 700 `ink` title at `xl`, and an `ink` back arrow (`headerTintColor`).
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/components/navigation/root-stack.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron reads "Back" to VoiceOver. The same `screenOptions` give every native header one design-language style (DLM-T02): a `surface` background, an Archivo 700 `ink` title at `xl`, and an `ink` back arrow (`headerTintColor`).
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`); all presentations hide the native header and draw their own top bar (`back · View Session · ⋮ · Edit` or `Session complete · Done`), so the title is only the back label of what the detail pushes
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
-- M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/app/_layout.tsx`; the group screen replaces `Group` with the group's name once loaded
+- M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/components/navigation/root-stack.tsx`; the group screen replaces `Group` with the group's name once loaded
 - `session/[sessionId]/index` has no native header (`headerShown: false`); its
   own top bar reads `Session`, or `Edit session` for a completed session. The exercise page likewise draws its own. Their
   stack titles (`Session`, `Exercise`) are only the back label VoiceOver reads
   on the screens they push (`Gyms`, `Link exercise`)
-- `gyms` declares `Gyms` in `apps/mobile/app/_layout.tsx`
-- `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/app/_layout.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
-- M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/app/_layout.tsx`
+- `gyms` declares `Gyms` in `apps/mobile/components/navigation/root-stack.tsx`
+- `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/components/navigation/root-stack.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
+- M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/components/navigation/root-stack.tsx`
 
 ## Documentation boundary
 

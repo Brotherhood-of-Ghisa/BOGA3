@@ -266,9 +266,10 @@ maestro_preauthorize_location() {
 
 # Seed expo-dev-menu's preferences in the dev client's data container so its
 # launch-time UI never covers the RN root. Since SDK 57 the dev menu opens its
-# onboarding sheet ("Continue") on every fresh install and draws a floating
-# "Dev tools" button; a `full` provision reset reinstalls the app, so both would
-# come back every cold run. The keys are expo-dev-menu's own
+# onboarding sheet ("Continue") on every fresh install; a `full` provision reset
+# reinstalls the app, so it would come back every cold run. (Its floating "Dev
+# tools" button is off in the binary's Info.plist, `app.config.ts`, so it also
+# stays off after a flow's `clearState`.) The keys are expo-dev-menu's own
 # (ios/Modules/DevMenuPreferences.swift), written into the app's preferences
 # plist, where UserDefaults.standard reads them ahead of the registered defaults.
 # The write goes through the simulator's own `defaults` so its cfprefsd records
@@ -286,9 +287,8 @@ maestro_seed_dev_menu_preferences() {
   plist="$container/Library/Preferences/$bundle_id.plist"
   xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuIsOnboardingFinished -bool true \
     && xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuShowsAtLaunch -bool false \
-    && xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuShowFloatingActionButton -bool false \
     || maestro_fail "Unable to seed dev-menu preferences in $plist."
-  echo "[maestro] seeded dev-menu preferences (onboarding finished, no launch menu, no floating button) for $bundle_id"
+  echo "[maestro] seeded dev-menu preferences (onboarding finished, no launch menu) for $bundle_id"
 }
 
 maestro_wait_for_http() {

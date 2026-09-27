@@ -153,7 +153,7 @@ it on every PR). The table below is the human summary; keep both in sync.
 | --- | --- |
 | Any `apps/mobile` TS/JS logic | `./boga test fast` |
 | `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `./boga test fast` **+** `./boga test frontend-ui` (**+** the area e2e lane below, if any) |
-| …the root layout (`app/_layout.tsx`) or the Maestro harness (`app/maestro-harness.tsx`) | `./boga test fast` **+** `./boga test frontend` (every lane boots / resets through them) |
+| …the root layout (`app/_layout.tsx`), the root stack and route access (`components/navigation/root-stack.tsx`, `components/navigation/auth-route-guard.tsx`, `src/navigation/root-route-access.ts`), or the Maestro harness (`app/maestro-harness.tsx`) | `./boga test fast` **+** `./boga test frontend` (every lane boots / resets through them) |
 | …sign-in, profile, or connected-agents screens | the UI row **+** `./boga test ios-auth-profile` |
 | …the sync-status surface (`components/sync-status/**`) | the UI row **+** `./boga test ios-sync-e2e` |
 | …only group screens (`app/group/**`, `app/group-session/**`, `app/(tabs)/groups.tsx`, `app/exercise-link.tsx`, `components/groups/**`) | `./boga test fast` **+** `./boga test ios-smoke` **+** `./boga test ios-groups-e2e` |

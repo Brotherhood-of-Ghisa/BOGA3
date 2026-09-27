@@ -26,7 +26,10 @@
 apps/mobile/app/**	fast,frontend-ui	UI screens / routes
 apps/mobile/components/**	fast,frontend-ui	UI components
 apps/mobile/app/__tests__/**	-frontend-ui	jest suites (fast gate; no simulator)
-apps/mobile/app/_layout.tsx	frontend	root layout: boot, auth route guard, sync gate (every lane boots through it)
+apps/mobile/app/_layout.tsx	frontend	root layout: boot effects (every lane boots through it)
+apps/mobile/components/navigation/root-stack.tsx	frontend	root stack: route access groups (every lane boots through it)
+apps/mobile/components/navigation/auth-route-guard.tsx	frontend	boot restore guard (every lane boots through it)
+apps/mobile/src/navigation/root-route-access.ts	frontend	root route access (every lane boots through it)
 apps/mobile/app/maestro-harness.tsx	frontend	Maestro harness deep link (every lane drives it)
 apps/mobile/app/sign-in.tsx	ios-auth-profile	sign-in screen (auth-profile e2e)
 apps/mobile/app/profile.tsx	ios-auth-profile	profile screen (auth-profile e2e)

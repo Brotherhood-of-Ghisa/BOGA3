@@ -10,7 +10,7 @@
  * exceeded". Every transition here fails on that error.
  */
 
-type MockAuth = { isConfigured: boolean; session: unknown; status: 'ready' };
+type MockAuth = { isConfigured: boolean; session: unknown; status: 'idle' | 'restoring' | 'ready' };
 let mockAuth: MockAuth;
 const mockAuthListeners = new Set<() => void>();
 const mockSetAuth = (next: Partial<MockAuth>) => {
@@ -45,6 +45,7 @@ import { router as navigate, Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
 
+import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { RootStack } from '@/components/navigation/root-stack';
 import {
   __resetAuthRequiredSignalForTests,
@@ -59,10 +60,19 @@ import SignInRoute from '../sign-in';
 const SESSION = { user: { id: 'user-a' } };
 
 
+// The guard wraps the stack as in `app/_layout.tsx`.
+function RootLayout() {
+  return (
+    <AuthRouteGuard>
+      <RootStack />
+    </AuthRouteGuard>
+  );
+}
+
 const render = (initialUrl: string) =>
   renderRouter(
     {
-      _layout: RootStack,
+      _layout: RootLayout,
       'sign-in': SignInRoute,
       'sync-setup': () => <Text testID="sync-setup-stub">Setting up</Text>,
       index: IndexRoute,
@@ -80,6 +90,7 @@ const setBootstrapped = (done: boolean) =>
       bootstrapCompletedAt: done ? new Date(1_700_000_000_000) : null,
       lastCycleErrorCode: null,
       forcedProgress: null,
+      bootstrapFlagKnown: true,
     });
   });
 
@@ -108,6 +119,21 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
   expect(consoleErrors.filter((message) => message.includes('Maximum update depth'))).toEqual([]);
+});
+
+it('keeps a cold-launch deep link through the session restore and the first flag read', async () => {
+  mockAuth = { ...mockAuth, status: 'idle' };
+  const router = render('/profile');
+  expect(await screen.findByTestId('auth-guard-loading')).toBeTruthy();
+
+  await act(async () => mockSetAuth({ status: 'restoring' }));
+  await act(async () => mockSetAuth({ status: 'ready', session: SESSION }));
+  // The restored session is signed in, but the persisted flag is not read yet.
+  expect(screen.getByTestId('auth-guard-loading')).toBeTruthy();
+
+  await setBootstrapped(true);
+  expect(screen.getByTestId('profile-stub')).toBeTruthy();
+  expect(router.getPathname()).toBe('/profile');
 });
 
 it('lands a signed-out launch on sign-in', async () => {
@@ -191,6 +217,7 @@ it('holds on sign-in, without looping, while a live session still has auth-requi
 
 it('keeps the dev/test harness reachable over the first-sync block, and not while signed out', async () => {
   mockAuth = { ...mockAuth, session: SESSION };
+  await setBootstrapped(false);
   const signedInRouter = render('/maestro-harness');
   expect(await screen.findByTestId('harness-stub')).toBeTruthy();
   expect(signedInRouter.getPathname()).toBe('/maestro-harness');
