@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useEffectEvent,
   useMemo,
   useState,
   type ReactNode,
@@ -80,6 +79,106 @@ export function useTrayVisibility(): TrayVisibilityContextValue {
   return value;
 }
 
+/**
+ * The tray's gesture and animation state, created once per tray. Measured
+ * content height and the latest snap state live here, not in React state, so
+ * a layout pass or a drag never re-renders the tray; the PanResponder and the
+ * handlers read them when they run.
+ */
+const createTrayModel = ({
+  initialState,
+  expand,
+  collapse,
+}: {
+  initialState: TraySnapState;
+  expand: () => void;
+  collapse: () => void;
+}) => {
+  // Natural (uncollapsed) inner-content height, measured via the inner
+  // wrapper's onLayout.
+  let contentHeight = 0;
+  let state = initialState;
+  const containerHeight = new Animated.Value(0);
+
+  const resolveTargetHeight = (target: TraySnapState) =>
+    target === 'collapsed' ? PEEK_HEIGHT : contentHeight;
+
+  const animateTo = (target: TraySnapState) => {
+    Animated.timing(containerHeight, {
+      toValue: resolveTargetHeight(target),
+      duration: COLLAPSE_DURATION_MS,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 2,
+    onPanResponderMove: (_event, gesture) => {
+      const startHeight = resolveTargetHeight(state);
+      // Downward drag (positive dy) shrinks height; upward grows it.
+      // Clamp so we never overshoot past either end.
+      const next = Math.min(contentHeight, Math.max(PEEK_HEIGHT, startHeight - gesture.dy));
+      containerHeight.setValue(next);
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      const travel = Math.max(0, contentHeight - PEEK_HEIGHT);
+      const nextState = resolveTraySnap({
+        startState: state,
+        dy: gesture.dy,
+        vy: gesture.vy,
+        travelDistance: travel,
+      });
+
+      if (nextState === state) {
+        // Snap back to current — animate to make the spring back feel
+        // intentional rather than rely on the parent state effect (which
+        // wouldn't fire because the value didn't change).
+        animateTo(nextState);
+        return;
+      }
+
+      if (nextState === 'collapsed') {
+        collapse();
+      } else {
+        expand();
+      }
+    },
+    onPanResponderTerminate: () => {
+      animateTo(state);
+    },
+  });
+
+  return {
+    containerHeight,
+    panResponder,
+    animateTo,
+    setState: (next: TraySnapState) => {
+      state = next;
+    },
+    onContentLayout: (event: LayoutChangeEvent) => {
+      const height = event.nativeEvent.layout.height;
+      if (height === contentHeight) {
+        return;
+      }
+      contentHeight = height;
+      // Re-pin to the current state's height based on the freshly measured
+      // natural content height. Skip animation on first layout to avoid a
+      // visible bounce.
+      containerHeight.setValue(resolveTargetHeight(state));
+    },
+    // Tapping the handle while collapsed restores the tray; while expanded it
+    // collapses (mirrors the drag affordance for accessibility).
+    onHandleTap: () => {
+      if (state === 'collapsed') {
+        expand();
+      } else {
+        collapse();
+      }
+    },
+  };
+};
+
 type BottomTrayProps = {
   children: ReactNode;
 };
@@ -103,110 +202,15 @@ export function BottomTray({ children }: BottomTrayProps) {
   // below the handle so the handle itself is never padded.
   const insets = useSafeAreaInsets();
 
-  // Natural (uncollapsed) inner-content height, measured via the inner
-  // wrapper's onLayout. The PanResponder is rebuilt when it or `state`
-  // changes, so its closure always sees the latest values.
-  const [contentHeight, setContentHeight] = useState(0);
-
-  // Lazy state, not a ref: the Animated.Value is created once and read during
-  // render (as the container's `height` style).
-  const [containerHeight] = useState(() => new Animated.Value(0));
-
-  const resolveTargetHeight = useCallback(
-    (target: TraySnapState) => (target === 'collapsed' ? PEEK_HEIGHT : contentHeight),
-    [contentHeight]
-  );
-
-  const animateTo = useCallback(
-    (target: TraySnapState) => {
-      Animated.timing(containerHeight, {
-        toValue: resolveTargetHeight(target),
-        duration: COLLAPSE_DURATION_MS,
-        useNativeDriver: false,
-      }).start();
-    },
-    [containerHeight, resolveTargetHeight]
-  );
+  const [tray] = useState(() => createTrayModel({ initialState: state, expand, collapse }));
+  const { containerHeight, panResponder } = tray;
 
   // Animate to the appropriate height whenever `state` changes externally
   // (e.g. screen called `expand()` or initial mount with a non-zero height).
-  // An effect event, so a fresh content measurement does not re-animate —
-  // `onContentLayout` pins that without animation.
-  const animateToState = useEffectEvent(() => animateTo(state));
   useEffect(() => {
-    animateToState();
-  }, [state]);
-
-  const onContentLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      const height = event.nativeEvent.layout.height;
-      if (height === contentHeight) {
-        return;
-      }
-      setContentHeight(height);
-      // Re-pin to the current state's height based on the freshly measured
-      // natural content height. Skip animation on first layout to avoid a
-      // visible bounce.
-      containerHeight.setValue(state === 'collapsed' ? PEEK_HEIGHT : height);
-    },
-    [containerHeight, contentHeight, state]
-  );
-
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_event, gesture) =>
-          Math.abs(gesture.dy) > 2,
-        onPanResponderMove: (_event, gesture) => {
-          const startHeight = resolveTargetHeight(state);
-          // Downward drag (positive dy) shrinks height; upward grows it.
-          // Clamp so we never overshoot past either end.
-          const next = Math.min(
-            contentHeight,
-            Math.max(PEEK_HEIGHT, startHeight - gesture.dy)
-          );
-          containerHeight.setValue(next);
-        },
-        onPanResponderRelease: (_event, gesture) => {
-          const travel = Math.max(0, contentHeight - PEEK_HEIGHT);
-          const nextState = resolveTraySnap({
-            startState: state,
-            dy: gesture.dy,
-            vy: gesture.vy,
-            travelDistance: travel,
-          });
-
-          if (nextState === state) {
-            // Snap back to current — animate to make the spring back feel
-            // intentional rather than rely on the parent state effect (which
-            // wouldn't fire because the value didn't change).
-            animateTo(nextState);
-            return;
-          }
-
-          if (nextState === 'collapsed') {
-            collapse();
-          } else {
-            expand();
-          }
-        },
-        onPanResponderTerminate: () => {
-          animateTo(state);
-        },
-      }),
-    [animateTo, containerHeight, collapse, contentHeight, expand, resolveTargetHeight, state]
-  );
-
-  const handleHandleTap = useCallback(() => {
-    // Tapping the handle while collapsed restores the tray; while expanded it
-    // collapses (mirrors the drag affordance for accessibility).
-    if (state === 'collapsed') {
-      expand();
-    } else {
-      collapse();
-    }
-  }, [expand, collapse, state]);
+    tray.setState(state);
+    tray.animateTo(state);
+  }, [state, tray]);
 
   return (
     <View pointerEvents="box-none" style={{ paddingBottom: insets.bottom }}>
@@ -214,7 +218,7 @@ export function BottomTray({ children }: BottomTrayProps) {
         pointerEvents="box-none"
         style={[styles.root, { height: containerHeight }]}
         testID="bottom-tray-root">
-        <View onLayout={onContentLayout} style={styles.content}>
+        <View onLayout={tray.onContentLayout} style={styles.content}>
           <View {...panResponder.panHandlers} style={styles.handleHitArea}>
             <Pressable
               accessibilityRole="button"
@@ -222,7 +226,7 @@ export function BottomTray({ children }: BottomTrayProps) {
                 state === 'expanded' ? 'Collapse navigation tray' : 'Expand navigation tray'
               }
               accessibilityState={{ expanded: state === 'expanded' }}
-              onPress={handleHandleTap}
+              onPress={tray.onHandleTap}
               style={styles.handlePressable}
               testID="bottom-tray-handle">
               <View style={styles.handleIndicator} />
