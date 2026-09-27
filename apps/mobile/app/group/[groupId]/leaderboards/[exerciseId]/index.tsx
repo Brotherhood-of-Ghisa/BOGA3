@@ -179,11 +179,9 @@ function GroupBoardContent({ userId, groupId, exerciseId, initialMetric, initial
   );
 
   // Keep the exercise's name in the header while a toggle reloads the rows.
-  useEffect(() => {
-    if (board.firstPage) {
-      setExercise(board.firstPage.exercise);
-    }
-  }, [board.firstPage]);
+  if (board.firstPage && board.firstPage.exercise !== exercise) {
+    setExercise(board.firstPage.exercise);
+  }
 
   const rows = useMemo(
     () => board.items.map((row) => buildBoardRow(row, metric, scope, userId)),

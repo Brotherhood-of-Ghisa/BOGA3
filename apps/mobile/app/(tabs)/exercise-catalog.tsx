@@ -171,11 +171,8 @@ export default function ExerciseCatalogScreen() {
     setIsEditorModalVisible(true);
   };
 
-  useEffect(() => {
-    if (didHandleInitialIntent || isLoading || loadError) {
-      return;
-    }
-
+  // The route's intent is handled once, in the first render after the catalog loads.
+  if (!didHandleInitialIntent && !isLoading && !loadError) {
     if (routeIntent === 'add') {
       setEditorExerciseTarget(null);
       setSaveFeedback(null);
@@ -183,7 +180,7 @@ export default function ExerciseCatalogScreen() {
     }
 
     setDidHandleInitialIntent(true);
-  }, [didHandleInitialIntent, isLoading, loadError, routeIntent]);
+  }
 
   const closeEditorModal = () => {
     setIsEditorModalVisible(false);

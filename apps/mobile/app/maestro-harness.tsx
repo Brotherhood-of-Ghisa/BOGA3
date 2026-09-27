@@ -25,6 +25,11 @@ type HarnessStatus =
   | { kind: 'success'; message: string }
   | { kind: 'error'; message: string };
 
+const HARNESS_NOT_ALLOWED: HarnessStatus = {
+  kind: 'error',
+  message: 'Maestro harness is only available in development/test runtime contexts.',
+};
+
 export default function MaestroHarnessScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -74,6 +79,9 @@ export default function MaestroHarnessScreen() {
   const maestroHistoryParam = coerceMaestroHarnessQueryParam(params.maestroHistory);
   const presentationParam = coerceMaestroHarnessQueryParam(params.presentation);
 
+  const harnessAllowed = isMaestroHarnessAllowed();
+  const shownStatus = harnessAllowed ? status : HARNESS_NOT_ALLOWED;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -100,14 +108,9 @@ export default function MaestroHarnessScreen() {
     }
     lastRunKeyRef.current = runKey;
 
-    if (!isMaestroHarnessAllowed()) {
-      setStatus({
-        kind: 'error',
-        message: 'Maestro harness is only available in development/test runtime contexts.',
-      });
-      return () => {
-        cancelled = true;
-      };
+    // Outside development/test the screen shows `HARNESS_NOT_ALLOWED` and runs nothing.
+    if (!harnessAllowed) {
+      return;
     }
 
     const resetMode = resolveMaestroHarnessResetMode(resetParam);
@@ -173,14 +176,14 @@ export default function MaestroHarnessScreen() {
     return () => {
       cancelled = true;
     };
-  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, maestroHistoryParam, presentationParam, router]);
+  }, [resetParam, fixtureParam, bootstrapParam, gateParam, teleportParam, intentParam, sessionIdParam, sessionExerciseIdParam, maestroShareParam, maestroCatalogParam, maestroHistoryParam, presentationParam, router, harnessAllowed]);
 
   // Dev/test-only (plan G8). Flows wait on the status copy, so it never changes.
   return (
     <Screen style={styles.screen} testID="maestro-harness-screen">
-      {status.kind === 'running' ? <ActivityIndicator color={uiRoles.inkMuted} size="small" /> : null}
-      <Text allowFontScaling={false} selectable style={[styles.message, status.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
-        {status.message}
+      {shownStatus.kind === 'running' ? <ActivityIndicator color={uiRoles.inkMuted} size="small" /> : null}
+      <Text allowFontScaling={false} selectable style={[styles.message, shownStatus.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
+        {shownStatus.message}
       </Text>
     </Screen>
   );

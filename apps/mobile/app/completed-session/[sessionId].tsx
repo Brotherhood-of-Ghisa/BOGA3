@@ -267,10 +267,13 @@ export function CompletedSessionDetailScreenShell({
   const [section, setSection] = useState<ViewSessionSection>('summary');
   const [comparisonMode, setComparisonMode] = useState<SessionComparisonMode>('exercise');
   const isDeleted = session?.deletedAt != null;
-  useEffect(() => {
+  // Another session opens on its summary, reset in the render that shows it.
+  const [shownSessionId, setShownSessionId] = useState(sessionId);
+  if (shownSessionId !== sessionId) {
+    setShownSessionId(sessionId);
     setSection('summary');
     setComparisonMode('exercise');
-  }, [sessionId]);
+  }
   const [historicalBests, setHistoricalBests] = useState<ReadonlyMap<string, number | null>>(
     () => new Map()
   );

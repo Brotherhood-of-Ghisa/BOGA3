@@ -71,7 +71,12 @@ export default function ProfileScreen() {
   const pendingEmail = user?.new_email?.trim() || null;
   const profileUsernameValue = profile?.username?.trim() || 'Not set';
 
-  useEffect(() => {
+  // Signing in, out, or to another account (or a confirmed email change)
+  // resets the forms in the render that sees it.
+  const accountKey = JSON.stringify([currentUserId, currentUserEmail]);
+  const [shownAccountKey, setShownAccountKey] = useState<string | null>(null);
+  if (shownAccountKey !== accountKey) {
+    setShownAccountKey(accountKey);
     if (!currentUserId) {
       setProfile(null);
       setProfileError(null);
@@ -80,18 +85,28 @@ export default function ProfileScreen() {
       setNewEmail('');
       setNewPassword('');
       setIsEditingProfile(false);
-      return;
+    } else {
+      setPassword('');
+      setFormError(null);
+      setSignOutError(null);
+      setProfileError(null);
+      setProfileUpdateFeedback(null);
+      setNewEmail(currentUserEmail);
+      setNewPassword('');
+      setIsEditingProfile(false);
     }
+  }
 
-    setPassword('');
-    setFormError(null);
-    setSignOutError(null);
-    setProfileError(null);
-    setProfileUpdateFeedback(null);
-    setNewEmail(currentUserEmail);
-    setNewPassword('');
-    setIsEditingProfile(false);
-  }, [currentUserEmail, currentUserId]);
+  // A signed-in user's profile loads: shown loading in the render that sees
+  // the user, fetched by the effect below.
+  const [profileLoadFor, setProfileLoadFor] = useState<string | null>(null);
+  if (profileLoadFor !== currentUserId) {
+    setProfileLoadFor(currentUserId);
+    if (currentUserId) {
+      setIsLoadingProfile(true);
+      setProfileError(null);
+    }
+  }
 
   useEffect(() => {
     if (!currentUserId) {
@@ -99,9 +114,6 @@ export default function ProfileScreen() {
     }
 
     let isActive = true;
-
-    setIsLoadingProfile(true);
-    setProfileError(null);
 
     void loadUserProfile(currentUserId)
       .then(({ profile: loadedProfile }) => {

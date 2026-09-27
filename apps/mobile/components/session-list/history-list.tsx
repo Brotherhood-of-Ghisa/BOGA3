@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 
 import {
@@ -76,7 +76,7 @@ export function HistoryList({
   const [menuState, setMenuState] = useState<CompletedSessionMenuState | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [hiddenIds, setHiddenIds] = useState<string[]>([]);
-  const deletingRowOpacity = useRef(new Animated.Value(1)).current;
+  const [deletingRowOpacity] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -84,11 +84,14 @@ export function HistoryList({
     }
   }, []);
 
-  useEffect(() => {
+  // Showing deleted sessions brings back the rows hidden after a delete.
+  const [hiddenFor, setHiddenFor] = useState(showDeletedSessions);
+  if (hiddenFor !== showDeletedSessions) {
+    setHiddenFor(showDeletedSessions);
     if (showDeletedSessions) {
       setHiddenIds([]);
     }
-  }, [showDeletedSessions]);
+  }
 
   const visibleSessions = sessions.filter((session) => !hiddenIds.includes(session.id));
 

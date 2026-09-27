@@ -65,11 +65,14 @@ function GroupsTabContent({ userId }: { userId: string }) {
   const [pickedGroupId, setPickedGroupId] = useState<string | null>(requestedGroupId);
   const [segment, setSegment] = useState<GroupsSegment>('stream');
   // A new link (a Today record or membership row) wins over the last pick and opens its Stream.
-  useEffect(() => {
-    if (!requestedGroupId) return;
-    setPickedGroupId(requestedGroupId);
-    setSegment('stream');
-  }, [requestedGroupId]);
+  const [followedRequest, setFollowedRequest] = useState(requestedGroupId);
+  if (followedRequest !== requestedGroupId) {
+    setFollowedRequest(requestedGroupId);
+    if (requestedGroupId) {
+      setPickedGroupId(requestedGroupId);
+      setSegment('stream');
+    }
+  }
   const selectedGroupId = groups ? resolveSelectedGroupId(groups, pickedGroupId, getLastViewedGroupId()) : null;
   useEffect(() => {
     if (selectedGroupId) setLastViewedGroupId(selectedGroupId);

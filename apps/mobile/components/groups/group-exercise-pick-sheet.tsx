@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -91,13 +91,15 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
   const [error, setError] = useState<string | null>(null);
 
   // Reset whenever a new target opens: the suggestion is preselected, else "Add as new".
-  useEffect(() => {
+  // Only a new target resets the choice, not a links reload.
+  const [shownTarget, setShownTarget] = useState<typeof target | undefined>(undefined);
+  if (shownTarget !== target) {
+    setShownTarget(target);
     setOption(model?.defaultOption === 'suggested' ? { kind: 'suggested' } : { kind: 'add-new' });
     setSearch('');
     setPending(false);
     setError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new target resets the choice, not a links reload
-  }, [target]);
+  }
 
   if (!target) {
     return null;

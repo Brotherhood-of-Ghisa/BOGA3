@@ -119,7 +119,7 @@ export function TodayScreen({
   const [planLaunchError, setPlanLaunchError] = useState<string | null>(null);
   const [isStartingPlan, setIsStartingPlan] = useState(false);
   const planLaunchInFlightRef = useRef(false);
-  const { sessions, isLoadingSessions, loadErrorMessage, reloadSessions } = useSessionListData({
+  const { sessions, isLoadingSessions, loadErrorMessage, loadedAtMs, reloadSessions } = useSessionListData({
     dataClient,
     initialSessions,
     showDeletedSessions: false,
@@ -184,6 +184,7 @@ export function TodayScreen({
                 <Text allowFontScaling={false} style={styles.cardTitle}>Active session</Text>
               </View>
               <SessionSummaryLine
+                nowMs={loadedAtMs}
                 session={activeSession}
                 testIdPrefix={`today-active-session-${activeSession.id}`}
               />

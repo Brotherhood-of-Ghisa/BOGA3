@@ -3,8 +3,8 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useEffectEvent,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -104,44 +104,52 @@ export function BottomTray({ children }: BottomTrayProps) {
   const insets = useSafeAreaInsets();
 
   // Natural (uncollapsed) inner-content height, measured via the inner
-  // wrapper's onLayout. Kept in a ref so the PanResponder closure always
-  // sees the latest value without re-creating itself.
-  const contentHeightRef = useRef(0);
-  const stateRef = useRef<TraySnapState>(state);
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+  // wrapper's onLayout. The PanResponder is rebuilt when it or `state`
+  // changes, so its closure always sees the latest values.
+  const [contentHeight, setContentHeight] = useState(0);
 
-  const containerHeight = useRef(new Animated.Value(0)).current;
+  // Lazy state, not a ref: the Animated.Value is created once and read during
+  // render (as the container's `height` style).
+  const [containerHeight] = useState(() => new Animated.Value(0));
 
-  const resolveTargetHeight = useCallback((target: TraySnapState) => {
-    if (target === 'collapsed') return PEEK_HEIGHT;
-    return contentHeightRef.current;
-  }, []);
+  const resolveTargetHeight = useCallback(
+    (target: TraySnapState) => (target === 'collapsed' ? PEEK_HEIGHT : contentHeight),
+    [contentHeight]
+  );
+
+  const animateTo = useCallback(
+    (target: TraySnapState) => {
+      Animated.timing(containerHeight, {
+        toValue: resolveTargetHeight(target),
+        duration: COLLAPSE_DURATION_MS,
+        useNativeDriver: false,
+      }).start();
+    },
+    [containerHeight, resolveTargetHeight]
+  );
 
   // Animate to the appropriate height whenever `state` changes externally
   // (e.g. screen called `expand()` or initial mount with a non-zero height).
+  // An effect event, so a fresh content measurement does not re-animate —
+  // `onContentLayout` pins that without animation.
+  const animateToState = useEffectEvent(() => animateTo(state));
   useEffect(() => {
-    Animated.timing(containerHeight, {
-      toValue: resolveTargetHeight(state),
-      duration: COLLAPSE_DURATION_MS,
-      useNativeDriver: false,
-    }).start();
-  }, [state, containerHeight, resolveTargetHeight]);
+    animateToState();
+  }, [state]);
 
   const onContentLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const height = event.nativeEvent.layout.height;
-      if (height === contentHeightRef.current) {
+      if (height === contentHeight) {
         return;
       }
-      contentHeightRef.current = height;
+      setContentHeight(height);
       // Re-pin to the current state's height based on the freshly measured
       // natural content height. Skip animation on first layout to avoid a
       // visible bounce.
-      containerHeight.setValue(resolveTargetHeight(stateRef.current));
+      containerHeight.setValue(state === 'collapsed' ? PEEK_HEIGHT : height);
     },
-    [containerHeight, resolveTargetHeight]
+    [containerHeight, contentHeight, state]
   );
 
   const panResponder = useMemo(
@@ -151,33 +159,29 @@ export function BottomTray({ children }: BottomTrayProps) {
         onMoveShouldSetPanResponder: (_event, gesture) =>
           Math.abs(gesture.dy) > 2,
         onPanResponderMove: (_event, gesture) => {
-          const startHeight = resolveTargetHeight(stateRef.current);
+          const startHeight = resolveTargetHeight(state);
           // Downward drag (positive dy) shrinks height; upward grows it.
           // Clamp so we never overshoot past either end.
           const next = Math.min(
-            contentHeightRef.current,
+            contentHeight,
             Math.max(PEEK_HEIGHT, startHeight - gesture.dy)
           );
           containerHeight.setValue(next);
         },
         onPanResponderRelease: (_event, gesture) => {
-          const travel = Math.max(0, contentHeightRef.current - PEEK_HEIGHT);
+          const travel = Math.max(0, contentHeight - PEEK_HEIGHT);
           const nextState = resolveTraySnap({
-            startState: stateRef.current,
+            startState: state,
             dy: gesture.dy,
             vy: gesture.vy,
             travelDistance: travel,
           });
 
-          if (nextState === stateRef.current) {
+          if (nextState === state) {
             // Snap back to current — animate to make the spring back feel
             // intentional rather than rely on the parent state effect (which
             // wouldn't fire because the value didn't change).
-            Animated.timing(containerHeight, {
-              toValue: resolveTargetHeight(nextState),
-              duration: COLLAPSE_DURATION_MS,
-              useNativeDriver: false,
-            }).start();
+            animateTo(nextState);
             return;
           }
 
@@ -188,25 +192,21 @@ export function BottomTray({ children }: BottomTrayProps) {
           }
         },
         onPanResponderTerminate: () => {
-          Animated.timing(containerHeight, {
-            toValue: resolveTargetHeight(stateRef.current),
-            duration: COLLAPSE_DURATION_MS,
-            useNativeDriver: false,
-          }).start();
+          animateTo(state);
         },
       }),
-    [containerHeight, collapse, expand, resolveTargetHeight]
+    [animateTo, containerHeight, collapse, contentHeight, expand, resolveTargetHeight, state]
   );
 
   const handleHandleTap = useCallback(() => {
     // Tapping the handle while collapsed restores the tray; while expanded it
     // collapses (mirrors the drag affordance for accessibility).
-    if (stateRef.current === 'collapsed') {
+    if (state === 'collapsed') {
       expand();
     } else {
       collapse();
     }
-  }, [expand, collapse]);
+  }, [expand, collapse, state]);
 
   return (
     <View pointerEvents="box-none" style={{ paddingBottom: insets.bottom }}>

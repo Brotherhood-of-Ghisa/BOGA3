@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { LegacyLoadReviewContent } from '@/components/bodyweight/legacy-load-review-sheet';
@@ -106,7 +106,8 @@ const buildEditorMuscleSelectionsFromExercise = (
       return true;
     })
     .map((mapping) => ({
-      rowId: mapping.id || createRowId(),
+      // Built during render, so derived, not random: secondary rows are unique per muscle.
+      rowId: mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`,
       muscleGroupId: mapping.muscleGroupId,
     }));
 
@@ -152,46 +153,57 @@ export function ExerciseEditorModal({
     [muscleGroups]
   );
 
-  useEffect(() => {
+  // Opening, or a different exercise or prefill, fills the form in the render that shows it.
+  const [shownFor, setShownFor] = useState<{
+    visible: boolean;
+    editingExercise: typeof editingExercise;
+    prefill: typeof prefill;
+  } | null>(null);
+  if (
+    !shownFor ||
+    shownFor.visible !== visible ||
+    shownFor.editingExercise !== editingExercise ||
+    shownFor.prefill !== prefill
+  ) {
+    setShownFor({ visible, editingExercise, prefill });
     if (!visible) {
       setReviewExercise(null);
-      return;
-    }
-
-    if (editingExercise) {
-      const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
-      setExerciseName(editingExercise.name);
-      setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
-      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
-      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
-    } else if (prefill) {
-      const nextSelections = buildEditorMuscleSelectionsFromExercise({
-        id: '',
-        name: prefill.name,
-        loadInputMode: prefill.loadInputMode,
-        deletedAt: null,
-        mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
-      });
-      setExerciseName(prefill.name);
-      setLoadInputMode(prefill.loadInputMode);
-      setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
-      setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
     } else {
-      setExerciseName('');
-      setLoadInputMode('total_load');
-      setPrimaryMuscleGroupId(null);
-      setSecondaryMuscleRows([]);
-    }
+      if (editingExercise) {
+        const nextSelections = buildEditorMuscleSelectionsFromExercise(editingExercise);
+        setExerciseName(editingExercise.name);
+        setLoadInputMode(editingExercise.loadInputMode ?? 'total_load');
+        setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+        setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+      } else if (prefill) {
+        const nextSelections = buildEditorMuscleSelectionsFromExercise({
+          id: '',
+          name: prefill.name,
+          loadInputMode: prefill.loadInputMode,
+          deletedAt: null,
+          mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
+        });
+        setExerciseName(prefill.name);
+        setLoadInputMode(prefill.loadInputMode);
+        setPrimaryMuscleGroupId(nextSelections.primaryMuscleGroupId);
+        setSecondaryMuscleRows(nextSelections.secondaryMuscleRows);
+      } else {
+        setExerciseName('');
+        setLoadInputMode('total_load');
+        setPrimaryMuscleGroupId(null);
+        setSecondaryMuscleRows([]);
+      }
 
-    const rules = editingExercise ?? prefill?.loadRules;
-    setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
-      movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
-    setLoadFieldsTouched(false);
-    setLoadRulesError(null);
-    setMuscleSelectorMode(null);
-    setValidation(createBlankValidationState());
-    setSaveError(null);
-  }, [editingExercise, prefill, visible]);
+      const rules = editingExercise ?? prefill?.loadRules;
+      setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
+        movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
+      setLoadFieldsTouched(false);
+      setLoadRulesError(null);
+      setMuscleSelectorMode(null);
+      setValidation(createBlankValidationState());
+      setSaveError(null);
+    }
+  }
 
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
   const availablePrimaryMuscleGroupsForSelector = muscleGroups.filter(

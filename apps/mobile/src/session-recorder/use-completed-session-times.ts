@@ -1,8 +1,8 @@
 import { useFocusEffect, useNavigation } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { createDraftAutosaveController, type DraftAutosaveController } from './draft-autosave';
+import { createDraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
 import { setCompletedSessionTimes } from './session-lifecycle';
 import {
@@ -45,6 +45,59 @@ const EMPTY_TEXT: SessionTimesText = { start: '', end: '' };
 const describeSaveError = (error: unknown) =>
   error instanceof Error ? error.message : 'Changes could not be saved.';
 
+// What the autosave controller writes, kept outside React state so the
+// controller — created once, on first render — always writes the latest.
+type SessionTimesLive = {
+  text: SessionTimesText;
+  // The instants first loaded: a field left showing them keeps them exactly.
+  initial: SessionTimes | null;
+  saveFailed: boolean;
+  mounted: boolean;
+};
+
+const createSessionTimesPersistence = ({
+  sessionId,
+  save,
+  setPaused,
+  setSaveError,
+}: {
+  sessionId: string | null;
+  save: (sessionId: string, times: SessionTimes) => Promise<void>;
+  setPaused: (paused: boolean) => void;
+  setSaveError: (message: string | null) => void;
+}) => {
+  const live: SessionTimesLive = { text: EMPTY_TEXT, initial: null, saveFailed: false, mounted: true };
+  const autosave = createDraftAutosaveController({
+    persistDraft: async () => {
+      const initial = live.initial;
+      if (!sessionId || !initial) return;
+      const times = resolveSessionTimes(live.text, initial);
+      if (!times) {
+        if (live.mounted) setPaused(true);
+        return;
+      }
+      await save(sessionId, times);
+      live.saveFailed = false;
+      if (live.mounted) {
+        setPaused(false);
+        setSaveError(null);
+      }
+    },
+    onError: (error) => {
+      live.saveFailed = true;
+      if (live.mounted) setSaveError(describeSaveError(error));
+    },
+  });
+  return {
+    live: live as Readonly<SessionTimesLive>,
+    setLive: (patch: Partial<SessionTimesLive>) => {
+      Object.assign(live, patch);
+    },
+    autosave,
+    lifecycle: createSessionRecorderLifecycleHelpers(autosave),
+  };
+};
+
 export const useCompletedSessionTimes = ({
   sessionId,
   persisted,
@@ -59,47 +112,21 @@ export const useCompletedSessionTimes = ({
   const [touched, setTouched] = useState({ start: false, end: false });
   const [paused, setPaused] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const textRef = useRef(text);
   // The instants first loaded: a field left showing them keeps them exactly.
-  const persistedRef = useRef<SessionTimes | null>(null);
-  const saveFailedRef = useRef(false);
-  const isMountedRef = useRef(true);
-  const autosaveRef = useRef<DraftAutosaveController | null>(null);
+  const [initial, setInitial] = useState<SessionTimes | null>(null);
   const navigation = useNavigation();
+  const [{ live, setLive, autosave, lifecycle }] = useState(() =>
+    createSessionTimesPersistence({ sessionId, save, setPaused, setSaveError })
+  );
 
   // Filled once: later reloads of the session must not overwrite the fields.
-  useEffect(() => {
-    if (persistedRef.current || !persisted) return;
-    persistedRef.current = persisted;
-    textRef.current = formatSessionTimes(persisted);
-    setText(textRef.current);
-  }, [persisted]);
-
-  if (!autosaveRef.current) {
-    autosaveRef.current = createDraftAutosaveController({
-      persistDraft: async () => {
-        const initial = persistedRef.current;
-        if (!sessionId || !initial) return;
-        const times = resolveSessionTimes(textRef.current, initial);
-        if (!times) {
-          if (isMountedRef.current) setPaused(true);
-          return;
-        }
-        await save(sessionId, times);
-        saveFailedRef.current = false;
-        if (isMountedRef.current) {
-          setPaused(false);
-          setSaveError(null);
-        }
-      },
-      onError: (error) => {
-        saveFailedRef.current = true;
-        if (isMountedRef.current) setSaveError(describeSaveError(error));
-      },
-    });
+  if (!initial && persisted) {
+    setInitial(persisted);
+    setText(formatSessionTimes(persisted));
   }
-  const autosave = autosaveRef.current;
-  const lifecycle = useMemo(() => createSessionRecorderLifecycleHelpers(autosave), [autosave]);
+  useEffect(() => {
+    if (initial) setLive({ initial, text: formatSessionTimes(initial) });
+  }, [initial, setLive]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -119,10 +146,10 @@ export const useCompletedSessionTimes = ({
 
   useEffect(
     () => () => {
-      isMountedRef.current = false;
+      setLive({ mounted: false });
       void autosave.dispose({ flushDirty: true });
     },
-    [autosave]
+    [autosave, setLive]
   );
 
   // Leaving writes pending valid times first, so the screen below reads them.
@@ -140,8 +167,8 @@ export const useCompletedSessionTimes = ({
   }, [autosave, navigation]);
 
   const change = (field: keyof SessionTimesText, value: string) => {
-    const next = { ...textRef.current, [field]: value };
-    textRef.current = next;
+    const next = { ...live.text, [field]: value };
+    setLive({ text: next });
     setText(next);
     autosave.markTextMutation();
   };
@@ -167,14 +194,13 @@ export const useCompletedSessionTimes = ({
     commitStart: () => commit('start'),
     commitEnd: () => commit('end'),
     submit: () => {
-      const initial = persistedRef.current;
-      const times = initial ? resolveSessionTimes(textRef.current, initial) : null;
+      const times = initial ? resolveSessionTimes(live.text, initial) : null;
       if (!times) setTouched({ start: true, end: true });
       return times;
     },
     flush: async () => {
       await autosave.flushNow();
-      return !saveFailedRef.current;
+      return !live.saveFailed;
     },
   };
 };

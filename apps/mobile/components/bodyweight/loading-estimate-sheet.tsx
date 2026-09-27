@@ -35,10 +35,20 @@ export function LoadingEstimateSheet({ visible, exerciseId, context, onDismiss }
   const source = useMemo(() => sources.find(row => row.id === sourceId) ?? null, [sources, sourceId]);
   const bodyweight = context.bodyweightCoefficient > 0;
   useEffect(() => { scroll.current?.scrollTo({ y: 0, animated: false }); }, [visible, choosingSource]);
+  // Opening, a new target, or Try again starts a fresh load, reset in the render that asks for it.
+  const loadKey = visible && exerciseId
+    ? JSON.stringify([exerciseId, context.bodyweightCoefficient, context.loadInputMode, context.bodyWeightKg, retry])
+    : null;
+  const [shownLoadKey, setShownLoadKey] = useState<string | null>(null);
+  if (loadKey !== shownLoadKey) {
+    setShownLoadKey(loadKey);
+    if (loadKey !== null) {
+      setLoading(true); setLoadError(null); setInputError(null); setResult(null); setChoosingSource(false); setUnit('kg');
+    }
+  }
   useEffect(() => {
     if (!visible || !exerciseId) return;
     let cancelled = false;
-    setLoading(true); setLoadError(null); setInputError(null); setResult(null); setChoosingSource(false); setUnit('kg');
     void Promise.all([loadExercisePerformanceHistory({ exerciseDefinitionId: exerciseId, period: 'all' }), readCurrentBodyWeight()])
       .then(([history, current]) => {
         if (cancelled) return;
