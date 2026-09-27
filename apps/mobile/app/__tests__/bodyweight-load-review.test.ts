@@ -4,12 +4,12 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import * as schema from '@/src/data/schema';
 import { generatedMigrationBundle } from '@/drizzle/migrations.generated';
-import { correctSessionBodyWeight } from '@/src/data/bodyweight';
+import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { applyPullPage, entityToWire } from '@/src/sync/cycle';
 import { reviewLegacyLoad } from '@/src/bodyweight/legacy-load';
 import { validateExerciseLoadRules, BODYWEIGHT_SEED_RULES } from '@/src/exercise-core/load-rules';
 import { applyLegacyLoadReview, listLegacyLoads, previewLegacyLoads } from '@/src/data/legacy-load-review';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, bodyWeightMeasurements, syncRuntimeState } from '@/src/data/schema';
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { seedSystemExerciseCatalog, SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
@@ -60,8 +60,8 @@ it('requires context for total conversion, leaves missing-B external loads unava
 const seed = () => {
   const db = mockFixture.database;
   db.insert(exerciseDefinitions).values({ id: 'pull', name: 'Pull-up', ...BODYWEIGHT_SEED_RULES.seed_pull_up }).run();
-  db.insert(sessions).values({ id: 'session', startedAt: new Date('2026-09-01'), status: 'completed',
-    bodyWeightKg: 80, bodyWeightSource: 'manual' }).run();
+  db.insert(sessions).values({ id: 'session', startedAt: new Date('2026-09-01'), status: 'completed' }).run();
+  db.insert(bodyWeightMeasurements).values({ id: 'reading', weightValue: '80', weightKg: 80, weightUnit: 'kg', measuredAt: new Date('2026-09-01') }).run();
   db.insert(sessionExercises).values({ id: 'exercise', sessionId: 'session', exerciseDefinitionId: 'pull', name: 'Pull-up', orderIndex: 0 }).run();
   db.insert(exerciseSets).values({ id: 'set', sessionExerciseId: 'exercise', orderIndex: 0, weightValue: '100', repsValue: '8',
     plannedWeightValue: '60', plannedRepsValue: '10', performanceStatus: null }).run();
@@ -91,7 +91,7 @@ it('previews originals without writes; atomically reviews actual/planned meaning
 it.each(['session', 'rules', 'set', 'membership'] as const)('rejects a stale %s preview with no conversion writes', async change => {
   const db = seed();
   const proposal = await preview();
-  if (change === 'session') db.update(sessions).set({ bodyWeightKg: 82 }).where(eq(sessions.id, 'session')).run();
+  if (change === 'session') db.update(bodyWeightMeasurements).set({ weightKg: 82, weightValue: '82' }).where(eq(bodyWeightMeasurements.id, 'reading')).run();
   if (change === 'rules') db.update(exerciseDefinitions).set({ bodyweightCoefficient: 0.7 }).where(eq(exerciseDefinitions.id, 'pull')).run();
   if (change === 'set') db.update(exerciseSets).set({ repsValue: '9' }).where(eq(exerciseSets.id, 'set')).run();
   if (change === 'membership') db.insert(exerciseSets).values({ id: 'new', sessionExerciseId: 'exercise', orderIndex: 1, weightValue: '0', repsValue: '5' }).run();
@@ -207,7 +207,7 @@ it('refuses an offline review after concurrent metadata hydration', async () => 
 it('restores an explicitly reviewed conventional tuple without B and clears an empty counterpart', async () => {
   const db = seed();
   db.update(exerciseDefinitions).set({ bodyweightCoefficient: 0 }).run();
-  db.update(sessions).set({ bodyWeightKg: null, bodyWeightSource: null, localBodyweightMetadataKnown: false }).run();
+  db.delete(bodyWeightMeasurements).run();
   db.update(exerciseSets).set({ localBodyweightMetadataKnown: false, plannedWeightValue: null, plannedRepsValue: null,
     plannedWeightUnit: 'lb', plannedExternalLoadMode: 'assistance' }).run();
   const proposal = previewLegacyLoads(await listLegacyLoads('pull'), [
@@ -254,7 +254,7 @@ it('upgrades a populated old database, reviews it offline, and serializes only t
       planned_weight_value,planned_reps_value,performance_status)
       VALUES ('set','exercise',0,'100','8','60','10','unperformed');
   `);
-  client.transaction(() => { applyMigration(7); applyMigration(8); })();
+  client.transaction(() => { applyMigration(7); applyMigration(8); applyMigration(9); })();
   const before = db.select().from(exerciseSets).get()!;
   expect(before.localBodyweightMetadataKnown).toBe(false);
   expect(entityToWire(before, 'exercise_sets').fields).not.toHaveProperty('weight_unit');
@@ -265,7 +265,7 @@ it('upgrades a populated old database, reviews it offline, and serializes only t
   await saveExerciseCatalogExercise({ id: 'pull', name: 'Old pull-up', loadInputMode: 'total_load',
     loadRules: { bodyweightCoefficient: 1, movementStandard: 'Strict pull-up', loadingMethod: 'Belt' },
     mappings: [{ muscleGroupId: 'lats', weight: 1, role: 'primary' }] });
-  await correctSessionBodyWeight('session', { weightValue: '80', weightUnit: 'kg' });
+  await saveBodyWeightReading({ weightValue: '80', weightUnit: 'kg', measuredAt: new Date(1000) });
   const inventory = await listLegacyLoads('pull');
   const proposal = previewLegacyLoads(inventory, [
     { key: 'set:actual', choice: { interpretation: 'total', unit: 'kg' } },
@@ -288,12 +288,14 @@ it('upgrades a populated old database, reviews it offline, and serializes only t
   const setWire = entityToWire(db.select().from(exerciseSets).get()!, 'exercise_sets');
   expect(setWire.fields).toMatchObject({ weight_value: '20', reps_value: '9', weight_unit: 'kg', external_load_mode: 'added',
     planned_weight_value: '60', planned_weight_unit: 'lb', planned_external_load_mode: 'assistance', performance_status: 'unperformed' });
-  expect(sessionWire.fields).toMatchObject({ body_weight_kg: 80, body_weight_source: 'manual' });
+  expect(sessionWire.fields).not.toHaveProperty('body_weight_kg');
+  const readingWire = entityToWire(db.select().from(bodyWeightMeasurements).get()!, 'body_weight_measurements');
   expect(definitionWire.fields.bodyweight_coefficient).toBe(1);
   expect(client.pragma('foreign_key_check')).toEqual([]);
 
   mockFixture.close(); mockFixture = createInMemoryDatabase();
   mockFixture.database.transaction(tx => {
+    applyPullPage(tx as Transaction, [readingWire], 'body_weight_measurements');
     applyPullPage(tx as Transaction, [definitionWire], 'exercise_definitions');
     applyPullPage(tx as Transaction, [sessionWire], 'sessions');
     applyPullPage(tx as Transaction, [blockWire], 'session_exercises');
@@ -302,5 +304,5 @@ it('upgrades a populated old database, reviews it offline, and serializes only t
   expect(mockFixture.database.select().from(exerciseSets).get()).toMatchObject({ weightValue: '20', repsValue: '9',
     weightUnit: 'kg', externalLoadMode: 'added', plannedWeightUnit: 'lb', plannedExternalLoadMode: 'assistance',
     localBodyweightMetadataKnown: true, performanceStatus: 'unperformed' });
-  expect(mockFixture.database.select().from(sessions).get()).toMatchObject({ bodyWeightKg: 80, bodyWeightSource: 'manual' });
+  expect(mockFixture.database.select().from(bodyWeightMeasurements).get()).toMatchObject({ weightKg: 80 });
 });

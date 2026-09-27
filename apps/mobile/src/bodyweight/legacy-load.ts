@@ -47,7 +47,7 @@ export const reviewLegacyLoad = (
   let mode: ExternalLoadMode;
   if (choice.interpretation === 'total') {
     if (context.bodyweightCoefficient > 0 && (context.bodyWeightKg == null || !Number.isFinite(context.bodyWeightKg) || context.bodyWeightKg <= 0)) {
-      throw new Error('Save a body weight on this session before converting an old total.');
+      throw new Error('Add a dated reading on or before this session before converting an old total.');
     }
     // The reviewed original is TOTAL resistance, even when external entry is per side.
     const bodyContribution = context.bodyweightCoefficient === 0 ? 0

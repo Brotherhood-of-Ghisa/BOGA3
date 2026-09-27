@@ -1,5 +1,5 @@
 // Owner-filtered database rows enter here. This adapter contains no new maths:
-// mobile and coaching share the same eligibility, snapshot and load boundary.
+// mobile and coaching share the same eligibility, dated context and load boundary.
 import {
   exerciseLoadContext, summarizeExerciseLoad,
 } from '../../../apps/mobile/src/exercise-calculations/analytics.ts';
@@ -14,7 +14,7 @@ import {
   isValidSessionWeight, type SessionWeightSnapshot,
 } from '../../../apps/mobile/src/bodyweight/snapshot.ts';
 
-export const METRIC_REVISION = 'effective_load_v1';
+export const METRIC_REVISION = 'dated_readings_v2';
 
 export type ExerciseLoadRow = {
   bodyweight_coefficient: number;
@@ -59,7 +59,7 @@ export function sessionWeightPayload(row: SessionWeightRow) {
     measurement_id: snapshot.bodyWeightMeasurementId,
     measured_at: snapshot.bodyWeightMeasuredAt && Number.isFinite(snapshot.bodyWeightMeasuredAt.getTime())
       ? snapshot.bodyWeightMeasuredAt.toISOString() : null,
-    estimated: valid && snapshot.bodyWeightSource === 'historical_estimate',
+    estimated: false,
   };
 }
 

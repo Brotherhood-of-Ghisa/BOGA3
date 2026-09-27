@@ -1,3 +1,4 @@
+import { loadAsOfWeightResolver } from './bodyweight';
 import { and, asc, eq, isNull, or } from 'drizzle-orm';
 
 import { reviewLegacyLoad, type LegacyLoadChoice, type ReviewedLoad } from '@/src/bodyweight/legacy-load';
@@ -50,11 +51,13 @@ const readInventory = (database: Reader, exerciseId: string): LegacyLoadInventor
       isNull(sessionExercises.deletedAt), isNull(sessions.deletedAt),
       or(eq(sessions.status, 'active'), eq(sessions.status, 'completed'))))
     .orderBy(asc(sessions.startedAt), asc(exerciseSets.id)).all();
+  const resolveWeight = loadAsOfWeightResolver(database);
   const candidates = rows.flatMap(({ set, session }): LegacyLoadCandidate[] => {
+    const context = resolveWeight(session.startedAt);
     const common = { setId: set.id, sessionId: session.id, startedAt: session.startedAt,
       setNumber: set.orderIndex + 1,
-      bodyWeightKg: session.localBodyweightMetadataKnown && isValidSessionWeight(session) ? session.bodyWeightKg : null,
-      bodyWeightSource: session.bodyWeightSource, bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
+      bodyWeightKg: isValidSessionWeight(context) ? context.bodyWeightKg : null,
+      bodyWeightSource: context.bodyWeightSource, bodyWeightMeasurementId: context.bodyWeightMeasurementId, bodyWeightMeasuredAt: context.bodyWeightMeasuredAt,
       metadataKnown: set.localBodyweightMetadataKnown };
     const result: LegacyLoadCandidate[] = [];
     if ((!set.localBodyweightMetadataKnown || (definition.bodyweightCoefficient > 0 && set.externalLoadMode === null)) &&
@@ -71,7 +74,7 @@ const readInventory = (database: Reader, exerciseId: string): LegacyLoadInventor
   });
   return { exerciseId, exerciseName: definition.name, bodyweightCoefficient: definition.bodyweightCoefficient,
     loadInputMode: definition.loadInputMode, metadataKnown: definition.localBodyweightMetadataKnown,
-    candidates, fingerprint: JSON.stringify({ definition: withoutDirtyFlag(definition),
+    candidates, fingerprint: JSON.stringify({ contexts: rows.map(row => resolveWeight(row.session.startedAt)), definition: withoutDirtyFlag(definition),
       rows: rows.map(row => ({ set: withoutDirtyFlag(row.set), exercise: withoutDirtyFlag(row.exercise), session: withoutDirtyFlag(row.session) })) }) };
 };
 

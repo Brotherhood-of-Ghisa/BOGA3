@@ -5,7 +5,7 @@ import type { GroupExerciseRules, GroupMetric } from '@/src/groups/metric-contra
 const rules: GroupExerciseRules = { name: 'Pull-up', loadInputMode: 'total_load', bodyweightCoefficient: 1,
   movementStandard: 'Strict pull-up', loadingMethod: 'Belt', defaultMetric: 'relative_strength' };
 const input: GroupPerformanceInput = { weightValue: '20', weightUnit: 'kg', repsValue: '5', externalLoadMode: 'added',
-  performanceStatus: null, bodyWeightKg: 60, bodyWeightSource: 'manual', bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null, live: true,
+  performanceStatus: null, bodyWeightKg: 60, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'r', bodyWeightMeasuredAt: new Date(1000), live: true,
   source: { loadInputMode: 'total_load', movementStandard: 'Strict pull-up', loadingMethod: 'Belt' } };
 const value = (p: GroupPerformanceInput, metric: GroupMetric, target = rules) => scoreGroupPerformance(p, target).scores.find(s => s.metric === metric)?.value;
 
@@ -64,11 +64,11 @@ describe('Shared target-specific group scores', () => {
 
 
 it('does not rank strength from a numeric weight with malformed saved provenance', () => {
-  const bad = { ...input, bodyWeightSource: 'reading' };
+  const bad = { ...input, bodyWeightMeasurementId: null };
   expect(scoreGroupPerformance(bad, rules).scores).toEqual([]);
   expect(scoreGroupPerformance({ ...bad, weightValue: '0' }, rules).scores)
     .toEqual([{ metric: 'bodyweight_reps', value: 5, unit: 'reps' }]);
   const estimate = { ...input, bodyWeightSource: 'historical_estimate', bodyWeightMeasurementId: 'reading',
     bodyWeightMeasuredAt: new Date('2026-09-20T12:00:00Z') };
-  expect(value(estimate, 'absolute_strength')).toBe(value(input, 'absolute_strength'));
+  expect(value(estimate, 'absolute_strength')).toBeUndefined();
 });

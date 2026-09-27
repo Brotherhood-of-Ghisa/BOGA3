@@ -774,7 +774,7 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 - tapOn:
-    id: "session-body-weight"
+    id: "session-body-weight-add-reading"
 - extendedWaitUntil:
     visible:
       id: "weight-entry-value"
@@ -820,7 +820,7 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "exercise-set-1-vol"
     text: "Vol 656"
-- takeScreenshot: "BWL10-corrected-session-context"
+- takeScreenshot: "BWL10-dated-session-context"
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - extendedWaitUntil:
     visible:

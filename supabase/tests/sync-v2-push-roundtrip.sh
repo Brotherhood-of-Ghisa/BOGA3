@@ -60,7 +60,7 @@ http_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -137,7 +137,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \

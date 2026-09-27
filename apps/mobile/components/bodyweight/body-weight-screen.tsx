@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -6,7 +7,6 @@ import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading 
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
-import { SessionWeightBackfillSheet } from './backfill-sheet';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
 
@@ -16,15 +16,9 @@ export function BodyWeightScreen() {
   const [error, setError] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorVisible, setEditorVisible] = useState(false);
-  const [backfillVisible, setBackfillVisible] = useState(false);
-  const readingAfterBackfill = useRef(false);
   const openEditor = (value: Editor) => { setEditor(value); setEditorVisible(true); };
-  const finishBackfillDismissal = () => {
-    if (!readingAfterBackfill.current) return;
-    readingAfterBackfill.current = false;
-    openEditor({ reading: null, measuredAt: new Date() });
-  };
   const [feedback, setFeedback] = useState<string | null>(null);
+  const datedWeightRevision = useBodyWeightContextRevision();
   const generation = useRef(0);
   const load = useCallback(async () => {
     const current = ++generation.current;
@@ -35,13 +29,14 @@ export function BodyWeightScreen() {
   useFocusEffect(useCallback(() => {
     void load();
     return () => { generation.current += 1; };
-  }, [load]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
+  }, [load, datedWeightRevision]));
   const current = readings?.find(row => row.measuredAt.getTime() <= Date.now());
   const currentValid = current && isValidBodyWeightReading(current);
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">
       <Text allowFontScaling={false} style={styles.body}>
-        New sessions use your latest reading at their start. Saved session weights stay fixed when you add, edit or delete a reading.
+        Each session uses the latest reading on or before its start. Adding, editing or deleting a reading recalculates affected sessions and group comparisons.
       </Text>
       {feedback ? <Notice live message={feedback} testID="body-weight-feedback" /> : null}
       {error ? <StatePanel kind="error" title="Could not load weight history."
@@ -58,8 +53,6 @@ export function BodyWeightScreen() {
           </View></Card>
           <ActionButton label="Add reading" variant="primary" testID="body-weight-add"
             onPress={() => openEditor({ reading: null, measuredAt: new Date() })} />
-          <ActionButton label="Fill missing session weights" variant="outline" testID="body-weight-backfill"
-            onPress={() => setBackfillVisible(true)} />
           <View style={styles.section}>
             <Text allowFontScaling={false} accessibilityRole="header" style={styles.label}>Weight history</Text>
             {readings.length === 0 ? <Text allowFontScaling={false} style={styles.body} testID="body-weight-empty">
@@ -76,25 +69,19 @@ export function BodyWeightScreen() {
           </View>
         </>}
     </ScreenScroll>
-    <SessionWeightBackfillSheet visible={backfillVisible} onDismiss={() => setBackfillVisible(false)}
-      onAfterDismiss={finishBackfillDismissal}
-      onAddReading={() => {
-        readingAfterBackfill.current = true;
-        setBackfillVisible(false);
-      }} />
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}
       initial={editor.reading ?? { weightValue: '', weightUnit: current?.weightUnit ?? 'kg' }} measuredAt={editor.measuredAt}
-      explanation="This reading will be available to new sessions. Saved session weights stay unchanged."
+      explanation="This reading recalculates affected sessions and group comparisons, up to the next reading. Weight-dependent certifications may need review."
       onDismiss={() => setEditorVisible(false)}
       onSave={async input => {
         if (!input.measuredAt) throw new Error('Enter a measurement date.');
         await saveBodyWeightReading({ ...input, measuredAt: input.measuredAt, id: editor.reading?.id });
-        setFeedback('Reading saved. Existing sessions are unchanged.');
+        setFeedback('Reading saved. Affected sessions recalculated.');
         await load();
       }} onDelete={editor.reading ? async () => {
         await deleteBodyWeightReading(editor.reading!.id);
-        setFeedback('Reading deleted. Existing sessions are unchanged.');
+        setFeedback('Reading deleted. Affected sessions recalculated.');
         await load();
       } : undefined} /> : null}
   </>;

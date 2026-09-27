@@ -22,15 +22,15 @@ don't restate it here.
 ./boga doctor          # verify THIS machine can run every lane
 ```
 
-The `ios-bodyweight` lane runs reading/session snapshots, exercise setup and
-logging/legacy-load review, explicit historical fill, and personal analytics /
-loading estimates. All four flows are
-part of `frontend` and `frontend-ui`; small and large phone runs provide
-form-layout evidence.
-Historical fill covers date/selection preview, cancellation, fallback provenance,
-repeat, restart, later readings, explicit correction and no-source entry.
-Analytics covers total records/history, explicit target/current B, assistance /
-units, missing/invalid source, corrections, Stats/heatmaps and share previews.
+The `ios-bodyweight` lane runs dated entry/history and missing-context entry,
+exercise setup/logging/legacy review, and personal analytics/loading estimates.
+All three flows belong to `frontend` and `frontend-ui`; small and large phone
+runs provide form-layout evidence. Dated entry covers invalid/future feedback,
+source deletion, backdated entry, later-reading isolation and cold restart.
+Analytics edits an applicable reading and checks total records/history, target
+and current calculator B, assistance/units, Stats/heatmaps and share previews.
+Pure and backend parity tests cover exact milliseconds, binary ties, date edits,
+restoration, malformed latest readings, session-date edits and certification.
 
 Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
 the canonical lane names everywhere: this doc, the timing records, `boga`).

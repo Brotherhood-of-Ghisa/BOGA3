@@ -1,6 +1,7 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -1184,6 +1185,7 @@ export default function StatsRoute() {
   const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } =
     useExerciseCatalogStats(periodDays);
 
+  const datedWeightRevision = useBodyWeightContextRevision();
   const loadSummary = useCallback(async (period: StatsPeriodDays) => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -1204,7 +1206,8 @@ export default function StatsRoute() {
       // another tab) is reflected without relying on a catalog-invalidation event.
       void loadSummary(periodDays);
       reloadExerciseCatalogStats();
-    }, [loadSummary, periodDays, reloadExerciseCatalogStats])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
+    }, [loadSummary, periodDays, reloadExerciseCatalogStats, datedWeightRevision])
   );
 
   const handleSelectPeriod = useCallback(
@@ -1319,6 +1322,14 @@ export default function StatsRoute() {
       setIsExerciseHistoryLoading(false);
     }
   }, []);
+
+  const observedWeightRevision = useRef(datedWeightRevision);
+  useEffect(() => {
+    if (observedWeightRevision.current === datedWeightRevision) return;
+    observedWeightRevision.current = datedWeightRevision;
+    if (selectedMuscle) void handlePressMuscleHistory(selectedMuscle);
+    if (selectedExercise) void handlePressExerciseHistory(selectedExercise);
+  }, [datedWeightRevision, selectedMuscle, selectedExercise, handlePressMuscleHistory, handlePressExerciseHistory]);
 
   const handleDismissExerciseHistory = useCallback(() => {
     exerciseHistoryRequestIdRef.current += 1;

@@ -115,7 +115,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
     {
       annotations: readOnlyAnnotations,
       description:
-        'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user. Entered load includes its original unit and added/assisted meaning. Effective resistance and estimated 1RM use saved session body weight and current exercise rules. Check basis, provenance, completeness and null values; known_subtotal is not a complete total.',
+        'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user. Entered load includes its original unit and added/assisted meaning. Effective resistance and estimated 1RM use the latest dated reading on or before the session start and current exercise rules. Check basis, provenance, completeness and null values; known_subtotal is not a complete total.',
       inputSchema: z.object({
         exercise_id: z.string().min(1).max(200),
         recent_sessions: z.number().int().min(1).max(20).optional(),
@@ -131,7 +131,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
     {
       annotations: readOnlyAnnotations,
       description:
-        'Get compact, bounded summaries of the authorizing user’s recent completed workouts, including saved body-weight provenance and volume coverage. A null total_volume.value is unavailable; known_subtotal must not be described as the total. Estimated historical body weight is explicitly identified.',
+        'Get compact, bounded summaries of the authorizing user’s recent completed workouts, including dated body-weight provenance and volume coverage. A null total_volume.value is unavailable; known_subtotal must not be described as the total. Missing applicable readings leave weight-dependent metrics unavailable.',
       inputSchema: z.object({
         cursor: z.string().max(500).optional(),
         limit: z.number().int().min(1).max(25).optional(),

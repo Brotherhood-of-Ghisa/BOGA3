@@ -118,9 +118,9 @@ describe('group session metrics', () => {
 
 
 describe('shared-session personal effective-load context', () => {
-  const session = { metric_scope: 'personal' as const, metric_revision: 'effective_load_v1' as const,
-    body_weight_kg: 80, body_weight_source: 'manual', body_weight_measurement_id: null,
-    body_weight_measured_at_ms: null };
+  const session = { metric_scope: 'personal' as const, metric_revision: 'dated_readings_v2' as const,
+    body_weight_kg: 80, body_weight_source: 'reading', body_weight_measurement_id: 'r',
+    body_weight_measured_at_ms: 1000 };
   const bwExercise = (overrides: Partial<GroupSessionExercise> = {}) => ({
     ...exercise('pull', [rawSet('set', '10', '5', { weight_unit: 'kg', external_load_mode: 'added' })]),
     bodyweight_coefficient: 0.5, load_input_mode: 'per_side_load', ...overrides,
@@ -145,7 +145,7 @@ describe('shared-session personal effective-load context', () => {
   it('keeps a conventional subtotal explicit when bodyweight context is missing', () => {
     const conventional = bwExercise({ bodyweight_coefficient: 0 });
     const result = computeGroupSessionMetrics([conventional, bwExercise()], {
-      ...session, body_weight_kg: null, body_weight_source: null });
+      ...session, body_weight_kg: null, body_weight_source: null, body_weight_measurement_id: null, body_weight_measured_at_ms: null });
     expect(result).toMatchObject({ performedSets: 2, totalVolumeKg: null,
       coverage: { complete: false, knownVolumeKgReps: 50, knownSetCount: 1, missingSetCount: 1 } });
   });
@@ -154,9 +154,9 @@ describe('shared-session personal effective-load context', () => {
     expect(result).toMatchObject({ performedSets: 1, totalVolumeKg: null,
       coverage: { knownSetCount: 0, invalidSetCount: 1 } });
   });
-  it('accepts explicit historical-estimate provenance from the saved shared tuple', () => {
+  it('rejects obsolete historical-estimate context in live shared calculations', () => {
     expect(computeGroupSessionMetrics([bwExercise()], { ...session, body_weight_source: 'historical_estimate',
-      body_weight_measurement_id: 'old-reading', body_weight_measured_at_ms: 1000 }).totalVolumeKg).toBe(300);
+      body_weight_measurement_id: 'old-reading', body_weight_measured_at_ms: 1000 }).totalVolumeKg).toBeNull();
   });
   it.each([
     { bodyweight_coefficient: null }, { load_input_mode: null },

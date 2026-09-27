@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
@@ -209,7 +210,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
         bodyWeightSource: sessionGraph.bodyWeightSource,
         bodyWeightMeasurementId: sessionGraph.bodyWeightMeasurementId,
         bodyWeightMeasuredAt: sessionGraph.bodyWeightMeasuredAt,
-        localBodyweightMetadataKnown: sessionGraph.localBodyweightMetadataKnown,
+
         startedAt: sessionGraph.startedAt.toISOString(),
         completedAt: completedAt.toISOString(),
         durationDisplay: formatSessionListCompactDuration(sessionGraph.durationSec),
@@ -260,6 +261,7 @@ export function CompletedSessionDetailScreenShell({
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const datedWeightRevision = useBodyWeightContextRevision();
   const [weightRevision, setWeightRevision] = useState(0);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
@@ -334,7 +336,7 @@ export function CompletedSessionDetailScreenShell({
     };
   // A saved weight invalidates this read without changing the route.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataClient, presentation, sessionId, weightRevision]);
+  }, [dataClient, presentation, sessionId, weightRevision, datedWeightRevision]);
 
   useFocusEffect(
     useCallback(() => {
@@ -379,7 +381,7 @@ export function CompletedSessionDetailScreenShell({
       return () => { cancelled = true; };
     // Weight corrections invalidate the derived comparisons too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataClient, sessionId, isDeleted, maestroInsights, weightRevision])
+    }, [dataClient, sessionId, isDeleted, maestroInsights, weightRevision, datedWeightRevision])
   );
 
   const formattedStartedAt = useMemo(
@@ -421,7 +423,7 @@ export function CompletedSessionDetailScreenShell({
     return summarizeCurrentSessionMuscleLoad({
       sessionId: session.id,
       sessionAt: new Date(session.completedAt),
-      bodyWeightKg: session.localBodyweightMetadataKnown === false ? null : session.bodyWeightKg,
+      bodyWeightKg: session.bodyWeightKg,
       exercises: session.exercises.map((exercise, exerciseIndex) => ({
         id: exercise.id,
         orderIndex: exerciseIndex,
@@ -603,11 +605,13 @@ export function CompletedSessionDetailScreenShell({
     </>
   );
 
-  if (isLoading) {
+  // A background read must preserve open editors and their unsaved input.
+  const hasLoadedSession = session !== null && session.id === sessionId;
+  if (isLoading && !hasLoadedSession) {
     return renderState('completed-session-detail-loading', 'Loading session...');
   }
 
-  if (errorMessage) {
+  if (errorMessage && !hasLoadedSession) {
     return renderState('completed-session-detail-error', 'Unable to load session', errorMessage);
   }
 
@@ -656,8 +660,7 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <ViewSessionScreen
-        bodyWeightContent={<SessionBodyWeight sessionId={session.id} snapshot={session}
-          metadataKnown={session.localBodyweightMetadataKnown} editable={!isDeleted}
+        bodyWeightContent={<SessionBodyWeight sessionId={session.id} snapshot={session} editable={!isDeleted}
           onSaved={() => setWeightRevision(value => value + 1)} />}
         section={section}
         onSectionChange={setSection}
@@ -691,7 +694,7 @@ export function CompletedSessionDetailScreenShell({
             />
           </>
         }
-        error={actionFeedback}
+        error={actionFeedback ?? errorMessage}
         model={buildCompletedSessionDetailModel(session.exercises, historicalBests)}
         onAppend={handleAppendExercise}
         onBack={handleBack}

@@ -2,17 +2,15 @@
 
 > **Status: implemented and locally verified in the release branch; hosted rollout pending.**
 > This contract does not claim that the hosted feature is enabled.
-> Owns bodyweight load meaning, snapshots, completeness and group dependencies.
+> Owns bodyweight load meaning, dated context, completeness and group dependencies.
 > Storage/wire mechanics remain in [05](../05-data-model.md) and
 > [Sync v2](sync-v2-server-contract.md); group authorization and ordinary events
 > remain in the [groups contract](groups-contract.md).
 
-Baseline reviewed: `a34708c0d6622e2d842771bdfbf2038a38f9aaed`, containing
-`origin/main` on 2026-09-26. The existing calculation is **Wathan**, and raw
-set weights had no unit or added/assisted interpretation column at that baseline.
-The paired schema, transport and compatibility replay are implemented below.
-The implementation order is storage/read compatibility, explicit load entry
-and legacy review, consumer adoption, then server-first feature rollout.
+Dated readings are the source of session body weight. Personal projections are
+resolved on read; group projections use the owner's same as-of context. The
+load equations remain unchanged. Hosted rollout requires the staged procedure
+in [RUNBOOK](../../../RUNBOOK.md#dated-bodyweight-cutover).
 
 ## 1. Typed values and storage boundary
 
@@ -23,11 +21,11 @@ Sync v2 id, timestamps, tombstone and dirty/LWW bookkeeping apply.
 | Entity | Additions / representation | Sync decision |
 | --- | --- | --- |
 | `body_weight_measurements` | `id`, `weightValue: string`, `weightUnit: 'kg' \| 'lb'`, `weightKg: number`, `measuredAt: number`; normal timestamps/tombstone | Owner-private Sync v2 root entity; never a profile field |
-| `sessions` | `bodyWeightKg: number \| null`, `bodyWeightSource: 'reading' \| 'manual' \| 'historical_estimate' \| null`, `bodyWeightMeasurementId: string \| null`, `bodyWeightMeasuredAt: number \| null` | In sync scope; one frozen snapshot tuple |
+| Session read context | `bodyWeightKg`, `bodyWeightSource: 'reading' \| null`, `bodyWeightMeasurementId`, `bodyWeightMeasuredAt` | Derived only; absent from session storage and sync |
 | `exercise_definitions` | `bodyweightCoefficient: number` (default 0), `movementStandard: string \| null`, `loadingMethod: string \| null` | In sync scope; current personal metadata reinterprets history |
 | `exercise_sets` | `weightUnit: 'kg' \| 'lb'` (legacy kg), `externalLoadMode: ExternalLoadMode \| null`, `plannedWeightUnit: 'kg' \| 'lb' \| null`, `plannedExternalLoadMode: ExternalLoadMode \| null` | In sync scope; actual and planned meanings travel independently |
 | Group rules, versions, scores, attestations | Server-authoritative, described below | Out of Sync v2 scope |
-| Personal calculations and backfill previews | Read-time projections | Out of sync scope; no achievement ledger |
+| Personal calculations | Read-time projections | Out of sync scope; no achievement ledger |
 
 `ExternalLoadMode = 'added' | 'assistance' | 'unquantified_assistance'`.
 Amounts remain nonnegative raw decimal text; a mode supplies the sign. Null
@@ -46,15 +44,15 @@ reps canonicalizes to zero, but blank measurement does not. Reps retain the
 existing positive-integer parser. Coefficient is finite in `[0,1]`, displayed
 as 0–100%; it is independent of load-input mode and muscle mapping weights.
 
-Snapshot tuples are either entirely absent or have positive finite kg and a
-valid source. Reading/estimate requires measurement id and actual reading date;
-manual has neither. The id is a provenance reference **without a foreign key**:
-source deletion must not erase the snapshot or make restoration depend on it.
-Consumers reject malformed context as unavailable rather than synthesizing B.
+Resolved context is either absent (all fields null) or identifies the selected
+reading and its timestamp. If that reading is malformed, kg is null and the
+source/date explain what needs review. Consumers never use an older reading
+as a fallback past a malformed latest reading. No manual session-only override
+or future-reading estimate is accepted by live calculations.
 
 ## 2. Effective load and distribution
 
-Let `E` be the parsed entered mass normalized to kg, `B` the saved session kg,
+Let `E` be the parsed entered mass normalized to kg, `B` the as-of session kg,
 `c` the applicable coefficient, and `s=+1` for added, `s=-1` for assistance.
 
 | Exercise | Exercise resistance basis | Muscle per-side basis |
@@ -138,53 +136,41 @@ Percentages and high-rep estimates are declared approximations. Weighted
 push-ups require a loading method (e.g. vest); face-value added mass is the
 release convention, not a claim of full mass borne through the hands.
 
-## 4. Readings, snapshots and historical fill
+## 4. Dated readings and session context
 
-Settings reading entry/history and explicit session correction are implemented
-in `src/data/bodyweight.ts`, with positive finite kg/lb validation, no future
-readings, dirty/monotonic writes and post-commit sync nudges. New-session
-`saveDraftGraph` captures the tuple inside its creation transaction; ordinary
-updates leave it alone. Intentional correction writes the whole manual tuple
-and marks metadata known. UI consumers validate the complete tuple and show
-unknown for malformed context. Historical fill uses the pure planner in
-`src/bodyweight/backfill.ts` and atomic repository in
-`src/data/bodyweight-backfill.ts`.
+The applicable reading is the latest nondeleted row with `measuredAt <=
+startedAt`, comparing exact stored epoch milliseconds. Ties select ascending
+reading ID by Unicode code point (SQLite BINARY / PostgreSQL COLLATE "C").
+Selection precedes validation. A later reading on the same local calendar day
+is still later and cannot supply context. Local date/time entry becomes an
+instant once; viewing timezone and DST do not reinterpret a stored instant.
 
-Settings shows latest nondeleted reading at/before now, with value/unit/date;
-history includes all readings. Equal dates resolve by ascending id (for both
-latest-prior and earliest-later selection).
-Creation copies the latest nondeleted reading at/before `startedAt`, never a
-future reading. Missing stays unknown and logging works. Reopen, sync restore,
-new weigh-ins and edits/deletion of the source never refresh a saved snapshot.
-An explicit session correction changes only the session tuple and explains
-personal/group recalculation and affected strength certification invalidation.
+`src/bodyweight/as-of.ts` owns the device resolver: sort the timeline once per
+graph, then binary-search each session. `data/bodyweight.ts` batches it into all
+repositories. The server `session_weight_as_of(owner,start)` implements the
+same ordered selection and strict validation; `bodyweight-as-of-parity.mjs`
+cross-checks it against the actual TypeScript resolver, including Unicode
+whitespace, binary ID ties, malformed latest rows, pounds and DST instants.
 
-Settings' fill flow defaults to completed, nondeleted sessions with missing
-tuples; date range is start-inclusive/end-exclusive in the displayed timezone,
-and individual selection is explicit. Preview prefers a prior reading, else
-the earliest nondeleted later reading marked `historical_estimate`, retaining
-its actual date. If no readings exist, offer record weight or an explicit
-manual value; never use 0. Backdated/active sessions can use explicit correction.
+Settings retains required dated kg/lb entry and add/edit/delete history. Future
+or invalid readings are rejected on entry. Readings use ordinary local dirty
+clocks and sync LWW. Adding a backdated reading, changing a value/date, deleting,
+restoring, importing or pulling a reading recalculates affected past sessions.
+Changing a session's recorded start resolves its context again. Session and raw
+set rows are never rewritten merely because a reading changes.
 
-Preview captures session ids/start times/local versions and source reading
-ids/values/units/dates/versions. In one local transaction re-read those inputs
-and membership of the relevant reading timeline before writing. A changed
-preview requires refresh; an already-filled/deleted session is skipped and
-reported, never overwritten. Apply only still-missing snapshots with ordinary
-dirty session updates. The implementation applies the selection in one atomic
-transaction; a failed write rolls back the entire selection. Repeat is a no-op,
-even after later readings. This is local revalidation, not a global
-compare-and-set: ordinary cross-device row LWW still applies.
+The UI shows read-only kg and `Reading from <date/time>`. Missing context shows
+`No reading on or before this session` and, for the owner, `Add dated reading`
+prefilled at the exact session start. Its date stays editable. Malformed context
+offers reading history for review. Friends have no entry or correction action.
+Forms explain historical recalculation and possible strength-certification
+invalidation. Missing context does not prevent logging or independent metrics.
 
-Missing means all four snapshot fields are null; malformed nonempty tuples are
-never replaced. Sessions awaiting metadata hydration are blocked. Preview
-fingerprints cover live readings and missing completed-session membership,
-ignoring only transport dirty acknowledgements. An unselected missing-session
-change also requires refresh; concurrently filled/deleted selected sessions are
-skipped. The commit recomputes sources from fresh rows, never trusting rendered
-snapshot values. Same-time IDs use SQLite BINARY/code-point ordering. Source
-measurement IDs remain provenance with no foreign key; restoration can apply
-sessions before readings and source deletion cannot erase a saved snapshot.
+Forward migrations remove all four stored session weight columns and the
+session-only hydration marker. They preserve readings, raw sets, session clocks
+and dirty state; no manual/session value is converted to a reading. The local
+migration clears disposable group caches. Unrelated exercise/set hydration
+markers remain. There is no historical-fill planner, preview, apply or override.
 
 ## 5. Legacy review and canonical identity
 
@@ -233,13 +219,13 @@ The logger carries actual/planned units and modes through typing, confirmation,
 copy and graph autosave. A stale page whose metadata was unknown omits its
 placeholders at the write boundary, preserving a replay completed meanwhile.
 New empty rows start with explicit added kg. Copies preserve their source's
-meaning, including unresolved legacy rows. Session-only correction is available
-on the exercise page. Logger previews, records and analytics resolve the frozen
+meaning, including unresolved legacy rows. The exercise page links missing
+context to dated entry. Logger previews, records and analytics resolve dated
 context through the same boundary (§8).
 
 `src/data/legacy-load-review.ts` inventories actual and planned unresolved values,
 previews selected interpretations, and rechecks the complete source membership
-and versions in one local transaction. Originals and estimated source dates stay
+and versions in one local transaction. Originals and applicable source dates stay
 visible in the preview. Unit choice is always explicit, including old `kg`
 placeholders; a legacy zero is unresolved too. Unknown exercise rules must first
 be recovered by sync or explicitly configured. For unavailable set metadata,
@@ -251,25 +237,26 @@ on empty counterparts. This also supports conventional exercises whose old
 units are unavailable; known conventional null modes do not require review.
 No missing cursor or bootstrap marker proves that a row has never synced.
 Changes in sync dirty bookkeeping alone do not invalidate a preview, but
-concurrent hydration does. Apply recomputes from current source rows and never
+concurrent hydration or a changed as-of reading does. Apply recomputes from current source rows and never
 confirms a set. Ordinary autosave continues to preserve unavailable metadata.
 The result is ordinary dirty Sync v2 data, with no global compare-and-set claim.
 
-Session-import v2 adds explicit actual/planned meaning, frozen context, personal
-rules for newly created exercises and optional owner-private reading content
-(an explicit empty array is allowed). The versioned serializer preserves these
-fields; local and sync-RPC import paths agree. v1 imports omit new wire fields
-and keep old loads unresolved. Both versions use the original import identity
-namespace, preventing duplicate sessions just because the schema was upgraded.
-Reimport is not a legacy conversion workflow. See the owning
+Session-import v3 carries explicit actual/planned meaning, personal rules for
+new exercises and an explicit owner-private reading array (empty is allowed).
+Sessions contain no weight tuple. The serializer upgrades v2 packages to v3,
+stripping stored session weights; local and remote importers also ignore legacy
+v2 tuples, even malformed ones, and never manufacture readings from them.
+V1 remains supported with unresolved old load meaning. Existing package IDs
+retain the original import identity namespace. Reimport is not a legacy
+conversion workflow. See the owning
 [import contract](../../../apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md).
 
 ## 6. Group metrics, revisions and certification
 
 **Implementation checkpoint (M27):** `src/groups/metric-contract.ts`,
 `performance-score.ts` and `metric-evaluation.ts` provide the pure target-specific
-rules/scoring boundary. They accept raw external units/mode, the complete saved
-session tuple and source distribution/standards; the personal coefficient is not
+rules/scoring boundary. They accept raw external units/mode, the resolved dated
+session context and source distribution/standards; the personal coefficient is not
 an input. Invalid B withholds strength while eligible unweighted reps survive.
 The v2 wire separates missing/invalid B, values/units and rules revision.
 A source's current counting eligibility is separate from its valid performance,
@@ -317,45 +304,46 @@ recalculation does not void a valid performance attestation. A rules change
 cannot expand an old attestation's dependency coverage: request certification
 again for a newly dependent metric. Existing conventional attestations remain
 valid only for their original coverage; none silently certifies B or assistance.
-Source-measurement edits and new readings do not change snapshots or pins.
-Explicit B/load corrections invalidate dependent strength attestations; a B
-edit alone preserves reps-only attestation. Estimated provenance is shown at
-certify time; this is a member's attestation, not automatic scale verification.
+Reading value/date/deletion/restoration changes enqueue affected shared sessions
+through the failure-isolated source queue. Strength pins include resolved kg,
+source ID and date; changed context voids dependent attestations. Reps-only and
+conventional pins exclude weight context and retain their prior pin version.
+The calculation source hash includes `dated_readings_v2`; strength pins use
+version 3, and disposable client caches use v3 keys. Immutable retired record
+and certification evidence may still display its original legacy provenance,
+but those stored values never supply new live scores. Attestation is not
+automatic scale verification.
 
 ## 7. Privacy and deployment compatibility
 
-Weight measurements use owner-first PK/RLS plus OAuth direct-access denial,
-like every synced entity. Include topology/cursors, bootstrap, serializers,
-drift, wipe and export/import. Adding a root entity also requires old-client
-pull compatibility: an old reader must never encounter an unknown entity.
-The implemented reader requests layer 4 with `capabilities: ["bodyweight_v1"]`
-and starts its independent cursor at null. Layer meanings 0–3 are unchanged;
-the local upgrade replays 0, 1 and 3 once, because an old reader may have
-advanced past metadata it ignored. A local known-metadata marker prevents
-placeholder defaults from being pushed and permits one-time hydration without
-overwriting newer unrelated local edits. Known metadata continues ordinary LWW.
-Older readers never receive this entity; upgraded readers do not skip historic
-readings. The new client requires the server migration first.
+Readings use owner-first PK/RLS and restrictive OAuth direct-access denial.
+They remain Sync v2 layer 4 with `capabilities: ["bodyweight_v1"]`. Exercise/set
+metadata omission and hydration remain supported; session weight is no longer
+part of any push/pull row. Exact old RPC signatures remain so outdated builds
+reach the cutoff before accessing removed fields.
 
-Server writers distinguish absent new fields (preserve stored value) from
-explicit null (clear by newer-client intent). Snapshot and metadata tuples
-are supplied atomically; partial tuples are rejected at the application
-boundary. Tests must prove older writes cannot erase populated new fields.
-Row LWW still controls whether the write wins; this is compatibility, not
-independent field clocks. Deploy compatible server readers/writers before
-enabling new client fields. The release procedure in RUNBOOK requires hosted
-compatibility smoke before activation.
+Release compatibility commit `11509384` first. It recognizes `UPDATE_REQUIRED`
+in setup and steady-state Settings without clearing local data, dirty state or
+cursors. After that build is distributed, the forward migration requires
+`x-boga-sync-protocol: 2` before normal authenticated sync reads/writes. Missing,
+old and malformed protocol values receive an actionable update-required error.
+OAuth and anonymous restrictions remain unchanged. Builds older than the
+compatibility release cannot be given new UI retroactively; they may display
+an older generic error and must update. See the exact staged operator procedure
+in RUNBOOK; no hosted deployment is implied by local verification.
 
-Authorized group reads reveal only needed shared session context, never
-reading history, owner-private gym coordinates or unrelated measurements.
-Coaching remains owner-scoped and read-only, with unit/completeness parity.
-No evaluation/notification failure may roll back personal sync.
+Authorized groups receive only needed shared-session context, never the
+private timeline or unrelated readings. Coaching uses service-only
+`session_weight_contexts(owner,session_ids)` after its existing owner/session
+authorization. That helper and the underlying as-of function are unavailable to
+normal authenticated/anonymous callers. No evaluator failure can roll back a
+personal reading write; normal retry/sweep repairs pending projections.
 
 ## 8. Personal consumer integration and refresh
 
 The personal adapter `src/exercise-calculations/analytics.ts` preserves metadata
 hydration flags and raw units/mode, and delegates to the kernel in §2. The
-following readers supply current exercise rules plus each saved session’s B:
+following readers supply current exercise rules plus each session’s as-of B:
 
 | Projection | Owning readers / adapters |
 | --- | --- |
@@ -365,8 +353,8 @@ following readers supply current exercise rules plus each saved session’s B:
 | Completion, comparisons and share content | `session-insights/repository.ts`, `session-insights/calculations.ts` |
 | Loading calculator | `bodyweight/loading-estimate.ts`, `components/bodyweight/loading-estimate-sheet.tsx` |
 
-Readers batch metadata once per graph, including the full saved-weight
-provenance tuple. `bodyweight/snapshot.ts` rejects malformed stored tuples even
+Readers batch metadata once per graph, including the full derived reading
+context. `bodyweight/snapshot.ts` rejects malformed resolved context even
 when their numeric B is positive; all personal projections then withhold the
 dependent metrics consistently with the session editor. Pure calculation inputs
 may supply an already-validated numeric B. Optional legacy conventional callers keep
@@ -395,29 +383,27 @@ therefore stays unweighted instead of displaying microscopic assistance. Larger
 positive and negative adjustments retain full precision. Manually editing target
 B replaces the reading/prefill hint with an explicit entered-target explanation.
 
-Explicit B corrections reload detail graphs and insights. Definition edits and
-legacy conversion refresh records/history on save or focus. New readings leave
-old projections unchanged. The current-gym preference filters records and
-history without changing the frozen context or importing another gym’s best.
-Changing the gym scope or explicitly correcting a saved input reloads the
-projection under that scope. Group and coaching integration is described in
-§6 and §9; this section does not claim hosted rollout.
+Committed reading writes invalidate catalogue stats and mounted dependent views.
+Every changed sync pull page invalidates after commit, even if later sync work
+fails. Detail graphs, records, insights, open heatmaps and calculators reload;
+exercise draft reload flushes pending edits first. Session-start edits also
+invalidate context. Legacy review fingerprints include the resolved reading so
+a concurrent reading change requires a fresh preview before conversion.
+Gym scope filters history without changing as-of selection or borrowing a
+record from another gym.
 
-## 9. Coaching integration (locally verified; hosted rollout pending)
+## 9. Coaching integration
 
-`supabase/functions/agent-api/training-metrics.ts` adapts owner-filtered wire
-rows to the same analytics and full-snapshot validation boundary used by mobile.
-Definitions/session context are batched. Exercise records and workout summaries
-use saved B and current personal rules, including unit conversion, canonical
-blank zero, assistance and unavailable context. Measurement history is never
-queried. New readings and source-reading changes do not replace saved snapshots.
+`agent-api/training-metrics.ts` uses the same effective-load kernel with batched
+owner-filtered definitions, sets and as-of contexts. Session SQL selects no
+removed columns. The service-only helper returns only selected sessions' context,
+never the owner's timeline. Reading changes affect the next API read.
 
-The additive `effective_load_v1` projection preserves the existing normalized
-external `load` field and adds raw `entered_load`, effective resistance, metric
-basis, session provenance and explicit volume coverage. Incomplete or truncated
-totals are null; records exclude incomplete session volume. MCP passes both
-structured and text JSON through without recalculating or acquiring database
-access. The [API contract](../../../supabase/functions/agent-api/README.md#effective-load-response-evolution)
-owns response shapes and compatibility details. Fast, backend contract parity
-and real OAuth MCP smoke passed locally. Hosted rollout and deployed
-verification remain required before client activation.
+`metric_revision: dated_readings_v2` replaces `effective_load_v1`. Existing
+normalized external `load` remains unchanged; raw `entered_load`, effective
+resistance, provenance and volume coverage retain their distinct meanings.
+Missing/invalid or truncated totals are null. `session_body_weight.source` is
+`reading` or null; deprecated `estimated` remains false. MCP passes the response
+through without calculations or database access. The
+[API contract](../../../supabase/functions/agent-api/README.md#effective-load-response-evolution)
+owns payload details. Hosted rollout remains an explicit operator action.

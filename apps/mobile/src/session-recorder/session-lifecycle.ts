@@ -16,7 +16,6 @@ import {
   appendSuggestedPlan,
   createExercise,
   mapDraftSnapshotToSession,
-  parseSessionDateTime,
   toPersistCompletedExercises,
   toPersistDraftExercises,
 } from './session-model';
@@ -70,9 +69,8 @@ export const loadActiveSessionGraph = async (sessionId: string): Promise<ActiveS
   return {
     sessionId: snapshot.sessionId,
     gymId: snapshot.gymId,
-    // The recorder persists its minute-precision start field; read it back the
-    // same way so both screens write the same `startedAt` and `durationSec`.
-    startedAt: parseSessionDateTime(session.dateTime) ?? snapshot.startedAt,
+    // Ordinary edits preserve the exact instant used by dated-reading selection.
+    startedAt: snapshot.startedAt,
     session,
   };
 };

@@ -1,6 +1,5 @@
 // Decode the version/unit boundary before a metric payload reaches UI or cache.
 import { isGroupMetric, isGroupMetricValue, validateGroupExerciseRules, type GroupMetricValue } from './metric-contract.ts';
-import { isValidSessionWeight } from '../bodyweight/snapshot.ts';
 import type {
   GroupMetricBoardWire, GroupMetricCertificationWire, GroupMetricExerciseWire,
   GroupMetricPodiumWire, GroupMetricRulesWire, GroupPerformanceSnapshotWire, GroupMetricRevisionWire,
@@ -43,12 +42,13 @@ export function isGroupPerformanceWire(value: unknown): value is GroupPerformanc
   const empty = [value.body_weight_kg,value.body_weight_source,value.body_weight_measurement_id,value.body_weight_measured_at_ms]
     .every(field => field === null);
   if (value.body_weight_status === 'missing' || value.body_weight_status === 'invalid') return empty;
-  return value.body_weight_status === 'known' && isValidSessionWeight({
-    bodyWeightKg: finite(value.body_weight_kg) ? value.body_weight_kg : null,
-    bodyWeightSource: typeof value.body_weight_source === 'string' ? value.body_weight_source : null,
-    bodyWeightMeasurementId: typeof value.body_weight_measurement_id === 'string' ? value.body_weight_measurement_id : null,
-    bodyWeightMeasuredAt: integer(value.body_weight_measured_at_ms) ? new Date(value.body_weight_measured_at_ms) : null,
-  });
+  // Historical record/certification evidence retains its original provenance.
+  // This decoder only displays server scores; live scoring accepts dated readings.
+  if (value.body_weight_status !== 'known' || !finite(value.body_weight_kg) || value.body_weight_kg <= 0) return false;
+  if (value.body_weight_source === 'manual') return value.body_weight_measurement_id === null && value.body_weight_measured_at_ms === null;
+  return ['reading', 'historical_estimate'].includes(String(value.body_weight_source)) &&
+    typeof value.body_weight_measurement_id === 'string' && value.body_weight_measurement_id.trim().length > 0 &&
+    integer(value.body_weight_measured_at_ms) && Number.isFinite(new Date(value.body_weight_measured_at_ms).getTime());
 }
 const isRow = (value: unknown, metric: unknown, revision: unknown) =>
   metricValueRecord(value) && value.metric === metric && value.rules_revision === revision &&

@@ -355,3 +355,12 @@ It does **not** lock the final sync API surface choice for `T-20260220-11` (`Edg
 - `Supabase-local` integration/contract tests: required for auth/RLS/API tasks
 - hosted smoke validation: owned by `T-20260220-09` (manual by default until CI exists)
 - cross-stack `E2E`: strategy only in M5; repo-root `e2e/` reserved for later implementation
+
+## Dated bodyweight cutover
+
+The forward migration `20260927150155_dated_bodyweight_groups.sql` removes
+stored session weight, adds private as-of projections and reading-triggered
+group reevaluation, and rejects outdated app sync calls before removed-column
+access. Release the isolated compatibility client first, then the migration,
+matching functions and dated client. Follow [RUNBOOK](../RUNBOOK.md#dated-bodyweight-cutover)
+for exact commands, hosted checks and forward repair; local gates do not deploy.

@@ -21,18 +21,14 @@ This document is project-level source of truth for what data exists and how it i
 
 ## Current model layers
 
-The [M27 bodyweight contract](tech/bodyweight-load-contract.md) defines private
-measurements, frozen session snapshots and explicit external load metadata.
-Their paired SQLite/server schema and sync transport are implemented. Reading
-entry/history and explicit session correction use the local repository; new
-sessions freeze context in their creation transaction. Personal exercise setup,
-explicit actual/planned load meaning and transactional legacy review use these
-same fields. Explicit historical fill uses one revalidated local transaction
-over still-missing completed sessions, preserving existing tuples; source
-selection, repeat behavior and provenance follow the bodyweight contract §4.
-It creates ordinary dirty session writes, with no new schema or background
-refresh. Broader calculation-consumer activation remains separate rollout work. The import contract defines v2 preservation of readings, frozen
-context and load meaning; v1 writes omit new fields rather than clearing them.
+The [bodyweight contract](tech/bodyweight-load-contract.md) defines private dated
+measurements and explicit external load metadata. Session weight is resolved on
+read from the latest live reading at/before its exact start instant; value/date
+edits, deletion and restoration recalculate history. No session tuple or manual
+override is persisted or synced. Forward migrations remove obsolete columns
+without manufacturing readings or changing raw sets. Import v3 omits session
+weight; old v2 tuples are ignored. The staged update-required rollout is owned
+by RUNBOOK and the Sync v2 contract.
 
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.
@@ -72,9 +68,7 @@ outside the mirror; no derived volume/1RM columns are stored.
 - `body_weight_measurements` (owner-private dated readings; raw `weight_value`,
   explicit `weight_unit`, normalized `weight_kg`, `measured_at`, timestamps and
   tombstone; no group access to reading history)
-- `sessions` (nullable frozen `body_weight_kg`, `body_weight_source`,
-  `body_weight_measurement_id`, `body_weight_measured_at`; source id is plain
-  provenance with no FK, so reading edits/deletion cannot rewrite a snapshot)
+- `sessions` (recorded start/end/status and ordinary sync fields; body weight is a dated read projection)
 - `session_exercises`
 - `exercise_sets` (actual entered `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for explicit planned/unperformed execution state; legacy `skipped` values remain readable)
 - `exercise_sets` also stores actual `weight_unit` (legacy default `kg`),

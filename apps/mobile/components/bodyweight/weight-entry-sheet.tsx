@@ -13,26 +13,26 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   autoFocus?: boolean;
   title: string;
   initial: WeightEntry;
-  measuredAt?: Date;
+  measuredAt: Date;
   explanation: string;
-  onSave: (input: WeightEntry & { measuredAt?: Date }) => Promise<void>;
+  onSave: (input: WeightEntry & { measuredAt: Date }) => Promise<void>;
   onDelete?: () => Promise<void>;
   onDismiss: () => void;
 }) {
   const [value, setValue] = useState(initial.weightValue);
   const [unit, setUnit] = useState(initial.weightUnit === 'lb' ? 'lb' : 'kg');
-  const [dateText, setDateText] = useState(measuredAt ? formatCurrentDateTime(measuredAt) : '');
+  const [dateText, setDateText] = useState(formatCurrentDateTime(measuredAt));
   const [valueError, setValueError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
-  const measuredAtMs = measuredAt?.getTime();
+  const measuredAtMs = measuredAt.getTime();
   useEffect(() => {
     if (!visible) return;
     setValue(initial.weightValue);
     setUnit(initial.weightUnit === 'lb' ? 'lb' : 'kg');
-    setDateText(measuredAtMs === undefined ? '' : formatCurrentDateTime(new Date(measuredAtMs)));
+    setDateText(formatCurrentDateTime(new Date(measuredAtMs)));
     setValueError(null); setDateError(null); setSaveError(null);
   }, [visible, initial.weightValue, initial.weightUnit, measuredAtMs]);
   const run = async (action: () => Promise<void>) => {
@@ -50,8 +50,8 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     const input = { weightValue: value, weightUnit: unit };
     try { validateBodyWeight(input); }
     catch (error) { setValueError((error as Error).message); return; }
-    let date: Date | undefined;
-    if (measuredAt) {
+    let date: Date;
+    {
       try { date = resolveMeasurementDate(dateText, measuredAt); }
       catch (error) { setDateError((error as Error).message); return; }
     }
@@ -67,16 +67,16 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
           editable={!busy} error={valueError} testID="weight-entry-value" />
         <SegmentedControl options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]}
           accessibilityLabel="Weight unit" value={unit} onChange={setUnit} disabled={busy} style={styles.unitControl} testIDPrefix="weight-entry-unit" />
-        {measuredAt ? <FormField label="Measured at" accessibilityLabel="Measurement date and time"
+        <FormField label="Measured at" accessibilityLabel="Measurement date and time"
           value={dateText} onChangeText={setDateText} autoCapitalize="none" autoCorrect={false}
           editable={!busy} error={dateError} hint="Local time · YYYY-MM-DD HH:mm"
-          testID="weight-entry-date" /> : null}
+          testID="weight-entry-date" />
         {saveError ? <Notice live tone="danger" message={saveError} testID="weight-entry-save-error" /> : null}
         <ActionButton label={busy ? 'Saving…' : 'Save weight'} onPress={save} disabled={busy}
           variant="primary" testID="weight-entry-save" />
         {onDelete ? <ActionButton label="Delete reading" variant="text" tone="danger" disabled={busy}
           testID="weight-entry-delete" onPress={() => Alert.alert('Delete reading?',
-            'This removes the reading from your history. Saved session weights stay unchanged.', [
+            'This recalculates affected sessions and group comparisons using the remaining dated readings.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Delete', style: 'destructive', onPress: () => void run(onDelete) },
             ])} /> : null}

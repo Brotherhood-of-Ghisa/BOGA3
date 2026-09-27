@@ -21,7 +21,7 @@ const inventory: LegacyLoadInventory = { exerciseId: 'pull', exerciseName: 'Pull
   bodyweightCoefficient: 1, loadInputMode: 'total_load', metadataKnown: true, candidates: [{
     key: 'set:actual', setId: 'set', part: 'actual', sessionId: 'session', startedAt: new Date('2026-01-01T12:00:00Z'),
     setNumber: 1, weightValue: '100', repsValue: '8', storedUnit: 'kg', bodyWeightKg: 80,
-    bodyWeightSource: 'historical_estimate', bodyWeightMeasurementId: 'reading', bodyWeightMeasuredAt: new Date('2026-01-10T12:00:00Z'), metadataKnown: true,
+    bodyWeightSource: 'reading', bodyWeightMeasurementId: 'reading', bodyWeightMeasuredAt: new Date('2026-01-10T12:00:00Z'), metadataKnown: true,
   }] };
 
 beforeEach(() => { jest.clearAllMocks(); data.listLegacyLoads.mockResolvedValue(inventory); data.applyLegacyLoadReview.mockResolvedValue(1); });
@@ -100,7 +100,7 @@ it('requires source unit, shows originals and conversion, and writes only after 
   fireEvent.press(screen.getByTestId('legacy-load-preview'));
   expect(screen.getByText('Original: 100 kg × 8')).toBeTruthy();
   expect(screen.getByText(/Added: 20 kg · Effective load 100 kg/)).toBeTruthy();
-  expect(screen.getByText(/Estimated from/)).toBeTruthy();
+  expect(screen.getByText(/Reading from/)).toBeTruthy();
   expect(data.applyLegacyLoadReview).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('legacy-load-apply'));
   await screen.findByTestId('legacy-load-result');

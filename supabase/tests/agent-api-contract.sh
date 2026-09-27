@@ -68,7 +68,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"
@@ -465,7 +465,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "effective_load_v1"
+  .data.metric_revision == "dated_readings_v2"
   and .data.exercise.bodyweight_coefficient == 0
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.complete == true
@@ -479,8 +479,10 @@ update_training_fixture "
   update app_public.exercise_definitions set bodyweight_coefficient=1,
     movement_standard='strict_pull_up',loading_method='free_weight'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
-  update app_public.sessions set body_weight_kg=80,body_weight_source='manual'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
+  insert into app_public.body_weight_measurements
+    (owner_user_id,id,weight_value,weight_unit,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-asof','80','kg',80,
+      ${STARTED_MS},${NOW_MS},${NOW_MS},${NOW_MS});
   update app_public.exercise_sets set weight_value='20',reps_value='8',external_load_mode='added'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
   update app_public.exercise_sets set weight_value='',reps_value='8',external_load_mode='added'
@@ -505,7 +507,7 @@ agent_get "workouts/recent?limit=1"
 assert_training_payload '.data.workouts[0].total_volume.value == 1440
   and .data.workouts[0].total_volume.complete == true
   and .data.workouts[0].completed_set_count == 2
-  and .data.workouts[0].session_body_weight.source == "manual"
+  and .data.workouts[0].session_body_weight.source == "reading"
   and .data.workouts[0].exercises[0].load_rules.bodyweight_coefficient == 1
 ' 'workout and exercise totals agree'
 
@@ -541,8 +543,8 @@ assert_training_payload '.data.recent_performances[0].sets[0].effective_load.val
 
 echo "[agent-api-test] verifying unknown B, partial volume and independent performed counts"
 update_training_fixture "
-  update app_public.sessions set body_weight_kg=null,body_weight_source=null
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
+  update app_public.body_weight_measurements set deleted_at=${NOW_MS}
+    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
   insert into app_public.session_exercises
     (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
      created_at,updated_at,client_updated_at_ms)
@@ -574,28 +576,27 @@ assert_training_payload '.data.workouts[0].completed_set_count == 2
   and .data.workouts[0].total_volume.complete == false
 ' 'partial known volume is explicitly incomplete across exercises'
 
-echo "[agent-api-test] verifying saved estimates, malformed provenance and later readings"
+echo "[agent-api-test] verifying dated readings, malformed values and later readings"
 update_training_fixture "
   update app_public.exercise_definitions set bodyweight_coefficient=1,load_input_mode='total_load'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
   update app_public.exercise_sets set weight_value='20'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
-  update app_public.sessions set body_weight_kg=80,body_weight_source='historical_estimate',
-    body_weight_measurement_id='agent-api-${RUN_TAG}-reading',body_weight_measured_at=${STARTED_MS}
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
+  update app_public.body_weight_measurements set deleted_at=null
+    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
   insert into app_public.body_weight_measurements
     (owner_user_id,id,weight_value,weight_unit,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-reading','90','kg',90,
       ${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].session_body_weight.estimated == true
+assert_training_payload '.data.recent_performances[0].session_body_weight.estimated == false
   and .data.recent_performances[0].session_body_weight.value == 80
-  and .data.recent_performances[0].session_body_weight.source == "historical_estimate"
+  and .data.recent_performances[0].session_body_weight.source == "reading"
   and (.data.recent_performances[0].session_body_weight.measured_at | endswith("Z"))
   and .data.recent_performances[0].volume.value == 800
   and (tostring | contains("weight_measurements") | not)
-' 'estimated B is identifiable and current reading does not replace it'
+' 'dated B is identifiable and a later reading does not replace it'
 update_training_fixture "
   update app_public.body_weight_measurements set weight_value='95',weight_kg=95,deleted_at=${NOW_MS}
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-reading';
@@ -603,19 +604,18 @@ update_training_fixture "
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].volume.value == 800
   and .data.recent_performances[0].session_body_weight.value == 80
-' 'editing or deleting the source reading does not rescore history'
+' 'editing or deleting a later reading leaves earlier history unchanged'
 update_training_fixture "
-  update app_public.sessions set body_weight_kg=82,body_weight_source='manual',
-    body_weight_measurement_id=null,body_weight_measured_at=null
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
+  update app_public.body_weight_measurements set weight_kg=82,weight_value='82'
+    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].volume.value == 816
   and .data.recent_performances[0].session_body_weight.estimated == false
-' 'explicit saved-session correction refreshes metrics'
+' 'editing an applicable reading refreshes metrics'
 update_training_fixture "
-  update app_public.sessions set body_weight_source=null
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
+  update app_public.body_weight_measurements set weight_value='bad'
+    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].volume.value == null
@@ -625,8 +625,8 @@ assert_training_payload '.data.recent_performances[0].volume.value == null
 
 echo "[agent-api-test] verifying unresolved modes and unquantified assistance"
 update_training_fixture "
-  update app_public.sessions set body_weight_source='manual'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SESSION_A}';
+  update app_public.body_weight_measurements set weight_value='82'
+    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
   update app_public.exercise_sets set external_load_mode='unquantified_assistance'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
 " >/dev/null

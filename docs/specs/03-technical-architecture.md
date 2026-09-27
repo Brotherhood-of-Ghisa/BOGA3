@@ -66,7 +66,7 @@ Capture top-level architecture decisions for MVP, with clear `Adopted` vs `Plann
 ## Personal effective-load projection boundary
 
 `src/exercise-calculations/analytics.ts` adapts raw sets, current personal exercise
-rules and the frozen session snapshot to the pure effective-load kernel.
+rules and the as-of dated reading to the pure effective-load kernel.
 Repository adapters batch definition/session context with their graph reads;
 no screen queries context per set. Local upgrade placeholders remain unavailable
 until hydration or explicit user intent establishes their meaning.
@@ -74,13 +74,13 @@ until hydration or explicit user intent establishes their meaning.
 The boundary feeds exercise history/block history, daily/weekly analytics,
 catalogue statistics, muscle contributions, session insights, recorder models,
 records and share previews. Current rules reinterpret historical personal
-projections; current weigh-ins do not replace historical session snapshots.
+projections; reading mutations update affected historical intervals.
 Complete volume and the known subtotal remain distinct through every rollup,
 including overflow. No derived metric or personal achievement is persisted.
 
 The calculator’s source loader reads completed eligible history; its target
-inputs and results are transient. Rule/session corrections and explicit legacy
-review refresh dependent reads on save/focus. Group score authority remains
+inputs and results are transient. Reading and session-start changes refresh focused views and open calculators
+after local commits or sync pulls. Explicit legacy review revalidates context. Group score authority remains
 separate and is governed by `tech/groups-contract.md`.
 
 ## Versioned group projection boundary (M27)
@@ -96,8 +96,8 @@ revision. Calculation revisions and metric-specific observation attestations
 are separate; changing group rules cannot silently broaden an old attestation.
 
 Shared-session cards use the member's personal effective-load context, while
-rankings use group rules. Both consume frozen session weight, never a current
-reading lookup. Server migration and typed mobile boundaries are implemented;
+rankings use group rules. Both resolve the owner’s latest live reading at/before the exact session start.
+The SQL/TypeScript parity suite fixes tie order, validation and UTC semantics. Server migration and typed mobile boundaries are implemented;
 group UI is integrated, with native acceptance and hosted rollout in progress.
 The owning contract is
 [`tech/groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).

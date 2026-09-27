@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { BOGA_SESSION_IMPORT_SCHEMA_V2 } from './bodyweight-import-context';
+import { supportsLoadMetadata } from './bodyweight-import-context';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '../../src/data/exercise-catalog-seeds';
 import {
   validateBogaSessionImportPackage,
@@ -159,7 +159,7 @@ const requireCatalogGym = (pkg: BogaSessionImportPackage, gymId: string) => {
 export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
   const validation = validateBogaSessionImportPackage(pkg);
   if (!validation.ok) throw new Error(validation.errors.join('\n'));
-  const v2 = pkg.schema === BOGA_SESSION_IMPORT_SCHEMA_V2;
+  const v2 = supportsLoadMetadata(pkg.schema);
   const generatedAtMs = epochMs(pkg.generatedAt, 'generatedAt');
   const entities: WireEntity[] = [];
   const seen = new Set<string>();
@@ -270,9 +270,6 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
       client_updated_at_ms: completedAtMs,
       fields: {
         gym_id: session.gymId,
-        ...(v2 ? { body_weight_kg: session.bodyWeightKg!, body_weight_source: session.bodyWeightSource!,
-          body_weight_measurement_id: session.bodyWeightMeasurementId ? generatedBodyWeightMeasurementId(pkg, session.bodyWeightMeasurementId) : null,
-          body_weight_measured_at: session.bodyWeightMeasuredAt ? epochMs(session.bodyWeightMeasuredAt, 'snapshot reading date') : null } : {}),
         status: 'completed',
         started_at: startedAtMs,
         completed_at: completedAtMs,
@@ -340,6 +337,7 @@ const signIn = async (apiUrl: string, anonKey: string, email: string, password: 
   const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
+      'x-boga-sync-protocol': '2',
       apikey: anonKey,
       'content-type': 'application/json',
     },
@@ -356,6 +354,7 @@ const verifyTokenEmail = async (apiUrl: string, anonKey: string, token: string, 
   const response = await fetch(`${apiUrl}/auth/v1/user`, {
     method: 'GET',
     headers: {
+      'x-boga-sync-protocol': '2',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       accept: 'application/json',
@@ -375,6 +374,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
     method: 'POST',
     headers: {
+      'x-boga-sync-protocol': '2',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',

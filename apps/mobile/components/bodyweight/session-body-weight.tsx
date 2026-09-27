@@ -1,39 +1,58 @@
 import { useState } from 'react';
-import { Card, Icon, ListRow, Stat, uiRoles } from '@/components/ui';
+import { useRouter } from 'expo-router';
 import { Text } from 'react-native';
-import { correctSessionBodyWeight } from '@/src/data/bodyweight';
+import { ActionButton, Card, ListRow, Notice, Stat } from '@/components/ui';
+import { saveBodyWeightReading } from '@/src/data/bodyweight';
+import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import { isValidSessionWeight, sessionWeightSourceLabel, type SessionWeightSnapshot } from '@/src/bodyweight/weight-entry';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
 
-export function SessionBodyWeight({ sessionId, snapshot, metadataKnown = true, editable = true, onSaved }: {
+export function SessionBodyWeight({ sessionId, snapshot, editable = true, onSaved }: {
   sessionId: string;
   snapshot: Partial<SessionWeightSnapshot>;
-  metadataKnown?: boolean;
   editable?: boolean;
   onSaved: (snapshot: SessionWeightSnapshot) => void;
 }) {
+  const router = useRouter();
+  const [entryDate, setEntryDate] = useState<Date | null>(null);
   const [editing, setEditing] = useState(false);
-  const valid = metadataKnown && isValidSessionWeight(snapshot);
-  const displayWeight = valid ? String(Number(snapshot.bodyWeightKg!.toFixed(3))) : 'Unknown';
-  const source = !metadataKnown ? 'Session weight unavailable.' : sessionWeightSourceLabel(snapshot);
+  const [error, setError] = useState<string | null>(null);
+  const valid = isValidSessionWeight(snapshot);
+  const displayWeight = valid ? String(Number(snapshot.bodyWeightKg!.toFixed(3))) : 'Unavailable';
+  const source = sessionWeightSourceLabel(snapshot);
+  const addReading = async () => {
+    setError(null);
+    try {
+      const session = await loadSessionSnapshotById(sessionId);
+      if (!session || session.deletedAt) throw new Error('This session is no longer available.');
+      setEntryDate(session.startedAt); setEditing(true);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not open dated entry.'); }
+  };
   return <>
     <Card>
-      <ListRow density="list" divider={false} onPress={editable ? () => setEditing(true) : undefined}
-        accessibilityLabel={`Session body weight, ${valid ? `${displayWeight} kg` : 'unknown'}, ${source}`}
-        accessibilityHint={editable ? 'Opens correction for this session only' : undefined}
-        testID="session-body-weight" trailing={editable ? <Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} /> : undefined}>
+      <ListRow density="list" divider={false}
+        accessibilityLabel={`Session body weight, ${valid ? `${displayWeight} kg` : 'unavailable'}, ${source}`}
+        testID="session-body-weight">
         <Stat label="Body weight · kg" value={displayWeight}
           kind={valid ? 'figure' : 'text'} rank="secondary" testID="session-body-weight-value" />
         <Text allowFontScaling={false} style={styles.body} testID="session-body-weight-source">{source}</Text>
       </ListRow>
+      {!valid && editable ? <ActionButton variant="text"
+        label={snapshot.bodyWeightMeasurementId ? 'Review weight history' : 'Add dated reading'}
+        testID="session-body-weight-add-reading"
+        onPress={() => snapshot.bodyWeightMeasurementId ? router.push('/body-weight') : void addReading()} /> : null}
+      {error ? <Notice live tone="danger" message={error} /> : null}
     </Card>
-    <WeightEntrySheet visible={editing} title="Session body weight"
-      initial={{ weightValue: valid ? String(snapshot.bodyWeightKg) : '', weightUnit: 'kg' }}
-      explanation="Changes this session only. Bodyweight load, personal records and group scores may change; weight-dependent certifications may need review. Your Settings readings stay unchanged."
+    {entryDate ? <WeightEntrySheet visible={editing} title="Add dated reading"
+      measuredAt={entryDate} initial={{ weightValue: '', weightUnit: 'kg' }}
+      explanation="This dated reading recalculates affected sessions and group comparisons, up to the next reading. It may change weight-dependent certifications."
       onDismiss={() => setEditing(false)} onSave={async input => {
-        const saved = await correctSessionBodyWeight(sessionId, input);
-        onSaved(saved);
-      }} />
+        await saveBodyWeightReading(input);
+        const session = await loadSessionSnapshotById(sessionId);
+        if (session) onSaved({ bodyWeightKg: session.bodyWeightKg ?? null,
+          bodyWeightSource: session.bodyWeightSource ?? null, bodyWeightMeasurementId: session.bodyWeightMeasurementId ?? null,
+          bodyWeightMeasuredAt: session.bodyWeightMeasuredAt ?? null });
+      }} /> : null}
   </>;
 }

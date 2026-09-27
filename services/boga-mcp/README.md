@@ -31,13 +31,13 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "effective_load_v1"` pass through
+Training projections with `metric_revision: "dated_readings_v2"` pass through
 unchanged in both structured and text JSON output. Tool names and strict input
 schemas remain compatible. Raw `entered_load` retains amount/unit/mode;
 normalized external `load` is distinct from `effective_load` and total 1RM.
-Descriptions direct coaches to inspect metric basis, saved session-weight
+Descriptions direct coaches to inspect metric basis, dated session-weight
 provenance, null availability and volume coverage. `known_subtotal` must never
-be described as a complete total, and estimated historical weight stays labelled.
+be described as a complete total, and missing applicable readings remain unavailable.
 The adapter adds no body-weight write tools, measurement timeline reads, group
 access or database credentials. See the [agent API contract](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
 

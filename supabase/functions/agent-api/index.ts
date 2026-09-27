@@ -80,7 +80,7 @@ type SessionRow = SessionWeightRow & {
 type SetRow = EnteredSetRow & { session_exercise_id: string };
 
 const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_coefficient,movement_standard,loading_method';
-const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec,body_weight_kg,body_weight_source,body_weight_measurement_id,body_weight_measured_at';
+const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec';
 
 class ApiError extends Error {
   constructor(
@@ -713,6 +713,24 @@ const searchExercises = async (
   };
 };
 
+// Resolve only already-authorized session IDs in one owner-filtered server call.
+const attachSessionWeightContexts = async (
+  client: SupabaseClient, userId: string, rows: SessionRow[],
+): Promise<SessionRow[]> => {
+  if (rows.length === 0) return rows;
+  const { data, error } = await client.schema('app_public').rpc('session_weight_contexts', {
+    p_owner: userId, p_session_ids: rows.map(row => row.id),
+  });
+  throwDatabaseError(error);
+  const byId = new Map((data as (SessionWeightRow & { session_id: string })[])
+    .map(context => [context.session_id, context]));
+  return rows.map(row => {
+    const context = byId.get(row.id);
+    if (!context) throw new ApiError(503, 'CONTEXT_UNAVAILABLE', 'Session context is unavailable.');
+    return { ...row, ...context };
+  });
+};
+
 const loadSessionsById = async (
   client: SupabaseClient,
   userId: string,
@@ -733,7 +751,7 @@ const loadSessionsById = async (
     throwDatabaseError(error);
     rows.push(...(data ?? []));
   }
-  return rows;
+  return attachSessionWeightContexts(client, userId, rows);
 };
 
 const loadSetsByBlock = async (
@@ -971,7 +989,7 @@ const getRecentWorkouts = async (
   throwDatabaseError(error);
   const rows = data ?? [];
   const hasMore = rows.length > limit;
-  const page = rows.slice(0, limit);
+  const page = await attachSessionWeightContexts(client, userId, rows.slice(0, limit));
   const sessionIds = page.map((row) => row.id);
 
   const { data: blocks, error: blockError } = sessionIds.length === 0

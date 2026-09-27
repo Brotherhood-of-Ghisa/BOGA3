@@ -154,9 +154,9 @@ Non-empty source notes are preserved under set `source.note` and summarized in
   pass `none` for buckets that should produce no gym assignment.
 
 
-## V2 explicit load context
+## V3 dated readings and explicit load context
 
-V2 retains the structure above and adds the following required context. The
+V3 retains the structure above and adds the following required context. The
 serializer `serializeBogaSessionImportPackage` validates before exporting JSON;
 both local and `sync_push` import paths preserve the same fields. V1 remains
 supported and never infers added/assisted meaning, even for zero. Adding v2 fields
@@ -168,11 +168,12 @@ to a v1-labelled package is rejected rather than silently discarding them.
   cannot be later than export generation or the importer's current time.
   They remain owner-private, never group data. This is opt-in package content,
   not a requirement to export unrelated weigh-ins with a workout.
-- Each session supplies `bodyWeightKg`, `bodyWeightSource`,
-  `bodyWeightMeasurementId`, `bodyWeightMeasuredAt`: all null, or positive kg
-  with `manual` and null provenance, or `reading`/`historical_estimate` with id
-  and UTC ISO reading time. Source readings may be absent from the package;
-  no FK or present-day reading lookup is needed. Snapshot kg stays frozen.
+- Sessions contain no body-weight fields. Existing v2 packages are accepted,
+  but their stored snapshot tuple is ignored even if malformed. Only explicit
+  `bodyWeightMeasurements` create readings; manual session-only weights never do.
+  The serializer upgrades v2 to v3 and strips that tuple. V3 rejects session
+  weight keys. Past sessions resolve from the imported/previously-owned dated
+  timeline using the same as-of rule as ordinary app reads.
 - A `create_new` exercise decision supplies `loadInputMode` and complete
   `loadRules` (`bodyweightCoefficient`, `movementStandard`, `loadingMethod`).
   Positive contribution requires explicit descriptions. `map_existing` never
@@ -194,3 +195,5 @@ review flow for legacy conversion. Reading ids use a deterministic import
 namespace, and snapshot references are remapped consistently even if the source
 reading is absent. V1 remote writes omit new fields so they cannot clear a newer
 client's context under the compatible sync writer.
+
+Remote imports send `x-boga-sync-protocol: 2`; obsolete clients are rejected before writes.

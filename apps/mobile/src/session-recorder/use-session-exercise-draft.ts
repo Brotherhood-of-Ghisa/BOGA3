@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -166,6 +167,7 @@ export const useSessionExerciseDraft = ({
     bodyWeightRef.current = snapshot;
     setState(current => current.status === 'ready' ? { ...current, bodyWeight: snapshot } : current);
   }, []);
+  const datedWeightRevision = useBodyWeightContextRevision();
   const reload = useCallback(async () => {
     if (!await flush()) return false;
     const prior = exerciseRef.current;
@@ -187,6 +189,7 @@ export const useSessionExerciseDraft = ({
   useFocusEffect(useCallback(() => {
     void reload();
     return () => { void lifecycle.onScreenBlur(); };
-  }, [lifecycle, reload]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
+  }, [lifecycle, reload, datedWeightRevision]));
   return { state, saveError, update, flush, remove, reload, setBodyWeight };
 };

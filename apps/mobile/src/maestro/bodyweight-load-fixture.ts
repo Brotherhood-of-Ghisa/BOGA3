@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 import { exerciseSets } from '@/src/data/schema';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { correctSessionBodyWeight } from '@/src/data/bodyweight';
+import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 
 /** Ambiguous legacy values are deliberate; the UI must review them, never guess. */
@@ -16,7 +16,7 @@ export const seedBodyweightLoadFixture = async (now = new Date(), missingBodyWei
   await persistSessionDraftSnapshot({ sessionId: 'maestro_bw_history', gymId: null, startedAt: historical,
     exercises: [{ id: 'maestro_bw_history_exercise', exerciseDefinitionId: exerciseId, name: 'Bodyweight Pull-Up',
       sets: [{ id: 'maestro_bw_legacy', weightValue: '80', repsValue: '8', setType: 'rir_1', performanceStatus: null }] }] });
-  await correctSessionBodyWeight('maestro_bw_history', { weightValue: '80', weightUnit: 'kg' });
+  if (!missingBodyWeight) await saveBodyWeightReading({ weightValue: '80', weightUnit: 'kg', measuredAt: historical });
   await completeSessionDraft('maestro_bw_history', { completedAt: new Date(historical.getTime() + 3600000) });
   await persistSessionDraftSnapshot({ sessionId: 'maestro_bw_active', gymId: null, startedAt: now,
     exercises: [{ id: 'maestro_bw_exercise', exerciseDefinitionId: exerciseId, name: 'Bodyweight Pull-Up', sets: [
@@ -27,7 +27,6 @@ export const seedBodyweightLoadFixture = async (now = new Date(), missingBodyWei
         plannedWeightValue: '100', plannedRepsValue: '8', plannedSetType: 'rir_1',
         plannedWeightUnit: 'kg', plannedExternalLoadMode: null },
     ] }] });
-  if (!missingBodyWeight) await correctSessionBodyWeight('maestro_bw_active', { weightValue: '80', weightUnit: 'kg' });
 };
 
 /** State after explicitly configuring an upgraded exercise, before its old

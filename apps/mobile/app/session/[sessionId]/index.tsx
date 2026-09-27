@@ -171,7 +171,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
       sessionId,
       status: "completed" as const,
       completedAt: state.data.comparisonAt,
-      bodyWeightKg: state.data.localBodyweightMetadataKnown === false ? null : state.data.bodyWeightKg,
+      bodyWeightKg: state.data.bodyWeightKg,
       exercises: toSessionInsightExercises(state.data.session, new Map()),
     };
     const base = { targetSession, historicalSessions: state.data.insightHistory };
@@ -435,8 +435,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           volume={model.volume}
           volumeNote={model.volumeNote}
         />
-        <SessionBodyWeight sessionId={data.sessionId} snapshot={data}
-          metadataKnown={data.localBodyweightMetadataKnown} onSaved={() => void reload()} />
+        <SessionBodyWeight sessionId={data.sessionId} snapshot={data} onSaved={() => void reload()} />
         {model.cards.map((card) => (
           <SessionExerciseCard
             card={card}

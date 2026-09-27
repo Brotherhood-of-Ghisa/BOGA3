@@ -4,7 +4,7 @@ appId: com.dinoderek.mobile
 # Dismiss each keyboard explicitly before navigation, and locate sheet fields
 # without centering swipes through the backdrop. Decimal pads use the neutral
 # field label; the single-line date field uses its native Return key.
-# M27: real local entry, history, frozen new-session context and explicit correction.
+# M27: real local entry, history, dated session context and missing-context entry.
 # Infra-free: writes do not depend on auth/server availability. Start/end reset.
 - runScript: ../scripts/bodyweight-dates.js
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
@@ -160,7 +160,7 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 - assertVisible:
-    text: "Reading saved. Existing sessions are unchanged."
+    text: "Reading saved. Affected sessions recalculated."
 - takeScreenshot: "BW04-populated"
 - tapOn:
     id: "body-weight-back"
@@ -192,7 +192,7 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "session-body-weight"
     text: ".*Reading from ${output.bodyweightPast}"
-- takeScreenshot: "BW05-session-snapshot"
+- takeScreenshot: "BW05-session-context"
 - tapOn:
     id: "top-level-tab-more"
 - extendedWaitUntil:
@@ -349,7 +349,7 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 - assertVisible:
-    text: "Reading deleted. Existing sessions are unchanged."
+    text: "Reading deleted. Affected sessions recalculated."
 - takeScreenshot: "BW06-source-deleted"
 - tapOn:
     id: "body-weight-back"
@@ -371,17 +371,16 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - assertVisible:
     id: "session-body-weight"
-    text: "Session body weight, 80 kg, .*"
-- assertVisible:
-    id: "session-body-weight"
-    text: ".*Reading from ${output.bodyweightPast}"
+    text: "Session body weight, unavailable, .*"
+- assertVisible: "No reading on or before this session"
+- takeScreenshot: "BW07-missing-context"
 - tapOn:
-    id: "session-body-weight"
+    id: "session-body-weight-add-reading"
 - extendedWaitUntil:
     visible:
       id: "weight-entry-sheet"
     timeout: 30000
-- takeScreenshot: "BW07-correction-sheet"
+- takeScreenshot: "BW07b-dated-entry-sheet"
 - scrollUntilVisible:
     element:
       id: "weight-entry-value"
@@ -413,8 +412,8 @@ appId: com.dinoderek.mobile
     text: "Session body weight, 82 kg, .*"
 - assertVisible:
     id: "session-body-weight"
-    text: ".*Set manually for this session"
-- takeScreenshot: "BW08-manual-snapshot"
+    text: ".*Reading from .*"
+- takeScreenshot: "BW08-dated-context"
 - tapOn:
     id: "top-level-tab-more"
 - extendedWaitUntil:
@@ -491,7 +490,7 @@ appId: com.dinoderek.mobile
     id: "session-body-weight"
     text: "Session body weight, 85 kg, .*"
 - takeScreenshot: "BW09-next-session"
-# A cold process restart keeps both private history and the frozen session.
+# A cold process restart keeps both private history and the dated session context.
 # Open the dev-client URL once from a stopped process. Launching and then
 # reopening that URL can tear down the bridge while its WebSocket opens.
 - stopApp
@@ -552,7 +551,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible:
       id: "session-body-weight"
-      text: "Session body weight, unknown, .*"
+      text: "Session body weight, unavailable, .*"
     timeout: 30000
 - extendedWaitUntil:
     notVisible:

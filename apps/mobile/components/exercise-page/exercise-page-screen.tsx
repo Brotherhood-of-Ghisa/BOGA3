@@ -134,7 +134,7 @@ export function ExercisePageScreen({
   const loadContext: LoadContext = {
     bodyweightCoefficient: !editingExercise || editingExercise.localBodyweightMetadataKnown === false ? NaN : editingExercise.bodyweightCoefficient ?? 0,
     loadInputMode: editingExercise?.loadInputMode ?? 'total_load',
-    bodyWeightKg: bodyWeight?.localBodyweightMetadataKnown !== false && isValidSessionWeight(bodyWeight ?? {}) ? bodyWeight?.bodyWeightKg : null,
+    bodyWeightKg: isValidSessionWeight(bodyWeight ?? {}) ? bodyWeight?.bodyWeightKg : null,
   };
   const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
@@ -287,8 +287,8 @@ export function ExercisePageScreen({
             view={recordsView}
           />
           {loadContext.bodyweightCoefficient > 0 ? <SessionBodyWeight sessionId={sessionId}
-            snapshot={draft.state.bodyWeight} metadataKnown={draft.state.bodyWeight?.localBodyweightMetadataKnown}
-            onSaved={snapshot => draft.setBodyWeight({ ...snapshot, localBodyweightMetadataKnown: true })} /> : null}
+            snapshot={draft.state.bodyWeight}
+            onSaved={snapshot => draft.setBodyWeight(snapshot)} /> : null}
           <Card testID="exercise-set-list">
             {rows.map((row, index) => {
               const isOpen = row.id === openSet?.id;

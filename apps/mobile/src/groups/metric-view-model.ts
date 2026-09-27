@@ -1,3 +1,4 @@
+import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
 // Presentation only: server order, score, metric and rule revision are preserved.
 import { sessionWeightSourceLabel } from '@/src/bodyweight/weight-entry';
 import { buildPodiumCards, formatEmptyBoardLabel, type PodiumCardViewModel, formatBoardDate, formatBoardMemberLabel, formatOrdinal, type BoardRowViewModel, type GroupBoardScope } from './board-view-model';
@@ -27,7 +28,10 @@ export function formatGroupRawPerformance(performance: GroupPerformanceSnapshotW
 }
 export function describeGroupPerformanceWeight(performance: GroupPerformanceSnapshotWire): string {
   if (performance.body_weight_status === 'invalid') return 'Session weight unavailable · invalid saved context';
-  const source = sessionWeightSourceLabel({ bodyWeightKg: performance.body_weight_kg, bodyWeightSource: performance.body_weight_source,
+  // Retired evidence is displayed with its original source, never used to score.
+  const source = performance.body_weight_source === 'manual' ? 'Original manual entry'
+    : performance.body_weight_source === 'historical_estimate' ? `Estimated from ${formatCurrentDateTime(new Date(performance.body_weight_measured_at_ms!))}`
+    : sessionWeightSourceLabel({ bodyWeightKg: performance.body_weight_kg, bodyWeightSource: performance.body_weight_source,
     bodyWeightMeasurementId: performance.body_weight_measurement_id,
     bodyWeightMeasuredAt: performance.body_weight_measured_at_ms === null ? null : new Date(performance.body_weight_measured_at_ms) });
   return performance.body_weight_kg === null ? source : `${Number(performance.body_weight_kg.toFixed(3))} kg · ${source}`;

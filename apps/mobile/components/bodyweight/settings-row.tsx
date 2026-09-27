@@ -1,3 +1,4 @@
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Icon, ListRow, uiRoles } from '@/components/ui';
@@ -7,6 +8,7 @@ import { BODY_WEIGHT_ROUTE } from '@/src/navigation/routes';
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
 
 export function BodyWeightSettingsRow() {
+  const datedWeightRevision = useBodyWeightContextRevision();
   const router = useRouter();
   const [description, setDescription] = useState('Loading weight…');
   useFocusEffect(useCallback(() => {
@@ -17,7 +19,8 @@ export function BodyWeightSettingsRow() {
         : 'Reading needs review');
     }).catch(() => { if (active) setDescription('Could not load weight. Open to retry.'); });
     return () => { active = false; };
-  }, []));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datedWeightRevision]));
   return <ListRow label="Body weight" description={description} density="list" divider={false}
     accessibilityLabel={`Body weight, ${description}`} accessibilityHint="Opens weight entry and history"
     onPress={() => router.push(BODY_WEIGHT_ROUTE)} testID="settings-body-weight-row"

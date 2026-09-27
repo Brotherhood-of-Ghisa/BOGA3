@@ -1,3 +1,5 @@
+import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
+import * as sessionDrafts from '@/src/data/session-drafts';
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
@@ -815,6 +817,25 @@ describe('CompletedSessionDetailScreenShell', () => {
     fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
     return screen.getByTestId('completed-session-detail-options-sheet');
   };
+
+  it('keeps an unfinished dated reading mounted during a background refresh', async () => {
+    const snapshot = jest.spyOn(sessionDrafts, 'loadSessionSnapshotById').mockResolvedValue({
+      sessionId: 'completed-under-test', startedAt: new Date(COMPLETED_SESSION_DETAIL_FIXTURE.startedAt), deletedAt: null,
+    } as Awaited<ReturnType<typeof sessionDrafts.loadSessionSnapshotById>>);
+    let finish!: (session: CompletedSessionDetailRecord) => void;
+    const load = jest.fn().mockResolvedValueOnce(COMPLETED_SESSION_DETAIL_FIXTURE)
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient({ loadCompletedSession: load })} />);
+    await screen.findByTestId('session-body-weight-add-reading');
+    fireEvent.press(screen.getByTestId('session-body-weight-add-reading'));
+    await screen.findByTestId('weight-entry-value');
+    fireEvent.changeText(screen.getByTestId('weight-entry-value'), '83.5');
+    act(() => invalidateBodyWeightContext());
+    expect(screen.getByTestId('weight-entry-value').props.value).toBe('83.5');
+    await act(async () => finish(COMPLETED_SESSION_DETAIL_FIXTURE));
+    expect(screen.getByTestId('weight-entry-value').props.value).toBe('83.5');
+    snapshot.mockRestore();
+  });
 
   it('renders loading, then the summary and every performed set in the design language', async () => {
     render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient()} />);

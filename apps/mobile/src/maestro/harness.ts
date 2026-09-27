@@ -15,7 +15,6 @@ import { isDevMode } from '@/src/utils/isDevMode';
 
 import { seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
 import { seedBodyweightAnalyticsFixture } from './bodyweight-analytics-fixture';
-import { seedBodyweightBackfillFixture } from './bodyweight-backfill-fixture';
 import { seedBodyweightLoadFixture, seedBodyweightOfflineReviewFixture } from './bodyweight-load-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
@@ -28,8 +27,6 @@ export type MaestroHarnessFixtureName =
   // The block history plus a newest completed session with two PRs.
   | 'completion-two-prs'
   | 'bodyweight-analytics'
-  | 'bodyweight-backfill'
-  | 'bodyweight-backfill-empty'
   | 'bodyweight-load-offline'
   | 'bodyweight-load'
   | 'bodyweight-load-missing'
@@ -90,8 +87,6 @@ export const resolveMaestroHarnessFixtureName = (
   value === 'exercise-block-history' ||
   value === 'completion-two-prs' ||
   value === 'bodyweight-analytics' ||
-  value === 'bodyweight-backfill' ||
-  value === 'bodyweight-backfill-empty' ||
   value === 'bodyweight-load-offline' ||
   value === 'bodyweight-load' ||
   value === 'bodyweight-load-missing' ||
@@ -203,9 +198,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
     await seedExerciseBlockHistoryFixture({ includeTwoPrSession: true });
   }
   if (fixtureName === 'bodyweight-analytics') await seedBodyweightAnalyticsFixture();
-  if (fixtureName === 'bodyweight-backfill' || fixtureName === 'bodyweight-backfill-empty') {
-    await seedBodyweightBackfillFixture(new Date(), fixtureName === 'bodyweight-backfill-empty');
-  }
+
   if (fixtureName === 'bodyweight-load-offline') await seedBodyweightOfflineReviewFixture();
   if (fixtureName === 'bodyweight-load' || fixtureName === 'bodyweight-load-missing') {
     await seedBodyweightLoadFixture(new Date(), fixtureName === 'bodyweight-load-missing');

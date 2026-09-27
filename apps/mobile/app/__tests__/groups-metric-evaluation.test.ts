@@ -5,8 +5,8 @@ const set: GroupMetricSourceSet = {
   exercise_definition_id: 'personal-pull-up', set_id: 'set', weight_value: '20', weight_unit: 'kg',
   external_load_mode: 'added', reps_value: '5', performance_status: null, live: true, counting: true,
   source_load_input_mode: 'total_load', movement_standard: 'Strict pull-up', loading_method: 'Belt',
-  body_weight_kg: 60, body_weight_source: 'manual', body_weight_measurement_id: null,
-  body_weight_measured_at_ms: null, achieved_at_ms: 1000, exercise_order_index: 0, set_order_index: 0,
+  body_weight_kg: 60, body_weight_source: 'reading', body_weight_measurement_id: 'r',
+  body_weight_measured_at_ms: 1000, achieved_at_ms: 1000, exercise_order_index: 0, set_order_index: 0,
   set_created_at_ms: 2000, fingerprints: { bodyweight_reps: 'reps-pin', absolute_strength: 'strength-pin',
     relative_strength: 'strength-pin', weight: 'conventional-pin', e1rm: 'conventional-pin' },
 };
@@ -23,7 +23,7 @@ it('carries revision, source token, raw session context and per-metric dependenc
   expect(result.scores).toHaveLength(2);
   expect(result.scores[0]).toMatchObject({ metric: 'absolute_strength', unit: 'kg',
     fingerprint: 'strength-pin', counting: true, effective_resistance_kg: 80,
-    performance: { weight_value: '20', weight_unit: 'kg', body_weight_status: 'known', body_weight_kg: 60, body_weight_source: 'manual' } });
+    performance: { weight_value: '20', weight_unit: 'kg', body_weight_status: 'known', body_weight_kg: 60, body_weight_source: 'reading' } });
   expect(result.scores[1]).toMatchObject({ metric: 'relative_strength', unit: 'x_bw' });
   expect(result.scores[0]).not.toHaveProperty('value_kg');
 });
@@ -43,7 +43,7 @@ it('retains a valid unlinked observation without allowing it into the live board
 });
 
 it('retains reps without valid B but refuses unconfirmed or incompatible performances', () => {
-  const noB = { ...set, weight_value: '', body_weight_kg: null, body_weight_source: null };
+  const noB = { ...set, weight_value: '', body_weight_kg: null, body_weight_source: null, body_weight_measurement_id: null, body_weight_measured_at_ms: null };
   const result = evaluateGroupMetricGraph({ ...graph, sets: [noB] });
   expect(result.scores).toEqual([expect.objectContaining({ metric: 'bodyweight_reps', unit: 'reps', value: 5,
     fingerprint: 'reps-pin', effective_resistance_kg: null,
@@ -59,9 +59,9 @@ it.each([
   { body_weight_kg: Number.POSITIVE_INFINITY },
   { body_weight_kg: -80 },
   { body_weight_source: 'future-source' },
-  { body_weight_source: 'reading' },
+  { body_weight_source: 'reading', body_weight_measurement_id: null },
   { body_weight_source: 'reading', body_weight_measurement_id: 'reading', body_weight_measured_at_ms: Number.POSITIVE_INFINITY },
-  { body_weight_source: 'manual', body_weight_measurement_id: 'unexpected-reading' },
+  { body_weight_source: 'reading', body_weight_measured_at_ms: null },
   { body_weight_kg: null, body_weight_source: 'reading' },
 ])('labels malformed session weight without losing an eligible unweighted-reps score: %p', patch => {
   const result = evaluateGroupMetricGraph({ ...graph, sets: [{ ...set, weight_value: '0', ...patch }] });
@@ -73,15 +73,11 @@ it.each([
   expect(JSON.stringify(result)).not.toMatch(/NaN|Infinity/);
 });
 
-it('keeps valid historical-estimate provenance on every ranked score', () => {
+it('does not reuse obsolete frozen provenance for live strength scores', () => {
   const result = evaluateGroupMetricGraph({ ...graph, sets: [{ ...set,
     body_weight_source: 'historical_estimate', body_weight_measurement_id: 'later-reading',
     body_weight_measured_at_ms: 9000 }] });
-  for (const score of result.scores) {
-    expect(score.performance).toMatchObject({ body_weight_status: 'known', body_weight_kg: 60,
-      body_weight_source: 'historical_estimate', body_weight_measurement_id: 'later-reading',
-      body_weight_measured_at_ms: 9000 });
-  }
+  expect(result.scores).toEqual([]);
 });
 
 it('fails the complete publication on missing eligible pins, duplicate identities or invalid revision', () => {

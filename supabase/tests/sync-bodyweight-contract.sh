@@ -16,8 +16,7 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "sessions", id: $session, client_updated_at_ms: $ts,
      fields: {gym_id: null, status: "completed", started_at: $ts, completed_at: ($ts+60000), duration_sec: 60,
-              body_weight_kg: 79.83225712, body_weight_source: "reading", body_weight_measurement_id: $reading,
-              body_weight_measured_at: $ts, created_at: $ts, updated_at: $ts, deleted_at: null}},
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $def, client_updated_at_ms: $ts,
      fields: {name: "Pull-Up", load_input_mode: "total_load", bodyweight_coefficient: 1,
               movement_standard: "strict", loading_method: "weighted", created_at: $ts, updated_at: $ts, deleted_at: null}},
@@ -57,7 +56,7 @@ bw_pull_layer() {
   exit 1
 }
 
-# Entire field maps round-trip, including raw units, frozen provenance and plans.
+# Entire field maps round-trip, including raw units, private dated readings and plans.
 for bw_layer in 0 1 2 3 4; do
   bw_pull_layer "${bw_layer}" true
   assert_status 200 "M27 pull layer ${bw_layer}"
@@ -96,9 +95,8 @@ BW_OLD_BODY="$(printf '%s' "${BW_BODY}" | jq '
       .planned_weight_unit,.planned_external_load_mode))')"
 sync_push "${USER_A_TOKEN}" "${BW_OLD_BODY}"
 assert_status 200 "M27 older writer accepted"
-user_select sessions "id=eq.${BW_SESSION_ID}&select=body_weight_kg,body_weight_source,body_weight_measurement_id,body_weight_measured_at" "${USER_A_TOKEN}"
-assert_json_expr --arg id "${BW_ID}" --argjson ts "${BASE_MS}" \
-  '.[0] == {body_weight_kg:79.83225712,body_weight_source:"reading",body_weight_measurement_id:$id,body_weight_measured_at:$ts}' "M27 older writer preserved snapshot tuple"
+user_select sessions "id=eq.${BW_SESSION_ID}&select=*" "${USER_A_TOKEN}"
+assert_json_expr '.[0] | has("body_weight_kg") | not' "sessions have no stored body weight"
 user_select exercise_definitions "id=eq.${BW_DEF_ID}&select=bodyweight_coefficient,movement_standard,loading_method" "${USER_A_TOKEN}"
 assert_json_expr '.[0] == {bodyweight_coefficient:1,movement_standard:"strict",loading_method:"weighted"}' "M27 older writer preserved exercise rules"
 user_select exercise_sets "id=eq.${BW_SET_ID}&select=weight_unit,external_load_mode,planned_weight_unit,planned_external_load_mode" "${USER_A_TOKEN}"
@@ -157,18 +155,27 @@ assert_non_2xx "M27 anonymous direct access denied"
 
 service_delete body_weight_measurements "owner_user_id=eq.${USER_A_UUID}&id=eq.${BW_ID}"
 assert_status 204 "M27 source physical deletion"
-user_select sessions "id=eq.${BW_SESSION_ID}&select=body_weight_kg,body_weight_measurement_id" "${USER_A_TOKEN}"
-assert_json_expr --arg id "${BW_ID}" '.[0].body_weight_kg == 79.83225712 and .[0].body_weight_measurement_id == $id' "M27 source deletion keeps frozen snapshot"
-
 BW_NULL_BODY="$(printf '%s' "${BW_BODY}" | jq '.entities |= map(select(.type != "body_weight_measurements") | .client_updated_at_ms += 400 |
-  if .type=="sessions" then .fields += {body_weight_kg:null,body_weight_source:null,body_weight_measurement_id:null,body_weight_measured_at:null}
-  elif .type=="exercise_sets" then .fields += {external_load_mode:null,planned_weight_unit:null,planned_external_load_mode:null}
+  if .type=="exercise_sets" then .fields += {external_load_mode:null,planned_weight_unit:null,planned_external_load_mode:null}
   elif .type=="exercise_definitions" then .fields += {movement_standard:null,loading_method:null} else . end)')"
 sync_push "${USER_A_TOKEN}" "${BW_NULL_BODY}"
 assert_status 200 "M27 explicit null accepted"
-user_select sessions "id=eq.${BW_SESSION_ID}&select=body_weight_kg,body_weight_source,body_weight_measurement_id,body_weight_measured_at" "${USER_A_TOKEN}"
-assert_json_expr 'all(.[0][]; . == null)' "M27 explicit null clears snapshot"
 user_select exercise_sets "id=eq.${BW_SET_ID}&select=external_load_mode,planned_weight_unit,planned_external_load_mode" "${USER_A_TOKEN}"
 assert_json_expr 'all(.[0][]; . == null)' "M27 explicit null clears modes"
 user_select exercise_definitions "id=eq.${BW_DEF_ID}&select=movement_standard,loading_method" "${USER_A_TOKEN}"
 assert_json_expr 'all(.[0][]; . == null)' "M27 explicit null clears descriptors"
+
+# The compatibility build must be rejected before any row or cursor can move.
+# An empty curl header suppresses it entirely, matching pre-cutover builds.
+for old_protocol in "" 1 invalid; do
+  BOGA_TEST_SYNC_PROTOCOL="$old_protocol" sync_push "${USER_A_TOKEN}" "${BW_BODY}"
+  assert_non_2xx 'old client push rejected'
+  assert_json_expr '.message | startswith("UPDATE_REQUIRED:")' 'actionable update-required push error'
+  BOGA_TEST_SYNC_PROTOCOL="$old_protocol" http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${ANON_KEY}" app_public '{"layer":0,"limit":10}'
+  assert_non_2xx 'old client pull rejected'
+  assert_json_expr '.message | startswith("UPDATE_REQUIRED:")' 'actionable update-required pull error'
+done
+# Neither authenticated owners nor OAuth clients can call the private projection seam.
+http_request POST "${API_URL}/rest/v1/rpc/session_weight_contexts" "${USER_A_TOKEN}" "${ANON_KEY}" app_public \
+  "$(jq -nc --arg u "$USER_A_UUID" --arg s "$BW_SESSION_ID" '{p_owner:$u,p_session_ids:[$s]}')"
+assert_non_2xx 'service projection cannot be called by a normal client'

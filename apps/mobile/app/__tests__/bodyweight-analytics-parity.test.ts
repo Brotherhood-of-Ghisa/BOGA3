@@ -18,12 +18,13 @@ const day = new Date('2026-09-20T12:00:00Z');
 const now = new Date('2026-09-21T12:00:00Z');
 function fixture(B: number | null, c: number, amount: string, mode: string | null,
   loadInputMode: 'total_load' | 'per_side_load' = 'total_load', unit = 'kg', known: { definition?: boolean; session?: boolean; set?: boolean } = {}) {
-  const context = exerciseLoadContext({ bodyweightCoefficient: c, loadInputMode, localBodyweightMetadataKnown: known.definition }, { bodyWeightKg: B, localBodyweightMetadataKnown: known.session });
+  if (known.session === false) B = null;
+  const context = exerciseLoadContext({ bodyweightCoefficient: c, loadInputMode, localBodyweightMetadataKnown: known.definition }, { bodyWeightKg: B });
   const definition = { id: 'pull', name: 'Pull-up', deletedAt: null, bodyweightCoefficient: c, loadInputMode, localBodyweightMetadataKnown: known.definition };
   const set = { setId: 'set', id: 'set', sessionExerciseId: 'exercise', orderIndex: 0,
     localBodyweightMetadataKnown: known.set, weightValue: amount, weightUnit: unit, externalLoadMode: mode, repsValue: '8', setType: 'rir_1' as const, performanceStatus: null };
   const sessionRow = { sessionId: 'session', sessionExerciseId: 'exercise', completedAt: day, gymName: null,
-    localBodyweightMetadataKnown: known.session, bodyWeightKg: B, bodyWeightSource: B === null ? null : 'manual', bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null };
+    bodyWeightKg: B, bodyWeightSource: B === null ? null : 'reading', bodyWeightMeasurementId: B === null ? null : 'reading', bodyWeightMeasuredAt: B === null ? null : day };
   const history = aggregateExerciseHistory({ exerciseDefinition: definition, period: 'all', appliedTagDefinitionId: null,
     sessionsInPeriod: [sessionRow], sessionsAllTime: [sessionRow], setsBySessionExerciseId: { exercise: [set] }, tagsBySessionExerciseId: {} });
   const exercise = { id: 'exercise', exerciseDefinitionId: 'pull', exerciseName: 'Pull-up', orderIndex: 0,
@@ -33,7 +34,7 @@ function fixture(B: number | null, c: number, amount: string, mode: string | nul
     setType: 'rir_1' as const, performanceStatus: null, plannedReps: null, plannedWeight: null, plannedSetType: null };
   const uiExercise = { id: 'exercise', exerciseDefinitionId: 'pull', name: 'Pull-up', machineName: '', loadContext: context, sets: [uiSet] };
   const session: Session = { dateTime: '2026-09-20 12:00', locationId: null, bodyWeightKg: B, exercises: [uiExercise] };
-  const muscle: MuscleAnalyticsInput = { sessions: [{ id: 'session', completedAt: day, bodyWeightKg: B, localBodyweightMetadataKnown: known.session }],
+  const muscle: MuscleAnalyticsInput = { sessions: [{ id: 'session', completedAt: day, bodyWeightKg: B }],
     exerciseDefinitions: [definition], sessionExercises: [{ id: 'exercise', sessionId: 'session', exerciseDefinitionId: 'pull' }],
     exerciseSets: [set], muscleMappings: [{ exerciseDefinitionId: 'pull', muscleGroupId: 'left', role: 'primary' }],
     muscleGroups: [{ id: 'left', displayName: 'Left', familyName: 'Back', sortOrder: 0 }] };

@@ -3,6 +3,8 @@ import { isWeightUnit, weightToKg, type ExternalLoadMode, type WeightUnit } from
 import { validateExerciseLoadRules, type ExerciseLoadRules } from '../../src/exercise-core/load-rules';
 import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
 
+export const BOGA_SESSION_IMPORT_SCHEMA_V3 = 'boga.session-import.v3' as const;
+export const supportsLoadMetadata = (schema: unknown) => schema === BOGA_SESSION_IMPORT_SCHEMA_V2 || schema === BOGA_SESSION_IMPORT_SCHEMA_V3;
 export const BOGA_SESSION_IMPORT_SCHEMA_V2 = 'boga.session-import.v2' as const;
 export type ImportedSessionWeight = {
   bodyWeightKg: number | null;
@@ -35,15 +37,6 @@ const date = (value: unknown): value is string => typeof value === 'string' &&
   new Date(value).toISOString() === (value.includes('.') ? value : value.replace('Z', '.000Z'));
 const mode = (value: unknown) => value === null || value === 'added' || value === 'assistance' || value === 'unquantified_assistance';
 
-/** Strict v2 metadata validation; v1 callers never infer these fields. */
-export const validateImportedSessionWeight = (value: Record<string, unknown>): boolean => {
-  const { bodyWeightKg: kg, bodyWeightSource: source, bodyWeightMeasurementId: id, bodyWeightMeasuredAt: at } = value;
-  if (kg === null) return source === null && id === null && at === null;
-  if (typeof kg !== 'number' || !Number.isFinite(kg) || kg <= 0) return false;
-  if (source === 'manual') return id === null && at === null;
-  return (source === 'reading' || source === 'historical_estimate') && typeof id === 'string' && id.trim() !== '' && date(at);
-};
-
 export const validateImportedSetMeaning = (value: Record<string, unknown>): boolean => {
   if (!isWeightUnit(value.weightUnit) || !mode(value.externalLoadMode)) return false;
   if (value.performanceStatus !== null && value.performanceStatus !== 'planned' && value.performanceStatus !== 'unperformed') return false;
@@ -73,15 +66,8 @@ export const validateImportedExerciseRules = (value: Record<string, unknown>): b
     movementStandard: value.loadRules.movementStandard, loadingMethod: value.loadRules.loadingMethod }).ok;
 };
 
-export const importedSessionWeight = (schema: string, value: Partial<ImportedSessionWeight>) =>
-  schema === BOGA_SESSION_IMPORT_SCHEMA_V2 ? {
-    bodyWeightKg: value.bodyWeightKg!, bodyWeightSource: value.bodyWeightSource!,
-    bodyWeightMeasurementId: value.bodyWeightMeasurementId!,
-    bodyWeightMeasuredAt: value.bodyWeightMeasuredAt ? new Date(value.bodyWeightMeasuredAt) : null,
-  } : {};
-
 export const importedSetMeaning = (schema: string, value: Partial<ImportedSetMeaning>) =>
-  schema === BOGA_SESSION_IMPORT_SCHEMA_V2 ? {
+  supportsLoadMetadata(schema) ? {
     weightUnit: value.weightUnit!, externalLoadMode: value.externalLoadMode!,
     plannedWeightValue: value.plannedWeightValue!, plannedWeightUnit: value.plannedWeightUnit!,
     plannedExternalLoadMode: value.plannedExternalLoadMode!, plannedRepsValue: value.plannedRepsValue!,

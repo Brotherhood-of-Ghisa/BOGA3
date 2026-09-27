@@ -1,6 +1,6 @@
 # T-20260927-01 — Replace frozen session weight with dated readings
 
-- Status: `planned`
+- Status: `in progress`
 - Depends on: none
 - Milestone: none; follow-up to the merged bodyweight and group-comparison work
 - Areas: cross-stack (mobile, sync, Supabase, groups, agent API, MCP, docs); UI impact: yes
@@ -43,17 +43,21 @@ Keep the effective-load formula and raw set data unchanged.
   an app update and give older builds an explicit update-required response
   before removing obsolete sync fields.
 
-## Open — resolve before coding
+## Accepted implementation decisions (2026-09-27)
 
-1. Pin the revised accepted UI target per `docs/specs/ui/ai-design-policy.md`:
-   the historical-fill entry point disappears, session weight becomes a
-   read-only derived fact, and missing-weight states link to dated entry.
-2. Specify the exact same-day/timezone boundary for "on or before the session
-   date" using the existing date-and-time entry model. Preserve one stable
-   ordering across devices and the group evaluator, including equal timestamps.
-3. Choose and document the client-version enforcement point and deployment
-   order so old builds see an update-required result rather than a schema-cache
-   or malformed-sync error.
+- UI: retain the existing layouts/tokens; remove historical fill and session-only
+  correction. Show read-only session kg and “Reading from <date/time>”. Missing
+  context shows “No reading on or before this session” and “Add dated reading”,
+  prefilled with the session start date/time. Friends remain read-only. Reading
+  forms explain affected past sessions will recalculate.
+- Time: compare stored epoch milliseconds, `measuredAt <= startedAt`; equal
+  timestamps use ascending ID in binary/code-point order. Local date/time input
+  becomes an instant once, and viewing timezone never changes selection.
+- Rollout: release the isolated compatibility commit first so existing users
+  have UPDATE_REQUIRED handling in setup and Settings. Then apply the guarded
+  breaking server migration, deploy matching functions, and release the dated
+  client. API cutoff precedes any obsolete-field access. No hosted deployment
+  is authorized by this task; provide operator commands and local stage proof.
 
 ## Deliverables and acceptance
 

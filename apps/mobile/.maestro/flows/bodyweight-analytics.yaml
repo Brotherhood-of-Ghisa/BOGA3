@@ -1,6 +1,7 @@
 appId: com.dinoderek.mobile
 ---
-# Real projections from frozen history and explicit session correction.
+# Real projections update after a dated reading edit.
+- runScript: ../scripts/bodyweight-dates.js
 - openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-analytics&teleport=exercise-page&sessionId=maestro_bwa_active&sessionExerciseId=maestro_bwa_active_pull"
 - extendedWaitUntil:
     visible:
@@ -461,7 +462,7 @@ appId: com.dinoderek.mobile
     text: "Volume 800"
 - assertVisible:
     text: "Body weight · kg 80"
-- takeScreenshot: "BWA10-frozen-history"
+- takeScreenshot: "BWA10-dated-history"
 - scrollUntilVisible:
     element:
       id: "view-session-section-sets"
@@ -483,16 +484,19 @@ appId: com.dinoderek.mobile
 - assertVisible:
     text: "BW + 20.0 kg × 8"
 - takeScreenshot: "BWA11-load-meaning"
+- openLink: "boga3://body-weight"
+- extendedWaitUntil:
+    visible:
+      id: "body-weight-screen"
+    timeout: 30000
 - scrollUntilVisible:
     element:
-      id: "session-body-weight"
-    direction: UP
+      text: "Edit 80 kg, ${output.bodyweightWeightedDate}.*"
+    direction: DOWN
     centerElement: true
     timeout: 20000
-- waitForAnimationToEnd:
-    timeout: 4000
 - tapOn:
-    id: "session-body-weight"
+    text: "Edit 80 kg, ${output.bodyweightWeightedDate}.*"
 - extendedWaitUntil:
     visible:
       id: "weight-entry-value"
@@ -515,6 +519,7 @@ appId: com.dinoderek.mobile
     notVisible:
       id: "weight-entry-sheet"
     timeout: 10000
+- openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_bwa_weighted"
 - extendedWaitUntil:
     visible:
       id: "completed-session-detail-screen"

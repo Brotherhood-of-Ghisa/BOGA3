@@ -36,7 +36,7 @@ beforeEach(() => { __resetClockForTests(); fixture = createInMemoryDatabase();
   fixture.database.insert(muscleGroups).values({ id: 'back_lats', displayName: 'Lats', familyName: 'Back', sortOrder: 0, isEditable: 0 }).run(); });
 afterEach(() => fixture.close());
 
-it('exports and imports v2 without losing private readings, frozen provenance, raw units, planned modes or confirmation state', () => {
+it('exports v3 and imports without losing private readings, raw units, planned modes or confirmation state', () => {
   const pkg = JSON.parse(serializeBogaSessionImportPackage(makePackage())) as BogaSessionImportPackage;
   expect(validateBogaSessionImportPackage(pkg)).toEqual({ ok: true, errors: [] });
   const options = { importingProfileLabel: 'test' };
@@ -45,8 +45,9 @@ it('exports and imports v2 without losing private readings, frozen provenance, r
   expect(result.wrote).toBe(true);
   const reading = fixture.database.select().from(bodyWeightMeasurements).get()!;
   expect(reading).toMatchObject({ weightValue: '180', weightUnit: 'lb', weightKg: 180 * 0.45359237, localDirty: true });
-  expect(fixture.database.select().from(sessions).get()).toMatchObject({ bodyWeightKg: 80, bodyWeightSource: 'historical_estimate',
-    bodyWeightMeasurementId: reading.id, bodyWeightMeasuredAt: new Date('2026-01-05T12:00:00.000Z') });
+  expect(pkg.schema).toBe('boga.session-import.v3');
+  expect(pkg.sessions[0]).not.toHaveProperty('bodyWeightKg');
+  expect(fixture.database.select().from(sessions).get()).not.toHaveProperty('bodyWeightKg');
   expect(fixture.database.select().from(exerciseDefinitions).get()).toMatchObject({ bodyweightCoefficient: 1, loadInputMode: 'per_side_load',
     movementStandard: 'Strict pull-up', loadingMethod: 'Belt' });
   expect(fixture.database.select().from(exerciseSets).get()).toMatchObject({ weightValue: '20', weightUnit: 'lb', externalLoadMode: 'added',
@@ -59,8 +60,7 @@ it('emits matching owner-scoped sync entities with explicit new metadata', () =>
   const entities = buildRemoteImportWireEntities(makePackage());
   const reading = entities.find(entity => entity.type === 'body_weight_measurements')!;
   expect(reading.fields).toMatchObject({ weight_value: '180', weight_unit: 'lb', weight_kg: 180 * 0.45359237 });
-  expect(entities.find(entity => entity.type === 'sessions')?.fields).toMatchObject({ body_weight_kg: 80,
-    body_weight_source: 'historical_estimate', body_weight_measurement_id: reading.id });
+  expect(entities.find(entity => entity.type === 'sessions')?.fields).not.toHaveProperty('body_weight_kg');
   expect(entities.find(entity => entity.type === 'exercise_sets')?.fields).toMatchObject({ weight_unit: 'lb', external_load_mode: 'added',
     planned_weight_unit: 'lb', planned_external_load_mode: 'assistance', performance_status: 'unperformed' });
 });
@@ -84,7 +84,7 @@ it('keeps v1 loads unresolved and omitted on the wire; schema upgrades keep impo
   expect(generatedSessionId(old, old.sessions[0])).toBe(generatedSessionId(next, next.sessions[0]));
   expect(importBogaSessionPackageToLocalDb(fixture.database, old, { importingProfileLabel: 'test' }).wrote).toBe(true);
   expect(fixture.database.select().from(exerciseSets).get()).toMatchObject({ weightUnit: 'kg', externalLoadMode: null });
-  expect(fixture.database.select().from(sessions).get()?.bodyWeightKg).toBeNull();
+  expect(fixture.database.select().from(bodyWeightMeasurements).all()).toEqual([]);
   const wire = buildRemoteImportWireEntities(old);
   expect(wire.find(entity => entity.type === 'exercise_sets')?.fields).not.toHaveProperty('external_load_mode');
   expect(wire.find(entity => entity.type === 'sessions')?.fields).not.toHaveProperty('body_weight_kg');
@@ -112,4 +112,21 @@ it.each([null, {}, [null], [{ id: 'bad' }]])('reports malformed reading collecti
   expect(result.wrote).toBe(false);
   expect(fixture.database.select().from(sessions).all()).toHaveLength(0);
   expect(fixture.database.select().from(bodyWeightMeasurements).all()).toHaveLength(0);
+});
+
+
+it('ignores even malformed legacy session-only weight without manufacturing readings', () => {
+  const pkg = makePackage(); pkg.bodyWeightMeasurements = [];
+  Object.assign(pkg.sessions[0], { bodyWeightKg: 'bad', bodyWeightSource: 'manual', bodyWeightMeasuredAt: 'bad' });
+  expect(validateBogaSessionImportPackage(pkg)).toEqual({ ok: true, errors: [] });
+  expect(importBogaSessionPackageToLocalDb(fixture.database, pkg, { importingProfileLabel: 'test' }).wrote).toBe(true);
+  expect(fixture.database.select().from(bodyWeightMeasurements).all()).toEqual([]);
+  expect(fixture.database.select().from(sessions).get()).not.toHaveProperty('bodyWeightKg');
+  expect(buildRemoteImportWireEntities(pkg).some(row => row.type === 'body_weight_measurements')).toBe(false);
+});
+
+it('rejects stored session-weight fields in a v3 package', () => {
+  const pkg = makePackage(); pkg.schema = 'boga.session-import.v3';
+  expect(validateBogaSessionImportPackage(pkg).ok).toBe(false);
+  expect(importBogaSessionPackageToLocalDb(fixture.database, pkg, { importingProfileLabel: 'test' }).wrote).toBe(false);
 });
