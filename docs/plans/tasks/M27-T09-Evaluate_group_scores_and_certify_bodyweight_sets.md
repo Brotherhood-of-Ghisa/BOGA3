@@ -1,7 +1,7 @@
 ---
 task_id: M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "node|deno|supabase|sql"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/tech/groups-c
 
 # M27-T09 — Evaluate group scores and certify bodyweight sets
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T06, M27-T08.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D7–D10.
@@ -65,3 +65,10 @@ and `sync-infra`) and `./boga test ios-groups-e2e`; resolve additional lanes
 with `./boga test for`. T12 owns deployed Edge Function smoke/rollout.
 Graduate evaluator/certification rules, attach evidence, mark the milestone
 entry complete and delete this card when shipped.
+
+## Execution checkpoint (2026-09-27)
+
+The shared target-specific scorer and full-graph score adapter are integrated. Tests cover the two-member ranking reversal, group coefficient/distribution authority, assistance, missing/invalid B, dependency-pin propagation and unlinked observations. Database queue/publication, event reconciliation, certification and group readers remain pending.
+
+Actual fast/backend/device gates are being run; TypeScript draft checks alone
+are not gate evidence. No new server RPC or group UI behavior is claimed shipped.

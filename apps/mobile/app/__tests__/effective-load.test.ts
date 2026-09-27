@@ -116,7 +116,7 @@ describe('performance eligibility and coverage', () => {
     expect(isBodyweightRepsEligible(set, true)).toBe(true);
     expect(isBodyweightRepsEligible(set, false)).toBe(false);
     for (const patch of [
-      { weightValue: '20' }, { externalLoadMode: 'unquantified_assistance' },
+      { weightValue: '20' }, { externalLoadMode: 'assistance' }, { externalLoadMode: 'unquantified_assistance' },
       { externalLoadMode: null }, { performanceStatus: 'planned' as const }, { weightUnit: 'unknown' },
     ]) expect(isBodyweightRepsEligible({ ...set, ...patch }, true)).toBe(false);
   });

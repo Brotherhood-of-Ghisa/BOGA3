@@ -132,3 +132,14 @@ notes, retry, dismissed reads and invalid restored reading context. Numerical
 forward/inverse vectors remain in the kernel tests. Device evidence belongs to
 the fourth ios-bodyweight flow on all three phone sizes, plus the full frontend
 gate; unit/typecheck success never substitutes for rendered evidence.
+
+## Target-specific group score coverage (M27)
+
+`groups-metric-contract.test.ts`, `groups-performance-score.test.ts` and
+`groups-metric-evaluation.test.ts` cover explicit metric/default/unit families,
+movement/loading compatibility, source distribution and group coefficient
+independence, the 60+20 versus 90+20 ranking reversal, strict performed eligibility,
+assistance, missing/invalid B and historical-estimate provenance. Preserve the
+separate source counting flag, duplicate/missing-pin refusal and explicit invalid
+weight payloads. These pure tests do not replace backend queue/publication,
+certification, legacy-reader or two-user device proofs.

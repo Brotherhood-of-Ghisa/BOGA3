@@ -215,7 +215,8 @@ export const summarizeEffectiveVolume = (sets: readonly EffectiveSetMetrics[]): 
 /** B is deliberately not an eligibility dependency for the unweighted reps board. */
 export const isBodyweightRepsEligible = (input: EffectiveSetInput, compatibleMovement: boolean): boolean => {
   if (!compatibleMovement || validateContext(input) || input.bodyweightCoefficient <= 0) return false;
-  if (input.externalLoadMode !== 'added' && input.externalLoadMode !== 'assistance') return false;
+  // Explicit assistance is never an unassisted performance, even at zero.
+  if (input.externalLoadMode !== 'added') return false;
   if (!isWeightUnit(input.weightUnit === undefined ? 'kg' : input.weightUnit)) return false;
   const weight = canonicalizeWeightForReps(input.weightValue ?? '', input.repsValue ?? '');
   return parseSetWeight(weight) === 0 && parseSetReps(input.repsValue) !== null &&

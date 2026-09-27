@@ -265,6 +265,17 @@ Reimport is not a legacy conversion workflow. See the owning
 
 ## 6. Group metrics, revisions and certification
 
+**Implementation checkpoint (M27):** `src/groups/metric-contract.ts`,
+`performance-score.ts` and `metric-evaluation.ts` provide the pure target-specific
+rules/scoring boundary. They accept raw external units/mode, the complete saved
+session tuple and source distribution/standards; the personal coefficient is not
+an input. Invalid B withholds strength while eligible unweighted reps survive.
+The proposed v2 wire separates missing/invalid B, values/units and rules revision.
+A source's current counting eligibility is separate from its valid performance,
+so unlinking need not falsify a historical observation. These modules are not yet
+connected to the database publisher, group RPC readers or screens. The revision,
+queue, certification and migration requirements below remain integration work.
+
 | Metric key | Unit | Eligibility / default |
 | --- | --- | --- |
 | `weight`, `e1rm` | `kg` | Existing conventional boards/conversion retained |

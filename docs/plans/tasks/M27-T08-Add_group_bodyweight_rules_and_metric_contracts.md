@@ -1,7 +1,7 @@
 ---
 task_id: M27-T08-Add_group_bodyweight_rules_and_metric_contracts
 milestone_id: M27
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "cross-stack"
 runtimes: "node|deno|supabase|sql"
@@ -12,7 +12,7 @@ docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/05-data-model
 
 # M27-T08 — Add group bodyweight rules and metric contracts
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: M27-T02, M27-T03, M27-T05.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
 - Governing decisions: D7–D10.
@@ -69,3 +69,10 @@ archived/former data and legacy migration. Run `./boga test fast`,
 if sync paths change and all requirements from `./boga test for`.
 Graduate group/data/auth decisions, attach evidence, mark the milestone entry
 complete and delete this card when shipped.
+
+## Execution checkpoint (2026-09-27)
+
+Pure metric/rule validation, explicit link compatibility and the proposed v2 unit/revision-aware wire types are integrated. Server schema/RPC compatibility, versioned publication, history and cache integration remain pending.
+
+Actual fast/backend/device gates are being run; TypeScript draft checks alone
+are not gate evidence. No new server RPC or group UI behavior is claimed shipped.

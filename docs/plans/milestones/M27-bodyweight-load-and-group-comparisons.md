@@ -285,8 +285,8 @@ captures to its PR. Reuse `components/ui` tokens, fields, sheets, lists and noti
 | [M27-T05 — Exercise setup and logging](../tasks/M27-T05-Configure_exercises_and_bodyweight_logging.md) | Coefficients, reviewed seeds/legacy values, added/assisted entry | T02, T03 | in_progress |
 | [M27-T06 — Historical backfill](../tasks/M27-T06-Backfill_and_correct_historical_session_weight.md) | Preview, earliest-reading fallback and explicit corrections | T04, T05 | in_progress |
 | [M27-T07 — Personal analytics](../tasks/M27-T07-Integrate_bodyweight_analytics_and_loading_estimates.md) | Consistent metrics, records, history and loading calculator | T03–T06 | in_progress |
-| [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | planned |
-| [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | planned |
+| [M27-T08 — Group rules and board contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Group authority, metric units/versioning and migration | T02, T03, T05 | in_progress |
+| [M27-T09 — Group evaluation and certification](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Per-group scores, re-evaluation and attestation dependencies | T06, T08 | in_progress |
 | [M27-T10 — Group UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Rule editor, links, podiums, three boards and record details | T07, T09 | planned |
 | [M27-T11 — Coaching API and MCP](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md) | Owner-scoped, unit-aware data and metric parity | T07 | in_progress |
 | [M27-T12 — Integration and rollout](../tasks/M27-T12-Verify_roll_out_and_close_bodyweight_milestone.md) | Cross-device/group proof, server-first rollout, graduation | T01–T11 | planned |
@@ -439,3 +439,14 @@ cards when shipped, marking their task-table entries completed.
   small/large/full-frontend verification is running before further mobile edits.
   [T11](../tasks/M27-T11-Align_coaching_API_and_MCP_bodyweight_metrics.md)
   tracks proof and compatible response evolution.
+
+- **T07/T08/T09 checkpoint (2026-09-27):** the complete personal analytics flow
+  passed on the small phone at `c119d5e`; new share/incomplete/coefficient/source
+  captures BWA13d–BWA16 were visually reviewed. Evidence:
+  `apps/mobile/artifacts/maestro/M27-offline-viewport-small/20260927-032818-73881/`.
+  That aggregate still failed the offline logging case: its fixture changed
+  rules directly in SQLite without refreshing the catalogue cache. `71702c1`
+  uses the real exercise-save path and checks bodyweight context before review;
+  fresh three-size/full-frontend verification is pending. T08/T09 pure scoring
+  and graph/metric contracts are now integrated for actual gate validation;
+  server publication, certification and group UI are still unfinished.
