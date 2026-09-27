@@ -370,11 +370,17 @@ appId: com.dinoderek.mobile
     timeout: 4000
 - tapOn:
     id: "loading-estimate-choose-source"
-- scrollUntilVisible:
-    element:
+- extendedWaitUntil:
+    visible:
+      text: "Choose source performance"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+# This three-row picker fits every target phone. Wait for its shorter sheet
+# before inspecting rows; a full-screen centering swipe can hit the backdrop.
+- extendedWaitUntil:
+    visible:
       id: "loading-estimate-source-maestro_bwa_unweighted_pull:maestro_bwa_unweighted_set"
-    direction: DOWN
-    centerElement: true
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 4000

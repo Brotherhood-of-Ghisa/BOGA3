@@ -474,3 +474,16 @@ cards when shipped, marking their task-table entries completed.
   post-restart readiness assertion (bounded to two retries with animation
   settling); every saved-data assertion remains required. Fresh device gates
   are pending. No product runtime code changed in this follow-up.
+
+- **Three-size verification follow-up:** all four `ios-bodyweight` flows passed
+  on the small phone at `4ab3ac6`, with runtime source still `19fc54d`.
+  Evidence: `M27-restart-readiness-small/20260927-042810-28105/`;
+  BWO03 and BWA14 were visually checked again for the reviewed load and
+  incomplete-volume presentation. The large-phone run passed entry, logging
+  and backfill but failed after opening the estimate source picker:
+  `M27-restart-readiness-large/20260927-044519-32038/`. Its screenshot shows
+  the sheet dismissed during the immediate full-screen centering scroll.
+  The three source rows fit on the small phone already; the flow now waits
+  for the picker header and row instead of scrolling during that transition.
+  Fresh large/full-frontend verification remains required. The failed
+  large aggregate is not counted as green, and no runtime code changed.
