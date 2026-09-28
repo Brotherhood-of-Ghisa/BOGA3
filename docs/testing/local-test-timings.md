@@ -56,7 +56,10 @@ lane run via `scripts/lane-timing.sh`), and are read with:
   `<utc>.<machine-id>.slot<slot>.<lane>.json`, append-only.
 - Record fields: `lane`, `wall_ms`, `exit_code`, `recorded_at`, `machine_id`
   (sha1 of `hw|cores|os-name`, first 8 chars), `hw`, `cores`, `os`, `slot`,
-  `commit`, `source`.
+  `commit` (short HEAD), `dirty` (`true` when the worktree had uncommitted
+  changes as the lane started — the run tested work in progress, not
+  `commit`; `null` when git could not tell), `source`. Records written before
+  `dirty` existed lack the field.
 - Commands run directly (`npm test`, a Maestro script, CI's workflow steps)
   bypass `./boga test` and record nothing; `./boga test for` only prints
   requirements.

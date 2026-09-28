@@ -85,12 +85,23 @@ boga_timing_machine_id() {
   fi
 }
 
-# boga_record_lane_timing <lane> <wall_ms> <exit_code>
+# Whether the worktree had uncommitted changes (tracked or untracked, not
+# ignored): "true", "false", or "null" when git cannot tell. `commit` alone
+# names HEAD, so without this a run of work-in-progress reads as a run of
+# that commit.
+boga_timing_worktree_dirty() {
+  local root="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+  local status
+  status="$(git -C "${root}" status --porcelain 2>/dev/null)" || { printf 'null'; return 0; }
+  if [[ -n "${status}" ]]; then printf 'true'; else printf 'false'; fi
+}
+
+# boga_record_lane_timing <lane> <wall_ms> <exit_code> [dirty]
 # Writes the record; swallows every error.
 boga_record_lane_timing() {
   (
     set +e
-    local lane="$1" wall_ms="$2" exit_code="$3"
+    local lane="$1" wall_ms="$2" exit_code="$3" dirty="${4:-null}"
     local root="${REPO_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null)}"
     local dir
     dir="$(boga_timing_records_dir)"
@@ -122,6 +133,7 @@ boga_record_lane_timing() {
   "os": "${os}",
   "slot": "${slot}",
   "commit": "${commit}",
+  "dirty": ${dirty},
   "source": "gate"
 }
 JSON
@@ -138,7 +150,9 @@ boga_time_lane() {
     "$@"
     return $?
   fi
-  local start end rc
+  local start end rc dirty
+  # Sampled before the lane runs: the code under test, not the lane's leftovers.
+  dirty="$(boga_timing_worktree_dirty)"
   start="$(boga_timing_now_ms)"
   if "$@"; then
     rc=0
@@ -146,6 +160,6 @@ boga_time_lane() {
     rc=$?
   fi
   end="$(boga_timing_now_ms)"
-  boga_record_lane_timing "${lane}" "$((end - start))" "${rc}"
+  boga_record_lane_timing "${lane}" "$((end - start))" "${rc}" "${dirty}"
   return "${rc}"
 }

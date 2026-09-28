@@ -26,6 +26,7 @@ REPO_ROOT="${TMP}/repo"
 mkdir -p "${REPO_ROOT}"
 git -C "${REPO_ROOT}" init -q
 printf '7\n' > "${REPO_ROOT}/.worktree-slot"
+printf '.worktree-slot\n' >> "${REPO_ROOT}/.git/info/exclude"  # ignored, as in a real worktree
 export REPO_ROOT
 
 # shellcheck disable=SC1091
@@ -42,10 +43,15 @@ green="$(ls "${STORE}"/*.green-lane.json)"
 grep -q '"exit_code": 0' "${green}" || fail "green record must carry exit_code 0"
 grep -q '"slot": "7"' "${green}" || fail "record must carry the worktree's slot"
 grep -q '"exit_code": 1' "${STORE}"/*.red-lane.json || fail "red record must carry exit_code 1"
+grep -q '"dirty": false' "${green}" || fail "a clean worktree must record dirty false"
+printf 'wip\n' > "${REPO_ROOT}/wip.txt"
+boga_time_lane dirty-lane true
+grep -q '"dirty": true' "${STORE}"/*.dirty-lane.json || fail "uncommitted changes must record dirty true"
+rm "${REPO_ROOT}/wip.txt"
 
 # 2. BOGA_LANE_TIMING=0 records nothing; BOGA_TIMINGS_DIR overrides the store.
 BOGA_LANE_TIMING=0 boga_time_lane off-lane true
-[ "$(count "${STORE}")" = "2" ] || fail "BOGA_LANE_TIMING=0 must not record"
+[ "$(count "${STORE}")" = "3" ] || fail "BOGA_LANE_TIMING=0 must not record"
 BOGA_TIMINGS_DIR="${TMP}/override" boga_time_lane override-lane true
 [ "$(count "${TMP}/override")" = "1" ] || fail "BOGA_TIMINGS_DIR must receive the record"
 
