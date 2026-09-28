@@ -229,13 +229,13 @@ additionally render faded (§6).
 
 ## 6. Presenting data
 
-- **`1RM` for conventional exercises; `Added 1RM` for bodyweight exercises**,
-  never `e1RM`. Wathan uses total effective resistance, then subtracts the
-  bodyweight contribution and expresses the result as added weight. Bodyweight
-  raw-load labels use `Added`, the entered unit and any per-side qualifier;
-  the coefficient is explicit when it differs from 100%. Missing metrics use
-  `—`, with incomplete volume identified in readable supporting text. Long
-  context wraps or gets a separate line instead of shrinking numeric figures.
+- **One vocabulary for every exercise:** `Weight`, `Top weight`, `1RM` and
+  `Volume`, never `e1RM`, `Added`, `External weight` or `Effective load`.
+  Bodyweight contribution and dated readings may alter the calculation when the
+  applicable capability is enabled, but normal data surfaces never expose the
+  arithmetic. All weights are kg. Valid zero renders `0`; `—` is reserved for
+  invalid, failed or genuinely unavailable strict-group results. Long context
+  wraps or gets a separate line instead of shrinking numeric figures.
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column (decided for Progress, DLM-T08-D2).

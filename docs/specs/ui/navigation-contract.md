@@ -515,12 +515,13 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 53. `/more` -> `/gyms?source=more`
    - the Tools `Gyms` row (`router.push`); native back or `Back to More` returns
 54. `/settings` -> `/body-weight`
-   - the Training `Body weight` row (`router.push`); header Back returns
-   - missing session context opens a dated-entry sheet on the owning session
-     route, prefilled with its exact start; saving updates the private reading
-     timeline and every affected session. Invalid context opens `/body-weight`
-     for reading-history review. Friends expose no entry or edit route.
-   - historical fill and session-only correction are removed.
+   - current pre-cutover: the Settings bodyweight row uses `router.push`; session
+     bodyweight surfaces can also navigate to reading entry/history; header Back
+     returns to the caller
+   - accepted replacement, implementation pending: `Manage weights` in the
+     `Bodyweight calculations` row is present only while the private preference
+     is enabled; workout/session routes never navigate to reading entry or
+     history, so the dated kg timeline is managed only from Settings
 
 Note:
 
@@ -549,21 +550,14 @@ Note:
 - `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/components/navigation/root-stack.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
 - M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/components/navigation/root-stack.tsx`
 
-## Versioned comparison navigation (M27)
+## Group calculation navigation
 
-The existing group board route resolves the comparison through the versioned
-catalogue before choosing legacy Weight/1RM or metric-aware presentation.
-`metric` accepts `bodyweight_reps`, `relative_strength`, `absolute_strength` for
-bodyweight comparisons; conventional comparisons retain `weight` / `e1rm`.
-An omitted metric uses the group's declared default. In-place board toggles
-update the route parameters; a new link's metric/scope replaces the previous
-selection even when Expo reuses the board screen. History likewise follows
-updated metric, scope and revision links; selecting a revision preserves the
-metric only if that revision supports it. `scope` remains
-`certified` / `all`. History additionally accepts a positive `revision`, and
-its revision selector keeps original kg-only entries distinct from later rules.
-Event history links carry the recorded revision rather than reinterpreting an
-old value under the current rule. Board rows open the metric record sheet.
+The existing group board route keeps `metric=weight|e1rm` and
+`scope=certified|all`; optional bodyweight calculation changes arithmetic, not
+route taxonomy. In-place toggles update parameters even when Expo reuses the
+screen. History accepts a positive rules revision and event links carry their
+recorded revision rather than reinterpreting an old value. Board rows open the
+same record sheet, which never routes to or exposes private reading context.
 
 ## Documentation boundary
 

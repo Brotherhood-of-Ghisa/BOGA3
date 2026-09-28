@@ -33,9 +33,9 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: 'all' });
 highestWeight, knownVolume? }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screen already loads powers the sheet's week banner.
 Muscle history offers per-side, role-weighted `totalVolume` and
-`workingSetCount`; exercise volume and Added 1RM use effective load from each
-session’s saved body weight and the current personal rules. Top added remains
-external load in kg; conventional exercise labels/results stay unchanged.
+`workingSetCount`; exercise Volume and 1RM use the current private calculation
+policy and as-of reading. Missing personal reading uses zero. Top weight remains
+raw entered kg, and every exercise uses the same labels.
 
 **Buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
 smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.

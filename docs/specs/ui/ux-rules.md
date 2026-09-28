@@ -19,48 +19,41 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 - `Current behavior (authoritative)`: verified against current app code.
 - `Pending / planned`: approved direction or audit-derived target not fully implemented yet.
 
-## Current behavior (authoritative)
+## Current behavior and accepted replacements
 
-### Dated bodyweight entry and session context
+Sections explicitly labelled `accepted replacement` are the approved target for
+the implementation task and supersede current bodyweight behavior; the remaining
+sections describe the current app.
 
-Settings → Body weight shows the latest nondeleted reading at/before now,
-with its entered unit and measurement time. Add/edit requires a date/time and
-positive finite decimal in kg or lb, and rejects future dates. Unchanged date
-text preserves its full stored timestamp. Read errors are retryable; failed
-local writes keep all input. Saves work offline. Save/delete feedback is simply “Reading saved” or “Reading deleted”; no
-warning about past workouts or group results appears.
+### Accepted replacement: optional bodyweight calculations
 
-Each session derives its weight from the latest nondeleted reading on or before
-its exact start instant; equal timestamps use ascending binary/code-point ID.
-Selection precedes validation, so malformed latest context cannot fall back to
-an older plausible weight. Later readings never estimate earlier sessions.
-Value/date edits, deletion, restoration, session-start edits and sync refresh
-visible derived results without rewriting raw sets or storing a session override.
+Settings owns one `Bodyweight calculations` row. Its toggle is always visible;
+`Manage weights` appears on the same row while enabled (wrapping below only when
+the viewport requires it). Toggling works offline and hides/ignores values
+without deleting contributions or readings. `Manage weights` is a kg-only dated
+history with add/edit/delete, inline validation and retryable writes.
 
-The session's read-only Body weight card shows kg and “Reading from <date/time>”.
-Missing context says “No reading on or before this session” and offers “Add dated
-reading”, prefilled at the session start but editable. Invalid context offers
-reading-history review. Friend and deleted-session displays have no entry/edit
-actions. Historical fill and session-only correction do not exist.
+There is no bodyweight card, value, source, prompt, warning, entry link or dialog
+on a session/workout surface. Personal calculations select the latest valid
+reading at/before the exact session start internally. Missing reading silently
+uses zero; reading/value/date/delete/restore and session-start changes refresh
+derived views without rewriting raw sets.
 
-The visual target is `design-targets/bodyweight.md`; personal and group
-calculations follow `../tech/bodyweight-load-contract.md`.
+While the private preference is enabled, the personal exercise editor adds only
+`Bodyweight contribution (%)` with decimal 0–100 validation and a short hint.
+When disabled, it hides the field and preserves its value. The in-place logger
+keeps one kg `Weight` field, reps, effort and confirmation. It never exposes a
+unit selector, movement/loading fields, calculation breakdown or bodyweight-
+specific label. Rows and analytics say `Weight`, `Top weight`, `1RM` and
+`Volume`; missing personal context never makes them unavailable. Valid zero
+renders as `0` and earns no record state.
 
-### Bodyweight exercise setup and added weight
-
-The shared exercise fields accept contribution from 0–100%; positive values
-require a movement standard and loading method. Help text explains the
-approximation, retroactive personal effect and separate group authority. The
-per-side choice scales only equal external inputs, never the session weight.
-An editor whose saved metadata has not arrived preserves it unless the user
-explicitly configures these fields.
-
-The in-place logger has one added-weight field, kg/lb controls, reps, effort and
-its confirmation tick. It shows total load and dated bodyweight as context;
-1RM is labelled “Added 1RM”. There are no assistance choices or legacy review.
-Every existing numeric weight means added weight. Missing bodyweight leaves
-load metrics unavailable while reps remain loggable. The exercise page exposes
-the same dated context and missing-reading entry as View Session.
+Groups own an independent admin toggle and conditional group contribution.
+Strict group calculation may omit a dependent score, but group surfaces use
+generic ineligible/no-score copy and retain raw Weight/reps/set activity. They
+never reveal a member reading value, date, identifier, source, history or
+dependency digest. The visual target is `design-targets/bodyweight.md`; the
+calculation contract is `../tech/bodyweight-load-contract.md`.
 
 ### 1. Action semantics
 
@@ -311,8 +304,8 @@ the same dated context and missing-reading entry as View Session.
 3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
 4. The summary card shows `Start` and `End` as `YYYY-MM-DD HH:mm` (the layout of
    the completed edit's fields, read-only), then `Duration`, `Gym`, `Sets` and
-   `Volume` (the confirmed sets with valid values, and their effective-load
-   volume with explicit incomplete coverage, no thousands separator). Below it, `Summary | Sets` defaults to
+   `Volume` (the confirmed sets with valid values, calculated under the current
+   private policy, with invalid/overflow coverage and no thousands separator). Below it, `Summary | Sets` defaults to
    Summary for every historical entry. Switching stays in place and retains the
    chart grouping; Edit → Done retains both selections while reloading facts,
    sets and insights. A different session starts at Summary / By exercise.
@@ -657,7 +650,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    `ink-muted`, with `new` in `ink`; they carry no green or red (G3). Volumes
    and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
-10. Exercise analytics uses resolved effective load × reps (conventional lifts retain entered-load semantics), with explicit incomplete coverage and no muscle-role weighting. Muscle history applies the shared per-side and role factors afterwards.
+10. Exercise analytics uses calculated load × reps under the current private policy, with invalid/overflow coverage and no muscle-role weighting. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
 13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
@@ -703,22 +696,22 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 13. Full boards and their history are online-only reads, each drawn as one `Card` of rows (the board's under its `Weight` | `1RM` and `Certified` | `All` `SegmentedControl`s and a `History` text button): never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail `Sheet` (08 pattern 11), titled with the lifter and the exercise, with no Close: the backdrop dismisses it. Its figures (the set, the 1RM) are `record` Plex Mono `Stat`s; `Certify` is its one `accent`, `Remove my certification` / `Cancel certification` are `danger` rows, and `View full session` is a row with a chevron. `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
 
-#### Versioned group comparisons (M27)
+#### Optional bodyweight-aware group calculations (accepted replacement; implementation pending)
 
-For metric comparisons, the above kg-only presentation rules are superseded by
-explicit Reps, Relative ×BW and Absolute kg labels. The declared default opens
-on Certified; switching the metric is local presentation. A rebuilding revision
-shows no old rows. Rule changes have a separate explanation, not a performed PR.
-Owners/admins review coefficient, movement/loading standard and external input
-convention before applying a revision. Linking preserves personal settings and
-explains incompatible variants. The record sheet exposes raw units/mode, saved
-session B/provenance, group rules and the dependencies that certification pins.
-Board rows and stream records use the same certification actions; a record with
-multiple achieved metrics selects and attests them separately. Cached records
-without current eligibility context offer read-only details until refreshed.
-Prior revisions and original kg-only retirement scores are read-only history.
-Full boards/history remain online reads; catalogue, podium and stream caches
-use their versioned keys. Native acceptance of this M27 extension is in progress.
+The group settings surface shows the admin-controlled `Bodyweight calculations`
+toggle. While enabled, the group exercise editor shows only `Bodyweight
+contribution (%)`; hiding it preserves the value. A preference/contribution
+change publishes one coherent revision, and `rebuilding` shows no mixed old/new
+rows. Linking preserves independent personal and group settings.
+
+Existing Weight/1RM board and certification recipes remain. Weight is raw entered
+kg. A strict 1RM may be absent; the board says `No eligible 1RM` without naming
+or implying missing private bodyweight. Record sheets show raw Weight/reps,
+public 1RM, revision and certification state, never the calculation breakdown or
+private reading/dependency facts. For enabled positive contribution, a changed
+reading or contribution may void the certification because the calculated
+result changed; off/zero behavior never reads private bodyweight. Copy must not
+imply the witness verified bodyweight.
 
 ### 14a. Exercise page
 
@@ -800,7 +793,7 @@ unchanged. What differs is presentation:
    (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
    (§7.7).
 5. The summary counts only confirmed performed sets (warm-ups included) and
-   their effective-load volume with explicit incomplete coverage; Time is elapsed since the session's start.
+   their calculated Volume under the current private policy; Time is elapsed since the session's start.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is
    the way back out, and returns to the tab rather than stacking it.
 7. **A completed session is edited here**. The top bar reads
@@ -826,38 +819,25 @@ unchanged. What differs is presentation:
 
 ## Pending / planned (not current behavior)
 
-None. (The primitive extraction these items tracked shipped as `StatePanel`,
-`Sheet`, `ListRow`, `FormField` and `Screen`; `components-catalog.md`.)
+The optional bodyweight-calculation replacement described above is accepted but
+not yet implemented. Its integrated UI requires the human hold point in
+`design-targets/bodyweight.md` before aggregate closeout.
 
 ## Personal bodyweight analytics and loading estimates
 
-Bodyweight strength figures read Added 1RM and top external records read Top
-added. Set rows retain numeric added weight, source units and
-coefficient/per-side context. Historical B determines historical strength.
-Record details show dated B and effective resistance. Conventional labels and arithmetic remain unchanged.
+Personal figures use the same `Top weight`, `1RM` and `Volume` labels for every
+exercise. Set rows show only entered kg Weight/reps/effort; records never expose
+the contribution, reading or calculated-load breakdown. Missing personal
+reading uses the zero fallback and is not an unavailable/incomplete state.
+Valid zero is displayed numerically and excluded from records/rankings.
 
-Volume subtotals explicitly say incomplete; wholly unavailable metrics show an
-em dash. Counts remain usable. Stats tables put the coverage note outside the
-narrow numeric cell. Missing heatmap values have a distinct marker/legend and
-do not become rest days or complete-volume baselines. Read errors preserve
-retry routes and do not fabricate records.
+Reading, preference, contribution and session-time changes refresh History,
+Stats, heatmaps, records, completion and share projections. Raw logged rows and
+Top weight do not change. Invalid raw input or arithmetic overflow may still
+produce the normal unavailable/retry treatment; read failures never fabricate
+records.
 
-Exercise records → Loading estimate opens a scrollable sheet. The strongest
-eligible completed set is selected initially; Choose another performance shows
-raw load, date, source B/provenance and added 1RM. Target reps must be a positive
-whole number; target B is positive kg. Saved target-session B is prefilled;
-Use current reading is explicit and shows its date. The result is nonnegative
-added load in kg/lb, with effective total and estimate
-wording. Inputs clear old results, one-rep/high-rep conventions are explained,
-and Done/dismiss changes no history. A target below bodyweight has no added-weight estimate. No source explains dated-weight
-requirements; read failures can retry and invalid inputs remain editable.
-
-After reading or personal coefficient changes,
-reopening affected projections recomputes their values. These are derived
-views, never persisted awards. Bodyweight share previews keep the same added
-1RM/raw external distinction as the completed session.
-
-Session summary rows keep incomplete volume figures compact: label a known
-subtotal `Known vol` and put its known/eligible set count in a full-width note
-below the facts. Entirely unavailable or overflowed volume is `—` with the
-reason below; coverage words never occupy the headline numeric slot.
+If the Loading estimate sheet remains, it is kg-only, uses Weight/1RM language
+and the same private policy, and does not expose bodyweight arithmetic or reading
+provenance. Inputs clear old results; Done/dismiss writes no history. The result
+is a transient estimate, not a saved award.

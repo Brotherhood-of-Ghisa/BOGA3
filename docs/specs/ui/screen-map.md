@@ -673,18 +673,18 @@ Brief entrypoint map of the current mobile screens.
 
 23. `/body-weight`
 - File: `apps/mobile/app/body-weight.tsx`; composition: `components/bodyweight/`
-- Purpose: private dated readings and history, reached from Settings or invalid
-  session-context review.
-- States: current value with unit and measurement date; empty history;
-  loading/retryable error; Add/Edit sheet with positive weight, kg/lb and required
+- Current pre-cutover purpose: private dated readings and history, reached from
+  Settings and from session bodyweight surfaces.
+- Current states: current value and measurement date; empty history;
+  loading/retryable error; Add/Edit sheet with positive kg and required
   local date/time; invalid/future date or failed-save feedback retaining input;
-  delete confirmation explaining recalculation. Saves are local/offline.
+  delete confirmation. Saves are local/offline.
 - Native back returns to the caller. History orders by measurement time then ID.
-  Session/detail/logger cards show read-only derived kg and source date. Missing
-  context offers an in-route dated editor prefilled at the session start;
-  invalid context opens history. Friends and deleted sessions remain read-only.
-- Reading value/date changes and deletion recalculate affected personal/group
-  results. Historical fill and session-only correction are removed.
+- **Accepted replacement; implementation pending:** the route becomes kg-only
+  and is reached only through `Manage weights` while the private preference is
+  enabled. No session/detail/logger surface will show or link to a reading.
+  Reading value/date changes and deletion will recalculate affected projections
+  silently.
 
 ## Route shell (not a user-facing screen)
 
@@ -724,37 +724,32 @@ Brief entrypoint map of the current mobile screens.
 - If route purpose or screen-level state set changes materially, update this doc in the same task.
 
 
-### Bodyweight load overlays on existing exercise routes
+### Optional bodyweight calculation overlays
 
-The exercise editor adds contribution, movement standard and loading method.
-The session exercise page labels numeric loads as added weight, shows their
-units and effective-load context, and offers dated reading entry when body
-weight is missing. These are overlays on existing routes, not additional
-destinations.
+Settings adds a private `Bodyweight calculations` toggle with conditional
+`Manage weights`. While enabled, the personal exercise editor adds only
+`Bodyweight contribution (%)`. The session/exercise routes keep ordinary kg
+Weight, 1RM and Volume labels and never show bodyweight context or entry actions.
+These are overlays on existing routes, not additional destinations.
 
 ### Personal loading estimate overlay
 
-Exercise page → records → Loading estimate uses
-`components/bodyweight/loading-estimate-sheet.tsx`. Source selection stays inside
-the same sheet. Target reps, saved/explicit current B and output unit produce a
-transient added-weight estimate. Targets below the bodyweight contribution are
-unavailable. Loading, retry, no-source, invalid input,
-source provenance and one-rep/high-rep states use existing UI primitives.
-Exercise history, Stats/heatmaps and session/share projections use the same
-effective-load boundary and expose incomplete volume.
+If retained, Exercise page → records → Loading estimate remains a kg-only
+transient sheet using Weight/1RM language and the same private policy. It does
+not expose source reading/provenance or the bodyweight arithmetic. Loading,
+retry and invalid-input states use existing UI primitives. Exercise history,
+Stats/heatmaps and session/share projections use the same calculation boundary.
 
 
-## M27 group comparison extension (native acceptance in progress)
+## Optional group bodyweight calculations (accepted target)
 
-The group exercise routes now include bodyweight contribution, declared movement
-and loading method, and default ranking. Calculation edits require review and
-an expected revision; stale forms retain edits until explicit reload. New local
-exercises can copy reviewed group rules; linking existing exercises never
-changes their personal metadata.
+Group settings adds an admin-only `Bodyweight calculations` toggle. While
+enabled, add/edit group exercise shows only the group's independent
+`Bodyweight contribution (%)`. Expected-revision conflicts retain edits; linking
+never changes personal settings or contribution.
 
-The existing board/history routes select their implementation from the versioned
-catalogue. Metric boards carry reps/×BW/kg, Certified/All, rebuilding and archived
-states. Record details show raw load, saved B/provenance and attestation coverage.
-History selects a revision and its events or scores, preserving legacy retirement
-rows. Podiums and group activity use versioned cache payloads. T10's task card
-records outstanding native and stream-certification acceptance.
+Existing Weight/1RM board/history routes remain. Weight is raw kg; strict 1RM
+may be generically absent while raw shared activity remains. Rebuilding and
+archived states keep their existing recipes. Record details show public raw set,
+score, revision and certification state but no private reading or calculation
+dependency. Integrated native acceptance is pending.

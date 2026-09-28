@@ -4,9 +4,9 @@ This folder holds subsystem-level implementation references that sit below the t
 
 Current docs:
 
-- `bodyweight-load-contract.md`: M27 planned bodyweight load, session snapshots,
-  legacy review, completeness, group metrics and rollout compatibility. Status
-  is explicit per delivered section; do not assume the feature is enabled.
+- `bodyweight-load-contract.md`: accepted replacement contract for ordinary and
+  optional private/group bodyweight calculations, kg-only migration, dated
+  readings, privacy and rollout. Implementation status is explicit in the doc.
 
 - `sync-v2-server-contract.md`: authoritative Sync v2 server contract — Part A (server schema, composite PKs, RLS, deferrable FKs, LWW/undelete, drift checker) and Part B (push/pull RPC wire protocol, batch caps, per-layer cursor drain). Verified against the as-built migrations and RPCs.
 - `groups-contract.md`: the group domain contract (as-built in M22):

@@ -21,14 +21,17 @@ This document is project-level source of truth for what data exists and how it i
 
 ## Current model layers
 
-The [bodyweight contract](tech/bodyweight-load-contract.md) defines private dated
-measurements and explicit external load metadata. Session weight is resolved on
-read from the latest live reading at/before its exact start instant; value/date
-edits, deletion and restoration recalculate history. No session tuple or manual
-override is persisted or synced. Forward migrations remove obsolete columns
-without manufacturing readings or changing raw sets. Import v3 omits session
-weight; old v2 tuples are ignored. The staged update-required rollout is owned
-by RUNBOOK and the Sync v2 contract.
+The platform layers below are current. Within them, the
+[bodyweight contract](tech/bodyweight-load-contract.md) defines the accepted
+replacement model; its kg-only preference/contribution cutover is
+implementation-pending rather than a description of the pre-cutover schema. It
+adds an
+owner-synced private preference, private dated kg readings and independent
+personal/group contributions. Sessions store no bodyweight tuple or override;
+the latest valid reading at/before the exact start is selected on read. Ordinary
+math is the default. Personal opt-in uses a missing-reading zero fallback;
+strict group opt-in omits dependent scores. Preference, contribution and reading
+changes recalculate derived history without changing raw sets.
 
 1. Mobile local data layer (`SQLite` via Drizzle)
 - primary runtime store for app behavior.
@@ -51,33 +54,33 @@ by RUNBOOK and the Sync v2 contract.
   `sync_push` RPC and read by the `sync_pull` RPC under per-row last-write-wins.
 - there is no projection function and no event log: the data is the event.
 
-Server-first compatibility: M27 fields omitted by an older LWW writer preserve
-stored values; explicit JSON null clears nullable fields. New clients request
-reading-only layer 4 with `capabilities: ["bodyweight_v1"]` and a fresh cursor;
-legacy layer meanings remain unchanged. Upgrading locally replays affected
-layers 0, 1 and 3 once to recover metadata an older reader could have ignored;
-layer 2 and existing row clocks/dirty bits are preserved. The schema migration must deploy
-before the upgraded sync client. Group projections and calculated metrics are
-outside the mirror; no derived volume/1RM columns are stored.
+The clean kg-only wire is a coordinated protocol cutover. The server migration
+deploys before the client and requires `x-boga-sync-protocol: 3`; older clients
+receive `UPDATE_REQUIRED` before row access. The wire removes obsolete unit,
+external-mode, movement/loading and hydration fields, renames coefficients to
+contributions, adds `user_settings`, and carries readings as kg only. There is
+no retired-field compatibility branch. Group projections and calculated metrics
+remain outside the mirror; no derived Volume/1RM columns are stored.
 
-## Local schema inventory (current)
+## Local schema inventory (accepted clean model)
 
 ### User-owned domain data (sync/backups expected)
 
 - `gyms` (user-owned personal gym rows; nullable private coordinate metadata is in sync scope)
-- `body_weight_measurements` (owner-private dated readings; raw `weight_value`,
-  explicit `weight_unit`, normalized `weight_kg`, `measured_at`, timestamps and
-  tombstone; no group access to reading history)
-- `sessions` (recorded start/end/status and ordinary sync fields; body weight is a dated read projection)
+- `user_settings` (singleton id `settings`; synced
+  `bodyweight_calculations_enabled`, default false)
+- `body_weight_measurements` (owner-private dated readings; positive finite
+  `weight_kg`, `measured_at`, timestamps and tombstone; no group access to
+  reading history)
+- `sessions` (recorded start/end/status and ordinary sync fields; bodyweight is a private read projection)
 - `session_exercises`
 - `exercise_sets` (actual entered `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for explicit planned/unperformed execution state; legacy `skipped` values remain readable)
-- `exercise_sets` also stores actual `weight_unit` (legacy default `kg`),
-  nullable `external_load_mode`, `planned_weight_unit` and
-  `planned_external_load_mode`; raw entered amounts remain unchanged. Null
-  mode is unresolved for bodyweight history, never guessed as added load.
-- `exercise_definitions` adds `bodyweight_coefficient` (default 0), nullable
-  `movement_standard` and `loading_method`; no heuristic activation of legacy
-  exercises is performed by the schema migration.
+- `exercise_sets` stores actual/planned Weight text in kg only; no unit or
+  external-load-mode columns remain. Blank performed Weight canonicalizes to
+  zero while malformed values remain invalid.
+- `exercise_definitions` stores `bodyweight_contribution` (fraction in `[0,1]`,
+  default 0). The private preference decides whether it participates; no
+  movement/loading fields or name inference exist.
   - `load_input_mode` is required metadata with values `total_load` and
     `per_side_load`. It describes whether the entered scalar is a shared load
     or already one-side load; it is not inferred from equipment names.
@@ -109,7 +112,7 @@ outside the mirror; no derived volume/1RM columns are stored.
 ### Sign-out / account-switch wipe
 
 `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`) deletes, in one
-transaction, the eleven user-owned entity tables (child before parent) and
+transaction, the twelve user-owned entity tables (child before parent) and
 `group_cache`, then resets `bootstrap_completed_at`, `pull_cursor`, and
 `applied_seed_migration_app_version` on the `sync_runtime_state` row. It keeps
 `last_emitted_ms` and issues no server delete.
@@ -117,17 +120,11 @@ transaction, the eleven user-owned entity tables (child before parent) and
 ### Local sync bookkeeping (Sync v2)
 
 v2 keeps no separate outbox/delivery tables. Per-row sync state is two local-only
-columns on each of the eleven user-owned entity tables:
+columns on each of the twelve user-owned entity tables:
 `local_dirty` (1 iff the row needs pushing) and `local_updated_at_ms` (the
 monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
-wire. M27 additionally tracks `local_bodyweight_metadata_known` on sessions,
-exercise definitions and sets to restore fields an older reader could have
-ignored, without pushing unknown defaults or discarding newer local edits.
-It is local-only and never an independent conflict clock. Explicit exercise-rule
-configuration, session correction or complete actual/planned load review can
-establish a tuple offline; ordinary autosave cannot. Load review rechecks its
-source inventory and marks the whole tuple known in one transaction (bodyweight
-contract §5), without assuming missing sync bookkeeping means never uploaded.
+wire. The clean cutover removes retired `local_bodyweight_metadata_known`
+compatibility markers; there is no partial metadata tuple to hydrate.
 Device-global sync state lives on the `sync_runtime_state` singleton row:
 `pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
 high-water mark), and `bootstrap_completed_at`. Deep detail:
@@ -139,7 +136,7 @@ high-water mark), and `bootstrap_completed_at`. Deep detail:
 `last_seen_at_ms`, and `occurrence_count`. Push selection excludes quarantined
 rows so one local orphan cannot wedge the backlog.
 
-## Backend schema inventory (current)
+## Backend schema inventory (accepted clean model)
 
 ### Auth/profile
 
@@ -157,6 +154,8 @@ and a nullable `deleted_at` tombstone. Per-column mapping is in
 `docs/specs/tech/sync-v2-server-contract.md` §A.2.
 
 - `app_public.gyms` (carries the four nullable private coordinate columns)
+- `app_public.user_settings` (owner-private singleton preference mirror)
+- `app_public.body_weight_measurements` (owner-private kg dated readings)
 - `app_public.sessions`
 - `app_public.session_exercises`
 - `app_public.exercise_sets` (actual logged set values plus optional planned target fields and `performance_status`)
@@ -193,7 +192,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 - `app_public.user_profiles.training_unit` and `time_zone`
   - training-relevant API preferences in the auth/profile layer;
   - sync impact decision: `out of sync scope` because `user_profiles` is
-    explicitly outside the eleven-table Sync v2 mirror.
+    explicitly outside the twelve-table Sync v2 mirror.
 
 ### Group domain (M22)
 
@@ -259,18 +258,15 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   only by the certification RPCs and the group evaluator
   (`docs/specs/tech/groups-contract.md` §2.12).
 
-- **Implemented (M27, `supabase/migrations/20260927073000_m27_group_metrics.sql`):**
-  versioned group rules and publication metadata extend `group_exercises`.
-  `group_rule_revisions`, `group_metric_eval_queue`, `group_metric_set_scores`,
-  `group_metric_board_entries`, `group_metric_board_state` and
-  `group_metric_certifications` retain the same server-only group posture.
-  Scores carry metric, unit and revision; certifications cover one observed
-  metric's dependencies. `group_events` holds both explicit legacy and v2 event
-  contracts. Sync impact decision: `out of sync scope`; there are no new
-  owner-private entities, source-table foreign keys or sync-envelope changes.
-  See [`tech/groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27)
-  for coherent publication and legacy retirement. Local verification and
-  hosted rollout are tracked separately from this schema description.
+- **Accepted replacement group calculation model:** `groups` stores
+  `bodyweight_calculations_enabled` and `group_exercises` stores
+  `bodyweight_contribution`. Rules/revision, evaluation queue, scores, board
+  state and certifications retain the server-only group posture. Sync impact
+  decision: `out of sync scope`; these are multi-reader, server-authoritative
+  rows and never become owner-LWW entities. The evaluator may read an applicable
+  owner-private measurement internally, but no group table or public payload
+  stores or exposes that value, date, identifier or dependency digest. See
+  [`tech/groups-contract.md` §11](tech/groups-contract.md#11-optional-bodyweight-aware-group-calculations).
 
 ## Ownership and identity invariants
 
@@ -285,7 +281,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
    to a newer stored value (including the undelete-loses case in
    `docs/specs/tech/sync-v2-server-contract.md` §A.1.1.2 Scenario A).
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
-6. All eleven sync-domain mirror tables use composite primary key
+6. All twelve sync-domain mirror tables use composite primary key
    `(owner_user_id, id)` — **owner-first**. The column order is load-bearing: the
    canonical pull query (`where owner_user_id = … order by server_received_at`)
    leads with the PK column, and the per-layer pull cursor depends on it (contract
@@ -330,7 +326,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 Deep wire/RPC detail lives in `docs/specs/tech/sync-v2-server-contract.md`; this
 section states only the data-model-level invariants.
 
-1. The eleven user-owned entity tables are mirrored 1:1 on the backend as typed
+1. The twelve user-owned entity tables are mirrored 1:1 on the backend as typed
    `app_public.<entity>` tables. The client marks a mutated row dirty
    (`local_dirty = 1`, `local_updated_at_ms = nowMonotonic()`) and pushes the full
    typed row — not a granular event. There is no outbox, no projection, no event
@@ -343,7 +339,8 @@ section states only the data-model-level invariants.
    `deleted_at` going non-null; undelete is the same row with `deleted_at` returning
    to null under the same LWW rule. There is no separate `deleted` flag and no
    special delete/undelete path (contract §A.1.1).
-4. Restore/bootstrap is a full `sync_pull` drain across all four topological layers
+4. Under the accepted protocol-3 cutover, restore/bootstrap is a full
+   `sync_pull` drain across all five topological layers
    (first sign-in or wiped-client reinstall). It must be coherent across all
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
@@ -364,24 +361,24 @@ section states only the data-model-level invariants.
 8. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
 9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
 10. Muscle volume is recomputed per side from current exercise metadata and
-   the saved session weight via `tech/bodyweight-load-contract.md` §2. Conventional
-   sets retain entered volume, halved for `total_load` and preserved for
-   `per_side_load`. Bodyweight sets resolve total effective resistance first,
-   then halve its volume. Apply the mapping role factor afterwards: `1` for
-   primary and `0.5` for secondary. Persisted
+   the applicable private calculation policy via
+   `tech/bodyweight-load-contract.md` §2. Ordinary mode ignores contribution
+   and readings: total input contributes `E / 2` per side and per-side input
+   contributes `E`, while its displayed Volume remains `E × reps`. Enabled
+   positive-contribution mode resolves total `c × B + F × E`, halves it for
+   muscle allocation, then applies the mapping role factor: `1` for primary and
+   `0.5` for secondary. Persisted
    `exercise_muscle_mappings.weight` does not alter this calculation; null-role
    and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
-   sides were performed in v1. Exercise history and records use effective
-   resistance for bodyweight volume; the resulting 1RM is expressed as added
-   weight after subtracting the bodyweight contribution, with no muscle-role factor.
-   Conventional exercises retain entered-scalar semantics. Top added weight
-   normalizes external units to kg and treats all numeric values as added weight;
-   it never substitutes total resistance for the entered external amount. Live and completion personal-record
+   sides were performed in v1. Exercise history and records use the same
+   current policy for Volume/1RM, with no muscle-role factor on 1RM. Top weight
+   is always raw entered kg and never substitutes calculated load. Live and
+   completion personal-record
    presentation resolves its exercise name from the current linked
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row.
    Completed-session exercise-volume comparisons remain a read-time projection,
-   not persisted data. They sum effective load × reps across valid confirmed
+   not persisted data. They sum calculated load × reps across valid confirmed
    sets (including warm-ups), combine repeated blocks by linked exercise
    definition, and compare only complete totals from earlier completed,
    nondeleted sessions for that definition. Missing/invalid load preserves
@@ -417,7 +414,7 @@ is no event log. Field-by-field detail: contract §B.2.
 
 ### Entity coverage (Sync v2)
 
-There are no per-entity event types. Every one of the eleven entities moves through
+There are no per-entity event types. Every one of the twelve entities moves through
 the same LWW upsert path. A delete is a row whose `deleted_at` is non-null; an
 undelete is that same row with `deleted_at` back to null. A reorder or complete is
 an ordinary field change (`order_index` / `status`); an attach is the join-table
@@ -434,7 +431,7 @@ link follows the same shape: link inserts or undeletes the deterministic-id
   commits or rolls back (deferrable FKs are checked at COMMIT). Failures surface as
   exactly one of `AUTH_REQUIRED`, `FK_VIOLATION`, or `INTERNAL` (contract §B.2.2,
   §B.3).
-- `sync_pull` downloads rows newer than a per-layer cursor, draining the four
+- `sync_pull` downloads rows newer than a per-layer cursor, draining the five
   topological layers in order so a child page never lands before its parents
   (contract §B.4). The five per-layer cursors persist in
   `sync_runtime_state.pull_cursor`.
@@ -458,11 +455,11 @@ Sync impact gate (mandatory for every data-model change):
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the eleven user-owned
+Modifying any file under `apps/mobile/src/data/schema/` for the twelve user-owned
 entities (`gyms`, `sessions`, `session_exercises`, `exercise_sets`,
 `exercise_definitions`, `exercise_muscle_mappings`, `exercise_tag_definitions`,
 `session_exercise_tags`, `muscle_groups`, `exercise_group_links`,
-`body_weight_measurements`) to add a
+`body_weight_measurements`, `user_settings`) to add a
 domain column requires a
 paired server migration under `supabase/migrations/` that adds the matching
 `app_public.<entity>` column with a compatible Postgres type, **and the server
@@ -471,9 +468,9 @@ migration must be deployed to production before the client change ships**.
 Why "server first": a client that depends on a typed server column not yet
 deployed will fail to round-trip that column; the server has nowhere typed to
 store it. Server-first additions must also preserve old writers that omit new
-fields and keep unknown entity types out of old-reader pulls. M27 additionally
-replays ignored projections on local upgrade (Sync v2 §B.4.1). Adding columns
-alone is not a complete mixed-version compatibility policy.
+fields and keep unknown entity types out of old-reader pulls. The kg-only
+removal/rename is a protocol-3 hard cutover rather than an additive mixed-version
+change. Adding columns alone is not a complete compatibility policy.
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, invoked via
 `npm run check:sync-drift` and gated by `./scripts/quality-slow.sh backend`)
@@ -488,10 +485,10 @@ This rule does NOT apply to: `smoke_records`, `sync_runtime_state`,
 `sync_quarantine`, or `group_cache` (test/runtime scaffolding, local sync
 bookkeeping, and the disposable group cache) — these
 have no server counterpart and are out of the checker's scope, which introspects
-only the eleven `app_public.<entity>` mirror tables. Nor does it apply to the two
+only the twelve `app_public.<entity>` mirror tables. Nor does it apply to the two
 local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on
 each entity table: those are listed under `exemptions.local_only_columns` in
-`sync-extras.json`. (`muscle_groups` is no longer exempt — it is one of the eleven
+`sync-extras.json`. (`muscle_groups` is no longer exempt — it is one of the twelve
 synced entities, and `exercise_muscle_mappings.muscleGroupId` is a typed,
 FK-checked column like any other.)
 

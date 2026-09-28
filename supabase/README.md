@@ -356,13 +356,12 @@ It does **not** lock the final sync API surface choice for `T-20260220-11` (`Edg
 - hosted smoke validation: owned by `T-20260220-09` (manual by default until CI exists)
 - cross-stack `E2E`: strategy only in M5; repo-root `e2e/` reserved for later implementation
 
-## Dated bodyweight cutover
+## Optional bodyweight-calculation cutover
 
-The forward migration `20260927150155_dated_bodyweight_groups.sql` removes
-stored session weight, adds private as-of projections and reading-triggered
-group reevaluation, and rejects outdated app sync calls before removed-column
-access. `20260927195000_added_bodyweight_loads.sql` then updates group pins and
-calculation revisions so every numeric load is treated as added weight.
-Release the isolated compatibility client first, then both migrations,
-matching functions and dated client. Follow [RUNBOOK](../RUNBOOK.md#dated-bodyweight-cutover)
-for exact commands, hosted checks and forward repair; local gates do not deploy.
+The accepted forward migration adds synced private settings and group enablement,
+renames contributions, converts retained lb values to kg, removes retired
+unit/mode/movement/loading/hydration fields and requires sync protocol 3 before
+removed-column access. Release an update-required compatibility client first,
+then the reviewed migration, matching functions and protocol-3 client. Follow
+[RUNBOOK](../RUNBOOK.md#optional-bodyweight-calculation-cutover) for hosted
+checks and forward repair; local gates do not deploy.

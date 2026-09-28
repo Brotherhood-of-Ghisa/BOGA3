@@ -29,35 +29,32 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
 - Decision: Current-session feedback keeps exercise PRs, exercise-volume context, and session muscle load as separate, derived signals.
 - Notes:
   - a PR belongs to the exercise that produced it and requires a strict estimated-1RM improvement over prior eligible completed history; a first performance without a baseline is not a PR,
-  - after submission, each performed exercise compares the session's effective-load volume with the median and fifth-to-ninety-fifth-percentile range of eligible earlier completed sessions,
+  - after submission, each performed exercise compares the session's calculated Volume under the current private policy with the median and fifth-to-ninety-fifth-percentile range of eligible earlier completed sessions,
   - muscle load is a session-wide summary using the same current-metadata, per-side, role-weighted semantics as history analytics,
   - successful submission opens a one-time completion presentation on the existing completed-session route; the presentation is not a persisted award or a historical-detail mode,
   - the share action previews and generates a session-summary PNG containing all PRs and exercise comparisons, then opens the platform share sheet; the app does not upload media, publish directly, include private gym/location data, or store a share record.
 
 
-- Date: `2026-09-26`
-- Decision: Bodyweight contribution is an explicit, editable accounting rule,
-  independent of external total/per-side entry and muscle mapping. A positive
-  contribution requires a movement standard and loading method. A different
-  movement gets its own exercise. Personal rule edits reinterpret personal
-  history using the applicable dated readings and do not edit group rules.
-- Entry: every numeric weight, including old records and zero, means added
-  weight. There are no assistance modes or legacy conversion screens. Raw amounts
-  and units stay unchanged. Missing dated bodyweight does not prevent logging reps.
-- The complete calculation and rollout boundary is owned by
-  `tech/bodyweight-load-contract.md`. Personal analytics uses effective load
-  consistently across logging, session summaries, history, records and share
-  previews. Missing load context preserves independent set/rep counts and marks
-  volume incomplete; incomplete totals cannot be complete comparison baselines.
-  Group/coaching adoption and production activation have separate rollout gates.
-
-- Date: `2026-09-27`
-- Decision: Personal bodyweight records calculate RM from total resistance and display
-  added-weight RM using
-  each performance’s latest reading on or before its start. The selected
-  reading must be valid; a malformed latest reading blocks older fallback.
-  Reading changes recalculate affected history and shared comparisons without
-  rewriting raw sets. Top added load remains external load.
-  Loading estimates use a selected historical performance and an explicit target
-  weight/repetition count; choosing a newer reading changes only the projection.
-  A negative projection is unavailable; there is no assisted-load result.
+- Date: `2026-09-28`
+- Decision: Ordinary exercise logging is the default for every exercise. Weight
+  is optional, kg-only and interpreted with the exercise's total/per-side input
+  mode; a blank performed Weight canonicalizes to zero. Volume and 1RM render
+  numeric zero when the calculated load is zero, while zero results never create
+  a record or ranking entry.
+- Decision: Private users and groups independently opt into bodyweight-aware
+  calculations. Each exercise then has one editable `Bodyweight contribution
+  (%)`; zero keeps ordinary math. Disabling either capability hides and ignores
+  its contributions without deleting them or dated readings. Personal and group
+  contributions never copy across an exercise link.
+- Decision: Dated kg readings remain private and are selected at or before the
+  exact session start. Personal calculations silently treat a missing applicable
+  reading as zero so logging and analytics remain available. Strict group scoring
+  omits a bodyweight-dependent score when the member has no applicable reading,
+  while preserving raw shared activity. A group may use the reading internally
+  but never disclose its value, date, identifier, history or dependency digest.
+- Decision: Current preferences, contributions and dated readings reinterpret
+  derived history without rewriting raw sets. `Top weight` is always the raw
+  entered Weight; 1RM and Volume are derived. User-facing calculation surfaces
+  use only `Weight`, `Top weight`, `1RM` and `Volume` and do not expose the
+  calculation breakdown. The complete boundary is owned by
+  `tech/bodyweight-load-contract.md`.

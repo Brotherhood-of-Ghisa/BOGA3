@@ -204,7 +204,7 @@ review before the final pass.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| `M28-T01-Define_simplified_bodyweight_contract` | Replace the durable contracts and accepted design target with D1-D17. | none | planned |
+| `M28-T01-Define_simplified_bodyweight_contract` | Replace the durable contracts and accepted design target with D1-D17. | none | completed |
 | `M28-T02-Implement_simplified_bodyweight_contract` | Ship the coordinated schema, calculations, UI, sync, groups, coaching and verification work. | T01 | planned |
 
 ## Risks / dependencies
