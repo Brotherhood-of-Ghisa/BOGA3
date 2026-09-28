@@ -74,7 +74,9 @@ export function SyncStatusPanel({
   onRequestSync = requestSync,
 }: SyncStatusPanelProps) {
   const [status, setStatus] = useState<SyncStatusSnapshot | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const isMountedRef = useRef(true);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -92,6 +94,10 @@ export function SyncStatusPanel({
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (refreshTimeoutRef.current !== null) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
     };
   }, []);
 
@@ -108,9 +114,25 @@ export function SyncStatusPanel({
     }, [refresh])
   );
 
-  const handleManualRefresh = useCallback(() => {
-    onRequestSync();
-    void refresh();
+  const handleManualRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.resolve(onRequestSync());
+      await refresh();
+    } finally {
+      if (refreshTimeoutRef.current !== null) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      refreshTimeoutRef.current = setTimeout(async () => {
+        try {
+          await refresh();
+        } finally {
+          if (isMountedRef.current) {
+            setIsRefreshing(false);
+          }
+        }
+      }, 1500);
+    }
   }, [onRequestSync, refresh]);
 
   const errorText = resolveErrorText(status);
@@ -177,9 +199,12 @@ export function SyncStatusPanel({
 
       <View style={styles.actions}>
         <ActionButton
-          accessibilityLabel="Refresh sync status and request a sync"
-          label="Refresh"
-          onPress={handleManualRefresh}
+          accessibilityLabel={isRefreshing ? 'Refreshing sync status…' : 'Refresh sync status and request a sync'}
+          disabled={isRefreshing}
+          label={isRefreshing ? 'Refreshing…' : 'Refresh'}
+          onPress={() => {
+            void handleManualRefresh();
+          }}
           testID="settings-sync-status-refresh-button"
           variant="outline"
         />

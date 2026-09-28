@@ -22,7 +22,7 @@ built from the vocabulary `exercise-session-v5.md` already governs.
 - Every native stack header has a `surface` background, an Archivo 700 `ink`
   title and an `ink` back arrow, which matches the top bars the session view,
   exercise page and View Session draw.
-- `Back to More` is a caps text button at the top left, not an outlined button.
+- `Back to More` is a `chevron-left` icon button at the top left.
 - The auth guard's restore state is a centred `StatePanel` (a spinner and
   "Loading…") on `paper`.
 

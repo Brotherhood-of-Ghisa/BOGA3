@@ -165,4 +165,32 @@ describe('Settings sync-status panel', () => {
     expect(onRequestSync).toHaveBeenCalledTimes(1);
     expect(readStatus.mock.calls.length).toBeGreaterThan(callsBefore);
   });
+
+  it('enters refreshing state on manual refresh and settles back to idle', async () => {
+    jest.useFakeTimers();
+    try {
+      const onRequestSync = jest.fn();
+      renderPanel({ dirtyCount: 1 }, onRequestSync);
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-sync-status-refresh-button')).toHaveTextContent('Refresh');
+      });
+
+      const button = screen.getByTestId('settings-sync-status-refresh-button');
+      await act(async () => {
+        fireEvent.press(button);
+      });
+
+      expect(button).toHaveTextContent('Refreshing…');
+      expect(button.props.accessibilityState).toMatchObject({ disabled: true });
+
+      await act(async () => {
+        jest.advanceTimersByTime(1600);
+      });
+
+      expect(button).toHaveTextContent('Refresh');
+      expect(button.props.accessibilityState).toMatchObject({ disabled: false });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });
