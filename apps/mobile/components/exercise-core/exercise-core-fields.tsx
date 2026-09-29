@@ -107,28 +107,35 @@ export function ExerciseCoreFields({
               Saved load settings have not synced yet. Leave these fields unchanged to preserve them, or configure them explicitly.
             </Text>
           ) : null}
-          <Text allowFontScaling={false} style={styles.helperText}>
-            0% uses external weight only. A bodyweight exercise uses this share of your dated body weight, plus added weight.
-          </Text>
-          {(Number(loadRules.value.percentage) > 0 || loadRules.value.movementStandard || loadRules.value.loadingMethod) ? (
+          {loadRules.scope === 'group' &&
+          (Number(loadRules.value.percentage) > 0 || loadRules.value.movementStandard || loadRules.value.loadingMethod) ? (
             <>
-              <FormField accessibilityLabel="Movement standard" editable={editable} face="text"
-                label="Movement standard" placeholder="e.g. Standard floor push-up"
+              <FormField
+                accessibilityLabel="Movement standard"
+                editable={editable}
+                face="text"
+                label="Movement standard"
+                placeholder="e.g. Standard floor push-up"
                 onChangeText={(movementStandard) => loadRules.onChange({ ...loadRules.value, movementStandard })}
-                testID={`${testIDPrefix}-movement-standard`} value={loadRules.value.movementStandard} />
-              <FormField accessibilityLabel="Loading method" editable={editable} face="text"
-                label="Loading method" placeholder="e.g. Vest"
+                testID={`${testIDPrefix}-movement-standard`}
+                value={loadRules.value.movementStandard}
+              />
+              <FormField
+                accessibilityLabel="Loading method"
+                editable={editable}
+                face="text"
+                label="Loading method"
+                placeholder="e.g. Vest"
                 onChangeText={(loadingMethod) => loadRules.onChange({ ...loadRules.value, loadingMethod })}
-                testID={`${testIDPrefix}-loading-method`} value={loadRules.value.loadingMethod} />
-              <Text allowFontScaling={false} style={styles.helperText}>
-                Percentages and added mass are accounting approximations. Per side applies only to equal external loads on both sides. Use a separate exercise for a different movement.
-              </Text>
+                testID={`${testIDPrefix}-loading-method`}
+                value={loadRules.value.loadingMethod}
+              />
             </>
           ) : null}
           <Text allowFontScaling={false} style={styles.helperText}>
             {loadRules.scope === 'group'
-              ? 'These rules score shared performances for this group. Personal exercise settings are independent. Different movements need different group exercises.'
-              : 'Changes recalculate personal history using each session’s saved weight. Group rules stay unchanged. Old loads require review before bodyweight calculations can use them.'}
+              ? 'The group uses this share of each member’s applicable weight. Personal exercise settings stay independent.'
+              : 'The calculation uses this share of your applicable dated weight. Changes recalculate personal history.'}
           </Text>
           {loadRules.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
             style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{loadRules.error}</Text> : null}

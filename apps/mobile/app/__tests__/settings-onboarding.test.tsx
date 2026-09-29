@@ -73,7 +73,6 @@ describe('settings onboarding surface', () => {
     const tree = JSON.stringify(result.toJSON());
     const orderedSectionIds = [
       'settings-section-account',
-      'settings-section-body-weight',
       'settings-section-ai-coaching',
       'settings-section-preferences',
       'settings-section-data-sync',

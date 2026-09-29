@@ -1,6 +1,7 @@
 appId: com.dinoderek.mobile
 ---
-# One dated reading changes a bodyweight exercise's added-weight RM and total-load volume.
+# M28: ordinary logging by default, private opt-in, kg-only reading management,
+# silent bodyweight-aware recalculation and the concise contribution editor.
 - openLink: "boga3://maestro-harness?reset=data&fixture=bodyweight-rm-volume&teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
 - tapOn: { text: "Open", optional: true }
 - tapOn: { text: "Continue", optional: true }
@@ -15,19 +16,40 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertVisible:
     id: "exercise-set-logger-preview"
-    text: "Added 1RM — · VOL —"
-- takeScreenshot: "bodyweight-before-reading"
-- scrollUntilVisible:
-    element: { id: "session-body-weight-add-reading" }
-    direction: UP
-    centerElement: true
-    timeout: 20000
-- tapOn: { id: "session-body-weight-add-reading" }
+    text: "1RM 25.5 · VOL 160"
+- assertVisible: "Weight · kg"
+- assertNotVisible: "Added"
+- assertNotVisible: "Effective load"
+- assertNotVisible: { id: "exercise-set-unit-lb" }
+- assertNotVisible: { id: "session-body-weight" }
+- takeScreenshot: "m28-recorder-mode-off"
+
+- openLink: "boga3://settings"
+- extendedWaitUntil:
+    visible: { id: "settings-bodyweight-calculations-row" }
+    timeout: 30000
+- assertVisible: { id: "settings-bodyweight-calculations-toggle" }
+- assertVisible: "Bodyweight calculations off"
+- assertVisible: { id: "settings-body-weight-row" }
+- takeScreenshot: "m28-settings-mode-off"
+- tapOn: { id: "settings-bodyweight-calculations-toggle" }
+- extendedWaitUntil:
+    visible: "Bodyweight calculations on"
+    timeout: 10000
+- assertVisible: { id: "settings-body-weight-row" }
+- takeScreenshot: "m28-settings-mode-on"
+- tapOn: { id: "settings-body-weight-row" }
+- extendedWaitUntil:
+    visible: { id: "body-weight-screen" }
+    timeout: 30000
+- tapOn: { id: "body-weight-add" }
 - extendedWaitUntil:
     visible: { id: "weight-entry-value" }
     timeout: 30000
 - tapOn: { id: "weight-entry-value" }
 - inputText: "82"
+- assertNotVisible:
+    id: "weight-entry-unit-lb"
 - hideKeyboard: { optional: true }
 - scrollUntilVisible:
     element: { id: "weight-entry-save" }
@@ -36,8 +58,14 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - tapOn: { id: "weight-entry-save" }
 - extendedWaitUntil:
-    notVisible: { id: "weight-entry-sheet" }
+    visible: { id: "body-weight-reading-.*" }
     timeout: 15000
+- takeScreenshot: "m28-weight-history-kg"
+
+- openLink: "boga3://maestro-harness?bodyweightCalculations=on&teleport=exercise-page&sessionId=maestro_bw_active&sessionExerciseId=maestro_bw_exercise"
+- extendedWaitUntil:
+    visible: { id: "exercise-page" }
+    timeout: 30000
 - scrollUntilVisible:
     element: { id: "exercise-set-logger-preview" }
     direction: DOWN
@@ -45,5 +73,19 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertVisible:
     id: "exercise-set-logger-preview"
-    text: "Added 1RM 48.2 · VOL 816"
-- takeScreenshot: "bodyweight-after-reading"
+    text: "1RM 48.2 · VOL 816"
+- assertVisible: "Weight · kg"
+- assertNotVisible: "Added"
+- assertNotVisible: "Effective load"
+- assertNotVisible: { id: "session-body-weight" }
+- takeScreenshot: "m28-recorder-mode-on"
+
+- tapOn: { id: "exercise-page-options" }
+- tapOn: { id: "exercise-options-edit" }
+- extendedWaitUntil:
+    visible: { id: "exercise-editor" }
+    timeout: 30000
+- assertVisible: { id: "exercise-editor-bodyweight-percentage" }
+- assertNotVisible: { id: "exercise-editor-movement-standard" }
+- assertNotVisible: { id: "exercise-editor-loading-method" }
+- takeScreenshot: "m28-exercise-editor"

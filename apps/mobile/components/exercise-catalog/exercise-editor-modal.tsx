@@ -12,6 +12,7 @@ import { Sheet } from '@/components/ui/sheet';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 import { validateExerciseCore } from '@/src/exercise-core';
 import { validateExerciseLoadRules, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
 import {
@@ -137,6 +138,7 @@ export function ExerciseEditorModal({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const { height } = useWindowDimensions();
+  const bodyweightCalculationsEnabled = useBodyweightCalculationsEnabled();
   const catalog = useExerciseCatalog();
   const muscleGroups = catalog.muscleGroups;
   const isLoadingMuscleGroups = catalog.status === 'idle' || catalog.status === 'loading';
@@ -407,9 +409,9 @@ export function ExerciseEditorModal({
                 <ExerciseCoreFields
                   autoFocus
                   loadInputMode={loadInputMode}
-                  loadRules={{ value: loadFields, error: loadRulesError,
+                  loadRules={bodyweightCalculationsEnabled ? { value: loadFields, error: loadRulesError,
                     metadataKnown: editingExercise?.localBodyweightMetadataKnown,
-                    onChange: (value) => { setLoadFields(value); setLoadFieldsTouched(true); setLoadRulesError(null); } }}
+                    onChange: (value) => { setLoadFields(value); setLoadFieldsTouched(true); setLoadRulesError(null); } } : undefined}
                   name={exerciseName}
                   nameError={validation.nameError}
                   onChangeLoadInputMode={setLoadInputMode}

@@ -15,7 +15,11 @@ export type ExerciseLoadRulesValidation =
   | { ok: true; value: ExerciseLoadRules }
   | { ok: false; field: keyof ExerciseLoadRules; message: string };
 
-/** Standards/methods are explicit descriptions, never inferred from a name. */
+/**
+ * Validate the contribution while retaining any legacy descriptions until the
+ * coordinated schema cutover removes those columns. New UI no longer asks for
+ * the descriptions, so they are optional even for a positive contribution.
+ */
 export const validateExerciseLoadRules = (input: {
   bodyweightCoefficient: unknown;
   movementStandard: unknown;
@@ -29,16 +33,11 @@ export const validateExerciseLoadRules = (input: {
   for (const field of ['movementStandard', 'loadingMethod'] as const) {
     const raw = input[field];
     if (raw !== null && raw !== undefined && typeof raw !== 'string') {
-      return { ok: false, field, message: 'Enter a movement standard and loading method as text.' };
+      return { ok: false, field, message: 'Enter legacy load metadata as text.' };
     }
     const text = typeof raw === 'string' ? raw.trim() : '';
     if (text.length > 120 || /[\u0000-\u001f\u007f]/.test(text)) {
       return { ok: false, field, message: 'Use a single line of at most 120 characters.' };
-    }
-    if (input.bodyweightCoefficient > 0 && text.length === 0) {
-      return { ok: false, field, message: field === 'movementStandard'
-        ? 'Describe the movement standard for this bodyweight exercise.'
-        : 'Describe how external weight is applied, for example a belt or vest.' };
     }
     value[field] = text || null;
   }

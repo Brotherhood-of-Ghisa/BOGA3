@@ -27,15 +27,15 @@ appId: com.dinoderek.mobile
 #      own (NO `bootstrap=complete` harness stamp). Landing on the data screen
 #      proves: logged in + all bootstrap data seeded locally.
 #   B. Save 80 kg and log one exercise; save 82 kg and log a second session.
-#      Each session captures its own reading and neither follows later readings.
+#      The session recorder stays free of body-weight management UI.
 #   C. Force a sync from the Settings sync-status surface and wait for "Pending
 #      changes" to reach 0. This is the run-SPECIFIC upload proof: the dirty rows
 #      were created THIS run in (B) on a freshly-bootstrapped local DB, so
 #      draining them to 0 means the logged exercise was accepted by the server.
 #   D. Fully wipe the device (clearState wipes BOTH the SQLite data AND the
 #      SecureStore session — see src/auth/storage.ts) and sign in again. The
-#      bootstrapper now PULLS from the (non-empty) server, so the logged workout
-#      reappears in history with both dated contexts and the readings.
+#      bootstrapper now PULLS from the (non-empty) server, so the logged workouts
+#      and both private dated readings reappear without session-local weight UI.
 #      After a full local wipe the ONLY source of any
 #      session is the remote DB — so a restored session proves the data is in the
 #      remote database.
@@ -149,6 +149,28 @@ appId: com.dinoderek.mobile
 - assertVisible: "Reading saved."
 - openLink: "boga3://train"
 - extendedWaitUntil:
+    visible: { id: "train-screen" }
+    timeout: 30000
+# A prior interrupted lane can leave this fixture user's uploaded session active.
+# Retire it through the real UI so the round trip is repeatable after a failed run.
+- runFlow:
+    when:
+      visible: { id: "train-resume-session-button" }
+    commands:
+      - tapOn: { id: "train-resume-session-button" }
+      - extendedWaitUntil:
+          visible: { id: "session-view-options-button" }
+          timeout: 30000
+      - tapOn: { id: "session-view-options-button" }
+      - extendedWaitUntil:
+          visible: { id: "session-view-abandon" }
+          timeout: 10000
+      - tapOn: { id: "session-view-abandon" }
+      - extendedWaitUntil:
+          visible: { text: "Abandon session?" }
+          timeout: 10000
+      - tapOn: { text: "Abandon" }
+- extendedWaitUntil:
     visible: { id: "train-start-empty-button" }
     timeout: 30000
 
@@ -174,9 +196,8 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-add-exercise"
     timeout: 30000
-- assertVisible:
+- assertNotVisible:
     id: "session-body-weight"
-    text: "Session body weight, 80 kg, Reading from .*"
 - tapOn:
     id: "session-view-add-exercise"
 - tapOn: "Exercise filter input"
@@ -292,9 +313,8 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-add-exercise"
     timeout: 30000
-- assertVisible:
+- assertNotVisible:
     id: "session-body-weight"
-    text: "Session body weight, 82 kg, Reading from .*"
 - tapOn:
     id: "session-view-add-exercise"
 - tapOn: "Exercise filter input"
@@ -530,25 +550,30 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - takeScreenshot: "20-first-run-roundtrip-restored-from-remote"
 
-# The two newest completed rows were logged above. Both dated contexts must
-# survive the full local wipe independently of the latest 82 kg reading.
+# The two newest completed rows were logged above. Completed-session screens
+# remain free of body-weight management UI after the full local wipe; the
+# private reading log below proves both dated readings restored independently.
 - tapOn: { id: "completed-session-open-button-.*", index: 0 }
 - extendedWaitUntil:
-    visible: { id: "session-body-weight", text: "Session body weight, 82 kg, Reading from .*" }
+    visible: { id: "completed-session-detail-screen" }
     timeout: 30000
-- takeScreenshot: "21-roundtrip-newer-context-82kg"
+- assertNotVisible:
+    id: "session-body-weight"
+- takeScreenshot: "21-roundtrip-newer-session-without-weight-ui"
 - tapOn: { id: "completed-session-detail-back" }
 - extendedWaitUntil:
     visible: { id: "completed-history-scroll" }
     timeout: 15000
 - tapOn: { id: "completed-session-open-button-.*", index: 1 }
 - extendedWaitUntil:
-    visible: { id: "session-body-weight", text: "Session body weight, 80 kg, Reading from .*" }
+    visible: { id: "completed-session-detail-screen" }
     timeout: 30000
-- takeScreenshot: "22-roundtrip-older-context-still-80kg"
+- assertNotVisible:
+    id: "session-body-weight"
+- takeScreenshot: "22-roundtrip-older-session-without-weight-ui"
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:
-    visible: { id: "body-weight-reading-.*", text: "Edit 82 kg, .*" }
+    visible: { id: "body-weight-reading-.*", text: "Edit 82 kilograms, .*" }
     timeout: 30000
-- assertVisible: { id: "body-weight-reading-.*", text: "Edit 80 kg, .*" }
+- assertVisible: { id: "body-weight-reading-.*", text: "Edit 80 kilograms, .*" }
 - takeScreenshot: "23-roundtrip-private-readings-restored"

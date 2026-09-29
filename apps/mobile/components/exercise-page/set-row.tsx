@@ -39,7 +39,7 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
-  const meaning = `${row.bodyweight ? 'Added' : 'Weight'} · ${row.weightUnit ?? 'kg'}`;
+  const meaning = 'Weight · kg';
   const glyph = performed ? 'set-done' : row.isCursor ? 'set-current' : 'set-planned';
   const statState = performed ? 'realised' : 'planned';
 
@@ -56,9 +56,9 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         <View>
           <Stat
             emphasis={row.oneRepMaxRecord ? 'record' : 'none'}
-            label={row.bodyweight ? "Added 1RM" : "1RM"}
-            layout={row.bodyweight ? "stacked" : "inline"}
-            rank={row.bodyweight ? "secondary" : "primary"}
+            label="1RM"
+            layout="inline"
+            rank="primary"
             state={statState}
             testID={`exercise-set-${row.number}-1rm`}
             value={row.oneRepMax !== null ? formatOneRepMax(row.oneRepMax) : DASH}

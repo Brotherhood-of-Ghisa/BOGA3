@@ -1,4 +1,3 @@
-import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
@@ -435,7 +434,6 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           volume={model.volume}
           volumeNote={model.volumeNote}
         />
-        <SessionBodyWeight sessionId={data.sessionId} snapshot={data} onSaved={() => void reload()} />
         {model.cards.map((card) => (
           <SessionExerciseCard
             card={card}

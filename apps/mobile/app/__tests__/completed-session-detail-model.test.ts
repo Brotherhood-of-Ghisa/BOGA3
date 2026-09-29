@@ -31,7 +31,7 @@ describe('buildCompletedSessionDetailModel', () => {
     expect(model.cards.map((card) => card.id)).toEqual(['bench', 'legacy']);
     expect(model.cards[0].setCount).toBe(3);
     expect(model.cards[0].rows.map((row) => row.id)).toEqual(['b1', 'b2', 'b-zero']);
-    expect(model.cards[0].rows[2]).toMatchObject({ weightReps: '0.0 × 5', volume: '0', oneRepMax: '—' });
+    expect(model.cards[0].rows[2]).toMatchObject({ weightReps: '0.0 × 5', volume: '0', oneRepMax: '0.0' });
     expect(model.performedSetCount).toBe(4);
     // 60×10 + 100×5 + 82.5×8, rounded, no separator.
     expect(model.volume).toBe('1760');
@@ -77,10 +77,10 @@ describe('buildCompletedSessionDetailModel', () => {
 });
 
 describe('formatSetRow', () => {
-  it('shows a zero-weight set with its volume and no 1RM', () => {
+  it('shows numeric zero volume and 1RM for a zero-weight set', () => {
     expect(formatSetRow({ id: 's', weight: 0, reps: 10, setType: 'rir_2', done: true })).toMatchObject({
       weightReps: '0.0 × 10',
-      oneRepMax: '—',
+      oneRepMax: '0.0',
       volume: '0',
     });
   });

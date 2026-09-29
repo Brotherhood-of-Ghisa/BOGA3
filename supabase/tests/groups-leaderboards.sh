@@ -396,7 +396,7 @@ expect_fact() {
   [[ "${actual}" == "$2" ]] || fail "fact $1: expected '$2', got '${actual}'"
 }
 expect_fact b1 "true:true:102.5:5:$(e1rm 102.5 5)"
-expect_fact b2 "true:true:0:8:-"
+expect_fact b2 "true:true:0:8:$(e1rm 0 8)"
 expect_fact b3 "false:true:-:-:-"
 expect_fact b4 "false:true:-:-:-"
 expect_fact b5 "false:true:-:-:-"

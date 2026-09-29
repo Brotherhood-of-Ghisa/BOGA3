@@ -1,8 +1,7 @@
 import { forwardRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { SegmentedControl } from '@/components/ui/segmented-control';
-import { resolveEffectiveLoad, type LoadContext } from '@/src/exercise-calculations/effective-load';
+import type { LoadContext } from '@/src/exercise-calculations/effective-load';
 import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
 import { Icon } from '@/components/ui/icon';
 import {
@@ -56,19 +55,13 @@ const DASH = '—';
  */
 export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogger(
   { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, loadContext, weightUnit = 'kg', externalLoadMode,
-    metadataKnown = true, unitEditable = true, onChangeLoad },
+    metadataKnown = true },
   weightInputRef
 ) {
-  const bodyweight = (loadContext?.bodyweightCoefficient ?? 0) > 0;
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
   const context = metadataKnown ? loadContext : { bodyweightCoefficient: NaN, loadInputMode: 'total_load' };
-  const load = context ? resolveEffectiveLoad({ ...context, weightValue: canonicalWeight, weightUnit, externalLoadMode }) : null;
   const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, context, { weightUnit, externalLoadMode });
   const canCommit = canCommitLogger({ weightValue, repsValue });
-  const amountLabel = bodyweight ? 'Added' : 'Weight';
-  const unavailable = !metadataKnown ? 'Unavailable · sync to restore the saved load settings.' :
-    load?.status === 'missing' ? 'Unavailable · session weight missing.' :
-    load?.status === 'invalid' && load.reason !== 'amount_invalid' ? 'Unavailable · check the load settings.' : null;
   const effort = formatEffort(setType);
 
   return (
@@ -76,28 +69,15 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
       <View style={styles.header}>
         <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
         <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
-          {`${bodyweight ? 'Added 1RM' : '1RM'} ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
+          {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}
         </Text>
       </View>
-      {onChangeLoad ? (
-        <View style={styles.loadControls}>
-          <SegmentedControl disabled={!metadataKnown || !unitEditable}
-            onChange={(weightUnit) => onChangeLoad({ weightUnit })}
-            options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]}
-            style={styles.modeControl} testIDPrefix="exercise-set-unit" value={weightUnit} />
-        </View>
-      ) : null}
-      {!unitEditable ? <Text allowFontScaling={false} style={pageText.microLabel}>Sync to change units.</Text> : null}
-      {unavailable ? <Text allowFontScaling={false} style={pageText.microLabel}
-        testID="exercise-set-load-unavailable">{unavailable}</Text> : null}
-      {bodyweight && load?.status === 'known' ? <Text allowFontScaling={false} style={pageText.microLabel}
-        testID="exercise-set-effective-load">{`Session ${Number(loadContext!.bodyWeightKg!.toFixed(3))} kg · Effective load ${Number(load.resistanceKg.toFixed(3))} kg`}</Text> : null}
       <View style={styles.fields}>
         <View style={[styles.field, styles.weightField]}>
-          <Text allowFontScaling={false} style={pageText.microLabel}>{`${amountLabel} · ${weightUnit}`}</Text>
+          <Text allowFontScaling={false} style={pageText.microLabel}>Weight · kg</Text>
           <TextInput
             allowFontScaling={false}
-            accessibilityLabel={bodyweight ? `Set ${number} added weight in ${weightUnit}` : `Set ${number} weight`}
+            accessibilityLabel={`Set ${number} weight in kilograms`}
             keyboardType="decimal-pad"
             onChangeText={(text) => {
               if (isWeightInput(text)) onChangeWeight(text);
@@ -174,8 +154,6 @@ const styles = StyleSheet.create({
     borderTopColor: uiRoles.ruleSoft,
     borderBottomColor: uiRoles.ruleSoft,
   },
-  loadControls: { gap: uiSpace.sm },
-  modeControl: { minHeight: uiGeometry.tapTarget },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

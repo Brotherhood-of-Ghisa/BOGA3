@@ -79,7 +79,8 @@ separate child-issue PRs.
    - Refresh all personal consumers after preference, contribution, reading,
      session-time and sync changes without rewriting raw sets.
 3. Personal UI
-   - Add the same-line Settings toggle and conditional `Manage weights` link.
+   - Add the Settings calculation On/Off control and independent, always-visible
+     `Body weight log` link.
    - Make reading entry/history kg-only.
    - Conditionally render the one contribution field in the exercise editor.
    - Remove session bodyweight cards/actions, unit selectors, extra fields,
@@ -102,8 +103,8 @@ separate child-issue PRs.
 
 1. Private mode off gives every exercise ordinary Weight / 1RM / Volume math;
    missing contributions or readings cannot block logging.
-2. Enabling private mode reveals preserved contributions and `Manage weights`;
-   disabling/re-enabling repeatedly loses no data.
+2. Enabling private mode reveals preserved contributions; `Body weight log`
+   remains available throughout, and disabling/re-enabling loses no data.
 3. Exact seed contributions are 100% pull-up/chin-up/dip and 70% push-up; all
    other new exercises default to zero without name inference.
 4. Personal positive-contribution math follows D5. Missing personal bodyweight
@@ -136,8 +137,8 @@ separate child-issue PRs.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Toggle private mode | Settings → toggle on → inspect same row → toggle off/on repeatedly | `Manage weights` and contribution fields follow visibility; all values return unchanged | Offline toggle persists locally and syncs later; no destructive warning because nothing is deleted |
-| Manage kg readings | Enabled Settings row → `Manage weights` → add/edit/delete dated kg reading | History updates and affected personal/group/coaching projections refresh | Invalid/future input remains editable; failed write is inline; no session-local entry path |
+| Toggle private mode | Settings → toggle on → inspect state → toggle off/on repeatedly | Contribution fields follow visibility; `Body weight log` remains available and all values return unchanged | Offline toggle persists locally and syncs later; no destructive warning because nothing is deleted |
+| Manage kg readings | Settings → `Body weight log` with calculations off or on → add/edit/delete dated kg reading | History updates and affected personal/group/coaching projections refresh | Invalid/future input remains editable; failed write is inline; no session-local entry path |
 | Configure contribution | Private mode on → create/edit exercise → enter 0-100% | Saved contribution drives personal calculations; seeded defaults are visible/editable | Decimal/range validation is inline; hiding via toggle preserves input |
 | Log ordinary set | Mode off or contribution 0 → enter or omit Weight → enter reps → confirm | Entered kg drives 1RM/Volume; blank becomes zero; set completes | Invalid numeric input cannot commit; missing bodyweight is irrelevant |
 | Log bodyweight-aware set | Mode on + positive contribution → log set with an applicable reading | Silent D5 calculation produces Weight/1RM/Volume with ordinary labels | Missing reading uses personal zero fallback; logging remains unblocked and no warning/prompt appears |

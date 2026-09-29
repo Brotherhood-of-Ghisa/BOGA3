@@ -101,7 +101,8 @@ that do not require bodyweight remain available.
 
 ### D7. Dated readings remain the bodyweight source
 
-`Manage weights` owns kg-only dated readings. A session selects the latest valid
+`Body weight log` owns kg-only dated readings and is available regardless of the
+private calculation preference. A session selects the latest valid
 reading at or before its exact start; later readings never apply backwards.
 Adding, editing or deleting a reading recalculates affected history without
 rewriting sessions or sets. There are no session-local overrides, prompts or
@@ -139,10 +140,10 @@ need not retain obsolete compatibility vocabulary.
 
 ### D12. Personal settings and exercise UI stay concise
 
-Private Settings presents one same-line row when space allows:
-`Bodyweight calculations` + toggle + `Manage weights`. The link appears only
-while enabled and opens the dated-reading screen. No session surface shows a
-bodyweight card, entry link, prompt or dialog.
+Private Settings presents `Bodyweight calculations` with an On/Off control and
+a separate, always-visible `Body weight log` row opening the dated-reading
+screen. Reading management is independent of the calculation preference. No
+session surface shows a bodyweight card, entry link, prompt or dialog.
 
 When private mode is enabled, the personal exercise editor adds only
 `Bodyweight contribution (%)` with a short field hint. When disabled it hides

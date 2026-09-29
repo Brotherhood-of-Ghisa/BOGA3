@@ -17,13 +17,15 @@ import { calculateAnalyticsSetMetrics } from '@/src/exercise-calculations/analyt
 beforeEach(() => { __resetClockForTests(); mockFixture = createInMemoryDatabase(); });
 afterEach(() => mockFixture.close());
 
-it('requires finite percentages and explicit movement and loading descriptions', () => {
+it('requires a finite percentage and treats retired descriptions as optional legacy metadata', () => {
   for (const coefficient of [-1, 1.01, NaN, Infinity]) {
     expect(validateExerciseLoadRules({ bodyweightCoefficient: coefficient, movementStandard: 'Pull-up', loadingMethod: 'Belt' }).ok).toBe(false);
   }
   expect(validateExerciseLoadRules({ bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null }).ok).toBe(true);
-  expect(validateExerciseLoadRules({ bodyweightCoefficient: 1, movementStandard: ' ', loadingMethod: 'Belt' }).ok).toBe(false);
-  expect(validateExerciseLoadRules({ bodyweightCoefficient: 1, movementStandard: 'Pull-up', loadingMethod: '' }).ok).toBe(false);
+  expect(validateExerciseLoadRules({ bodyweightCoefficient: 1, movementStandard: ' ', loadingMethod: 'Belt' }))
+    .toMatchObject({ ok: true, value: { movementStandard: null, loadingMethod: 'Belt' } });
+  expect(validateExerciseLoadRules({ bodyweightCoefficient: 1, movementStandard: 'Pull-up', loadingMethod: '' }))
+    .toMatchObject({ ok: true, value: { movementStandard: 'Pull-up', loadingMethod: null } });
   expect(Object.keys(BODYWEIGHT_SEED_RULES).sort()).toEqual(['seed_chin-ups', 'seed_parallel_bar_dips', 'seed_pull_up', 'seed_push_up']);
 });
 

@@ -5,34 +5,27 @@ import { addSet, commitSet, displayedValues, updateLoggerValues } from '@/src/se
 const context = { bodyweightCoefficient: 1, bodyWeightKg: 80, loadInputMode: 'total_load' };
 const props = { number: 1, weightValue: '20', repsValue: '8', setType: null,
   onChangeWeight: jest.fn(), onChangeReps: jest.fn(), onCycleEffort: jest.fn(), onOpenEffort: jest.fn(), onCommit: jest.fn(),
-  onChangeLoad: jest.fn(), weightUnit: 'kg', externalLoadMode: 'added', loadContext: context };
+  weightUnit: 'kg', externalLoadMode: 'added', loadContext: context };
 beforeEach(() => jest.clearAllMocks());
 
-it.each([null, 'added', 'assistance', 'unquantified_assistance'])('treats saved numeric values as added weight, including old mode %s', externalLoadMode => {
+it.each([null, 'added', 'assistance', 'unquantified_assistance'])('uses ordinary kg copy for retained loads, including old mode %s', externalLoadMode => {
   render(<SetLogger {...props} externalLoadMode={externalLoadMode} />);
-  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Added 1RM 47.7 · VOL 800');
-  expect(screen.getByText('Added · kg')).toBeTruthy();
-  expect(screen.getByLabelText('Set 1 added weight in kg')).toBeTruthy();
+  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('1RM 47.7 · VOL 800');
+  expect(screen.getByText('Weight · kg')).toBeTruthy();
+  expect(screen.getByLabelText('Set 1 weight in kilograms')).toBeTruthy();
   expect(screen.queryByText('Assisted')).toBeNull();
   expect(screen.queryByText('Unquantified')).toBeNull();
-  expect(screen.queryByText('Review original loads')).toBeNull();
+  expect(screen.queryByText(/Added|External|Effective load|session weight missing/i)).toBeNull();
   expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('20');
-  fireEvent.press(screen.getByTestId('exercise-set-unit-lb'));
-  expect(props.onChangeLoad).toHaveBeenCalledWith({ weightUnit: 'lb' });
+  expect(screen.queryByTestId('exercise-set-unit-lb')).toBeNull();
   fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
   expect(props.onCommit).toHaveBeenCalledTimes(1);
 });
 
-it('keeps the unit selector read-only until unknown saved units hydrate', () => {
-  render(<SetLogger {...props} unitEditable={false} />);
-  expect(screen.getByText('Sync to change units.')).toBeTruthy();
-  expect(screen.getByTestId('exercise-set-unit-lb').props.accessibilityState.disabled).toBe(true);
-});
-
-it('permits confirmed reps with missing body weight without showing a fake load score', () => {
-  render(<SetLogger {...props} loadContext={{ ...context, bodyWeightKg: null }} />);
-  expect(screen.getByText('Unavailable · session weight missing.')).toBeTruthy();
-  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('Added 1RM — · VOL —');
+it('uses the personal zero fallback without a warning when no reading applies', () => {
+  render(<SetLogger {...props} loadContext={{ ...context, bodyWeightKg: 0 }} />);
+  expect(screen.queryByText(/Unavailable|missing|body weight/i)).toBeNull();
+  expect(screen.getByTestId('exercise-set-logger-preview').props.children).toBe('1RM 25.5 · VOL 160');
   fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
   expect(props.onCommit).toHaveBeenCalledTimes(1);
 });

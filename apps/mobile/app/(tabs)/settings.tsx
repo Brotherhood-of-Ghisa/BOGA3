@@ -190,11 +190,6 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
-      <View style={styles.section} testID="settings-section-body-weight">
-        <SectionLabel title="Training" />
-        <Card><BodyWeightSettingsRow /></Card>
-      </View>
-
       <View style={styles.section} testID="settings-section-ai-coaching">
         <SectionLabel title="AI coaching" />
         <Text allowFontScaling={false} style={styles.sectionIntro}>
@@ -243,6 +238,7 @@ export default function SettingsScreen() {
 
       <View style={styles.section} testID="settings-section-preferences">
         <SectionLabel title="Preferences" />
+        <Card><BodyWeightSettingsRow /></Card>
         <Card style={styles.cardBody} testID="settings-preferences-card">
           <Text allowFontScaling={false} style={styles.bodyMuted}>
             Configure how dates and other details are displayed throughout BoGa.

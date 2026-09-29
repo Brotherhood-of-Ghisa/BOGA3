@@ -94,7 +94,9 @@ export const resolveEffectiveLoad = (input: EffectiveLoadInput): EffectiveLoad =
   if (enteredWeightKg === null) return invalid('numeric_overflow');
   const c = input.bodyweightCoefficient;
   if (c > 0 && input.bodyWeightKg == null) return missing('body_weight_missing');
-  if (c > 0 && !positiveFinite(input.bodyWeightKg)) return invalid('body_weight_invalid');
+  if (c > 0 && (typeof input.bodyWeightKg !== 'number' || !Number.isFinite(input.bodyWeightKg) || input.bodyWeightKg < 0)) {
+    return invalid('body_weight_invalid');
+  }
 
   const externalFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
   const totalExternalAdjustmentKg = enteredWeightKg * externalFactor;

@@ -518,9 +518,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - current pre-cutover: the Settings bodyweight row uses `router.push`; session
      bodyweight surfaces can also navigate to reading entry/history; header Back
      returns to the caller
-   - accepted replacement, implementation pending: `Manage weights` in the
-     `Bodyweight calculations` row is present only while the private preference
-     is enabled; workout/session routes never navigate to reading entry or
+   - accepted replacement, implementation pending: the always-visible `Body
+     weight log` row navigates independently of the `Bodyweight calculations`
+     preference; workout/session routes never navigate to reading entry or
      history, so the dated kg timeline is managed only from Settings
 
 Note:

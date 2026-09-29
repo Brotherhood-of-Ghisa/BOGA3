@@ -43,7 +43,6 @@ describe('shared effective-load vectors', () => {
 
   it.each([
     [{ bodyWeightKg: null }, 'missing', 'body_weight_missing'],
-    [{ bodyWeightKg: 0 }, 'invalid', 'body_weight_invalid'],
     [{ bodyWeightKg: -80 }, 'invalid', 'body_weight_invalid'],
     [{ bodyWeightKg: Infinity }, 'invalid', 'body_weight_invalid'],
     [{ bodyweightCoefficient: NaN }, 'invalid', 'coefficient_invalid'],
@@ -54,6 +53,14 @@ describe('shared effective-load vectors', () => {
     [{ loadInputMode: 'unknown' }, 'invalid', 'load_input_mode_invalid'],
   ] as const)('keeps unavailable load explicit: %j', (patch, status, reason) => {
     expect(resolveEffectiveLoad({ ...pullUp, ...patch })).toEqual({ status, reason });
+  });
+
+  it('uses zero as the personal missing-reading fallback', () => {
+    expect(resolveEffectiveLoad({ ...pullUp, bodyWeightKg: 0 })).toMatchObject({
+      status: 'known',
+      bodyContributionKg: 0,
+      resistanceKg: 20,
+    });
   });
 
   it.each(['-1', '1e3', '12,5', 'NaN', 'Infinity', '.', ''])('retains the decimal parser policy for %j', weightValue => {

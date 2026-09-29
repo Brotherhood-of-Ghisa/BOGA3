@@ -19,7 +19,8 @@ describe('Unit-aware group metric contract', () => {
     expect(validateGroupExerciseRules({ ...pull, bodyweightCoefficient: 0, defaultMetric: 'relative_strength' }))
       .toMatchObject({ ok: false, field: 'defaultMetric' });
     expect(validateGroupExerciseRules({ ...pull, defaultMetric: undefined })).toMatchObject({ ok: false, field: 'defaultMetric' });
-    expect(validateGroupExerciseRules({ ...pull, movementStandard: '' })).toMatchObject({ ok: false, field: 'movementStandard' });
+    expect(validateGroupExerciseRules({ ...pull, movementStandard: '' }))
+      .toMatchObject({ ok: true, value: { movementStandard: null } });
   });
 
   it('accepts only finite unit-correct scores and integer positive reps', () => {

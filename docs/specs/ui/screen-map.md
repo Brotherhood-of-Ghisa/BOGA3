@@ -681,8 +681,9 @@ Brief entrypoint map of the current mobile screens.
   delete confirmation. Saves are local/offline.
 - Native back returns to the caller. History orders by measurement time then ID.
 - **Accepted replacement; implementation pending:** the route becomes kg-only
-  and is reached only through `Manage weights` while the private preference is
-  enabled. No session/detail/logger surface will show or link to a reading.
+  and is reached through the always-visible `Body weight log` Settings row,
+  independently of the private calculation preference. No
+  session/detail/logger surface will show or link to a reading.
   Reading value/date changes and deletion will recalculate affected projections
   silently.
 
@@ -726,8 +727,8 @@ Brief entrypoint map of the current mobile screens.
 
 ### Optional bodyweight calculation overlays
 
-Settings adds a private `Bodyweight calculations` toggle with conditional
-`Manage weights`. While enabled, the personal exercise editor adds only
+Settings adds a private `Bodyweight calculations` On/Off control and a separate,
+always-visible `Body weight log` row. While calculations are enabled, the personal exercise editor adds only
 `Bodyweight contribution (%)`. The session/exercise routes keep ordinary kg
 Weight, 1RM and Volume labels and never show bodyweight context or entry actions.
 These are overlays on existing routes, not additional destinations.

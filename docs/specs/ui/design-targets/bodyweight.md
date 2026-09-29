@@ -23,11 +23,10 @@ vocabulary. No external design service is required.
 
 ## Brief
 
-- Settings has one responsive row: `Bodyweight calculations`, toggle, and
-  `Manage weights` while enabled. Keep toggle and label together; the link may
-  wrap below on the smallest width. The row uses ordinary Settings emphasis,
-  never the screen's primary accent.
-- `Manage weights` is a kg-only dated history with add/edit/delete. It is the
+- Settings keeps `Bodyweight calculations` and its On/Off control together,
+  followed by a separate, always-visible `Body weight log` link. The log link
+  does not depend on the calculation preference.
+- `Body weight log` is a kg-only dated history with add/edit/delete. It is the
   only bodyweight entry surface. No workout/session screen shows a reading,
   prompt, card, warning, action or dialog.
 - The personal exercise editor conditionally adds only `Bodyweight contribution
@@ -48,8 +47,8 @@ vocabulary. No external design service is required.
 
 | Flow | Trigger and steps | Success | Failure / edge evidence |
 | --- | --- | --- | --- |
-| Toggle private calculations | Settings → toggle on → inspect row → off → on | `Manage weights` and editor contribution visibility follow the toggle; saved values return unchanged | Offline toggle persists locally; small-width row wraps without clipping; no destructive warning |
-| Manage kg readings | Enabled row → `Manage weights` → add/edit/delete dated kg reading | Current/history list updates and affected projections refresh | Empty history; blank/zero/negative/nonfinite/future input; failed save retains input |
+| Toggle private calculations | Settings → toggle on → inspect row → off → on | Editor contribution visibility follows the toggle; `Body weight log` remains available and saved values return unchanged | Offline toggle persists locally; no destructive warning |
+| Manage kg readings | Settings → `Body weight log` with calculations either off or on → add/edit/delete dated kg reading | Current/history list updates and affected projections refresh | Empty history; blank/zero/negative/nonfinite/future input; failed save retains input |
 | Configure contribution | Enable private mode → create/edit exercise → enter 0–100% | One contribution field saves and later drives calculations | Decimal/range validation inline; disabled mode hides but preserves value; no extra fields |
 | Log ordinary set | Mode off or contribution 0 → enter or omit Weight → reps → confirm | Weight/1RM/Volume use ordinary kg math; blank becomes zero | Invalid numeric input cannot commit; no reading prompt or bodyweight copy |
 | Log aware set | Mode on + positive contribution → log with and without an applicable reading | Reading participates silently when present; missing uses the personal zero fallback | No warning/incomplete label; zero values remain numeric; raw Top weight stays unchanged |

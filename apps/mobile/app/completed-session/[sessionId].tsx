@@ -1,6 +1,5 @@
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { LoadContext } from '@/src/exercise-calculations/effective-load';
-import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
 import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -262,7 +261,6 @@ export function CompletedSessionDetailScreenShell({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const datedWeightRevision = useBodyWeightContextRevision();
-  const [weightRevision, setWeightRevision] = useState(0);
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -339,7 +337,7 @@ export function CompletedSessionDetailScreenShell({
     };
   // A saved weight invalidates this read without changing the route.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataClient, presentation, sessionId, weightRevision, datedWeightRevision]);
+  }, [dataClient, presentation, sessionId, datedWeightRevision]);
 
   useFocusEffect(
     useCallback(() => {
@@ -384,7 +382,7 @@ export function CompletedSessionDetailScreenShell({
       return () => { cancelled = true; };
     // Weight corrections invalidate the derived comparisons too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataClient, sessionId, isDeleted, maestroInsights, weightRevision, datedWeightRevision])
+    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision])
   );
 
   const formattedStartedAt = useMemo(
@@ -663,8 +661,6 @@ export function CompletedSessionDetailScreenShell({
     <>
       <Stack.Screen options={stackOptions} />
       <ViewSessionScreen
-        bodyWeightContent={<SessionBodyWeight sessionId={session.id} snapshot={session} editable={!isDeleted}
-          onSaved={() => setWeightRevision(value => value + 1)} />}
         section={section}
         onSectionChange={setSection}
         summaryContent={

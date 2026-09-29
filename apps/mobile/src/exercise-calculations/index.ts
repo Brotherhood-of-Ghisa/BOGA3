@@ -110,8 +110,9 @@ const collectParsedSets = (
  * positive integer reps)` pair so callers can short-circuit cleanly.
  */
 export const estimateOneRepMax = (weight: number, reps: number): number | null => {
-  if (!Number.isFinite(weight) || weight <= 0) return null;
+  if (!Number.isFinite(weight) || weight < 0) return null;
   if (!Number.isInteger(reps) || reps <= 0) return null;
+  if (weight === 0) return 0;
   const denominator = 48.8 + 53.8 * Math.exp(-0.075 * reps);
   return (100 * weight) / denominator;
 };

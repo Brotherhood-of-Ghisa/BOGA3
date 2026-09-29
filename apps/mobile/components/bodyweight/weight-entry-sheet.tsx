@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Alert, Keyboard, ScrollView, Text } from 'react-native';
-import { ActionButton, FormField, Notice, SegmentedControl, Sheet } from '@/components/ui';
+import { ActionButton, FormField, Notice, Sheet } from '@/components/ui';
 import { resolveMeasurementDate, validateBodyWeight, type WeightEntry } from '@/src/bodyweight/weight-entry';
 import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
 import { weightStyles as styles } from './styles';
@@ -20,7 +20,6 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   onDismiss: () => void;
 }) {
   const [value, setValue] = useState(initial.weightValue);
-  const [unit, setUnit] = useState(initial.weightUnit === 'lb' ? 'lb' : 'kg');
   const [dateText, setDateText] = useState(formatCurrentDateTime(measuredAt));
   const [valueError, setValueError] = useState<string | null>(null);
   const [dateError, setDateError] = useState<string | null>(null);
@@ -35,7 +34,6 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     setShownFormKey(formKey);
     if (formKey !== null) {
       setValue(initial.weightValue);
-      setUnit(initial.weightUnit === 'lb' ? 'lb' : 'kg');
       setDateText(formatCurrentDateTime(new Date(measuredAtMs)));
       setValueError(null); setDateError(null); setSaveError(null);
     }
@@ -52,7 +50,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   };
   const save = () => {
     setValueError(null); setDateError(null);
-    const input = { weightValue: value, weightUnit: unit };
+    const input = { weightValue: value, weightUnit: 'kg' };
     try { validateBodyWeight(input); }
     catch (error) { setValueError((error as Error).message); return; }
     let date: Date;
@@ -67,11 +65,9 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
       onDismiss={() => { if (!saving.current) onDismiss(); }} testID="weight-entry-sheet">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
         {explanation ? <Text allowFontScaling={false} style={styles.body}>{explanation}</Text> : null}
-        <FormField label={`Body weight (${unit})`} accessibilityLabel={`Body weight in ${unit}`}
+        <FormField label="Body weight (kg)" accessibilityLabel="Body weight in kilograms"
           value={value} onChangeText={setValue} keyboardType="decimal-pad" autoFocus={autoFocus}
           editable={!busy} error={valueError} testID="weight-entry-value" />
-        <SegmentedControl options={[{ value: 'kg', label: 'kg' }, { value: 'lb', label: 'lb' }]}
-          accessibilityLabel="Weight unit" value={unit} onChange={setUnit} disabled={busy} style={styles.unitControl} testIDPrefix="weight-entry-unit" />
         <FormField label="Measured at" accessibilityLabel="Measurement date and time"
           value={dateText} onChangeText={setDateText} autoCapitalize="none" autoCorrect={false}
           editable={!busy} error={dateError} hint="Local time · YYYY-MM-DD HH:mm"

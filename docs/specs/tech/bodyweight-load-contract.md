@@ -125,7 +125,8 @@ reading ID by Unicode code point (SQLite BINARY / PostgreSQL COLLATE `C`). A
 malformed restored row stays visible/editable in history but is skipped for
 calculation. A later reading on the same calendar day does not apply backwards.
 
-`Manage weights` owns kg-only add/edit/delete and history. Readings are private,
+`Body weight log` owns kg-only add/edit/delete and history and remains available
+regardless of the private calculation preference. Readings are private,
 sync offline through the normal owner-scoped domain, and never live on a session.
 There is no session prompt, card, entry link, override, correction or automatic
 dialog. Adding, editing, deleting, restoring, importing or pulling a reading
@@ -191,10 +192,10 @@ flag. No compatibility branch retains removed fields for old clients.
 
 ## 6. Personal UI and consumers
 
-Settings presents `Bodyweight calculations` with its toggle and, while enabled,
-`Manage weights` on the same row when space permits. The link opens the dated kg
-history. Disabling the toggle hides the link and the exercise-editor contribution
-field but deletes nothing. The personal exercise editor shows only
+Settings presents `Bodyweight calculations` with an On/Off control and a separate,
+always-visible `Body weight log` row that opens dated kg history. Disabling the
+toggle hides the exercise-editor contribution field but never hides reading
+management or deletes anything. The personal exercise editor shows only
 `Bodyweight contribution (%)` plus a short hint while enabled.
 
 The logger always says `Weight`; rows, records, History, Stats, completion and

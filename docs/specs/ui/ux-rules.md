@@ -27,11 +27,12 @@ sections describe the current app.
 
 ### Accepted replacement: optional bodyweight calculations
 
-Settings owns one `Bodyweight calculations` row. Its toggle is always visible;
-`Manage weights` appears on the same row while enabled (wrapping below only when
-the viewport requires it). Toggling works offline and hides/ignores values
-without deleting contributions or readings. `Manage weights` is a kg-only dated
-history with add/edit/delete, inline validation and retryable writes.
+Settings owns a `Bodyweight calculations` row with an always-visible On/Off
+control and a separate, always-visible `Body weight log` row beneath it.
+Toggling works offline and hides/ignores calculation contributions without
+deleting them or any readings. `Body weight log` opens the kg-only dated history
+with add/edit/delete, inline validation and retryable writes; reading management
+never depends on whether calculations are enabled.
 
 There is no bodyweight card, value, source, prompt, warning, entry link or dialog
 on a session/workout surface. Personal calculations select the latest valid

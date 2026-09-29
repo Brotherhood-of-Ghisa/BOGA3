@@ -565,9 +565,10 @@ Brief entrypoint inventory of the current reusable UI component set.
   Reopening resets cancelled input to the chosen reading.
   TestIDs: `weight-entry-sheet`, `weight-entry-value`,
   `weight-entry-date`, `weight-entry-save`, `weight-entry-delete`.
-- `BodyWeightSettingsRow` will compose label, toggle and conditional `Manage weights`
-  in one responsive row, reads/writes the synced private preference, and
-  navigates to `/body-weight` only while enabled. No primary accent is used.
+- `BodyWeightSettingsRow` will compose a calculation row with an On/Off control
+  and a separate, always-visible `Body weight log` row. It reads/writes the
+  synced private preference and navigates to `/body-weight` independently of
+  that preference.
 - `BodyWeightScreen` will compose current reading, Add and history with edit/delete;
   history and saves stay in the owner-private local/sync domain. Covered by
   `bodyweight-entry.test.ts` and `bodyweight-screen.test.tsx`; `ios-sync-e2e`
