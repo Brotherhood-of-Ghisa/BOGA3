@@ -106,8 +106,8 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 | Gate | Expands to (registry order) | Infrastructure | When to run |
 |---|---|---|---|
 | `./boga test fast` | `lint` + `typecheck` + `jest-full` + `ui-guardrails` + `docs-check` + `meta-tests` + `agent-auth-web` + `mcp-unit` + `backend-fast` | mobile/repository/consent/MCP lanes none; backend-fast local Supabase + Docker | Default local closeout fast gate. (`fast-frontend`, `fast-repo`, and `fast-backend` run the parts.) |
-| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-bodyweight` + `ios-auth-profile` + `ios-sync-e2e` + `ios-groups-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile, sync-e2e, and groups-e2e additionally need local Supabase + Docker | Risk-triggered: root layout / Maestro harness / Maestro runtime changes, and the full sweep (`./boga sweep`, run before iOS builds and on large PRs). |
-| `./boga test frontend-ui` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-bodyweight` (the `frontend` lanes whose infra is `ios`) | iOS simulator + Metro + Maestro dev-client; no Supabase | Any screen/component change (`app/**`, `components/**`); the Supabase-backed e2e lanes are added by their own area triggers (spec 02). |
+| `./boga test frontend` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-bodyweight` + `ios-auth-profile` + `ios-sync-e2e` + `ios-groups-e2e` | iOS simulator + Metro + Maestro dev-client; auth-profile, sync-e2e, and groups-e2e additionally need local Supabase + Docker | Path default for root layout / Maestro harness / Maestro runtime changes (spec 02, "Choosing lanes"), and the full sweep (`./boga sweep`, required before a release build). |
+| `./boga test frontend-ui` | `ios-smoke` + `ios-data-smoke` + `ios-ui-regression` + `ios-exercise-page` + `ios-session-view` + `ios-bodyweight` (the `frontend` lanes whose infra is `ios`) | iOS simulator + Metro + Maestro dev-client; no Supabase | Path default for any screen/component change (`app/**`, `components/**`); the Supabase-backed e2e lanes are added by their own area triggers (spec 02). |
 | `./boga test backend` | `auth-authz` → `groups-contract` → `groups-leaderboards` → `agent-api` → `sync-v2-schema` → `sync-push-contract` → `sync-pull-contract` → `dev-wipe-my-data` → `sync-drift` → `sync-v2-e2e` → `sync-infra` → `mcp-smoke` | local Supabase + Docker (`run-suite.sh` ensures `ensure-local-runtime-baseline.sh`; the smoke also starts the local MCP process) | Risk-triggered backend work: `supabase/migrations/**`, `supabase/functions/**`, auth config/policies, sync RPC contracts/fixtures, or the MCP-to-API boundary. |
 
 > The slow gate runs are not always mandatory. "When to run" is governed by the
@@ -119,7 +119,7 @@ legacy `./scripts/quality-fast.sh` / `./scripts/quality-slow.sh` forward here.
 | Lane | Purpose | When to run |
 |---|---|---|
 | `docs-check` | `gen-docs.sh check`: generated doc blocks current (lane matrix; median column exempt from staleness), lane-name citations valid, relative `.md` links resolve, spec ownership headers present, no plan-file path (`docs/plans/<file>.md`) referenced outside `docs/plans/**` / `docs/brainstorms/**`. | Any docs/registry/CI-definition change. Part of `boga test fast` and CI. |
-| `meta-tests` | `scripts/tests/run-meta-tests.sh`: fixture-based self-tests for `gen-docs.sh`, `test-for.sh` (trigger matcher), `pr-check.sh` (PR Tests-table checker), the Android launchers (SDK discovery, evaluated Metro ports, matching local API reverse, argument forwarding and failure paths with stub adb/Expo), the iOS simulator boot-wait (`ios-sim-boot.sh` fails within its deadline with a diagnosis, killing the blocked `simctl bootstatus`, with stub xcrun), and the edge function server lifecycle (no `functions serve` process for the slot survives `local-runtime-down.sh`, and `local-runtime-up.sh` removes orphans, with a stub npx process tree). | Any change to the meta-tooling under `scripts/`, or to `apps/mobile/scripts/ios-sim-boot.sh` or `supabase/scripts/local-runtime-{up,down}.sh`. Part of `boga test fast` and CI. |
+| `meta-tests` | `scripts/tests/run-meta-tests.sh`: fixture-based self-tests for `gen-docs.sh`, `test-for.sh` (trigger matcher), the Android launchers (SDK discovery, evaluated Metro ports, matching local API reverse, argument forwarding and failure paths with stub adb/Expo), the iOS simulator boot-wait (`ios-sim-boot.sh` fails within its deadline with a diagnosis, killing the blocked `simctl bootstatus`, with stub xcrun), and the edge function server lifecycle (no `functions serve` process for the slot survives `local-runtime-down.sh`, and `local-runtime-up.sh` removes orphans, with a stub npx process tree). | Any change to the meta-tooling under `scripts/`, or to `apps/mobile/scripts/ios-sim-boot.sh` or `supabase/scripts/local-runtime-{up,down}.sh`. Part of `boga test fast` and CI. |
 | `agent-auth-web` | `scripts/test-agent-auth-web.sh`: clean locked install, production-dependency audit, consent authorization-state tests, typecheck, and Vite production build. | Any `apps/agent-auth-web/**` change. Part of `boga test fast` and CI. |
 | `mcp-unit` | `scripts/test-boga-mcp.sh`: clean locked install, production-dependency audit, typecheck, MCP discovery/tool translation/security-contract tests, and production build. | Any `services/boga-mcp/**` change. Part of `boga test fast` and CI. |
 
@@ -268,12 +268,12 @@ screenshots are the visual evidence.
 
 ## Default testing practice
 
-- Every feature should include at least one success-path test and one
-  offline/error-path test.
+- Jest is the default and is always required: every code change adds or updates
+  Jest coverage for the behaviour it changes. Every feature should include at
+  least one success-path test and one offline/error-path test.
 - Run a targeted test or gate after each meaningful change, then run
-  `./boga test fast` before closeout. Run `./boga test
-  backend|frontend` when the change touches the areas/paths its lanes cover (see the catalog
-  and policies).
+  `./boga test fast` before closeout. Simulator and Docker lanes run as agreed
+  with the operator, starting from the path default (spec 02, "Choosing lanes").
 - For how long each lane actually takes, run `./scripts/test-timings.sh`
   (measured medians + 3× ceilings from the records the gates write). Do not
   invent durations.
@@ -349,6 +349,31 @@ govern — read them when editing tests there (rule in `AGENTS.md`):
 
 This document keeps only the cross-cutting policies below.
 
+## Maestro scope policy
+
+Maestro is the expensive tier (lane medians in spec 02). It covers core user
+journeys and what Jest cannot reach; everything else belongs in Jest.
+
+- **Device-only reasons.** A Maestro claim must need at least one of: app boot
+  or dev-client launch; root layout / navigation stack transitions; deep links;
+  a native module; the on-device `expo-sqlite` runtime (migrations, boot data
+  layer); real gestures, keyboard, sheets/modals, or scrolling to reach a
+  control; a real round trip to local Supabase; two users. Screen state, copy,
+  formatting, conditional rendering, calculated values, and local sorting or
+  toggles are Jest (RNTL + the in-memory SQLite fixture).
+- **New Maestro coverage needs the operator.** Adding a flow, or a new scenario
+  to an existing flow, requires a justification (which device-only reason, and
+  why Jest cannot prove it) and explicit operator approval before it is written.
+  Removing or trimming Maestro coverage that Jest now owns does not.
+- **Flows state what they prove.** Every flow opens with a header block:
+  - `Proves:` a numbered list of the behaviours it asserts;
+  - `Why device:` the device-only reason for each;
+  - `Jest counterpart:` the Jest files covering the rest of the feature.
+
+  Runtime workarounds go below the header, next to the steps they explain.
+- **Run the minimum.** Pick the lanes whose flows exercise the changed
+  behaviour (spec 02, "Choosing lanes").
+
 ## iOS UI smoke policy (Maestro)
 
 - Jest / RNTL remains the default for component logic, state transitions, and
@@ -364,12 +389,12 @@ This document keeps only the cross-cutting policies below.
   real tab navigation (no teleport). Required smoke screenshots: `01-m26-today`
   … `05-m26-session-view-empty` (capture automated by the flow; stored under
   the canonical artifact root).
-- Require `./boga test frontend` when a change touches Maestro runtime
-  scripts, the dev-client/runtime handshake, the root layout, or harness setup
-  behavior. A screen/component change requires `./boga test frontend-ui` (plus
-  the e2e lane of its area); editing one committed flow requires only the lane
-  that runs it. The authoritative path → lane map is `scripts/triggers.tsv`
-  (`./boga test for`), summarized in spec 02.
+- Path defaults: `./boga test frontend` for Maestro runtime scripts, the
+  dev-client/runtime handshake, the root layout, or harness setup behavior;
+  `./boga test frontend-ui` (plus the e2e lane of its area) for a
+  screen/component change; only the owning lane for an edit to one committed
+  flow. The path → lane map is `scripts/triggers.tsv` (`./boga test for`); the
+  final set is agreed with the operator (spec 02, "Choosing lanes").
 
 ## iOS simulator data smoke policy (Maestro)
 

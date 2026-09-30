@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# test-for.sh — which gates/lanes does a change require?
+# test-for.sh — which gates/lanes should a change run by default?
 #
 #   ./boga test for                          # paths from `git diff origin/main...HEAD`
 #   ./boga test for --diff <range>           # paths from `git diff <range>`
@@ -12,12 +12,13 @@
 # the requirement is the UNION of every matching row minus any `-name`
 # removals those rows carry (so a narrower row can drop what a broader one
 # added, e.g. jest suites under app/__tests__ drop the simulator lanes). The
-# change's requirement is the union over its paths, and each requirement is
-# printed with the rule that demanded it — cite that rule when marking a gate
-# ⛔ N/A in the PR Tests table. `frontend` subsumes `frontend-ui`.
+# change's default is the union over its paths, and each lane is printed with
+# the rule that selected it. `frontend` subsumes `frontend-ui`.
 #
-# Exit code is 0 unless the registry is unreadable; this tool informs, the PR
-# checker (pr-check.sh) enforces.
+# The output is a DEFAULT, not a requirement (spec 02, "Choosing lanes"): the
+# agent proposes a lane set from it plus judgement, the operator agrees it, and
+# the PR lists the lanes that ran. Exit code is 0 unless the registry is
+# unreadable.
 
 set -euo pipefail
 
@@ -143,13 +144,13 @@ for p, hits in per_path:
 if unmatched:
     print(f"  (no trigger matched: {', '.join(unmatched)} — fast gate is still the default for any code change)")
 print()
-print("REQUIRED (union):")
+print("DEFAULT (union) — propose to the operator; agree the final set before running slow lanes:")
 for r in ordered:
     print(f"  ./boga test {r:<14} — {'; '.join(sorted(required[r]))}")
 if not ordered:
     print("  none — but run ./boga test fast if any code changed.")
 
-# Advisory only (never in --tsv, so pr-check never requires it): a diff that
+# Suggestion only (never in --tsv): a diff that
 # touches shared UI chrome or many screens is where the selective UI tier is
 # most likely to miss a cross-screen break the e2e lanes would catch.
 SHARED_UI = re.compile(r"^apps/mobile/(components/(ui|navigation)/|app/\(tabs\)/_layout\.tsx$)")
@@ -160,6 +161,6 @@ if shared or len(ui_paths) >= 15:
     why = (f"touches shared UI chrome ({shared[0]}{' …' if len(shared) > 1 else ''})" if shared
            else f"{len(ui_paths)} screen/component files")
     print()
-    print("RECOMMENDED (advisory, spec 02):")
+    print("SUGGEST TO THE OPERATOR (optional, spec 02):")
     print(f"  ./boga sweep --ref origin/<branch> — {why}; runs every lane, incl. the e2e lanes this tier skips")
 PY

@@ -1,9 +1,11 @@
-# BOGA path-trigger registry — machine-readable form of "which gate for what
-# you changed" (the human tables live in AGENTS.md and
+# BOGA path-trigger registry — machine-readable form of "which lanes a change
+# runs by default" (the human tables live in AGENTS.md and
 # docs/specs/02-quality-and-test-gates.md; keep all three in sync in the same
-# change — docs-check validates that the lanes cited here exist).
+# change — docs-check validates that the lanes cited here exist). The result is
+# a default the agent proposes and the operator agrees, not a requirement
+# (spec 02, "Choosing lanes").
 #
-# Consumed by `./boga test for [--diff <range>] [paths...]` and `./boga pr check`.
+# Consumed by `./boga test for [--diff <range>] [paths...]`.
 #
 # Columns (tab-separated): pattern	requires	rule
 #   pattern:  glob over repo-relative paths. `**` matches across `/`,
@@ -13,16 +15,16 @@
 #             that requirement for the paths this row matches (a narrower row
 #             carving an exception out of a broader one); it never affects
 #             other paths in the same change.
-#   rule:     short human name — this is what a ⛔ N/A justification cites.
+#   rule:     short human name — printed next to each default lane.
 #   A changed path may match many rows; its requirement is the UNION of them
 #   minus their removals, and the change's requirement is the union over paths.
 #
-# UI tiering (spec 02, "Which gate for what you changed"): a screen/component
+# UI tiering (spec 02, "Default lanes by path"): a screen/component
 # change runs `frontend-ui` — every simulator lane that needs no backend. The
 # Supabase-backed e2e lanes (ios-auth-profile, ios-sync-e2e, ios-groups-e2e)
 # run only for their own screens (rows below) and for the src/sync, src/auth,
-# src/groups, and migration rows; the full sweep (`boga sweep`, run before iOS
-# builds and on large PRs — test-for recommends it) runs everything.
+# src/groups, and migration rows; the full sweep (`boga sweep`, required before
+# a release build, otherwise suggested to the operator) runs everything.
 apps/mobile/app/**	fast,frontend-ui	UI screens / routes
 apps/mobile/components/**	fast,frontend-ui	UI components
 apps/mobile/app/__tests__/**	-frontend-ui	jest suites (fast gate; no simulator)
@@ -96,14 +98,13 @@ scripts/test-for.sh	meta-tests	trigger matcher
 scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
 scripts/lane-timing.sh	meta-tests	lane-timing recorder (lane-timing meta-test)
 scripts/test-timings.sh	meta-tests	timings reader / import (lane-timing meta-test)
-scripts/pr-check.sh	meta-tests	PR Tests-table checker
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint
 scripts/pr-wait.sh	meta-tests	PR merge waiter (lifecycle meta-test)
 scripts/boga-config-init.sh	meta-tests	machine config seeding (run by worktree start)
 scripts/tests/**	meta-tests	meta-tooling tests
 .github/workflows/**	docs-check	CI definition (update spec 02 CI posture)
-.github/pull_request_template.md	docs-check,meta-tests	PR template (pr-check parses it)
+.github/pull_request_template.md	docs-check	PR template
 AGENTS.md	docs-check	agent entrypoint
 docs/**	docs-check	curated docs
 *.md	docs-check	root markdown

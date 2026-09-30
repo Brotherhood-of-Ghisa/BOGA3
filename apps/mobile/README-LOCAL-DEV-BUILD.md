@@ -296,7 +296,10 @@ This build is a development client. The teammate still needs access to Metro:
 
 When you need a dev-client build of `com.phano.boga3.dev` for App Store
 Connect/TestFlight, build and submit the `preview` profile instead. It uses
-store signing while keeping the dev bundle ID:
+store signing while keeping the dev bundle ID. This is a release build: first
+run the full sweep on the commit you ship (`./boga sweep`, or
+`./boga sweep --ref origin/<branch>`) and build only from a green sweep
+(`docs/specs/02-quality-and-test-gates.md`).
 
 ```bash
 cd /Users/sboschi/Code/BOGA3/apps/mobile

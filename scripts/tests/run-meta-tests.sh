@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
-# (gen-docs.sh, test-for.sh, pr-check.sh), the lane-timing store, the
+# (gen-docs.sh, test-for.sh), the lane-timing store, the
 # Supabase container resolver,
 # the Maestro fixture-user and
 # flow-has-a-lane rules, and
@@ -19,7 +19,6 @@ TESTS=(
   "gen-docs.test.sh"
   "lane-timing.test.sh"
   "test-for.test.sh"
-  "pr-check.test.sh"
   "full-sweep.test.sh"
   "maestro-fixture-users.test.sh"
   "maestro-flow-lanes.test.sh"

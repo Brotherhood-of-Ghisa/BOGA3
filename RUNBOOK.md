@@ -822,8 +822,8 @@ the hosted database for this cutover.
    retain dirty local data and cursors when the guard later activates.
 
 2. **Validate the implementation release locally.** In its leased worktree, run
-   `./boga test for --diff origin/main...HEAD`, every selected lane and any
-   recommended sweep. The integrated UI must already have explicit human
+   `./boga test for --diff origin/main...HEAD`, every selected lane and the
+   full sweep (`./boga sweep`). The integrated UI must already have explicit human
    acceptance. Confirm populated migration fixtures preserve sessions, sets,
    readings, contributions, IDs and clocks; convert lb actual/planned/readings
    to kg exactly; default private/group preferences off; and remove all retired

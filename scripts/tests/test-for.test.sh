@@ -79,8 +79,8 @@ requires docs-check    docs/specs/05-data-model.md
 not_requires fast      docs/specs/05-data-model.md
 
 # meta-tooling → meta-tests
-requires meta-tests    scripts/pr-check.sh
-requires meta-tests    scripts/tests/fixtures/pr-bodies/good.md
+requires meta-tests    scripts/pr-wait.sh
+requires meta-tests    scripts/tests/test-for.test.sh
 
 # Maestro runner / config → frontend + meta-tests (the fixture-user rule guard);
 # a single flow → only the lane that runs it (+ meta-tests)
@@ -101,8 +101,8 @@ requires frontend-ui   apps/mobile/components/Button.tsx supabase/tests/x.sh
 out="$("${TF}" --tsv some/random/file.xyz)"
 [[ -z "${out}" ]] || fail "expected no requirements for unmatched path, got: ${out}"
 
-# Advisory sweep hint: shown for shared UI chrome or 15+ UI files, never in
-# --tsv (so pr-check can't turn it into a requirement), not for one screen.
+# Sweep suggestion: shown for shared UI chrome or 15+ UI files, never in
+# --tsv (it is a suggestion, not a default lane), not for one screen.
 "${TF}" apps/mobile/components/ui/card.tsx | grep -q 'boga sweep' \
   || fail "expected a sweep recommendation for a components/ui change"
 many=(); for i in $(seq 1 15); do many+=("apps/mobile/components/session-view/f${i}.tsx"); done
