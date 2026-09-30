@@ -211,11 +211,11 @@ review before the final pass.
 
 ## Production completion
 
-The user confirmed on 2026-09-30 that the M28 code has rolled out in a build.
-This closes the milestone's planning status. The build number, hosted project,
-hosted smoke results and populated-device upgrade evidence were not supplied
-with that confirmation; this note does not claim independent verification of
-those release details.
+The user confirmed on 2026-09-30 that the M28 code rolled out in version
+1.1.0 build 18. This closes the milestone's planning status. The hosted
+project, hosted smoke results and populated-device upgrade evidence were not
+supplied with that confirmation; this note does not claim independent
+verification of those release details.
 
 The milestone is not complete when the implementation PR merges. Follow the
 staged operator procedure in `RUNBOOK.md` under “Optional bodyweight-calculation

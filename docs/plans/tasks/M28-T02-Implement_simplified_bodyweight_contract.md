@@ -13,8 +13,8 @@ dated readings, integrate private/group/coaching consumers, obtain explicit
 human UI acceptance, and then run the complete locally selected gate suite.
 
 Completion status records the user's 2026-09-30 confirmation that the code was
-rolled out in a build. Exact release identifiers and hosted/device verification
-evidence were not supplied with that confirmation.
+rolled out in version 1.1.0 build 18. Hosted/device verification evidence was
+not supplied with that confirmation.
 
 This one task closes the combined acceptance cases in #392, #395, #396, #398
 and #399; do not split it into five symptom patches.
