@@ -19,7 +19,8 @@ place each under `docs/specs/**`, routed from here.
    shared by all worktrees). If a lane has no data, run it; the gate records
    it. Estimating a duration is an error.
 
-3. **Run the gates for what you changed, to green, before opening the PR.**
+3. **Jest always; slower lanes by agreement with the operator** (the human you
+   are working with). Run the agreed lanes to green before opening the PR.
    `./boga` is the single entrypoint (runnable from anywhere in the repo;
    lanes defined in `scripts/lanes.tsv`; `./boga test --list` shows everything):
 
@@ -27,10 +28,12 @@ place each under `docs/specs/**`, routed from here.
    ./boga test fast       # mobile + docs/meta + consent/MCP unit + backend fast smoke
    ./boga test backend    # local Supabase: auth/agent/sync contracts + MCP smoke
    ./boga test frontend   # iOS sim: every Maestro lane (the frontend-ui lanes + auth-profile + sync e2e + groups e2e)
-   ./boga test frontend-ui  # iOS sim: the lanes that need no backend — what a screen/component change requires
+   ./boga test frontend-ui  # iOS sim: the lanes that need no backend — the default for a screen/component change
    ```
 
-   | You changed… | Run |
+   Path defaults (`./boga test for` prints them for your diff):
+
+   | You changed… | Default |
    | --- | --- |
    | Any `apps/mobile` TS/JS logic | `boga test fast` |
    | UI screens / components / navigation | `boga test fast` + `boga test frontend-ui` (+ the area e2e lane `boga test for` prints) |
@@ -42,10 +45,20 @@ place each under `docs/specs/**`, routed from here.
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
 
-   Gate selection is path-based and selective (`./boga test for` is the
-   authority). The backstop is `./boga sweep --ref <ref>` — every lane, in its
-   own worktree — run before an iOS build and on large or shared-UI PRs
-   (`boga test for` flags those; spec `02`).
+   - **Jest is never optional:** every code change adds or updates Jest
+     coverage for the behaviour it changes and passes `boga test fast`.
+   - **The table is a default, not a rule.** Before running any lane beyond
+     `boga test fast`, propose a lane set to the operator — the default lowered or
+     raised by judgement (`cosmetic`, `copy-only`, `test-only`, `docs-only`,
+     `covered-by-jest`; definitions in spec `02`, "Choosing lanes") — and run
+     what they agree.
+   - **Maestro is minimal.** Run only the lanes whose flows exercise the change.
+     Adding a Maestro flow or scenario needs a justification (why Jest cannot
+     prove it) and the operator's approval first; every flow states what it
+     proves (spec `06`, "Maestro scope policy").
+   - **The full sweep** (`./boga sweep --ref <ref>`, every lane in its own
+     worktree) is required only before a release build. Otherwise suggest it to
+     the operator when `boga test for` flags it; they decide.
 
    Once the worktree holds a slot lease (rule 5), the gates bootstrap deps and
    the local Supabase stack themselves; Docker must be running for the slow lanes. Full lane matrix, CI posture, and the dev-client
@@ -144,9 +157,7 @@ brainstorm.** Source-of-truth lives in `docs/specs/**`, `AGENTS.md`, and
 
 Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md`:
 **Objective / Tests / Review hard / Deviations**, using data and `file:line`
-pointers, not prose (~25 lines; link, don't quote). The **Tests** section must list
-every gate lane from `docs/specs/02-quality-and-test-gates.md` with ✅ ran / ⛔ N/A
-and a result + evidence link for each — "CI green" alone is not enough, and every
-⛔ must cite the path-trigger rule it relies on. Get the rules from
-`./boga test for` (it prints what your diff requires and why); validate the body
-with `./boga pr check --body <file>` before opening — CI runs the same check.
+pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
+the lanes that ran, each with its result and an evidence link ("CI green" alone
+is not enough), and notes that the set was agreed with the operator, including
+any default lane skipped and the reason.

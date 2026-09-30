@@ -9,18 +9,15 @@ Link CI runs / artifacts / prior threads — do not paste them.
 
 ## Tests
 
-<!-- List EVERY gate lane (docs/specs/02-quality-and-test-gates.md). Mark ✅ ran / ⛔ N/A.
-     Add an evidence link for greens and a one-line reason for each ⛔. "CI green" alone is not enough.
-     `./boga test for` prints what your diff requires (cite its rule in any ⛔);
-     `./boga pr check --body <draft>` validates this table — CI runs the same check. -->
+<!-- The lanes that ran, agreed with the operator before running anything beyond `./boga test fast`
+     (docs/specs/02-quality-and-test-gates.md, "Choosing lanes"). One row per lane or gate, with evidence.
+     "CI green" alone is not enough. Note any default lane (`./boga test for`) you skipped and why. -->
 
-| Gate | Ran? | Result |
+| Lane / gate | Result | Evidence |
 | --- | --- | --- |
-| fast — `./boga test fast` (lint/typecheck/jest + backend smoke) | ⬜ | |
-| slow frontend — `./boga test frontend` (every iOS lane; root layout / harness / Maestro runtime changes) | ⬜ | |
-| slow frontend UI tier — `./boga test frontend-ui` (backend-free iOS lanes; any screen/component change) | ⬜ | |
-| slow backend — `./boga test backend` (auth/RLS + sync-v2 + sync-infra) | ⬜ | |
-| iOS sync e2e — `./boga test ios-sync-e2e` (UI↔server; mandatory for sync/scheduler/auth-session changes) | ⬜ | |
+| `./boga test fast` | | |
+
+Agreed with operator: <!-- yes, plus anything lowered or raised and why -->
 
 ## Review hard
 

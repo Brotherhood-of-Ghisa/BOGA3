@@ -16,7 +16,7 @@ don't restate it here.
 ./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
 ./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + session view + bodyweight + auth-profile + sync e2e + two-user groups e2e
 ./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, UI regression, exercise page, session view, bodyweight)
-./boga sweep [--ref <ref>]  # every gate lane on origin/main (or <ref>) in a dedicated worktree — the backstop
+./boga sweep [--ref <ref>]  # every gate lane on origin/main (or <ref>) in a dedicated worktree — required before a release build
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
 ./boga doctor          # verify THIS machine can run every lane
@@ -150,15 +150,52 @@ Two traps this table exists to kill:
   trigger wiring only surface in the e2e lane; a green sync-infra is not evidence
   for them.
 
-## Which gate for what you changed
+## Choosing lanes
+
+Lane choice is **judgement, agreed with the operator** — paths give a default,
+not a requirement. The simulator and Docker lanes are the expensive part of the
+ladder, and a path match says little about risk (a restyle of a screen matches
+the same rows as a rewrite of its logic).
+
+1. **Jest is always required.** Every code change adds or updates the Jest
+   coverage for the behaviour it changes and runs `./boga test fast` to green.
+   This is the one gate that is never negotiable.
+2. **Start from the default.** `./boga test for [--diff <range>] [paths…]`
+   prints the default lanes for the diff (`scripts/triggers.tsv`, summarized in
+   the table below) and the rule that selected each.
+3. **Propose, then agree.** Before running any lane beyond `./boga test fast`,
+   the agent proposes a lane set to the operator (the human it works with):
+   the default, lowered or raised by judgement, with a one-line reason per
+   change. Lowering the default uses one
+   of these categories:
+   - `cosmetic` — colours, fonts, spacing, icons, and styling that do not change
+     what renders, when it renders, or where an interactive element sits. Not
+     cosmetic: conditional rendering, `testID`s, layout that can push a control
+     off-screen or under the keyboard, list/scroll structure. Cosmetic evidence is
+     a screenshot against the design target (`ui/ai-design-policy.md`), not a
+     Maestro run.
+   - `copy-only` — user-visible text changes with no logic change.
+   - `test-only` — only Jest tests or test helpers changed.
+   - `docs-only` — only documentation changed.
+   - `covered-by-jest` — the changed behaviour has no device-only aspect (spec
+     06, "Maestro scope policy") and the Jest tests in the diff prove it.
+
+   Raise the default when the change carries risk its paths do not show (a
+   shared hook, a boot-time effect, a native call). The operator's answer is
+   final. The dev-client rebuild after a native iOS change (below) is not a
+   lane choice and is never lowered.
+4. **Run the smallest Maestro set.** Pick the lanes whose flows exercise the
+   changed behaviour, not every lane a path matches.
+5. **Record what ran.** The PR lists the lanes that ran, their result, and that
+   the set was agreed with the operator (`.github/pull_request_template.md`).
+   No checker validates it; reviewers read it.
+
+### Default lanes by path
 
 Machine-readable form: `scripts/triggers.tsv`, queried with
-`./boga test for [--diff <range>] [paths…]` — it prints the required gates AND
-the trigger rule demanding each, which is exactly what a ⛔ N/A in the PR
-Tests table must cite. `./boga pr check` enforces this on PR bodies (CI runs
-it on every PR). The table below is the human summary; keep both in sync.
+`./boga test for`. The table below is the human summary; keep both in sync.
 
-| You changed… | Run |
+| You changed… | Default |
 | --- | --- |
 | Any `apps/mobile` TS/JS logic | `./boga test fast` |
 | `apps/mobile` UI screens / components / navigation (`app/**`, `components/**`) | `./boga test fast` **+** `./boga test frontend-ui` (**+** the area e2e lane below, if any) |
@@ -176,9 +213,9 @@ it on every PR). The table below is the human summary; keep both in sync.
 | MCP server (`services/boga-mcp/**`) | `./boga test fast` **+** `./boga test mcp-smoke` |
 | Added/removed/upgraded a **native iOS** dependency (iOS pod, native Expo module, or an iOS-affecting native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |
 
-### Why UI changes run `frontend-ui`, not the whole frontend gate
+### Why the UI default is `frontend-ui`, not the whole frontend gate
 
-Gate selection is by path, and it is deliberately **selective for UI**: a
+The path default is deliberately **selective for UI**: a
 screen/component change runs the backend-free simulator lanes, while the three
 Supabase-backed e2e lanes (`ios-auth-profile`, `ios-sync-e2e`,
 `ios-groups-e2e`) run for their own screens and for the sync / auth / groups /
@@ -191,28 +228,29 @@ controls cover that instead:
    Maestro `id:` selector must still exist in app source. Chip/segment ids
    built through a generic `${prefix}-${value}` join are only loosely checked
    (see the script header).
-2. **The full sweep, run opportunistically** — `./boga sweep [--ref <ref>]`
+2. **The full sweep** — `./boga sweep [--ref <ref>]`
    (`scripts/full-sweep.sh`) runs every gate lane on `origin/main` (or a pushed
    branch) in its own long-lived worktree (`$(boga_worktree_root)/full-sweep`,
    own slot) and writes a summary under `~/.config/boga/sweep/latest/`. It is
-   not scheduled. Run it:
-   - on the `main` commit you are about to ship as an iOS build (TestFlight /
-     preview), before building;
-   - on a large or shared-UI PR before merge (`--ref origin/<branch>`) —
-     `./boga test for` prints a *RECOMMENDED* sweep line for a diff touching
-     shared UI chrome (`components/ui/**`, `components/navigation/**`, the tab
-     layout) or 15+ screen/component files. Advisory, not required: the
-     PR Tests table lists it only if you ran it.
+   not scheduled.
+   - **Required** on the `main` commit you are about to ship as a release
+     build (TestFlight / App Store), before building
+     (`apps/mobile/README-LOCAL-DEV-BUILD.md`, `RUNBOOK.md`).
+   - **Otherwise a suggestion to the operator, never a requirement.**
+     `./boga test for` prints a *SUGGEST TO THE OPERATOR* sweep line for a diff
+     touching shared UI chrome (`components/ui/**`, `components/navigation/**`,
+     the tab layout) or 15+ screen/component files; the agent passes that
+     suggestion on and the operator decides.
 
    A RED sweep means the ref has a regression the PR gates did not select —
    bisect with `./boga test <lane>`. It needs the machine awake (a lid-closed
    Mac pauses Docker).
 
 Any UI change may still run `./boga test frontend` — it covers `frontend-ui`
-and every lane in the PR Tests table.
+and the three Supabase-backed e2e lanes.
 
-Run the gate(s) for your change **to green before opening the PR**, and put the
-evidence (command output / Maestro artifact path) in the PR. A pure-JS or
+Run the agreed lanes **to green before opening the PR**, and put the evidence
+(command output / Maestro artifact path) in the PR. A pure-JS or
 config-only change never needs the dev-client rebuild (Metro bundles it at
 runtime); a native iOS change always does, or every worktree's Maestro run fails at
 boot with `Cannot find native module`. Android-only fields in `app.config.ts` (e.g.
@@ -242,7 +280,7 @@ your area (table above) before the PR.
 Update this doc — **including the lane matrix above** — in the same change
 whenever you alter a gate or lane: `scripts/lanes.tsv` (the registry `./boga`
 runs from), `scripts/triggers.tsv` (the path-trigger registry behind
-`boga test for` / `boga pr check`), `supabase/scripts/run-suite.sh` / `test-*.sh`,
+`boga test for`), `supabase/scripts/run-suite.sh` / `test-*.sh`,
 `apps/mobile/scripts/maestro-run-lane.sh` (moving a flow between lanes means
 updating its `triggers.tsv` row — `test-for.test.sh` enforces it),
 `scripts/full-sweep.sh`, an `apps/mobile/package.json`

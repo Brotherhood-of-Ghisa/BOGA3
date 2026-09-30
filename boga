@@ -12,9 +12,8 @@
 #   boga test <lane>                           # one lane by registry name
 #   boga test --list                           # what exists, where it runs
 #   boga test <lane> --dry-run                 # print the command, don't run
-#   boga test for [--diff <range>] [paths...]  # which gates does a change require?
-#   boga sweep [--dry-run]                     # every lane on origin/main, in its own worktree (scheduled backstop)
-#   boga pr check --body <file|->              # validate a PR body's Tests table
+#   boga test for [--diff <range>] [paths...]  # default lanes for a change (propose, agree with the operator)
+#   boga sweep [--dry-run]                     # every lane on origin/main, in its own worktree (required before a release build)
 #   boga pr wait [--interval <s>]              # optional: block until this branch's PR merges/closes
 #   boga doctor [--android]                    # can THIS machine run every lane (or Android dev)?
 #   boga android doctor|run|start              # verify Android environment or run dev client
@@ -320,9 +319,8 @@ case "${cmd}" in
   pr)
     sub="${1:-}"; shift || true
     case "${sub}" in
-      check) exec "${REPO_ROOT}/scripts/pr-check.sh" "$@" ;;
       wait)  exec "${REPO_ROOT}/scripts/pr-wait.sh" "$@" ;;
-      *) fail "usage: boga pr check --body <file|-> [--diff <range>] [--strict] | boga pr wait [--interval <s>]" ;;
+      *) fail "usage: boga pr wait [--interval <s>]" ;;
     esac
     ;;
   docs)
