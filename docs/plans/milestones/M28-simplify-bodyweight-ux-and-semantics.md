@@ -1,6 +1,6 @@
 # M28 — Simplify bodyweight UX and semantics
 
-- Status: `in progress`
+- Status: `completed` (rollout confirmed by user on 2026-09-30)
 - Created: 2026-09-28, planning baseline `2e5db9e9` on `origin/main`
 - Workstream: https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/401
 
@@ -207,9 +207,15 @@ review before the final pass.
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | `M28-T01-Define_simplified_bodyweight_contract` | Replace the durable contracts and accepted design target with D1-D17. | none | completed |
-| `M28-T02-Implement_simplified_bodyweight_contract` | Ship the coordinated schema, calculations, UI, sync, groups, coaching, verification and production rollout. | T01 | in progress |
+| `M28-T02-Implement_simplified_bodyweight_contract` | Ship the coordinated schema, calculations, UI, sync, groups, coaching, verification and production rollout. | T01 | completed |
 
 ## Production completion
+
+The user confirmed on 2026-09-30 that the M28 code has rolled out in a build.
+This closes the milestone's planning status. The build number, hosted project,
+hosted smoke results and populated-device upgrade evidence were not supplied
+with that confirmation; this note does not claim independent verification of
+those release details.
 
 The milestone is not complete when the implementation PR merges. Follow the
 staged operator procedure in `RUNBOOK.md` under “Optional bodyweight-calculation
