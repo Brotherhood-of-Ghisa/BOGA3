@@ -1,6 +1,6 @@
 import { aggregateStats } from '@/src/data/stats';
 import { buildHeatmapData } from '@/components/heatmaps/heatmapData';
-import { exerciseLoadContext, formatEnteredLoad, addFiniteVolume, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
+import { personalLoadContext, addFiniteVolume, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import type { Session } from '@/components/session-recorder/types';
 import { aggregateExerciseDailyEffort, aggregateExerciseWeeklyEffort } from '@/src/data/exercise-analytics';
 import { aggregateExerciseBlockHistory } from '@/src/data/exercise-block-history';
@@ -12,29 +12,31 @@ import { buildSetRows, previewMetrics } from '@/src/session-recorder/exercise-pa
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 import { deriveExerciseRecords } from '@/src/session-recorder/exercise-records';
 import { deriveSessionExerciseVolumeComparisons, deriveSessionPersonalRecords, type PersonalRecordSessionInput } from '@/src/session-insights';
-import { loadingEstimateSources, projectLoadingEstimate } from '@/src/bodyweight/loading-estimate';
 
 const day = new Date('2026-09-20T12:00:00Z');
 const now = new Date('2026-09-21T12:00:00Z');
-function fixture(B: number | null, c: number, amount: string, mode: string | null,
-  loadInputMode: 'total_load' | 'per_side_load' = 'total_load', unit = 'kg', known: { definition?: boolean; session?: boolean; set?: boolean } = {}) {
-  if (known.session === false) B = null;
-  const context = exerciseLoadContext({ bodyweightCoefficient: c, loadInputMode, localBodyweightMetadataKnown: known.definition }, { bodyWeightKg: B });
-  const definition = { id: 'pull', name: 'Pull-up', deletedAt: null, bodyweightCoefficient: c, loadInputMode, localBodyweightMetadataKnown: known.definition };
+function fixture(B: number | null, c: number, amount: string,
+  loadInputMode: 'total_load' | 'per_side_load' = 'total_load', enabled = true) {
+  const resolved = B === null ? null : { bodyWeightKg: B, bodyWeightSource: 'reading' as const,
+    bodyWeightMeasurementId: 'reading', bodyWeightMeasuredAt: day };
+  const context = personalLoadContext(enabled, { bodyweightContribution: c, loadInputMode }, resolved);
+  const definition = { id: 'pull', name: 'Pull-up', deletedAt: null,
+    bodyweightContribution: c, bodyweightCalculationsEnabled: enabled, loadInputMode };
   const set = { setId: 'set', id: 'set', sessionExerciseId: 'exercise', orderIndex: 0,
-    localBodyweightMetadataKnown: known.set, weightValue: amount, weightUnit: unit, externalLoadMode: mode, repsValue: '8', setType: 'rir_1' as const, performanceStatus: null };
+    weightValue: amount, repsValue: '8', setType: 'rir_1' as const, performanceStatus: null };
   const sessionRow = { sessionId: 'session', sessionExerciseId: 'exercise', completedAt: day, gymName: null,
-    bodyWeightKg: B, bodyWeightSource: B === null ? null : 'reading', bodyWeightMeasurementId: B === null ? null : 'reading', bodyWeightMeasuredAt: B === null ? null : day };
+    bodyWeightKg: B, bodyWeightSource: B === null ? null : 'reading' as const, bodyWeightMeasurementId: B === null ? null : 'reading', bodyWeightMeasuredAt: B === null ? null : day };
   const history = aggregateExerciseHistory({ exerciseDefinition: definition, period: 'all', appliedTagDefinitionId: null,
     sessionsInPeriod: [sessionRow], sessionsAllTime: [sessionRow], setsBySessionExerciseId: { exercise: [set] }, tagsBySessionExerciseId: {} });
   const exercise = { id: 'exercise', exerciseDefinitionId: 'pull', exerciseName: 'Pull-up', orderIndex: 0,
     loadContext: context, sets: [set] };
   const performance: PersonalRecordSessionInput = { sessionId: 'session', status: 'completed', completedAt: day, bodyWeightKg: B, exercises: [exercise] };
-  const uiSet = { id: 'set', localBodyweightMetadataKnown: known.set, weight: amount, reps: '8', weightUnit: unit, externalLoadMode: mode,
+  const uiSet = { id: 'set', weight: amount, reps: '8',
     setType: 'rir_1' as const, performanceStatus: null, plannedReps: null, plannedWeight: null, plannedSetType: null };
   const uiExercise = { id: 'exercise', exerciseDefinitionId: 'pull', name: 'Pull-up', machineName: '', loadContext: context, sets: [uiSet] };
-  const session: Session = { dateTime: '2026-09-20 12:00', locationId: null, bodyWeightKg: B, exercises: [uiExercise] };
-  const muscle: MuscleAnalyticsInput = { sessions: [{ id: 'session', completedAt: day, bodyWeightKg: B }],
+  const session: Session = { dateTime: '2026-09-20 12:00', locationId: null, exercises: [uiExercise] };
+  const muscle: MuscleAnalyticsInput = { bodyweightCalculationsEnabled: enabled,
+    sessions: [{ id: 'session', completedAt: day, ...(resolved ?? {}) }],
     exerciseDefinitions: [definition], sessionExercises: [{ id: 'exercise', sessionId: 'session', exerciseDefinitionId: 'pull' }],
     exerciseSets: [set], muscleMappings: [{ exerciseDefinitionId: 'pull', muscleGroupId: 'left', role: 'primary' }],
     muscleGroups: [{ id: 'left', displayName: 'Left', familyName: 'Back', sortOrder: 0 }] };
@@ -47,30 +49,28 @@ const equalMetric = (actual: number | null | undefined, expected: number | null)
 };
 
 it.each([
-  [80, 1, '0', 'added', 'total_load', 'kg', 640, 320],
-  [80, 1, '', 'added', 'total_load', 'kg', 640, 320],
-  [80, 1, '20', 'added', 'total_load', 'kg', 800, 400],
-  [80, 1, '20', 'assistance', 'total_load', 'kg', 800, 400],
-  [80, 0.7, '20', 'added', 'total_load', 'kg', 608, 304],
-  [80, 1, '20', 'added', 'per_side_load', 'kg', 960, 480],
-  [null, 0, '20', null, 'per_side_load', 'kg', 160, 160],
-  [null, 0, '20', null, 'total_load', 'kg', 160, 80],
-  [80, 1, '20', 'added', 'total_load', 'lb', 712.5747792, 356.2873896],
-  [null, 1, '20', 'added', 'total_load', 'kg', null, null],
-  [80, 1, '20', 'unquantified_assistance', 'total_load', 'kg', 800, 400],
-  [80, 1, '0', null, 'total_load', 'kg', 640, 320],
-  [80, 1, '100', 'assistance', 'total_load', 'kg', 1440, 720],
-] as const)('agrees across surfaces for B=%s c=%s %s %s %s %s', (B, c, amount, mode, loadMode, unit, volume, muscleVolume) => {
-  const f = fixture(B, c, amount, mode, loadMode, unit);
+  [80, 1, '0', 'total_load', true, 640, 320],
+  [80, 1, '', 'total_load', true, 640, 320],
+  [80, 1, '20', 'total_load', true, 800, 400],
+  [80, 0.7, '20', 'total_load', true, 608, 304],
+  [80, 1, '20', 'per_side_load', true, 960, 480],
+  [null, 0, '20', 'per_side_load', true, 160, 160],
+  [null, 0, '20', 'total_load', true, 160, 80],
+  [null, 1, '20', 'total_load', true, 160, 80],
+  [80, 1, '20', 'total_load', false, 160, 80],
+  [80, 1, '100', 'total_load', true, 1440, 720],
+] as const)('agrees across surfaces for B=%s c=%s Weight=%s mode=%s enabled=%s', (B, c, amount, loadMode, enabled, volume, muscleVolume) => {
+  const f = fixture(B, c, amount, loadMode, enabled);
   const entry = f.history.sessions[0];
   const daily = aggregateExerciseDailyEffort([{ completedAt: day, loadContext: f.context, sets: [f.set] }])[0];
   const blocks = aggregateExerciseBlockHistory({ now, sessions: [{ sessionId: 'session', completedAt: day, loadContext: f.context }],
     sessionExercises: [{ sessionExerciseId: 'exercise', sessionId: 'session', orderIndex: 0 }], setsBySessionExerciseId: { exercise: [f.set] } });
-  const catalog = aggregateExerciseCatalogStats({ sessions: f.muscle.sessions, exerciseDefinitions: [f.definition],
+  const catalog = aggregateExerciseCatalogStats({ bodyweightCalculationsEnabled: enabled,
+    sessions: f.muscle.sessions, exerciseDefinitions: [f.definition],
     sessionExercises: f.muscle.sessionExercises, exerciseSets: [f.set] }, 'all', now).aggregatesById.get('pull')!;
   equalMetric(entry.totalVolume, volume); equalMetric(daily.totalVolume, volume);
   equalMetric(buildSetRows([f.set], null, f.context)[0].volume, volume);
-  equalMetric(previewMetrics(amount, '8', f.context, { weightUnit: unit, externalLoadMode: mode }).volume, volume);
+  equalMetric(previewMetrics(amount, '8', f.context).volume, volume);
   equalMetric(blocks.blocks[0].totalVolume, volume); equalMetric(catalog.totalVolume, volume);
   equalMetric(collectMuscleSetContributions(f.muscle)[0].weightedVolume, muscleVolume);
   const records = deriveExerciseRecords(f.history.sessions);
@@ -86,58 +86,27 @@ it.each([
 });
 
 it('keeps partial volume out of baselines and never awards an unavailable strength record', () => {
-  const known = fixture(80, 1, '0', 'added');
-  const missing = fixture(null, 1, '100', 'added');
+  const known = fixture(80, 1, '0');
+  const invalid = fixture(80, Number.NaN, '100');
   const target = { ...known.performance, sessionId: 'later', completedAt: now };
-  const incomplete = deriveSessionExerciseVolumeComparisons({ targetSession: missing.performance, historicalSessions: [] })[0];
+  const incomplete = deriveSessionExerciseVolumeComparisons({ targetSession: invalid.performance, historicalSessions: [] })[0];
   expect(incomplete).toMatchObject({ currentVolume: null, state: 'incomplete', setCount: 1, workingSetCount: 1 });
-  const baseline = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [missing.performance] })[0];
+  const baseline = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [invalid.performance] })[0];
   expect(baseline).toMatchObject({ currentVolume: 640, historicalSessionCount: 0, excludedHistoricalSessionCount: 1, state: 'no-history' });
-  expect(deriveSessionPersonalRecords({ targetSession: { ...missing.performance, sessionId: 'later', completedAt: now }, historicalSessions: [known.performance] })).toEqual([]);
+  expect(deriveSessionPersonalRecords({ targetSession: { ...invalid.performance, sessionId: 'later', completedAt: now }, historicalSessions: [known.performance] })).toEqual([]);
   expect(deriveSessionPersonalRecords({ targetSession: target, historicalSessions: [] })).toEqual([]);
 });
 
-it('uses the dated source for strength and changes only the projected external target', () => {
-  const f = fixture(80, 1, '20', 'added');
-  const source = loadingEstimateSources(f.history.sessions)[0];
-  const before = JSON.stringify(source);
-  const at90 = projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '90', unit: 'kg' });
-  expect(() => projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '110', unit: 'kg' })).toThrow('No added-weight estimate');
-  expect(at90.enteredAmount).toBeCloseTo(10, 9); expect(at90.externalLoadMode).toBe('added');
-  expect(at90.predictedResistanceKg).toBeCloseTo(100, 9);
-  expect(JSON.stringify(source)).toBe(before);
-  const atOne = projectLoadingEstimate(source, f.context, { reps: '1', bodyWeightKg: '80', unit: 'kg' });
-  expect(atOne.oneRepConvention).toBe('capacity'); expect(atOne.predictedResistanceKg).toBe(source.estimatedTotalOneRepMaxKg);
-  expect(() => projectLoadingEstimate(source, f.context, { reps: '0', bodyWeightKg: '80', unit: 'kg' })).toThrow('positive whole');
-  expect(() => projectLoadingEstimate(source, f.context, { reps: '8', bodyWeightKg: '', unit: 'kg' })).toThrow('positive target');
-  expect(loadingEstimateSources(fixture(null, 1, '20', 'added').history.sessions)).toEqual([]);
-  expect(loadingEstimateSources(fixture(80, 1, '20', 'unquantified_assistance').history.sessions)).toHaveLength(1);
-});
-
-
-it.each(['definition', 'session'] as const)('withholds load metrics while %s metadata is awaiting upgrade hydration', part => {
-  const f = fixture(80, 1, '20', 'added', 'total_load', 'kg', { [part]: false });
-  expect(f.history.sessions[0].totalVolume).toBeNull();
-  expect(f.history.sessions[0].estimatedOneRepMax).toBeNull();
-  expect(deriveExerciseRecords(f.history.sessions).records.oneRepMax).toBeNull();
-  expect(loadingEstimateSources(f.history.sessions)).toEqual([]);
-  expect(collectMuscleSetContributions(f.muscle)[0].weightedVolume).toBeNull();
-  const daily = aggregateExerciseDailyEffort([{ completedAt: day, loadContext: f.context, sets: [f.set] }])[0];
-  expect(daily).toMatchObject({ totalVolume: null, workingSetCount: 1 });
-  expect(buildSessionViewModel(f.session, new Map()).volume).toBe('—');
-});
-
-it('names the entered meaning without disguising coefficient or per-side amounts', () => {
-  expect(previewMetrics('20', '8', undefined, { weightUnit: 'lb' }).volume).toBeCloseTo(72.5747792, 8);
-  expect(formatEnteredLoad(20, { bodyweightCoefficient: 0.7, bodyWeightKg: 80, loadInputMode: 'total_load' }, 'added', 'kg'))
-    .toBe('70% BW + 20.0 kg');
-  expect(formatEnteredLoad(10, { bodyweightCoefficient: 1, bodyWeightKg: 80, loadInputMode: 'per_side_load' }, 'assistance', 'lb'))
-    .toBe('BW + 10.0 lb/side');
+it('keeps raw Weight unchanged while bodyweight changes only derived math', () => {
+  const aware = fixture(80, 1, '20');
+  const ordinary = fixture(80, 1, '20', 'total_load', false);
+  expect(buildSetRows([aware.set], null, aware.context)[0]).toMatchObject({ weight: 20, volume: 800 });
+  expect(buildSetRows([ordinary.set], null, ordinary.context)[0]).toMatchObject({ weight: 20, volume: 160 });
 });
 
 
 it('withholds overflowing aggregates without losing independent counts or later resetting an unknown subtotal', () => {
-  const f = fixture(null, 0, '1' + '0'.repeat(306), null);
+  const f = fixture(null, 0, '1' + '0'.repeat(306));
   const sets = Array.from({ length: 50 }, (_, index) => ({ ...f.set, id: `set-${index}`, setId: `set-${index}`, orderIndex: index }));
   const raw = [{ completedAt: day, loadContext: f.context, sets }];
   expect(aggregateExerciseDailyEffort(raw)[0]).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });

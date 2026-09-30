@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { Icon, ListRow, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import {
   setBodyweightCalculationsEnabled,
+  useBodyweightCalculationPreferenceError,
   useBodyweightCalculationsEnabled,
 } from '@/src/bodyweight/calculation-preference';
 import { BODY_WEIGHT_ROUTE } from '@/src/navigation/routes';
@@ -10,6 +11,7 @@ import { BODY_WEIGHT_ROUTE } from '@/src/navigation/routes';
 export function BodyWeightSettingsRow() {
   const router = useRouter();
   const enabled = useBodyweightCalculationsEnabled();
+  const preferenceError = useBodyweightCalculationPreferenceError();
   return (
     <>
       <ListRow
@@ -23,7 +25,7 @@ export function BodyWeightSettingsRow() {
             accessibilityRole="switch"
             accessibilityState={{ checked: enabled }}
             hitSlop={uiSpace.sm}
-            onPress={() => setBodyweightCalculationsEnabled(!enabled)}
+            onPress={() => { void setBodyweightCalculationsEnabled(!enabled); }}
             style={({ pressed }) => [
               styles.stateButton,
               enabled ? styles.stateButtonOn : null,
@@ -36,6 +38,16 @@ export function BodyWeightSettingsRow() {
           </Pressable>
         }
       />
+      {preferenceError ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          accessibilityRole="alert"
+          allowFontScaling={false}
+          style={styles.preferenceError}
+          testID="settings-bodyweight-calculations-error">
+          {preferenceError}
+        </Text>
+      ) : null}
       <ListRow
         accessibilityHint="Opens dated body weight readings"
         accessibilityLabel="Open body weight log"
@@ -60,6 +72,14 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.lg,
     fontWeight: '400',
     lineHeight: uiTypography.lineHeight.lg,
+  },
+  preferenceError: {
+    color: uiRoles.danger,
+    fontFamily: uiFonts.body.family,
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    paddingBottom: uiSpace.sm,
+    paddingHorizontal: uiSpace.md,
   },
   stateButton: {
     minWidth: uiGeometry.tapTarget + uiSpace.sm,

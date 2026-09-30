@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Keyboard, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
+import { ExerciseCoreFields, type BodyweightContributionFieldValue } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -14,7 +14,7 @@ import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 import { validateExerciseCore } from '@/src/exercise-core';
-import { validateExerciseLoadRules, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
+import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 import {
   saveExerciseCatalogExercise,
   type ExerciseCatalogExercise,
@@ -37,14 +37,14 @@ type MuscleSelectorMode = 'primary' | 'secondary' | null;
 
 /** Initial values for a new exercise (M25-T07 "Add as new" from a group exercise). */
 export type ExerciseEditorPrefill = {
-  loadRules?: ExerciseLoadRules;
+  bodyweightContribution?: number;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
   mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
 };
 
 export type ExerciseEditorSaveInput = {
-  loadRules?: ExerciseLoadRules;
+  bodyweightContribution?: number;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
   mappings: { muscleGroupId: string; weight: number; role: ExerciseCatalogExerciseMuscleMapping['role'] }[];
@@ -128,9 +128,8 @@ export function ExerciseEditorModal({
   const [isSaving, setIsSaving] = useState(false);
   const [muscleSelectorMode, setMuscleSelectorMode] = useState<MuscleSelectorMode>(null);
   const [exerciseName, setExerciseName] = useState('');
-  const [loadFields, setLoadFields] = useState<ExerciseLoadFieldsValue>({ percentage: '0', movementStandard: '', loadingMethod: '' });
-  const [loadFieldsTouched, setLoadFieldsTouched] = useState(false);
-  const [loadRulesError, setLoadRulesError] = useState<string | null>(null);
+  const [bodyweightContributionField, setBodyweightContributionField] = useState<BodyweightContributionFieldValue>({ percentage: '0' });
+  const [bodyweightContributionError, setBodyweightContributionError] = useState<string | null>(null);
   const [loadInputMode, setLoadInputMode] = useState<'total_load' | 'per_side_load'>('total_load');
   const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState<string | null>(null);
   const [secondaryMuscleRows, setSecondaryMuscleRows] = useState<EditableSecondaryMuscleRow[]>([]);
@@ -176,6 +175,7 @@ export function ExerciseEditorModal({
           id: '',
           name: prefill.name,
           loadInputMode: prefill.loadInputMode,
+          bodyweightContribution: 0,
           deletedAt: null,
           mappings: prefill.mappings.map((mapping) => ({ ...mapping, id: '' })),
         });
@@ -190,11 +190,9 @@ export function ExerciseEditorModal({
         setSecondaryMuscleRows([]);
       }
 
-      const rules = editingExercise ?? prefill?.loadRules;
-      setLoadFields({ percentage: `${(rules?.bodyweightCoefficient ?? 0) * 100}`,
-        movementStandard: rules?.movementStandard ?? '', loadingMethod: rules?.loadingMethod ?? '' });
-      setLoadFieldsTouched(false);
-      setLoadRulesError(null);
+      const contribution = editingExercise?.bodyweightContribution ?? prefill?.bodyweightContribution ?? 0;
+      setBodyweightContributionField({ percentage: `${contribution * 100}` });
+      setBodyweightContributionError(null);
       setMuscleSelectorMode(null);
       setValidation(createBlankValidationState());
       setSaveError(null);
@@ -344,20 +342,23 @@ export function ExerciseEditorModal({
       return;
     }
 
-    let loadRules: ExerciseLoadRules | undefined;
-    if (!editingExercise || editingExercise.localBodyweightMetadataKnown !== false || loadFieldsTouched) {
-      const percentage = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(loadFields.percentage.trim())
-        ? Number(loadFields.percentage) : NaN;
-      const checked = validateExerciseLoadRules({ bodyweightCoefficient: percentage / 100,
-        movementStandard: loadFields.movementStandard, loadingMethod: loadFields.loadingMethod });
-      if (!checked.ok) { setLoadRulesError(checked.message); return; }
-      loadRules = checked.value;
+    const percentageText = bodyweightContributionField.percentage.trim();
+    const percentage = /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(percentageText) ? Number(percentageText) : NaN;
+    const checkedContribution = validateBodyweightContribution(percentage / 100);
+    if (!checkedContribution.ok) {
+      setBodyweightContributionError(checkedContribution.message);
+      return;
     }
-    setLoadRulesError(null);
+    setBodyweightContributionError(null);
     Keyboard.dismiss();
     setIsSaving(true);
     try {
-      const input = { loadRules, name: exerciseName, loadInputMode, mappings: result.parsedMappings };
+      const input = {
+        bodyweightContribution: checkedContribution.value,
+        name: exerciseName,
+        loadInputMode,
+        mappings: result.parsedMappings,
+      };
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
@@ -409,9 +410,14 @@ export function ExerciseEditorModal({
                 <ExerciseCoreFields
                   autoFocus
                   loadInputMode={loadInputMode}
-                  loadRules={bodyweightCalculationsEnabled ? { value: loadFields, error: loadRulesError,
-                    metadataKnown: editingExercise?.localBodyweightMetadataKnown,
-                    onChange: (value) => { setLoadFields(value); setLoadFieldsTouched(true); setLoadRulesError(null); } } : undefined}
+                  bodyweightContribution={bodyweightCalculationsEnabled ? {
+                    value: bodyweightContributionField,
+                    error: bodyweightContributionError,
+                    onChange: (value) => {
+                      setBodyweightContributionField(value);
+                      setBodyweightContributionError(null);
+                    },
+                  } : undefined}
                   name={exerciseName}
                   nameError={validation.nameError}
                   onChangeLoadInputMode={setLoadInputMode}

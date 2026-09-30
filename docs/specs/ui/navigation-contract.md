@@ -490,7 +490,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit` (M25-T08)
    - owner/admin `Add exercise` and the exercise sheet's `Rename` (`router.push`); both return with `router.back()` after saving, and the Exercises segment refreshes on focus
 42. `/groups` -> `/group/<groupId>/leaderboards/<exerciseId>` (M25-T09)
-   - a podium card on the Groups screen's Leaderboards segment (`router.push`, no query: e1RM · Certified)
+   - a podium card on the Groups screen's Leaderboards segment (`router.push`, no query: 1RM · Certified)
 43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=` (M25-T09)
    - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
 44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
@@ -515,12 +515,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 53. `/more` -> `/gyms?source=more`
    - the Tools `Gyms` row (`router.push`); native back or `Back to More` returns
 54. `/settings` -> `/body-weight`
-   - current pre-cutover: the Settings bodyweight row uses `router.push`; session
-     bodyweight surfaces can also navigate to reading entry/history; header Back
-     returns to the caller
-   - accepted replacement, implementation pending: the always-visible `Body
-     weight log` row navigates independently of the `Bodyweight calculations`
-     preference; workout/session routes never navigate to reading entry or
+   - the always-visible `Body weight log` row uses `router.push` independently
+     of the `Bodyweight calculations` preference; header Back returns to
+     Settings. Workout/session routes never navigate to reading entry or
      history, so the dated kg timeline is managed only from Settings
 
 Note:

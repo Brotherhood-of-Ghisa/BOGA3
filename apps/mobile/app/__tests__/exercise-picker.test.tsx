@@ -24,6 +24,7 @@ jest.mock('@/src/data', () => ({
 type MockCatalogExercise = {
   id: string;
   name: string;
+  bodyweightContribution?: number;
   loadInputMode?: string;
   deletedAt: null;
   mappings: { id: string; muscleGroupId: string; weight: number; role: string }[];
@@ -37,6 +38,7 @@ jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogExercises: jest.fn().mockImplementation(async () => mockCatalogExercises),
   listExerciseCatalogMuscleGroups: jest.fn().mockImplementation(async () => mockMuscleGroups),
   saveExerciseCatalogExercise: jest.fn().mockImplementation(async (input: any) => ({
+    bodyweightContribution: 0,
     id: input.id ?? 'custom-exercise-1',
     name: input.name.trim(),
     loadInputMode: input.loadInputMode,
@@ -106,9 +108,9 @@ const mockCreateExerciseWithGroupLink = jest.mocked(createExerciseWithGroupLink)
 // ---- Fixtures: the group picker's catalogue (session-recorder-group-picker).
 
 const GROUP_FIXTURE_EXERCISES: MockCatalogExercise[] = [
-  { id: 'seed_barbell_back_squat', name: 'Barbell Squat', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
-  { id: 'seed_barbell_bench_press', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
-  { id: 'ex-hotel', name: 'Hotel Bench', loadInputMode: 'per_side_load', deletedAt: null, mappings: [] },
+  { bodyweightContribution: 0, id: 'seed_barbell_back_squat', name: 'Barbell Squat', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
+  { bodyweightContribution: 0, id: 'seed_barbell_bench_press', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
+  { bodyweightContribution: 0, id: 'ex-hotel', name: 'Hotel Bench', loadInputMode: 'per_side_load', deletedAt: null, mappings: [] },
 ];
 const GROUP_FIXTURE_MUSCLE_GROUPS: MockMuscleGroup[] = [
   { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
@@ -149,6 +151,7 @@ const linkingState = (links: LinkRef[] = [SQUAT_LINK]) => ({
 
 const INTERACTION_FIXTURE_EXERCISES: MockCatalogExercise[] = [
   {
+    bodyweightContribution: 0,
     id: 'seed_barbell_back_squat',
     name: 'Barbell Squat',
     loadInputMode: 'total_load',
@@ -156,6 +159,7 @@ const INTERACTION_FIXTURE_EXERCISES: MockCatalogExercise[] = [
     mappings: [{ id: 'map-squat-quads', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
   },
   {
+    bodyweightContribution: 0,
     id: 'seed_barbell_bench_press',
     name: 'Bench Press',
     loadInputMode: 'total_load',
@@ -166,6 +170,7 @@ const INTERACTION_FIXTURE_EXERCISES: MockCatalogExercise[] = [
     ],
   },
   {
+    bodyweightContribution: 0,
     id: 'seed_dumbbell_bench_press',
     name: 'Dumbbell Bench Press',
     loadInputMode: 'per_side_load',
@@ -389,7 +394,7 @@ describe('pick sheet (E0.2)', () => {
 
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-seed_barbell_bench_press'));
     expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(
-      "Your total-load weights will show halved on this group's boards.",
+      'Weight stays as logged. 1RM is compared in per-side terms.',
     );
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-ex-hotel'));
     expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
@@ -416,7 +421,7 @@ describe('pick sheet (E0.2)', () => {
 
   it('Add as new opens the prefilled editor and creates the exercise and its link together', async () => {
     mockCreateExerciseWithGroupLink.mockResolvedValue({
-      exercise: { id: 'ex-new', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
+      exercise: { bodyweightContribution: 0, id: 'ex-new', name: 'Bench Press', loadInputMode: 'total_load', deletedAt: null, mappings: [] },
       link: {} as never,
     });
     const { onSelectExercise } = await renderPicker();
@@ -433,6 +438,7 @@ describe('pick sheet (E0.2)', () => {
 
     expect(mockCreateExerciseWithGroupLink).toHaveBeenCalledWith(
       expect.objectContaining({
+        bodyweightContribution: 0,
         name: 'Bench Press',
         loadInputMode: 'total_load',
         mappings: expect.arrayContaining([expect.objectContaining({ role: 'primary' })]),
@@ -651,7 +657,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
         id: undefined,
         name: 'Custom Press',
         loadInputMode: 'total_load',
-        loadRules: { bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null },
+        bodyweightContribution: 0,
         mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
       });
     });

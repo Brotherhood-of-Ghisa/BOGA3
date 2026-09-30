@@ -1914,14 +1914,14 @@ describe('StatsRoute — view mode toggle search query reset', () => {
 });
 
 
-it('keeps partial volume readable in the exercise table and names total bodyweight strength', () => {
+it('keeps partial volume readable and uses ordinary strength copy for bodyweight arithmetic', () => {
   render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseListItems: [{
-    id: 'bw', name: 'Pull-up', bodyweight: true, setCount: 2, nearFailureCount: 2,
+    id: 'bw', name: 'Pull-up', setCount: 2, nearFailureCount: 2,
     totalVolume: null, knownVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
   }] })} />);
   expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');
   expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
-  expect(screen.getByText('Added 1RM · kg')).toBeTruthy();
+  expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
-    .toBe('Open Pull-up heatmap. 2 sets, 2 working sets. Volume 800 · incomplete. Estimated total one rep max 128 kg');
+    .toBe('Open Pull-up heatmap. 2 sets, 2 working sets. Volume 800 · incomplete. Estimated one rep max 128 kg');
 });

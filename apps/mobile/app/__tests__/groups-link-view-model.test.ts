@@ -86,13 +86,13 @@ describe('groupExercisesLoaded', () => {
 describe('notes', () => {
   it('load-mode note in both directions, none when the modes match', () => {
     expect(describeLoadModeNote('per_side_load', 'total_load')).toBe(
-      "Your per-side weights will show doubled on this group's boards.",
+      'Weight stays as logged. 1RM is compared in total-load terms.',
     );
     expect(describeLoadModeNote('total_load', 'per_side_load')).toBe(
-      "Your total-load weights will show halved on this group's boards.",
+      'Weight stays as logged. 1RM is compared in per-side terms.',
     );
     expect(describeLoadModeNote(undefined, 'per_side_load')).toBe(
-      "Your total-load weights will show halved on this group's boards.",
+      'Weight stays as logged. 1RM is compared in per-side terms.',
     );
     expect(describeLoadModeNote('per_side_load', 'per_side_load')).toBeNull();
   });
@@ -271,7 +271,7 @@ describe('Link screen (E0.3)', () => {
     ]);
     // Tuesday's Bench is a name match (comp grip contains "bench") → Suggested, not repeated below.
     expect(model.suggested.map((row) => row.key)).toEqual(['g-tue:gx-bench-tue']);
-    expect(model.suggested[0].loadModeNote).toBe("Your total-load weights will show halved on this group's boards.");
+    expect(model.suggested[0].loadModeNote).toBe('Weight stays as logged. 1RM is compared in per-side terms.');
     // Iron: the linked target is gone from the list, archived is never offered, Deadlift is unavailable.
     expect(model.groups).toEqual([
       {
@@ -380,49 +380,29 @@ describe('unlink preservation and frozen targets', () => {
 describe('versioned comparison linking', () => {
   const target: GroupMetricExerciseWire = { group_exercise_id: 'gx-pull', name: 'Pull-up',
     source_exercise_id: 'seed_pull_up', archived_at_ms: null, legacy: false,
-    load_input_mode: 'per_side_load', bodyweight_coefficient: 1, movement_standard: 'Strict pull-up',
-    loading_method: 'Belt', default_metric: 'relative_strength', rules_revision: 2,
+    load_input_mode: 'per_side_load', bodyweight_calculations_enabled: true,
+    bodyweight_contribution: 1, default_metric: 'e1rm', rules_revision: 2,
     published_revision: 2, rebuilding: false };
-  const compatible = exercise({ id: 'mine', name: 'Pull-up', movementStandard: 'Strict pull-up', loadingMethod: 'Belt' });
-  const wrongMovement = { ...compatible, id: 'seed_pull_up', movementStandard: 'Kipping pull-up' };
-  const wrongMethod = { ...compatible, id: 'machine', loadingMethod: 'Assisted machine' };
-  const unknown = { ...compatible, id: 'old', localBodyweightMetadataKnown: false };
+  const compatible = exercise({ id: 'mine', name: 'Pull-up' });
 
-  it('rejects incompatible source/name matches and explains disabled choices', () => {
+  it('keeps compatible choices available without retired metadata matching', () => {
     const model = buildPickSheetModel({ groupId: 'g', groupName: 'Crew', groupExercise: target,
-      exercises: [wrongMovement, wrongMethod, unknown, compatible], links: [] });
+      exercises: [compatible], links: [] });
     expect(model.suggestion).toBe(compatible);
-    expect(model.choices.find(row => row.exercise.id === 'seed_pull_up')?.unavailableReason).toMatch(/movement standard/);
-    expect(model.choices.find(row => row.exercise.id === 'machine')?.unavailableReason).toMatch(/loading method/);
-    expect(model.choices.find(row => row.exercise.id === 'old')?.unavailableReason).toMatch(/Sync/);
     expect(model.choices.find(row => row.exercise.id === 'mine')?.unavailableReason).toBeNull();
   });
 
-  it('does not use the personal coefficient or halve body weight for group per-side input', () => {
-    const personal = { ...compatible, bodyweightCoefficient: 0.7 };
+  it('keeps personal exercise settings independent from the group calculation', () => {
+    const personal = { ...compatible };
     expect(describeGroupLinkIncompatibility(personal, target)).toBeNull();
-    expect(describeGroupLinkLoadNote(personal, target)).toMatch(/100% of the saved session body weight once/);
+    expect(describeGroupLinkLoadNote(personal, target)).toMatch(/100% bodyweight contribution/);
     expect(describeGroupLinkLoadNote(personal, target)).toMatch(/settings stay unchanged/);
-    expect(describeGroupLinkLoadNote({ ...personal, loadInputMode: 'per_side_load' }, target)).toMatch(/external weight is doubled/);
-    expect(personal.bodyweightCoefficient).toBe(0.7);
   });
 
-  it('explains existing incompatible links and prevents new suggestions on the dedicated link screen', () => {
-    const catalogs = [{ groupId: 'g', groupName: 'Crew', exercises: [target] }];
-    const available = buildLinkScreenModel({ exercise: wrongMovement, catalogs, links: [], query: '' });
-    expect(available.suggested).toEqual([]);
-    expect(available.groups[0].rows[0].unavailableReason).toMatch(/movement standard/);
-    const linked = buildLinkScreenModel({ exercise: wrongMovement, catalogs,
-      links: [link(wrongMovement.id, 'g', target.group_exercise_id)], query: '' });
-    expect(linked.linked[0].loadModeNote).toMatch(/^Not counted:/);
-    expect(linked.linked[0].status).toBe('active');
-  });
-
-  it('prefills new personal rules and rechecks edited input before a linked creation', () => {
+  it('prefills the shared exercise core and rechecks edited input before a linked creation', () => {
     const prefill = buildAddAsNewPrefill(target);
-    expect(prefill.loadRules).toEqual({ bodyweightCoefficient: 1, movementStandard: 'Strict pull-up', loadingMethod: 'Belt' });
+    expect(prefill).toMatchObject({ name: 'Pull-up', loadInputMode: 'per_side_load' });
     expect(() => requireAddAsNewCompatibility(prefill, target)).not.toThrow();
-    expect(() => requireAddAsNewCompatibility({ ...prefill, loadRules: { ...prefill.loadRules!, loadingMethod: 'Band' } }, target)).toThrow(/loading method/);
-    expect(() => requireAddAsNewCompatibility({ ...prefill, loadRules: { ...prefill.loadRules!, bodyweightCoefficient: 0.5 } }, target)).not.toThrow();
+    expect(() => requireAddAsNewCompatibility({ ...prefill, loadInputMode: 'total_load' }, target)).not.toThrow();
   });
 });

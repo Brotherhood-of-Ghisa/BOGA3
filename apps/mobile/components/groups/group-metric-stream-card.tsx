@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Icon, Tag, uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { formatBoardDate, formatMemberName } from '@/src/groups';
-import { describeGroupPerformanceWeight, describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS } from '@/src/groups/metric-view-model';
+import { describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS } from '@/src/groups/metric-view-model';
 import type { GroupMetricStreamItemWire } from '@/src/groups/metric-wire';
 import { GroupCertificationStatus } from './certification-status';
 
@@ -24,9 +24,6 @@ export function GroupMetricStreamCard({ item, userId, showGroupName, onPress, pr
   const details: string[] = [];
   if (item.kind === 'record') {
     details.push(`As logged: ${formatGroupRawPerformance(item.performance)}`);
-    if (item.group_exercise.bodyweight_coefficient > 0 || item.performance.body_weight_kg !== null) {
-      details.push(`Session body weight: ${describeGroupPerformanceWeight(item.performance)}`);
-    }
     if (item.voided) details.push('This performance no longer counts. Its original event remains in history.');
     else if (item.provisional) details.push('Session in progress');
   } else if (item.kind === 'record_voided') {

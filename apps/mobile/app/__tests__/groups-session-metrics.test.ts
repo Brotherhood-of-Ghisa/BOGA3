@@ -27,6 +27,8 @@ const rawSet = (
 });
 
 const exercise = (id: string, sets: GroupSessionSet[]): GroupSessionExercise => ({
+  exercise_definition_id: `definition-${id}`,
+  load_input_mode: 'total_load',
   session_exercise_id: id,
   name: `Exercise ${id}`,
   machine_name: null,
@@ -116,57 +118,27 @@ describe('group session metrics', () => {
   });
 });
 
+describe('shared-session presentation', () => {
+  it('uses the same entered Weight and volume presentation as an ordinary exercise', () => {
+    const row = exercise('pull-up', [rawSet('set', '10', '5')]);
+    expect(computeGroupSessionMetrics([row])).toMatchObject({
+      performedSets: 1,
+      totalVolumeKg: 50,
+      exerciseCount: 1,
+    });
+    expect(selectGroupPerformedExercises([row])[0].sets[0]).toMatchObject({
+      enteredWeight: 10,
+      weightKg: 10,
+      metrics: { load: { calculatedLoadKg: 10 }, volumeKgReps: 50 },
+    });
+  });
 
-describe('shared-session personal effective-load context', () => {
-  const session = { metric_scope: 'personal' as const, metric_revision: 'dated_added_load_v3' as const,
-    body_weight_kg: 80, body_weight_source: 'reading', body_weight_measurement_id: 'r',
-    body_weight_measured_at_ms: 1000 };
-  const bwExercise = (overrides: Partial<GroupSessionExercise> = {}) => ({
-    ...exercise('pull', [rawSet('set', '10', '5', { weight_unit: 'kg', external_load_mode: 'added' })]),
-    bodyweight_coefficient: 0.5, load_input_mode: 'per_side_load', ...overrides,
-  });
-  it('uses the personal coefficient and frozen B, counting bodyweight only once', () => {
-    const result = computeGroupSessionMetrics([bwExercise()], session);
-    expect(result).toMatchObject({ basis: 'personal', performedSets: 1, totalVolumeKg: 300,
-      coverage: { complete: true, knownSetCount: 1 } });
-    expect(selectGroupPerformedExercises([bwExercise()], session)[0].sets[0])
-      .toMatchObject({ enteredWeight: 10, weightKg: 10, metrics: { load: { resistanceKg: 60 } } });
-  });
-  it('uses the numeric added weight despite obsolete mode tags', () => {
-    const row = bwExercise({ sets: [rawSet('assist', '10', '5', { weight_unit: 'kg', external_load_mode: 'assistance' })] });
-    expect(computeGroupSessionMetrics([row], session)).toMatchObject({ performedSets: 1, totalVolumeKg: 300 });
-  });
-  it('normalizes lb, while keeping raw amount and unit for the visible row', () => {
-    const row = bwExercise({ load_input_mode: 'total_load',
-      sets: [rawSet('lb', '20', '5', { weight_unit: 'lb', external_load_mode: 'added' })] });
-    expect(computeGroupSessionMetrics([row], session).totalVolumeKg).toBeCloseTo((40 + 20 * 0.45359237) * 5);
-    expect(selectGroupPerformedExercises([row], session)[0].sets[0]).toMatchObject({ enteredWeight: 20, weightUnit: 'lb' });
-  });
-  it('keeps a conventional subtotal explicit when bodyweight context is missing', () => {
-    const conventional = bwExercise({ bodyweight_coefficient: 0 });
-    const result = computeGroupSessionMetrics([conventional, bwExercise()], {
-      ...session, body_weight_kg: null, body_weight_source: null, body_weight_measurement_id: null, body_weight_measured_at_ms: null });
-    expect(result).toMatchObject({ performedSets: 2, totalVolumeKg: null,
-      coverage: { complete: false, knownVolumeKgReps: 50, knownSetCount: 1, missingSetCount: 1 } });
-  });
-  it('rejects a positive B with malformed provenance instead of calculating strength', () => {
-    const result = computeGroupSessionMetrics([bwExercise()], { ...session, body_weight_source: null });
-    expect(result).toMatchObject({ performedSets: 1, totalVolumeKg: null,
-      coverage: { knownSetCount: 0, invalidSetCount: 1 } });
-  });
-  it('rejects obsolete historical-estimate context in live shared calculations', () => {
-    expect(computeGroupSessionMetrics([bwExercise()], { ...session, body_weight_source: 'historical_estimate',
-      body_weight_measurement_id: 'old-reading', body_weight_measured_at_ms: 1000 }).totalVolumeKg).toBeNull();
-  });
-  it.each([
-    { bodyweight_coefficient: null }, { load_input_mode: null },
-    { sets: [rawSet('unit', '10', '5', { external_load_mode: 'added' })] },
-  ])('does not guess absent or unresolved metadata: %j', overrides => {
-    expect(computeGroupSessionMetrics([bwExercise(overrides)], session)).toMatchObject({
-      performedSets: 1, totalVolumeKg: null, coverage: { complete: false } });
-  });
-  it('labels old payloads with their original entered-load basis', () => {
-    expect(computeGroupSessionMetrics([exercise('legacy', [rawSet('old', '10', '5')])]))
-      .toMatchObject({ basis: 'legacy_entered_load', totalVolumeKg: 50 });
+  it('keeps the group exercise load mode while never requiring private bodyweight context', () => {
+    const row = { ...exercise('press', [rawSet('set', '20', '5')]), load_input_mode: 'per_side_load' };
+    expect(selectGroupPerformedExercises([row])[0].loadContext).toMatchObject({
+      loadInputMode: 'per_side_load',
+      bodyweightContribution: 0,
+    });
+    expect(computeGroupSessionMetrics([row])).toMatchObject({ totalVolumeKg: 100 });
   });
 });

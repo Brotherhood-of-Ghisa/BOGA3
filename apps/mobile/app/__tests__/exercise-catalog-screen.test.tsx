@@ -119,6 +119,7 @@ describe('ExerciseCatalogScreen', () => {
   it('creates a new exercise with primary and secondary muscles', async () => {
     mockListExercises.mockResolvedValue([]);
     const savedExercise: ExerciseCatalogExercise = {
+      bodyweightContribution: 0,
       id: 'custom-ex-1',
       name: 'Incline Press',
       loadInputMode: 'per_side_load',
@@ -154,7 +155,7 @@ describe('ExerciseCatalogScreen', () => {
         id: undefined,
         name: 'Incline Press',
         loadInputMode: 'per_side_load',
-        loadRules: { bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null },
+        bodyweightContribution: 0,
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
@@ -171,6 +172,7 @@ describe('ExerciseCatalogScreen', () => {
   it('edits an existing exercise by changing name and secondary muscles', async () => {
     mockListExercises.mockResolvedValue([
       {
+        bodyweightContribution: 0,
         id: 'seed_barbell_bench_press',
         name: 'Barbell Bench Press',
         loadInputMode: 'total_load',
@@ -182,6 +184,7 @@ describe('ExerciseCatalogScreen', () => {
       },
     ]);
     const updatedExercise: ExerciseCatalogExercise = {
+      bodyweightContribution: 0,
       id: 'seed_barbell_bench_press',
       name: 'Bench Press',
       loadInputMode: 'per_side_load',
@@ -221,7 +224,7 @@ describe('ExerciseCatalogScreen', () => {
         id: 'seed_barbell_bench_press',
         name: 'Bench Press',
         loadInputMode: 'per_side_load',
-        loadRules: { bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null },
+        bodyweightContribution: 0,
         mappings: [
           { muscleGroupId: 'chest', weight: 1, role: 'primary' },
           { muscleGroupId: 'delts_front', weight: 0.5, role: 'secondary' },
@@ -325,6 +328,7 @@ describe('ExerciseCatalogScreen', () => {
       {
         id: 'custom-ex-1',
         name: 'Incline Press',
+        bodyweightContribution: 0,
         deletedAt: null,
         mappings: [{ id: 'map-1', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
       },
@@ -350,12 +354,14 @@ describe('ExerciseCatalogScreen', () => {
     const activeExercise: ExerciseCatalogExercise = {
       id: 'exercise-active-1',
       name: 'Bench Press',
+      bodyweightContribution: 0,
       deletedAt: null,
       mappings: [{ id: 'map-a', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
     };
     const deletedExercise: ExerciseCatalogExercise = {
       id: 'exercise-deleted-1',
       name: 'Old Fly',
+      bodyweightContribution: 0,
       deletedAt: new Date('2026-02-27T10:00:00.000Z'),
       mappings: [{ id: 'map-b', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
     };
@@ -391,6 +397,7 @@ describe('ExerciseCatalogScreen', () => {
 
   describe('design language (DLM-T07)', () => {
     const BENCH: ExerciseCatalogExercise = {
+      bodyweightContribution: 0,
       id: 'seed_barbell_bench_press',
       name: 'Barbell Bench Press',
       loadInputMode: 'total_load',

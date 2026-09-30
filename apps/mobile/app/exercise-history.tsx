@@ -192,7 +192,7 @@ export function ExerciseHistoryScreenShell({
               />
             ) : null}
 
-            <BestCard bodyweight={(summary.bodyweightCoefficient ?? 0) > 0} best={summary.allTimeBest} onPressSession={onPressSession} />
+            <BestCard best={summary.allTimeBest} onPressSession={onPressSession} />
 
             {summary.sessions.length === 0 ? (
               <Card>
@@ -231,11 +231,9 @@ export function ExerciseHistoryScreenShell({
 // The exercise's all-time bests: two rows that open the session holding each.
 // The figures are in `record`, the one superlative (T10-D2).
 function BestCard({
-  bodyweight,
   best,
   onPressSession,
 }: {
-  bodyweight: boolean;
   best: ExerciseHistorySummary['allTimeBest'];
   onPressSession: (sessionId: string) => void;
 }) {
@@ -247,14 +245,14 @@ function BestCard({
       <BestRow
         date={oneRm ? formatSessionDate(oneRm.completedAt) : null}
         divider={false}
-        label={bodyweight ? "Added 1RM" : "1RM"}
+        label="1RM"
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
         testID="exercise-history-best-est-1rm"
         value={formatOneRepMax(oneRm?.value ?? null)}
       />
       <BestRow
         date={topWeight ? formatSessionDate(topWeight.completedAt) : null}
-        label={bodyweight ? "Top added" : "Top weight"}
+        label="Top weight"
         onPress={topWeight ? () => onPressSession(topWeight.sessionId) : undefined}
         testID="exercise-history-best-top-weight"
         value={formatTopSet(topWeight)}
@@ -324,8 +322,6 @@ function SessionCard({
     formatSetRow({
       id: set.setId,
       weight: parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)),
-      weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
-      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
       loadContext: entry.loadContext,
       reps: parseSetReps(set.repsValue),
       setType: set.setType,
@@ -356,8 +352,8 @@ function SessionCard({
             </View>
           ) : null}
           <View style={styles.stats}>
-            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Added 1RM" : "1RM"} rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
-            <Stat label={(entry.loadContext?.bodyweightCoefficient ?? 0) > 0 ? "Top added" : "Top set"} rank="secondary" value={formatTopSet(entry.topWeightSet)} />
+            <Stat label="1RM" rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
+            <Stat label="Top set" rank="secondary" value={formatTopSet(entry.topWeightSet)} />
             <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
               rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />
             <Stat label="W/sets" rank="secondary" value={String(entry.workingSetCount)} />

@@ -56,17 +56,17 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'dated_added_load_v3',
+    metric_revision: 'bodyweight_optional_v1',
     recent_performances: [{
-      session_body_weight: { status: 'known', value: 80, unit: 'kg', source: 'reading', measurement_id: 'reading-a', measured_at: '2026-09-01T10:00:00Z', estimated: false },
+      session_body_weight: { status: 'known', value: 80, unit: 'kg', measured_at: '2026-09-01T10:00:00Z' },
       volume: { value: null, unit: 'kg_reps', known_subtotal: 500, complete: false },
-      sets: [{ entered_load: { raw_value: '20', value: 20, unit: 'lb', mode: 'assistance' },
-        effective_load: { value: 70.9281526, unit: 'kg', status: 'known', basis: 'total_resistance' } }],
+      sets: [{ load: { value: 20, unit: 'kg' }, reps: 8,
+        calculated_load: { value: 100, unit: 'kg', status: 'known', reason: null } }],
     }],
   },
   '/functions/v1/agent-api/v1/agent/workouts/recent': {
     next_cursor: null,
-    metric_revision: 'dated_added_load_v3',
+    metric_revision: 'bodyweight_optional_v1',
     workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
 };

@@ -13,6 +13,7 @@ import {
   type BogaSessionImportPackage,
 } from './boga-import-contract';
 import {
+  generatedBodyWeightMeasurementId,
   generatedExerciseDefinitionId,
   generatedExerciseMuscleMappingId,
   generatedSessionExerciseId,
@@ -24,6 +25,8 @@ type WireValue = string | number | boolean | null;
 
 type WireEntity = {
   type:
+    | 'user_settings'
+    | 'body_weight_measurements'
     | 'gyms'
     | 'exercise_definitions'
     | 'muscle_groups'
@@ -143,6 +146,33 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
   const entities: WireEntity[] = [];
   const seen = new Set<string>();
 
+  pushUnique(entities, seen, {
+    type: 'user_settings',
+    id: 'settings',
+    client_updated_at_ms: generatedAtMs,
+    fields: {
+      bodyweight_calculations_enabled: pkg.bodyweightCalculationsEnabled,
+      created_at: generatedAtMs,
+      updated_at: generatedAtMs,
+      deleted_at: null,
+    },
+  });
+
+  for (const reading of pkg.bodyWeightMeasurements) {
+    pushUnique(entities, seen, {
+      type: 'body_weight_measurements',
+      id: generatedBodyWeightMeasurementId(pkg, reading.id),
+      client_updated_at_ms: generatedAtMs,
+      fields: {
+        weight_kg: reading.weightKg,
+        measured_at: epochMs(reading.measuredAt, `${reading.id}.measuredAt`),
+        created_at: generatedAtMs,
+        updated_at: generatedAtMs,
+        deleted_at: null,
+      },
+    });
+  }
+
   for (const gym of pkg.target.catalogSnapshot.gyms) {
     pushUnique(entities, seen, {
       type: 'gyms',
@@ -178,13 +208,31 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
     });
   }
 
-  for (const exercise of [...SYSTEM_EXERCISE_DEFINITION_SEEDS, ...pkg.target.catalogSnapshot.exercises]) {
+  for (const exercise of SYSTEM_EXERCISE_DEFINITION_SEEDS) {
     pushUnique(entities, seen, {
       type: 'exercise_definitions',
       id: exercise.id,
       client_updated_at_ms: generatedAtMs,
       fields: {
         name: exercise.name,
+        load_input_mode: exercise.loadInputMode,
+        bodyweight_contribution: exercise.bodyweightContribution,
+        created_at: generatedAtMs,
+        updated_at: generatedAtMs,
+        deleted_at: null,
+      },
+    });
+  }
+
+  for (const exercise of pkg.target.catalogSnapshot.exercises) {
+    pushUnique(entities, seen, {
+      type: 'exercise_definitions',
+      id: exercise.id,
+      client_updated_at_ms: generatedAtMs,
+      fields: {
+        name: exercise.name,
+        load_input_mode: 'total_load',
+        bodyweight_contribution: 0,
         created_at: generatedAtMs,
         updated_at: generatedAtMs,
         deleted_at: null,
@@ -220,6 +268,8 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
       client_updated_at_ms: generatedAtMs,
       fields: {
         name: decision.exerciseName,
+        load_input_mode: decision.loadInputMode,
+        bodyweight_contribution: decision.bodyweightContribution,
         created_at: generatedAtMs,
         updated_at: generatedAtMs,
         deleted_at: null,
@@ -301,10 +351,10 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
             weight_value: set.weightValue,
             reps_value: set.repsValue,
             set_type: set.setType,
-            planned_weight_value: null,
-            planned_reps_value: null,
-            planned_set_type: null,
-            performance_status: null,
+            planned_weight_value: set.plannedWeightValue,
+            planned_reps_value: set.plannedRepsValue,
+            planned_set_type: set.plannedSetType,
+            performance_status: set.performanceStatus,
             created_at: startedAtMs,
             updated_at: completedAtMs,
             deleted_at: null,
@@ -343,7 +393,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
       accept: 'application/json',
       'accept-profile': 'app_public',
       'content-profile': 'app_public',
-      'x-boga-sync-protocol': '2',
+      'x-boga-sync-protocol': '3',
     },
     body: JSON.stringify({ entities: batch }),
   });
@@ -355,6 +405,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
 
 const layerRank = (type: WireEntity['type']) => {
   switch (type) {
+    case 'user_settings':
     case 'gyms':
     case 'exercise_definitions':
     case 'muscle_groups':
@@ -366,6 +417,8 @@ const layerRank = (type: WireEntity['type']) => {
       return 2;
     case 'exercise_sets':
       return 3;
+    case 'body_weight_measurements':
+      return 4;
   }
 };
 

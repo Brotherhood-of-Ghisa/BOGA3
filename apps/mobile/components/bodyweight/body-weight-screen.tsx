@@ -76,8 +76,8 @@ export function BodyWeightScreen() {
     </ScreenScroll>
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}
-      initial={editor.reading ? { weightValue: displayKg(editor.reading.weightKg), weightUnit: 'kg' }
-        : { weightValue: '', weightUnit: 'kg' }} measuredAt={editor.measuredAt}
+      initial={editor.reading ? { weightValue: displayKg(editor.reading.weightKg) }
+        : { weightValue: '' }} measuredAt={editor.measuredAt}
       onDismiss={() => setEditorVisible(false)}
       onSave={async input => {
         if (!input.measuredAt) throw new Error('Enter a measurement date.');

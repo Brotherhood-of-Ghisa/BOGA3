@@ -35,10 +35,8 @@ Error envelope:
 ```
 
 All responses are JSON with `Cache-Control: no-store` and `x-request-id`.
-Timestamps below are ISO 8601 strings. In the current pre-cutover response,
-normalized loads use `kg`, load-volume uses `kg_reps`, and `entered_load`
-retains its original `kg` or `lb` unit. The accepted clean response below makes
-every weight kg when implemented. The entire serialized success response is limited to 256 KiB and a
+Timestamps below are ISO 8601 strings. Every weight is kg and load-volume uses
+`kg_reps`. The entire serialized success response is limited to 256 KiB and a
 validated user/client pair is limited to 120 requests per minute per function
 instance.
 
@@ -203,7 +201,7 @@ any internal safety cap explicit.
 
 ## Optional bodyweight calculation response
 
-> **Status: accepted clean response contract; implementation pending.**
+> **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
 `metric_revision: "bodyweight_optional_v1"`. Routes, arguments, authorization

@@ -5,19 +5,16 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { LOAD_INPUT_MODES, LOAD_INPUT_MODE_LABELS, type LoadInputMode } from '@/src/exercise-core';
 
-export type ExerciseLoadFieldsValue = {
+export type BodyweightContributionFieldValue = {
   percentage: string;
-  movementStandard: string;
-  loadingMethod: string;
 };
 
 type ExerciseCoreFieldsProps = {
-  loadRules?: {
-    value: ExerciseLoadFieldsValue;
+  bodyweightContribution?: {
+    value: BodyweightContributionFieldValue;
     scope?: 'personal' | 'group';
-    onChange: (value: ExerciseLoadFieldsValue) => void;
+    onChange: (value: BodyweightContributionFieldValue) => void;
     error?: string | null;
-    metadataKnown?: boolean;
   };
   name: string;
   onChangeName: (name: string) => void;
@@ -53,7 +50,7 @@ export function ExerciseCoreFields({
   testIDPrefix,
   editable = true,
   autoFocus = false,
-  loadRules,
+  bodyweightContribution,
 }: ExerciseCoreFieldsProps) {
   return (
     <View style={styles.root}>
@@ -85,12 +82,12 @@ export function ExerciseCoreFields({
           value={loadInputMode}
         />
         <Text allowFontScaling={false} style={styles.helperText}>
-          {loadRules?.scope === 'group'
-            ? 'Declare total or per-side external weight for this comparison. Body weight is always counted once.'
+          {bodyweightContribution?.scope === 'group'
+            ? 'Choose whether entered Weight is shared across both sides or entered per side.'
             : 'Choose whether the weight you enter is shared across both sides or already represents one side.'}
         </Text>
       </View>
-      {loadRules ? (
+      {bodyweightContribution ? (
         <View style={styles.group}>
           <FormField
             accessibilityLabel="Bodyweight contribution percent"
@@ -98,47 +95,17 @@ export function ExerciseCoreFields({
             face="figure"
             keyboardType="decimal-pad"
             label="Bodyweight contribution (%)"
-            onChangeText={(percentage) => loadRules.onChange({ ...loadRules.value, percentage })}
+            onChangeText={(percentage) => bodyweightContribution.onChange({ percentage })}
             testID={`${testIDPrefix}-bodyweight-percentage`}
-            value={loadRules.value.percentage}
+            value={bodyweightContribution.value.percentage}
           />
-          {loadRules.metadataKnown === false ? (
-            <Text allowFontScaling={false} style={styles.helperText}>
-              Saved load settings have not synced yet. Leave these fields unchanged to preserve them, or configure them explicitly.
-            </Text>
-          ) : null}
-          {loadRules.scope === 'group' &&
-          (Number(loadRules.value.percentage) > 0 || loadRules.value.movementStandard || loadRules.value.loadingMethod) ? (
-            <>
-              <FormField
-                accessibilityLabel="Movement standard"
-                editable={editable}
-                face="text"
-                label="Movement standard"
-                placeholder="e.g. Standard floor push-up"
-                onChangeText={(movementStandard) => loadRules.onChange({ ...loadRules.value, movementStandard })}
-                testID={`${testIDPrefix}-movement-standard`}
-                value={loadRules.value.movementStandard}
-              />
-              <FormField
-                accessibilityLabel="Loading method"
-                editable={editable}
-                face="text"
-                label="Loading method"
-                placeholder="e.g. Vest"
-                onChangeText={(loadingMethod) => loadRules.onChange({ ...loadRules.value, loadingMethod })}
-                testID={`${testIDPrefix}-loading-method`}
-                value={loadRules.value.loadingMethod}
-              />
-            </>
-          ) : null}
           <Text allowFontScaling={false} style={styles.helperText}>
-            {loadRules.scope === 'group'
+            {bodyweightContribution.scope === 'group'
               ? 'The group uses this share of each member’s applicable weight. Personal exercise settings stay independent.'
               : 'The calculation uses this share of your applicable dated weight. Changes recalculate personal history.'}
           </Text>
-          {loadRules.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
-            style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{loadRules.error}</Text> : null}
+          {bodyweightContribution.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
+            style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{bodyweightContribution.error}</Text> : null}
         </View>
       ) : null}
     </View>

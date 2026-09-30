@@ -10,7 +10,9 @@ const makePackage = (
   exerciseName = 'Bench'
 ): BogaSessionImportPackage =>
   ({
-    schema: 'boga.session-import.v1',
+    schema: 'boga.session-import.v4',
+    bodyweightCalculationsEnabled: false,
+    bodyWeightMeasurements: [],
     generatedAt: '2026-06-05T17:02:00.498Z',
     target: {
       importingProfileLabel: 'test',
@@ -67,6 +69,10 @@ const makePackage = (
               repsValue: '5',
               weightValue: '100',
               setType: set.setType,
+              plannedWeightValue: null,
+              plannedRepsValue: null,
+              plannedSetType: null,
+              performanceStatus: null,
               source: {
                 rowIndex: index,
                 workoutName: 'Workout',
@@ -98,7 +104,8 @@ const makePackage = (
       notes: [],
       warnings: [],
     },
-  }) as BogaSessionImportPackage;
+  // The validator cases below deliberately pass invalid set-type strings.
+  }) as unknown as BogaSessionImportPackage;
 
 describe('BOGA import set type enrichment', () => {
   it('applies the import effort ladder by set rank', () => {

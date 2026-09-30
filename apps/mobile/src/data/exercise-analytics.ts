@@ -1,13 +1,13 @@
 import { loadAsOfWeightResolver } from './bodyweight';
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
-import { addFiniteVolume, exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
-import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import { addFiniteVolume, ordinaryLoadContext, personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 import { isWorkingSessionSetType } from './set-types';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
@@ -18,8 +18,6 @@ type ExerciseRawSet = {
   weightValue: string;
   repsValue: string;
   performanceStatus?: SessionSetPerformanceStatus;
-  localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string | null; externalLoadMode?: string | null;
 };
 
 export type ExerciseRawSession = {
@@ -95,7 +93,7 @@ export const aggregateExerciseDailyEffort = (
       bestRM1: null,
       highestWeight: null,
     };
-    const summary = summarizeExerciseLoad(session.sets, session.loadContext ?? exerciseLoadContext());
+    const summary = summarizeExerciseLoad(session.sets, session.loadContext ?? ordinaryLoadContext());
     if (summary.volumeCoverage.eligibleSetCount === 0) continue;
     day.knownVolume = addFiniteVolume(day.knownVolume, summary.volumeCoverage.knownVolumeKgReps);
     day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeCoverage.totalVolumeKgReps);
@@ -200,7 +198,12 @@ const loadExerciseRawSessions = async (
   options: ComputeSelectedExerciseWeeklyEffortOptions
 ): Promise<ExerciseRawSession[]> => {
   const database = await bootstrapLocalDataLayer();
-    const resolveWeight = loadAsOfWeightResolver(database);
+  const resolveWeight = loadAsOfWeightResolver(database);
+  const bodyweightCalculationsEnabled = database
+    .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+    .from(userSettings)
+    .where(eq(userSettings.id, 'settings'))
+    .get()?.enabled ?? false;
 
   const storedSessionRows = database
     .select({ id: sessions.id, completedAt: sessions.completedAt, startedAt: sessions.startedAt })
@@ -247,7 +250,6 @@ const loadExerciseRawSessions = async (
       sessionExerciseId: exerciseSets.sessionExerciseId,
       setType: exerciseSets.setType,
       weightValue: exerciseSets.weightValue,
-      localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
       repsValue: exerciseSets.repsValue,
       performanceStatus: exerciseSets.performanceStatus,
     })
@@ -273,7 +275,6 @@ const loadExerciseRawSessions = async (
     existing.push({
       setType: set.setType ?? null,
       weightValue: set.weightValue,
-      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
       repsValue: set.repsValue,
       performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
     });
@@ -288,7 +289,7 @@ const loadExerciseRawSessions = async (
     if (!session) continue;
     rawSessions.push({
       completedAt: session.completedAt,
-      loadContext: exerciseLoadContext(definition, session),
+      loadContext: personalLoadContext(bodyweightCalculationsEnabled, definition, session),
       sets: setsByExerciseId.get(seRow.id) ?? [],
     });
   }

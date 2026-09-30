@@ -20,10 +20,10 @@
 //   output.groupsCardKey             "<user_d>:<session>" (stream card testIDs)
 //   output.groupsHistoryCardKey      the pre-join session's would-be card key
 //   output.groupsFirstSetId          first set of the live session (friend view)
-//   output.groupsBoardExerciseId     the active custom group exercise user_d links to (M25-T09)
-//   output.groupsRecordKey           the record item's key (record card testIDs, M25-T11)
-//   output.groupsRecordSessionCardKey "<user_d>:<record session>" (its session card, M25-T11)
-//   output.groupsRecordSetId         the record set (M25-T11)
+//   output.groupsBoardExerciseId     the active custom group exercise user_d links to
+//   output.groupsRecordKey           the record item's key (record card testIDs)
+//   output.groupsRecordSessionCardKey "<user_d>:<record session>" (its session card)
+//   output.groupsRecordSetId         the record set
 //
 // Any unexpected response throws, which fails the Maestro step.
 
@@ -70,7 +70,7 @@ function signIn() {
 }
 
 function rpc(token, name, args) {
-  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '2' });
+  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '3' });
 }
 
 function rpcOk(token, name, args) {
@@ -212,7 +212,7 @@ function assertUnlinkPreserved(linked) {
   console.log(TAG + ' UNLINK_PRESERVATION linked=' + linked + ' record=' + output.unlinkRecordKey + ' certification=' + output.unlinkCertificationId + ' second-link=preserved');
 }
 
-// M27: public RPC polling verifies the same published revision the device reads.
+// Public RPC polling verifies the same published revision the device reads.
 function bodyweightBoard(metric, certified) {
   return rpcOk(output.groupsToken, 'group_metric_board', {
     p_group_id: output.groupsGroupId, p_group_exercise_id: output.bodyweightExerciseId,
@@ -234,7 +234,7 @@ function bodyweightSession(id, stamp, missing) {
 }
 function bodyweightReading(id, kg, stamp) {
   return entity('body_weight_measurements', id + '-reading', stamp, {
-    weight_value: String(kg), weight_unit: 'kg', weight_kg: kg,
+    weight_kg: kg,
     measured_at: output.bodyweightStartedAt, created_at: stamp, updated_at: stamp, deleted_at: null,
   });
 }
@@ -290,6 +290,8 @@ var steps = {
     push([
       entity('exercise_definitions', definitionId, cuam, {
         name: 'Bench Press',
+        load_input_mode: 'total_load',
+        bodyweight_contribution: 0,
         created_at: cuam,
         updated_at: cuam,
         deleted_at: null,
@@ -297,8 +299,8 @@ var steps = {
       // The complete-volume fixture declares both conventional definitions.
       // An unconfigured definition now correctly yields incomplete metrics.
       entity('exercise_definitions', sessionId + '-def-row', cuam, {
-        name: 'Barbell Row', load_input_mode: 'total_load', bodyweight_coefficient: 0,
-        movement_standard: null, loading_method: null, created_at: cuam, updated_at: cuam, deleted_at: null,
+        name: 'Barbell Row', load_input_mode: 'total_load', bodyweight_contribution: 0,
+        created_at: cuam, updated_at: cuam, deleted_at: null,
       }),
       sessionEntity(historyId, historyStart, cuam, historyStart + DURATION_SEC * 1000),
       sessionExerciseEntity(historyId + '-bench', historyId, definitionId, 0, 'Bench Press', cuam),
@@ -334,7 +336,7 @@ var steps = {
     console.log(TAG + ' GROUPS_E2E_LATENCY ' + LABEL + ' sync_push->card visible: ' + elapsed + ' ms');
   },
 
-  // M25-T08: a member reads the exercises the owner added on the device — the
+  // A member reads the exercises the owner added on the device — the
   // renamed custom one (active, per side, no source) first, then the archived
   // standard copy (it keeps its seed id).
   'assert-exercises': function () {
@@ -357,12 +359,12 @@ var steps = {
     console.log(TAG + ' member reads the group exercises: ' + JSON.stringify(got));
   },
 
-  // M25-T09: user_d links its pushed Bench Press (total load) to the device's
+  // user_d links its pushed Bench Press (total load) to the device's
   // active custom group exercise, Prowler Push (per side), with a sync_push like
   // its own app would. Its completed sets from before the link then count as a
   // link effect (contract §2.11). Waits until the evaluator has written the
-  // board, so the device's reads are deterministic: best 102.5 kg × 5 logged,
-  // converted ×0.5 to 51.25 kg per side (D6), uncertified.
+  // board, so the device's reads are deterministic: raw Weight 102.5 kg × 5,
+  // uncertified. The per-side group rule affects calculated 1RM, not Weight.
   'link-board': function () {
     var list = rpcOk(output.groupsToken, 'group_exercise_list_v2', { p_group_id: output.groupsGroupId });
     var targets = (list.exercises || []).filter(function (exercise) {
@@ -413,7 +415,7 @@ var steps = {
     if (
       board.entries.length !== 1 ||
       row.member.user_id !== output.groupsCounterpartyUserId ||
-      Number(row.value) !== 51.25 ||
+      Number(row.value) !== 102.5 ||
       Number(row.performance.reps) !== 5 ||
       Number(row.performance.weight_value) !== 102.5 || row.performance.source_load_input_mode !== 'total_load' ||
       row.certified !== false
@@ -425,10 +427,10 @@ var steps = {
     );
   },
 
-  // M25-T11: a new completed session on the already-linked Bench Press, one set
+  // A new completed session on the already-linked Bench Press, one set
   // of 110 kg × 5 total. Its sets are created after the link, so the evaluator
-  // attributes a record, not a link effect (contract §2.11 step 5): 55 kg × 5
-  // per side, beating 51.25 kg on Weight and e1RM, a group record on both.
+  // attributes a record, not a link effect (contract §2.11 step 5): raw
+  // Weight 110 kg × 5, beating 102.5 kg on Weight and 1RM.
   // Waits until the stream returns the final (non-provisional) record item.
   'push-record': function () {
     var cuam = nextClientUpdatedAt();
@@ -471,7 +473,7 @@ var steps = {
       .sort()
       .join(',');
     if (
-      Number(record.boards.filter(function (b) { return b.metric === 'weight'; })[0].value) !== 55 ||
+      Number(record.boards.filter(function (b) { return b.metric === 'weight'; })[0].value) !== 110 ||
       Number(record.performance.reps) !== 5 ||
       Number(record.performance.weight_value) !== 110 || record.performance.source_load_input_mode !== 'total_load' ||
       boards !== 'e1rm:true,weight:true' ||
@@ -486,8 +488,8 @@ var steps = {
     );
   },
 
-  // M25-T11: after the device certified the record set, wait until the
-  // evaluator has written the Certified · e1RM entry (certify -> pg_net kick ->
+  // After the device certified the record set, wait until the
+  // evaluator has written the Certified · 1RM entry (certify -> pg_net kick ->
   // apply), so the device's board reads are deterministic. The script cannot
   // see the tap, so the latency is from this step's start (it includes the
   // Maestro steps between the tap and this script).
@@ -509,7 +511,7 @@ var steps = {
       var rows = board.entries || [];
       if (rows.length > 0 && rows[0].set_id === output.groupsRecordSetId) break;
       if (Date.now() > deadline) {
-        fail('no Certified · e1RM row for ' + output.groupsRecordSetId + ' (' + polls + ' polls); rows: ' + JSON.stringify(rows));
+        fail('no Certified · 1RM row for ' + output.groupsRecordSetId + ' (' + polls + ' polls); rows: ' + JSON.stringify(rows));
       }
       pause(POLL_INTERVAL_MS);
     }
@@ -519,12 +521,13 @@ var steps = {
     if (
       board.entries.length !== 1 ||
       row.member.user_id !== output.groupsCounterpartyUserId ||
-      Number(row.effective_resistance_kg) !== 55 ||
+      row.metric !== 'e1rm' || !Number.isFinite(Number(row.value)) || Number(row.value) <= 0 ||
+      Number(row.performance.weight_value) !== 110 ||
       row.certified !== true ||
       !by ||
       by.user_id === output.groupsCounterpartyUserId
     ) {
-      fail('unexpected Certified · e1RM board: ' + JSON.stringify(board.entries));
+      fail('unexpected Certified · 1RM board: ' + JSON.stringify(board.entries));
     }
     // Measured from the certification's server certified_at_ms (the local
     // stack's clock; host/VM skew applies), so it includes the device steps
@@ -557,7 +560,8 @@ var steps = {
     var entities = [];
     for (var i = 0; i < definitions.length; i++) {
       entities.push(entity('exercise_definitions', definitions[i], stamp, {
-        name: names[i], load_input_mode: 'total_load', created_at: stamp, updated_at: stamp, deleted_at: null,
+        name: names[i], load_input_mode: 'total_load', bodyweight_contribution: 0,
+        created_at: stamp, updated_at: stamp, deleted_at: null,
       }));
       entities.push(entity('exercise_group_links', output.groupsGroupId + ':' + definitions[i], stamp, {
         exercise_definition_id: definitions[i], group_id: output.groupsGroupId, group_exercise_id: output.unlinkGroupExerciseId,
@@ -596,28 +600,30 @@ var steps = {
   'assert-device-relinked': function () { assertUnlinkPreserved(true); },
 
   'prepare-bodyweight': function () {
+    rpcOk(output.unlinkDeviceToken, 'group_update', {
+      p_group_id: output.groupsGroupId, p_name: 'Maestro Groups E2E', p_description: null,
+      p_bodyweight_calculations_enabled: true,
+    });
     var created = rpcOk(output.unlinkDeviceToken, 'group_exercise_create_v2', {
-      p_group_id: output.groupsGroupId, p_name: 'M27 Strict Pull-up', p_load_input_mode: 'total_load',
-      p_source_exercise_id: null, p_bodyweight_coefficient: 1, p_movement_standard: 'strict_pullup',
-      p_loading_method: 'belt', p_default_metric: 'relative_strength',
+      p_group_id: output.groupsGroupId, p_name: 'Pull-up', p_load_input_mode: 'total_load',
+      p_source_exercise_id: null, p_bodyweight_contribution: 1, p_default_metric: 'e1rm',
     });
     output.bodyweightExerciseId = created.exercise.group_exercise_id;
     output.bodyweightStartedAt = nextClientUpdatedAt();
-    output.bodyweightCounterpartySessionId = 'maestro-m27-heavy';
+    output.bodyweightCounterpartySessionId = 'maestro-bodyweight-heavy';
     var people = [
-      { token: output.unlinkDeviceToken, id: 'maestro-m27-light', kg: 60, coefficient: 0.1 },
-      { token: output.groupsToken, id: output.bodyweightCounterpartySessionId, kg: 90, coefficient: 0.7 },
+      { token: output.unlinkDeviceToken, id: 'maestro-bodyweight-light', kg: 60, contribution: 0.1 },
+      { token: output.groupsToken, id: output.bodyweightCounterpartySessionId, kg: 90, contribution: 0.7 },
     ];
     for (var i = 0; i < people.length; i++) {
       var person = people[i];
       var stamp = nextClientUpdatedAt();
       var def = person.id + '-def';
       var set = setEntity(person.id + '-set', person.id + '-se', 0, '20', '5', stamp);
-      set.fields.weight_unit = 'kg'; set.fields.external_load_mode = 'added';
       var entities = [
         entity('exercise_definitions', def, stamp, {
-          name: 'M27 Personal Pull-up', load_input_mode: 'total_load', bodyweight_coefficient: person.coefficient,
-          movement_standard: 'strict_pullup', loading_method: 'belt', created_at: stamp, updated_at: stamp, deleted_at: null,
+          name: 'Personal Pull-up', load_input_mode: 'total_load', bodyweight_contribution: person.contribution,
+          created_at: stamp, updated_at: stamp, deleted_at: null,
         }),
         entity('exercise_group_links', output.groupsGroupId + ':' + def, stamp, {
           exercise_definition_id: def, group_id: output.groupsGroupId, group_exercise_id: output.bodyweightExerciseId,
@@ -625,65 +631,66 @@ var steps = {
         }),
         bodyweightSession(person.id, stamp, false),
         bodyweightReading(person.id, person.kg, stamp),
-        sessionExerciseEntity(person.id + '-se', person.id, def, 0, 'M27 Personal Pull-up', stamp), set,
+        sessionExerciseEntity(person.id + '-se', person.id, def, 0, 'Personal Pull-up', stamp), set,
       ];
-      // A session preceding the timeline is eligible for the unweighted-reps board only.
+      // A session preceding the timeline keeps its raw Weight but has no group 1RM.
       if (i === 1) {
         var missing = person.id + '-missing';
-        var reps = setEntity(missing + '-set', missing + '-se', 0, '0', '15', stamp);
-        reps.fields.weight_unit = 'kg'; reps.fields.external_load_mode = 'added';
+        var reps = setEntity(missing + '-set', missing + '-se', 0, '10', '15', stamp);
         entities.push(bodyweightSession(missing, stamp, true));
-        entities.push(sessionExerciseEntity(missing + '-se', missing, def, 0, 'M27 Personal Pull-up', stamp));
+        entities.push(sessionExerciseEntity(missing + '-se', missing, def, 0, 'Personal Pull-up', stamp));
         entities.push(reps);
       }
       if (!rpcOk(person.token, 'sync_push', { entities: entities }).ok) fail('could not seed bodyweight performance');
     }
-    awaitBodyweightBoard('relative_strength', false, function (b) {
-      return b.entries.length === 2 && b.entries[0].member.user_id === output.unlinkDeviceUserId &&
-        b.entries[0].effective_resistance_kg === 80 && b.entries[1].effective_resistance_kg === 110;
-    });
-    awaitBodyweightBoard('absolute_strength', false, function (b) {
+    awaitBodyweightBoard('e1rm', false, function (b) {
       return b.entries.length === 2 && b.entries[0].member.user_id === output.groupsCounterpartyUserId;
     });
-    awaitBodyweightBoard('bodyweight_reps', false, function (b) {
-      return b.entries.length === 1 && b.entries[0].value === 15 && b.entries[0].performance.body_weight_kg === null;
+    awaitBodyweightBoard('weight', false, function (b) {
+      return b.entries.length === 2 && b.entries.every(function (row) {
+        return row.value === 20 && row.metric === 'weight';
+      });
     });
-    console.log(TAG + ' M27 reversal, missing-B reps and group coefficient authority verified');
+    console.log(TAG + ' normal Weight and bodyweight-aware 1RM group calculations verified');
   },
   'await-bodyweight-certified': function () {
-    var board = awaitBodyweightBoard('absolute_strength', true, function (b) {
+    var board = awaitBodyweightBoard('e1rm', true, function (b) {
       return b.entries.length === 1 && b.entries[0].member.user_id === output.groupsCounterpartyUserId;
     });
     output.bodyweightCertificationId = board.entries[0].certification_id;
     var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
       p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
     }).certification;
-    if (!cert.includes_body_weight || cert.performance.body_weight_source !== 'reading' ||
-      cert.certified_by.user_id !== output.unlinkDeviceUserId) fail('dated inputs were not attested');
+    if (cert.certified_by.user_id !== output.unlinkDeviceUserId) fail('performance was not attested');
+    if (/body_weight|measurement/i.test(JSON.stringify(cert))) fail('certification leaked private weight context');
   },
   'assert-bodyweight-rules': function () {
-    var board = awaitBodyweightBoard('absolute_strength', false, function (b) {
+    var board = awaitBodyweightBoard('e1rm', false, function (b) {
       return b.rules_revision === 2 && b.entries.length === 2 && b.entries.every(function (row) { return row.rules_revision === 2; });
     });
-    if (board.entries[0].effective_resistance_kg !== 83 || board.entries[1].effective_resistance_kg !== 62) {
-      fail('group coefficient did not govern both performances: ' + JSON.stringify(board));
+    if (board.entries.some(function (row) { return row.metric !== 'e1rm' || row.unit !== 'kg'; })) {
+      fail('group board did not use the normal 1RM presentation: ' + JSON.stringify(board));
     }
-    awaitBodyweightBoard('absolute_strength', true, function (b) {
-      return b.rules_revision === 2 && b.entries.length === 1 && b.entries[0].certification_id === output.bodyweightCertificationId;
+    awaitBodyweightBoard('e1rm', true, function (b) {
+      return b.rules_revision === 2 && b.entries.length === 0;
     });
+    var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
+      p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
+    }).certification;
+    if (cert.ended_at_ms === null) fail('rule contribution change retained the prior certification');
   },
   'correct-bodyweight': function () {
     var stamp = nextClientUpdatedAt();
     push([bodyweightReading(output.bodyweightCounterpartySessionId, 95, stamp)]);
-    awaitBodyweightBoard('absolute_strength', false, function (b) {
-      return b.rules_revision === 2 && b.entries.length === 2 && b.entries[0].performance.body_weight_kg === 95 && !b.entries[0].certified;
+    awaitBodyweightBoard('e1rm', false, function (b) {
+      return b.rules_revision === 2 && b.entries.length === 2 && !b.entries[0].certified;
     });
-    awaitBodyweightBoard('absolute_strength', true, function (b) { return b.entries.length === 0; });
+    awaitBodyweightBoard('e1rm', true, function (b) { return b.entries.length === 0; });
     var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
       p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
     }).certification;
     if (cert.ended_at_ms === null) fail('bodyweight correction retained an active strength certification');
-    console.log(TAG + ' M27 dated-reading correction invalidated the strength attestation');
+    console.log(TAG + ' dated-reading correction invalidated the 1RM attestation');
   },
 
   // AC11: once removed, the counterparty's next read of the group is NOT_FOUND.

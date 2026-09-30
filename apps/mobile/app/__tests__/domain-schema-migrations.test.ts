@@ -126,10 +126,10 @@ describe('domain schema and runtime migrations', () => {
   it('keeps the squashed v2 baseline as m0000 and appends feature migrations after it', () => {
     // The history was squashed to a single v2 baseline (`m0000`); forward feature
     // migrations append after it. The first follow-up is the local sync
-    // quarantine table; planned set targets append after that; the M22 local
-    // group cache is m0004, m0005 empties it for the raw-set payload shape, and
-    // the M25 exercise_group_links synced entity is m0006.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(10);
+    // quarantine table; planned set targets append after that; the local
+    // group cache is m0004, m0005 empties it for the raw-set payload shape,
+    // exercise_group_links is m0006, and the kg-only cutover is m0010.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(11);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -169,6 +169,7 @@ describe('domain schema and runtime migrations', () => {
       'm0007',
       'm0008',
       'm0009',
+      'm0010',
     ]);
   });
 

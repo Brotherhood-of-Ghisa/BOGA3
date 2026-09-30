@@ -1,6 +1,6 @@
 # M28 — Simplify bodyweight UX and semantics
 
-- Status: `planned`
+- Status: `in progress`
 - Created: 2026-09-28, planning baseline `2e5db9e9` on `origin/main`
 - Workstream: https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/401
 
@@ -27,7 +27,8 @@ preserving workout history and dated bodyweight readings.
   - personal settings, exercise editing, logging, records, history, Stats,
     completion/share and group-administration UI;
   - migrations, sync, imports/exports, coaching API and all affected tests;
-  - human interaction/design acceptance before aggregate closeout gates.
+  - human interaction/design acceptance before aggregate closeout gates;
+  - coordinated hosted cutover, store release and verified production availability.
 - Out:
   - unrelated exercise, session, group or coaching redesigns;
   - changing the Wathan estimator itself;
@@ -206,7 +207,21 @@ review before the final pass.
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | `M28-T01-Define_simplified_bodyweight_contract` | Replace the durable contracts and accepted design target with D1-D17. | none | completed |
-| `M28-T02-Implement_simplified_bodyweight_contract` | Ship the coordinated schema, calculations, UI, sync, groups, coaching and verification work. | T01 | planned |
+| `M28-T02-Implement_simplified_bodyweight_contract` | Ship the coordinated schema, calculations, UI, sync, groups, coaching, verification and production rollout. | T01 | in progress |
+
+## Production completion
+
+The milestone is not complete when the implementation PR merges. Follow the
+staged operator procedure in `RUNBOOK.md` under “Optional bodyweight-calculation
+cutover”: distribute a reviewed update-required compatibility client first,
+then apply the hosted protocol-3 migration and matching functions, run hosted
+smoke checks, and submit the reviewed protocol-3 client to the public app's
+store track. Verify the build is available to the intended audience and that
+a populated device upgrades without losing workouts or dated readings. Record
+the exact commits, build numbers, hosted project, migration/function versions
+and smoke evidence in the release PR. Stop for explicit approval before the
+hosted write or store submission; local implementation alone does not authorize
+either operation.
 
 ## Risks / dependencies
 

@@ -2,8 +2,7 @@
   "exemptions": {
     "local_only_columns": [
       "local_dirty",
-      "local_updated_at_ms",
-      "local_bodyweight_metadata_known"
+      "local_updated_at_ms"
     ]
   }
 }

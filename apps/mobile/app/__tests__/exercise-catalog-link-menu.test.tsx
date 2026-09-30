@@ -51,12 +51,14 @@ jest.mock('@/src/data/exercise-catalog', () => ({
 const ACTIVE: ExerciseCatalogExercise = {
   id: 'seed_barbell_bench_press',
   name: 'Bench Press',
+  bodyweightContribution: 0,
   deletedAt: null,
   mappings: [{ id: 'map-a', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
 };
 const DELETED: ExerciseCatalogExercise = {
   id: 'exercise-deleted-1',
   name: 'Old Fly',
+  bodyweightContribution: 0,
   deletedAt: new Date('2026-02-27T10:00:00.000Z'),
   mappings: [{ id: 'map-b', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
 };

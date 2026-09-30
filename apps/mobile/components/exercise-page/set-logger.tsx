@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
 import { Icon } from '@/components/ui/icon';
 import {
@@ -24,12 +24,7 @@ import {
 import { pageText } from './text-styles';
 
 type SetLoggerProps = {
-  loadContext?: LoadContext;
-  weightUnit?: string;
-  externalLoadMode?: string | null;
-  metadataKnown?: boolean;
-  unitEditable?: boolean;
-  onChangeLoad?: (value: { weightUnit?: string; externalLoadMode?: string }) => void;
+  loadContext: LoadContext;
   number: number;
   weightValue: string;
   repsValue: string;
@@ -54,13 +49,11 @@ const DASH = '—';
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, loadContext, weightUnit = 'kg', externalLoadMode,
-    metadataKnown = true },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, loadContext },
   weightInputRef
 ) {
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
-  const context = metadataKnown ? loadContext : { bodyweightCoefficient: NaN, loadInputMode: 'total_load' };
-  const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, context, { weightUnit, externalLoadMode });
+  const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, loadContext);
   const canCommit = canCommitLogger({ weightValue, repsValue });
   const effort = formatEffort(setType);
 

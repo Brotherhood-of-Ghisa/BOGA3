@@ -70,14 +70,17 @@ appId: com.dinoderek.mobile
 - launchApp:
     clearState: true
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- extendedWaitUntil:
-    visible:
-      text: "Continue"
-    timeout: 30000
-# Settle the sheet, then retry each dismissal tap so the transient iOS-26
-# `kAXErrorInvalidUIElement` (stale element ref during the post-clearState reload
-# churn) is re-attempted rather than failing the run. Each retry wraps one tap
-# and is idempotent: the element stays present until the tap succeeds.
+- retry:
+    maxRetries: 3
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: "Continue"
+          timeout: 30000
+# Settle the sheet, then retry each dismissal tap. iOS 26 can return
+# `kAXErrorInvalidUIElement` during the post-clearState reload; retrying the
+# wait and taps covers the same transient. Each tap remains idempotent because
+# its element stays present until the tap succeeds.
 - waitForAnimationToEnd:
     timeout: 4000
 - retry:
@@ -196,8 +199,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-add-exercise"
     timeout: 30000
-- assertNotVisible:
-    id: "session-body-weight"
+- assertNotVisible: "Body weight"
 - tapOn:
     id: "session-view-add-exercise"
 - tapOn: "Exercise filter input"
@@ -313,8 +315,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-add-exercise"
     timeout: 30000
-- assertNotVisible:
-    id: "session-body-weight"
+- assertNotVisible: "Body weight"
 - tapOn:
     id: "session-view-add-exercise"
 - tapOn: "Exercise filter input"
@@ -557,8 +558,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "completed-session-detail-screen" }
     timeout: 30000
-- assertNotVisible:
-    id: "session-body-weight"
+- assertNotVisible: "Body weight"
 - takeScreenshot: "21-roundtrip-newer-session-without-weight-ui"
 - tapOn: { id: "completed-session-detail-back" }
 - extendedWaitUntil:
@@ -568,8 +568,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "completed-session-detail-screen" }
     timeout: 30000
-- assertNotVisible:
-    id: "session-body-weight"
+- assertNotVisible: "Body weight"
 - takeScreenshot: "22-roundtrip-older-session-without-weight-ui"
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:

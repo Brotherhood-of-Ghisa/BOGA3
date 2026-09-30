@@ -5,8 +5,8 @@ import {
   type SessionDraftExerciseSnapshot,
   type SessionDraftExerciseInput,
   type SessionGraphSnapshot,
-  type SessionBodyWeightSnapshot,
 } from '@/src/data/session-drafts';
+import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 
 /**
  * One session exercise of an active draft or a completed session, read and
@@ -38,7 +38,7 @@ export type SessionExerciseDraftLoad =
       status: 'ready';
       exercise: SessionDraftExerciseSnapshot;
       sessionStatus: SessionGraphSnapshot['status'];
-      bodyWeight: SessionBodyWeightSnapshot;
+      bodyWeight: ResolvedSessionWeight;
       gymId: string | null;
     }
   | { status: SessionExerciseDraftLoadError };
@@ -77,11 +77,6 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
   sets: exercise.sets.map((set) => ({
     id: set.id,
     weightValue: set.weightValue,
-    localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
-    weightUnit: set.weightUnit,
-    externalLoadMode: set.externalLoadMode,
-    plannedWeightUnit: set.plannedWeightUnit,
-    plannedExternalLoadMode: set.plannedExternalLoadMode,
     repsValue: set.repsValue,
     setType: set.setType,
     plannedWeightValue: set.plannedWeightValue,

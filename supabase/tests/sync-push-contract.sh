@@ -67,7 +67,7 @@ http_request() {
   fi
 
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL-2}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL-3}" -H "Content-Type: application/json" --data "${body}")
   fi
 
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
@@ -230,7 +230,7 @@ GYM_UNDELETE_ID="push-gym-undelete-${RUN_TAG}"
 GYM_CLAMP_ID="push-gym-clamp-${RUN_TAG}"
 GYM_CROSS_OWNER_ID="push-gym-cross-${RUN_TAG}"
 EXDEF_A_ID="push-exdef-a-${RUN_TAG}"
-EXDEF_COMPAT_ID="push-exdef-compat-${RUN_TAG}"
+EXDEF_PATCH_ID="push-exdef-patch-${RUN_TAG}"
 SESSION_A_ID="push-session-a-${RUN_TAG}"
 SX_A_ID="push-sx-a-${RUN_TAG}"
 SX_ORPHAN_ID="push-sx-orphan-${RUN_TAG}"
@@ -305,7 +305,7 @@ PAYLOAD="$(jq -nc \
               completed_at: null, duration_sec: null,
               created_at: $now, updated_at: $now, deleted_at: null}},
     {type: "exercise_definitions", id: $exdef_id, client_updated_at_ms: $now,
-     fields: {name: "Bench Press", load_input_mode: "per_side_load",
+     fields: {name: "Bench Press", load_input_mode: "per_side_load", bodyweight_contribution: 0,
               created_at: $now, updated_at: $now,
               deleted_at: null}}
   ]}')"
@@ -324,55 +324,53 @@ service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SET_A_ID
 assert_json_expr 'length == 1 and .[0].weight_value == "100" and .[0].reps_value == "8" and .[0].set_type == "rir_4"' "multi-layer: exercise_set landed"
 
 # ===========================================================================
-# 3. Server-first compatibility for pre-M19 clients. An omitted
-#    load_input_mode defaults to total_load for a new row. Once a current
-#    client stores per_side_load, a newer legacy payload without the key still
-#    wins row-level LWW for the fields it knows, but preserves the stored mode.
+# 3. Current exercise-definition updates carry both required load fields
+#    through row-level LWW.
 # ===========================================================================
 
-echo "[sync-push] pre-M19 omission defaults on insert and preserves on update"
-T_COMPAT_INSERT=$((BASE_MS + 110))
-PAYLOAD="$(jq -nc --arg id "${EXDEF_COMPAT_ID}" \
-  --argjson cuam "${T_COMPAT_INSERT}" --argjson ts "${T_COMPAT_INSERT}" \
+echo "[sync-push] exercise-definition updates carry the current load fields"
+T_PATCH_INSERT=$((BASE_MS + 110))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+  --argjson cuam "${T_PATCH_INSERT}" --argjson ts "${T_PATCH_INSERT}" \
   '{entities: [
     {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
-     fields: {name: "Legacy Insert",
+     fields: {name: "Patch Target", load_input_mode: "total_load", bodyweight_contribution: 0,
               created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
-assert_status "200" "pre-M19 compatibility: omitted-key insert"
+assert_status "200" "exercise-definition insert"
 
-service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_COMPAT_ID}&select=name,load_input_mode,client_updated_at_ms"
-assert_json_expr --argjson cuam "${T_COMPAT_INSERT}" \
-  'length == 1 and .[0].name == "Legacy Insert" and .[0].load_input_mode == "total_load" and .[0].client_updated_at_ms == $cuam' \
-  "pre-M19 compatibility: omitted-key insert defaults to total_load"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=name,load_input_mode,bodyweight_contribution,client_updated_at_ms"
+assert_json_expr --argjson cuam "${T_PATCH_INSERT}" \
+  'length == 1 and .[0].name == "Patch Target" and .[0].load_input_mode == "total_load" and .[0].bodyweight_contribution == 0 and .[0].client_updated_at_ms == $cuam' \
+  "exercise-definition insert stores current load fields"
 
-T_COMPAT_CURRENT=$((BASE_MS + 120))
-PAYLOAD="$(jq -nc --arg id "${EXDEF_COMPAT_ID}" \
-  --argjson cuam "${T_COMPAT_CURRENT}" --argjson ts "${T_COMPAT_CURRENT}" \
+T_PATCH_LOAD=$((BASE_MS + 120))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+  --argjson cuam "${T_PATCH_LOAD}" --argjson ts "${T_PATCH_LOAD}" \
   '{entities: [
     {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
-     fields: {name: "Current Per-Side", load_input_mode: "per_side_load",
+     fields: {name: "Per-Side Target", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
               created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
-assert_status "200" "pre-M19 compatibility: establish per-side row"
+assert_status "200" "exercise-definition load update"
 
-T_COMPAT_LEGACY=$((BASE_MS + 130))
-PAYLOAD="$(jq -nc --arg id "${EXDEF_COMPAT_ID}" \
-  --argjson cuam "${T_COMPAT_LEGACY}" --argjson ts "${T_COMPAT_LEGACY}" \
+T_PATCH_RENAME=$((BASE_MS + 130))
+PAYLOAD="$(jq -nc --arg id "${EXDEF_PATCH_ID}" \
+  --argjson cuam "${T_PATCH_RENAME}" --argjson ts "${T_PATCH_RENAME}" \
   '{entities: [
     {type: "exercise_definitions", id: $id, client_updated_at_ms: $cuam,
-     fields: {name: "Legacy Rename",
+     fields: {name: "Renamed Target", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
               created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
 sync_push "${USER_A_TOKEN}" "${PAYLOAD}"
-assert_status "200" "pre-M19 compatibility: newer omitted-key update"
+assert_status "200" "exercise-definition rename"
 
-service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_COMPAT_ID}&select=name,load_input_mode,client_updated_at_ms"
-assert_json_expr --argjson cuam "${T_COMPAT_LEGACY}" \
-  'length == 1 and .[0].name == "Legacy Rename" and .[0].load_input_mode == "per_side_load" and .[0].client_updated_at_ms == $cuam' \
-  "pre-M19 compatibility: newer omitted-key update preserves per_side_load"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EXDEF_PATCH_ID}&select=name,load_input_mode,bodyweight_contribution,client_updated_at_ms"
+assert_json_expr --argjson cuam "${T_PATCH_RENAME}" \
+  'length == 1 and .[0].name == "Renamed Target" and .[0].load_input_mode == "per_side_load" and .[0].bodyweight_contribution == 0.5 and .[0].client_updated_at_ms == $cuam' \
+  "exercise-definition update retains load mode and contribution"
 
 # ===========================================================================
 # 4. LWW newer wins — push T=100, then T=200 with a different name.

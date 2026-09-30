@@ -1,6 +1,6 @@
 import { asc, eq, inArray } from 'drizzle-orm';
 
-import { BODYWEIGHT_SEED_RULES, CONVENTIONAL_LOAD_RULES, type ExerciseLoadRules } from '@/src/exercise-core/load-rules';
+import { BODYWEIGHT_SEED_CONTRIBUTIONS } from '@/src/exercise-core/bodyweight-contribution';
 
 import { nowMonotonic } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups, syncRuntimeState } from './schema';
@@ -50,7 +50,8 @@ export type MuscleGroupSeed = {
   isEditable: 0;
 };
 
-export type SystemExerciseDefinitionSeed = Partial<ExerciseLoadRules> & {
+export type SystemExerciseDefinitionSeed = {
+  bodyweightContribution: number;
   id: string;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
@@ -174,7 +175,7 @@ export const SYSTEM_MUSCLE_GROUP_SEEDS: MuscleGroupSeed[] = [
   { id: 'calves', displayName: 'Calves', familyName: 'Lower Legs', sortOrder: 18, isEditable: 0 },
 ];
 
-const SYSTEM_EXERCISE_DEFINITION_INPUTS: Omit<SystemExerciseDefinitionSeed, 'loadInputMode'>[] = [
+const SYSTEM_EXERCISE_DEFINITION_INPUTS: Omit<SystemExerciseDefinitionSeed, 'loadInputMode' | 'bodyweightContribution'>[] = [
   { id: 'seed_barbell_bench_press', name: 'Barbell Bench Press' },
   { id: 'seed_incline_dumbbell_press', name: 'Incline Dumbbell Press' },
   { id: 'seed_seated_dumbbell_overhead_press', name: 'Seated Dumbbell Overhead Press' },
@@ -860,7 +861,7 @@ export const SYSTEM_EXERCISE_DEFINITION_SEEDS: SystemExerciseDefinitionSeed[] =
   SYSTEM_EXERCISE_DEFINITION_INPUTS.filter((exercise) => M19_STARTER_EXERCISE_KEEP_IDS.has(exercise.id)).map(
     (exercise) => ({
       ...exercise,
-      ...(BODYWEIGHT_SEED_RULES[exercise.id] ?? CONVENTIONAL_LOAD_RULES),
+      bodyweightContribution: BODYWEIGHT_SEED_CONTRIBUTIONS[exercise.id] ?? 0,
       name: M19_STARTER_EXERCISE_NAME_OVERRIDES[exercise.id] ?? exercise.name,
       loadInputMode: PER_SIDE_LOAD_SEED_IDS.has(exercise.id) ? 'per_side_load' : 'total_load',
     })

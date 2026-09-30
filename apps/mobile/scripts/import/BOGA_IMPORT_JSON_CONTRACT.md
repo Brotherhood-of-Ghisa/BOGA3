@@ -6,16 +6,7 @@ rows into BOGA SQLite.
 
 ## Schema
 
-Currently implemented schema identifiers (GymBook digestion remains v1 until
-its source meaning is explicitly reviewed):
-
-```text
-boga.session-import.v1
-boga.session-import.v2
-boga.session-import.v3
-```
-
-Accepted replacement identifier (implementation pending; not yet importer-ready):
+The importer and GymBook digester emit the clean package identifier:
 
 ```text
 boga.session-import.v4
@@ -49,7 +40,9 @@ After reviewing the dry-run entity counts, write mode requires
 
 ```json
 {
-  "schema": "boga.session-import.v1",
+  "schema": "boga.session-import.v4",
+  "bodyweightCalculationsEnabled": false,
+  "bodyWeightMeasurements": [],
   "generatedAt": "2026-06-04T12:00:00.000Z",
   "target": {
     "importingProfileLabel": "Human-readable local profile/user",
@@ -162,9 +155,7 @@ Non-empty source notes are preserved under set `source.note` and summarized in
   pass `none` for buckets that should produce no gym assignment.
 
 
-## V4 optional bodyweight calculations and kg-only values
-
-> **Status: accepted clean package contract; implementation pending.**
+## Optional bodyweight calculations and kg-only values
 
 V4 is the clean export/import shape. The serializer
 `serializeBogaSessionImportPackage` validates before export; local and
@@ -185,23 +176,16 @@ V4 is the clean export/import shape. The serializer
   `plannedRepsValue`, `plannedSetType` and `performanceStatus`; an absent plan
   uses nulls. Status is null (confirmed), `planned`, or `unperformed`; import
   never implicitly confirms a planned/unperformed row.
-- Unit, external-mode, movement-standard, loading-method, session-bodyweight and
-  hydration/compatibility keys are invalid in a V4-labelled package.
+- Objects accept only the documented keys; unknown fields make the package
+  invalid instead of being ignored.
 
-The importer may explicitly upgrade older supported packages. V1/GymBook kg
-weights remain kg with contribution zero. Older packages default the imported
-private preference off. V2/V3 valid lb actual/planned values
-and readings convert with exactly `1 lb = 0.45359237 kg` and no display rounding;
-stored coefficients rename to contributions. Removed descriptive/mode/session
-fields do not survive the upgrade, and malformed legacy numeric values remain
-invalid rather than becoming plausible kg. Adding newer keys to an older-labelled
-package is rejected instead of silently discarding them.
+The live importer accepts this schema only and contains no alternate decoding
+branch.
 
-Generated exercise/session IDs use the original v1 identity namespace for all
-supported versions. Reimport does not duplicate a workout merely because its package
-schema changed; local already-imported rows are left unchanged. Reading IDs use
-a deterministic import namespace.
+Generated exercise/session IDs deliberately retain the original stable identity
+salt. That string is an identity namespace, not an accepted package schema, and
+prevents an already imported workout from being duplicated after an offline
+conversion. Reading IDs use a deterministic import namespace.
 
-Once V4 is implemented, remote imports send `x-boga-sync-protocol: 3`; obsolete
-clients are rejected before writes. Until then the operational importer remains
-on the pre-cutover protocol and V1–V3 contract.
+Remote imports send `x-boga-sync-protocol: 3`; mismatched protocol requests are
+rejected before writes.

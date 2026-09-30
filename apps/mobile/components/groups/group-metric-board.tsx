@@ -5,7 +5,7 @@ import { Text, FlatList, RefreshControl, View } from 'react-native';
 import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getGroupMetricBoard } from '@/src/groups/api';
-import { isGroupMetric, metricsForGroupRules, type GroupMetric } from '@/src/groups/metric-contract';
+import { GROUP_METRICS, isGroupMetric, type GroupMetric } from '@/src/groups/metric-contract';
 import { buildGroupMetricRow, describeGroupRules, GROUP_METRIC_SHORT_LABELS, GROUP_METRIC_VIEW_LABELS } from '@/src/groups/metric-view-model';
 import type { GroupMetricBoardRowWire, GroupMetricBoardWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 import { GroupBoardRow } from './group-board-row';
@@ -26,7 +26,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   userId: string; groupId: string; exercise: GroupMetricExerciseWire; initialMetric: string | null; initialScope: GroupBoardScope;
 }) {
   const router = useRouter();
-  const allowed = metricsForGroupRules({ bodyweightCoefficient: initialExercise.bodyweight_coefficient });
+  const allowed = GROUP_METRICS;
   const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);
   const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : initialExercise.default_metric;
   const [scope, setScope] = useState(initialScope);
@@ -79,10 +79,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
       value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
       onChange={value => selectView(metric, value)} testIDPrefix="group-board-scope" />
-    {metric === 'bodyweight_reps' ? <Text allowFontScaling={false} style={textStyles.muted}>Confirmed reps with zero added weight. Body weight may be missing.</Text>
-      : <Text allowFontScaling={false} style={textStyles.muted}>{exercise.bodyweight_coefficient > 0
-        ? 'Strength estimates use the saved session body weight. Missing or incompatible performances are not ranked.'
-        : 'Weight and 1RM use the entered external load under the group’s declared weight convention.'}</Text>}
+    <Text allowFontScaling={false} style={textStyles.muted}>Scores use the group’s current rules. Ineligible performances are omitted.</Text>
     {board.offline ? <GroupOfflineBanner lastUpdatedAtMs={board.loadedAtMs} /> : null}
     {error && board.firstPage ? <GroupInlineError error={error} onRetry={onRefresh} testID="group-board-inline-error" /> : null}
     {staleCursor ? <GroupStateView title="The board changed" body="Refresh to load one consistent rules revision."
@@ -92,7 +89,6 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
     : rebuilding ? <GroupStateView title="Recalculating under the new rules" body="The whole board will appear together."
         actionLabel="Refresh board" onAction={onRefresh} testID="group-board-rebuilding" />
     : <GroupStateView title={scope === 'certified' ? 'No certified sets yet' : 'No eligible sets yet'}
-        body={scope === 'all' ? 'Check the movement, loading method and saved body weight in the linked session.' : undefined}
         actionLabel={scope === 'certified' ? 'See all sets' : undefined} onAction={() => selectView(metric, 'all')}
         actionTestID="group-board-see-all-button" testID="group-board-empty" />;
   return <>

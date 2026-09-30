@@ -68,7 +68,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"
@@ -445,9 +445,9 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and (.data.workouts[0].completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
   ' >/dev/null || fail "recent workout response is not compact and explicit"
 
-# M27: exercise and workout projections share the mobile effective-load kernel.
-# Updates use the owner's database identity, as ordinary sync writes do.
-# Keep ownership triggers active throughout every parity vector.
+# Exercise and workout projections share the mobile load-calculation kernel.
+# Updates use the owner's database identity, as ordinary sync writes do, while
+# ownership triggers remain active throughout every parity vector.
 update_training_fixture() {
   run_psql "begin;
     select set_config('request.jwt.claims', json_build_object('sub', '${USER_A_UUID}', 'role', 'authenticated')::text, true);
@@ -465,140 +465,116 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "dated_added_load_v3"
-  and .data.exercise.bodyweight_coefficient == 0
+  .data.metric_revision == "bodyweight_optional_v1"
+  and (.data.exercise | has("bodyweight_contribution") | not)
+  and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.complete == true
   and .data.personal_records.top_weight.value == 105
   and .data.recent_performances[0].sets[0].load.unit == "kg"
-  and .data.personal_records.estimated_one_rep_max.basis == "entered_load"
+  and .data.recent_performances[0].sets[0].calculated_load.unit == "kg"
 ' 'conventional fields retain numeric values and kg units'
 
-echo "[agent-api-test] verifying saved B, added load and bodyweight-only parity"
+echo "[agent-api-test] verifying the private preference, contribution and dated reading"
 update_training_fixture "
-  update app_public.exercise_definitions set bodyweight_coefficient=1,
-    movement_standard='strict_pull_up',loading_method='free_weight'
+  insert into app_public.user_settings
+    (owner_user_id,id,bodyweight_calculations_enabled,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'settings',true,${NOW_MS},${NOW_MS},${NOW_MS})
+    on conflict(owner_user_id,id) do update set bodyweight_calculations_enabled=true,
+      updated_at=excluded.updated_at,client_updated_at_ms=excluded.client_updated_at_ms;
+  update app_public.exercise_definitions set bodyweight_contribution=1
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
   insert into app_public.body_weight_measurements
-    (owner_user_id,id,weight_value,weight_unit,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-asof','80','kg',80,
+    (owner_user_id,id,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-asof',80,
       ${STARTED_MS},${NOW_MS},${NOW_MS},${NOW_MS});
-  update app_public.exercise_sets set weight_value='20',reps_value='8',external_load_mode='added'
+  update app_public.exercise_sets set weight_value='20',reps_value='8'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
-  update app_public.exercise_sets set weight_value='',reps_value='8',external_load_mode='added'
+  update app_public.exercise_sets set weight_value='',reps_value='8'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A2}';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.exercise.bodyweight_coefficient == 1
+  .data.exercise.bodyweight_contribution == 1
   and .data.recent_performances[0].session_body_weight.value == 80
+  and .data.recent_performances[0].session_body_weight.status == "known"
   and .data.recent_performances[0].volume.value == 1440
-  and .data.recent_performances[0].sets[0].entered_load.value == 20
-  and .data.recent_performances[0].sets[0].effective_load.value == 100
-  and .data.recent_performances[0].sets[1].entered_load.raw_value == ""
-  and .data.recent_performances[0].sets[1].entered_load.value == 0
-  and .data.recent_performances[0].sets[1].effective_load.value == 80
-  and .data.personal_records.estimated_one_rep_max.basis == "added_load"
+  and .data.recent_performances[0].sets[0].load.value == 20
+  and .data.recent_performances[0].sets[0].calculated_load.value == 100
+  and .data.recent_performances[0].sets[1].load.value == 0
+  and .data.recent_performances[0].sets[1].calculated_load.value == 80
   and .data.personal_records.estimated_one_rep_max.value > 47.6
   and .data.personal_records.estimated_one_rep_max.value < 47.8
   and .data.personal_records.top_weight.value == 20
-' 'bodyweight and added values match app fixtures including canonical blank zero'
+' 'bodyweight-aware values match app fixtures including canonical blank zero'
 agent_get "workouts/recent?limit=1"
 assert_training_payload '.data.workouts[0].total_volume.value == 1440
   and .data.workouts[0].total_volume.complete == true
   and .data.workouts[0].completed_set_count == 2
-  and .data.workouts[0].session_body_weight.source == "reading"
-  and .data.workouts[0].exercises[0].load_rules.bodyweight_coefficient == 1
+  and .data.workouts[0].session_body_weight.status == "known"
+  and .data.workouts[0].exercises[0].bodyweight_contribution == 1
 ' 'workout and exercise totals agree'
 
-echo "[agent-api-test] verifying legacy mode values count as added weight with raw units"
+echo "[agent-api-test] verifying per-side adjustment and current personal contribution"
 update_training_fixture "
-  update app_public.exercise_sets set weight_unit='lb',external_load_mode='assistance'
+  update app_public.exercise_definitions set bodyweight_contribution=0.7,load_input_mode='per_side_load'
+    where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
+  update app_public.exercise_sets set weight_value='10',performance_status=null
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
   update app_public.exercise_sets set performance_status='unperformed'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A2}';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '
-  .data.recent_performances[0].sets[0].entered_load.unit == "lb"
-  and .data.recent_performances[0].sets[0].entered_load.mode == "added"
-  and .data.recent_performances[0].sets[0].load.unit == "kg"
-  and ((.data.recent_performances[0].sets[0].load.value - 9.0718474) | fabs) < 0.000001
-  and ((.data.recent_performances[0].volume.value - 712.5747792) | fabs) < 0.000001
-  and ((.data.personal_records.top_weight.value - 9.0718474) | fabs) < 0.000001
-' 'legacy mode counts the saved numeric weight as added pounds'
-
-echo "[agent-api-test] verifying per-side adjustment and current personal coefficient"
-update_training_fixture "
-  update app_public.exercise_definitions set bodyweight_coefficient=0.7,load_input_mode='per_side_load'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
-  update app_public.exercise_sets set weight_unit='kg',weight_value='10',external_load_mode='added'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
-" >/dev/null
-agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].sets[0].effective_load.value == 76
+assert_training_payload '.data.recent_performances[0].sets[0].calculated_load.value == 76
   and .data.recent_performances[0].volume.value == 608
-  and .data.recent_performances[0].sets[0].entered_load.value == 10
+  and .data.recent_performances[0].sets[0].load.value == 10
 ' 'body contribution is counted once before the per-side external adjustment'
 
-echo "[agent-api-test] verifying unknown B, partial volume and independent performed counts"
+echo "[agent-api-test] verifying missing-reading personal fallback"
 update_training_fixture "
   update app_public.body_weight_measurements set deleted_at=${NOW_MS}
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
-  insert into app_public.session_exercises
-    (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
-     created_at,updated_at,client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid,'${BLOCK_A}-conventional','${SESSION_A}','${EXERCISE_A2}',1,
-      'Conventional',${NOW_MS},${NOW_MS},${NOW_MS});
-  insert into app_public.exercise_sets
-    (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
-     created_at,updated_at,client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid,'${SET_A1}-conventional','${BLOCK_A}-conventional',0,
-      '50','10','working',${NOW_MS},${NOW_MS},${NOW_MS});
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].session_body_weight.status == "missing"
-  and .data.recent_performances[0].volume.value == null
-  and .data.recent_performances[0].volume.complete == false
+  and .data.recent_performances[0].volume.value == 160
+  and .data.recent_performances[0].volume.complete == true
   and .data.recent_performances[0].volume.eligible_set_count == 1
-  and .data.recent_performances[0].sets[0].effective_load.reason == "body_weight_missing"
-  and .data.personal_records.estimated_one_rep_max == null
-  and .data.personal_records.max_session_volume == null
-  and .data.personal_records.excluded_incomplete_volume_sessions == 1
-  and .data.volume_series[0].value == null
-' 'missing B withholds dependent metrics without erasing performed sets'
+  and .data.recent_performances[0].sets[0].calculated_load.value == 20
+  and .data.personal_records.estimated_one_rep_max != null
+  and .data.personal_records.excluded_incomplete_volume_sessions == 0
+' 'missing B uses the personal zero fallback without erasing performed sets'
 agent_get "workouts/recent?limit=1"
-assert_training_payload '.data.workouts[0].completed_set_count == 2
-  and .data.workouts[0].total_volume.value == null
-  and .data.workouts[0].total_volume.known_subtotal == 500
+assert_training_payload '.data.workouts[0].completed_set_count == 1
+  and .data.workouts[0].total_volume.value == 160
+  and .data.workouts[0].total_volume.known_subtotal == 160
   and .data.workouts[0].total_volume.known_set_count == 1
-  and .data.workouts[0].total_volume.eligible_set_count == 2
-  and .data.workouts[0].total_volume.complete == false
-' 'partial known volume is explicitly incomplete across exercises'
+  and .data.workouts[0].total_volume.eligible_set_count == 1
+  and .data.workouts[0].total_volume.complete == true
+' 'workout totals use the same missing-reading fallback'
 
-echo "[agent-api-test] verifying dated readings, malformed values and later readings"
+echo "[agent-api-test] verifying dated readings, correction and future exclusion"
 update_training_fixture "
-  update app_public.exercise_definitions set bodyweight_coefficient=1,load_input_mode='total_load'
+  update app_public.exercise_definitions set bodyweight_contribution=1,load_input_mode='total_load'
     where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
-  update app_public.exercise_sets set weight_value='20'
+  update app_public.exercise_sets set weight_value='20',performance_status=null
     where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
   update app_public.body_weight_measurements set deleted_at=null
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
   insert into app_public.body_weight_measurements
-    (owner_user_id,id,weight_value,weight_unit,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-reading','90','kg',90,
+    (owner_user_id,id,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-reading',90,
       ${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].session_body_weight.estimated == false
-  and .data.recent_performances[0].session_body_weight.value == 80
-  and .data.recent_performances[0].session_body_weight.source == "reading"
+assert_training_payload '.data.recent_performances[0].session_body_weight.value == 80
+  and .data.recent_performances[0].session_body_weight.status == "known"
   and (.data.recent_performances[0].session_body_weight.measured_at | endswith("Z"))
   and .data.recent_performances[0].volume.value == 800
-  and (tostring | contains("weight_measurements") | not)
+  and (tostring | contains("measurement_id") | not)
 ' 'dated B is identifiable and a later reading does not replace it'
 update_training_fixture "
-  update app_public.body_weight_measurements set weight_value='95',weight_kg=95,deleted_at=${NOW_MS}
+  update app_public.body_weight_measurements set weight_kg=95,deleted_at=${NOW_MS}
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-reading';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
@@ -606,44 +582,27 @@ assert_training_payload '.data.recent_performances[0].volume.value == 800
   and .data.recent_performances[0].session_body_weight.value == 80
 ' 'editing or deleting a later reading leaves earlier history unchanged'
 update_training_fixture "
-  update app_public.body_weight_measurements set weight_kg=82,weight_value='82'
+  update app_public.body_weight_measurements set weight_kg=82
     where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '.data.recent_performances[0].volume.value == 816
-  and .data.recent_performances[0].session_body_weight.estimated == false
+  and .data.recent_performances[0].session_body_weight.value == 82
 ' 'editing an applicable reading refreshes metrics'
-update_training_fixture "
-  update app_public.body_weight_measurements set weight_value='bad'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
-" >/dev/null
-agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].volume.value == null
-  and .data.recent_performances[0].session_body_weight.status == "invalid"
-  and .data.recent_performances[0].session_body_weight.value == null
-' 'positive B with malformed provenance cannot establish valid context'
 
-echo "[agent-api-test] verifying all old mode tokens follow the added-weight rule"
+echo "[agent-api-test] verifying preference off returns the ordinary contract"
 update_training_fixture "
-  update app_public.body_weight_measurements set weight_value='82'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
-  update app_public.exercise_sets set external_load_mode='unquantified_assistance'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
+  update app_public.user_settings set bodyweight_calculations_enabled=false,
+    updated_at=${NOW_MS}+1,client_updated_at_ms=${NOW_MS}+1
+    where owner_user_id='${USER_A_UUID}'::uuid and id='settings';
 " >/dev/null
 agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].sets[0].effective_load.status == "known"
-  and .data.recent_performances[0].sets[0].entered_load.mode == "added"
-  and .data.recent_performances[0].volume.value > 0
-' 'old band tag no longer changes the numeric added weight'
-update_training_fixture "
-  update app_public.exercise_sets set external_load_mode=null,weight_value='0'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
-" >/dev/null
-agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].sets[0].effective_load.status == "known"
-  and .data.recent_performances[0].sets[0].entered_load.value == 0
-  and .data.recent_performances[0].volume.value > 0
-' 'legacy zero means no added weight'
+assert_training_payload '(.data.exercise | has("bodyweight_contribution") | not)
+  and (.data.recent_performances[0] | has("session_body_weight") | not)
+  and .data.recent_performances[0].volume.value == 160
+  and .data.recent_performances[0].sets[0].load.value == 20
+  and .data.recent_performances[0].sets[0].calculated_load.value == 20
+' 'disabled preference returns ordinary Weight math without reading context'
 echo "[agent-api-test] PASS: bodyweight projection parity and completeness"
 
 

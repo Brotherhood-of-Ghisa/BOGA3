@@ -137,6 +137,10 @@ const { shareAsync: mockShareAsync } = jest.requireMock('expo-sharing') as {
 
 const COMPLETED_SESSION_DETAIL_FIXTURE: CompletedSessionDetailRecord = {
   id: 'completed-under-test',
+  bodyWeightKg: null,
+  bodyWeightSource: null,
+  bodyWeightMeasurementId: null,
+  bodyWeightMeasuredAt: null,
   startedAt: '2026-02-20T16:00:00.000Z',
   completedAt: '2026-02-20T16:58:00.000Z',
   durationDisplay: '58m',

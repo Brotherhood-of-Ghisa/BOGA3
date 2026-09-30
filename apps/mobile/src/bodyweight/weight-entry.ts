@@ -1,24 +1,19 @@
-import { isValidSessionWeight, type SessionWeightSnapshot } from './snapshot';
 import { parseSetWeight } from '@/src/exercise-calculations';
-import { isWeightUnit, weightToKg, type WeightUnit } from '@/src/exercise-calculations/effective-load';
 import { formatCurrentDateTime, parseSessionDateTime } from '@/src/session-recorder/session-model';
 
-export { isValidSessionWeight, type SessionWeightSnapshot } from './snapshot';
+export { isValidSessionWeight } from './as-of';
 
-export type WeightEntry = { weightValue: string; weightUnit: string };
+export type WeightEntry = { weightValue: string };
 export type WeightReadingInput = WeightEntry & { id?: string; measuredAt: Date; now?: Date };
 export { EMPTY_SESSION_WEIGHT, isValidBodyWeightReading } from './as-of';
 
 export const validateBodyWeight = (input: WeightEntry): {
-  weightValue: string; weightUnit: WeightUnit; weightKg: number;
+  weightKg: number;
 } => {
   const weightValue = input.weightValue.trim();
-  const parsed = parseSetWeight(weightValue);
-  if (!isWeightUnit(input.weightUnit)) throw new Error('Choose kg or lb.');
-  if (parsed === null || parsed <= 0) throw new Error('Enter a weight greater than zero.');
-  const weightKg = weightToKg(parsed, input.weightUnit);
-  if (weightKg === null || !Number.isFinite(weightKg) || weightKg <= 0) throw new Error('Enter a valid positive weight.');
-  return { weightValue, weightUnit: input.weightUnit, weightKg };
+  const weightKg = parseSetWeight(weightValue);
+  if (weightKg === null || weightKg <= 0) throw new Error('Enter a weight greater than zero.');
+  return { weightKg };
 };
 
 export const requireDate = (date: Date, label: string): void => {
@@ -33,11 +28,4 @@ export function resolveMeasurementDate(text: string, original: Date, now = new D
   requireDate(date, 'measurement date');
   if (date.getTime() > now.getTime()) throw new Error('The measurement date cannot be in the future.');
   return date;
-}
-
-
-export function sessionWeightSourceLabel(snapshot: Partial<SessionWeightSnapshot>): string {
-  if (!isValidSessionWeight(snapshot)) return snapshot.bodyWeightMeasurementId
-    ? 'The applicable reading needs review.' : 'No reading on or before this session';
-  return `Reading from ${formatCurrentDateTime(snapshot.bodyWeightMeasuredAt!)}`;
 }

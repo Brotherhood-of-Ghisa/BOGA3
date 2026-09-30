@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FormField, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, FormField, SegmentedControl, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import {
   GROUP_DESCRIPTION_MAX_LENGTH,
   GROUP_NAME_MAX_LENGTH,
@@ -14,12 +14,13 @@ import { GroupWriteNotice } from './write-notice';
 type GroupDetailsFormProps = {
   initialName?: string;
   initialDescription?: string | null;
+  initialBodyweightCalculationsEnabled?: boolean;
   submitLabel: string;
   pendingLabel: string;
   pending: boolean;
   /** The failed write's message (nothing changed), shown above the submit button. */
   errorMessage: string | null;
-  onSubmit: (details: GroupDetailsInput) => void;
+  onSubmit: (details: GroupDetailsInput & { bodyweightCalculationsEnabled?: boolean }) => void;
 };
 
 /**
@@ -31,6 +32,7 @@ type GroupDetailsFormProps = {
 export function GroupDetailsForm({
   initialName = '',
   initialDescription = null,
+  initialBodyweightCalculationsEnabled,
   submitLabel,
   pendingLabel,
   pending,
@@ -39,12 +41,16 @@ export function GroupDetailsForm({
 }: GroupDetailsFormProps) {
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription ?? '');
+  const [bodyweightCalculationsEnabled, setBodyweightCalculationsEnabled] = useState(
+    initialBodyweightCalculationsEnabled ?? false,
+  );
   const [showErrors, setShowErrors] = useState(false);
   const validation = validateGroupDetails(name, description);
 
   const submit = () => {
     setShowErrors(true);
-    if (validation.valid) onSubmit(validation.value);
+    if (validation.valid) onSubmit({ ...validation.value,
+      ...(initialBodyweightCalculationsEnabled === undefined ? {} : { bodyweightCalculationsEnabled }) });
   };
 
   const nameError = showErrors ? validation.errors.name : undefined;
@@ -83,6 +89,19 @@ export function GroupDetailsForm({
           {`${description.trim().length}/${GROUP_DESCRIPTION_MAX_LENGTH}`}
         </Text>
       </View>
+      {initialBodyweightCalculationsEnabled !== undefined ? (
+        <View style={styles.field}>
+          <Text allowFontScaling={false} style={styles.sectionLabel}>Bodyweight calculations</Text>
+          <SegmentedControl
+            accessibilityLabel="Bodyweight calculations"
+            disabled={pending}
+            onChange={(value: 'off' | 'on') => setBodyweightCalculationsEnabled(value === 'on')}
+            options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'On' }]}
+            testIDPrefix="group-form-bodyweight-calculations"
+            value={bodyweightCalculationsEnabled ? 'on' : 'off'}
+          />
+        </View>
+      ) : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-form-error" tone="error" /> : null}
       <ActionButton
         disabled={pending}
@@ -110,5 +129,14 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.inkMuted,
+  },
+  sectionLabel: {
+    color: uiRoles.inkMuted,
+    fontFamily: uiFonts.display.family,
+    fontSize: uiTypography.size.xxs,
+    fontWeight: '700',
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    lineHeight: uiTypography.lineHeight.xxs,
+    textTransform: 'uppercase',
   },
 });

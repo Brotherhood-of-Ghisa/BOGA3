@@ -473,14 +473,16 @@ function quoteIdent(name: string): string {
  * (docs/specs/tech/sync-v2-server-contract.md). The timestamp_ms discriminator
  * on the client is reflected as `integer` by the SQLite catalog; bigint on the
  * server is `int8`. The narrow map accepts client `integer` against either
- * `int4` or `int8` (which is exactly the §A.7.3 row). Default-expression
- * equality is NOT compared.
+ * `int4` or `int8`, plus the one synced SQLite boolean stored as integer.
+ * Default-expression equality is NOT compared.
  */
-function isTypeCompatible(sqliteType: string, udtName: string): boolean {
+function isTypeCompatible(sqliteType: string, udtName: string, entity: string, wireName: string): boolean {
   const c = sqliteType.toLowerCase();
   const s = udtName.toLowerCase();
   if (c === 'text' && s === 'text') return true;
   if (c === 'integer' && (s === 'int4' || s === 'int8')) return true;
+  if (c === 'integer' && s === 'bool' && entity === 'user_settings'
+    && wireName === 'bodyweight_calculations_enabled') return true;
   if (c === 'real' && (s === 'float8' || s === 'numeric')) return true;
   return false;
 }
@@ -919,11 +921,11 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
     if (exempt.has(wireName)) continue;
     const pgCol = pgColByName.get(wireName);
     if (pgCol) {
-      if (!isTypeCompatible(col.type, pgCol.udt_name)) {
+      if (!isTypeCompatible(col.type, pgCol.udt_name, entity, wireName)) {
         addError(
           findings,
           `${entity}.${wireName}: type mismatch — client ${col.type} vs server ${pgCol.udt_name} (udt). ` +
-            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric (docs/specs/tech/sync-v2-server-contract.md §A.7.3).`
+            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric; user_settings.bodyweight_calculations_enabled integer↔bool (docs/specs/tech/sync-v2-server-contract.md §A.7.3).`
         );
       }
       continue;

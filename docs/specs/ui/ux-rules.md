@@ -14,18 +14,9 @@ Document app-specific UI semantics and guardrails for the current mobile app.
 - Navigation contract: `docs/specs/ui/navigation-contract.md`
 - Components catalog: `docs/specs/ui/components-catalog.md`
 
-## Status legend
+## Current behavior
 
-- `Current behavior (authoritative)`: verified against current app code.
-- `Pending / planned`: approved direction or audit-derived target not fully implemented yet.
-
-## Current behavior and accepted replacements
-
-Sections explicitly labelled `accepted replacement` are the approved target for
-the implementation task and supersede current bodyweight behavior; the remaining
-sections describe the current app.
-
-### Accepted replacement: optional bodyweight calculations
+### Optional bodyweight calculations
 
 Settings owns a `Bodyweight calculations` row with an always-visible On/Off
 control and a separate, always-visible `Body weight log` row beneath it.
@@ -34,18 +25,17 @@ deleting them or any readings. `Body weight log` opens the kg-only dated history
 with add/edit/delete, inline validation and retryable writes; reading management
 never depends on whether calculations are enabled.
 
-There is no bodyweight card, value, source, prompt, warning, entry link or dialog
-on a session/workout surface. Personal calculations select the latest valid
-reading at/before the exact session start internally. Missing reading silently
-uses zero; reading/value/date/delete/restore and session-start changes refresh
-derived views without rewriting raw sets.
+Session/workout surfaces keep the ordinary session facts and logging controls.
+Personal calculations select the latest valid reading at/before the exact
+session start internally. Missing reading silently uses zero;
+reading/value/date/delete/restore and session-start changes refresh derived
+views without rewriting raw sets.
 
 While the private preference is enabled, the personal exercise editor adds only
 `Bodyweight contribution (%)` with decimal 0–100 validation and a short hint.
 When disabled, it hides the field and preserves its value. The in-place logger
-keeps one kg `Weight` field, reps, effort and confirmation. It never exposes a
-unit selector, movement/loading fields, calculation breakdown or bodyweight-
-specific label. Rows and analytics say `Weight`, `Top weight`, `1RM` and
+keeps one kg `Weight` field, reps, effort and confirmation; bodyweight arithmetic
+stays internal. Rows and analytics say `Weight`, `Top weight`, `1RM` and
 `Volume`; missing personal context never makes them unavailable. Valid zero
 renders as `0` and earns no record state.
 
@@ -697,7 +687,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 13. Full boards and their history are online-only reads, each drawn as one `Card` of rows (the board's under its `Weight` | `1RM` and `Certified` | `All` `SegmentedControl`s and a `History` text button): never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
 14. Certification (M25-T10). A record card and a full-board row open the same row detail `Sheet` (08 pattern 11), titled with the lifter and the exercise, with no Close: the backdrop dismisses it. Its figures (the set, the 1RM) are `record` Plex Mono `Stat`s; `Certify` is its one `accent`, `Remove my certification` / `Cancel certification` are `danger` rows, and `View full session` is a row with a chevron. `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
 
-#### Optional bodyweight-aware group calculations (accepted replacement; implementation pending)
+#### Optional bodyweight-aware group calculations
 
 The group settings surface shows the admin-controlled `Bodyweight calculations`
 toggle. While enabled, the group exercise editor shows only `Bodyweight
@@ -818,13 +808,7 @@ unchanged. What differs is presentation:
 2. If the change is route-path/param/transition related, update `navigation-contract.md` in the same task.
 3. If the change is component/primitives API related, update `components-catalog.md` in the same task.
 
-## Pending / planned (not current behavior)
-
-The optional bodyweight-calculation replacement described above is accepted but
-not yet implemented. Its integrated UI requires the human hold point in
-`design-targets/bodyweight.md` before aggregate closeout.
-
-## Personal bodyweight analytics and loading estimates
+## Personal bodyweight analytics
 
 Personal figures use the same `Top weight`, `1RM` and `Volume` labels for every
 exercise. Set rows show only entered kg Weight/reps/effort; records never expose
@@ -837,8 +821,3 @@ Stats, heatmaps, records, completion and share projections. Raw logged rows and
 Top weight do not change. Invalid raw input or arithmetic overflow may still
 produce the normal unavailable/retry treatment; read failures never fabricate
 records.
-
-If the Loading estimate sheet remains, it is kg-only, uses Weight/1RM language
-and the same private policy, and does not expose bodyweight arithmetic or reading
-provenance. Inputs clear old results; Done/dismiss writes no history. The result
-is a transient estimate, not a saved award.

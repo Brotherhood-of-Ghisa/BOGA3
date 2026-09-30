@@ -1,13 +1,9 @@
-# Optional bodyweight calculations — accepted implementation target
+# Optional bodyweight calculations
 
-**Status: repo-native brief accepted; implementation and hands-on acceptance
-pending.** Existing reference captures govern the established visual recipes,
-not their retired bodyweight copy or controls.
-
-This target supersedes the session bodyweight card/link, kg/lb selectors,
-movement-standard/loading-method fields, bodyweight-specific metric boards,
-calculation breakdowns and `Added`, `External weight` or `Effective load`
-vocabulary. No external design service is required.
+**Status: current.** Existing reference captures govern
+the established visual recipes. Bodyweight contribution changes calculation
+inputs without introducing a separate visual language. No external design
+service is required.
 
 ## Target and authority
 
@@ -59,13 +55,12 @@ vocabulary. No external design service is required.
 ## Reference captures
 
 These committed captures preserve layout, typography, spacing, list/card and
-logger recipes. Their old labels, unit controls, session bodyweight surfaces and
-group metric choices are explicitly not part of this target.
+logger recipes. The requirements above govern bodyweight behavior and copy.
 
 | Reference | Recipe retained |
 | --- | --- |
 | [Settings](bodyweight/settings-reference.png) | Settings row rhythm and section hierarchy |
-| [View Session](bodyweight/session-reference.png) | Session facts/cards after the bodyweight card is removed |
+| [View Session](bodyweight/session-reference.png) | Session facts/card hierarchy |
 | [Exercise editor](bodyweight/editor-reference.png) | Form spacing and inline validation |
 | [Logger](bodyweight/logger-reference.png) | In-place Weight/reps/effort/confirmation structure |
 | [Group board](bodyweight/board-reference.png) | Existing Weight/1RM board, podium and list hierarchy |

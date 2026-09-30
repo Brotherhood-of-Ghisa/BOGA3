@@ -542,18 +542,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
     `ios-session-view` lane
 
-### Bodyweight components (current pre-cutover UI)
-
-- `WeightEntrySheet`, `BodyWeightScreen` and the Settings bodyweight row manage
-  dated readings in the current unit-aware contract.
-- `SessionBodyWeight` is still rendered by session, exercise, completion and
-  shared-session surfaces and can link to or open reading entry.
-- Exercise editing, logger metrics and group surfaces still implement the
-  pre-cutover movement/loading and bodyweight-specific vocabulary. The accepted
-  replacement below does not describe current source until its implementation
-  lands.
-
-### Optional bodyweight settings and readings (accepted replacement; implementation pending)
+### Optional bodyweight settings and readings
 
 - `components/bodyweight/weight-entry-sheet.tsx`: `WeightEntrySheet` uses a
   keyboard-avoiding, scrollable `Sheet` and kg `FormField`. `initial` supplies
@@ -565,25 +554,25 @@ Brief entrypoint inventory of the current reusable UI component set.
   Reopening resets cancelled input to the chosen reading.
   TestIDs: `weight-entry-sheet`, `weight-entry-value`,
   `weight-entry-date`, `weight-entry-save`, `weight-entry-delete`.
-- `BodyWeightSettingsRow` will compose a calculation row with an On/Off control
+- `BodyWeightSettingsRow` composes a calculation row with an On/Off control
   and a separate, always-visible `Body weight log` row. It reads/writes the
   synced private preference and navigates to `/body-weight` independently of
-  that preference.
-- `BodyWeightScreen` will compose current reading, Add and history with edit/delete;
+  that preference. A failed preference write restores the stored state and
+  presents an inline retryable error.
+- `BodyWeightScreen` composes current reading, Add and history with edit/delete;
   history and saves stay in the owner-private local/sync domain. Covered by
   `bodyweight-entry.test.ts` and `bodyweight-screen.test.tsx`; `ios-sync-e2e`
   drives the real weight editor on device.
-- `SessionBodyWeight` will be removed. No reusable session/logger component may show
-  or edit the selected reading.
+- No reusable session/logger component shows or edits the selected reading.
 
-### Optional contribution and ordinary logger (accepted replacement; implementation pending)
+### Optional contribution and ordinary logger
 
-- `ExerciseCoreFields` will conditionally render one
+- `ExerciseCoreFields` conditionally renders one
   `Bodyweight contribution (%)` field when the owning private/group preference
   is enabled. It preserves hidden values and owns decimal 0–100 inline validation.
-- `SetLogger` will keep one kg `Weight` field, reps, effort and confirmation. It
+- `SetLogger` keeps one kg `Weight` field, reps, effort and confirmation. It
   receives derived 1RM/Volume but no reading/source/breakdown props.
-- Pure/data coverage: `bodyweight-added-load.test.ts`, `bodyweight-import.test.ts`;
+- Pure/data coverage: `bodyweight-contribution.test.ts`, `bodyweight-import.test.ts`;
   interaction coverage: `bodyweight-logging-ui.test.tsx`. The focused native
   bodyweight flow covers reading entry and the changed RM/volume display.
 
@@ -615,12 +604,6 @@ Brief entrypoint inventory of the current reusable UI component set.
   - Reason: they are route composition/test helpers, not reusable UI building blocks
   - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from Progress and the preserved `/stats-history` path); the component remains a route-level shell, not a reusable primitive
 
-## Pending / planned (not current components)
-
-The optional-bodyweight replacement sections in this catalog are pending: they
-change the Settings row and exercise editor, simplify the logger contract and remove
-`SessionBodyWeight`. No new generic primitive is currently planned.
-
 The retired audit's candidate primitives (audit deleted 2026-06-10; in git
 history) all shipped in the design language: `IconActionButton` → `IconButton`,
 `EmptyState` / state panels → `StatePanel`, `ScreenContainer` /
@@ -629,35 +612,33 @@ history) all shipped in the design language: `IconActionButton` → `IconButton`
 `ListRow` with `onPress`. A new primitive is built when a screen asks for it,
 from the tokens in entry 1.
 
-### Personal load projections and calculator (accepted replacement; implementation pending)
+### Personal load projections
 
-- `LoadingEstimateSheet`, if retained, will be a stable kg-only `Sheet` using Weight/1RM
-  vocabulary and the private policy without exposing readings or arithmetic.
-- `SetSummaryRow` will use one Weight/1RM/Volume layout for every exercise; zero is a
+- `SetSummaryRow` uses one Weight/1RM/Volume layout for every exercise; zero is a
   numeric figure and no bodyweight context is rendered.
-- `RecordsPanel` will keep raw Top weight independent from derived 1RM/Volume.
-- Stats and `HistorySheet` will use the same Weight/1RM/Volume labels; missing personal
+- `RecordsPanel` keeps raw Top weight independent from derived 1RM/Volume.
+- Stats and `HistorySheet` use the same Weight/1RM/Volume labels; missing personal
   reading never creates an unavailable/incomplete state.
 - Coverage must live in `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
-  `bodyweight-analytics-formatting.test.ts`, `bodyweight-loading-estimate-ui.test.tsx`
+  `bodyweight-analytics-formatting.test.ts`
   and existing screen tests. The focused ios-bodyweight flow asserts the reading
   entry’s RM and volume effect; pure/data tests cover other calculations.
 
-The logger's fixed-height amount field will use `Weight · kg`; its accessibility
+The logger's fixed-height amount field uses `Weight · kg`; its accessibility
 label says Weight in kilograms. The figure and label remain legible at 375pt.
 
 
-### Optional group bodyweight controls (accepted replacement; implementation pending)
+### Optional group bodyweight controls
 
-- Group Settings will compose the admin-only `Bodyweight calculations` toggle with
+- Group Settings composes the admin-only `Bodyweight calculations` toggle with
   existing online-write and expected-revision feedback.
-- `GroupComparisonForm` will conditionally add one group
-  `Bodyweight contribution (%)` field, preserves it while hidden and retains
+- `GroupComparisonForm` conditionally adds one group
+  `Bodyweight contribution (%)` field, preserves it while hidden, and retains
   stale edits. Apply remains the one primary action; Reload is outline.
-- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` will reuse the
+- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` reuse the
   existing Weight/1RM kg recipes. Strict absent scores use generic copy; record
   detail never receives private reading/provenance/dependency props.
-- `metric-view-model.ts` will own Weight/1RM labels, revision and generic eligibility
+- `metric-view-model.ts` owns Weight/1RM labels, revision and generic eligibility
   summaries. Wire guards will fail closed if a group payload contains a private
   reading value/date/id or dependency digest.
 

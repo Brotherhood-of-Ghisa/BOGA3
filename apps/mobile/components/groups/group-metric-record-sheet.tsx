@@ -5,7 +5,7 @@ import { Text, Alert, ScrollView } from 'react-native';
 import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, uiSpace } from '@/components/ui';
 import { canManageGroup, formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { certifyGroupMetric, endGroupMetricCertification, getGroupMetricCertification, toGroupApiError } from '@/src/groups/api';
-import { describeGroupPerformanceWeight, describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
+import { describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
 import type { GroupMetric } from '@/src/groups/metric-contract';
 import type { GroupMetricBoardRowWire, GroupMetricCertificationWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 import { GroupWriteNotice } from './write-notice';
@@ -65,7 +65,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   const certified = certification ? active !== null : row.certified;
   const readOnly = Boolean(readOnlyReason) || row.former || exercise.archived_at_ms !== null || exercise.rebuilding || row.rules_revision !== exercise.rules_revision;
   const isMine = row.member.user_id === userId;
-  const includesWeight = row.metric === 'relative_strength' || row.metric === 'absolute_strength';
+  const strengthMetric = row.metric === 'e1rm';
   const blocked = pending || online === false || readOnly || needsReview;
   const perform = async (action: 'certify' | 'withdraw' | 'cancel') => {
     if (blocked) return;
@@ -109,15 +109,9 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
       <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</Text>
-      {exercise.bodyweight_coefficient > 0 || row.performance.body_weight_kg !== null ? <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-weight">Session body weight: {describeGroupPerformanceWeight(row.performance)}</Text> : null}
-      {row.effective_resistance_kg !== null ? <Text allowFontScaling={false} style={textStyles.body}>Effective resistance: {Number(row.effective_resistance_kg.toFixed(3))} kg</Text> : null}
-      {row.external_adjustment_kg !== null ? <Text allowFontScaling={false} style={textStyles.body}>External adjustment: {Number(row.external_adjustment_kg.toFixed(3))} kg
-        {row.added_percent_bodyweight !== null ? ` · ${Number(row.added_percent_bodyweight.toFixed(2))}% of session body weight` : ''}</Text> : null}
       <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules(exercise)}</Text>
-      <Text allowFontScaling={false} style={textStyles.muted}>{includesWeight
-        ? 'Certification pins this set’s entered load, mode, reps, performed status and saved body weight with its source. Corrections can invalidate it.'
-        : 'Certification pins this set’s entered load, mode, reps and performed status. Session body weight is not part of this metric’s certification.'}</Text>
-      <Text allowFontScaling={false} style={textStyles.muted}>{row.metric === 'e1rm' || includesWeight ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</Text>
+      <Text allowFontScaling={false} style={textStyles.muted}>Certification pins this performance and its applicable group rules. Corrections can invalidate it.</Text>
+      <Text allowFontScaling={false} style={textStyles.muted}>{strengthMetric ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-status">{active
         ? `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms)}`
         : certification?.end_reason ? `Certification ${certification.end_reason}` : certified ? 'Certified' : 'Uncertified'}</Text>

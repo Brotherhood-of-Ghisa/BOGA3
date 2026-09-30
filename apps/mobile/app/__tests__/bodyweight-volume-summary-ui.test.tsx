@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 import { SessionSummaryCard } from '@/components/session-view/session-summary-card';
 import { ViewSessionScreen } from '@/components/view-session/view-session-screen';
 import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
-import type { VolumeCoverage } from '@/src/exercise-calculations/effective-load';
+import type { VolumeCoverage } from '@/src/exercise-calculations/load-metrics';
 
 const partial: VolumeCoverage = { knownVolumeKgReps: 500, totalVolumeKgReps: null,
   eligibleSetCount: 2, knownSetCount: 1, missingSetCount: 1, invalidSetCount: 0, complete: false, overflow: false };

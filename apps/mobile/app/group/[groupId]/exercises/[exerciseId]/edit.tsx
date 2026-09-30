@@ -120,6 +120,7 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
   } else {
     body = (
       <GroupComparisonForm
+        bodyweightCalculationsEnabled={group.data.group.bodyweight_calculations_enabled}
         errorMessage={update.error ? describeGroupExerciseWriteError(update.error) : null}
         existing={exercise}
         onSubmit={(core, revision) => void onSubmit(core, revision)}

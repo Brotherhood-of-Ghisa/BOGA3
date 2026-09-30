@@ -1,7 +1,7 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-// Local-only, disposable cache of server-authoritative group RPC results (M22,
-// `docs/specs/tech/groups-contract.md` §6.2). One row per cache key holds the
+// Local-only, disposable cache of server-authoritative group RPC results
+// (`docs/specs/tech/groups-contract.md` §6.2). One row per cache key holds the
 // last successful RPC payload for the account that fetched it.
 //
 // This is NOT user data and never crosses the wire: no dirty bit, no monotonic
@@ -13,8 +13,8 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 // account switch (`src/sync/account-wipe.ts`).
 export const groupCache = sqliteTable('group_cache', {
   /**
-   * `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, or
-   * `session:<memberId>:<sessionId>` — built by `groupCacheKeys` in
+   * Versioned `groups`, `group`, `stream`, `session`, `group-exercises`, and
+   * `boards` keys are built by `groupCacheKeys` in
    * `src/groups/cache.ts`.
    */
   cacheKey: text('cache_key').primaryKey(),

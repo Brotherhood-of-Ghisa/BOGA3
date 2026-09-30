@@ -19,6 +19,7 @@
 
 import { eq } from 'drizzle-orm';
 
+import { resetBodyweightCalculationPreferenceForAccountSwitch } from '@/src/bodyweight/calculation-preference';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import {
@@ -35,18 +36,20 @@ import {
   sessionExercises,
   sessions,
   syncRuntimeState,
+  userSettings,
 } from '@/src/data/schema';
 
 /**
  * Clears every per-user local table and resets the singleton sync-accounting
  * row, in a single transaction, on the supplied database handle.
  *
- * What it clears (the eleven syncable, per-user entity tables, deleted in
+ * What it clears (the twelve syncable, per-user entity tables, deleted in
  * child-before-parent order so foreign keys stay satisfied even if a future
  * schema change drops a cascade):
  *   session_exercise_tags, exercise_sets, session_exercises, sessions,
  *   gyms, exercise_tag_definitions, exercise_muscle_mappings,
- *   exercise_group_links, exercise_definitions, muscle_groups, body_weight_measurements.
+ *   exercise_group_links, exercise_definitions, muscle_groups, user_settings,
+ *   body_weight_measurements.
  * (`exercise_group_links` has a `no action` FK into `exercise_definitions`, so
  * it must be deleted first.)
  * Plus the local-only, FK-free `group_cache` (the previous account's cached
@@ -86,6 +89,7 @@ const wipeLocalTables = (database: LocalDatabase): void => {
     transaction.delete(exerciseGroupLinks).run();
     transaction.delete(exerciseDefinitions).run();
     transaction.delete(muscleGroups).run();
+    transaction.delete(userSettings).run();
     transaction.delete(bodyWeightMeasurements).run();
     transaction.delete(groupCache).run();
 
@@ -113,6 +117,7 @@ const wipeLocalTables = (database: LocalDatabase): void => {
  * account. It performs no network I/O and issues no server delete.
  */
 export const wipeLocalForAccountSwitch = async (): Promise<void> => {
+  await resetBodyweightCalculationPreferenceForAccountSwitch();
   const database = await bootstrapLocalDataLayer();
   wipeLocalTables(database);
 };

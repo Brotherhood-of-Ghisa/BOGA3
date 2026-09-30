@@ -15,7 +15,7 @@ import {
   type BogaImportWarning,
   type BogaSessionImportPackage,
 } from './boga-import-contract';
-import { supportsLoadMetadata, importedSetMeaning, validateImportedWeightReading, type ImportedWeightReading, type ImportedExerciseRules } from './bodyweight-import-context';
+import { validateImportedWeightReading, type ImportedWeightReading, type ImportedExerciseDefinition } from './bodyweight-import-context';
 import { nowMonotonic } from '../../src/data/clock';
 import * as schema from '../../src/data/schema';
 import {
@@ -27,6 +27,7 @@ import {
   muscleGroups,
   sessionExercises,
   sessions,
+  userSettings,
 } from '../../src/data/schema';
 import {
   generatedBodyWeightMeasurementId,
@@ -108,8 +109,8 @@ export type BogaLocalImportPlan = {
   rows: {
     bodyWeightMeasurements: { id: string; source: ImportedWeightReading }[];
     exerciseDefinitions: {
-      loadInputMode?: ImportedExerciseRules['loadInputMode'];
-      loadRules?: ImportedExerciseRules['loadRules'];
+      loadInputMode: ImportedExerciseDefinition['loadInputMode'];
+      bodyweightContribution: number;
       id: string;
       name: string;
       createdAt: Date;
@@ -461,7 +462,8 @@ export const planBogaLocalImport = (
       generatedExerciseRows.push({
         id: exerciseDefinitionId,
         name: decision.exerciseName,
-        ...(supportsLoadMetadata(pkg.schema) ? { loadInputMode: decision.loadInputMode, loadRules: decision.loadRules } : {}),
+        loadInputMode: decision.loadInputMode,
+        bodyweightContribution: decision.bodyweightContribution,
         createdAt: generatedAt,
         updatedAt: generatedAt,
       });
@@ -595,11 +597,11 @@ export const planBogaLocalImport = (
 
   ensureUnique('generated import row id', generatedIds, errors);
 
-  const readingRows = supportsLoadMetadata(pkg.schema) && Array.isArray(pkg.bodyWeightMeasurements) ? pkg.bodyWeightMeasurements
+  const readingRows = (Array.isArray(pkg.bodyWeightMeasurements) ? pkg.bodyWeightMeasurements : [])
     .filter(validateImportedWeightReading)
     .map(source => ({ id: generatedBodyWeightMeasurementId(pkg, source.id), source }))
     .filter(row => !database.select({ id: bodyWeightMeasurements.id }).from(bodyWeightMeasurements)
-      .where(eq(bodyWeightMeasurements.id, row.id)).get()) : [];
+      .where(eq(bodyWeightMeasurements.id, row.id)).get());
 
   const report: BogaLocalImportReport = {
     target: {
@@ -672,9 +674,16 @@ export const importBogaSessionPackageToLocalDb = (
 
   const inserted = { ...EMPTY_INSERT_COUNTS };
   database.transaction((tx) => {
+    const settingsClock = nowMonotonic(tx);
+    tx.insert(userSettings).values({ id: 'settings', bodyweightCalculationsEnabled: pkg.bodyweightCalculationsEnabled,
+      createdAt: new Date(pkg.generatedAt), updatedAt: new Date(pkg.generatedAt), localDirty: true,
+      localUpdatedAtMs: settingsClock }).onConflictDoUpdate({ target: userSettings.id, set: {
+        bodyweightCalculationsEnabled: pkg.bodyweightCalculationsEnabled,
+        updatedAt: new Date(pkg.generatedAt), localDirty: true, localUpdatedAtMs: settingsClock,
+      } }).run();
     for (const row of plan.rows.bodyWeightMeasurements) {
-      tx.insert(bodyWeightMeasurements).values({ id: row.id, weightValue: row.source.weightValue,
-        weightUnit: row.source.weightUnit, weightKg: row.source.weightKg, measuredAt: new Date(row.source.measuredAt),
+      tx.insert(bodyWeightMeasurements).values({ id: row.id,
+        weightKg: row.source.weightKg, measuredAt: new Date(row.source.measuredAt),
         createdAt: new Date(pkg.generatedAt), updatedAt: new Date(pkg.generatedAt), localDirty: true,
         localUpdatedAtMs: nowMonotonic(tx) }).run();
       inserted.bodyWeightMeasurementsInserted++;
@@ -684,7 +693,8 @@ export const importBogaSessionPackageToLocalDb = (
         .values({
           id: row.id,
           name: row.name,
-          ...(row.loadRules ? { ...row.loadRules, loadInputMode: row.loadInputMode } : {}),
+          loadInputMode: row.loadInputMode,
+          bodyweightContribution: row.bodyweightContribution,
           deletedAt: null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
@@ -757,10 +767,13 @@ export const importBogaSessionPackageToLocalDb = (
           id: row.id,
           sessionExerciseId: row.sessionExerciseId,
           orderIndex: row.source.orderIndex,
-          ...importedSetMeaning(pkg.schema, row.source),
           weightValue: row.source.weightValue,
           repsValue: row.source.repsValue,
           setType: row.source.setType,
+          plannedWeightValue: row.source.plannedWeightValue,
+          plannedRepsValue: row.source.plannedRepsValue,
+          plannedSetType: row.source.plannedSetType,
+          performanceStatus: row.source.performanceStatus,
           deletedAt: null,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,

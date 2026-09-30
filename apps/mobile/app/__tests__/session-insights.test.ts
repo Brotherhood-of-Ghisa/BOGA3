@@ -162,8 +162,8 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
     const summary = summarizeCurrentSessionMuscleLoad(
       muscleInput({
         exerciseDefinitions: [
-          { id: "barbell-bench", loadInputMode: "total_load" },
-          { id: "curl", loadInputMode: "per_side_load" },
+          { bodyweightContribution: 0, id: "barbell-bench", loadInputMode: "total_load" },
+          { bodyweightContribution: 0, id: "curl", loadInputMode: "per_side_load" },
         ],
         exercises: [
           insightExercise({
@@ -264,7 +264,7 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
     const summary = summarizeCurrentSessionMuscleLoad(
       muscleInput({
         exerciseDefinitions: [
-          { id: "bodyweight", loadInputMode: "total_load" },
+          { bodyweightContribution: 0, id: "bodyweight", loadInputMode: "total_load" },
         ],
         exercises: [
           insightExercise({
@@ -299,9 +299,9 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
     const partial = summarizeCurrentSessionMuscleLoad(
       muscleInput({
         exerciseDefinitions: [
-          { id: "mapped", loadInputMode: "per_side_load" },
-          { id: "unmapped", loadInputMode: "per_side_load" },
-          { id: "stabilizer-only", loadInputMode: "per_side_load" },
+          { bodyweightContribution: 0, id: "mapped", loadInputMode: "per_side_load" },
+          { bodyweightContribution: 0, id: "unmapped", loadInputMode: "per_side_load" },
+          { bodyweightContribution: 0, id: "stabilizer-only", loadInputMode: "per_side_load" },
         ],
         exercises: [
           insightExercise({
@@ -369,7 +369,7 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
   it("uses taxonomy order as the stable tie-breaker and excludes tombstones", () => {
     const summary = summarizeCurrentSessionMuscleLoad(
       muscleInput({
-        exerciseDefinitions: [{ id: "press", loadInputMode: "per_side_load" }],
+        exerciseDefinitions: [{ bodyweightContribution: 0, id: "press", loadInputMode: "per_side_load" }],
         exercises: [
           insightExercise({
             id: "press-row",

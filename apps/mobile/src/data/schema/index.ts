@@ -30,6 +30,7 @@ export {
 } from './session-exercise-tags';
 export { sessionExercises, type NewSessionExercise, type SessionExercise } from './session-exercises';
 export { sessions, type NewSession, type Session } from './sessions';
+export { userSettings, type NewUserSettings, type UserSettings } from './user-settings';
 export {
   syncQuarantine,
   type NewSyncQuarantineRecord,

@@ -51,7 +51,7 @@ export interface SyncFkEdge {
  * The local FK dependency graph for the syncable entities, keyed by child type.
  * Mirrors the `.references(...)` declarations in `src/data/schema/*` for every
  * edge whose parent is itself syncable. Entities with no syncable-parent FK
- * (`gyms`, `exercise_definitions`, `muscle_groups`) are simply absent.
+ * (`gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`) are simply absent.
  *
  * Kept in sync with the schema by the same review discipline as
  * `topo-order.ts`: a new cross-entity FK must be added here as well as to its
@@ -90,6 +90,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
 
 /** Drizzle table object for each entity type that appears as an FK parent. */
 const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
+  user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,

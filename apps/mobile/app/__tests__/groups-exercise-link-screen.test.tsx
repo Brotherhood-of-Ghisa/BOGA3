@@ -75,8 +75,8 @@ const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
 const USER_ID = 'user-me';
 
-const IRON: GroupSummary = { group_id: 'g-iron', name: 'Iron Brotherhood', description: null, member_count: 3, my_role: 'member' };
-const TUESDAY: GroupSummary = { group_id: 'g-tue', name: 'Tuesday Crew', description: null, member_count: 2, my_role: 'member' };
+const IRON: GroupSummary = { group_id: 'g-iron', name: 'Iron Brotherhood', description: null, member_count: 3, my_role: 'member', bodyweight_calculations_enabled: false };
+const TUESDAY: GroupSummary = { group_id: 'g-tue', name: 'Tuesday Crew', description: null, member_count: 2, my_role: 'member', bodyweight_calculations_enabled: false };
 
 const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, 'group_exercise_id' | 'name'>): GroupExercise => ({
   load_input_mode: 'total_load',
@@ -160,7 +160,7 @@ describe('Link screen', () => {
     const suggested = await screen.findByTestId('exercise-link-row-gx-bench');
     expect(within(suggested).getByText(/Bench Press/)).toBeTruthy();
     // Tuesday's "Bench" is a name match → Suggested too, with the load-mode note.
-    expect(screen.getByText("Your total-load weights will show halved on this group's boards.")).toBeTruthy();
+    expect(screen.getByText('Weight stays as logged. 1RM is compared in per-side terms.')).toBeTruthy();
     expect(screen.getByTestId('exercise-link-row-gx-deadlift')).toBeTruthy();
 
     await act(async () => {

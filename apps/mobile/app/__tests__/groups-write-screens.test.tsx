@@ -112,6 +112,7 @@ const summary = (my_role: GroupRole): GroupSummary => ({
   description: 'Early crew',
   member_count: 4,
   my_role,
+  bodyweight_calculations_enabled: false,
 });
 
 /** `group_get` from my view: me with `myRole`, plus one member of every other role. */
@@ -448,7 +449,7 @@ describe('Edit group (flow 5)', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('group-form-submit'));
     });
-    expect(api.updateGroup).toHaveBeenCalledWith(GROUP_ID, { name: 'Garage Gym 2', description: 'Early crew' });
+    expect(api.updateGroup).toHaveBeenCalledWith(GROUP_ID, { name: 'Garage Gym 2', description: 'Early crew', bodyweightCalculationsEnabled: false });
     expect(mockRouter.back).toHaveBeenCalled();
   });
 

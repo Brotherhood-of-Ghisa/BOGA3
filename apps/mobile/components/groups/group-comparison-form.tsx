@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Text } from 'react-native';
 
-import { ExerciseCoreFields, type ExerciseLoadFieldsValue } from '@/components/exercise-core/exercise-core-fields';
+import { ExerciseCoreFields, type BodyweightContributionFieldValue } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton, Card, SegmentedControl, uiSpace } from '@/components/ui';
 import type { LoadInputMode } from '@/src/exercise-core';
-import { metricsForGroupRules, validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from '@/src/groups/metric-contract';
+import { GROUP_METRICS, validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from '@/src/groups/metric-contract';
 import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 
 import { GroupWriteNotice } from './write-notice';
 import { groupMetricTextStyles as textStyles } from './screen-styles';
 
 type Props = {
+  bodyweightCalculationsEnabled: boolean;
   initialRules?: GroupExerciseRules;
   /** Preserve the version seen when editing begins, even if a refresh lands. */
   existing?: GroupMetricExerciseWire;
@@ -21,29 +22,34 @@ type Props = {
   errorMessage: string | null;
   onSubmit: (rules: GroupExerciseRules, expectedRevision: number | null) => void;
 };
-const empty: GroupExerciseRules = { name: '', loadInputMode: 'total_load', bodyweightCoefficient: 0,
-  movementStandard: null, loadingMethod: null, defaultMetric: 'e1rm' };
+const empty: GroupExerciseRules = { name: '', loadInputMode: 'total_load', bodyweightCalculationsEnabled: false,
+  bodyweightContribution: 0,
+  defaultMetric: 'e1rm' };
 const rulesFromWire = (exercise: GroupMetricExerciseWire): GroupExerciseRules => ({
-  name: exercise.name, loadInputMode: exercise.load_input_mode, bodyweightCoefficient: exercise.bodyweight_coefficient,
-  movementStandard: exercise.movement_standard, loadingMethod: exercise.loading_method, defaultMetric: exercise.default_metric,
+  name: exercise.name, loadInputMode: exercise.load_input_mode,
+  bodyweightCalculationsEnabled: exercise.bodyweight_calculations_enabled,
+  bodyweightContribution: exercise.bodyweight_contribution,
+  defaultMetric: exercise.default_metric,
 });
-const fieldsFromRules = (rules: GroupExerciseRules): ExerciseLoadFieldsValue => ({
-  percentage: String(rules.bodyweightCoefficient * 100), movementStandard: rules.movementStandard ?? '', loadingMethod: rules.loadingMethod ?? '',
+const contributionFieldFromRules = (rules: GroupExerciseRules): BodyweightContributionFieldValue => ({
+  percentage: String(rules.bodyweightContribution * 100),
 });
 const metricLabels: Record<GroupMetric, string> = {
-  weight: 'Weight kg', e1rm: '1RM kg', bodyweight_reps: 'Reps', relative_strength: 'Relative ×BW', absolute_strength: 'Absolute kg',
+  weight: 'Weight kg', e1rm: '1RM kg',
 };
 const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
-  left.loadInputMode === right.loadInputMode && left.bodyweightCoefficient === right.bodyweightCoefficient &&
-  left.movementStandard === right.movementStandard && left.loadingMethod === right.loadingMethod;
+  left.loadInputMode === right.loadInputMode &&
+  left.bodyweightCalculationsEnabled === right.bodyweightCalculationsEnabled &&
+  left.bodyweightContribution === right.bodyweightContribution;
 
 /** Shared field recipe, with a version-bound preview for group-wide changes. */
-export function GroupComparisonForm({ initialRules = empty, existing, note, submitLabel, pendingLabel, pending, errorMessage, onSubmit }: Props) {
-  const prefill = existing ? rulesFromWire(existing) : initialRules;
+export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRules = empty, existing, note,
+  submitLabel, pendingLabel, pending, errorMessage, onSubmit }: Props) {
+  const prefill = existing ? rulesFromWire(existing) : { ...initialRules, bodyweightCalculationsEnabled };
   const [baseline, setBaseline] = useState({ rules: prefill, revision: existing?.rules_revision ?? null, legacy: existing?.legacy ?? false });
   const [name, setName] = useState(prefill.name);
   const [loadInputMode, setLoadInputMode] = useState<LoadInputMode>(prefill.loadInputMode);
-  const [loadFields, setLoadFields] = useState(fieldsFromRules(prefill));
+  const [contributionField, setContributionField] = useState(contributionFieldFromRules(prefill));
   const [defaultMetric, setDefaultMetric] = useState<GroupMetric>(prefill.defaultMetric);
   const [dirty, setDirty] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -54,18 +60,21 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
   if (!dirty && followedKey !== prefillKey) {
     setFollowedKey(prefillKey);
     setBaseline({ rules: prefill, revision: existing?.rules_revision ?? null, legacy: existing?.legacy ?? false });
-    setName(prefill.name); setLoadInputMode(prefill.loadInputMode); setLoadFields(fieldsFromRules(prefill)); setDefaultMetric(prefill.defaultMetric);
+    setName(prefill.name);
+    setLoadInputMode(prefill.loadInputMode);
+    setContributionField(contributionFieldFromRules(prefill));
+    setDefaultMetric(prefill.defaultMetric);
   }
   const changed = () => { setDirty(true); setReviewed(false); };
-  const percentage = loadFields.percentage.trim() === '' ? NaN : Number(loadFields.percentage.replace(',', '.'));
-  const validation = validateGroupExerciseRules({ name, loadInputMode, bodyweightCoefficient: percentage / 100,
-    movementStandard: loadFields.movementStandard || null, loadingMethod: loadFields.loadingMethod || null, defaultMetric });
-  const movementChanged = baseline.rules.movementStandard !== null && validation.ok &&
-    validation.value.movementStandard !== baseline.rules.movementStandard;
+  const percentage = contributionField.percentage.trim() === ''
+    ? NaN
+    : Number(contributionField.percentage.replace(',', '.'));
+  const validation = validateGroupExerciseRules({ name, loadInputMode, bodyweightCalculationsEnabled,
+    bodyweightContribution: percentage / 100, defaultMetric });
   const calculationChanged = baseline.revision !== null && validation.ok && !sameCalculation(baseline.rules, validation.value);
   const submit = () => {
     setShowErrors(true);
-    if (!validation.ok || movementChanged || pending) return;
+    if (!validation.ok || pending) return;
     if (calculationChanged && !reviewed) { setReviewed(true); return; }
     onSubmit(validation.value, baseline.revision);
   };
@@ -79,13 +88,16 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
         nameError={showErrors && !validation.ok && validation.field === 'name' ? validation.message : null}
         onChangeName={value => { changed(); setName(value); }}
         onChangeLoadInputMode={value => { changed(); setLoadInputMode(value); }}
-        testIDPrefix="group-exercise-form" loadRules={{ value: loadFields, scope: 'group',
-          onChange: value => { changed(); setLoadFields(value); }, error: rulesError }} />
-      {movementChanged ? <GroupWriteNotice tone="error" testID="group-rules-movement-error"
-        message="A different movement needs a new group exercise. Keep this movement standard to preserve its history." /> : null}
+        testIDPrefix="group-exercise-form"
+        bodyweightContribution={bodyweightCalculationsEnabled ? {
+          value: contributionField,
+          scope: 'group',
+          onChange: value => { changed(); setContributionField(value); },
+          error: rulesError,
+        } : undefined} />
       <Text allowFontScaling={false} style={textStyles.muted}>Default ranking</Text>
       <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={defaultMetric} layout="fit"
-        options={metricsForGroupRules({ bodyweightCoefficient: percentage > 0 ? percentage / 100 : 0 }).map(metric => ({
+        options={GROUP_METRICS.map(metric => ({
           value: metric, label: metricLabels[metric], accessibilityLabel: metricLabels[metric],
         }))}
         onChange={value => { changed(); setDefaultMetric(value); }} testIDPrefix="group-exercise-default-metric" />
@@ -96,10 +108,10 @@ export function GroupComparisonForm({ initialRules = empty, existing, note, subm
         onPress={() => { setDirty(false); setFollowedKey(null); setReviewed(false); setShowErrors(false); }} /> : null}
       {reviewed && calculationChanged && validation.ok ? <>
         <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-preview">
-          {`Apply rules revision ${(baseline.revision ?? 0) + 1}: ${baseline.rules.bodyweightCoefficient * 100}% → ${validation.value.bodyweightCoefficient * 100}% bodyweight, ${validation.value.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} external weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`}
+          {`Apply rules revision ${(baseline.revision ?? 0) + 1}: ${baseline.rules.bodyweightContribution * 100}% → ${validation.value.bodyweightContribution * 100}% bodyweight contribution, ${validation.value.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`}
         </Text>
         {baseline.legacy ? <Text allowFontScaling={false} style={textStyles.muted}>Existing certifications keep their original coverage. Recalculated comparisons need new metric-specific attestations.</Text> :
-          <Text allowFontScaling={false} style={textStyles.muted}>Attestations of unchanged performance inputs stay valid. Personal exercise settings and saved session weights stay unchanged.</Text>}
+          <Text allowFontScaling={false} style={textStyles.muted}>Attestations of unchanged performance inputs stay valid. Personal exercise settings stay unchanged.</Text>}
       </> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
       <ActionButton variant="primary" disabled={pending || Boolean(stale)} label={pending ? pendingLabel : calculationChanged ? reviewed ? 'Apply group rules' : 'Review rule changes' : submitLabel}

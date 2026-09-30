@@ -1,33 +1,23 @@
 # Sync v2 Server Contract
 
-> **Status boundary.** The protocol-2 baseline in this document is verified
-> against the current code as described below. The kg-only `user_settings`,
-> contribution and protocol-3 changes are the accepted replacement
-> contract and remain implementation-pending until the coordinated cutover
-> lands. Any paragraph that describes those changes is normative for that
-> cutover, not a claim about the pre-cutover runtime.
+> **Status: current protocol-3 contract.** The kg-only schema and RPC behavior
+> below are authoritative for local and server sync.
 
-The accepted kg-only cutover adds synced `user_settings`, keeps private dated
-readings in layer 4, renames coefficients to contributions and removes retired
-unit/mode/movement/loading/hydration fields. It requires protocol header
+The kg-only contract includes synced `user_settings`, private dated readings in
+layer 4, personal contributions and the normal kg Weight fields. It requires protocol header
 `x-boga-sync-protocol: 3` before authenticated app push/pull. Session bodyweight
 remains a read projection and never enters session rows. See
 [bodyweight semantics](bodyweight-load-contract.md) §5.
 
-> **Promoted from the sync-v2 plan; this is the authoritative sync-v2 server
-> contract.** It merges the two former design docs (`t1` — server schema &
-> drift control; `t2` — push/pull RPC protocol) into one normative reference
-> and has been verified against the as-built code: the clean-room migration
+> **Status evidence.** This contract is verified against the clean-room migration
 > (`supabase/migrations/20260525120000_sync_v2_clean_room.sql`), the push/pull
 > RPCs (`20260525130000_sync_v2_push_rpc.sql`,
 > `20260525130100_sync_v2_pull_rpc.sql`), the drift checker
 > (`apps/mobile/scripts/check-sync-schema-drift.ts`), and the `supabase/tests/`
 > contract suites.
 >
-> The document is in two parts. Both former docs numbered their sections
-> "§1, §2, …"; on merge they are disambiguated to **A.x** (server schema) and
-> **B.x** (push/pull protocol). Cross-references inside the text use those
-> anchors. Where a normative claim differs from the as-built code, the code is
+> The document is in two parts: **A.x** owns server schema and **B.x** owns the
+> push/pull protocol. Where a normative claim differs from the as-built code, the code is
 > ground truth and the discrepancy is called out in a **Build note**.
 
 **Contents — this doc is ~1,200 lines; load the part your task needs, not all
@@ -119,9 +109,8 @@ These invariants hold for every table below.
   `UPDATE_REQUIRED`, the server converts/removes fields, and only protocol-3
   clients resume. Additive-only does not apply inside that window.
 
-> **Build note.** A.1's shared schema rules are verified on the current eleven
-> tables. The accepted cutover must preserve them on all twelve tables after
-> adding `user_settings`:
+> **Build note.** A.1's shared schema rules are verified on all twelve tables,
+> including `user_settings`:
 > only the named M19 load-mode CHECK, no `extras` column, no `deleted`
 > boolean, and the non-unique form of every slot/pair index. The drift checker
 > independently asserts the single named M19 CHECK, no-`extras`, no-`deleted` (see A.7).
@@ -524,9 +513,8 @@ drift check at PR time. See A.9 for the worked example.
 }
 ```
 
-> **Cutover requirement.** `sync-extras.json` contains only the two universal
-> bookkeeping columns. The retired bodyweight metadata hydration marker is
-> removed with the clean protocol cutover.
+> **Current requirement.** `sync-extras.json` contains only the two universal
+> bookkeeping columns.
 > There is no `untyped_text_references` entry —
 > the former `muscleGroupId` waiver was removed when `muscle_groups` became a
 > typed synced entity (A.2.9) and `muscle_group_id` gained its real FK (A.5.2),
@@ -713,8 +701,11 @@ Location: `apps/mobile/scripts/check-sync-schema-drift.ts`. Command:
 5. Run the A.7.7 topological FK-order assertion.
 
 Type-compatibility map (narrow): `text`↔`text`; client `integer`↔`int4`|`int8`;
-client `real`↔`float8`|`numeric`. Nullability and default-expression equality
-are **not** compared. The 4f sanity checks ARE strict (they assert A.1).
+client `real`↔`float8`|`numeric`; and only
+`user_settings.bodyweight_calculations_enabled` client `integer`↔server `bool`
+(SQLite stores this Drizzle boolean as an integer). Nullability and
+default-expression equality are **not** compared. The 4f sanity checks ARE
+strict (they assert A.1).
 
 ### A.7.4 Failure output / exit codes
 
@@ -752,9 +743,8 @@ export const TOPO_LAYERS: readonly (readonly string[])[] = [
 ];
 ```
 
-This is the accepted protocol-3 form. The current protocol-2 array has the same
-five layers but does not yet include `user_settings` in layer 0; its layer 4 is
-capability-gated.
+This is the protocol-3 form. `user_settings` is a layer-0 root and private
+readings are always drained as the independent layer-4 root.
 
 Each layer must satisfy (a) **no intra-layer FK** and (b) **every FK points to a
 strictly earlier layer or is a self-edge**. The assertion:
@@ -940,8 +930,8 @@ under `fields.<wire_key>` (snake_case Postgres column name); nullable columns
 get JSON null. Local-only sync columns (B.9) must not appear; any other client
 column is drift, caught at PR time.
 
-Protocol-3 writers send every clean typed field. Removed unit/mode,
-movement/loading and hydration keys are rejected as drift rather than preserved.
+Protocol-3 writers send every typed field listed in A.2. Any additional key is
+rejected as drift rather than preserved.
 This remains row LWW, not independent field clocks. Session bodyweight keys are
 neither written nor read.
 
@@ -1063,15 +1053,14 @@ on the client.
 > `execute` to `authenticated`, `service_role`, and `anon` (same `AUTH_REQUIRED`
 > rationale as push). `layer` must be an integer `0..4`; `limit` an integer
 > `1..200` defaulting to 200; `cursor` either null/absent or an object carrying
-> all four keys with a `type` that is one of the current eleven entity types —
-> twelve after the accepted `user_settings` cutover — otherwise `INTERNAL`.
+> all four keys with a `type` that is one of the twelve entity types — otherwise
+> `INTERNAL`.
 
-The protocol-3 local migration converts the existing rows before normal sync,
-adds `user_settings`, removes retired hydration markers and resets the affected
-layer 0, 3 and 4 cursors once. The fresh layer-4 request is
-`{ "layer": 4, "cursor": null, "limit": 200 }`; it restores every private
-reading without a capability flag. Existing dirty bits and LWW clocks survive
-the schema conversion.
+The protocol-3 local migration converts existing rows before normal sync, adds
+`user_settings` and resets the affected layer 0, 3 and 4 cursors once. The fresh
+layer-4 request is `{ "layer": 4, "cursor": null, "limit": 200 }`; it restores
+every private reading. Existing dirty bits and LWW clocks survive the schema
+conversion.
 
 ### B.4.2 Response
 
@@ -1118,11 +1107,11 @@ limitation; future hardening could use `pg_xact_commit_timestamp(xmin)`.
 > **Build note (verified).** The as-built query fetches `limit + 1` rows to
 > compute `has_more`, then trims the overshoot row and strips the cursor-axis
 > fields (`owner_user_id`, `server_received_at`) off each emitted envelope. The
-> static `UNION ALL` over all current eleven tables is scoped to the layer by
+> static `UNION ALL` over all twelve tables is scoped to the layer by
 > `type = any(v_types)`; each leg also carries an explicit
 > `where owner_user_id = auth.uid()` to pin the planner on
 > `<table>_owner_received_idx`. The known race is documented in the migration
-> header. The accepted cutover adds the twelfth `user_settings` leg.
+> header. The union includes the `user_settings` leg.
 > `supabase/tests/sync-pull-contract.sh` covers snapshot, paginated
 > drain, and layer→type mapping.
 
@@ -1141,14 +1130,13 @@ for layer in [0, 1, 2, 3, 4]:
     if not resp.has_more: break
 ```
 
-Accepted protocol-3 layer→type mapping: 0 = `gyms`,
+Protocol-3 layer→type mapping: 0 = `gyms`,
 `exercise_definitions`, `muscle_groups`, `user_settings`; 1 = `sessions`,
 `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links`;
 2 = `session_exercises`;
 3 = `exercise_sets`, `session_exercise_tags`; 4 =
-`body_weight_measurements`. The current protocol-2 mapping uses the same five
-layers without `user_settings` and capability-gates layer 4; protocol 3 removes
-that capability flag. (See the B.3.4.1 corrected-mapping note.)
+`body_weight_measurements`. There is no capability-gated reading layer or
+protocol-2 shape. (See the B.3.4.1 corrected-mapping note.)
 Per-layer cursors persist after every page COMMIT, so an aborted drain resumes
 from where it stopped; the DB is FK-consistent at every commit boundary.
 
@@ -1285,9 +1273,8 @@ null default 0` (the row's client-monotonic timestamp, sent as
 `client_updated_at_ms`). Neither crosses the wire. `local_dirty = 0` ⇒ the
 server has the row (it only clears via push ack or pull apply).
 
-The clean cutover has no bodyweight-specific hydration marker. Preference,
-contribution and kg fields follow the same row-LWW/dirty-bit rules as every
-other synced field.
+Preference, contribution and kg fields follow the same row-LWW/dirty-bit rules
+as every other synced field; there is no bodyweight-specific bookkeeping path.
 
 ### B.7.2 Setting and clearing
 

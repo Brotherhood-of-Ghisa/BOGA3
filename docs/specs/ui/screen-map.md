@@ -673,19 +673,15 @@ Brief entrypoint map of the current mobile screens.
 
 23. `/body-weight`
 - File: `apps/mobile/app/body-weight.tsx`; composition: `components/bodyweight/`
-- Current pre-cutover purpose: private dated readings and history, reached from
-  Settings and from session bodyweight surfaces.
-- Current states: current value and measurement date; empty history;
+- Purpose: private dated kg readings and history, reached from the always-visible
+  `Body weight log` Settings row independently of the calculation preference.
+- States: current value and measurement date; empty history;
   loading/retryable error; Add/Edit sheet with positive kg and required
   local date/time; invalid/future date or failed-save feedback retaining input;
   delete confirmation. Saves are local/offline.
 - Native back returns to the caller. History orders by measurement time then ID.
-- **Accepted replacement; implementation pending:** the route becomes kg-only
-  and is reached through the always-visible `Body weight log` Settings row,
-  independently of the private calculation preference. No
-  session/detail/logger surface will show or link to a reading.
-  Reading value/date changes and deletion will recalculate affected projections
-  silently.
+- No session/detail/logger surface shows or links to a reading. Reading
+  value/date changes and deletion recalculate affected projections silently.
 
 ## Route shell (not a user-facing screen)
 
@@ -733,16 +729,7 @@ always-visible `Body weight log` row. While calculations are enabled, the person
 Weight, 1RM and Volume labels and never show bodyweight context or entry actions.
 These are overlays on existing routes, not additional destinations.
 
-### Personal loading estimate overlay
-
-If retained, Exercise page → records → Loading estimate remains a kg-only
-transient sheet using Weight/1RM language and the same private policy. It does
-not expose source reading/provenance or the bodyweight arithmetic. Loading,
-retry and invalid-input states use existing UI primitives. Exercise history,
-Stats/heatmaps and session/share projections use the same calculation boundary.
-
-
-## Optional group bodyweight calculations (accepted target)
+## Optional group bodyweight calculations
 
 Group settings adds an admin-only `Bodyweight calculations` toggle. While
 enabled, add/edit group exercise shows only the group's independent
@@ -753,4 +740,4 @@ Existing Weight/1RM board/history routes remain. Weight is raw kg; strict 1RM
 may be generically absent while raw shared activity remains. Rebuilding and
 archived states keep their existing recipes. Record details show public raw set,
 score, revision and certification state but no private reading or calculation
-dependency. Integrated native acceptance is pending.
+dependency.

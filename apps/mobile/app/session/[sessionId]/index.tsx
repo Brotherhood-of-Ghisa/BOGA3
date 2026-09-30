@@ -184,8 +184,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
                 (exercise) => ({
                   id: exercise.id,
                   loadInputMode: exercise.loadInputMode ?? "total_load",
-                  bodyweightCoefficient: exercise.bodyweightCoefficient,
-                  localBodyweightMetadataKnown: exercise.localBodyweightMetadataKnown,
+                  bodyweightContribution: exercise.bodyweightContribution,
                 }),
               ),
               muscleMappings: exerciseCatalog.exercises.flatMap((exercise) =>

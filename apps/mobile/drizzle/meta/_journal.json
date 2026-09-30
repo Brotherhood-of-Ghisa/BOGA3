@@ -71,6 +71,13 @@
       "when": 1790521306944,
       "tag": "0009_amazing_fixer",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790712946963,
+      "tag": "0010_square_stranger",
+      "breakpoints": true
     }
   ]
 }

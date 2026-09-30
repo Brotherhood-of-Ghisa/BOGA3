@@ -16,6 +16,7 @@ const exercises: ExerciseCatalogExercise[] = [
   {
     id: 'exercise-bench',
     name: 'Bench Press',
+    bodyweightContribution: 0,
     deletedAt: null,
     mappings: [
       { id: 'map-bench-primary', muscleGroupId: 'chest', weight: 1, role: 'primary' },
@@ -25,18 +26,21 @@ const exercises: ExerciseCatalogExercise[] = [
   {
     id: 'exercise-squat',
     name: 'Barbell Squat',
+    bodyweightContribution: 0,
     deletedAt: null,
     mappings: [{ id: 'map-squat', muscleGroupId: 'quads', weight: 1, role: 'primary' }],
   },
   {
     id: 'exercise-deadlift',
     name: 'Deadlift',
+    bodyweightContribution: 0,
     deletedAt: null,
     mappings: [{ id: 'map-deadlift', muscleGroupId: 'back', weight: 1, role: 'primary' }],
   },
   {
     id: 'exercise-overhead-press',
     name: 'Overhead Press',
+    bodyweightContribution: 0,
     deletedAt: null,
     mappings: [{ id: 'map-overhead-press', muscleGroupId: 'delts_front', weight: 1, role: 'primary' }],
   },

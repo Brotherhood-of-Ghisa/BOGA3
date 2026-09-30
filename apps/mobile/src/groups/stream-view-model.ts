@@ -145,7 +145,8 @@ export type StreamSessionCardViewModel = {
   groupNames: string[];
   setsLabel: string;
   volumeLabel: string;
-  metricsNote: string;
+  /** Present only when the volume summary needs qualification. */
+  volumeNote: string | null;
   exercisesLabel: string;
   /** "1 record" / "N records": the session's non-voided record sets among the loaded items. Null when none. */
   recordsLabel: string | null;
@@ -203,7 +204,7 @@ export type StreamItemViewModel =
   | { kind: 'metric_event'; key: string; event: GroupMetricStreamItemWire };
 
 const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel => {
-  const metrics = computeGroupSessionMetrics(item.exercises, item);
+  const metrics = computeGroupSessionMetrics(item.exercises);
   const summary = sessionVolumeSummary(metrics.coverage);
   return {
     kind: 'session',
@@ -220,8 +221,7 @@ const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel =
     volumeLabel: metrics.totalVolumeKg === null
       ? `${summary.volume} kg · ${metrics.coverage.knownSetCount > 0 ? 'incomplete' : 'unavailable'}`
       : formatVolumeKg(metrics.totalVolumeKg),
-    metricsNote: [metrics.basis === 'personal' ? 'Personal metrics' : 'Original entered-load metrics',
-      summary.volumeNote].filter(Boolean).join(' · '),
+    volumeNote: summary.volumeNote ?? null,
     exercisesLabel: formatExerciseCount(metrics.exerciseCount),
     recordsLabel: null,
   };
@@ -238,7 +238,7 @@ const buildMembershipItem = (item: StreamMembershipItem): StreamMembershipViewMo
 // ---- Record cards, record-removed and link items (M25-T10) ---------------------
 
 export const YOU_NAME = 'You';
-// Display copy only (G7): the metric key stays `e1rm` in params, RPCs and view keys.
+// Display copy only: the metric key stays `e1rm` in params, RPCs and view keys.
 export const METRIC_NAMES: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: '1RM' };
 const METRIC_ORDER: GroupBoardMetric[] = ['weight', 'e1rm'];
 const metricRank = (metric: GroupBoardMetric): number => METRIC_ORDER.indexOf(metric);

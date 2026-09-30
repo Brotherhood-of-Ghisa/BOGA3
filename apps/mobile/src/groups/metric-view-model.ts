@@ -1,44 +1,30 @@
-import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
 // Presentation only: server order, score, metric and rule revision are preserved.
-import { sessionWeightSourceLabel } from '@/src/bodyweight/weight-entry';
 import { buildPodiumCards, formatEmptyBoardLabel, type PodiumCardViewModel, formatBoardDate, formatBoardMemberLabel, formatOrdinal, type BoardRowViewModel, type GroupBoardScope } from './board-view-model';
 import { formatMemberName } from './stream-view-model';
 import type { GroupMetric, GroupMetricValue } from './metric-contract';
 import type { GroupMetricBoardRowWire, GroupMetricPodiumWire, GroupMetricEventWire, GroupMetricExerciseWire, GroupPerformanceSnapshotWire } from './metric-wire';
 
 export const GROUP_METRIC_LABELS: Readonly<Record<GroupMetric, string>> = {
-  weight: 'Weight', e1rm: '1RM', bodyweight_reps: 'Reps', relative_strength: 'Relative strength', absolute_strength: 'Absolute strength',
+  weight: 'Weight', e1rm: '1RM',
 };
 export const GROUP_METRIC_VIEW_LABELS: Readonly<Record<GroupMetric, string>> = {
-  weight: 'Weight kg', e1rm: '1RM kg', bodyweight_reps: 'Reps', relative_strength: 'Relative strength ×BW', absolute_strength: 'Absolute strength kg',
+  weight: 'Weight kg', e1rm: '1RM kg',
 };
 export const GROUP_METRIC_SHORT_LABELS: Readonly<Record<GroupMetric, string>> = {
-  weight: 'Weight', e1rm: '1RM', bodyweight_reps: 'Reps', relative_strength: 'Relative ×BW', absolute_strength: 'Absolute kg',
+  weight: 'Weight', e1rm: '1RM',
 };
 export function formatGroupMetricValue(score: GroupMetricValue): string {
   if (!Number.isFinite(score.value) || score.value <= 0) return 'Unavailable';
-  if (score.metric === 'bodyweight_reps') return `${score.value} reps`;
-  return score.metric === 'relative_strength' ? `${score.value.toFixed(2)} ×BW` : `${score.value.toFixed(1)} kg`;
+  return `${score.value.toFixed(1)} kg`;
 }
 export function formatGroupRawPerformance(performance: GroupPerformanceSnapshotWire): string {
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
-  return `Added ${performance.weight_value} ${performance.weight_unit}${distribution} × ${performance.reps}`;
+  return `Weight ${performance.weight_value} kg${distribution} × ${performance.reps}`;
 }
-export function describeGroupPerformanceWeight(performance: GroupPerformanceSnapshotWire): string {
-  if (performance.body_weight_status === 'invalid') return 'Session weight unavailable · invalid saved context';
-  // Retired evidence is displayed with its original source, never used to score.
-  const source = performance.body_weight_source === 'manual' ? 'Original manual entry'
-    : performance.body_weight_source === 'historical_estimate' ? `Estimated from ${formatCurrentDateTime(new Date(performance.body_weight_measured_at_ms!))}`
-    : sessionWeightSourceLabel({ bodyWeightKg: performance.body_weight_kg, bodyWeightSource: performance.body_weight_source,
-    bodyWeightMeasurementId: performance.body_weight_measurement_id,
-    bodyWeightMeasuredAt: performance.body_weight_measured_at_ms === null ? null : new Date(performance.body_weight_measured_at_ms) });
-  return performance.body_weight_kg === null ? source : `${Number(performance.body_weight_kg.toFixed(3))} kg · ${source}`;
-}
-export function describeGroupRules(exercise: Pick<GroupMetricExerciseWire, 'rules_revision' | 'bodyweight_coefficient' | 'movement_standard' | 'loading_method' | 'load_input_mode'>): string {
-  const parts = [`Rules ${exercise.rules_revision}`, `${Math.round(exercise.bodyweight_coefficient * 10000) / 100}% bodyweight`,
-    exercise.movement_standard, exercise.loading_method,
-    exercise.load_input_mode === 'per_side_load' ? 'per-side external weight' : 'total external weight'];
-  return parts.filter(Boolean).join(' · ');
+export function describeGroupRules(exercise: Pick<GroupMetricExerciseWire,
+  'rules_revision' | 'load_input_mode'>): string {
+  return [`Rules ${exercise.rules_revision}`,
+    exercise.load_input_mode === 'per_side_load' ? 'per-side Weight' : 'total Weight'].join(' · ');
 }
 export function buildGroupMetricRow(row: GroupMetricBoardRowWire, scope: GroupBoardScope, myUserId: string | null,
   nowMs: number = Date.now()): BoardRowViewModel {
@@ -84,7 +70,7 @@ export function buildGroupMetricPodiums(payload: GroupMetricPodiumWire, myUserId
   });
 }
 
-/** Legacy event payloads retain kg-only meaning; never infer missing bodyweight inputs. */
+/** Retired event payloads retain their original Weight/1RM meaning. */
 export function describeLegacyMetricHistory(event: import('./metric-wire').GroupLegacyMetricHistoryWire, userId: string | null): string {
   const holder = event.payload.leader;
   if (!holder || typeof holder !== 'object') return 'No one holds #1 under these original kg-only rules.';

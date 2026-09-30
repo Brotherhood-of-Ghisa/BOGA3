@@ -1,5 +1,5 @@
-import { type LoadContext } from '@/src/exercise-calculations/effective-load';
-import { addFiniteVolume, calculateAnalyticsSetMetrics, exerciseLoadContext, summarizeExerciseLoad, formatEnteredLoad } from '@/src/exercise-calculations/analytics';
+import { type LoadContext } from '@/src/exercise-calculations/load-metrics';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
 import { isWorkingSessionSetType } from "@/src/data/set-types";
 import {
   collectMuscleSetContributions,
@@ -25,8 +25,6 @@ export type SessionInsightSetInput = {
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
-  localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string | null; externalLoadMode?: string | null;
   deletedAt?: Date | null;
 };
 
@@ -43,7 +41,7 @@ export type SessionInsightExerciseInput = {
 export type SessionInsightExerciseDefinition = {
   id: string;
   loadInputMode: "total_load" | "per_side_load";
-  bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean;
+  bodyweightContribution: number;
 };
 
 export type SessionInsightMuscleMapping = {
@@ -109,9 +107,6 @@ export type ExercisePersonalRecord = {
   reps: number;
   estimatedOneRepMax: number;
   historicalBestEstimatedOneRepMax: number;
-  loadLabel?: string;
-  bodyWeightKg?: number | null;
-  effectiveResistanceKg?: number | null;
 };
 
 export type PersonalRecordSessionInput = {
@@ -239,6 +234,7 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
     .sort(compareExerciseOrder);
 
   return {
+    bodyweightCalculationsEnabled: exercises.some(exercise => exercise.loadContext?.policy === 'personal'),
     sessions: [{ id: input.sessionId, completedAt: input.sessionAt, bodyWeightKg: input.bodyWeightKg ?? exercises[0]?.loadContext?.bodyWeightKg }],
     exerciseDefinitions: input.exerciseDefinitions,
     sessionExercises: exercises.map((exercise) => ({
@@ -257,7 +253,6 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
           orderIndex: set.orderIndex,
           setType: set.setType,
           weightValue: set.weightValue,
-          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown, weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
           repsValue: set.repsValue,
           performanceStatus: set.performanceStatus,
         })),
@@ -421,7 +416,7 @@ const findBestPersonalRecordCandidate = (
     const reps = parseSetReps(set.repsValue);
     if (weight === null || reps === null) continue;
 
-    const metric = calculateAnalyticsSetMetrics({ ...set, ...(exercise.loadContext ?? exerciseLoadContext()) });
+    const metric = calculateAnalyticsSetMetrics({ ...set, ...(exercise.loadContext ?? ordinaryLoadContext()) });
     const estimatedOneRepMax = metric.estimatedOneRepMaxKg;
     if (estimatedOneRepMax === null) continue;
     if (best !== null && estimatedOneRepMax <= best.estimatedOneRepMax)
@@ -437,9 +432,6 @@ const findBestPersonalRecordCandidate = (
       weight: metric.eligible && metric.load.status === 'known' ? metric.load.enteredWeightKg : weight,
       reps,
       estimatedOneRepMax,
-      loadLabel: formatEnteredLoad(weight, exercise.loadContext ?? exerciseLoadContext(), set.externalLoadMode, set.weightUnit),
-      bodyWeightKg: (exercise.loadContext?.bodyweightCoefficient ?? 0) > 0 ? exercise.loadContext?.bodyWeightKg : null,
-      effectiveResistanceKg: metric.eligible && metric.load.status === 'known' ? metric.load.resistanceKg : null,
     };
   }
 
@@ -606,7 +598,7 @@ const collectExerciseVolumeObservations = (
     current.workingSetCount += eligibleSets.filter((set) =>
       isWorkingSetType(set.setType),
     ).length;
-    const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? exerciseLoadContext()).volumeCoverage;
+    const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
     current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
     current.volume = addFiniteVolume(current.volume, coverage.totalVolumeKgReps);
     observationsByIdentity.set(identity, current);

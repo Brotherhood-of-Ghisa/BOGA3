@@ -1,6 +1,6 @@
 # M28-T02 — Implement the simplified bodyweight contract
 
-- Status: `planned`
+- Status: `in progress`
 - Depends on: `M28-T01-Define_simplified_bodyweight_contract`
 - Milestone: `docs/plans/milestones/M28-simplify-bodyweight-ux-and-semantics.md`
 - Areas: frontend, backend, cross-stack; UI impact: yes
@@ -26,7 +26,8 @@ and #399; do not split it into five symptom patches.
     Stats, completion/share and group administration/board behavior;
   - group evaluator, privacy, publication, records and certification handling;
   - connected-agent/coaching output and import/export alignment;
-  - focused tests, native evidence, human UI review and final selected gates.
+  - focused tests, native evidence, human UI review and final selected gates;
+  - staged hosted migration, store release and verified production availability.
 - Out:
   - unrelated UI restyling or group/coaching features;
   - exposing the calculation breakdown;
@@ -98,6 +99,17 @@ separate child-issue PRs.
    - Replace retired unit/component/backend/native expectations.
    - Complete the human UI hold point before aggregate gates.
    - Verify every child issue explicitly and record evidence in the PR.
+6. Production rollout
+   - Verify the update-required compatibility client has reached and synced on
+     the installed fleet before the clean server cutover.
+   - Inspect the linked hosted project's pending migrations, then apply only
+     the reviewed protocol-3 cutover and deploy matching edge functions after
+     explicit approval.
+   - Prove old-client rejection, new-client sync, private-reading isolation,
+     group recalculation and coaching behavior with dedicated hosted accounts.
+   - Build and submit the exact reviewed protocol-3 commit to the intended
+     store track after explicit approval; confirm availability and a populated
+     device's upgrade. Keep the milestone open until this evidence is recorded.
 
 ## Deliverables and acceptance
 
@@ -132,6 +144,9 @@ separate child-issue PRs.
     before the aggregate closeout suite runs.
 14. Every lane selected by final `./boga test for --diff origin/main...HEAD` is
     green, with evidence in the PR body.
+15. The hosted cutover and matching functions are live, the intended store
+    build is available, and a populated installation upgrades and syncs with
+    its workouts and readings intact.
 
 ## UX contract
 

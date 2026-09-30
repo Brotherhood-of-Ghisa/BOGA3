@@ -2,7 +2,7 @@
 
 # Contract tests for the developer-only app_public.dev_wipe_my_data() helper.
 #
-# The helper deletes every row owned by the caller across all ten entity
+# The helper deletes every row owned by the caller across all synced entity
 # tables, in one transaction, and returns the count. It is security definer,
 # so it must scope its own deletes to the caller and refuse to run outside a
 # non-production environment.
@@ -82,7 +82,7 @@ RUN_TAG="$(date +%s)-$$-${RANDOM}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 NOW_MS="$(($(date +%s) * 1000))"
 
-# IDs for user A's full eleven-table FK chain (deleted by the helper) plus a
+# IDs for user A's full twelve-table FK chain (deleted by the helper) plus a
 # single user B gym that must survive (owner-scoping check).
 A_BW="dw-${RUN_TAG}-abw"
 A_GYM="dw-${RUN_TAG}-agym"
@@ -109,6 +109,7 @@ cleanup_rows() {
     delete from app_public.muscle_groups            where id in ('${A_MG}');
     delete from app_public.exercise_tag_definitions where id in ('${A_ETD}');
     delete from app_public.body_weight_measurements where id = '${A_BW}';
+    delete from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.sessions                 where id in ('${A_SESS}');
     delete from app_public.exercise_group_links     where id in ('${A_EGL}');
     delete from app_public.exercise_definitions     where id in ('${A_EDEF}');
@@ -170,7 +171,7 @@ pass "scenario 2: unset app.env raises FORBIDDEN_ENV"
 # ---------------------------------------------------------------------------
 # Scenario 3: owner-scoped wipe under a non-production env.
 #
-# Seed user A's full eleven-table FK chain plus one user B gym, then call the
+# Seed user A's full twelve-table FK chain plus one user B gym, then call the
 # helper as user A with app.env='local'. Assert: the return count equals A's
 # ten rows, all of A's rows are gone, and B's gym survives.
 # ---------------------------------------------------------------------------
@@ -253,8 +254,12 @@ run_psql_sql "
             ${NOW_MS}, ${NOW_MS});
 
     insert into app_public.body_weight_measurements
-      (owner_user_id, id, weight_value, weight_unit, weight_kg, measured_at, created_at, updated_at, client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid, '${A_BW}', '80', 'kg', 80, ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+      (owner_user_id, id, weight_kg, measured_at, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_BW}', 80, ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.user_settings
+      (owner_user_id, id, bodyweight_calculations_enabled, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'settings', true, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
     insert into app_public.exercise_group_links
       (owner_user_id, id, exercise_definition_id, group_id, group_exercise_id,
@@ -280,10 +285,10 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "11" ]]; then
-  fail "scenario 3 expected 11 rows deleted, got '${deleted}'"
+if [[ "${deleted}" != "12" ]]; then
+  fail "scenario 3 expected 12 rows deleted, got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 11"
+pass "scenario 3: helper returned rows_deleted = 12"
 
 remaining_a="$(run_psql "
   select
@@ -297,6 +302,7 @@ remaining_a="$(run_psql "
   + (select count(*) from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SET}')
   + (select count(*) from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SXTAG}')
   + (select count(*) from app_public.body_weight_measurements where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_BW}')
+  + (select count(*) from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid)
   + (select count(*) from app_public.exercise_group_links     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EGL}');
 ")"
 if [[ "${remaining_a}" != "0" ]]; then

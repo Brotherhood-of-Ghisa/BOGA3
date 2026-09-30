@@ -1,14 +1,12 @@
-// M27 versioned metric boundary. Legacy payloads remain explicitly tagged.
-// Unlike the legacy kg-only board payloads, every
-// ranked value here is discriminated by metric and unit. Keys stay snake_case.
+// Versioned kg-only metric boundary. Ranked values are discriminated by metric
+// and unit; calculation dependencies remain private to the evaluator.
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { GroupMetric, GroupMetricValue } from './metric-contract.ts';
 import type { GroupBoardPodiumExercise, GroupMemberRef, GroupRef, StreamCursor, StreamMembershipItem, StreamSessionItem } from './types.ts';
 
 export type GroupMetricRulesWire = {
-  bodyweight_coefficient: number;
-  movement_standard: string | null;
-  loading_method: string | null;
+  bodyweight_calculations_enabled: boolean;
+  bodyweight_contribution: number;
   load_input_mode: LoadInputMode;
   default_metric: GroupMetric;
   rules_revision: number;
@@ -23,27 +21,17 @@ export type GroupMetricExerciseWire = GroupMetricRulesWire & {
   rebuilding: boolean;
 };
 
-/** Only the saved shared-session tuple is exposed; never the reading timeline. */
+/** Only the performed set is exposed; private calculation context never is. */
 export type GroupPerformanceSnapshotWire = {
   session_id: string;
   session_exercise_id: string;
   exercise_definition_id: string;
   set_id: string;
   weight_value: string;
-  weight_unit: 'kg' | 'lb';
-  external_load_mode: 'added' | 'assistance' | 'unquantified_assistance' | null;
   reps_value: string;
   reps: number;
   performance_status: string | null;
   source_load_input_mode: LoadInputMode;
-  movement_standard: string | null;
-  loading_method: string | null;
-  body_weight_status: 'known' | 'missing' | 'invalid';
-  /** Invalid stored tuples are labelled, never rendered as usable readings. */
-  body_weight_kg: number | null;
-  body_weight_source: 'reading' | 'manual' | 'historical_estimate' | null;
-  body_weight_measurement_id: string | null;
-  body_weight_measured_at_ms: number | null;
   achieved_at_ms: number;
   exercise_order_index: number;
   set_order_index: number;
@@ -60,14 +48,11 @@ export type GroupMetricBoardRowWire = GroupMetricHolderWire & {
   rank: number;
   fingerprint: string;
   performance: GroupPerformanceSnapshotWire;
-  effective_resistance_kg: number | null;
-  external_adjustment_kg: number | null;
-  added_percent_bodyweight: number | null;
   certified: boolean;
   certification_id: string | null;
 };
 export type GroupMetricBoardWire = {
-  contract_version: 2;
+  contract_version: 3;
   exercise: GroupMetricExerciseWire;
   metric: GroupMetric;
   certified: boolean;
@@ -92,7 +77,7 @@ export type GroupMetricPodiumCardWire = {
   entry_count: number;
   all_entry_count: number;
 } | { legacy: true; exercise: GroupMetricExerciseWire; board: GroupBoardPodiumExercise };
-export type GroupMetricPodiumWire = { contract_version: 2; exercises: GroupMetricPodiumCardWire[] };
+export type GroupMetricPodiumWire = { contract_version: 3; exercises: GroupMetricPodiumCardWire[] };
 
 /** The rule revision explains the score; the pin attests raw dependencies. */
 export type GroupMetricCertificationWire = {
@@ -104,8 +89,6 @@ export type GroupMetricCertificationWire = {
   unit: GroupMetricValue['unit'];
   certified_at_ms: number;
   performance: GroupPerformanceSnapshotWire;
-  /** Bodyweight/provenance is a strength dependency; reps-only excludes it. */
-  includes_body_weight: boolean;
   ended_at_ms: number | null;
   end_reason: 'withdrawn' | 'cancelled' | 'voided' | null;
 };
@@ -153,7 +136,7 @@ export type GroupMetricEventWire = GroupMetricEventBase & (
 );
 
 export type GroupMetricHistoryWire = {
-  contract_version: 2;
+  contract_version: 3;
   exercise: GroupMetricExerciseWire;
   revision: GroupMetricRevisionWire;
   metric: GroupMetric;
@@ -191,12 +174,12 @@ export type GroupLegacyMetricHistoryWire = {
   payload: Record<string, unknown>;
 };
 export type GroupMetricRevisionsWire = {
-  contract_version: 2; exercise: GroupMetricExerciseWire; revisions: GroupMetricRevisionWire[];
+  contract_version: 3; exercise: GroupMetricExerciseWire; revisions: GroupMetricRevisionWire[];
 };
-export type GroupMetricExerciseListWire = { contract_version: 2; exercises: GroupMetricExerciseWire[] };
-export type GroupMetricExerciseWriteWire = { contract_version: 2; exercise: GroupMetricExerciseWire };
+export type GroupMetricExerciseListWire = { contract_version: 3; exercises: GroupMetricExerciseWire[] };
+export type GroupMetricExerciseWriteWire = { contract_version: 3; exercise: GroupMetricExerciseWire };
 export type GroupMetricCertificationResultWire = {
-  contract_version: 2; certification: GroupMetricCertificationWire; created?: boolean;
+  contract_version: 3; certification: GroupMetricCertificationWire; created?: boolean;
 };
 
 export type GroupMetricRecordContextWire = {
@@ -204,8 +187,6 @@ export type GroupMetricRecordContextWire = {
   former: boolean;
   metrics: {
     metric: GroupMetric; fingerprint: string; eligible: boolean;
-    effective_resistance_kg: number | null; external_adjustment_kg: number | null;
-    added_percent_bodyweight: number | null;
     certification: GroupMetricCertificationWire | null;
   }[];
 };
@@ -216,7 +197,7 @@ export type GroupMetricStreamItemWire = (
   (Omit<MetricLinkEvent, 'kind'> & { kind: 'link'; event: 'link' | 'unlink' })
 ) & {
   metric_event: true;
-  /** Missing in older cached v2 pages: details remain read-only until refreshed. */
+  /** Missing context never enables an attestation write. */
   record_context?: GroupMetricRecordContextWire;
   key: string;
   group: GroupRef;
@@ -224,7 +205,7 @@ export type GroupMetricStreamItemWire = (
 };
 export type GroupMetricStreamCursor = Omit<StreamCursor, 'kind'> & { kind: StreamCursor['kind'] | 'rules_change' };
 export type GroupMetricStreamWire = {
-  contract_version: 2;
+  contract_version: 3;
   items: (StreamSessionItem | StreamMembershipItem | GroupMetricStreamItemWire |
     (import('./types.ts').StreamRecordItem & { legacy: true; rules_revision: number }) |
     (import('./types.ts').StreamRecordVoidedItem & { legacy: true; rules_revision: number }) |

@@ -18,6 +18,10 @@ const createMockStore = (): jest.Mocked<SessionDraftStore> => ({
 
 const buildSessionRecord = (overrides: Partial<SessionPersistenceRecord> = {}): SessionPersistenceRecord => ({
   id: 'session-1',
+  bodyWeightKg: null,
+  bodyWeightSource: null,
+  bodyWeightMeasurementId: null,
+  bodyWeightMeasuredAt: null,
   gymId: 'gym-1',
   status: 'active',
   startedAt: new Date('2026-02-20T10:00:00.000Z'),

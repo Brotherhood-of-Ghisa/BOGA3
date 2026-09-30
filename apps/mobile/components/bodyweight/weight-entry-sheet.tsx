@@ -28,7 +28,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   const saving = useRef(false);
   const measuredAtMs = measuredAt.getTime();
   // Opening (or a new reading while open) shows it, reset in the render that opens.
-  const formKey = visible ? JSON.stringify([initial.weightValue, initial.weightUnit, measuredAtMs]) : null;
+  const formKey = visible ? JSON.stringify([initial.weightValue, measuredAtMs]) : null;
   const [shownFormKey, setShownFormKey] = useState<string | null>(null);
   if (formKey !== shownFormKey) {
     setShownFormKey(formKey);
@@ -50,7 +50,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   };
   const save = () => {
     setValueError(null); setDateError(null);
-    const input = { weightValue: value, weightUnit: 'kg' };
+    const input = { weightValue: value };
     try { validateBodyWeight(input); }
     catch (error) { setValueError((error as Error).message); return; }
     let date: Date;

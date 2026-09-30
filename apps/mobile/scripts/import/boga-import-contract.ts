@@ -1,10 +1,10 @@
-import { BOGA_SESSION_IMPORT_SCHEMA_V2, BOGA_SESSION_IMPORT_SCHEMA_V3, supportsLoadMetadata, validateImportedSetMeaning,
-  validateImportedWeightReading, validateImportedExerciseRules, type ImportedSessionWeight,
-  type ImportedSetMeaning, type ImportedWeightReading, type ImportedExerciseRules } from './bodyweight-import-context';
-export { BOGA_SESSION_IMPORT_SCHEMA_V2, BOGA_SESSION_IMPORT_SCHEMA_V3 } from './bodyweight-import-context';
+import { BOGA_SESSION_IMPORT_SCHEMA_V4, validateImportedSetMeaning,
+  validateImportedWeightReading, validateImportedExerciseDefinition, validateImportedWeightText,
+  type ImportedSetMeaning, type ImportedWeightReading, type ImportedExerciseDefinition } from './bodyweight-import-context';
+export { BOGA_SESSION_IMPORT_SCHEMA_V4 } from './bodyweight-import-context';
 import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
 
-export const BOGA_SESSION_IMPORT_SCHEMA = 'boga.session-import.v1' as const;
+export const BOGA_SESSION_IMPORT_SCHEMA = BOGA_SESSION_IMPORT_SCHEMA_V4;
 
 export type BogaImportCatalogExercise = {
   id: string;
@@ -37,8 +37,8 @@ export type BogaImportExerciseDecision =
   | {
       sourceExerciseName: string;
       decision: 'create_new';
-      loadInputMode?: ImportedExerciseRules['loadInputMode'];
-      loadRules?: ImportedExerciseRules['loadRules'];
+      loadInputMode: ImportedExerciseDefinition['loadInputMode'];
+      bodyweightContribution: number;
       importExerciseKey: string;
       exerciseName: string;
       muscleMappings: {
@@ -63,7 +63,7 @@ export type BogaImportExerciseTarget =
 
 export type BogaImportSetType = SessionSetTypeValue;
 
-export type BogaImportSet = Partial<ImportedSetMeaning> & {
+export type BogaImportSet = ImportedSetMeaning & {
   orderIndex: number;
   repsValue: string;
   weightValue: string;
@@ -91,7 +91,7 @@ export type BogaImportSessionExercise = {
   sets: BogaImportSet[];
 };
 
-export type BogaImportSession = Partial<ImportedSessionWeight> & {
+export type BogaImportSession = {
   importSessionKey: string;
   localDate: string;
   startedAt: string;
@@ -106,8 +106,9 @@ export type BogaImportSession = Partial<ImportedSessionWeight> & {
 };
 
 export type BogaSessionImportPackage = {
-  schema: typeof BOGA_SESSION_IMPORT_SCHEMA | typeof BOGA_SESSION_IMPORT_SCHEMA_V2 | typeof BOGA_SESSION_IMPORT_SCHEMA_V3;
-  bodyWeightMeasurements?: ImportedWeightReading[];
+  schema: typeof BOGA_SESSION_IMPORT_SCHEMA;
+  bodyweightCalculationsEnabled: boolean;
+  bodyWeightMeasurements: ImportedWeightReading[];
   generatedAt: string;
   target: {
     importingProfileLabel: string;
@@ -187,6 +188,8 @@ const isNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
 const isArray = (value: unknown): value is unknown[] => Array.isArray(value);
+const hasOnlyKeys = (value: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(value).every(key => keys.includes(key));
 
 export const isValidBogaImportSetType = (value: unknown): value is BogaImportSetType =>
   value === null || isSessionSetType(value);
@@ -201,29 +204,32 @@ export const validateBogaSessionImportPackage = (
     return { ok: false, errors: ['package must be an object'] };
   }
 
-  const v2 = supportsLoadMetadata(value.schema);
-  if (value.schema !== BOGA_SESSION_IMPORT_SCHEMA && !v2) {
-    errors.push(`schema must be ${BOGA_SESSION_IMPORT_SCHEMA} or ${BOGA_SESSION_IMPORT_SCHEMA_V2} or ${BOGA_SESSION_IMPORT_SCHEMA_V3}`);
+  if (value.schema !== BOGA_SESSION_IMPORT_SCHEMA) {
+    errors.push(`schema must be ${BOGA_SESSION_IMPORT_SCHEMA}`);
   }
 
   if (!isString(value.generatedAt)) {
     errors.push('generatedAt must be an ISO string');
   }
 
-  if (v2) {
-    if (!Array.isArray(value.bodyWeightMeasurements)) errors.push('v2 requires a bodyWeightMeasurements array (empty is allowed)');
-    else {
-      const ids = new Set<string>();
-      for (const reading of value.bodyWeightMeasurements) {
-        if (!validateImportedWeightReading(reading)) { errors.push('Invalid body weight reading'); continue; }
-        if (ids.has(reading.id)) errors.push('Duplicate body weight reading id');
-        ids.add(reading.id);
-        if (new Date(reading.measuredAt).getTime() > Date.now() || (typeof value.generatedAt === 'string' && new Date(reading.measuredAt).getTime() > new Date(value.generatedAt).getTime())) {
-          errors.push('A reading cannot be later than the package generation time');
-        }
+  if (typeof value.bodyweightCalculationsEnabled !== 'boolean') {
+    errors.push('bodyweightCalculationsEnabled must be a boolean');
+  }
+  if (!Array.isArray(value.bodyWeightMeasurements)) {
+    errors.push('bodyWeightMeasurements must be an array (empty is allowed)');
+  } else {
+    const ids = new Set<string>();
+    for (const reading of value.bodyWeightMeasurements) {
+      if (!validateImportedWeightReading(reading)) { errors.push('Invalid body weight reading'); continue; }
+      if (ids.has(reading.id)) errors.push('Duplicate body weight reading id');
+      ids.add(reading.id);
+      if (new Date(reading.measuredAt).getTime() > Date.now() ||
+          (typeof value.generatedAt === 'string' &&
+            new Date(reading.measuredAt).getTime() > new Date(value.generatedAt).getTime())) {
+        errors.push('A reading cannot be later than the package generation time');
       }
     }
-  } else if (value.bodyWeightMeasurements !== undefined) errors.push('Body weight readings require the v2 schema');
+  }
 
   const target = value.target;
   if (!isRecord(target)) {
@@ -268,12 +274,20 @@ export const validateBogaSessionImportPackage = (
       }
       decisionKeys.add(decision.sourceExerciseName);
       if (decision.decision === 'map_existing') {
+        if (!hasOnlyKeys(decision, ['sourceExerciseName', 'decision', 'exerciseDefinitionId', 'exerciseName'])) {
+          errors.push(`exercise decision ${decision.sourceExerciseName} contains unsupported fields`);
+        }
         if (!isString(decision.exerciseDefinitionId) || decision.exerciseDefinitionId.trim() === '') {
           errors.push(`exercise decision ${decision.sourceExerciseName} needs exerciseDefinitionId`);
         }
       } else if (decision.decision === 'create_new') {
-        if (v2 && !validateImportedExerciseRules(decision)) errors.push(`exercise decision ${decision.sourceExerciseName} needs valid loadInputMode and loadRules`);
-        if (!v2 && (decision.loadRules !== undefined || decision.loadInputMode !== undefined)) errors.push('Exercise load rules require the v2 schema');
+        if (!hasOnlyKeys(decision, ['sourceExerciseName', 'decision', 'loadInputMode',
+          'bodyweightContribution', 'importExerciseKey', 'exerciseName', 'muscleMappings', 'warnings'])) {
+          errors.push(`exercise decision ${decision.sourceExerciseName} contains unsupported fields`);
+        }
+        if (!validateImportedExerciseDefinition(decision)) {
+          errors.push(`exercise decision ${decision.sourceExerciseName} needs valid loadInputMode and bodyweightContribution`);
+        }
         if (!isString(decision.importExerciseKey) || decision.importExerciseKey.trim() === '') {
           errors.push(`exercise decision ${decision.sourceExerciseName} needs importExerciseKey`);
         }
@@ -302,9 +316,10 @@ export const validateBogaSessionImportPackage = (
         errors.push(`sessions[${sessionIndex}] must be an object`);
         return;
       }
-      // Legacy v2 snapshots are ignored, including malformed tuples; only explicit readings import.
-      if (value.schema === BOGA_SESSION_IMPORT_SCHEMA_V3 && ['bodyWeightKg', 'bodyWeightSource', 'bodyWeightMeasurementId', 'bodyWeightMeasuredAt'].some(key => key in session)) errors.push('v3 sessions cannot contain stored body weight');
-      if (!v2 && ['bodyWeightKg', 'bodyWeightSource', 'bodyWeightMeasurementId', 'bodyWeightMeasuredAt'].some(key => session[key] !== undefined)) errors.push('Session body weight requires the v2 schema');
+      if (!hasOnlyKeys(session, ['importSessionKey', 'localDate', 'startedAt', 'completedAt',
+        'durationSec', 'rawSpanSec', 'gymId', 'gymBucket', 'sourceWorkoutNames', 'exercises', 'warnings'])) {
+        errors.push(`sessions[${sessionIndex}] contains unsupported fields`);
+      }
       if (!isString(session.importSessionKey) || session.importSessionKey.trim() === '') {
         errors.push(`sessions[${sessionIndex}].importSessionKey is required`);
       }
@@ -340,8 +355,13 @@ export const validateBogaSessionImportPackage = (
               errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] must be an object`);
               return;
             }
-            if (v2 && !validateImportedSetMeaning(set)) errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] needs explicit actual/planned units, modes and performance status`);
-            if (!v2 && ['weightUnit', 'externalLoadMode', 'plannedWeightUnit', 'plannedExternalLoadMode', 'performanceStatus'].some(key => set[key] !== undefined)) errors.push('Explicit set load meaning requires the v2 schema');
+            if (!validateImportedSetMeaning(set)) {
+              errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] needs explicit planned values and performance status`);
+            }
+            if (!hasOnlyKeys(set, ['orderIndex', 'repsValue', 'weightValue', 'setType',
+              'plannedRepsValue', 'plannedWeightValue', 'plannedSetType', 'performanceStatus', 'source', 'warnings'])) {
+              errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] contains unsupported fields`);
+            }
             const orderIndex = set.orderIndex;
             if (typeof orderIndex !== 'number' || !Number.isInteger(orderIndex) || orderIndex < 0) {
               errors.push(
@@ -353,6 +373,8 @@ export const validateBogaSessionImportPackage = (
             }
             if (!isString(set.weightValue)) {
               errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].weightValue must be a string`);
+            } else if (set.weightValue !== '' && !validateImportedWeightText(set.weightValue)) {
+              errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}].weightValue must be valid kg text`);
             }
             if (!isValidBogaImportSetType(set.setType)) {
               errors.push(
@@ -369,12 +391,9 @@ export const validateBogaSessionImportPackage = (
 };
 
 
-/** Export the versioned package without dropping raw units, provenance or plans. */
+/** Export only the already-normalized kg-only V4 package. */
 export const serializeBogaSessionImportPackage = (pkg: BogaSessionImportPackage): string => {
   const validation = validateBogaSessionImportPackage(pkg);
   if (!validation.ok) throw new Error(validation.errors.join('\n'));
-  const { sessions, ...rest } = pkg;
-  const exported = { ...rest, schema: supportsLoadMetadata(pkg.schema) ? BOGA_SESSION_IMPORT_SCHEMA_V3 : pkg.schema,
-    sessions: sessions.map(({ bodyWeightKg, bodyWeightSource, bodyWeightMeasurementId, bodyWeightMeasuredAt, ...session }) => session) };
-  return JSON.stringify(exported, null, 2) + '\n';
+  return JSON.stringify(pkg, null, 2) + '\n';
 };

@@ -118,7 +118,8 @@ b_code() { jq -nc --arg c "$1" '{p_code: $c}'; }
 b_target() { jq -nc --arg g "$1" --arg u "$2" '{p_group_id: $g, p_user_id: $u}'; }
 b_role() { jq -nc --arg g "$1" --arg u "$2" --arg r "$3" '{p_group_id: $g, p_user_id: $u, p_role: $r}'; }
 b_create() { jq -nc --arg n "$1" --arg d "$2" '{p_name: $n, p_description: $d}'; }
-b_update() { jq -nc --arg g "$1" --arg n "$2" --arg d "$3" '{p_group_id: $g, p_name: $n, p_description: $d}'; }
+b_update() { jq -nc --arg g "$1" --arg n "$2" --arg d "$3" --argjson enabled "${4:-false}" \
+  '{p_group_id: $g, p_name: $n, p_description: $d, p_bodyweight_calculations_enabled: $enabled}'; }
 
 repeat_char() { node -e 'process.stdout.write(process.argv[1].repeat(Number(process.argv[2])))' "$1" "$2"; }
 lower() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
@@ -285,7 +286,8 @@ expect_ok "owner list_mine"
 check "list_mine sorts by name case-insensitively and returns GroupSummary" \
   '.groups | map(.group_id) == [$solo, $g]
    and all(.[]; .my_role == "owner" and .member_count == 1)
-   and (.[1] | keys == ["description","group_id","member_count","my_role","name"])
+   and (.[1] | keys == ["bodyweight_calculations_enabled","description","group_id","member_count","my_role","name"])
+   and all(.[]; .bodyweight_calculations_enabled == false)
    and .[1].name == $name and .[1].description == null and .[0].description == "A solo group"' \
   --arg solo "${SOLO}" --arg g "${G}" --arg name "${G_NAME}"
 
@@ -359,7 +361,8 @@ check "set_role returns { group, members } with the new role" \
 rpc "${MEMBER_TOKEN}" group_get "$(b_group "${G}")"
 expect_ok "member group_get"
 check "group_get: summary + members owner→admin→members, usernames case-insensitive" \
-  '.group == {group_id: $g, name: $name, description: null, member_count: 4, my_role: "member"}
+  '.group == {group_id: $g, name: $name, description: null, member_count: 4, my_role: "member",
+              bodyweight_calculations_enabled: false}
    and (.members | map(.user_id)) == [$o, $a, $j, $m]
    and (.members | map(.role)) == ["owner","admin","member","member"]
    and .members[3].username == $mname
@@ -411,7 +414,8 @@ DESC280="$(repeat_char e 280)"
 rpc "${ADMIN_TOKEN}" group_update "$(b_update "${G}" "  ${G_NAME} " "${DESC280}")"
 expect_ok "admin update with a 280-char description"
 check "update returns { group: GroupSummary }" \
-  '. == {group: {group_id: $g, name: $name, description: $d, member_count: 4, my_role: "admin"}}' \
+  '. == {group: {group_id: $g, name: $name, description: $d, member_count: 4, my_role: "admin",
+                 bodyweight_calculations_enabled: false}}' \
   --arg g "${G}" --arg name "${G_NAME}" --arg d "${DESC280}"
 rpc "${ADMIN_TOKEN}" group_update "$(b_update "${G}" "$(repeat_char n 51)" "")"
 expect_error VALIDATION "update with 51-char name"
@@ -742,17 +746,14 @@ card() {
 }
 
 card "active card: training now, its one live set as raw synced text" \
-  '.metric_revision == "dated_added_load_v3" and .metric_scope == "personal"
-   and .body_weight_kg == null and .body_weight_source == null and .body_weight_measurement_id == null and .body_weight_measured_at_ms == null
-   and .status == "active" and .completed_at_ms == null and .duration_sec == null
+  '.status == "active" and .completed_at_ms == null and .duration_sec == null
    and .started_at_ms == $s and .sort_at_ms == $s and .session_id == $sid
    and .member == {user_id: $u, username: $un} and .gym_name == $gym
    and .exercises == [{session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
-                       exercise_definition_id: $def, load_input_mode: "total_load", bodyweight_coefficient: 0,
-                       movement_standard: null, loading_method: null,
+                       exercise_definition_id: $def, load_input_mode: "total_load",
                        order_index: 0,
                        sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_value: "100", reps_value: "5",
-                               weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: null}]}]' \
+                               set_type: "working", performance_status: null}]}]' \
   --arg def "${DEF_A}" --argjson s "${S1_START}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" \
   --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}" --arg bench "Athlete Bench ${RUN_TAG}"
 
@@ -829,26 +830,25 @@ check "detail: every live set as raw synced text, tombstoned sets and exercises 
    and (.exercises | map(.name)) == [$bench, "Athlete Row", "Athlete Squat", "Athlete Freeform", "Athlete Planned Only"]
    and (.exercises | map(.order_index)) == [0, 1, 2, 3, 4]
    and .exercises[0] == {session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
-                       exercise_definition_id: $def, load_input_mode: "total_load", bodyweight_coefficient: 0,
-                       movement_standard: null, loading_method: null,
+                       exercise_definition_id: $def, load_input_mode: "total_load",
                          order_index: 0,
                          sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_value: "102.5", reps_value: "5",
-                                 weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: null},
+                                 set_type: "working", performance_status: null},
                                 {set_id: ($sid + "-a2"), order_index: 1, weight_value: "110", reps_value: "5",
-                                 weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: "planned"},
+                                 set_type: "working", performance_status: "planned"},
                                 {set_id: ($sid + "-a3"), order_index: 2, weight_value: "110", reps_value: "",
-                                 weight_unit: "kg", external_load_mode: null, set_type: "working", performance_status: null}]}
+                                 set_type: "working", performance_status: null}]}
    and .exercises[1].sets == [{set_id: ($sid + "-b1"), order_index: 0, weight_value: "80", reps_value: "5",
-                               weight_unit: "kg", external_load_mode: null, set_type: "warm_up", performance_status: null}]
+                               set_type: "warm_up", performance_status: null}]
    and (.exercises | map(.sets | length)) == [3, 1, 1, 1, 1]' \
   --arg def "${DEF_A}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" --arg un "athlete-${RUN_TAG}" --arg gym "${GYM_NAME}" \
   --argjson s "${S1_START}" --arg bench "Athlete Bench ${RUN_TAG}"
 check "detail carries no GPS field at any depth" \
   '[.. | objects | keys[]] | map(select(test("lat|lon|coordinate|accuracy"))) == []'
 check "detail keys are exactly the contract shape" \
-  '(.session | keys) == ["body_weight_kg","body_weight_measured_at_ms","body_weight_measurement_id","body_weight_source","completed_at_ms","duration_sec","exercises","gym_name","member","metric_revision","metric_scope","session_id","started_at_ms","status"]
-   and (.session.exercises[0] | keys) == ["bodyweight_coefficient","exercise_definition_id","load_input_mode","loading_method","machine_name","movement_standard","name","order_index","session_exercise_id","sets"]
-   and (.session.exercises[0].sets[0] | keys) == ["external_load_mode","order_index","performance_status","reps_value","set_id","set_type","weight_unit","weight_value"]'
+  '(.session | keys) == ["completed_at_ms","duration_sec","exercises","gym_name","member","session_id","started_at_ms","status"]
+   and (.session.exercises[0] | keys) == ["exercise_definition_id","load_input_mode","machine_name","name","order_index","session_exercise_id","sets"]
+   and (.session.exercises[0].sets[0] | keys) == ["order_index","performance_status","reps_value","set_id","set_type","weight_value"]'
 stream "${VIEWER_TOKEN}" "" null 50
 expect_ok "viewer stream for the GPS check"
 check "stream carries no GPS field at any depth" \
@@ -980,8 +980,8 @@ check "All: membership items for joined and left, keyed <membership_id>:joined|e
     and ($ms[0] | keys) == ["event","group","key","kind","member","sort_at_ms"]' \
   --arg ath "${ATHLETE_UID}" --arg a "${GA}" --arg b "${GB}"
 check "session card keys are exactly the contract shape" '
-  [.items[] | select(.kind == "session")][0] | keys == ["body_weight_kg","body_weight_measured_at_ms","body_weight_measurement_id","body_weight_source","completed_at_ms","duration_sec","exercises","groups",
-    "gym_name","key","kind","member","metric_revision","metric_scope","session_id","sort_at_ms","started_at_ms","status"]'
+  [.items[] | select(.kind == "session")][0] | keys == ["completed_at_ms","duration_sec","exercises","groups",
+    "gym_name","key","kind","member","session_id","sort_at_ms","started_at_ms","status"]'
 
 rpc "${VIEWER_TOKEN}" group_stream '{}'
 expect_ok "viewer stream with every argument defaulted"

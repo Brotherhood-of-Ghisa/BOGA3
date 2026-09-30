@@ -28,8 +28,7 @@ export function GroupMetricStreamRecordSheet({ record, userId, myRole, onClose, 
     : context.exercise.rebuilding ? 'rules are recalculating' : !detail?.eligible ? 'performance changed; refresh to review' : undefined;
   const row: GroupMetricBoardRowWire = { ...score, rank: 1, member: record.member ?? { user_id: '', username: null },
     former: context?.former ?? false, achieved_at_ms: record.performance.achieved_at_ms, rules_revision: record.rules_revision,
-    set_id: record.set_id, performance: record.performance, effective_resistance_kg: detail?.effective_resistance_kg ?? null,
-    external_adjustment_kg: detail?.external_adjustment_kg ?? null, added_percent_bodyweight: detail?.added_percent_bodyweight ?? null,
+    set_id: record.set_id, performance: record.performance,
     certified: certificate !== null, certification_id: certificate?.certification_id ?? null };
   return <GroupMetricRecordSheet key={`${record.key}:${score.metric}`} row={row} exercise={exercise} groupId={record.group.group_id}
     userId={userId} myRole={myRole} onClose={onClose} onChanged={onChanged} readOnlyReason={readOnlyReason}

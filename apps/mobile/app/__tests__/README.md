@@ -91,15 +91,11 @@
 
 ## Dated bodyweight coverage
 
-> **Accepted post-cutover coverage; implementation pending.** The named files
-> are the required destinations for this coverage. Until the cutover lands,
-> existing bodyweight suites may still encode the pre-cutover contract.
-
 `bodyweight-as-of.test.ts` must fix exact-instant ordering, binary Unicode ID ties,
 DST equivalence, malformed-row skipping, and edit/move/delete/restore intervals.
 `bodyweight-data.test.ts` must run populated old-schema upgrades and prove kg
 conversion plus retained row IDs, clocks, readings, history and contributions;
-obsolete session/unit/mode/movement/loading/hydration columns disappear. Reading
+superseded storage columns disappear. Reading
 mutations must recalculate consumers without modifying sessions or sets. Sync
 must cover LWW/reinstall, the private preference and post-commit invalidation.
 UI tests must cover
@@ -116,8 +112,8 @@ record/ranking exclusion. No test may infer contribution from an exercise name.
 
 `bodyweight-logging-ui.test.tsx` must cover one kg Weight field, numeric-zero display,
 conditional contribution, repeated off/on persistence and ordinary Weight/1RM/
-Volume copy. It must assert absence of unit selectors, movement/loading fields,
-session prompts and retired Added/External/Effective vocabulary.
+Volume copy. It must assert absence of unit selectors, calculation-only fields
+and session prompts.
 
 ## Personal bodyweight analytics coverage
 
@@ -130,9 +126,6 @@ context parity (including malformed-row fallback), later-reading isolation and r
 after reading/preference/contribution changes. Existing History/Stats/heatmap,
 completion and share tests must prove Top weight remains raw and missing personal
 reading never creates an unavailable state.
-
-If retained, `bodyweight-loading-estimate-ui.test.tsx` must cover kg-only transient
-Weight/1RM behavior without reading provenance or calculation breakdown.
 
 ## Strict group bodyweight coverage
 

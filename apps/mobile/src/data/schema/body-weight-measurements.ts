@@ -1,14 +1,12 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-// Owner-private Sync v2 root. Sessions resolve applicable readings on read;
+// Owner-private sync root. Sessions resolve applicable readings on read;
 // reading changes never write session or set rows.
 export const bodyWeightMeasurements = sqliteTable(
   'body_weight_measurements',
   {
     id: text('id').primaryKey().notNull().default(sql`(lower(hex(randomblob(16))))`),
-    weightValue: text('weight_value').notNull(),
-    weightUnit: text('weight_unit').notNull(),
     weightKg: real('weight_kg').notNull(),
     measuredAt: integer('measured_at', { mode: 'timestamp_ms' }).notNull(),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),

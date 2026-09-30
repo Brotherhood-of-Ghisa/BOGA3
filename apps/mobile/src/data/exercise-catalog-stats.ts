@@ -1,9 +1,10 @@
 import { loadAsOfWeightResolver } from './bodyweight';
-import type { SessionWeightContext } from '@/src/bodyweight/snapshot';
+import type { SessionWeightContext } from '@/src/bodyweight/as-of';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 
-import { addFiniteVolume, calculateAnalyticsSetMetrics, exerciseLoadContext } from '@/src/exercise-calculations/analytics';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, personalLoadContext } from '@/src/exercise-calculations/analytics';
+import type { LoadInputMode } from '@/src/exercise-calculations/load-metrics';
 import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
@@ -11,7 +12,7 @@ import {
 } from '@/src/session-recorder/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 import { isWorkingSessionSetType } from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 
@@ -43,7 +44,8 @@ export type ExerciseCatalogStats = {
 
 export type ExerciseCatalogStatsRawHistory = {
   sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
-  exerciseDefinitions?: { id: string; bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean; loadInputMode?: string }[];
+  bodyweightCalculationsEnabled?: boolean;
+  exerciseDefinitions?: { id: string; bodyweightContribution: number; loadInputMode: LoadInputMode }[];
   sessionExercises: { id: string; sessionId: string; exerciseDefinitionId: string | null }[];
   exerciseSets: {
     sessionExerciseId: string;
@@ -51,8 +53,6 @@ export type ExerciseCatalogStatsRawHistory = {
     repsValue: string;
     setType: string | null;
     performanceStatus?: SessionSetPerformanceStatus;
-    localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string | null; externalLoadMode?: string | null;
   }[];
 };
 
@@ -64,6 +64,11 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
   async loadRawHistory() {
     const database = await bootstrapLocalDataLayer();
     const resolveWeight = loadAsOfWeightResolver(database);
+    const bodyweightCalculationsEnabled = database
+      .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+      .from(userSettings)
+      .where(eq(userSettings.id, 'settings'))
+      .get()?.enabled ?? false;
 
     const storedSessionRows = database
       .select({
@@ -108,7 +113,6 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
             .select({
               sessionExerciseId: exerciseSets.sessionExerciseId,
               weightValue: exerciseSets.weightValue,
-              localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
               repsValue: exerciseSets.repsValue,
               setType: exerciseSets.setType,
               performanceStatus: exerciseSets.performanceStatus,
@@ -128,13 +132,13 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
     const definitions = definitionIds.length ? database.select().from(exerciseDefinitions)
       .where(inArray(exerciseDefinitions.id, definitionIds)).all() : [];
     return {
+      bodyweightCalculationsEnabled,
       exerciseDefinitions: definitions,
       sessions: sessionsCompleted,
       sessionExercises: sessionExerciseRows,
       exerciseSets: exerciseSetRows.map((row) => ({
         sessionExerciseId: row.sessionExerciseId,
         weightValue: row.weightValue,
-        localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit, externalLoadMode: row.externalLoadMode,
         repsValue: row.repsValue,
         setType: row.setType ?? null,
         performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
@@ -218,7 +222,14 @@ export const aggregateExerciseCatalogStats = (
     const defId = link.exerciseDefinitionId;
     const completedAt = sessionCompletedAt.get(link.sessionId);
     if (!completedAt) continue;
-    const metric = calculateAnalyticsSetMetrics({ ...set, ...exerciseLoadContext(definitionById.get(defId), sessionById.get(link.sessionId)) });
+    const metric = calculateAnalyticsSetMetrics({
+      ...set,
+      ...personalLoadContext(
+        raw.bodyweightCalculationsEnabled ?? false,
+        definitionById.get(defId),
+        sessionById.get(link.sessionId),
+      ),
+    });
     if (!metric.eligible) continue;
 
     // All browser history uses the same eligible sets as Favourite and counts.

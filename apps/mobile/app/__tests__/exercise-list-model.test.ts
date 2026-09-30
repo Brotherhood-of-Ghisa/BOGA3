@@ -23,11 +23,11 @@ const rawHistory = (): ExerciseCatalogStatsRawHistory => ({
 });
 const muscleGroups = [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10 }];
 const exercises: IndexedExerciseCatalogExercise[] = [
-  { id: 'bench', name: 'Bench Press', deletedAt: null, mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'bench press chest' },
-  { id: 'old', name: 'Ancient Press', deletedAt: null, mappings: [{ id: 'm2', muscleGroupId: 'chest', weight: 1, role: 'secondary' }], searchText: 'ancient press' },
-  { id: 'never', name: 'Cable Fly', deletedAt: null, mappings: [{ id: 'm3', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'cable fly chest' },
-  { id: 'unmapped', name: 'Carry', deletedAt: null, mappings: [], searchText: 'carry' },
-  { id: 'deleted', name: 'Deleted Fly', deletedAt: NOW, mappings: [], searchText: 'deleted fly' },
+  { id: 'bench', name: 'Bench Press', bodyweightContribution: 0, deletedAt: null, mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'bench press chest' },
+  { id: 'old', name: 'Ancient Press', bodyweightContribution: 0, deletedAt: null, mappings: [{ id: 'm2', muscleGroupId: 'chest', weight: 1, role: 'secondary' }], searchText: 'ancient press' },
+  { id: 'never', name: 'Cable Fly', bodyweightContribution: 0, deletedAt: null, mappings: [{ id: 'm3', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'cable fly chest' },
+  { id: 'unmapped', name: 'Carry', bodyweightContribution: 0, deletedAt: null, mappings: [], searchText: 'carry' },
+  { id: 'deleted', name: 'Deleted Fly', bodyweightContribution: 0, deletedAt: NOW, mappings: [], searchText: 'deleted fly' },
 ];
 const buildModel = (preferences: Partial<ExerciseListPreferences> = {}, query = '') => buildExerciseListModel({
   exercises, muscleGroups,

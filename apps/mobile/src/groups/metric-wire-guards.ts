@@ -7,8 +7,23 @@ import type {
 
 export const isMetricRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
+const PRIVATE_CALCULATION_FIELDS = new Set([
+  'body_weight_kg',
+  'body_weight_source',
+  'body_weight_measurement_id',
+  'body_weight_measured_at',
+  'body_weight_measured_at_ms',
+  'body_weight_dependency_digest',
+]);
+const hasPrivateCalculationField = (value: Record<string, unknown>): boolean =>
+  Object.keys(value).some(key => PRIVATE_CALCULATION_FIELDS.has(key));
+const PERFORMANCE_FIELDS = new Set([
+  'session_id', 'session_exercise_id', 'exercise_definition_id', 'set_id',
+  'weight_value', 'reps_value', 'reps', 'performance_status',
+  'source_load_input_mode', 'achieved_at_ms', 'exercise_order_index', 'set_order_index',
+]);
 const metricValueRecord = (value: unknown): value is GroupMetricValue & Record<string, unknown> =>
-  isMetricRecord(value) && isGroupMetricValue(value);
+  isMetricRecord(value) && !hasPrivateCalculationField(value) && isGroupMetricValue(value);
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const integer = (value: unknown): value is number => finite(value) && Number.isSafeInteger(value);
 const nullableString = (value: unknown) => value === null || typeof value === 'string';
@@ -16,10 +31,11 @@ const member = (value: unknown) => isMetricRecord(value) && typeof value.user_id
 const nullableFinite = (value: unknown) => value === null || finite(value);
 
 export function isGroupMetricRulesWire(value: unknown): value is GroupMetricRulesWire & Record<string, unknown> {
-  if (!isMetricRecord(value) || !integer(value.rules_revision) || value.rules_revision < 1) return false;
+  if (!isMetricRecord(value) || hasPrivateCalculationField(value) ||
+    !integer(value.rules_revision) || value.rules_revision < 1) return false;
   return validateGroupExerciseRules({ name: typeof value.name === 'string' ? value.name : 'Comparison',
-    loadInputMode: value.load_input_mode, bodyweightCoefficient: value.bodyweight_coefficient,
-    movementStandard: value.movement_standard, loadingMethod: value.loading_method,
+    loadInputMode: value.load_input_mode, bodyweightCalculationsEnabled: value.bodyweight_calculations_enabled,
+    bodyweightContribution: value.bodyweight_contribution,
     defaultMetric: value.default_metric }).ok;
 }
 export function isGroupMetricExerciseWire(value: unknown): value is GroupMetricExerciseWire {
@@ -32,23 +48,13 @@ export function isGroupMetricExerciseWire(value: unknown): value is GroupMetricE
 }
 export function isGroupPerformanceWire(value: unknown): value is GroupPerformanceSnapshotWire {
   if (!isMetricRecord(value)) return false;
+  if (Object.keys(value).some(key => !PERFORMANCE_FIELDS.has(key))) return false;
   if (!['session_id','session_exercise_id','exercise_definition_id','set_id','weight_value','reps_value']
     .every(key => typeof value[key] === 'string') || !integer(value.reps) || value.reps < 1 ||
     !integer(value.achieved_at_ms) || !integer(value.exercise_order_index) || !integer(value.set_order_index) ||
-    !nullableString(value.performance_status) || !nullableString(value.movement_standard) || !nullableString(value.loading_method) ||
-    !['kg','lb'].includes(String(value.weight_unit)) ||
-    ![null,'added','assistance','unquantified_assistance'].includes(value.external_load_mode as string | null) ||
+    !nullableString(value.performance_status) ||
     !['total_load','per_side_load'].includes(String(value.source_load_input_mode))) return false;
-  const empty = [value.body_weight_kg,value.body_weight_source,value.body_weight_measurement_id,value.body_weight_measured_at_ms]
-    .every(field => field === null);
-  if (value.body_weight_status === 'missing' || value.body_weight_status === 'invalid') return empty;
-  // Historical record/certification evidence retains its original provenance.
-  // This decoder only displays server scores; live scoring accepts dated readings.
-  if (value.body_weight_status !== 'known' || !finite(value.body_weight_kg) || value.body_weight_kg <= 0) return false;
-  if (value.body_weight_source === 'manual') return value.body_weight_measurement_id === null && value.body_weight_measured_at_ms === null;
-  return ['reading', 'historical_estimate'].includes(String(value.body_weight_source)) &&
-    typeof value.body_weight_measurement_id === 'string' && value.body_weight_measurement_id.trim().length > 0 &&
-    integer(value.body_weight_measured_at_ms) && Number.isFinite(new Date(value.body_weight_measured_at_ms).getTime());
+  return true;
 }
 const isRow = (value: unknown, metric: unknown, revision: unknown) =>
   metricValueRecord(value) && value.metric === metric && value.rules_revision === revision &&
@@ -56,14 +62,12 @@ const isRow = (value: unknown, metric: unknown, revision: unknown) =>
   integer(value.achieved_at_ms) && typeof value.set_id === 'string' && isGroupPerformanceWire(value.performance) &&
   value.performance.set_id === value.set_id && value.performance.achieved_at_ms === value.achieved_at_ms &&
   value.performance.performance_status === null &&
-  (!['relative_strength','absolute_strength'].includes(String(metric)) || value.performance.body_weight_status === 'known') &&
-  nullableFinite(value.effective_resistance_kg) && nullableFinite(value.external_adjustment_kg) &&
-  nullableFinite(value.added_percent_bodyweight) && typeof value.fingerprint === 'string' && value.fingerprint.length > 0 &&
+  typeof value.fingerprint === 'string' && value.fingerprint.length > 0 &&
   typeof value.certified === 'boolean' && nullableString(value.certification_id) &&
   value.certified === (value.certification_id !== null);
 
 export function isGroupMetricBoardWire(value: unknown): value is GroupMetricBoardWire {
-  if (!isMetricRecord(value) || value.contract_version !== 2 || !isGroupMetricExerciseWire(value.exercise) ||
+  if (!isMetricRecord(value) || value.contract_version !== 3 || !isGroupMetricExerciseWire(value.exercise) ||
     !isGroupMetric(value.metric) || typeof value.certified !== 'boolean' ||
     value.exercise.legacy || value.rules_revision !== value.exercise.rules_revision ||
     !['ready','rebuilding','archived'].includes(String(value.state)) || !Array.isArray(value.entries) ||
@@ -75,12 +79,12 @@ export function isGroupMetricBoardWire(value: unknown): value is GroupMetricBoar
     (value.state === 'rebuilding') === value.exercise.rebuilding;
 }
 export function isGroupMetricPodiumWire(value: unknown): value is GroupMetricPodiumWire {
-  if (!isMetricRecord(value) || value.contract_version !== 2 || !Array.isArray(value.exercises)) return false;
+  if (!isMetricRecord(value) || value.contract_version !== 3 || !Array.isArray(value.exercises)) return false;
   return value.exercises.every(card => {
     if (!isMetricRecord(card) || !isGroupMetricExerciseWire(card.exercise)) return false;
     if (card.legacy === true) return card.exercise.legacy && isMetricRecord(card.board) && Array.isArray(card.board.podium);
     return card.legacy === false && !card.exercise.legacy && isGroupMetricBoardWire({
-      ...card, contract_version: 2, entries: card.podium, next_cursor: null,
+      ...card, contract_version: 3, entries: card.podium, next_cursor: null,
     }) && integer(card.all_entry_count) && card.all_entry_count >= 0;
   });
 }
@@ -89,8 +93,6 @@ export function isGroupMetricCertificationWire(value: unknown): value is GroupMe
   return typeof value.certification_id === 'string' && integer(value.rules_revision) && value.rules_revision > 0 &&
     (value.certified_by === null || member(value.certified_by)) && integer(value.certified_at_ms) &&
     isGroupPerformanceWire(value.performance) &&
-    (!['relative_strength','absolute_strength'].includes(value.metric) || value.performance.body_weight_status === 'known') &&
-    value.includes_body_weight === ['absolute_strength','relative_strength'].includes(value.metric) &&
     (value.ended_at_ms === null ? value.end_reason === null : integer(value.ended_at_ms) &&
       ['withdrawn','cancelled','voided'].includes(String(value.end_reason)));
 }
@@ -114,7 +116,7 @@ const isEventBase = (value: Record<string, unknown>) => typeof value.event_id ==
   integer(value.rules_revision) && value.rules_revision > 0 && (value.member === null || member(value.member));
 
 export function isGroupMetricHistoryWire(value: unknown): boolean {
-  if (!isMetricRecord(value) || value.contract_version !== 2 || !isGroupMetricExerciseWire(value.exercise) ||
+  if (!isMetricRecord(value) || value.contract_version !== 3 || !isGroupMetricExerciseWire(value.exercise) ||
     !isGroupMetricRevisionWire(value.revision) || !isGroupMetric(value.metric) ||
     typeof value.certified !== 'boolean' || !nullableString(value.next_cursor) || !Array.isArray(value.events)) return false;
   const revision = value.revision;
@@ -151,8 +153,6 @@ const isRecordContext = (value: unknown, event: Record<string, unknown>): boolea
     seen.add(context.metric);
     const board = (event.boards as unknown[]).find(item => isMetricRecord(item) && item.metric === context.metric);
     return isMetricRecord(board) && board.fingerprint === context.fingerprint && typeof context.eligible === 'boolean' &&
-      nullableFinite(context.effective_resistance_kg) && nullableFinite(context.external_adjustment_kg) &&
-      nullableFinite(context.added_percent_bodyweight) &&
       (!context.eligible || (isGroupMetricExerciseWire(value.exercise) && !value.former && !event.voided &&
         value.exercise.archived_at_ms === null && !value.exercise.rebuilding && value.exercise.rules_revision === event.rules_revision)) &&
       (context.certification === null || (isGroupMetricCertificationWire(context.certification) &&

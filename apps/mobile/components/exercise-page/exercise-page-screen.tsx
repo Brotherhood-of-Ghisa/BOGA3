@@ -13,9 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { isValidSessionWeight } from '@/src/bodyweight/weight-entry';
+import { EMPTY_SESSION_WEIGHT, isValidSessionWeight } from '@/src/bodyweight/weight-entry';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
-import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -115,7 +115,7 @@ export function ExercisePageScreen({
       scope: listPreferences.pastRecordsGymScope,
       currentGymId,
     },
-    JSON.stringify([recordsRevision, editingExercise?.bodyweightCoefficient, editingExercise?.loadInputMode, editingExercise?.localBodyweightMetadataKnown])
+    JSON.stringify([recordsRevision, editingExercise?.bodyweightContribution, editingExercise?.loadInputMode])
   );
 
   const [recordsExpanded, setRecordsExpanded] = useState(false);
@@ -132,14 +132,15 @@ export function ExercisePageScreen({
   }, [router]);
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
-  const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : {};
-  const loadContext: LoadContext = {
-    bodyweightCoefficient: !bodyweightCalculationsEnabled ? 0
-      : !editingExercise || editingExercise.localBodyweightMetadataKnown === false ? NaN
-      : editingExercise.bodyweightCoefficient ?? 0,
-    loadInputMode: editingExercise?.loadInputMode ?? 'total_load',
-    bodyWeightKg: isValidSessionWeight(bodyWeight ?? {}) ? bodyWeight?.bodyWeightKg : 0,
-  };
+  const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : EMPTY_SESSION_WEIGHT;
+  const loadContext = personalLoadContext(
+    bodyweightCalculationsEnabled,
+    editingExercise ? {
+      bodyweightContribution: editingExercise.bodyweightContribution,
+      loadInputMode: editingExercise.loadInputMode,
+    } : null,
+    isValidSessionWeight(bodyWeight) ? bodyWeight : null,
+  );
   const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
   const rows = buildSetRows(sets, baseline, loadContext);
@@ -157,7 +158,7 @@ export function ExercisePageScreen({
     [draft]
   );
 
-  const onChangeLogger = (values: { weightValue?: string; repsValue?: string; weightUnit?: string; externalLoadMode?: string }) => {
+  const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
     if (!openSet) return;
     updateSets((current) => updateLoggerValues(current, openSet.id, values), 'text');
   };
@@ -171,7 +172,7 @@ export function ExercisePageScreen({
   const onCommit = () => {
     if (!openSet || !loggerValues) return;
     Keyboard.dismiss();
-    updateSets((current) => commitSet(current, openSet.id, { ...loggerValues, externalLoadMode: 'added' }), 'structural');
+    updateSets((current) => commitSet(current, openSet.id, loggerValues), 'structural');
     setOpenSetId(null);
   };
 
@@ -267,7 +268,6 @@ export function ExercisePageScreen({
             card's content, so page and card share one rhythm. */}
         <ScreenScroll gutter="md" keyboardShouldPersistTaps="handled" testID="exercise-page-scroll">
           <RecordsPanel
-            bodyweight={false}
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
             isFilteredByGym={isFilteredByGym}
@@ -294,9 +294,6 @@ export function ExercisePageScreen({
                   <SetLogger
                     key={row.id}
                     loadContext={loadContext}
-                    weightUnit={loggerValues.weightUnit}
-                    externalLoadMode={loggerValues.externalLoadMode}
-                    metadataKnown={editingExercise?.localBodyweightMetadataKnown !== false}
                     number={row.number}
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}

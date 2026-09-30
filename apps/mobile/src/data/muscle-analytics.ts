@@ -1,6 +1,6 @@
-import type { SessionWeightContext } from '@/src/bodyweight/snapshot';
-import { type EffectiveSetMetrics } from '@/src/exercise-calculations/effective-load';
-import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredAddedWeightKg, exerciseLoadContext } from '@/src/exercise-calculations/analytics';
+import type { SessionWeightContext } from '@/src/bodyweight/as-of';
+import { type SetMetrics } from '@/src/exercise-calculations/load-metrics';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
   computeSetVolume,
   estimateOneRepMax,
@@ -16,10 +16,11 @@ import { isWorkingSessionSetType } from './set-types';
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
 export type MuscleAnalyticsInput = {
+  bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: {
     id: string;
     loadInputMode: 'total_load' | 'per_side_load';
-    bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean;
+    bodyweightContribution: number;
   }[];
   sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
   sessionExercises: {
@@ -36,8 +37,6 @@ export type MuscleAnalyticsInput = {
     weightValue: string;
     repsValue: string;
     performanceStatus?: SessionSetPerformanceStatus;
-    localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string | null; externalLoadMode?: string | null;
   }[];
   muscleMappings: {
     exerciseDefinitionId: string;
@@ -62,8 +61,8 @@ export type MuscleSetContribution = {
   roleWeight: number;
   weightedVolume: number | null;
   setVolume: number | null;
-  metrics?: EffectiveSetMetrics;
-  addedWeightKg?: number | null;
+  metrics?: SetMetrics;
+  enteredWeightKg?: number | null;
   sessionId: string;
   sessionCompletedAt: Date;
   sessionExerciseId: string;
@@ -236,10 +235,14 @@ export const collectMuscleSetContributions = (
     const mappings = mappingsByExerciseDefinitionId.get(exercise.exerciseDefinitionId) ?? [];
     if (mappings.length === 0) continue;
 
-    const context = exerciseLoadContext(definitionById.get(exercise.exerciseDefinitionId), session);
+    const context = personalLoadContext(
+      input.bodyweightCalculationsEnabled ?? false,
+      definitionById.get(exercise.exerciseDefinitionId),
+      session,
+    );
     const metrics = calculateAnalyticsSetMetrics({ ...set, ...context });
     const rawSetVolume = metrics.eligible && metrics.load.status === 'known'
-      ? metrics.load.muscleResistancePerSideKg * metrics.reps : null;
+      ? metrics.load.perSideCalculatedLoadKg * metrics.reps : null;
     const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
     for (const mapping of mappings) {
@@ -252,7 +255,7 @@ export const collectMuscleSetContributions = (
         role: mapping.role,
         roleWeight,
         weightedVolume: setVolume === null ? null : setVolume * roleWeight,
-        metrics, addedWeightKg: enteredAddedWeightKg(set, context),
+        metrics, enteredWeightKg: enteredWeightKg(set),
         setVolume,
         sessionId: exercise.sessionId,
         sessionCompletedAt: session.completedAt,
@@ -390,8 +393,8 @@ export const accumulateContributionMetrics = (
     acc.workingSetCount += 1;
   }
 
-  const weight = contribution.addedWeightKg === undefined
-    ? parseSetWeight(contribution.weightValue) : contribution.addedWeightKg;
+  const weight = contribution.enteredWeightKg === undefined
+    ? parseSetWeight(contribution.weightValue) : contribution.enteredWeightKg;
   if (weight !== null) acc.highestWeight = Math.max(acc.highestWeight ?? 0, weight);
   const reps = parseSetReps(contribution.repsValue);
   const rm1 = contribution.metrics === undefined

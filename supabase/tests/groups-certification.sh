@@ -129,7 +129,7 @@ drain() {
   local out
   out="$(mktemp)"
   STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
     -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
   BODY="$(cat "${out}")"
   rm -f "${out}"
@@ -467,7 +467,7 @@ check_args "certify returns the pinned certification" --arg c "${CERTIFIER_UID}"
                                    "group_exercise_id","group_id","member","pinned","session_id","set_id"]
    and .certification.member.user_id == $r and .certification.certified_by.user_id == $c
    and .certification.set_id == $s and .certification.end_reason == null and .certification.ended_by == null
-   and .certification.pinned == {weight_value: "95", weight_unit: "kg", external_load_mode: "added", reps_value: "1", performance_status: null,
+   and .certification.pinned == {weight_value: "95", reps_value: "1", performance_status: null,
                                  weight_kg: 95, reps: 1, e1rm_kg: .certification.pinned.e1rm_kg}
    and (.certification.pinned.e1rm_kg | type) == "number"'
 R1_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"

@@ -22,10 +22,8 @@ This document is project-level source of truth for what data exists and how it i
 ## Current model layers
 
 The platform layers below are current. Within them, the
-[bodyweight contract](tech/bodyweight-load-contract.md) defines the accepted
-replacement model; its kg-only preference/contribution cutover is
-implementation-pending rather than a description of the pre-cutover schema. It
-adds an
+[bodyweight contract](tech/bodyweight-load-contract.md) defines the kg-only
+preference/contribution model. It includes an
 owner-synced private preference, private dated kg readings and independent
 personal/group contributions. Sessions store no bodyweight tuple or override;
 the latest valid reading at/before the exact start is selected on read. Ordinary
@@ -54,15 +52,13 @@ changes recalculate derived history without changing raw sets.
   `sync_push` RPC and read by the `sync_pull` RPC under per-row last-write-wins.
 - there is no projection function and no event log: the data is the event.
 
-The clean kg-only wire is a coordinated protocol cutover. The server migration
-deploys before the client and requires `x-boga-sync-protocol: 3`; older clients
-receive `UPDATE_REQUIRED` before row access. The wire removes obsolete unit,
-external-mode, movement/loading and hydration fields, renames coefficients to
-contributions, adds `user_settings`, and carries readings as kg only. There is
-no retired-field compatibility branch. Group projections and calculated metrics
-remain outside the mirror; no derived Volume/1RM columns are stored.
+The kg-only wire uses `x-boga-sync-protocol: 3`; missing, malformed or
+unsupported versions receive `UPDATE_REQUIRED` before row access. It includes
+`user_settings`, carries readings as kg and carries exercise contributions.
+Group projections and calculated metrics remain outside the mirror; no derived
+Volume/1RM columns are stored.
 
-## Local schema inventory (accepted clean model)
+## Local schema inventory
 
 ### User-owned domain data (sync/backups expected)
 
@@ -75,12 +71,10 @@ remain outside the mirror; no derived Volume/1RM columns are stored.
 - `sessions` (recorded start/end/status and ordinary sync fields; bodyweight is a private read projection)
 - `session_exercises`
 - `exercise_sets` (actual entered `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for explicit planned/unperformed execution state; legacy `skipped` values remain readable)
-- `exercise_sets` stores actual/planned Weight text in kg only; no unit or
-  external-load-mode columns remain. Blank performed Weight canonicalizes to
-  zero while malformed values remain invalid.
+- `exercise_sets` stores actual/planned Weight text in kg. Blank performed
+  Weight canonicalizes to zero while malformed values remain invalid.
 - `exercise_definitions` stores `bodyweight_contribution` (fraction in `[0,1]`,
-  default 0). The private preference decides whether it participates; no
-  movement/loading fields or name inference exist.
+  default 0). The private preference decides whether it participates.
   - `load_input_mode` is required metadata with values `total_load` and
     `per_side_load`. It describes whether the entered scalar is a shared load
     or already one-side load; it is not inferred from equipment names.
@@ -123,8 +117,7 @@ v2 keeps no separate outbox/delivery tables. Per-row sync state is two local-onl
 columns on each of the twelve user-owned entity tables:
 `local_dirty` (1 iff the row needs pushing) and `local_updated_at_ms` (the
 monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
-wire. The clean cutover removes retired `local_bodyweight_metadata_known`
-compatibility markers; there is no partial metadata tuple to hydrate.
+wire.
 Device-global sync state lives on the `sync_runtime_state` singleton row:
 `pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
 high-water mark), and `bootstrap_completed_at`. Deep detail:
@@ -136,7 +129,7 @@ high-water mark), and `bootstrap_completed_at`. Deep detail:
 `last_seen_at_ms`, and `occurrence_count`. Push selection excludes quarantined
 rows so one local orphan cannot wedge the backlog.
 
-## Backend schema inventory (accepted clean model)
+## Backend schema inventory
 
 ### Auth/profile
 
@@ -258,7 +251,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   only by the certification RPCs and the group evaluator
   (`docs/specs/tech/groups-contract.md` §2.12).
 
-- **Accepted replacement group calculation model:** `groups` stores
+- **Group calculation model:** `groups` stores
   `bodyweight_calculations_enabled` and `group_exercises` stores
   `bodyweight_contribution`. Rules/revision, evaluation queue, scores, board
   state and certifications retain the server-only group posture. Sync impact
@@ -339,7 +332,7 @@ section states only the data-model-level invariants.
    `deleted_at` going non-null; undelete is the same row with `deleted_at` returning
    to null under the same LWW rule. There is no separate `deleted` flag and no
    special delete/undelete path (contract §A.1.1).
-4. Under the accepted protocol-3 cutover, restore/bootstrap is a full
+4. Under protocol 3, restore/bootstrap is a full
    `sync_pull` drain across all five topological layers
    (first sign-in or wiped-client reinstall). It must be coherent across all
    user-owned entities listed in this document, with FK integrity preserved at every

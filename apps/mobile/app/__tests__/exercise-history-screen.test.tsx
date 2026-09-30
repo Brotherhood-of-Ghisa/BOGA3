@@ -58,6 +58,7 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
   exerciseDefinitionId: 'ex-bench',
   exerciseName: 'Bench Press',
   exerciseDeletedAt: null,
+  bodyweightContribution: 0,
   period: 30,
   appliedTagDefinitionId: null,
   appliedGymId: null,
@@ -90,6 +91,10 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
   sessions: [
     {
       sessionId: 'session-newest',
+      bodyWeightKg: null,
+      bodyWeightSource: null,
+      bodyWeightMeasurementId: null,
+      bodyWeightMeasuredAt: null,
       sessionExerciseId: 'se-newest',
       completedAt: new Date('2026-05-18T16:00:00.000Z'),
       gymName: 'Westside Barbell Club',
@@ -105,6 +110,10 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
     },
     {
       sessionId: 'session-older',
+      bodyWeightKg: null,
+      bodyWeightSource: null,
+      bodyWeightMeasurementId: null,
+      bodyWeightMeasuredAt: null,
       sessionExerciseId: 'se-older',
       completedAt: new Date('2026-05-11T16:00:00.000Z'),
       gymName: null,
@@ -549,18 +558,19 @@ describe('ExerciseHistoryScreenShell — design language (DLM-T10)', () => {
 });
 
 
-it('labels added-weight strength and calculates legacy numeric loads', () => {
-  const summary = buildSummary({ bodyweightCoefficient: 1 });
+it('uses ordinary strength copy while bodyweight changes only the calculation', () => {
+  const summary = buildSummary({ bodyweightContribution: 1 });
   summary.sessions = [{ ...summary.sessions[0],
-    loadContext: { bodyweightCoefficient: 1, loadInputMode: 'total_load', bodyWeightKg: 80 },
+    loadContext: { policy: 'personal', bodyweightContribution: 1, loadInputMode: 'total_load', bodyWeightKg: 80 },
     totalVolume: null, estimatedOneRepMax: null, topWeightSet: null,
-    sets: [{ ...summary.sessions[0].sets[0], weightValue: '20', weightUnit: 'kg', externalLoadMode: 'added', localBodyweightMetadataKnown: false }],
+    sets: [{ ...summary.sessions[0].sets[0], weightValue: '20' }],
   }];
   summary.allTimeBest = { estimatedOneRepMax: null, topWeight: null };
   render(<ExerciseHistoryScreenShell summary={summary} period={30} appliedTagDefinitionId={null}
     isLoading={false} errorMessage={null} onSelectPeriod={jest.fn()} onSelectTag={jest.fn()}
     onPressSession={jest.fn()} onSelectMainTab={jest.fn()} />);
-  expect(screen.getByTestId('exercise-history-best-est-1rm').props.accessibilityLabel).toBe('Added 1RM —');
-  expect(screen.getByTestId('exercise-history-set-row-st-1-1rm')).toHaveTextContent(/Added 1RM.*47.7/);
+  expect(screen.getByTestId('exercise-history-best-est-1rm').props.accessibilityLabel).toBe('1RM —');
+  expect(screen.getByTestId('exercise-history-set-row-st-1-1rm')).toHaveTextContent(/1RM.*47.7/);
+  expect(screen.queryByText(/Added|BW \+|Effective load/i)).toBeNull();
   expect(screen.getByTestId('exercise-history-set-row-st-1-vol')).toHaveTextContent(/Vol.*800/);
 });

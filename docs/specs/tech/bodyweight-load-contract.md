@@ -1,6 +1,6 @@
 # Optional Bodyweight Calculations Contract
 
-> **Status: accepted replacement contract; implementation and rollout pending.**
+> **Status: accepted current contract.**
 > This document owns ordinary/bodyweight-aware calculation meaning, private and
 > group policy, dated context, kg-only migration, refresh and consumer behavior.
 > Storage/wire mechanics remain in [05](../05-data-model.md) and
@@ -24,7 +24,7 @@ tombstones and dirty/LWW bookkeeping apply.
 | `body_weight_measurements` | `id`, positive finite `weightKg: number`, `measuredAt`; normal timestamps/tombstone | Owner-private Sync v2 root entity; never a profile or group field |
 | Session read context | Selected measurement and kg for internal calculation | Derived only; absent from session storage and sync |
 | `exercise_definitions` | `bodyweightContribution: number`, fraction in `[0,1]`, default 0 | In Sync v2 scope; current personal metadata reinterprets history |
-| `exercise_sets` | Actual/planned Weight text is kg; no unit or external-load-mode fields | In Sync v2 scope; raw Weight remains the source value |
+| `exercise_sets` | Actual/planned Weight text is kg | In Sync v2 scope; raw Weight remains the source value |
 | `groups` | `bodyweight_calculations_enabled`, default false | Server-authoritative and outside Sync v2 |
 | `group_exercises` | `bodyweight_contribution`, fraction in `[0,1]`, default 0 | Server-authoritative and outside Sync v2 |
 | Calculated metrics | Read-time/device or server projections | Never Sync v2 entities or persisted personal achievements |
@@ -36,10 +36,9 @@ mutates the other preference, either contribution, any reading, or a raw set.
 
 The UI edits contribution as a decimal percentage from 0 through 100 and stores
 the corresponding fraction. Zero is ordinary math. Positive values enable
-bodyweight-aware math only while the applicable preference is enabled. There is
-no movement-standard, loading-method, weight-unit or external-load-mode setting.
-The existing `loadInputMode` (`total_load` or `per_side_load`) remains because it
-describes the exercise's entered Weight distribution, not bodyweight semantics.
+bodyweight-aware math only while the applicable preference is enabled.
+`loadInputMode` (`total_load` or `per_side_load`) describes the exercise's
+entered Weight distribution, not bodyweight semantics.
 
 All Weight values, planned Weight values, readings, group rules/results,
 imports/exports and coaching payloads are kg. Exactly `1 lb = 0.45359237 kg`
@@ -162,33 +161,27 @@ contribution reinterpret live group projections under the group's coherent
 revision/publication boundary. Repeated off/on cycles restore the stored values
 unchanged.
 
-## 5. Clean kg-only migration and protocol cutover
+## 5. Kg-only migration and protocol 3
 
 The forward migration preserves session, session-exercise, set, reading and
 exercise identifiers; row clocks/tombstones; actual/planned Weight and reps;
 performed status; readings; and existing contribution values. It performs these
 changes atomically:
 
-1. Rename personal/group coefficients to contributions without changing their
-   numeric fraction.
+1. Preserve existing personal and group contribution fractions.
 2. Add the private and group preferences with migrated value `false`.
-3. Convert valid lb actual/planned Weight text and dated readings to kg using
-   the exact factor above, without display rounding. Blank set fields remain
-   blank/null. A malformed legacy Weight remains malformed and excluded, with a
-   migration diagnostic; it is never reinterpreted as a valid kg metric.
-4. Reduce readings to authoritative `weight_kg` plus date/identity metadata.
-5. Remove movement-standard, loading-method, weight-unit,
-   external-load-mode, retired session-weight and hydration/compatibility fields.
-6. Clear disposable derived/group caches and enqueue affected group projections;
+3. Normalize valid actual/planned Weight text and dated readings to kg using the
+   exact factor above, without display rounding. Blank set fields remain
+   blank/null and malformed Weight remains invalid.
+4. Produce exactly the durable shapes in §1; session weight context remains
+   derived.
+5. Clear disposable derived/group caches and enqueue affected group projections;
    never rewrite a raw workout solely to refresh a metric.
 
-The clean wire is a coordinated protocol cutover. The server schema/RPC deploys
-before the client and requires `x-boga-sync-protocol: 3`; older, missing or
-malformed protocol values receive `UPDATE_REQUIRED` before row access. A prior
-compatibility build must already preserve dirty local data and cursors when it
-sees that response. The v3 client carries only the clean fields, includes
-`user_settings` in layer 0, and pulls readings without the retired capability
-flag. No compatibility branch retains removed fields for old clients.
+The server schema and RPCs require `x-boga-sync-protocol: 3`; missing,
+malformed or unsupported protocol values receive `UPDATE_REQUIRED` before row
+access. The v3 client carries the fields in §1, includes `user_settings` in
+layer 0 and pulls readings in layer 4.
 
 ## 6. Personal UI and consumers
 
@@ -199,20 +192,16 @@ management or deletes anything. The personal exercise editor shows only
 `Bodyweight contribution (%)` plus a short hint while enabled.
 
 The logger always says `Weight`; rows, records, History, Stats, completion and
-share surfaces use `Top weight`, `1RM` and `Volume`. They never say `Added`,
-`External weight` or `Effective load`, never show the calculation breakdown, and
-never prompt for a reading during a workout. Numeric zero renders as `0`, not
-unavailable. Raw top Weight stays independent from derived 1RM and Volume.
+share surfaces use `Top weight`, `1RM` and `Volume`. They do not expose the
+calculation breakdown or prompt for a reading during a workout. Numeric zero
+renders as `0`, not unavailable. Raw top Weight stays independent from derived
+1RM and Volume.
 
 Repository adapters batch the synced preference, current exercise definition
 and as-of readings with graph reads. Preference/contribution/reading/session-time
 commits and relevant sync pulls invalidate mounted projections after commit.
 Refresh failures retain the prior view and expose the normal retry state; they
 must not fabricate calculations or mutate raw history.
-
-The loading-estimate feature, if retained, uses kg-only Weight/1RM vocabulary
-and the same policy/formula. It is a transient projection, not a calculator that
-exposes bodyweight arithmetic or writes history.
 
 ## 7. Group calculations, privacy and certification
 
@@ -231,7 +220,7 @@ readers never mix enabled states or contributions.
 
 For an explicitly linked exercise, the kernel uses the member/source
 exercise's `loadInputMode` to derive its displayed 1RM. The group evaluator then
-applies the existing source→group-target mode conversion to that 1RM for board
+applies the source→group-target mode conversion to that 1RM for board
 comparison and record detection. It does not pass the target mode into the
 kernel. Volume has no target-mode conversion.
 
@@ -253,10 +242,6 @@ A change to any included dependency voids the certification before a
 recalculated result can inherit it. Certification RPCs identify the
 record/revision and re-read dependencies server-side; the client never supplies
 or receives private reading facts.
-
-This internal digest is provisional. Implementation review must call out a
-simpler model if it can prevent certification transfer across recalculation with
-the same privacy and honesty guarantees.
 
 ## 8. Coaching and import/export
 
@@ -291,5 +276,5 @@ invalidation. Coaching/import tests cover preference gating and clean kg payload
 
 Component/native evidence covers the Settings row, repeated toggle persistence,
 kg history, conditional contribution fields, ordinary/bodyweight-aware logging,
-numeric zero, historical refresh and group administration. The accepted UI target
+numeric zero, historical refresh and group administration. The UI target
 is [the bodyweight design target](../ui/design-targets/bodyweight.md).

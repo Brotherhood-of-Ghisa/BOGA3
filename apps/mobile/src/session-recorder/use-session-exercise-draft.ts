@@ -3,7 +3,8 @@ import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { SessionBodyWeightSnapshot, SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
+import { EMPTY_SESSION_WEIGHT, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
+import type { SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
 
 import { createDraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
@@ -30,7 +31,7 @@ export type SessionExerciseDraftState =
       exercise: SessionDraftExerciseSnapshot;
       // A completed session is edited in place (history, not a draft).
       sessionStatus: SessionGraphSnapshot['status'];
-      bodyWeight: SessionBodyWeightSnapshot;
+      bodyWeight: ResolvedSessionWeight;
       gymId: string | null;
     };
 
@@ -51,7 +52,7 @@ export type UseSessionExerciseDraft = {
   // Removes the exercise from its session. Pending edits are dropped.
   remove: () => Promise<void>;
   reload: () => Promise<boolean>;
-  setBodyWeight: (snapshot: SessionBodyWeightSnapshot) => void;
+  setBodyWeight: (snapshot: ResolvedSessionWeight) => void;
 };
 
 const describeSaveError = (error: unknown) =>
@@ -62,7 +63,7 @@ const describeSaveError = (error: unknown) =>
 type ExerciseDraftLive = {
   exercise: SessionDraftExerciseSnapshot | null;
   sessionStatus: SessionGraphSnapshot['status'];
-  bodyWeight: SessionBodyWeightSnapshot;
+  bodyWeight: ResolvedSessionWeight;
   gymId: string | null;
   saveFailed: boolean;
   mounted: boolean;
@@ -82,7 +83,7 @@ const createExerciseDraftPersistence = ({
   const live: ExerciseDraftLive = {
     exercise: null,
     sessionStatus: 'active',
-    bodyWeight: {},
+    bodyWeight: { ...EMPTY_SESSION_WEIGHT },
     gymId: null,
     saveFailed: false,
     mounted: true,
@@ -194,7 +195,7 @@ export const useSessionExerciseDraft = ({
     );
   }, [autosave, client, live, sessionExerciseId, sessionId]);
 
-  const setBodyWeight = useCallback((snapshot: SessionBodyWeightSnapshot) => {
+  const setBodyWeight = useCallback((snapshot: ResolvedSessionWeight) => {
     setLive({ bodyWeight: snapshot });
     setState(current => current.status === 'ready' ? { ...current, bodyWeight: snapshot } : current);
   }, [setLive]);

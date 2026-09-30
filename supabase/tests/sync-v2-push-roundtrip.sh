@@ -60,7 +60,7 @@ http_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -137,7 +137,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -190,8 +190,9 @@ BASE_MS="$(($(date +%s) * 1000))"
 # Per-layer ID set. Non-topological ARRAY ORDER for the multi-layer batch:
 # we list layer-3 first, layer-2, layer-1, layer-0 last so the deferrable-FK
 # path is exercised inside one transaction (mirroring the push contract
-# suite's deferrable-FK scenarios, but with all four topological layers and
-# all ten types in one call rather than just the four-row chain).
+# suite's deferrable-FK scenarios, but with all ten FK-bearing entity types in
+# one call rather than just the four-row chain). The two independent roots are
+# covered by sync-bodyweight-contract.sh.
 GYM_ID="rt-${RUN_TAG}-gym"
 EDEF_ID="rt-${RUN_TAG}-edef"
 MG_ID="rt-${RUN_TAG}-mg"
@@ -239,7 +240,7 @@ trap cleanup_on_exit EXIT
 
 # ---------------------------------------------------------------------------
 # Step 1 — multi-layer multi-row batch in NON-topological order. All four
-# layers, all ten entity types in a single push.
+# FK-bearing layers, all ten FK-bearing entity types in a single push.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-push-roundtrip] step 1 — multi-layer batch in non-topological order"
 
@@ -288,7 +289,7 @@ BATCH_PAYLOAD="$(jq -nc \
               coordinate_accuracy_m: null, coordinates_updated_at: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $edef, client_updated_at_ms: $ts,
-     fields: {name: "Bench Press", load_input_mode: "total_load",
+     fields: {name: "Bench Press", load_input_mode: "total_load", bodyweight_contribution: 0,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "muscle_groups", id: $mg, client_updated_at_ms: $ts,
      fields: {display_name: "Pectorals", family_name: "chest",
@@ -313,8 +314,8 @@ for spec in "gyms|${GYM_ID}" "exercise_definitions|${EDEF_ID}" \
   assert_jq 'length == 1' "step 1 service-role read ${table}.${row_id}"
 done
 echo "[sync-v2-push-roundtrip] step 1 ok — every row in every layer landed"
-service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EDEF_ID}&select=load_input_mode"
-assert_jq '.[0].load_input_mode == "total_load"' "step 1 exercise load mode landed"
+service_select "exercise_definitions" "owner_user_id=eq.${USER_A_UUID}&id=eq.${EDEF_ID}&select=load_input_mode,bodyweight_contribution"
+assert_jq '.[0].load_input_mode == "total_load" and .[0].bodyweight_contribution == 0' "step 1 exercise load fields landed"
 
 # ---------------------------------------------------------------------------
 # Step 2 — LWW newer wins. Push the SAME batch but bump every column,
@@ -334,7 +335,7 @@ NEWER_PAYLOAD="$(jq -nc \
               coordinate_accuracy_m: 5.0, coordinates_updated_at: $ts,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $edef, client_updated_at_ms: $ts,
-     fields: {name: "Renamed Exercise", load_input_mode: "per_side_load",
+     fields: {name: "Renamed Exercise", load_input_mode: "per_side_load", bodyweight_contribution: 0.5,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_tag_definitions", id: $etd, client_updated_at_ms: $ts,
      fields: {exercise_definition_id: $edef, name: "Renamed Tag",

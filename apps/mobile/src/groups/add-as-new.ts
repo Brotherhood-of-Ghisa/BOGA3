@@ -7,17 +7,14 @@
 
 import { SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import type { LoadInputMode } from '@/src/exercise-core';
-import type { ExerciseLoadRules } from '@/src/exercise-core/load-rules';
 
 import { groupExerciseCore } from './api';
 import { describeGroupLinkIncompatibility } from './link-view-model';
 import type { GroupExercise } from './types';
-import { isGroupMetricExerciseWire } from './metric-wire-guards';
 
 export type AddAsNewPrefill = {
   name: string;
   loadInputMode: LoadInputMode;
-  loadRules?: ExerciseLoadRules;
   mappings: { muscleGroupId: string; weight: number; role: 'primary' | 'secondary' }[];
 };
 
@@ -29,17 +26,12 @@ export const buildAddAsNewPrefill = (groupExercise: GroupExercise): AddAsNewPref
         ({ muscleGroupId, weight, role }) => ({ muscleGroupId, weight, role }),
       )
     : [];
-  const loadRules = isGroupMetricExerciseWire(groupExercise) ? {
-    bodyweightCoefficient: groupExercise.bodyweight_coefficient,
-    movementStandard: groupExercise.movement_standard,
-    loadingMethod: groupExercise.loading_method,
-  } : undefined;
-  return { name, loadInputMode, mappings, ...(loadRules ? { loadRules } : {}) };
+  return { name, loadInputMode, mappings };
 };
 
 /** Recheck the reviewed editor input before creating both the exercise and its link. */
-export function requireAddAsNewCompatibility(input: { name: string; loadInputMode: LoadInputMode; loadRules?: ExerciseLoadRules }, target: GroupExercise): void {
+export function requireAddAsNewCompatibility(input: { name: string; loadInputMode: LoadInputMode }, target: GroupExercise): void {
   const reason = describeGroupLinkIncompatibility({ id: '', name: input.name, deletedAt: null,
-    loadInputMode: input.loadInputMode, ...input.loadRules }, target);
+    loadInputMode: input.loadInputMode }, target);
   if (reason) throw new Error(reason);
 }

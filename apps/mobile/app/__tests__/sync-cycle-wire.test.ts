@@ -1,5 +1,5 @@
 /**
- * Wire-serialisation round-trip coverage: for every one of the eleven entity
+ * Wire-serialisation round-trip coverage: for every synced entity
  * types, a representative row serialised to the wire envelope and back through
  * the database round-trips its typed columns intact. Confirms the local-only
  * bookkeeping columns never reach the wire, and that timestamp columns
@@ -34,6 +34,7 @@ afterEach(() => {
 });
 
 const TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
+  user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
@@ -59,8 +60,14 @@ const seedParents = (): void => {
 
 /** A representative row literal per entity type, including null and value cases. */
 const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
+  user_settings: {
+    id: 'settings', bodyweightCalculationsEnabled: true,
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
+  },
   body_weight_measurements: {
-    id: 'bw-wire', weightValue: '176', weightUnit: 'lb', weightKg: 79.83225712,
+    id: 'bw-wire', weightKg: 79.83225712,
     measuredAt: new Date('2026-05-29T07:00:00.000Z'),
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
@@ -81,9 +88,7 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     id: 'def-wire',
     name: 'Squat',
     loadInputMode: 'per_side_load',
-    bodyweightCoefficient: 0.7,
-    movementStandard: 'strict',
-    loadingMethod: 'added',
+    bodyweightContribution: 0.7,
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: new Date('2026-05-29T10:00:00.000Z'),
@@ -114,10 +119,6 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     startedAt: new Date('2026-05-29T08:00:00.000Z'),
     completedAt: new Date('2026-05-29T09:00:00.000Z'),
     durationSec: 3600,
-    bodyWeightKg: 80,
-    bodyWeightSource: 'historical_estimate',
-    bodyWeightMeasurementId: 'not-a-foreign-key',
-    bodyWeightMeasuredAt: new Date('2026-05-30T08:00:00.000Z'),
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T09:00:00.000Z'),
     deletedAt: null,
@@ -153,10 +154,6 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     deletedAt: null,
   },
   exercise_sets: {
-    weightUnit: 'lb',
-    externalLoadMode: 'assistance',
-    plannedWeightUnit: 'kg',
-    plannedExternalLoadMode: 'added',
     id: 'set-wire',
     sessionExerciseId: 'sx-1',
     orderIndex: 0,

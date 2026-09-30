@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the ten v2 entity tables. All four operations must either:
+# one of the twelve v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -81,6 +81,8 @@ ENTITIES=(
   exercise_sets
   session_exercise_tags
   exercise_group_links
+  user_settings
+  body_weight_measurements
 )
 
 # -----------------------------------------------------------------------------
@@ -114,7 +116,7 @@ sign_in() {
   status="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -166,25 +168,15 @@ SET_ID="rls-${RUN_TAG}-bset"
 SXTAG_ID="rls-${RUN_TAG}-bsxtag"
 GRP_ID="rls-${RUN_TAG}-bgrp"
 EGL_ID="${GRP_ID}:${EDEF_ID}"
-
-# Build per-entity ID map so we know which ID to target for each table.
-declare -a ROW_IDS=(
-  "${GYM_ID}"
-  "${EDEF_ID}"
-  "${MG_ID}"
-  "${ETD_ID}"
-  "${SESS_ID}"
-  "${EMM_ID}"
-  "${SX_ID}"
-  "${SET_ID}"
-  "${SXTAG_ID}"
-  "${EGL_ID}"
-)
+SETTINGS_ID="rls-${RUN_TAG}-bsettings"
+BODY_WEIGHT_ID="rls-${RUN_TAG}-bweight"
 
 cleanup_rows() {
   run_psql_sql "
     delete from app_public.session_exercise_tags    where id = '${SXTAG_ID}';
     delete from app_public.exercise_group_links     where id = '${EGL_ID}';
+    delete from app_public.user_settings            where id = '${SETTINGS_ID}';
+    delete from app_public.body_weight_measurements where id = '${BODY_WEIGHT_ID}';
     delete from app_public.exercise_sets            where id = '${SET_ID}';
     delete from app_public.session_exercises        where id = '${SX_ID}';
     delete from app_public.exercise_muscle_mappings where id = '${EMM_ID}';
@@ -278,6 +270,18 @@ run_psql_sql "
        created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${EGL_ID}', '${EDEF_ID}', '${GRP_ID}', 'rls-${RUN_TAG}-bgex',
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.user_settings
+      (owner_user_id, id, bodyweight_calculations_enabled,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SETTINGS_ID}', true,
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.body_weight_measurements
+      (owner_user_id, id, weight_kg, measured_at,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${BODY_WEIGHT_ID}', 81.5, ${NOW_MS},
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   commit;
 " >/dev/null
 
@@ -302,7 +306,7 @@ http_request() {
   )
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -386,6 +390,18 @@ insert_payload_for() {
           group_id: $grp, group_exercise_id: "injected",
           client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    user_settings)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, bodyweight_calculations_enabled: true,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
+    body_weight_measurements)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, weight_kg: 81.5, measured_at: $ts,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
   esac
 }
 
@@ -401,6 +417,8 @@ target_row_id_for() {
     exercise_sets)            echo "${SET_ID}" ;;
     session_exercise_tags)    echo "${SXTAG_ID}" ;;
     exercise_group_links)     echo "${EGL_ID}" ;;
+    user_settings)            echo "${SETTINGS_ID}" ;;
+    body_weight_measurements) echo "${BODY_WEIGHT_ID}" ;;
   esac
 }
 

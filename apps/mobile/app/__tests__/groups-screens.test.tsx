@@ -87,8 +87,8 @@ const USER_ID = 'user-me';
 /** 09:05 local, so "last updated 09:05" holds in any time zone. */
 const T0 = new Date(2026, 8, 11, 9, 5).getTime();
 
-const GROUP_A: GroupSummary = { group_id: 'group-a', name: 'Garage Gym', description: 'Early crew', member_count: 3, my_role: 'owner' };
-const GROUP_B: GroupSummary = { group_id: 'group-b', name: 'Lunch Lifters', description: null, member_count: 2, my_role: 'member' };
+const GROUP_A: GroupSummary = { group_id: 'group-a', name: 'Garage Gym', description: 'Early crew', member_count: 3, my_role: 'owner', bodyweight_calculations_enabled: false };
+const GROUP_B: GroupSummary = { group_id: 'group-b', name: 'Lunch Lifters', description: null, member_count: 2, my_role: 'member', bodyweight_calculations_enabled: false };
 
 const completedItem = (overrides: Partial<StreamSessionItem> = {}): StreamSessionItem => ({
   kind: 'session',
@@ -222,8 +222,8 @@ beforeEach(() => {
   api.getGroupStream.mockResolvedValue(page([]));
   api.getGroup.mockResolvedValue(GROUP_A_DETAIL);
   api.getGroupSessionDetail.mockResolvedValue(sessionDetail());
-  api.listGroupExercises.mockResolvedValue({ contract_version: 2, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listGroupExercises>>);
-  api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 2, exercises: [] } as unknown as Awaited<ReturnType<typeof api.getGroupMetricPodiums>>);
+  api.listGroupExercises.mockResolvedValue({ contract_version: 3, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listGroupExercises>>);
+  api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 3, exercises: [] } as unknown as Awaited<ReturnType<typeof api.getGroupMetricPodiums>>);
 });
 
 afterEach(() => {

@@ -14,7 +14,7 @@ jest.mock('@/src/data/bodyweight', () => ({
   readCurrentBodyWeight: jest.fn(), listBodyWeightReadings: jest.fn(), saveBodyWeightReading: jest.fn(), deleteBodyWeightReading: jest.fn(),
 }));
 const data = jest.requireMock('@/src/data/bodyweight') as Record<string, jest.Mock>;
-const reading = { id: 'r1', weightValue: '80', weightUnit: 'kg', weightKg: 80,
+const reading = { id: 'r1', weightKg: 80,
   measuredAt: new Date('2026-01-01T10:23:45.678Z') };
 beforeEach(() => {
   jest.clearAllMocks();
@@ -31,7 +31,7 @@ it('shows empty history and saves a kg reading with its date offline', async () 
   expect(screen.queryByTestId('weight-entry-unit-lb')).toBeNull();
   fireEvent.press(screen.getByTestId('weight-entry-save'));
   await waitFor(() => expect(data.saveBodyWeightReading).toHaveBeenCalledWith(expect.objectContaining({
-    weightValue: '176.4', weightUnit: 'kg', measuredAt: expect.any(Date),
+    weightValue: '176.4', measuredAt: expect.any(Date),
   })));
   await waitFor(() => expect(screen.queryByTestId('weight-entry-sheet')).toBeNull());
   expect(screen.getByText('Reading saved.')).toBeTruthy();
@@ -40,7 +40,7 @@ it('shows empty history and saves a kg reading with its date offline', async () 
 it('keeps invalid and failed input editable, then retries successfully', async () => {
   const save = jest.fn().mockRejectedValueOnce(new Error('Storage full')).mockResolvedValue(undefined);
   const dismiss = jest.fn();
-  render(<WeightEntrySheet title="Add reading" initial={{ weightValue: '', weightUnit: 'kg' }}
+  render(<WeightEntrySheet title="Add reading" initial={{ weightValue: '' }}
     measuredAt={reading.measuredAt} onSave={save} onDismiss={dismiss} />);
   fireEvent.press(screen.getByTestId('weight-entry-save'));
   expect(screen.getByTestId('weight-entry-value-error')).toBeTruthy();
@@ -56,7 +56,7 @@ it('keeps invalid and failed input editable, then retries successfully', async (
   expect(dismiss).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('weight-entry-save'));
   await waitFor(() => expect(dismiss).toHaveBeenCalledTimes(1));
-  expect(save).toHaveBeenLastCalledWith({ weightValue: '80.25', weightUnit: 'kg', measuredAt: reading.measuredAt });
+  expect(save).toHaveBeenLastCalledWith({ weightValue: '80.25', measuredAt: reading.measuredAt });
 });
 
 it('discards cancelled fields and starts each reopened editor from its reading', async () => {

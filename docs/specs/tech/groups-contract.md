@@ -1,72 +1,14 @@
 # Groups Contract
 
-The accepted optional bodyweight calculation boundary is specified in §11 and
-the [bodyweight contract](bodyweight-load-contract.md). Earlier sections continue
-to describe the shipped group foundation; §11 owns the replacement group
-preference, contribution, strict calculation and privacy rules. Implementation
-and hosted rollout remain pending.
+The optional bodyweight calculation boundary is specified in §11 and the
+[bodyweight contract](bodyweight-load-contract.md). Earlier sections describe
+the group foundation; §11 owns the current group preference, contribution,
+strict calculation and privacy rules.
 
-> **Status: As-built (M22 and M25 shipped).**
->
-> - §2–§5, the server half: the membership/invite RPCs (M22-T01,
->   `supabase/migrations/20260910120000_m22_groups_membership.sql`) and the
->   share ledger, trigger, and stream/detail reads (M22-T02,
->   `supabase/migrations/20260911120000_m22_group_record.sql`). Both are proven
->   by `./boga test groups-contract`.
-> - §6.1–§6.2, the mobile client (M22-T03).
-> - §6.3/§7, the read-side UI: the Groups tab, My groups, the group screen, and
->   the friend's session view (M22-T04).
-> - §6.3/§7, the write UI: create, edit, join (deep link), invite, member
->   actions, leave, and the username gate (M22-T05).
-> - §8, the two-user Maestro lane `ios-groups-e2e` (M22-T06).
-> - Post-M22: group reads return raw set rows, card metrics are computed on
->   the viewing device, and PR highlights are deferred (§4.2, §5, §9;
->   `supabase/migrations/20260912120000_m22_group_raw_sets.sql`).
-> - M25-T02: the stream is persistent. `group_events` holds one row per
->   stream item and `group_stream` reads only that table; the wire contract
->   is unchanged (§2.6, §4.2;
->   `supabase/migrations/20260913153000_m25_group_events.sql`).
-> - M25 step 2, group exercises (M25-T01): the `group_exercises` table and its
->   RPCs (§2.7, §4.4;
->   `supabase/migrations/20260913160000_m25_group_exercises.sql`), proven by
->   `./boga test groups-contract`, and the client wrappers plus the shared
->   `ExerciseCore` validator (§6.1).
-> - M25 step 2, the evaluator pipeline (M25-T04): the queue, the enqueue
->   triggers, the set facts, the `group-eval` Edge Function, and the pg_net
->   kick with its pg_cron sweep (§2.8–§2.10;
->   `supabase/migrations/20260913180000_m25_group_eval.sql`), proven by
->   `./boga test groups-leaderboards`.
-> - M25-T08, the group page: Stream · Exercises · Leaderboards, Members behind
->   the header's member count, and the Exercises page with owner/admin add,
->   copy, rename, and archive (§6.2 `group-exercises:<groupId>`, §6.3, §8).
-> - M25 step 2, boards and events (M25-T05): the apply recomputes and diffs
->   `group_board_entries`, writes `record`, `record_voided`, `link`/`unlink`,
->   and `lead_change` events, and serves the board and history reads; the
->   stream returns the new kinds (§2.6, §2.10, §2.11, §4.2, §4.5;
->   `supabase/migrations/20260914120000_m25_group_boards.sql`), proven by the
->   `groups-boards.sh` body of `./boga test groups-leaderboards`.
-> - M25 step 2, certification (M25-T06): `group_certifications`, the certify /
->   withdraw / cancel RPCs, evaluator voids on a fingerprint mismatch,
->   Certified entries and `lead_change{certification}`, and `certified` on
->   the board and stream reads (§2.11, §2.12, §4.2, §4.5, §4.6;
->   `supabase/migrations/20260916120000_m25_group_certification.sql`), proven
->   by the `groups-certification.sh` body of `./boga test groups-leaderboards`.
->
-> - M25-T11: the two-user Maestro lane certifies a record set on device and
->   asserts the Certified boards (§8), and M25 closed. Its product rules and
->   decisions (P#, D#, E#, cited throughout) are §10.
-> - Post-M25 groups UI iteration: the Groups screen shows one group at a
->   time (no All) with Stream · Leaderboards, the group page is management
->   only (header + Exercises), Join / Create moved to My groups, and Today's
->   Group activity includes record cards (§6.3 "As-built (groups UI
->   iteration)"; P5 and D10 amended in §10).
->
-> This doc owns the technical contract and is the durable record of what M22
-> and M25 built. The M22 milestone spec (product requirements and acceptance
-> criteria) was deleted after shipping; git history and PR #280 keep it. The
-> M25 milestone, product spec, and technical design were deleted by M25-T11;
-> their durable rules are §10 and the as-built sections, and git history keeps
-> the narrative.
+> **Status: current contract.** Membership, sharing, stream/detail reads,
+> comparisons, Weight/1RM boards, certification and the optional group
+> bodyweight policy are implemented. The backend contract suites and the
+> two-user device lane own executable coverage.
 
 This doc covers:
 
@@ -80,7 +22,7 @@ It is not the source for these:
 
 | Topic | Source |
 | --- | --- |
-| Product requirements and acceptance | M22: the milestone spec (git history). M25: §10 here; the sketches are in git history |
+| Product requirements and acceptance | §10 here and the UI specs under `docs/specs/ui/` |
 | Sync v2 | `sync-v2-server-contract.md` |
 | The authN/authZ baseline | `docs/specs/10-api-authn-authz-guidelines.md` |
 
@@ -620,14 +562,12 @@ active certification ids at the last apply, for certification attribution.
 
 - **Counting set** of `(G, M, GX)`: a performed, live fact whose Sync v2
   set row still exists, whose session is shared into G, and whose exercise
-  has a live link to `(G, GX)`. The Weight board needs `weight_kg > 0`
-  (a 0 kg set is not weight lifted; bodyweight metrics are out of scope);
-  the e1RM board needs a non-null `e1rm_kg`.
+  has a live link to `(G, GX)`. The Weight board needs `weight_kg > 0`;
+  the 1RM board needs a non-null `e1rm_kg`. A zero result never ranks.
 - **Conversion (D6).** The factor compares the member exercise's current
   `load_input_mode` with the group exercise's: the same mode gives 1, per side
-  → total gives 2, total → per side gives 0.5. It applies to Weight and e1RM,
-  and record detection uses converted values. The accepted replacement in §11
-  supersedes the Weight half only when that cutover lands.
+  → total gives 2, total → per side gives 0.5. It applies to 1RM and its record
+  detection. Weight always remains the raw entered kg value.
 - **A member's best**: highest `value_kg`, then the earlier `achieved_at_ms`,
   `exercise_order_index`, `set_order_index`, `set_id` (P7).
 - **Rank**: `value_kg desc, achieved_at_ms asc, member_user_id asc`, strict
@@ -896,7 +836,8 @@ included (M25-T10).
 { "user_id": "uuid", "username": "string|null", "role": "owner|admin|member" }
 // GroupSummary
 { "group_id": "uuid", "name": "…", "description": "…|null",
-  "member_count": 3, "my_role": "owner|admin|member" }
+  "member_count": 3, "my_role": "owner|admin|member",
+  "bodyweight_calculations_enabled": false }
 ```
 
 `member_count` counts active members. Usernames may be null if a member
@@ -1090,7 +1031,7 @@ items (T6).
 | RPC | Allowed | Effect / returns |
 | --- | --- | --- |
 | `group_create(p_name, p_description)` | any app user with a username | Creates the group, the caller's `owner` period, and an invite. Returns `{ group_id }`. |
-| `group_update(p_group_id, p_name, p_description)` | owner, admin | `{ group: GroupSummary }` |
+| `group_update(p_group_id, p_name, p_description, p_bodyweight_calculations_enabled)` | owner, admin | Updates group details and the group calculation policy; returns `{ group: GroupSummary }` |
 | `group_invite_get(p_group_id)` | owner, admin (C7.4) | `{ code }` |
 | `group_invite_regenerate(p_group_id)` | owner, admin | Replaces the code. Returns `{ code }`. |
 | `group_join(p_code)` | any app user with a username | Already active: `{ group_id, joined: false }`, no-op. Otherwise it inserts a `member` period: `{ group_id, joined: true }`. |
@@ -1219,7 +1160,7 @@ podium's `entry_count` and `me` count only valid Certified entries (§2.11).
   JSON value of the wrong type, is `VALIDATION`; JSON `null` means no
   cursor.
 - **Archived** exercises are readable and sort last in the podiums.
-- **Mobile (M25-T09).** `getGroupBoardPodiums(groupId)` (always e1RM ·
+- **Mobile (M25-T09).** `getGroupBoardPodiums(groupId)` (always 1RM ·
   Certified), `getGroupBoard({ …, after, limit = 50 })`, and
   `getGroupBoardHistory({ …, before, limit = 20 })` in `src/groups/api.ts`
   send every `p_*` arg and pass cursors back verbatim. `isGroupExerciseNotFound`
@@ -1295,24 +1236,14 @@ TS the session screens use. Nothing is mirrored in SQL.
   canonicalizes blank weight with valid reps to zero; invalid decimal amounts
   (for example `1e3`) do not produce a performed row.
 - **Sets** — the count of performed sets.
-- **Volume** — the effective-load kernel uses the member's current personal
-  coefficient/distribution and the saved session body-weight tuple. Warm-ups
-  are included. `metric_revision: effective_load_v1` and
-  `metric_scope: personal` distinguish this projection from the group's ranked
-  score. Missing/invalid context preserves sets and reps but makes complete
-  volume unavailable; the known subtotal and coverage remain explicit. Old
-  payloads without that revision retain their entered-load fallback. Raw
-  entered units/modes remain visible in the friend's session detail.
+- **Volume** — the ordinary kg calculation uses raw entered Weight and the
+  source exercise's `load_input_mode`. Warm-ups are included. This shared
+  session summary never reads a personal preference, contribution or weight
+  reading; positive group contributions belong only to the server-authoritative
+  ranked projection in §11.
 - **Exercises** — live session exercises with at least one performed set.
 - **Friend's session view** — the same performed sets; exercises with none are
   omitted.
-
-> **Accepted replacement; implementation pending.** §11 replaces this
-> pre-cutover
-> personal projection for group summaries. Ordinary group Volume remains
-> device-derivable when the group preference is off or contribution is zero;
-> the authorized group projection supplies positive-contribution Volume or a
-> strict null without exposing any private reading context.
 
 **Why the device.** M22 first computed these in SQL helpers that mirrored the
 TS parsers, held in parity by shared test vectors. That duplicated set
@@ -1321,8 +1252,8 @@ device now reuses the session screens' code. The cost: a co-member's device rece
 every live set, planned and skipped ones included, although the UI shows
 performed sets only.
 
-**PR highlights are deferred** (§9). The M22 rule compared a session's best
-e1RM with the member's full completed history, including sessions never shared
+**PR highlights are deferred** (§9). The existing rule compared a session's best
+1RM with the member's full completed history, including sessions never shared
 into the group (§2.5), so the viewer cannot compute it from shared data.
 
 **As-built (post-M22).** `session-metrics.ts` exports `toGroupPerformedSet`,
@@ -1427,7 +1358,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | `groups:mine`, `group:<id>`, `stream:all`, `stream:<groupId>`, `session:<memberId>:<sessionId>`, `group-exercises:<groupId>` (M25-T07; the Exercises segment reads it too, M25-T08), `boards:<groupId>` (M25-T09: the podium page on Certified · 1RM; full boards and history are never cached) |
+| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:all`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>` and `boards:v4:<groupId>`; full boards and history are never cached |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1610,18 +1541,18 @@ E0.1–E0.3).
 - **Where each fact is read.** Linked-state comes from the local synced
   `exercise_group_links` (`listLinks()`), so it renders offline and right after
   a local write. Group and group-exercise names come from `group_cache`
-  (`groups:mine` and `group-exercises:<groupId>`, the `group_exercise_list`
+  (`groups:v4:mine` and `group-exercises:v4:<groupId>`, the group exercise list
   payload); a missing entry shows `Group exercise` / `A group`. Only cached
   group exercises can be linked. Link and unlink are local writes, not group
   RPCs, so the online-only write rule (C3.10.3) does not apply to them.
 - **`use-group-exercise-linking.ts`.** `useGroupExerciseLinking({ userId })` is
-  the cache-first hook: it reads `groups:mine` and each `group-exercises:<id>`,
+  the cache-first hook: it reads `groups:v4:mine` and each `group-exercises:v4:<id>`,
   refreshes them on focus, when the session view's picker opens, and on `refresh()`
   (pull-to-refresh) — no 30 s poll, since these lists change rarely and the
   screens are not live views — with per-group `listGroupExercises`. A group
   whose list returns `NOT_FOUND` is evicted (`evictGroup`) and left out of the
-  cached `groups:mine`. Links reload on focus and on `reloadLinks()`. A
-  `groups:mine` with no cached list yet reads as not loaded
+  cached `groups:v4:mine`. Links reload on focus and on `reloadLinks()`. A
+  `groups:v4:mine` with no cached list yet reads as not loaded
   (`groupExercisesLoaded`), so offline shows "Connect once…"; NETWORK errors
   are left to the offline marker (`pickInlineError`). `useGroupLinkingUserId()` reads the auth store directly
   (signed in and configured, else null), so the picker, exercise page and catalogue need no
@@ -1794,7 +1725,7 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
     `set_id`. It is a label, not a link.
   - Record card (`GroupStreamRecordCard`): `<name> — group record` when any
     listed board has `group_record`, else `— PR`; `<exercise>`, then the
-    figures `140.0 × 1`, plus ` · 1RM 142.5` when an e1RM board is listed (no
+    figures `140.0 × 1`, plus ` · 1RM 142.5` when a 1RM board is listed (no
     unit in a figure, and the metric reads `1RM`: display copy only, the key
     stays `e1rm`; DLM-T11-D4); badges per board, Weight then 1RM, `PR ·
     <metric>` then `Group record · <metric>`;
@@ -1831,7 +1762,7 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
   - `withdraw` (`Remove my certification`): I am the certifier;
   - `cancel` (`Cancel certification`): owner or admin, not the certifier.
   My role comes from `group:<groupId>` on the group screen and the full board
-  (which now reads it, cache-first) and from `groups:mine` on the Groups tab;
+  (which now reads it, cache-first) and from `groups:v4:mine` on the Groups tab;
   unknown hides `Cancel`.
 - **Writes** (`useRecordSetCertification`, one per host: the stream list or
   the board route). Offline is refused before any request, nothing is queued
@@ -1975,7 +1906,7 @@ group screen, and Today details above where they differ. No server change.
   - **Coverage:**
     - §2.8–§2.10 posture;
     - facts through real pushes: the §5 fixtures, the per-side entered mode,
-      e1RM, `live` and fingerprint through edits, tombstones, undeletes, and
+      1RM, `live` and fingerprint through edits, tombstones, undeletes, and
       a hard delete;
     - no job for an unshared session;
     - every target and inert-link case, archive and unarchive, load mode,
@@ -2150,10 +2081,10 @@ group screen, and Today details above where they differ. No server change.
   - **Counterparty.** `push-record` pushes a new completed session on the
     already-linked Bench Press: one set of 110 kg × 5, created after the link,
     so §2.11 step 5 attributes a `record` (55 kg × 5 per side, a group record
-    on Weight and e1RM). It polls `group_stream` until the record item is
+    on Weight and 1RM). It polls `group_stream` until the record item is
     final (not provisional), asserts its payload, and outputs
     `groupsRecordKey`, `groupsRecordSessionCardKey`, and `groupsRecordSetId`.
-    After the device certifies, `await-certified` polls the Certified · e1RM
+    After the device certifies, `await-certified` polls the Certified · 1RM
     `group_board` until row 1 is that set, certified by someone other than
     the lifter. Like `link-board`, both poll every 250 ms (a busy wait:
     `runScript` has no sleep) and fail after 90 s, longer than the 30 s
@@ -2185,14 +2116,14 @@ group screen, and Today details above where they differ. No server change.
 - **Phase 2 live follow** needs either membership-scoped RLS `SELECT` policies
   for Realtime `postgres_changes` or a broadcast channel. That is decided in
   that milestone.
-- **PR highlights** on stream cards. The M22 rule (a strict Wathan e1RM gain
+- **PR highlights** on stream cards. The existing rule (a strict Wathan 1RM gain
   over the member's full completed history) needs history that is never shared
   into the group, so the viewer cannot compute it from shared data. Decide the
   mechanism with the PR work — for example, the athlete's device syncs a
   per-session PR summary — without reintroducing SQL mirrors of the TS set rules.
   M25 record cards (§4.2) are group-board records, not these history PRs.
-- **Out of M25 scope (P19):** group gyms and gym filters, time-windowed boards,
-  bodyweight or reps-only metrics, member proposals for group exercises,
+- **Out of scope (P19):** group gyms and gym filters, time-windowed boards,
+  metrics other than Weight and 1RM, member proposals for group exercises,
   disputes, and push notifications.
 - Phases 3 (links, §2.7, `sync-v2-server-contract.md` A.2.10), 4 (boards,
   §2.10–§2.11), and 5 (certification, §2.12, §4.6) shipped in M25.
@@ -2215,9 +2146,9 @@ contract. The narrative sketches and design trade-offs are in git history
 | P3 | Group exercises never appear in the default picker or catalogue lists: only in search, the Link screen, and the group page (E0). |
 | P4 | Links are retroactive: every shared set of the exercise counts; unlinking removes them. Links survive leaving and are inactive until rejoin. |
 | P5 | The group page is for managing the group: its header and Exercises; Members sits behind the header's member count. The stream and leaderboards are the Groups screen's Stream · Leaderboards, one group at a time (amended post-M25; was Stream · Exercises · Leaderboards). |
-| P6 | Four boards per group exercise: Weight (heaviest for ≥ 1 rep) / e1RM × Certified / All. |
+| P6 | Four boards per group exercise: Weight (heaviest for ≥ 1 rep) / 1RM (`e1rm` wire key) × Certified / All. |
 | P7 | One row per member (best set on that board): rank, name, value, date. Both scopes ranked; ties go to the earlier date; former members stay listed, marked former. |
-| P8 | Leaderboards page: one podium card per group exercise on Certified · e1RM; tapping opens the full board (E1). |
+| P8 | Leaderboards page: one podium card per group exercise on Certified · 1RM; tapping opens the full board (E1). |
 | P9 | Each board has a history of who took #1, when, and with what (E1.3). |
 | P10 | Only a record set (a board row or a record card) can be certified, by any current member other than the lifter. One certification is enough. |
 | P11 | A certifier can remove their own certification; owners and admins can cancel any. No disputes. A cancelled set can be certified again. |
@@ -2239,12 +2170,12 @@ contract. The narrative sketches and design trade-offs are in git history
 | D3 | Only record sets (board rows, record cards) can be certified. |
 | D4 | A certification cancelled by an admin can be given again (a new row). |
 | D5 | No claims, no disputes; one certification suffices; admins can cancel. |
-| D6 | A weight-entry mismatch is converted to the group exercise's mode (per side × 2 = total; total ÷ 2 = per side) on Weight and e1RM; record detection uses converted values. |
+| D6 | A weight-entry mismatch is converted to the group exercise's mode (per side × 2 = total; total ÷ 2 = per side) on 1RM; raw Weight is never converted. |
 | D7 | Superseded by D9. |
 | D8 | Archiving keeps links and a read-only board; the exercise is no longer offered for new links. |
 | D9 | Group exercises stay out of the default picker and catalogue lists; they appear in picker search (after my matches), on the Link screen, and on the group page's Exercises. |
 | D10 | Group page = header + Exercises (management); Groups screen = one group, Stream · Leaderboards (amended post-M25). |
-| D11 | Leaderboards page: one podium card per exercise on Certified · e1RM; full board on tap with both toggles. |
+| D11 | Leaderboards page: one podium card per exercise on Certified · 1RM; full board on tap with both toggles. |
 | D12 | Leaderboard history = lead changes per board only. |
 | D13 | Picker search: group matches in a bottom section, plus a Groups toggle for group exercises only. |
 | D14 | Members live in the group-page header (tap the member count). |
@@ -2261,8 +2192,8 @@ contract. The narrative sketches and design trade-offs are in git history
 | E0.2 | Pick sheet for an unlinked group exercise: suggested exercise, choose another, or add as new | §6.3 M25-T07 |
 | E0.3 | Link screen from the catalogue `⋮` / exercise-page `⋮` menus: Linked, Suggested, All | §6.3 M25-T07 |
 | E0.4 | Group page Exercises: my link status, `Link your exercise`, `Unlink…` with individual selection and confirmation | §6.3 M25-T08 and shared unlink contract |
-| E1 / E1.1 | Leaderboards page: podium cards on Certified · e1RM, `You: Nth`, archived last | §6.3 M25-T09 |
-| E1.2 | Full board: Weight/e1RM × Certified/All toggles in place, certified / uncertified mark on All, rows open E2 | §6.3 M25-T09, M25-T10 |
+| E1 / E1.1 | Leaderboards page: podium cards on Certified · 1RM, `You: Nth`, archived last | §6.3 M25-T09 |
+| E1.2 | Full board: Weight/1RM × Certified/All toggles in place, certified / uncertified mark on All, rows open E2 | §6.3 M25-T09, M25-T10 |
 | E1.3 | History: one sentence per lead change, newest first | §6.3 M25-T09 |
 | E2 | Row detail sheet shared by board rows and record cards: value, as logged, date · gym, logged as, certification line and actions, View full session | §6.3 M25-T10 |
 | E3 | Stream record card with its session: title, value, badges, certification status, inline Certify | §6.3 M25-T10 |
@@ -2308,7 +2239,7 @@ the diff plus the cause (T7; rules in §2.11).
 
 ## 11. Optional bodyweight-aware group calculations
 
-> **Status: accepted replacement contract; implementation pending.**
+> **Status: current contract.**
 
 The calculation equation and personal/group policy distinction are owned by
 [`bodyweight-load-contract.md` §2](bodyweight-load-contract.md#2-calculation-policies).
@@ -2318,7 +2249,7 @@ and certification behavior.
 ### 11.1 Group preference and exercise contribution
 
 `groups.bodyweight_calculations_enabled` is an owner/admin-controlled boolean
-and defaults false after migration. `group_exercises.bodyweight_contribution`
+and defaults false. `group_exercises.bodyweight_contribution`
 is a fraction in `[0,1]`, defaults zero, and is edited as
 `Bodyweight contribution (%)`. Disabling the group preference hides and ignores
 contributions but never clears them. Re-enabling restores them unchanged.
@@ -2332,14 +2263,12 @@ Owners/admins may edit the preference and contributions. Members may read the
 published state needed to understand board availability but cannot write it.
 Updates require the expected rules revision; stale writes return `CONFLICT` and
 retain form input. Preference/contribution changes increment the calculation
-revision and enqueue a whole-comparison rebuild. Names and the existing
-`load_input_mode` remain separate fields. Movement standard, loading method,
-default bodyweight metric, unit and external-mode fields are removed.
+revision and enqueue a whole-comparison rebuild. Name, `load_input_mode`,
+`bodyweight_contribution` and `default_metric` are the complete exercise rule.
 
-The migration preserves exercises, links, events, memberships and existing
-coefficient values under the renamed contribution. It defaults the group
-preference off, converts retained lb facts to kg at the clean protocol boundary,
-and does not keep a legacy calculation branch solely for old clients.
+The migration preserves exercises, links, events, memberships and contribution
+values. It initializes the group preference to off and normalizes retained
+Weight facts to kg at the protocol boundary.
 
 ### 11.2 Evaluation and coherent publication
 
@@ -2363,8 +2292,8 @@ ordinary off/zero evaluation never calls the private-reading helper.
 `evaluateGroupMetricGraph` runs the shared TypeScript kernel with the strict
 `group` policy and the member/source exercise's `load_input_mode`; SQL performs
 no bodyweight/Wathan calculation. For 1RM, the kernel first derives the
-displayed source-mode value, then the existing D6 source→group-target conversion
-is applied for board comparison and record detection. A Weight board always
+displayed source-mode value, then the source→group-target distribution
+conversion is applied for board comparison and record detection. A Weight board always
 uses raw entered kg with neither D6 conversion nor bodyweight contribution.
 1RM and Volume use ordinary math while the preference is off or contribution is
 zero, and bodyweight-aware math otherwise.
@@ -2415,15 +2344,14 @@ calculation breakdown or dependency digest. Enqueue/publication failures remain
 isolated from certification and personal-sync commits; no evaluation error may
 roll back a workout push.
 
-The internal digest design is provisional. Implementation review must surface a
-simpler honest alternative if it prevents certification transfer across changed
-calculation dependencies without exposing private reading facts.
-
 ### 11.4 Readers, privacy and client boundary
 
 | RPC | Response / purpose |
 | --- | --- |
 | `group_exercise_list_v2` | Catalogue with preference/contribution and publication metadata |
+| `group_exercise_create_v2(p_group_id, p_name, p_load_input_mode, p_source_exercise_id, p_bodyweight_contribution, p_default_metric)` | Owner/admin create under the current group policy; returns contract version 3 and the comparison |
+| `group_exercise_update_v2(p_group_id, p_exercise_id, p_expected_revision, p_name, p_load_input_mode, p_bodyweight_contribution, p_default_metric)` | Revision-checked owner/admin update; preserves input on `CONFLICT` and returns contract version 3 |
+| `group_exercise_archive_v2`, `group_exercise_unarchive_v2` | Owner/admin lifecycle writes returning contract version 3 |
 | `group_metric_board` | Weight or 1RM, kg, revision, ready/rebuilding/archived state, ranked entries and opaque cursor |
 | `group_metric_podiums` | One card per comparison using its existing board default |
 | `group_metric_history` | Revision/metric/scope-bound history; cursor cannot cross dimensions |
@@ -2446,10 +2374,10 @@ reading/dependency fields and malformed certification state. Unknown future
 stream item kinds can be skipped while preserving the server cursor; known
 malformed items fail instead of entering cache.
 
-The clean cutover bumps group cache keys and clears every earlier bodyweight
-projection. Shared-session summaries may apply the viewer-independent group
-projection but never carry a member's private reading context. An as-logged
-personal summary cannot masquerade as a group-authoritative score.
+Group caches use the current versioned key namespace. Shared-session summaries
+may apply the viewer-independent group projection but never carry a member's
+private reading context. An as-logged personal summary cannot masquerade as a
+group-authoritative score.
 
 ### 11.5 Verification ownership
 

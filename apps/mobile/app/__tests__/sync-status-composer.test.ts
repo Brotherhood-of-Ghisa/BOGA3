@@ -73,11 +73,11 @@ afterEach(() => {
   fixture.close();
 });
 
-describe('dirty-row count across the eleven entity tables', () => {
+describe('dirty-row count across the synced entity tables', () => {
   it('includes pending bodyweight readings but excludes clean readings', async () => {
     await fixture.database.insert(bodyWeightMeasurements).values([
-      { id: 'pending', weightValue: '80', weightUnit: 'kg', weightKg: 80, measuredAt: new Date(1000), localDirty: true },
-      { id: 'clean', weightValue: '81', weightUnit: 'kg', weightKg: 81, measuredAt: new Date(2000), localDirty: false },
+      { id: 'pending', weightKg: 80, measuredAt: new Date(1000), localDirty: true },
+      { id: 'clean', weightKg: 81, measuredAt: new Date(2000), localDirty: false },
     ]);
     expect((await getSyncStatus()).dirtyCount).toBe(1);
   });
