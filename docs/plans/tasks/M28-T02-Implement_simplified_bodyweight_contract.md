@@ -1,6 +1,6 @@
 # M28-T02 — Implement the simplified bodyweight contract
 
-- Status: `in progress`
+- Status: `completed` (rollout confirmed by user on 2026-09-30)
 - Depends on: `M28-T01-Define_simplified_bodyweight_contract`
 - Milestone: `docs/plans/milestones/M28-simplify-bodyweight-ux-and-semantics.md`
 - Areas: frontend, backend, cross-stack; UI impact: yes
@@ -11,6 +11,10 @@ Implement the accepted M28 bodyweight contract as one coordinated cross-stack
 change. Replace the old schema and semantics, preserve workout history and
 dated readings, integrate private/group/coaching consumers, obtain explicit
 human UI acceptance, and then run the complete locally selected gate suite.
+
+Completion status records the user's 2026-09-30 confirmation that the code was
+rolled out in version 1.1.0 build 18. Hosted/device verification evidence was
+not supplied with that confirmation.
 
 This one task closes the combined acceptance cases in #392, #395, #396, #398
 and #399; do not split it into five symptom patches.
