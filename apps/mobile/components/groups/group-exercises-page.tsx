@@ -59,7 +59,7 @@ type GroupExercisesPageProps = {
   groupId: string;
   groupName: string;
   myRole: GroupRole;
-  /** `group_exercise_list` through `useGroupResource` (`group-exercises:<groupId>`), owned by the group screen. */
+  /** The group exercise list through its versioned cache resource, owned by the group screen. */
   exercises: GroupResourceState<GroupExerciseListResult>;
   offline: boolean;
   error: GroupApiError | null;

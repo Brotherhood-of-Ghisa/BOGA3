@@ -1,11 +1,10 @@
-import type { LoadContext } from '@/src/exercise-calculations/effective-load';
-import type { SessionSetLoadMetadata } from '@/src/data/session-drafts';
+import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
 export type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
-export type SessionSet = SessionSetLoadMetadata & {
+export type SessionSet = {
   id: string;
   reps: string;
   weight: string;
@@ -26,7 +25,6 @@ export type SessionExercise = {
 };
 
 export type Session = {
-  bodyWeightKg?: number | null;
   dateTime: string;
   locationId: string | null;
   exercises: SessionExercise[];

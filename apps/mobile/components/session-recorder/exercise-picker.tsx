@@ -406,8 +406,6 @@ export function ExercisePicker({
                               reps: parseSetReps(set.repsValue),
                               setType: set.setType,
                               loadContext: preselection.suggestion?.loadContext,
-                              weightUnit: set.weightUnit, externalLoadMode: set.externalLoadMode,
-                              localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
                               done: false,
                             })}
                             testID={`exercise-picker-plan-set-row-${index + 1}`}

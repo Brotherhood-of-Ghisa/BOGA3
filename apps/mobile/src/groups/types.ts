@@ -21,6 +21,7 @@ export type GroupSummary = {
   /** Active members only. */
   member_count: number;
   my_role: GroupRole;
+  bodyweight_calculations_enabled: boolean;
 };
 
 export type GroupRef = {
@@ -35,17 +36,7 @@ export type GroupMemberRef = {
 
 export type GroupSessionStatus = 'active' | 'completed';
 
-/** Frozen shared-session context. Missing revision denotes an older entered-load payload. */
-export type GroupSessionLoadContext = {
-  metric_scope?: 'personal';
-  metric_revision?: 'dated_added_load_v3';
-  body_weight_kg?: number | null;
-  body_weight_source?: string | null;
-  body_weight_measurement_id?: string | null;
-  body_weight_measured_at_ms?: number | null;
-};
-
-export type StreamSessionItem = GroupSessionLoadContext & {
+export type StreamSessionItem = {
   kind: 'session';
   /** `<member_user_id>:<session_id>` */
   key: string;
@@ -172,8 +163,6 @@ export type GroupSessionSet = {
   set_id: string;
   order_index: number;
   weight_value: string;
-  weight_unit?: string | null;
-  external_load_mode?: string | null;
   reps_value: string;
   set_type: string | null;
   performance_status: string | null;
@@ -182,9 +171,6 @@ export type GroupSessionSet = {
 export type GroupSessionExercise = {
   exercise_definition_id?: string | null;
   load_input_mode?: string | null;
-  bodyweight_coefficient?: number | null;
-  movement_standard?: string | null;
-  loading_method?: string | null;
   session_exercise_id: string;
   /** The member's own exercise name (`session_exercises.name`). */
   name: string;
@@ -194,7 +180,7 @@ export type GroupSessionExercise = {
   sets: GroupSessionSet[];
 };
 
-export type GroupSessionDetail = GroupSessionLoadContext & {
+export type GroupSessionDetail = {
   member: GroupMemberRef;
   session_id: string;
   gym_name: string | null;
@@ -261,7 +247,7 @@ export type BoardRow = {
   member: GroupMemberRef;
   /** No longer an active member; still ranked (P7). */
   former: boolean;
-  /** The ranked value: `weight_kg` on Weight, `e1rm_kg` on e1RM. */
+  /** The ranked value: `weight_kg` on Weight, `e1rm_kg` on 1RM. */
   value_kg: number;
   weight_kg: number;
   reps: number;

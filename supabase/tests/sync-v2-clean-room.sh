@@ -8,12 +8,12 @@
 #
 #   1. v1 sync objects absent (sync_apply_projection_event,
 #      sync_events_ingest, sync_events_ingest_impl, sync_ingest_failure,
-#      sync_device_ingest_state, sync_ingested_events); all ten v2 entity
+#      sync_device_ingest_state, sync_ingested_events); all twelve v2 entity
 #      tables present in app_public.
-#   2. Each of the ten tables has composite PK (owner_user_id, id),
+#   2. Each of the twelve tables has composite PK (owner_user_id, id),
 #      universal columns (owner_user_id, client_updated_at_ms,
 #      server_received_at, deleted_at), the per-table btree indexes,
-#      and ZERO CHECK constraints (per §A.1, "no server validation").
+#      and only the contract-allowed CHECK constraints.
 #   3. Each table has the two universal triggers
 #      (<table>_touch_server_received_at, <table>_owner_user_id_immutable);
 #      the enforce_owner_user_id_immutable function body contains the
@@ -92,6 +92,8 @@ ENTITIES=(
   exercise_sets
   session_exercise_tags
   exercise_group_links
+  user_settings
+  body_weight_measurements
 )
 
 # -----------------------------------------------------------------------------
@@ -137,7 +139,7 @@ done
 pass "check 1.A — v1 sync-state tables absent from pg_class"
 
 # -----------------------------------------------------------------------------
-# Check 1.B — all ten v2 entity tables present.
+# Check 1.B — all twelve v2 entity tables present.
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -153,7 +155,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "check 1.B — ten v2 entity tables present in app_public"
+pass "check 1.B — twelve v2 entity tables present in app_public"
 
 # -----------------------------------------------------------------------------
 # Check 2 — schema shape: composite PK, universal columns with correct

@@ -807,59 +807,40 @@ deploy and one setting per hosted project:
 Locally, the shared baseline sets the URL for you
 (`supabase/scripts/group-eval-configure.sh`).
 
-## Dated bodyweight cutover
+## Optional bodyweight-calculation cutover
 
-This is an operator procedure, not a record of hosted deployment. Keep the
-compatibility commit independently buildable; do not squash it away before
-publishing the compatibility build. Record commit SHAs, TestFlight build numbers,
-project ref, migration/function versions and smoke evidence in the release PR.
-Never reset the hosted database for this cutover.
+This is an accepted operator procedure, not authorization or evidence of a
+hosted deployment. Record exact commit SHAs, store build numbers, project ref,
+migration/function versions and smoke evidence in the release PR. Never reset
+the hosted database for this cutover.
 
-1. **Distribute compatibility first.** Commit `11509384` contains only the
-   update-required client support and its tests. It keeps the old schema and
-   old sync protocol. From a clean release worktree at that commit, run the
-   required gates and build/submit the store profile. The commands below use
-   `prod` (`com.phano.boga3`). If the installed TestFlight fleet uses `preview`
-   (`com.phano.boga3.dev`), use `--profile preview` in **both** build and submit
-   commands, for **both** releases. Confirm that profile's EAS environment points
-   at the same hosted project selected in step 2; distributing another bundle
-   cannot update the installed fleet.
+1. **Distribute update-required compatibility first.** Build the latest reviewed
+   client that still speaks the current server protocol but recognizes
+   `UPDATE_REQUIRED` during setup and steady-state sync. Run its required local
+   gates and sweep, submit the same EAS profile/bundle ID used by the installed
+   fleet, and verify it reaches normal sync before the server cutover. It must
+   retain dirty local data and cursors when the guard later activates.
 
-   ```bash
-   ./boga worktree create --from 11509384 codex/bodyweight-compat-release
-   # cd to the exact worktree path printed above
-   # This isolated compatibility commit predates the Expo SDK 57 upgrade.
-   ./boga ios build-client --force
-   ./boga test fast
-   ./boga test frontend
-   ./boga sweep --ref 11509384
-   cd apps/mobile
-   npx eas-cli build --platform ios --profile prod --local --output /tmp/boga-bodyweight-compat.ipa
-   npx eas-cli submit --platform ios --profile prod --path /tmp/boga-bodyweight-compat.ipa
-   ```
+2. **Validate the implementation release locally.** In its leased worktree, run
+   `./boga test for --diff origin/main...HEAD`, every selected lane and any
+   recommended sweep. The integrated UI must already have explicit human
+   acceptance. Confirm populated migration fixtures preserve sessions, sets,
+   readings, contributions, IDs and clocks; convert lb actual/planned/readings
+   to kg exactly; default private/group preferences off; and remove all retired
+   unit/mode/movement/loading/hydration fields.
 
-   Verify this compatibility build reaches normal sync on the pre-cutover
-   server, and distribute it before the breaking server step. It recognizes
-   `UPDATE_REQUIRED` in first-run setup and steady-state Settings, keeps data
-   on-device, and offers no misleading Retry in the setup gate. Builds predating
-   this compatibility commit may show a generic sync failure; their UI cannot be
-   changed remotely. TestFlight's update path is required for those builds.
-
-2. **Review pending migrations, then cut over the server.** Use the reviewed
-   full implementation checkout, its slot lease and the intended linked hosted
-   project. The pinned CLI wrapper uses that checkout's configuration. Verify
-   the linked project ref before proceeding; the command below shows the
-   migration plan without modifying the hosted database:
+3. **Review and apply the hosted cutover.** Verify the linked project and inspect
+   the exact migration plan before modifying anything:
 
    ```bash
    bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
    bash -lc 'source supabase/scripts/_common.sh && run_supabase db push --linked --dry-run'
    ```
 
-   Confirm the chain includes `20260927150155_dated_bodyweight_groups.sql` and
-   `20260927195000_added_bodyweight_loads.sql`, with no unreviewed migrations.
-   Then apply the migrations and immediately deploy the matching
-   functions from the full checkout (they import shared mobile TypeScript):
+   Apply only the reviewed clean-schema/protocol-3 migrations, then immediately
+   deploy the matching `group-eval` and `agent-api` functions. Retain the Vault
+   secret, evaluator URL and queued jobs. The protocol guard must activate before
+   removed columns become inaccessible.
 
    ```bash
    bash -lc 'source supabase/scripts/_common.sh && run_supabase db push --linked'
@@ -868,58 +849,34 @@ Never reset the hosted database for this cutover.
    bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
    ```
 
-   The first migration installs the protocol guard before dropping stored
-   session columns and enqueues active comparisons. Matching function deployment
-   follows the schema: a short API/evaluator failure interval is possible;
-   preserve the queue for retry. Retain the existing Vault secret and evaluator
-   URL. Do not release the dated client before the following smoke checks.
+4. **Smoke the cutoff with dedicated hosted accounts.** Missing, malformed and
+   protocol-2 push/pull headers must return `UPDATE_REQUIRED` before row access;
+   `x-boga-sync-protocol: 3` succeeds. Rejected calls change no rows/cursors.
+   Verify the twelve clean entities, synced private preference, layer-4 kg
+   readings, removed fields and reinstall restore.
 
-3. **Verify the cutoff and projections with dedicated hosted test accounts.**
-   Use the compatibility build: Sync now and a clean setup must display the
-   update requirement, retaining dirty changes and existing local data. At the
-   HTTP boundary, calls to `app_public.sync_push` and `sync_pull` with no protocol
-   header or value 1 return SQLSTATE `P0001` and message beginning
-   `UPDATE_REQUIRED:`; calls with `x-boga-sync-protocol: 2` succeed normally.
-   Confirm neither a rejected push nor pull changes rows/cursors. Session rows
-   contain no `body_weight_*` fields; layer 4 still restores private readings.
+   With two group members, exercise private/group off/on independence, preserved
+   contributions, reading add/backdate/edit/delete/restore, ordinary/personal/
+   strict-group calculations and coherent publication. A missing group reading
+   omits only dependent scores. Inspect every public group payload/cache/event/
+   board/certification response for absence of reading value/date/id/provenance
+   and dependency digest. Reading or contribution changes must invalidate the
+   affected certification without claiming the witness verified bodyweight.
+   Confirm coaching uses `bodyweight_optional_v1`, emits ordinary/no-reading
+   output while private mode is off and authorized aware output while on. Re-run
+   hosted OAuth/discovery/revocation checks.
 
-   With two group members, add/backdate/edit/move/delete/restore a reading.
-   Verify affected personal/shared/coaching values agree; later readings cannot
-   fill earlier sessions. Cross-owner reading access and direct authenticated
-   `session_weight_contexts` calls must be denied. Verify changed strength pins
-   void certificates while reps-only certificates survive. Check both evaluator
-   queues drain through the configured worker, with no repeated failure/backoff.
-   Confirm API/MCP responses use `dated_added_load_v3` and keep incomplete totals
-   null. Re-run the hosted OAuth/discovery/revocation checks above.
+5. **Release the protocol-3 client.** Build and submit only the reviewed commit
+   whose local gates/sweep produced the evidence above. Upgrade a populated
+   device and verify raw workouts/readings survive, lb values are kg-converted,
+   settings/contributions restore across sync, disposable group caches clear,
+   and no workout surface prompts for bodyweight.
 
-4. **Release the dated client.** From the reviewed implementation checkout after
-   local gates and the sweep pass, restore its SDK 57 simulator client if the
-   compatibility release rebuilt the shared cache. Verify that native build
-   before the store build:
-
-   ```bash
-   ./boga ios build-client --force
-   release_ref="$(git rev-parse HEAD)"
-   ./boga sweep --ref "$release_ref"
-   cd apps/mobile
-   npx eas-cli build --platform ios --profile prod --local --output /tmp/boga-dated-bodyweight.ipa
-   npx eas-cli submit --platform ios --profile prod --path /tmp/boga-dated-bodyweight.ipa
-   ```
-
-   Verify an upgrade preserves raw workouts/readings, drops obsolete local
-   session fields, clears old group caches and resumes protocol-2 sync. A
-   session without an applicable reading remains usable but has unavailable
-   weight-dependent metrics. Nothing manufactures a reading from old manual
-   weights. All saved numeric bodyweight loads, including rows with retired
-   mode tags, count as added weight without changing their raw amounts or units.
-
-If validation fails, hold the dated client and repair forward. Keep the guard
-active and preserve readings, raw workouts and queued jobs. Do not restore the
-old session writer or old calculation worker. Pausing the evaluator must retain
-its pending jobs; resume with matching code and verify coherent publication.
-Retired rule/event evidence keeps its historical meaning. Local gate results do
-not substitute for these hosted checks, and executing the implementation task
-does not authorize any deployment or store submission.
+If validation fails, hold the protocol-3 client and repair forward. Keep the
+guard active and preserve readings, raw workouts, dirty data and queued jobs.
+Do not restore retired fields or the old calculation worker. Local gate results
+do not substitute for hosted checks, and implementing the feature does not
+authorize deployment or store submission.
 
 ## Upgrading from v1 sync (one-time wipe)
 

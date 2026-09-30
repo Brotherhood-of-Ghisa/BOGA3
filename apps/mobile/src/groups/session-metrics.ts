@@ -1,25 +1,24 @@
-// Personal/as-logged metrics for shared-session cards and detail. Group rules
-// are deliberately absent: ranked scores use performance-score.ts instead.
-import { isValidSessionWeight } from '@/src/bodyweight/snapshot';
+// Shared-session cards use ordinary kg math. Private settings, contributions,
+// and readings never cross the group boundary; ranked group scores are
+// calculated server-side under group-owned rules.
 import { parseSetWeight } from '@/src/exercise-calculations';
 import {
-  calculateEffectiveSetMetrics, isWeightUnit, summarizeEffectiveVolume, weightToKg,
-  type EffectiveSetMetrics, type LoadContext, type VolumeCoverage,
-} from '@/src/exercise-calculations/effective-load';
+  calculateSetMetrics, summarizeVolume,
+  type LoadContext, type SetMetrics, type VolumeCoverage,
+} from '@/src/exercise-calculations/load-metrics';
+import { ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
-import type { GroupSessionExercise, GroupSessionLoadContext, GroupSessionSet } from './types';
+import type { GroupSessionExercise, GroupSessionSet } from './types';
 
 export type GroupPerformedSet = {
   setId: string;
   orderIndex: number;
-  /** Original amount/unit for the visible row; never replace it with resistance. */
+  /** Raw entered kg for the visible row. */
   enteredWeight: number;
-  weightUnit: string | null;
-  weightKg: number | null;
-  externalLoadMode: string | null;
+  weightKg: number;
   reps: number;
   setType: string | null;
-  metrics: EffectiveSetMetrics;
+  metrics: SetMetrics;
 };
 export type GroupPerformedExercise = {
   sessionExerciseId: string;
@@ -31,72 +30,52 @@ export type GroupPerformedExercise = {
 };
 export type GroupSessionMetrics = {
   performedSets: number;
-  /** Null when any performed set lacks valid load context. */
+  /** Null only when a performed row is invalid. */
   totalVolumeKg: number | null;
   exerciseCount: number;
   coverage: VolumeCoverage;
-  basis: 'personal' | 'legacy_entered_load';
 };
 
-const legacyContext: LoadContext = { bodyweightCoefficient: 0, loadInputMode: 'total_load' };
-
-/** A v2 payload with absent definition metadata is unknown, never c=0. */
-export const groupSessionWeightSnapshot = (session: GroupSessionLoadContext) => ({
-  bodyWeightKg: session.body_weight_kg ?? null,
-  bodyWeightSource: session.body_weight_source ?? null,
-  bodyWeightMeasurementId: session.body_weight_measurement_id ?? null,
-  bodyWeightMeasuredAt: session.body_weight_measured_at_ms == null ? null : new Date(session.body_weight_measured_at_ms),
-});
-
 export function groupSessionExerciseLoadContext(
-  exercise: GroupSessionExercise, session?: GroupSessionLoadContext,
+  exercise: GroupSessionExercise,
 ): LoadContext {
-  if (session?.metric_revision !== 'dated_added_load_v3') return legacyContext;
-  const snapshot = groupSessionWeightSnapshot(session);
-  const absent = Object.values(snapshot).every(value => value === null);
-  return {
-    bodyweightCoefficient: exercise.bodyweight_coefficient ?? NaN,
-    loadInputMode: exercise.load_input_mode ?? '',
-    // The kernel distinguishes a missing tuple from malformed provenance.
-    bodyWeightKg: isValidSessionWeight(snapshot) ? snapshot.bodyWeightKg : absent ? null : NaN,
-  };
+  return ordinaryLoadContext(
+    exercise.load_input_mode === 'per_side_load' ? 'per_side_load' : 'total_load',
+  );
 }
 
 /** Preserve performed rows even when only load-dependent metrics are unavailable. */
 export function toGroupPerformedSet(
-  set: GroupSessionSet, context: LoadContext = legacyContext, requireMetadata = false,
+  set: GroupSessionSet, context: LoadContext = ordinaryLoadContext(),
 ): GroupPerformedSet | null {
   if (set.performance_status !== null) return null;
   const weight = canonicalizeWeightForReps(set.weight_value, set.reps_value);
   const enteredWeight = parseSetWeight(weight);
-  const weightUnit = set.weight_unit === undefined ? requireMetadata ? null : 'kg' : set.weight_unit;
-  const metrics = calculateEffectiveSetMetrics({ ...context, weightValue: weight,
-    repsValue: set.reps_value, weightUnit, externalLoadMode: set.external_load_mode,
+  const metrics = calculateSetMetrics({ ...context, weightValue: weight,
+    repsValue: set.reps_value,
     performanceStatus: null, setType: set.set_type });
   if (!metrics.eligible || enteredWeight === null) return null;
-  return { setId: set.set_id, orderIndex: set.order_index, enteredWeight, weightUnit,
-    weightKg: isWeightUnit(weightUnit) ? weightToKg(enteredWeight, weightUnit) : null,
-    externalLoadMode: set.external_load_mode ?? null, reps: metrics.reps, setType: set.set_type, metrics };
+  return { setId: set.set_id, orderIndex: set.order_index, enteredWeight,
+    weightKg: enteredWeight, reps: metrics.reps, setType: set.set_type, metrics };
 }
 
 export function selectGroupPerformedExercises(
-  exercises: GroupSessionExercise[], session?: GroupSessionLoadContext,
+  exercises: GroupSessionExercise[],
 ): GroupPerformedExercise[] {
   return exercises.flatMap(exercise => {
-    const loadContext = groupSessionExerciseLoadContext(exercise, session);
+    const loadContext = groupSessionExerciseLoadContext(exercise);
     const sets = exercise.sets.flatMap(set =>
-      toGroupPerformedSet(set, loadContext, session?.metric_revision === 'dated_added_load_v3') ?? []);
+      toGroupPerformedSet(set, loadContext) ?? []);
     return sets.length ? [{ sessionExerciseId: exercise.session_exercise_id, name: exercise.name,
       machineName: exercise.machine_name, orderIndex: exercise.order_index, loadContext, sets }] : [];
   });
 }
 
 export function computeGroupSessionMetrics(
-  exercises: GroupSessionExercise[], session?: GroupSessionLoadContext,
+  exercises: GroupSessionExercise[],
 ): GroupSessionMetrics {
-  const performed = selectGroupPerformedExercises(exercises, session);
-  const coverage = summarizeEffectiveVolume(performed.flatMap(exercise => exercise.sets.map(set => set.metrics)));
+  const performed = selectGroupPerformedExercises(exercises);
+  const coverage = summarizeVolume(performed.flatMap(exercise => exercise.sets.map(set => set.metrics)));
   return { performedSets: coverage.eligibleSetCount, totalVolumeKg: coverage.totalVolumeKgReps,
-    exerciseCount: performed.length, coverage,
-    basis: session?.metric_revision === 'dated_added_load_v3' ? 'personal' : 'legacy_entered_load' };
+    exerciseCount: performed.length, coverage };
 }

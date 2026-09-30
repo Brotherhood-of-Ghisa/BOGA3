@@ -8,7 +8,7 @@
  * restore.
  *
  * The wipe must, on the singleton runtime-state row:
- *   - clear all rows from the eleven syncable entity tables (muscle_groups
+ *   - clear all rows from the twelve syncable entity tables (muscle_groups
  *     included — it is now a synced entity, recovered for the next account via
  *     the generic first-sign-in pull);
  *   - reset bootstrap_completed_at → null;
@@ -81,13 +81,15 @@ import {
   sessionExercises,
   sessions,
   syncRuntimeState,
+  userSettings,
 } from '@/src/data/schema';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 
-// The eleven syncable, per-user entity tables the wipe must clear, paired with a
+// The twelve syncable, per-user entity tables the wipe must clear, paired with a
 // label for readable assertions.
 const ENTITY_TABLES = [
   ['body_weight_measurements', bodyWeightMeasurements],
+  ['user_settings', userSettings],
   ['muscle_groups', muscleGroups],
   ['gyms', gyms],
   ['exercise_definitions', exerciseDefinitions],
@@ -106,9 +108,10 @@ const db = (): TestDatabase => fixture.database;
 
 const PRESERVED_LAST_EMITTED_MS = 1_700_000_555_000;
 
-/** Inserts one minimal row into each of the eleven syncable entity tables. */
+/** Inserts one minimal row into each of the twelve syncable entity tables. */
 const seedEveryEntityTable = (): void => {
-  db().insert(bodyWeightMeasurements).values({ id: 'bw-1', weightValue: '80', weightUnit: 'kg', weightKg: 80, measuredAt: new Date(1000) }).run();
+  db().insert(bodyWeightMeasurements).values({ id: 'bw-1', weightKg: 80, measuredAt: new Date(1000) }).run();
+  db().insert(userSettings).values({ id: 'settings', bodyweightCalculationsEnabled: true }).run();
   db()
     .insert(muscleGroups)
     .values({ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 })
@@ -192,7 +195,7 @@ describe('sign-out / account-switch local wipe', () => {
     mockClientState.client = null;
   });
 
-  it('clears every one of the eleven syncable entity tables', async () => {
+  it('clears every one of the twelve syncable entity tables', async () => {
     for (const [label, table] of ENTITY_TABLES) {
       expect([label, countRows(table)]).toEqual([label, 1]);
     }

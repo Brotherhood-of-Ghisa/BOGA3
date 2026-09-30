@@ -27,7 +27,6 @@ type ViewSessionScreenProps = {
   section: ViewSessionSection;
   onSectionChange: (section: ViewSessionSection) => void;
   summaryContent: ReactNode;
-  bodyWeightContent?: ReactNode;
   summary: ViewSessionSummary;
   model: CompletedSessionDetailModel;
   // A failed write (delete, undelete, append), shown until the next action.
@@ -51,7 +50,6 @@ export function ViewSessionScreen({
   section,
   onSectionChange,
   summaryContent,
-  bodyWeightContent,
   model,
   error,
   onBack,
@@ -97,7 +95,6 @@ export function ViewSessionScreen({
           testID="completed-session-detail-summary"
           times={{ start: summary.start, end: summary.end, testID: 'completed-session-detail-times' }}
         />
-        {bodyWeightContent}
         <SegmentedControl
           accessibilityLabel="Session review section"
           options={[{ value: 'summary', label: 'Summary' }, { value: 'sets', label: 'Sets' }]}

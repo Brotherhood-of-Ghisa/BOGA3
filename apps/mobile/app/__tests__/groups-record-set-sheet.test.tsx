@@ -106,7 +106,8 @@ const GROUP_ID = 'g1';
 const RECORD_CARD = 'group-stream-record-card-ev-record-1';
 
 const groupPayload = (role: GroupRole = 'member'): GroupGetResult => ({
-  group: { group_id: GROUP_ID, name: 'Crew', description: null, member_count: 3, my_role: role },
+  group: { group_id: GROUP_ID, name: 'Crew', description: null, member_count: 3, my_role: role,
+    bodyweight_calculations_enabled: false },
   members: [{ user_id: ME, username: 'me', role }],
 });
 

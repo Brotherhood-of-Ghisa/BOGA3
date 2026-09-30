@@ -1,14 +1,10 @@
 // The dated-reading boundary shared by device repositories and server adapters.
-// Resolve selection before validation: a malformed latest reading cannot silently
-// fall back to an older, plausible weight. No timezone or wall clock enters here.
-import { parseSetWeight } from '../exercise-calculations/index.ts';
-import { isWeightUnit, weightToKg } from '../exercise-calculations/effective-load.ts';
+// Invalid restored rows remain editable but are never calculation candidates.
+// No timezone or wall clock enters here.
 
 export type DatedWeightReading = {
   id: string;
   measuredAt: Date | number;
-  weightValue: string;
-  weightUnit: string;
   weightKg: number;
   deletedAt?: Date | number | null;
 };
@@ -18,6 +14,7 @@ export type ResolvedSessionWeight = {
   bodyWeightMeasurementId: string | null;
   bodyWeightMeasuredAt: Date | null;
 };
+export type SessionWeightContext = Partial<ResolvedSessionWeight>;
 export const EMPTY_SESSION_WEIGHT: ResolvedSessionWeight = {
   bodyWeightKg: null, bodyWeightSource: null, bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null,
 };
@@ -35,13 +32,7 @@ export function compareReadingIds(left: string, right: string): number {
 
 export function isValidBodyWeightReading(reading: DatedWeightReading): boolean {
   if (!reading.id.trim() || (!Number.isSafeInteger(millis(reading.measuredAt)) || Math.abs(millis(reading.measuredAt)) > 8640000000000000)) return false;
-  if (typeof reading.weightValue !== 'string' || !isWeightUnit(reading.weightUnit)) return false;
-  const amount = parseSetWeight(reading.weightValue);
-  if (amount === null || amount <= 0) return false;
-  const kg = weightToKg(amount, reading.weightUnit);
-  return kg !== null && Number.isFinite(kg) && kg > 0 &&
-    Number.isFinite(reading.weightKg) && reading.weightKg > 0 &&
-    Math.abs(kg - reading.weightKg) <= Number.EPSILON * 16 * Math.max(1, kg);
+  return Number.isFinite(reading.weightKg) && reading.weightKg > 0;
 }
 
 export function resolveReadingContext(reading: DatedWeightReading | null): ResolvedSessionWeight {
@@ -53,9 +44,32 @@ export function resolveReadingContext(reading: DatedWeightReading | null): Resol
   };
 }
 
+/** A calculation context is valid only when its dated-reading tuple is complete. */
+export function isValidSessionWeight(context: SessionWeightContext): context is ResolvedSessionWeight & {
+  bodyWeightKg: number;
+  bodyWeightSource: 'reading';
+  bodyWeightMeasurementId: string;
+  bodyWeightMeasuredAt: Date;
+} {
+  const { bodyWeightKg: kg, bodyWeightSource: source, bodyWeightMeasurementId: id, bodyWeightMeasuredAt: at } = context;
+  if (typeof kg !== 'number' || !Number.isFinite(kg) || kg <= 0) return false;
+  return source === 'reading' && typeof id === 'string' && id.trim().length > 0 &&
+    at instanceof Date && Number.isFinite(at.getTime());
+}
+
+/** DB readers supply the full tuple. Pure calculation inputs may supply only B. */
+export function sessionBodyWeightForCalculation(session?: SessionWeightContext | null): number | null {
+  if (!session) return null;
+  const kg = session.bodyWeightKg;
+  if (typeof kg !== 'number' || !Number.isFinite(kg) || kg <= 0) return null;
+  const hasProvenance = 'bodyWeightSource' in session || 'bodyWeightMeasurementId' in session ||
+    'bodyWeightMeasuredAt' in session;
+  return hasProvenance && !isValidSessionWeight(session) ? null : kg;
+}
+
 /** Sort once per graph; each session lookup is logarithmic, with no per-set reads. */
 export function createAsOfWeightResolver(readings: readonly DatedWeightReading[]) {
-  const sorted = readings.filter(row => row.deletedAt == null && Number.isSafeInteger(millis(row.measuredAt)))
+  const sorted = readings.filter(row => row.deletedAt == null && isValidBodyWeightReading(row))
     .slice().sort((a, b) => millis(a.measuredAt) - millis(b.measuredAt) || compareReadingIds(a.id, b.id));
   const timeline = sorted.filter((row, i) => i === 0 || millis(row.measuredAt) !== millis(sorted[i - 1].measuredAt));
   return (startedAt: Date | number): ResolvedSessionWeight => {

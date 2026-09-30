@@ -138,6 +138,7 @@ Use this section as the single source of truth for reusable UX patterns.
 2. Typography
    - Body and input text should remain readable without zoom.
    - Titles and section labels should be visually distinct from body text.
+   - Use a subtitle only when the title alone cannot communicate the item's purpose or action. Do not add subtitles that merely repeat the title, preview details that become clear after opening the item, or state units the destination already makes evident.
 3. Touch targets
    - Primary interactive elements must meet mobile tap-target expectations.
    - Destructive actions must be visually distinguishable from primary actions.

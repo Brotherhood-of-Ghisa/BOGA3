@@ -2,75 +2,66 @@ import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { scoreGroupPerformance, type GroupPerformanceInput } from '@/src/groups/performance-score';
 import type { GroupExerciseRules, GroupMetric } from '@/src/groups/metric-contract';
 
-const rules: GroupExerciseRules = { name: 'Pull-up', loadInputMode: 'total_load', bodyweightCoefficient: 1,
-  movementStandard: 'Strict pull-up', loadingMethod: 'Belt', defaultMetric: 'relative_strength' };
-const input: GroupPerformanceInput = { weightValue: '20', weightUnit: 'kg', repsValue: '5', externalLoadMode: 'added',
-  performanceStatus: null, bodyWeightKg: 60, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'r', bodyWeightMeasuredAt: new Date(1000), live: true,
-  source: { loadInputMode: 'total_load', movementStandard: 'Strict pull-up', loadingMethod: 'Belt' } };
-const value = (p: GroupPerformanceInput, metric: GroupMetric, target = rules) => scoreGroupPerformance(p, target).scores.find(s => s.metric === metric)?.value;
+const rules: GroupExerciseRules = {
+  name: 'Pull-up', loadInputMode: 'total_load', bodyweightCalculationsEnabled: true,
+  bodyweightContribution: 1, defaultMetric: 'e1rm',
+};
+const input: GroupPerformanceInput = {
+  weightValue: '20', repsValue: '5', performanceStatus: null,
+  bodyWeightKg: 60, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'r',
+  bodyWeightMeasuredAt: new Date(1000), live: true,
+  source: { loadInputMode: 'total_load' },
+};
+const value = (performance: GroupPerformanceInput, metric: GroupMetric, target = rules) =>
+  scoreGroupPerformance(performance, target).scores.find(score => score.metric === metric)?.value;
 
-describe('Shared target-specific group scores', () => {
-  it('reverses absolute and relative ranking for the milestone equal-rep example', () => {
-    const light = input, heavy = { ...input, bodyWeightKg: 90 };
-    expect(value(light, 'absolute_strength')).toBeCloseTo(estimateOneRepMax(80, 5)! - 60, 10);
-    expect(value(heavy, 'absolute_strength')).toBeCloseTo(estimateOneRepMax(110, 5)! - 90, 10);
-    expect(value(light, 'absolute_strength')!).toBeLessThan(value(heavy, 'absolute_strength')!);
-    expect(value(light, 'relative_strength')!).toBeGreaterThan(value(heavy, 'relative_strength')!);
-    expect(scoreGroupPerformance(light, rules).addedPercentBodyweight).toBeCloseTo(100 / 3, 10);
+describe('target-specific group scores', () => {
+  it('keeps Weight raw while changing only the 1RM calculation', () => {
+    expect(value(input, 'weight')).toBe(20);
+    expect(value(input, 'e1rm')).toBeCloseTo(estimateOneRepMax(80, 5)! - 60, 10);
+    expect(value({ ...input, bodyWeightKg: 90 }, 'weight')).toBe(20);
+    expect(value({ ...input, bodyWeightKg: 90 }, 'e1rm')).toBeCloseTo(estimateOneRepMax(110, 5)! - 90, 10);
   });
 
-  it('uses each group coefficient and the source distribution exactly once', () => {
-    const p = { ...input, bodyWeightKg: 80, weightValue: '10', repsValue: '8', source: { ...input.source, loadInputMode: 'per_side_load' } };
-    expect(scoreGroupPerformance(p, rules).effectiveResistanceKg).toBe(100);
-    expect(scoreGroupPerformance(p, { ...rules, loadInputMode: 'per_side_load' }).effectiveResistanceKg).toBe(100);
-    expect(scoreGroupPerformance(p, { ...rules, bodyweightCoefficient: 0.7 }).effectiveResistanceKg).toBe(76);
-    expect(value(p, 'absolute_strength')).toBeCloseTo(estimateOneRepMax(100, 8)! - 80, 10);
-    expect(value(p, 'absolute_strength', { ...rules, loadInputMode: 'per_side_load' })).toBeCloseTo((estimateOneRepMax(100, 8)! - 80) / 2, 10);
-    expect(value(p, 'relative_strength')).toBeCloseTo((estimateOneRepMax(100, 8)! - 80) / 80, 10);
+  it('applies source-to-target distribution to 1RM but never raw Weight', () => {
+    const performance = { ...input, bodyWeightKg: 80, weightValue: '10', repsValue: '8',
+      source: { loadInputMode: 'per_side_load' as const } };
+    expect(value(performance, 'weight')).toBe(10);
+    expect(value(performance, 'e1rm')).toBeCloseTo(estimateOneRepMax(100, 8)! - 80, 10);
+    expect(value(performance, 'e1rm', { ...rules, loadInputMode: 'per_side_load' }))
+      .toBeCloseTo((estimateOneRepMax(100, 8)! - 80) / 2, 10);
+    expect(value(performance, 'e1rm', { ...rules, bodyweightContribution: 0.7 }))
+      .toBeCloseTo(estimateOneRepMax(76, 8)! - 56, 10);
   });
 
-  it('counts zero added weight regardless of old mode without requiring B', () => {
-    const zero = { ...input, weightValue: '0', bodyWeightKg: null };
-    expect(scoreGroupPerformance(zero, rules).scores).toEqual([{ metric: 'bodyweight_reps', value: 5, unit: 'reps' }]);
-    expect(scoreGroupPerformance({ ...zero, weightValue: '' }, rules).scores).toEqual([{ metric: 'bodyweight_reps', value: 5, unit: 'reps' }]);
-    for (const externalLoadMode of [null, 'assistance', 'unquantified_assistance']) {
-      expect(value({ ...zero, externalLoadMode }, 'bodyweight_reps')).toBe(5);
-    }
+  it('retains raw Weight when a strict dependent 1RM has no reading', () => {
+    const missing = { ...input, bodyWeightKg: null, bodyWeightSource: null,
+      bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null };
+    expect(scoreGroupPerformance(missing, rules).scores)
+      .toEqual([{ metric: 'weight', value: 20, unit: 'kg' }]);
+    expect(scoreGroupPerformance({ ...missing, weightValue: '0' }, rules).scores).toEqual([]);
+    expect(scoreGroupPerformance({ ...missing, weightValue: '' }, rules).scores).toEqual([]);
+  });
+
+  it('rejects unperformed or non-live rows', () => {
     for (const performanceStatus of ['planned', 'unperformed', 'skipped', 'future-status']) {
-      expect(scoreGroupPerformance({ ...zero, performanceStatus }, rules).scores).toEqual([]);
+      expect(scoreGroupPerformance({ ...input, performanceStatus }, rules).scores).toEqual([]);
     }
-    expect(value({ ...zero, live: false }, 'bodyweight_reps')).toBeUndefined();
-    expect(value({ ...zero, source: { ...zero.source, movementStandard: 'Kipping pull-up' } }, 'bodyweight_reps')).toBeUndefined();
+    expect(scoreGroupPerformance({ ...input, live: false }, rules).scores).toEqual([]);
   });
 
-  it('ignores legacy mode tags, normalizes units and rejects unusable load contexts', () => {
-    const assisted = { ...input, externalLoadMode: 'assistance', weightUnit: 'lb' };
-    expect(scoreGroupPerformance(assisted, rules).effectiveResistanceKg).toBeCloseTo(60 + 20 * 0.45359237, 12);
-    expect(value(assisted, 'bodyweight_reps')).toBeUndefined();
-    expect(scoreGroupPerformance({ ...assisted, weightValue: '200' }, rules).effectiveResistanceKg).toBeCloseTo(60 + 200 * 0.45359237, 12);
-    expect(scoreGroupPerformance({ ...input, source: { ...input.source, metadataKnown: false } }, rules).scores).toEqual([]);
-    expect(scoreGroupPerformance({ ...input, weightUnit: 'unknown' }, rules).scores).toEqual([]);
-    expect(scoreGroupPerformance({ ...input, bodyWeightKg: null }, rules).scores).toEqual([]);
+  it('uses ordinary math while the group preference is off', () => {
+    const ordinary = { ...rules, bodyweightCalculationsEnabled: false };
+    const performance = { ...input, bodyWeightKg: null, bodyWeightSource: null,
+      bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null,
+      source: { loadInputMode: 'per_side_load' as const } };
+    expect(value(performance, 'weight', ordinary)).toBe(20);
+    expect(value(performance, 'e1rm', ordinary)).toBeCloseTo(estimateOneRepMax(20, 5)! * 2, 10);
   });
 
-  it('retains conventional mode conversion and does not require B', () => {
-    const conventional: GroupExerciseRules = { ...rules, bodyweightCoefficient: 0, movementStandard: null, loadingMethod: null, defaultMetric: 'e1rm' };
-    const p = { ...input, externalLoadMode: null, bodyWeightKg: null, source: { ...input.source, loadInputMode: 'per_side_load' } };
-    expect(value(p, 'weight', conventional)).toBe(40);
-    expect(scoreGroupPerformance(p, conventional).effectiveResistanceKg).toBe(40);
-    expect(scoreGroupPerformance({ ...p, bodyWeightKg: 80 }, conventional).addedPercentBodyweight).toBeNull();
-    expect(value(p, 'e1rm', conventional)).toBeCloseTo(estimateOneRepMax(20, 5)! * 2, 10);
-    expect(value({ ...p, weightUnit: 'lb' }, 'weight', conventional)).toBeCloseTo(40 * 0.45359237, 12);
+  it('does not use a numeric reading with incomplete provenance for 1RM', () => {
+    const malformed = { ...input, bodyWeightMeasurementId: null };
+    expect(scoreGroupPerformance(malformed, rules).scores)
+      .toEqual([{ metric: 'weight', value: 20, unit: 'kg' }]);
   });
-});
-
-
-it('does not rank strength from a numeric weight with malformed saved provenance', () => {
-  const bad = { ...input, bodyWeightMeasurementId: null };
-  expect(scoreGroupPerformance(bad, rules).scores).toEqual([]);
-  expect(scoreGroupPerformance({ ...bad, weightValue: '0' }, rules).scores)
-    .toEqual([{ metric: 'bodyweight_reps', value: 5, unit: 'reps' }]);
-  const estimate = { ...input, bodyWeightSource: 'historical_estimate', bodyWeightMeasurementId: 'reading',
-    bodyWeightMeasuredAt: new Date('2026-09-20T12:00:00Z') };
-  expect(value(estimate, 'absolute_strength')).toBeUndefined();
 });

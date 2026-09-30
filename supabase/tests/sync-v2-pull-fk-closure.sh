@@ -2,8 +2,10 @@
 
 # Integration test — layered drain preserves client-FK closure (load-bearing).
 #
-# Pushes a fully-connected dataset for user A (one row in every entity type,
-# with the entire FK chain wired up), then drains layers 0→3 sequentially.
+# Pushes a fully-connected dataset for user A (one row in every FK-bearing
+# entity type, with the entire FK chain wired up), then drains layers 0→3
+# sequentially. The independent `user_settings` and
+# `body_weight_measurements` roots are covered by sync-bodyweight-contract.sh.
 # For every row emitted by the layer-N response, asserts that every FK parent
 # of that row has already appeared in a layer-M response with M ≤ N (or in
 # the same layer-N response — though the FK graph (server contract §A.5) has no
@@ -19,7 +21,7 @@
 # SQLite.
 #
 # Also asserts the layer→type partition exactly matches the topological
-# mapping in the server contract §B.4.4:
+# FK-bearing portion of the mapping in the server contract §B.4.4:
 #   Layer 0: gyms, exercise_definitions, muscle_groups
 #   Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
 #            exercise_group_links
@@ -59,7 +61,7 @@ http_request() {
     curl_args+=(-H "Accept-Profile: ${profile}" -H "Content-Profile: ${profile}")
   fi
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -82,7 +84,7 @@ sign_in() {
   local payload
   payload="$(jq -nc --arg e "${email}" --arg p "${password}" '{email: $e, password: $p}')"
   REQUEST_STATUS="$(curl --silent --show-error \
-    -X POST -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -X POST -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -o "${response_file}" -w "%{http_code}" \
     --data "${payload}" \
     "${API_URL}/auth/v1/token?grant_type=password")"
@@ -166,8 +168,8 @@ LAYER_TYPES_2='["session_exercises"]'
 LAYER_TYPES_3='["exercise_sets","session_exercise_tags"]'
 
 # ---------------------------------------------------------------------------
-# Step 1 — push a fully-connected dataset (one of every entity type) wired
-# through the FK chain.
+# Step 1 — push a fully-connected dataset (one of every FK-bearing entity
+# type) wired through the FK chain.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-pull-fk-closure] step 1 — push fully-connected dataset"
 GYM_ID="fkc-${RUN_TAG}-gym"
@@ -195,7 +197,8 @@ PAYLOAD="$(jq -nc \
               coordinate_accuracy_m: null, coordinates_updated_at: null,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $ed, client_updated_at_ms: ($ts + 2),
-     fields: {name: "ED", created_at: $ts, updated_at: $ts, deleted_at: null}},
+     fields: {name: "ED", load_input_mode: "total_load", bodyweight_contribution: 0,
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "muscle_groups", id: $mg, client_updated_at_ms: ($ts + 2),
      fields: {display_name: "Pectorals", family_name: "chest",
               sort_order: 0, is_editable: 0,
@@ -326,14 +329,14 @@ drain_layer_and_check 1 "${LAYER_TYPES_1}"
 drain_layer_and_check 2 "${LAYER_TYPES_2}"
 drain_layer_and_check 3 "${LAYER_TYPES_3}"
 
-# Final sanity: SEEN_IDS holds all ten of our seed rows.
+# Final sanity: SEEN_IDS holds all ten FK-bearing seed rows.
 TOTAL_SEEN="$(printf '%s' "${SEEN_IDS}" | jq 'length')"
 if [[ "${TOTAL_SEEN}" != "10" ]]; then
-  fail "after draining all four layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 10 (one per entity type)"
+  fail "after draining all four FK-bearing layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 10"
 fi
 
 pass "FK closure — fully-connected dataset drained layer-by-layer with zero forward FK references"
-pass "FK closure — ten entity types partition exactly across the four layers"
+pass "FK closure — ten FK-bearing entity types partition exactly across layers 0–3"
 
 # ---------------------------------------------------------------------------
 # Step 3 — pull every layer one more time as a sanity check that the

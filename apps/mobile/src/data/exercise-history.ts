@@ -1,9 +1,9 @@
 import { loadAsOfWeightResolver } from './bodyweight';
-import type { SessionBodyWeightSnapshot } from './session-drafts';
+import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
-import { exerciseLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
-import type { LoadContext, VolumeCoverage } from '@/src/exercise-calculations/effective-load';
+import { personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import type { LoadContext, LoadInputMode, VolumeCoverage } from '@/src/exercise-calculations/load-metrics';
 import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
@@ -19,6 +19,7 @@ import {
   sessionExerciseTags,
   sessionExercises,
   sessions,
+  userSettings,
 } from './schema';
 import {
   isWorkingSessionSetType,
@@ -36,12 +37,9 @@ export type ExerciseHistorySetEntry = {
   repsValue: string;
   setType: SessionSetTypeValue;
   isWorking: boolean;
-  localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string | null;
-  externalLoadMode?: string | null;
 };
 
-export type ExerciseHistorySessionEntry = SessionBodyWeightSnapshot & {
+export type ExerciseHistorySessionEntry = ResolvedSessionWeight & {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
@@ -88,7 +86,7 @@ export type ExerciseHistorySummary = {
   exerciseDefinitionId: string;
   exerciseName: string;
   exerciseDeletedAt: Date | null;
-  bodyweightCoefficient?: number;
+  bodyweightContribution: number;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
   appliedGymId: string | null;
@@ -98,13 +96,12 @@ export type ExerciseHistorySummary = {
   allTimeBest: ExerciseHistoryBest;
 };
 
-export type ExerciseHistorySessionRow = SessionBodyWeightSnapshot & {
+export type ExerciseHistorySessionRow = ResolvedSessionWeight & {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
   gymId?: string | null;
   gymName: string | null;
-  bodyWeightKg?: number | null;
 };
 
 export type ExerciseHistorySetRow = {
@@ -115,9 +112,6 @@ export type ExerciseHistorySetRow = {
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
-  localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string | null;
-  externalLoadMode?: string | null;
 };
 
 export type ExerciseHistoryTagRow = {
@@ -131,9 +125,9 @@ export type ExerciseHistoryDefinitionRow = {
   id: string;
   name: string;
   deletedAt: Date | null;
-  bodyweightCoefficient?: number;
-  loadInputMode?: string;
-  localBodyweightMetadataKnown?: boolean;
+  bodyweightContribution: number;
+  bodyweightCalculationsEnabled: boolean;
+  loadInputMode: LoadInputMode;
 };
 
 export type ExerciseHistoryAggregationInput = {
@@ -232,11 +226,10 @@ const buildSessionEntry = (
     repsValue: row.repsValue,
     setType: normalizeSessionSetType(row.setType),
     isWorking: isWorkingSessionSetType(row.setType),
-    localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit, externalLoadMode: row.externalLoadMode,
   }));
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
-  const loadContext = exerciseLoadContext(definition, sessionRow);
+  const loadContext = personalLoadContext(definition.bodyweightCalculationsEnabled, definition, sessionRow);
   const { estimatedOneRepMax, volumeCoverage, topWeightSet } = summarizeExerciseLoad(orderedSets, loadContext);
   const totalVolume = volumeCoverage.totalVolumeKgReps;
 
@@ -408,7 +401,7 @@ export const aggregateExerciseHistory = (
     exerciseDefinitionId: input.exerciseDefinition.id,
     exerciseName: input.exerciseDefinition.name,
     exerciseDeletedAt: input.exerciseDefinition.deletedAt,
-    bodyweightCoefficient: input.exerciseDefinition.bodyweightCoefficient ?? 0,
+    bodyweightContribution: input.exerciseDefinition.bodyweightContribution,
     period: input.period,
     appliedTagDefinitionId: input.appliedTagDefinitionId,
     appliedGymId,
@@ -427,8 +420,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         id: exerciseDefinitions.id,
         name: exerciseDefinitions.name,
         deletedAt: exerciseDefinitions.deletedAt,
-        bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
-        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
+        bodyweightContribution: exerciseDefinitions.bodyweightContribution,
         loadInputMode: exerciseDefinitions.loadInputMode,
       })
       .from(exerciseDefinitions)
@@ -436,7 +428,12 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .get();
 
     if (!row) return null;
-    return { ...row, deletedAt: row.deletedAt ?? null };
+    const bodyweightCalculationsEnabled = database
+      .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+      .from(userSettings)
+      .where(eq(userSettings.id, 'settings'))
+      .get()?.enabled ?? false;
+    return { ...row, bodyweightCalculationsEnabled, deletedAt: row.deletedAt ?? null };
   },
   async loadSessionsForExercise({ exerciseDefinitionId, start, end }) {
     const database = await bootstrapLocalDataLayer();
@@ -495,7 +492,6 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
-        localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,
@@ -515,7 +511,6 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       weightValue: row.weightValue,
-      localBodyweightMetadataKnown: row.localBodyweightMetadataKnown, weightUnit: row.weightUnit, externalLoadMode: row.externalLoadMode,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
       performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),

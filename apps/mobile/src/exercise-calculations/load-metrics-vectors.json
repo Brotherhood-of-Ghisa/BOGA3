@@ -1,0 +1,93 @@
+[
+  {
+    "name": "ordinary total-load exercise",
+    "policy": "ordinary",
+    "bodyweightContribution": 0,
+    "bodyWeightKg": null,
+    "loadInputMode": "total_load",
+    "weightValue": "100",
+    "repsValue": "8",
+    "calculatedLoadKg": 100,
+    "volumeKgReps": 800,
+    "estimatedOneRepMaxKg": 127.67141908045373,
+    "perSideCalculatedLoadKg": 50
+  },
+  {
+    "name": "personal unweighted pull-up",
+    "policy": "personal",
+    "bodyweightContribution": 1,
+    "bodyWeightKg": 80,
+    "loadInputMode": "total_load",
+    "weightValue": "0",
+    "repsValue": "8",
+    "calculatedLoadKg": 80,
+    "volumeKgReps": 640,
+    "estimatedOneRepMaxKg": 22.137135264362982,
+    "perSideCalculatedLoadKg": 40
+  },
+  {
+    "name": "personal weighted pull-up",
+    "policy": "personal",
+    "bodyweightContribution": 1,
+    "bodyWeightKg": 80,
+    "loadInputMode": "total_load",
+    "weightValue": "20",
+    "repsValue": "8",
+    "calculatedLoadKg": 100,
+    "volumeKgReps": 800,
+    "estimatedOneRepMaxKg": 47.67141908045373,
+    "perSideCalculatedLoadKg": 50
+  },
+  {
+    "name": "personal push-up contribution",
+    "policy": "personal",
+    "bodyweightContribution": 0.7,
+    "bodyWeightKg": 80,
+    "loadInputMode": "total_load",
+    "weightValue": "0",
+    "repsValue": "15",
+    "calculatedLoadKg": 56,
+    "volumeKgReps": 840,
+    "estimatedOneRepMaxKg": 28.507506351216392,
+    "perSideCalculatedLoadKg": 28
+  },
+  {
+    "name": "personal per-side entered weight",
+    "policy": "personal",
+    "bodyweightContribution": 1,
+    "bodyWeightKg": 80,
+    "loadInputMode": "per_side_load",
+    "weightValue": "10",
+    "repsValue": "8",
+    "calculatedLoadKg": 100,
+    "volumeKgReps": 800,
+    "estimatedOneRepMaxKg": 23.835709540226865,
+    "perSideCalculatedLoadKg": 50
+  },
+  {
+    "name": "personal missing reading uses zero",
+    "policy": "personal",
+    "bodyweightContribution": 1,
+    "bodyWeightKg": null,
+    "loadInputMode": "total_load",
+    "weightValue": "20",
+    "repsValue": "8",
+    "calculatedLoadKg": 20,
+    "volumeKgReps": 160,
+    "estimatedOneRepMaxKg": 25.534283816090746,
+    "perSideCalculatedLoadKg": 10
+  },
+  {
+    "name": "ordinary zero load",
+    "policy": "ordinary",
+    "bodyweightContribution": 0,
+    "bodyWeightKg": null,
+    "loadInputMode": "total_load",
+    "weightValue": "0",
+    "repsValue": "8",
+    "calculatedLoadKg": 0,
+    "volumeKgReps": 0,
+    "estimatedOneRepMaxKg": 0,
+    "perSideCalculatedLoadKg": 0
+  }
+]

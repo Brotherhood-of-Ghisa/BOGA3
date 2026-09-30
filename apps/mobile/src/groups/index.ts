@@ -45,6 +45,7 @@ export {
   type GroupBoardRequest,
   type GroupBoardView,
   type GroupDetailsInput,
+  type GroupUpdateInput,
   type GroupRpcName,
   type GroupStreamRequest,
 } from './api';

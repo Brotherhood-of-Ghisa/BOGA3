@@ -21,6 +21,7 @@ describe('exercise catalog repository', () => {
       { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 1 },
     ]);
     store.saveExercise.mockResolvedValue({
+      bodyweightContribution: 0,
       id: 'exercise-1',
       name: 'Custom Press',
       loadInputMode: 'per_side_load',
@@ -32,6 +33,7 @@ describe('exercise catalog repository', () => {
     });
 
     const saved = await repository.saveExercise({
+      bodyweightContribution: 0,
       name: '  Custom Press  ',
       loadInputMode: 'per_side_load',
       mappings: [
@@ -43,6 +45,7 @@ describe('exercise catalog repository', () => {
 
     expect(saved.name).toBe('Custom Press');
     expect(store.saveExercise).toHaveBeenCalledWith({
+      bodyweightContribution: 0,
       id: undefined,
       name: 'Custom Press',
       loadInputMode: 'per_side_load',
@@ -58,12 +61,12 @@ describe('exercise catalog repository', () => {
     const store = createMockStore();
     const repository = createExerciseCatalogRepository(store);
     store.listMuscleGroups.mockResolvedValue([{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 }]);
-    store.saveExercise.mockResolvedValue({ id: 'exercise-1', name: 'Bench', loadInputMode: 'total_load', deletedAt: null, mappings: [] });
+    store.saveExercise.mockResolvedValue({ bodyweightContribution: 0, id: 'exercise-1', name: 'Bench', loadInputMode: 'total_load', deletedAt: null, mappings: [] });
     const mappings = [{ muscleGroupId: 'chest', weight: 1 }];
 
     await expect(repository.saveExercise({ name: ' \t\u00a0', mappings })).rejects.toThrow('Exercise name is required');
     await expect(
-      repository.saveExercise({ name: 'Bench', loadInputMode: 'kg' as never, mappings })
+      repository.saveExercise({ bodyweightContribution: 0, name: 'Bench', loadInputMode: 'kg' as never, mappings })
     ).rejects.toThrow('Weight entry must be total load or per side');
     expect(store.saveExercise).not.toHaveBeenCalled();
 

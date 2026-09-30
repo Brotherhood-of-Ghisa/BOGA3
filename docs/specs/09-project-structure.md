@@ -69,12 +69,13 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns the non-UI group client: wire types, the typed group RPC client (the only mobile code that calls Supabase for groups), `group_cache` access, the pure stream view model, the group NetInfo hook, and the resource/action hooks screens use (`docs/specs/tech/groups-contract.md` §6.1).
   - group screens under `app/**` consume it through `@/src/groups`; group code never runs inside the sync cycle and must not modify `src/sync/**` beyond the `group_cache` delete in the account wipe.
   - `set-facts.ts` (M25) is the one implementation of the group set rules, shared with the `group-eval` Edge Function, which loads it by relative path: it may import only by relative `.ts` specifier (never `@/`), and only modules that follow the same rule.
-  - M27 `metric-contract.ts`, `performance-score.ts` and `metric-evaluation.ts`
-    own the target-specific rules and graph scorer shared with that worker.
+  - `metric-contract.ts`, `performance-score.ts` and `metric-evaluation.ts`
+    own group Weight/1RM rules and the strict optional-bodyweight graph scorer
+    shared with that worker.
     Their entire import graph follows the same relative `.ts` rule, including
     type-only imports. `metric-wire.ts` / `metric-wire-guards.ts` own versioned
-    payloads and validation at `api.ts`; `session-metrics.ts` separately owns
-    the shared session's personal effective-load projection.
+    payloads and privacy validation at `api.ts`; `session-metrics.ts` owns the
+    raw/public shared-session projection and never a private reading context.
 - `apps/mobile/src/exercise-core/` (M25)
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.

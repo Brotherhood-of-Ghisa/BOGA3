@@ -93,6 +93,8 @@ const exerciseDefinitionRow = (id: string, name: string, updatedAtMs: number): W
   client_updated_at_ms: updatedAtMs,
   fields: {
     name,
+    load_input_mode: 'total_load',
+    bodyweight_contribution: 0,
     created_at: updatedAtMs,
     updated_at: updatedAtMs,
     deleted_at: null,

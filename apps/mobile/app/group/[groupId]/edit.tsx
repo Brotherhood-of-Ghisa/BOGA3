@@ -19,13 +19,14 @@ import {
   useGroupAction,
   useGroupResource,
   type GroupDetailsInput,
+  type GroupUpdateInput,
   type GroupGetResult,
 } from '@/src/groups';
 
 const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
-/** Edit the group's name and description (groups contract §6.3, card flow 5): owner and admins. */
+/** Edit group details and calculation policy: owner and admins. */
 export default function EditGroupRoute() {
   const { isConfigured, user } = useAuth();
   const groupId = firstParam(useLocalSearchParams<{ groupId?: string | string[] }>().groupId);
@@ -47,10 +48,14 @@ function EditGroupContent({ userId, groupId }: { userId: string; groupId: string
     fetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const update = useGroupAction((details: GroupDetailsInput) => updateGroup(groupId, details));
+  const update = useGroupAction((details: GroupUpdateInput) => updateGroup(groupId, details));
 
-  const onSubmit = async (details: GroupDetailsInput) => {
-    const result = await update.run(details);
+  const onSubmit = async (details: GroupDetailsInput & { bodyweightCalculationsEnabled?: boolean }) => {
+    if (details.bodyweightCalculationsEnabled === undefined) {
+      throw new Error('Group calculation preference is required when editing a group.');
+    }
+    const result = await update.run({ ...details,
+      bodyweightCalculationsEnabled: details.bodyweightCalculationsEnabled });
     if (result.ok) {
       await group.refresh();
       router.back();
@@ -82,6 +87,7 @@ function EditGroupContent({ userId, groupId }: { userId: string; groupId: string
       <GroupDetailsForm
         errorMessage={update.error ? describeGroupWriteError(update.error) : null}
         initialDescription={group.data.group.description}
+        initialBodyweightCalculationsEnabled={group.data.group.bodyweight_calculations_enabled}
         initialName={group.data.group.name}
         onSubmit={(details) => void onSubmit(details)}
         pending={update.pending}

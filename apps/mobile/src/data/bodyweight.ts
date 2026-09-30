@@ -3,7 +3,7 @@ import { and, asc, desc, eq, isNull, lte } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
 import { bodyWeightMeasurements, type BodyWeightMeasurement } from './schema';
-import { createAsOfWeightResolver, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
+import { createAsOfWeightResolver, isValidBodyWeightReading, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { requireDate, validateBodyWeight, type WeightReadingInput } from '@/src/bodyweight/weight-entry';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
@@ -15,7 +15,8 @@ export const findLatestWeightReading = (tx: ReadWeightTx, at: Date): BodyWeightM
   requireDate(at, 'session date');
   return tx.select().from(bodyWeightMeasurements)
     .where(and(isNull(bodyWeightMeasurements.deletedAt), lte(bodyWeightMeasurements.measuredAt, at)))
-    .orderBy(desc(bodyWeightMeasurements.measuredAt), asc(bodyWeightMeasurements.id)).limit(1).get() ?? null;
+    .orderBy(desc(bodyWeightMeasurements.measuredAt), asc(bodyWeightMeasurements.id)).all()
+    .find(isValidBodyWeightReading) ?? null;
 };
 
 /** One timeline read per graph; sessions and sets remain immutable. */

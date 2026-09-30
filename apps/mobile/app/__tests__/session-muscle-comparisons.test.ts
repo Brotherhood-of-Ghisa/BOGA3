@@ -5,7 +5,7 @@ import {
 } from '@/src/session-insights';
 
 const catalog = {
-  exerciseDefinitions: [{ id: 'bench', loadInputMode: 'total_load' as const }],
+  exerciseDefinitions: [{ bodyweightContribution: 0, id: 'bench', loadInputMode: 'total_load' as const }],
   muscleMappings: [
     { exerciseDefinitionId: 'bench', muscleGroupId: 'chest', role: 'primary' as const },
     { exerciseDefinitionId: 'bench', muscleGroupId: 'triceps', role: 'secondary' as const },

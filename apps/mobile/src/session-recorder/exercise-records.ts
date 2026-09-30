@@ -1,8 +1,7 @@
 import type { ExerciseHistorySessionEntry } from '@/src/data/exercise-history';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
-import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredAddedWeightKg, exerciseLoadContext, formatEnteredLoad } from '@/src/exercise-calculations/analytics';
-import { isWeightUnit, weightToKg } from '@/src/exercise-calculations/effective-load';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 
 import { canonicalizeWeightForReps } from './set-semantics';
 
@@ -23,10 +22,6 @@ export type RecordSet = {
   reps: number;
   oneRepMax: number | null;
   volume: number | null;
-  addedWeightKg?: number | null;
-  loadLabel?: string;
-  effectiveResistanceKg?: number | null;
-  bodyWeightKg?: number | null;
 };
 
 export type ExerciseRecords = {
@@ -35,9 +30,6 @@ export type ExerciseRecords = {
     completedAt: Date;
     weight: number;
     reps: number;
-    loadLabel?: string;
-    effectiveResistanceKg?: number | null;
-    bodyWeightKg?: number | null;
     gymId?: string | null;
     gymName?: string | null;
   } | null;
@@ -85,20 +77,14 @@ const toRecordSet = (set: ExerciseHistorySessionEntry['sets'][number], entry: Ex
   const rawWeight = parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue));
   const reps = parseSetReps(set.repsValue);
   if (rawWeight === null || reps === null) return null;
-  const context = entry.loadContext ?? exerciseLoadContext();
+  const context = entry.loadContext ?? ordinaryLoadContext();
   const metric = calculateAnalyticsSetMetrics({ ...set, ...context });
-  const unit = set.weightUnit ?? 'kg';
-  const weight = isWeightUnit(unit) ? weightToKg(rawWeight, unit) : null;
   return {
     setType: set.setType,
-    weight: weight ?? rawWeight,
+    weight: rawWeight,
     reps,
     oneRepMax: metric.estimatedOneRepMaxKg,
     volume: metric.volumeKgReps,
-    addedWeightKg: enteredAddedWeightKg(set, context),
-    loadLabel: formatEnteredLoad(rawWeight, context, set.externalLoadMode, set.weightUnit),
-    effectiveResistanceKg: metric.eligible && metric.load.status === 'known' ? metric.load.resistanceKg : null,
-    bodyWeightKg: context.bodyweightCoefficient > 0 ? context.bodyWeightKg : null,
   };
 };
 
@@ -155,17 +141,14 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
           completedAt: block.completedAt,
           weight: set.weight,
           reps: set.reps,
-          loadLabel: set.loadLabel,
-          effectiveResistanceKg: set.effectiveResistanceKg,
-          bodyWeightKg: set.bodyWeightKg,
           gymId: block.gymId,
           gymName: block.gymName,
         };
       }
       const max = records.maxWeight;
-      if (set.addedWeightKg != null && (max === null || set.addedWeightKg > max.weight || (set.addedWeightKg === max.weight && set.reps > max.reps))) {
+      if (max === null || set.weight > max.weight || (set.weight === max.weight && set.reps > max.reps)) {
         records.maxWeight = {
-          weight: set.addedWeightKg,
+          weight: set.weight,
           reps: set.reps,
           completedAt: block.completedAt,
           gymId: block.gymId,

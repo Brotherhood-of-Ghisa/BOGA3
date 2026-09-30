@@ -169,7 +169,7 @@ describe('group stream view model', () => {
         groupNames: ['Crew', 'Gym pals'],
         setsLabel: '3 sets',
         volumeLabel: '1752.5 kg',
-        metricsNote: 'Original entered-load metrics',
+        volumeNote: null,
         exercisesLabel: '2 exercises',
         recordsLabel: null,
       });

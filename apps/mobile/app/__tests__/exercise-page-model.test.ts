@@ -1,4 +1,5 @@
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
+import { ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 import {
   addSet,
   buildSetRows,
@@ -54,6 +55,11 @@ const quietSets = (): SessionDraftSetSnapshot[] => [
   plannedSet('s5', '85', '5', 'rir_0'),
 ];
 
+const rowsFor = (
+  sets: SessionDraftSetSnapshot[],
+  baseline: { oneRepMax: number | null; weight: number | null } | null = null,
+) => buildSetRows(sets, baseline, ordinaryLoadContext());
+
 describe('exercise page model', () => {
   it('puts the cursor on the first set not performed', () => {
     expect(findCursorIndex(quietSets())).toBe(2);
@@ -61,7 +67,7 @@ describe('exercise page model', () => {
   });
 
   it('shows 1RM and volume for every row, warm-ups and planned sets included', () => {
-    const rows = buildSetRows(quietSets());
+    const rows = rowsFor(quietSets());
     expect(rows.map((row) => row.kind)).toEqual(['performed', 'performed', 'pending', 'pending', 'pending']);
     expect(rows[0]).toMatchObject({
       setType: 'warm_up',
@@ -82,7 +88,7 @@ describe('exercise page model', () => {
   });
 
   it('highlights no per-column best: without a record every figure is plain', () => {
-    const rows = buildSetRows([
+    const rows = rowsFor([
       performedSet('a', '100', '3', 'rir_1'),
       performedSet('b', '90', '8', 'rir_1'),
     ]);
@@ -95,7 +101,7 @@ describe('exercise page model', () => {
   });
 
   it('marks a weight or 1RM beating the all-time best as a record, and never a planned row', () => {
-    const rows = buildSetRows([...quietSets(), performedSet('s6', '90', '6', 'rir_0')], {
+    const rows = rowsFor([...quietSets(), performedSet('s6', '90', '6', 'rir_0')], {
       oneRepMax: 102.2,
       weight: 85,
     });
@@ -106,11 +112,11 @@ describe('exercise page model', () => {
     expect(rows[4]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
 
     // A weight record without a 1RM record is marked on its own.
-    const heavy = buildSetRows([performedSet('h', '87.5', '1', 'rir_0')], { oneRepMax: 102.2, weight: 85 });
+    const heavy = rowsFor([performedSet('h', '87.5', '1', 'rir_0')], { oneRepMax: 102.2, weight: 85 });
     expect(heavy[0]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
 
     // No history, no records.
-    expect(buildSetRows([performedSet('x', '200', '5', 'rir_0')])[0]).toMatchObject({
+    expect(rowsFor([performedSet('x', '200', '5', 'rir_0')])[0]).toMatchObject({
       weightRecord: false,
       oneRepMaxRecord: false,
     });
@@ -125,7 +131,6 @@ describe('exercise page model', () => {
       performanceStatus: 'planned',
     });
     expect(displayedValues(set!)).toEqual({
-      weightUnit: 'kg', externalLoadMode: 'added',
       weightValue: '80',
       repsValue: '6',
       setType: 'rir_1',
@@ -195,8 +200,6 @@ describe('exercise page model', () => {
     const next = addSet(quietSets(), 'new');
     expect(next[5]).toEqual({
       id: 'new',
-      weightUnit: 'kg', externalLoadMode: 'added',
-      plannedWeightUnit: null, plannedExternalLoadMode: null, localBodyweightMetadataKnown: true,
       weightValue: '85',
       repsValue: '5',
       setType: 'rir_0',

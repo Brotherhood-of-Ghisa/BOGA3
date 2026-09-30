@@ -117,7 +117,7 @@ const T0 = new Date(2026, 8, 11, 9, 5).getTime();
 const SEP_10 = new Date(2026, 8, 10, 18, 0).getTime();
 
 const exercise = (id: string, name: string, archived = false): GroupMetricExerciseWire => ({
-  legacy: true, bodyweight_coefficient: 0, movement_standard: null, loading_method: null,
+  legacy: true, bodyweight_calculations_enabled: false, bodyweight_contribution: 0,
   default_metric: 'e1rm', rules_revision: 1, published_revision: 1, rebuilding: false,
   group_exercise_id: id,
   name,
@@ -129,7 +129,8 @@ const BENCH = exercise(EXERCISE_ID, 'Bench Press');
 const OLD = exercise('ge-old', 'Old Squat', true);
 
 const detail: GroupGetResult = {
-  group: { group_id: GROUP_ID, name: 'Garage Gym', description: null, member_count: 3, my_role: 'member' },
+  group: { group_id: GROUP_ID, name: 'Garage Gym', description: null, member_count: 3, my_role: 'member',
+    bodyweight_calculations_enabled: false },
   members: [{ user_id: USER_ID, username: 'me', role: 'member' }],
 };
 
@@ -177,7 +178,7 @@ const boardPage = (rows: BoardRow[], overrides: Partial<GroupBoardResult> = {}):
   ...overrides,
 });
 
-const METRIC_PODIUMS = { contract_version: 2 as const, exercises: PODIUMS.exercises.map(board => ({ legacy: true as const, exercise: board.exercise as GroupMetricExerciseWire, board })) };
+const METRIC_PODIUMS = { contract_version: 3 as const, exercises: PODIUMS.exercises.map(board => ({ legacy: true as const, exercise: board.exercise as GroupMetricExerciseWire, board })) };
 
 const seedCache = (cacheKey: string, payload: unknown) =>
   writeGroupCache(fixture.database, { cacheKey, userId: USER_ID, payload, fetchedAtMs: T0 });
@@ -251,7 +252,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
   });
 
   it('shows the empty state when the group has no exercises', async () => {
-    api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 2, exercises: [] });
+    api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 3, exercises: [] });
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-empty')).toHaveTextContent(/No group exercises yet/);
   });

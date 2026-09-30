@@ -118,7 +118,7 @@ else
       values
         ('${USER_UUID}'::uuid,'${GYM_ID}','MCP Smoke Gym',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_definitions
-        (owner_user_id,id,name,load_input_mode,bodyweight_coefficient,created_at,updated_at,client_updated_at_ms)
+        (owner_user_id,id,name,load_input_mode,bodyweight_contribution,created_at,updated_at,client_updated_at_ms)
       values
         ('${USER_UUID}'::uuid,'${EXERCISE_ID}','${EXERCISE_QUERY}','total_load',1,
          ${NOW_MS},${NOW_MS},${NOW_MS});
@@ -129,9 +129,12 @@ else
         ('${USER_UUID}'::uuid,'${SESSION_ID}','${GYM_ID}','completed',
          $((NOW_MS - 900000)),$((NOW_MS - 600000)),300,${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.body_weight_measurements
-        (owner_user_id,id,weight_value,weight_unit,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
-      values ('${USER_UUID}'::uuid,'${SESSION_ID}-reading','80','kg',80,
+        (owner_user_id,id,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
+      values ('${USER_UUID}'::uuid,'${SESSION_ID}-reading',80,
         $((NOW_MS - 900000)),${NOW_MS},${NOW_MS},${NOW_MS});
+      insert into app_public.user_settings
+        (owner_user_id,id,bodyweight_calculations_enabled,created_at,updated_at,client_updated_at_ms)
+      values ('${USER_UUID}'::uuid,'settings',true,${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.session_exercises
         (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
          created_at,updated_at,client_updated_at_ms)
@@ -139,10 +142,10 @@ else
         ('${USER_UUID}'::uuid,'${BLOCK_ID}','${SESSION_ID}','${EXERCISE_ID}',0,
          '${EXERCISE_QUERY}',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_sets
-        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,external_load_mode,
+        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,
          created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8','added',
+        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8',
          ${NOW_MS},${NOW_MS},${NOW_MS});
     commit;
   " >/dev/null

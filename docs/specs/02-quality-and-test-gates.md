@@ -22,15 +22,13 @@ don't restate it here.
 ./boga doctor          # verify THIS machine can run every lane
 ```
 
-The `ios-bodyweight` lane has one native path: enter a dated weight for a
-bodyweight exercise and assert that its added-weight RM and total-load volume
-change from unavailable to the expected values. Its two captures show the
-before and after state. Local unit tests cover further load and input cases.
-Pure and backend parity tests cover exact milliseconds, binary ties, date edits,
-restoration, malformed latest readings, session-date edits and certification.
-The three measured green runs of this one-flow revision took 97–111 seconds
-end-to-end (20–26 seconds inside Maestro). The generated table below still
-mixes these with older, longer multi-flow runs in its all-history median.
+The accepted `ios-bodyweight` rewrite proves ordinary logging first, private
+opt-in, kg reading management, preserved contribution across off/on cycles,
+silent historical recalculation and numeric-zero rendering without a session
+prompt. Pure/backend coverage owns policy variants, exact date selection,
+migration, strict group omission, non-disclosure and certification invalidation.
+Until the implementation task rewrites and measures the lane, the generated
+matrix below continues to report historical runs of the current flow.
 
 Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
 the canonical lane names everywhere: this doc, the timing records, `boga`).

@@ -48,6 +48,8 @@ export type GymBookExerciseDecisionInput =
       decision: 'create_new';
       exerciseName?: string;
       importExerciseKey?: string;
+      loadInputMode?: 'total_load' | 'per_side_load';
+      bodyweightContribution?: number;
       muscleMappings?: {
         muscleGroupId: string;
         weight: number;
@@ -334,6 +336,8 @@ const resolveExerciseDecisions = (
       decision: 'create_new',
       importExerciseKey: decision.importExerciseKey ?? `gymbook-create-${slug(entry.name)}`,
       exerciseName: decision.exerciseName ?? entry.name,
+      loadInputMode: decision.loadInputMode ?? 'total_load',
+      bodyweightContribution: decision.bodyweightContribution ?? 0,
       muscleMappings,
       warnings:
         muscleMappings.length === 0
@@ -460,6 +464,10 @@ const buildSessionExercises = (
       repsValue: row.reps.trim(),
       weightValue: weight.value,
       setType: null,
+      plannedWeightValue: null,
+      plannedRepsValue: null,
+      plannedSetType: null,
+      performanceStatus: null,
       source: {
         rowIndex: row.rowIndex,
         workoutName: row.workout,
@@ -626,6 +634,8 @@ export const digestGymBookExport = (xml: string, options: DigestGymBookOptions):
 
   const packageValue: BogaSessionImportPackage = {
     schema: BOGA_SESSION_IMPORT_SCHEMA,
+    bodyweightCalculationsEnabled: false,
+    bodyWeightMeasurements: [],
     generatedAt: generatedAt.toISOString(),
     target: {
       importingProfileLabel: options.importingProfileLabel,

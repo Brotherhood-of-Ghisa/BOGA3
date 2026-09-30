@@ -12,14 +12,10 @@ export const exerciseDefinitions = sqliteTable(
     loadInputMode: text('load_input_mode', { enum: ['total_load', 'per_side_load'] })
       .notNull()
       .default('total_load'),
-    bodyweightCoefficient: real('bodyweight_coefficient').notNull().default(0),
-    movementStandard: text('movement_standard'),
-    loadingMethod: text('loading_method'),
+    bodyweightContribution: real('bodyweight_contribution').notNull().default(0),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),
-    // False only on pre-M27 rows awaiting one-time metadata hydration.
-    localBodyweightMetadataKnown: integer('local_bodyweight_metadata_known', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at', { mode: 'timestamp_ms' })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

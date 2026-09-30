@@ -62,10 +62,10 @@ describe('the cycle and scheduler import the layer partition, never redefine it'
 });
 
 describe('the single source of truth has the expected shape', () => {
-  it('declares five layers spanning eleven entity types', () => {
+  it('declares five layers spanning twelve entity types', () => {
     expect(TOPO_LAYERS).toHaveLength(5);
     const flat = TOPO_LAYERS.flat();
-    expect(new Set(flat).size).toBe(11);
+    expect(new Set(flat).size).toBe(12);
     // New readers get a fresh cursor without replaying the legacy layers.
     expect(TOPO_LAYERS[4]).toEqual(['body_weight_measurements']);
     // exercise_group_links sits in Layer 1, after its exercise_definitions parent.
@@ -75,6 +75,7 @@ describe('the single source of truth has the expected shape', () => {
       'exercise_definitions',
       'gyms',
       'muscle_groups',
+      'user_settings',
     ]);
   });
 });

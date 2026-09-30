@@ -2,7 +2,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 
-import type { SessionBodyWeightSnapshot } from '@/src/data/session-drafts';
+import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import type { Session } from '@/components/session-recorder/types';
 import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
 import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
@@ -10,7 +10,7 @@ import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotBy
 import { loadHistoricalBestsExcluding } from './historical-bests';
 import { mapDraftSnapshotToSession } from './session-model';
 
-export type SessionViewData = SessionBodyWeightSnapshot & {
+export type SessionViewData = ResolvedSessionWeight & {
   sessionId: string;
   // `completed`: a finished session opened to edit it (History, completed
   // session `Edit`); `completedAt` is then its persisted End.

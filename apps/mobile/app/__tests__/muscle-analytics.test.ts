@@ -11,7 +11,7 @@ describe('per-side load semantics', () => {
     aggregateSelectedMuscleDailyEffort(
       buildAnalyticsInput({
         sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
-        exerciseDefinitions: [{ id: 'bench', loadInputMode }],
+        exerciseDefinitions: [{ id: 'bench', loadInputMode, bodyweightContribution: 0 }],
         sessionExercises: [
           { id: 'session-exercise', sessionId: 'session', exerciseDefinitionId: 'bench' },
         ],
@@ -52,8 +52,8 @@ describe('per-side load semantics', () => {
     const input = buildAnalyticsInput({
       sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
       exerciseDefinitions: [
-        { id: 'barbell-bench', loadInputMode: 'total_load' },
-        { id: 'dumbbell-bench', loadInputMode: 'per_side_load' },
+        { bodyweightContribution: 0, id: 'barbell-bench', loadInputMode: 'total_load' },
+        { bodyweightContribution: 0, id: 'dumbbell-bench', loadInputMode: 'per_side_load' },
       ],
       sessionExercises: [
         {
@@ -118,7 +118,7 @@ describe('per-side load semantics', () => {
 
   it('uses the role factor after per-side normalization, ignoring legacy mapping weight', () => {
     const input = buildAnalyticsInput({
-      exerciseDefinitions: [{ id: 'ex-press', loadInputMode: 'total_load' }],
+      exerciseDefinitions: [{ bodyweightContribution: 0, id: 'ex-press', loadInputMode: 'total_load' }],
       muscleMappings: [
         {
           exerciseDefinitionId: 'ex-press',
@@ -139,7 +139,7 @@ describe('per-side load semantics', () => {
   it('excludes valid but unconfirmed sets from muscle contributions', () => {
     const input = buildAnalyticsInput({
       sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
-      exerciseDefinitions: [{ id: 'bench', loadInputMode: 'per_side_load' }],
+      exerciseDefinitions: [{ bodyweightContribution: 0, id: 'bench', loadInputMode: 'per_side_load' }],
       sessionExercises: [{ id: 'se', sessionId: 'session', exerciseDefinitionId: 'bench' }],
       exerciseSets: [
         {
@@ -177,8 +177,8 @@ const buildAnalyticsInput = (
   overrides: Partial<MuscleAnalyticsInput> = {}
 ): MuscleAnalyticsInput => ({
   exerciseDefinitions: [
-    { id: 'ex-press', loadInputMode: 'per_side_load' },
-    { id: 'ex-curl', loadInputMode: 'per_side_load' },
+    { bodyweightContribution: 0, id: 'ex-press', loadInputMode: 'per_side_load' },
+    { bodyweightContribution: 0, id: 'ex-curl', loadInputMode: 'per_side_load' },
   ],
   sessions: [
     { id: 'session-sunday', completedAt: new Date('2026-03-29T22:30:00.000Z') },

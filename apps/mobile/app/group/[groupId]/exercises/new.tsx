@@ -13,7 +13,6 @@ import {
 import { ScreenScroll, SegmentedControl, uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
-import { BODYWEIGHT_SEED_RULES, CONVENTIONAL_LOAD_RULES } from '@/src/exercise-core/load-rules';
 import type { GroupExerciseRules } from '@/src/groups/metric-contract';
 import { createGroupComparison } from '@/src/groups/api';
 import {
@@ -86,6 +85,7 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
 
   const errorMessage = create.error ? describeGroupExerciseWriteError(create.error) : null;
   const formProps = {
+    bodyweightCalculationsEnabled: group.data?.group.bodyweight_calculations_enabled ?? false,
     errorMessage,
     onSubmit: (core: GroupExerciseRules) => void onSubmit(core),
     pending: create.pending,
@@ -140,10 +140,8 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
             {picked ? (
               <GroupComparisonForm
                 initialRules={{ name: picked.name, loadInputMode: picked.loadInputMode,
-                  ...(BODYWEIGHT_SEED_RULES[picked.sourceExerciseId] ?? CONVENTIONAL_LOAD_RULES),
-                  defaultMetric: BODYWEIGHT_SEED_RULES[picked.sourceExerciseId]
-                    ? picked.sourceExerciseId === 'seed_push_up' ? 'bodyweight_reps' : 'relative_strength'
-                    : 'e1rm' }}
+                  bodyweightCalculationsEnabled: group.data.group.bodyweight_calculations_enabled,
+                  bodyweightContribution: 0, defaultMetric: 'e1rm' }}
                 key={picked.sourceExerciseId}
                 note={`Copies the standard exercise "${picked.name}". You can change its name.`}
                 {...formProps}

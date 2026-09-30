@@ -1,4 +1,5 @@
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
+import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calculation-preference';
 // Client sync cycle: converges local SQLite state with the server by issuing
 // PULL -> PUSH -> PULL until both ends are quiet for one full round.
 //
@@ -482,9 +483,13 @@ const SC = (wireKey: string, prop: string): FieldSpec => ({ wireKey, prop, kind:
  * other.
  */
 const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
+  user_settings: [
+    SC('bodyweight_calculations_enabled', 'bodyweightCalculationsEnabled'),
+    TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'),
+    TS('deleted_at', 'deletedAt'),
+  ],
   body_weight_measurements: [
-    SC('weight_value', 'weightValue'),
-    SC('weight_unit', 'weightUnit'),
     SC('weight_kg', 'weightKg'),
     TS('measured_at', 'measuredAt'),
     TS('created_at', 'createdAt'),
@@ -504,9 +509,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   exercise_definitions: [
     SC('name', 'name'),
     SC('load_input_mode', 'loadInputMode'),
-    SC('bodyweight_coefficient', 'bodyweightCoefficient'),
-    SC('movement_standard', 'movementStandard'),
-    SC('loading_method', 'loadingMethod'),
+    SC('bodyweight_contribution', 'bodyweightContribution'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -569,13 +572,9 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('session_exercise_id', 'sessionExerciseId'),
     SC('order_index', 'orderIndex'),
     SC('weight_value', 'weightValue'),
-    SC('weight_unit', 'weightUnit'),
-    SC('external_load_mode', 'externalLoadMode'),
     SC('reps_value', 'repsValue'),
     SC('set_type', 'setType'),
     SC('planned_weight_value', 'plannedWeightValue'),
-    SC('planned_weight_unit', 'plannedWeightUnit'),
-    SC('planned_external_load_mode', 'plannedExternalLoadMode'),
     SC('planned_reps_value', 'plannedRepsValue'),
     SC('planned_set_type', 'plannedSetType'),
     SC('performance_status', 'performanceStatus'),
@@ -593,6 +592,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
 
 /** The Drizzle table object for each entity type. */
 const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
+  user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
@@ -614,14 +614,6 @@ const ENTITY_ORDER: EntityTableName[] = TOPO_LAYERS.flatMap(
 // -----------------------------------------------------------------------------
 // Wire serialisation
 // -----------------------------------------------------------------------------
-
-// Columns absent from pre-M27 local rows. The upgrade marks those rows unknown
-// and replays their layers once. Unknown defaults must never reach the server:
-// an old app may already have pulled past another device's richer metadata.
-const BODYWEIGHT_WIRE_KEYS: Partial<Record<EntityTableName, readonly string[]>> = {
-  exercise_definitions: ['bodyweight_coefficient', 'movement_standard', 'loading_method'],
-  exercise_sets: ['weight_unit', 'external_load_mode', 'planned_weight_unit', 'planned_external_load_mode'],
-};
 
 /** A loosely-typed entity row as read from / written to Drizzle. */
 type EntityRow = Record<string, unknown>;
@@ -660,7 +652,6 @@ const fromWireValue = (value: WireValue, kind: FieldSpec['kind']): unknown => {
 export const entityToWire = (row: EntityRow, type: EntityTableName): WireEntity => {
   const fields: WireFields = {};
   for (const spec of ENTITY_FIELDS[type]) {
-    if (row.localBodyweightMetadataKnown === false && BODYWEIGHT_WIRE_KEYS[type]?.includes(spec.wireKey)) continue;
     fields[spec.wireKey] = toWireValue(row[spec.prop], spec.kind);
   }
   return {
@@ -682,27 +673,7 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
     localDirty: false,
     localUpdatedAtMs: envelope.client_updated_at_ms,
   };
-  const metadataKeys = BODYWEIGHT_WIRE_KEYS[type];
-  if (metadataKeys) values.localBodyweightMetadataKnown = metadataKeys.every(key => envelope.fields[key] !== undefined);
   for (const spec of ENTITY_FIELDS[type]) {
-    if (
-      type === 'exercise_definitions' &&
-      spec.wireKey === 'load_input_mode' &&
-      envelope.fields[spec.wireKey] === undefined
-    ) {
-      values[spec.prop] = 'total_load';
-      continue;
-    }
-    if (envelope.fields[spec.wireKey] === undefined) {
-      if (type === 'exercise_definitions' && spec.wireKey === 'bodyweight_coefficient') {
-        values[spec.prop] = 0;
-        continue;
-      }
-      if (type === 'exercise_sets' && spec.wireKey === 'weight_unit') {
-        values[spec.prop] = 'kg';
-        continue;
-      }
-    }
     values[spec.prop] = fromWireValue(envelope.fields[spec.wireKey] ?? null, spec.kind);
   }
   return values;
@@ -810,16 +781,6 @@ export const applyPullPage = (
     if (envelope.client_updated_at_ms > Number(existing.localUpdatedAtMs)) {
       tx.update(table).set(values as never).where(eq(table.id, envelope.id)).run();
       changed += 1;
-    } else if (existing.localBodyweightMetadataKnown === false && values.localBodyweightMetadataKnown === true) {
-      // One-time hydration of fields this old client never held. Keep every
-      // ordinary field, dirty bit and row clock intact, including a newer local
-      // edit. This is not an exception to LWW for known data.
-      const metadata: EntityRow = { localBodyweightMetadataKnown: true };
-      for (const spec of ENTITY_FIELDS[type]) {
-        if (BODYWEIGHT_WIRE_KEYS[type]?.includes(spec.wireKey)) metadata[spec.prop] = values[spec.prop];
-      }
-      tx.update(table).set(metadata as never).where(eq(table.id, envelope.id)).run();
-      changed += 1;
     }
     // Otherwise the known local row is newer-or-equal: keep it untouched.
   }
@@ -904,9 +865,6 @@ const callSyncPull = async (layer: number, cursor: PullCursor): Promise<PullResp
     layer,
     cursor,
     limit: BATCH_CAP,
-    // Layer 4 is never returned to an old reader. Other layers keep their
-    // existing cursors and entity sets; upgrade cannot skip old measurements.
-    ...(layer === 4 ? { capabilities: ['bodyweight_v1'] } : {}),
   })) as RpcResult;
 
   const code = classifyRpcResult(error, data);
@@ -1016,6 +974,9 @@ const runPullLeg = async (
         if (page.entities.some(entity => entity.type === 'body_weight_measurements' || entity.type === 'sessions')) {
           invalidateBodyWeightContext();
         }
+        if (page.entities.some(entity => entity.type === 'user_settings')) {
+          await refreshBodyweightCalculationPreference();
+        }
       }
       receivedTotal += page.entities.length;
       changedTotal += pageChanged;
@@ -1035,7 +996,7 @@ const runPullLeg = async (
 };
 
 /**
- * Drains all four topological layers once, reporting per-page and per-layer
+ * Drains every topological layer once, reporting per-page and per-layer
  * progress. This is the first full pull the bootstrapper runs before deciding
  * whether to seed: its return value is the total rows RECEIVED across every
  * layer (tombstones included, since a tombstone is a normal returned row). The

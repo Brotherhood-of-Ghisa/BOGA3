@@ -1,5 +1,4 @@
-import { LoadingEstimateSheet } from '@/components/bodyweight/loading-estimate-sheet';
-import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -14,9 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { SessionBodyWeight } from '@/components/bodyweight/session-body-weight';
-import { isValidSessionWeight } from '@/src/bodyweight/weight-entry';
-import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import { EMPTY_SESSION_WEIGHT, isValidSessionWeight } from '@/src/bodyweight/weight-entry';
+import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
+import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -87,6 +86,11 @@ export function ExercisePageScreen({
   loadHistory,
 }: ExercisePageScreenProps) {
   const router = useRouter();
+  const bodyweightCalculationsEnabled = useBodyweightCalculationsEnabled();
+  const [, setPreferenceFocusRevision] = useState(0);
+  useFocusEffect(useCallback(() => {
+    setPreferenceFocusRevision((value) => value + 1);
+  }, []));
   const groupLinkingUserId = useGroupLinkingUserId();
   const draft = useSessionExerciseDraft({
     sessionId,
@@ -100,7 +104,6 @@ export function ExercisePageScreen({
     ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
     : null;
   const [recordsRevision, setRecordsRevision] = useState(0);
-  const [estimateVisible, setEstimateVisible] = useState(false);
   const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
   const [listPreferences] = useExerciseListPreferences();
   const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
@@ -112,7 +115,7 @@ export function ExercisePageScreen({
       scope: listPreferences.pastRecordsGymScope,
       currentGymId,
     },
-    JSON.stringify([recordsRevision, editingExercise?.bodyweightCoefficient, editingExercise?.loadInputMode, editingExercise?.localBodyweightMetadataKnown])
+    JSON.stringify([recordsRevision, editingExercise?.bodyweightContribution, editingExercise?.loadInputMode])
   );
 
   const [recordsExpanded, setRecordsExpanded] = useState(false);
@@ -129,12 +132,15 @@ export function ExercisePageScreen({
   }, [router]);
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
-  const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : {};
-  const loadContext: LoadContext = {
-    bodyweightCoefficient: !editingExercise || editingExercise.localBodyweightMetadataKnown === false ? NaN : editingExercise.bodyweightCoefficient ?? 0,
-    loadInputMode: editingExercise?.loadInputMode ?? 'total_load',
-    bodyWeightKg: isValidSessionWeight(bodyWeight ?? {}) ? bodyWeight?.bodyWeightKg : null,
-  };
+  const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : EMPTY_SESSION_WEIGHT;
+  const loadContext = personalLoadContext(
+    bodyweightCalculationsEnabled,
+    editingExercise ? {
+      bodyweightContribution: editingExercise.bodyweightContribution,
+      loadInputMode: editingExercise.loadInputMode,
+    } : null,
+    isValidSessionWeight(bodyWeight) ? bodyWeight : null,
+  );
   const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
   const rows = buildSetRows(sets, baseline, loadContext);
@@ -152,7 +158,7 @@ export function ExercisePageScreen({
     [draft]
   );
 
-  const onChangeLogger = (values: { weightValue?: string; repsValue?: string; weightUnit?: string; externalLoadMode?: string }) => {
+  const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
     if (!openSet) return;
     updateSets((current) => updateLoggerValues(current, openSet.id, values), 'text');
   };
@@ -166,7 +172,7 @@ export function ExercisePageScreen({
   const onCommit = () => {
     if (!openSet || !loggerValues) return;
     Keyboard.dismiss();
-    updateSets((current) => commitSet(current, openSet.id, { ...loggerValues, externalLoadMode: 'added' }), 'structural');
+    updateSets((current) => commitSet(current, openSet.id, loggerValues), 'structural');
     setOpenSetId(null);
   };
 
@@ -262,8 +268,6 @@ export function ExercisePageScreen({
             card's content, so page and card share one rhythm. */}
         <ScreenScroll gutter="md" keyboardShouldPersistTaps="handled" testID="exercise-page-scroll">
           <RecordsPanel
-            bodyweight={loadContext.bodyweightCoefficient > 0}
-            onEstimate={() => setEstimateVisible(true)}
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
             isFilteredByGym={isFilteredByGym}
@@ -281,9 +285,6 @@ export function ExercisePageScreen({
             state={records}
             view={recordsView}
           />
-          {loadContext.bodyweightCoefficient > 0 ? <SessionBodyWeight sessionId={sessionId}
-            snapshot={draft.state.bodyWeight}
-            onSaved={snapshot => draft.setBodyWeight(snapshot)} /> : null}
           <Card testID="exercise-set-list">
             {rows.map((row, index) => {
               const isOpen = row.id === openSet?.id;
@@ -293,11 +294,6 @@ export function ExercisePageScreen({
                   <SetLogger
                     key={row.id}
                     loadContext={loadContext}
-                    weightUnit={loggerValues.weightUnit}
-                    externalLoadMode={loggerValues.externalLoadMode}
-                    metadataKnown={editingExercise?.localBodyweightMetadataKnown !== false}
-                    unitEditable={openSet?.localBodyweightMetadataKnown !== false}
-                    onChangeLoad={onChangeLogger}
                     number={row.number}
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
@@ -363,9 +359,6 @@ export function ExercisePageScreen({
         selected={loggerValues?.setType ?? null}
         visible={openSheet === 'effort'}
       />
-      <LoadingEstimateSheet visible={estimateVisible} exerciseId={exercise.exerciseDefinitionId}
-        context={loadContext} onDismiss={() => setEstimateVisible(false)} />
-
       <ExerciseOptionsSheet
         exerciseName={exercise.name}
         onDismiss={() => setOpenSheet('none')}

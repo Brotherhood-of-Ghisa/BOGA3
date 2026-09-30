@@ -1,7 +1,7 @@
 import { loadAsOfWeightResolver, resolveSessionWeights } from '@/src/data/bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
-import { sessionBodyWeightForCalculation } from '@/src/bodyweight/snapshot';
-import { exerciseLoadContext } from '@/src/exercise-calculations/analytics';
+import { sessionBodyWeightForCalculation } from '@/src/bodyweight/as-of';
+import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
@@ -12,6 +12,7 @@ import {
   sessionExercises,
   sessions,
   muscleGroups,
+  userSettings,
 } from "@/src/data/schema";
 import { normalizeSessionSetPerformanceStatus } from "@/src/session-recorder/set-semantics";
 
@@ -55,7 +56,7 @@ export type SessionInsightsStore = {
     definitions: {
       id: string;
       loadInputMode: "total_load" | "per_side_load";
-      bodyweightCoefficient?: number; localBodyweightMetadataKnown?: boolean;
+      bodyweightContribution: number;
     }[];
     mappings: {
       exerciseDefinitionId: string;
@@ -100,8 +101,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         .select({
           id: exerciseDefinitions.id,
           loadInputMode: exerciseDefinitions.loadInputMode,
-          bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
-        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
+          bodyweightContribution: exerciseDefinitions.bodyweightContribution,
         })
         .from(exerciseDefinitions)
         .all(),
@@ -164,6 +164,11 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
     if (sessionIds.length === 0) return [];
     const database = await bootstrapLocalDataLayer();
     const resolveWeight = loadAsOfWeightResolver(database);
+    const bodyweightCalculationsEnabled = database
+      .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+      .from(userSettings)
+      .where(eq(userSettings.id, 'settings'))
+      .get()?.enabled ?? false;
     return database
       .select({
         id: sessionExercises.id,
@@ -172,8 +177,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
         capturedExerciseName: sessionExercises.name,
         currentExerciseName: exerciseDefinitions.name,
-        bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient,
-        localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
+        bodyweightContribution: exerciseDefinitions.bodyweightContribution,
         loadInputMode: exerciseDefinitions.loadInputMode,
         startedAt: sessions.startedAt,
         deletedAt: sessionExercises.deletedAt,
@@ -192,10 +196,13 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       )
       .orderBy(asc(sessionExercises.orderIndex), asc(sessionExercises.id))
       .all()
-      .map(({ capturedExerciseName, currentExerciseName, bodyweightCoefficient, loadInputMode, startedAt, localBodyweightMetadataKnown, ...row }) => ({
+      .map(({ capturedExerciseName, currentExerciseName, bodyweightContribution, loadInputMode, startedAt, ...row }) => ({
         ...row,
         exerciseName: currentExerciseName ?? capturedExerciseName,
-        loadContext: exerciseLoadContext({ bodyweightCoefficient: bodyweightCoefficient ?? 0, loadInputMode: loadInputMode ?? 'total_load', localBodyweightMetadataKnown: localBodyweightMetadataKnown ?? undefined }, resolveWeight(startedAt)),
+        loadContext: personalLoadContext(bodyweightCalculationsEnabled, {
+          bodyweightContribution: bodyweightContribution ?? 0,
+          loadInputMode: loadInputMode ?? 'total_load',
+        }, resolveWeight(startedAt)),
       }));
   },
 
@@ -208,7 +215,6 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
-        localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,

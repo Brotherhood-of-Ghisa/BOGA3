@@ -18,9 +18,6 @@ export type LinkableExercise = {
   id: string;
   name: string;
   loadInputMode?: LoadInputMode;
-  movementStandard?: string | null;
-  loadingMethod?: string | null;
-  localBodyweightMetadataKnown?: boolean;
   deletedAt: Date | null;
 };
 
@@ -31,7 +28,7 @@ export type LinkRef = {
   groupExerciseId: string;
 };
 
-/** One of my groups (from `groups:mine`) with its cached exercise list; `exercises` is null until cached. */
+/** One of my groups with its cached exercise list; `exercises` is null until cached. */
 export type GroupExerciseCatalog = {
   groupId: string;
   groupName: string;
@@ -40,9 +37,9 @@ export type GroupExerciseCatalog = {
 
 /**
  * True once group exercises can be offered: my groups are known and at least
- * one group's list is cached (or I'm in no groups). A known `groups:mine` with
+ * one group's list is cached (or I'm in no groups). A known mine list with
  * no cached list yet — the state right after the upgrade that added
- * `group-exercises:<id>` — still reads as not loaded.
+ * no matching versioned exercise-list entry still reads as not loaded.
  */
 export const groupExercisesLoaded = (
   catalogs: readonly GroupExerciseCatalog[] | null,
@@ -102,7 +99,7 @@ export const describeUnlinkSuccess = (context: ExerciseUnlinkContext, offline: b
 
 export const describeAlreadyLinkedIn = (groupName: string): string => `already linked in ${groupName}`;
 
-/** Product "Weight entry" note (D6): null when both modes match. An omitted personal mode is `total_load`. */
+/** Weight stays raw; only 1RM is converted when source and target modes differ. */
 export const describeLoadModeNote = (
   myMode: LoadInputMode | undefined,
   groupMode: LoadInputMode,
@@ -112,8 +109,8 @@ export const describeLoadModeNote = (
     return null;
   }
   return mine === 'per_side_load'
-    ? "Your per-side weights will show doubled on this group's boards."
-    : "Your total-load weights will show halved on this group's boards.";
+    ? 'Weight stays as logged. 1RM is compared in total-load terms.'
+    : 'Weight stays as logged. 1RM is compared in per-side terms.';
 };
 
 /** Linking never changes personal metadata. Incompatible variants need a separate exercise. */
@@ -121,19 +118,13 @@ export function describeGroupLinkIncompatibility(exercise: LinkableExercise, tar
   if (!isGroupMetricExerciseWire(target) || target.legacy) return null;
   const result = checkGroupLinkCompatibility({
     loadInputMode: exercise.loadInputMode ?? 'total_load',
-    movementStandard: exercise.movementStandard ?? null,
-    loadingMethod: exercise.loadingMethod ?? null,
-    metadataKnown: exercise.localBodyweightMetadataKnown,
   }, {
     name: target.name, loadInputMode: target.load_input_mode,
-    bodyweightCoefficient: target.bodyweight_coefficient, movementStandard: target.movement_standard,
-    loadingMethod: target.loading_method, defaultMetric: target.default_metric,
+    bodyweightCalculationsEnabled: target.bodyweight_calculations_enabled,
+    bodyweightContribution: target.bodyweight_contribution, defaultMetric: target.default_metric,
   });
   if (result.compatible) return null;
   switch (result.reason) {
-    case 'metadata_unknown': return 'Sync this exercise’s load settings before linking.';
-    case 'movement_standard': return `Requires movement standard: ${target.movement_standard}. Use a separate exercise for a different movement.`;
-    case 'loading_method': return `Requires loading method: ${target.loading_method}.`;
     case 'load_input_mode_invalid': return 'Review this exercise’s weight entry before linking.';
   }
 }
@@ -141,13 +132,11 @@ export function describeGroupLinkIncompatibility(exercise: LinkableExercise, tar
 export function describeGroupLinkLoadNote(exercise: LinkableExercise, target: GroupExercise): string | null {
   const incompatible = describeGroupLinkIncompatibility(exercise, target);
   if (incompatible) return `Not counted: ${incompatible}`;
-  if (!isGroupMetricExerciseWire(target) || target.legacy || target.bodyweight_coefficient === 0) {
+  if (!isGroupMetricExerciseWire(target) || target.legacy || !target.bodyweight_calculations_enabled ||
+    target.bodyweight_contribution === 0) {
     return describeLoadModeNote(exercise.loadInputMode, target.load_input_mode);
   }
-  const external = exercise.loadInputMode === 'per_side_load'
-    ? 'Your per-side external weight is doubled to total external weight.'
-    : 'Your entered external weight is already a total.';
-  return `${external} The group counts ${Number((target.bodyweight_coefficient * 100).toFixed(2))}% of the saved session body weight once. Your personal exercise settings stay unchanged.`;
+  return `The group applies a ${Number((target.bodyweight_contribution * 100).toFixed(2))}% bodyweight contribution using its own calculation settings. Your personal exercise settings stay unchanged.`;
 }
 
 // ---- Shared lookups ---------------------------------------------------------

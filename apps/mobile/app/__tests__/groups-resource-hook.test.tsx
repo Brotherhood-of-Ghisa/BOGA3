@@ -344,7 +344,7 @@ describe('useGroupResource', () => {
 
     expect(result.current).toMatchObject({ lostAccess: true, data: null, lastUpdatedAtMs: null, offline: false });
     expect(result.current.error?.code).toBe('NOT_FOUND');
-    expect(cachedKeys()).toEqual(['groups:mine', 'stream:v4:all']);
+    expect(cachedKeys()).toEqual(['groups:v4:mine', 'stream:v4:all']);
   });
 
   it('on NOT_FOUND without a group id evicts only its own entry', async () => {

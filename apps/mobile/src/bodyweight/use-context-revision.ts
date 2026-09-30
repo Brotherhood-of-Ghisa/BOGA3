@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { subscribeToBodyWeightContext } from './invalidation';
+import { useSyncExternalStore } from 'react';
+import { getBodyWeightContextRevision, subscribeToBodyWeightContext } from './invalidation';
 
-/** A reading write or sync pull refreshes focused projections and open sheets. */
+/** Every mounted analytics consumer observes one shared, durable revision. */
 export function useBodyWeightContextRevision() {
-  const [revision, setRevision] = useState(0);
-  useEffect(() => subscribeToBodyWeightContext(() => setRevision(value => value + 1)), []);
-  return revision;
+  return useSyncExternalStore(
+    subscribeToBodyWeightContext,
+    getBodyWeightContextRevision,
+    getBodyWeightContextRevision,
+  );
 }

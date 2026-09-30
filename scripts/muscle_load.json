@@ -4,7 +4,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -38,7 +37,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -62,7 +60,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoid_anterior",
@@ -86,7 +83,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoid_anterior",
@@ -105,7 +101,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -139,7 +134,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -168,7 +162,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -192,7 +185,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -216,7 +208,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -235,7 +226,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -264,7 +254,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -278,7 +267,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -292,7 +280,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -306,7 +293,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -320,7 +306,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -339,7 +324,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -358,7 +342,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -377,7 +360,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -396,7 +378,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -415,7 +396,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -434,7 +414,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -453,7 +432,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -472,7 +450,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -496,7 +473,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -520,7 +496,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -544,7 +519,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -568,7 +542,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -592,7 +565,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -616,7 +588,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -640,7 +611,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -664,7 +634,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -683,7 +652,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -702,7 +670,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -721,7 +688,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -740,7 +706,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -759,7 +724,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -778,7 +742,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -797,7 +760,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -816,7 +778,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -835,7 +796,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -854,7 +814,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -873,7 +832,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -892,7 +850,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -911,7 +868,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -930,7 +886,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -949,7 +904,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -968,7 +922,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -992,7 +945,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1016,7 +968,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1040,7 +991,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1064,7 +1014,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1088,7 +1037,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1112,7 +1060,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "frontal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1136,7 +1083,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1160,7 +1106,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1174,7 +1119,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1188,7 +1132,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1202,7 +1145,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1216,7 +1158,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1230,7 +1171,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1244,7 +1184,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1258,7 +1197,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1277,7 +1215,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1301,7 +1238,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1325,7 +1261,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1349,7 +1284,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1373,7 +1307,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1397,7 +1330,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1421,7 +1353,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1445,7 +1376,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1469,7 +1399,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1493,7 +1422,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1517,7 +1445,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1541,7 +1468,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1565,7 +1491,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1589,7 +1514,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1608,7 +1532,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1627,7 +1550,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1646,7 +1568,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1665,7 +1586,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1684,7 +1604,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1703,7 +1622,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1722,7 +1640,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1741,7 +1658,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1765,7 +1681,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1789,7 +1704,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "transverse",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1813,7 +1727,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "band",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -1832,7 +1745,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -1851,7 +1763,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1865,7 +1776,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1879,7 +1789,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1893,7 +1802,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1907,7 +1815,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1921,7 +1828,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1940,7 +1846,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -1974,7 +1879,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2008,7 +1912,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2042,7 +1945,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2076,7 +1978,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2110,7 +2011,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2144,7 +2044,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2178,7 +2077,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2212,7 +2110,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2246,7 +2143,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2280,7 +2176,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2329,7 +2224,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2378,7 +2272,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2407,7 +2300,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2436,7 +2328,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1.0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2460,7 +2351,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2484,7 +2374,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2508,7 +2397,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2557,7 +2445,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2606,7 +2493,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2655,7 +2541,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -2704,7 +2589,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2738,7 +2622,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2772,7 +2655,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2806,7 +2688,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2840,7 +2721,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2874,7 +2754,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1.0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2903,7 +2782,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2932,7 +2810,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2961,7 +2838,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -2985,7 +2861,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3009,7 +2884,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3033,7 +2907,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3057,7 +2930,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3076,7 +2948,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1.0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3100,7 +2971,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3124,7 +2994,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -3148,7 +3017,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3162,7 +3030,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3186,7 +3053,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "ball",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3210,7 +3076,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3234,7 +3099,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3288,7 +3152,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3327,7 +3190,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3366,7 +3228,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3405,7 +3266,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3444,7 +3304,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -3483,7 +3342,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3507,7 +3365,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3531,7 +3388,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3555,7 +3411,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3579,7 +3434,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.7,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3603,7 +3457,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3627,7 +3480,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.9,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -3651,7 +3503,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3665,7 +3516,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3679,7 +3529,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3693,7 +3542,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3707,7 +3555,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3721,7 +3568,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3735,7 +3581,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3749,7 +3594,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3763,7 +3607,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3777,7 +3620,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3791,7 +3633,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3805,7 +3646,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3819,7 +3659,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3833,7 +3672,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3847,7 +3685,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3861,7 +3698,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3875,7 +3711,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3889,7 +3724,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3903,7 +3737,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3917,7 +3750,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.9,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3941,7 +3773,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.9,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3965,7 +3796,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -3984,7 +3814,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -4003,7 +3832,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4017,7 +3845,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4031,7 +3858,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4045,7 +3871,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4059,7 +3884,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4073,7 +3897,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4087,7 +3910,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4101,7 +3923,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4115,7 +3936,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4129,7 +3949,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4143,7 +3962,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4157,7 +3975,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4171,7 +3988,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4185,7 +4001,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4199,7 +4014,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4213,7 +4027,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4227,7 +4040,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4241,7 +4053,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4255,7 +4066,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4269,7 +4079,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4283,7 +4092,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4297,7 +4105,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4311,7 +4118,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4325,7 +4131,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4339,7 +4144,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4353,7 +4157,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4367,7 +4170,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4381,7 +4183,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4395,7 +4196,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4409,7 +4209,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4423,7 +4222,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4437,7 +4235,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4451,7 +4248,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4465,7 +4261,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4484,7 +4279,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4503,7 +4297,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4522,7 +4315,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4541,7 +4333,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "biceps_brachii",
@@ -4560,7 +4351,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4574,7 +4364,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4588,7 +4377,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4602,7 +4390,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4621,7 +4408,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4640,7 +4426,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4659,7 +4444,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4678,7 +4462,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4697,7 +4480,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4716,7 +4498,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4795,7 +4576,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4874,7 +4654,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_extensors",
@@ -4953,7 +4732,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_flexors",
@@ -4967,7 +4745,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_flexors",
@@ -4981,7 +4758,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_flexors",
@@ -4995,7 +4771,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_flexors",
@@ -5009,7 +4784,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -5053,7 +4827,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -5097,7 +4870,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "ball",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5141,7 +4913,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5185,7 +4956,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5204,7 +4974,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5223,7 +4992,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5247,7 +5015,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5271,7 +5038,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5295,7 +5061,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5319,7 +5084,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5343,7 +5107,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5367,7 +5130,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5391,7 +5153,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5415,7 +5176,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5439,7 +5199,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5463,7 +5222,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5497,7 +5255,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5531,7 +5288,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5565,7 +5321,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5599,7 +5354,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5623,7 +5377,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5647,7 +5400,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 0.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5671,7 +5423,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1.0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -5715,7 +5466,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5729,7 +5479,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5743,7 +5492,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5757,7 +5505,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5771,7 +5518,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5785,7 +5531,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5804,7 +5549,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5828,7 +5572,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5852,7 +5595,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "obliques",
@@ -5876,7 +5618,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -5940,7 +5681,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -6004,7 +5744,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "erector_spinae",
@@ -6068,7 +5807,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6082,7 +5820,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6096,7 +5833,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6110,7 +5846,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6124,7 +5859,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "ball",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6148,7 +5882,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6172,7 +5905,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6196,7 +5928,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6220,7 +5951,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6239,7 +5969,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6258,7 +5987,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6277,7 +6005,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6296,7 +6023,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6315,7 +6041,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6334,7 +6059,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6353,7 +6077,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6372,7 +6095,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6391,7 +6113,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6410,7 +6131,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6429,7 +6149,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6453,7 +6172,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6477,7 +6195,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6501,7 +6218,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1.0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -6555,7 +6271,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6574,7 +6289,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6613,7 +6327,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6657,7 +6370,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6701,7 +6413,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6745,7 +6456,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6789,7 +6499,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6833,7 +6542,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6877,7 +6585,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6921,7 +6628,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -6965,7 +6671,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7009,7 +6714,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "kettlebell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7048,7 +6752,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7087,7 +6790,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7116,7 +6818,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7145,7 +6846,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7174,7 +6874,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7203,7 +6902,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7232,7 +6930,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -7276,7 +6973,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7290,7 +6986,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7304,7 +6999,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7318,7 +7012,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7332,7 +7025,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7346,7 +7038,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7365,7 +7056,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7394,7 +7084,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7423,7 +7112,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7452,7 +7140,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7481,7 +7168,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7525,7 +7211,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "bodyweight",
-    "bodyweight_coefficient": 1.0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -7579,7 +7264,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "cable",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "adductors",
@@ -7593,7 +7277,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "adductors",
@@ -7607,7 +7290,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7631,7 +7313,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7655,7 +7336,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7679,7 +7359,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7698,7 +7377,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7717,7 +7395,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7736,7 +7413,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7755,7 +7431,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7774,7 +7449,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -7793,7 +7467,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7807,7 +7480,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7821,7 +7493,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7835,7 +7506,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7849,7 +7519,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "barbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7863,7 +7532,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7877,7 +7545,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "dumbbell",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7891,7 +7558,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7905,7 +7571,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",
@@ -7919,7 +7584,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -7998,7 +7662,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8077,7 +7740,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8156,7 +7818,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8220,7 +7881,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -8274,7 +7934,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8303,7 +7962,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8332,7 +7990,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8396,7 +8053,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8450,7 +8106,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8504,7 +8159,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8538,7 +8192,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8572,7 +8225,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8606,7 +8258,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "machine",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8640,7 +8291,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -8674,7 +8324,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8703,7 +8352,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8727,7 +8375,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8751,7 +8398,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "deltoids",
@@ -8780,7 +8426,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -8799,7 +8444,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "pectoralis_major",
@@ -8828,7 +8472,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -8842,7 +8485,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -8856,7 +8498,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "trapezius",
@@ -8870,7 +8511,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -8889,7 +8529,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -8913,7 +8552,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "latissimus_dorsi",
@@ -8937,7 +8575,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "triceps_brachii",
@@ -8956,7 +8593,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "forearm_flexors",
@@ -8970,7 +8606,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "rectus_abdominis",
@@ -8999,7 +8634,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -9018,7 +8652,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gluteus_maximus",
@@ -9037,7 +8670,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -9051,7 +8683,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -9065,7 +8696,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "quadriceps_femoris",
@@ -9084,7 +8714,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -9103,7 +8732,6 @@
     "movement_pattern": "pull",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "hamstrings",
@@ -9122,7 +8750,6 @@
     "movement_pattern": "push",
     "plane_of_motion": "sagittal",
     "equipment_type": "other",
-    "bodyweight_coefficient": 0,
     "muscle_attribution": [
       {
         "muscle_id": "gastrocnemius",

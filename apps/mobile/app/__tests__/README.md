@@ -91,68 +91,61 @@
 
 ## Dated bodyweight coverage
 
-`bodyweight-as-of.test.ts` fixes exact-instant ordering, binary Unicode ID ties,
-DST equivalence, malformed latest context, and edit/move/delete/restore intervals.
-`bodyweight-data.test.ts` runs populated old-schema upgrades and proves obsolete
-session columns disappear while raw data, clocks and readings survive. Entry
-and analytics repository tests prove reading mutations recalculate every consumer
-without modifying sessions or sets. Sync covers LWW/reinstall and post-commit
-invalidation despite later failure. Import tests reject v3 snapshots and discard
-old ones without manufacturing readings. UI tests cover required dated entry,
-read-only known/friend context, missing-context prefill and failure feedback.
-Backend SQL/device parity and real group/coaching contracts complement these
-checks; native `ios-bodyweight` covers one dated-entry change to RM and volume at the
-accepted phone sizes.
+`bodyweight-as-of.test.ts` must fix exact-instant ordering, binary Unicode ID ties,
+DST equivalence, malformed-row skipping, and edit/move/delete/restore intervals.
+`bodyweight-data.test.ts` must run populated old-schema upgrades and prove kg
+conversion plus retained row IDs, clocks, readings, history and contributions;
+superseded storage columns disappear. Reading
+mutations must recalculate consumers without modifying sessions or sets. Sync
+must cover LWW/reinstall, the private preference and post-commit invalidation.
+UI tests must cover
+kg entry/history, validation and failed-write input retention; no session surface
+may render a reading, prompt or history action.
 
-## Added bodyweight load coverage
+## Optional bodyweight calculation coverage
 
-`bodyweight-added-load.test.ts` preserves seed/rule/hydration checks and proves
-that old null/assistance tags and numeric values need no conversion or writes.
-`bodyweight-logging-ui.test.tsx` covers the single added-weight field, unit
-selection, added-RM display, total-load volume, missing B and planned/actual
-preservation. No assistance selector or legacy review sheet is offered.
+Pure tests must cover explicit `ordinary`, `personal` and `group` policies;
+preference off/on; contribution 0/decimal/100; exact seed defaults; kg
+total/per-side math; blank/zero; personal missing-reading fallback; strict group
+missing-reading omission; invalid/overflow values; Wathan projection; and zero
+record/ranking exclusion. No test may infer contribution from an exercise name.
 
-## Personal bodyweight analytics coverage (M27)
+`bodyweight-logging-ui.test.tsx` must cover one kg Weight field, numeric-zero display,
+conditional contribution, repeated off/on persistence and ordinary Weight/1RM/
+Volume copy. It must assert absence of unit selectors, calculation-only fields
+and session prompts.
 
-`bodyweight-analytics-parity.test.ts` runs weighted/unweighted/legacy-tag, unit,
-coefficient/per-side, missing/invalid/legacy and hydration vectors through the
+## Personal bodyweight analytics coverage
+
+`bodyweight-analytics-parity.test.ts` must run preference/contribution/per-side,
+missing/invalid and zero vectors through the
 logger, rows, records, exercise/muscle/catalogue/weekly projections and session
 models. Retain aggregate overflow and independent zero/count distinctions.
-`bodyweight-analytics-data.test.ts` uses real migrated SQLite to prove repository
-context parity (including malformed applicable readings), later-reading isolation and refresh
-after reading/coefficient/mode changes. Formatter tests cover incomplete totals
-and nonfinite percentage output. Existing History/Stats/heatmap tests retain
-coverage and raw-versus-total labels.
+`bodyweight-analytics-data.test.ts` must use real migrated SQLite to prove repository
+context parity (including malformed-row fallback), later-reading isolation and refresh
+after reading/preference/contribution changes. Existing History/Stats/heatmap,
+completion and share tests must prove Top weight remains raw and missing personal
+reading never creates an unavailable state.
 
-`bodyweight-loading-estimate-ui.test.tsx` covers source choice, target-session
-B, explicit current reading, added pounds and below-bodyweight unavailable targets, validation, one-rep/high-rep
-notes, retry, dismissed reads and invalid restored reading context. Numerical
-forward/inverse vectors remain in the kernel tests.
-
-## Target-specific group score coverage (M27)
+## Strict group bodyweight coverage
 
 `groups-metric-contract.test.ts`, `groups-performance-score.test.ts` and
-`groups-metric-evaluation.test.ts` cover explicit metric/default/unit families,
-movement/loading compatibility, source distribution and group coefficient
-independence, the 60+20 versus 90+20 ranking reversal, strict performed eligibility,
-legacy mode reinterpretation, missing/invalid B and historical-estimate provenance. Preserve the
-separate source counting flag, duplicate/missing-pin refusal and explicit invalid
-weight payloads. These pure tests do not replace backend queue/publication,
-certification, legacy-reader or two-user device proofs.
+`groups-metric-evaluation.test.ts` must cover independent group preference and
+contribution, raw Weight, strict 1RM/Volume, kg total/per-side input, missing or
+invalid reading omission, performed eligibility and zero ranking exclusion.
+Mode-mismatch vectors must keep Weight raw, derive source-mode 1RM before target
+conversion, leave Volume target-unconverted and rebuild after either mode
+changes. Off/zero vectors must prove no private-reading lookup or invalidation;
+positive+missing must rebuild when a first applicable reading arrives. Personal
+preference/contribution must never affect group results.
 
-`groups-metric-api.test.ts` checks the v2 RPC request/response boundary:
-metric/unit/revision and requested-scope coherence, malformed known stream
-items, future-kind pagination, rebuilding emptiness and attestation dependency
-coverage. Cache tests retain upgrade eviction of both old and versioned keys.
-`groups-session-metrics.test.ts` separately proves the personal shared-session
-projection, raw units/modes, incomplete volume, strict performed status and
-malformed derived-context handling. Never substitute that personal coefficient
-for the target group's coefficient in ranking tests.
+`groups-metric-api.test.ts` must check Weight/1RM kg/revision/scope coherence,
+rebuilding emptiness and fails closed if any reading value/date/id/provenance or
+dependency digest enters a public payload. Cache tests must prove old projections
+are evicted. Session metric tests must prove raw activity survives an absent
+derived score.
 
-`groups-comparison-form.test.tsx` covers review/stale-edit behavior.
-`groups-metric-screens.test.tsx` runs the real cache/paging hooks around mocked
-RPCs for unit/scope switching, rebuilding, missing/estimated B, revision history,
-self/former/archive restrictions, stale certification refusal and offline stream
-reopen. Linking tests preserve personal coefficient independence and reject
-incompatible reviewed new-exercise inputs. These tests do not replace three-size
-render comparisons or two-user Maestro proof.
+`groups-comparison-form.test.tsx` must cover admin/member control, off/on persistence
+and stale edits. Screen tests must cover Weight/1RM scope switching, rebuilding,
+generic absent-score copy, certification invalidation and offline reopen without
+private context. These do not replace three-size rendering or two-user device proof.

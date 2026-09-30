@@ -5,7 +5,7 @@ import { Text, FlatList, RefreshControl, View } from 'react-native';
 import { ChipGroup, SegmentedControl } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useGroupOnlinePages, type BoardRowViewModel, type GroupBoardScope } from '@/src/groups';
 import { getGroupMetricBoard, getGroupMetricHistory, getGroupMetricRevisions } from '@/src/groups/api';
-import { isGroupMetric, metricsForGroupRules, type GroupMetric } from '@/src/groups/metric-contract';
+import { GROUP_METRICS, isGroupMetric, type GroupMetric } from '@/src/groups/metric-contract';
 import { buildGroupMetricRow, describeGroupMetricHistory, describeGroupRules, describeLegacyMetricHistory, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
 import type { GroupMetricBoardRowWire, GroupMetricBoardWire, GroupMetricExerciseWire, GroupMetricHistoryWire, GroupMetricRevisionWire, GroupMetricRevisionsWire } from '@/src/groups/metric-wire';
 import { GroupBoardHistoryItem } from './group-board-history-item';
@@ -42,7 +42,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   const [pickedRevision, setPickedRevision] = useState(initialRevision ?? exercise.rules_revision);
   const revision = revisions.items.find(row => row.rules.rules_revision === pickedRevision) ?? revisions.items[0];
   const rules = revision?.rules ?? exercise;
-  const allowed = metricsForGroupRules({ bodyweightCoefficient: rules.bodyweight_coefficient });
+  const allowed = GROUP_METRICS;
   const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);
   const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : rules.default_metric;
   const [scope, setScope] = useState(initialScope);
@@ -98,11 +98,11 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
         label: `Rules ${item.rules.rules_revision}${item.legacy ? ' · original kg-only' : ''}${item.retired_at_ms !== null ? ' · retired' : ''}` }))}
       onChange={next => {
         const nextRules = revisions.items.find(item => item.rules.rules_revision === next)?.rules;
-        if (nextRules) selectView(metricsForGroupRules({ bodyweightCoefficient: nextRules.bodyweight_coefficient }).includes(metric)
+        if (nextRules) selectView(GROUP_METRICS.includes(metric)
           ? metric : nextRules.default_metric, scope, next);
       }} testIDPrefix="group-history-revision" />
     <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules({ ...exercise, ...rules })}</Text>
-    <Text allowFontScaling={false} style={textStyles.muted}>{revision.legacy ? 'Original kg-only records and frozen retirement scores. Bodyweight context was not added to these certifications.'
+    <Text allowFontScaling={false} style={textStyles.muted}>{revision.legacy ? 'Original kg-only records retain their original certification coverage.'
       : 'Rules changes recalculate the comparison. They are listed separately from new performances.'}</Text>
     <SegmentedControl accessibilityLabel="Metric" value={metric} onChange={next => selectView(next, scope, rules.rules_revision)}
       options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))} testIDPrefix="group-history-metric" />

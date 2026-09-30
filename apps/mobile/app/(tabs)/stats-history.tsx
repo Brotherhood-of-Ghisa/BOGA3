@@ -75,13 +75,11 @@ export type MuscleHistoryTarget = {
 export type ExerciseHeatmapTarget = {
   exerciseDefinitionId: string;
   displayName: string;
-  bodyweight?: boolean;
 };
 
 export type ExerciseListItem = {
   id: string;
   name: string;
-  bodyweight?: boolean;
   setCount: number;
   nearFailureCount: number;
   totalVolume: number | null;
@@ -657,9 +655,7 @@ export function StatsScreenShell({
           isLoading={isExerciseHistoryLoading}
           kind="exercise"
           metric={exerciseHistoryMetric}
-          metricOptions={selectedExercise.bodyweight ? EXERCISE_HISTORY_METRIC_OPTIONS.map(option => ({ ...option,
-            label: option.value === 'estimatedRM1' ? 'Added 1RM' : option.value === 'highestWeight' ? 'Top added' : option.label,
-          })) : EXERCISE_HISTORY_METRIC_OPTIONS}
+          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissExerciseHistory}
           onSelectMetric={onSelectExerciseHistoryMetric}
           onSelectView={onSelectExerciseHistoryView}
@@ -1024,7 +1020,7 @@ function ExerciseListView({
           )}${
             item.estimatedOneRepMax === null
               ? '. Estimated one rep max unavailable'
-              : `. Estimated ${item.bodyweight ? 'total ' : ''}one rep max ${formatTotalWeight(item.estimatedOneRepMax)} kg`
+              : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)} kg`
           }`}
           density="list"
           meta={
@@ -1049,15 +1045,13 @@ function ExerciseListView({
               </Text>
             </View>
           }
-          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name,
-            ...(item.bodyweight ? { bodyweight: true } : {}) })}
+          onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name })}
           testID={`stats-exercise-row-${item.id}`}>
           <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
           </Text>
           {item.totalVolume === null ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}
             testID={`stats-exercise-coverage-${item.id}`}>Volume incomplete</Text> : null}
-          {item.bodyweight ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}>Added 1RM · kg</Text> : null}
         </ListRow>
       ))}
     </Card>
@@ -1360,7 +1354,6 @@ export default function StatsRoute() {
         return {
           id: ex.id,
           name: ex.name,
-          bodyweight: (ex.bodyweightCoefficient ?? 0) > 0,
           setCount: agg?.setCount ?? 0,
           nearFailureCount: agg?.nearFailureCount ?? 0,
           totalVolume: agg ? agg.totalVolume : 0,

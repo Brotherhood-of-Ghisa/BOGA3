@@ -41,8 +41,8 @@ describe('group cache', () => {
   });
 
   it('builds the contract cache keys', () => {
-    expect(groupCacheKeys.mine).toBe('groups:mine');
-    expect(groupCacheKeys.group('g1')).toBe('group:g1');
+    expect(groupCacheKeys.mine).toBe('groups:v4:mine');
+    expect(groupCacheKeys.group('g1')).toBe('group:v4:g1');
     expect(groupCacheKeys.streamAll).toBe('stream:v4:all');
     expect(groupCacheKeys.stream('g1')).toBe('stream:v4:g1');
     expect(groupCacheKeys.session('u2', 's1')).toBe('session:v4:u2:s1');
@@ -100,7 +100,7 @@ describe('group cache', () => {
 
     evictGroup(db(), 'g1');
 
-    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:g2', 'groups:mine', 'stream:v4:all', 'stream:v4:g2']);
+    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:v4:g2', 'groups:v4:mine', 'stream:v4:all', 'stream:v4:g2']);
   });
 
   it('never reads a v1 payload under a v2 key and evicts both generations on access loss', () => {
@@ -110,7 +110,7 @@ describe('group cache', () => {
     put('session:u2:s1');
     put('stream:g2');
     expect(readGroupCache(db(), groupCacheKeys.stream('g1'), 'user-1')).toBeNull();
-    put(groupCacheKeys.stream('g1'), 'user-1', { contract_version: 2 });
+    put(groupCacheKeys.stream('g1'), 'user-1', { contract_version: 3 });
     evictGroup(db(), 'g1');
     expect(allKeys()).toEqual(['stream:g2']);
   });
@@ -121,7 +121,7 @@ describe('group cache', () => {
 
     deleteGroupCacheEntry(db(), groupCacheKeys.group('g1'));
 
-    expect(allKeys()).toEqual(['group:g2']);
+    expect(allKeys()).toEqual(['group:v4:g2']);
   });
 
   it('wipeGroupCache clears every row for every user', () => {

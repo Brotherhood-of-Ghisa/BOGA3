@@ -94,8 +94,8 @@ describe('group evaluator set facts', () => {
     expect(factOf(row('s1', '30', '10'))).toMatchObject({ weight_kg: 30, e1rm_kg: estimateOneRepMax(30, 10) });
   });
 
-  it('counts a blank weight with valid reps as a performed 0 kg set with no e1RM', () => {
-    expect(factOf(row('s1', '', '8'))).toMatchObject({ performed: true, weight_kg: 0, reps: 8, e1rm_kg: null });
+  it('counts a blank weight with valid reps as a performed 0 kg set with numeric zero e1RM', () => {
+    expect(factOf(row('s1', '', '8'))).toMatchObject({ performed: true, weight_kg: 0, reps: 8, e1rm_kg: 0 });
   });
 
   it('nulls the numbers of a set that is not performed and passes live through', () => {
@@ -124,18 +124,4 @@ describe('group evaluator set facts', () => {
   it('yields no facts for a session that no longer exists', () => {
     expect(normalizeGroupSetFacts({ session_id: 'gone', started_at_ms: null, sets: [] })).toEqual([]);
   });
-});
-
-
-it('normalizes explicit lb before writing conventional set facts', () => {
-  expect(factOf(row('lb', '20', '5', { weight_unit: 'lb', external_load_mode: 'added' })))
-    .toMatchObject({ performed: true, weight_kg: 20 * 0.45359237 });
-});
-it.each(['assistance', 'unquantified_assistance', 'future-mode'])('ignores retired mode %s in a legacy external-load fact', external_load_mode => {
-  expect(factOf(row('mode', '0', '5', { weight_unit: 'kg', external_load_mode })))
-    .toMatchObject({ performed: true, weight_kg: 0, reps: 5, e1rm_kg: null });
-});
-it('does not normalize an unknown future performance status into a record', () => {
-  expect(factOf(row('future', '100', '5', { performance_status: 'future_status' })))
-    .toMatchObject({ performed: false, weight_kg: null });
 });

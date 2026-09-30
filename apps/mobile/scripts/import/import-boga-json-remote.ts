@@ -2,7 +2,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { supportsLoadMetadata } from './bodyweight-import-context';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '../../src/data/exercise-catalog-seeds';
 import {
   validateBogaSessionImportPackage,
@@ -22,6 +21,7 @@ type WireValue = string | number | boolean | null;
 
 type WireEntity = {
   type:
+    | 'user_settings'
     | 'body_weight_measurements'
     | 'gyms'
     | 'exercise_definitions'
@@ -159,10 +159,15 @@ const requireCatalogGym = (pkg: BogaSessionImportPackage, gymId: string) => {
 export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
   const validation = validateBogaSessionImportPackage(pkg);
   if (!validation.ok) throw new Error(validation.errors.join('\n'));
-  const v2 = supportsLoadMetadata(pkg.schema);
   const generatedAtMs = epochMs(pkg.generatedAt, 'generatedAt');
   const entities: WireEntity[] = [];
   const seen = new Set<string>();
+
+  pushUnique(entities, seen, {
+    type: 'user_settings', id: 'settings', client_updated_at_ms: generatedAtMs,
+    fields: { bodyweight_calculations_enabled: pkg.bodyweightCalculationsEnabled,
+      created_at: generatedAtMs, updated_at: generatedAtMs, deleted_at: null },
+  });
 
   const referencedGymIds = new Set(pkg.sessions.map((session) => session.gymId).filter((gymId): gymId is string => !!gymId));
   for (const gymId of [...referencedGymIds].sort()) {
@@ -212,10 +217,10 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
     });
   }
 
-  if (v2) for (const reading of pkg.bodyWeightMeasurements ?? []) {
+  for (const reading of pkg.bodyWeightMeasurements) {
     pushUnique(entities, seen, { type: 'body_weight_measurements', id: generatedBodyWeightMeasurementId(pkg, reading.id),
       client_updated_at_ms: generatedAtMs, fields: {
-        weight_value: reading.weightValue, weight_unit: reading.weightUnit, weight_kg: reading.weightKg,
+        weight_kg: reading.weightKg,
         measured_at: epochMs(reading.measuredAt, 'measurement date'), created_at: generatedAtMs,
         updated_at: generatedAtMs, deleted_at: null,
       } });
@@ -232,8 +237,8 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
       client_updated_at_ms: generatedAtMs,
       fields: {
         name: decision.exerciseName,
-        ...(v2 ? { load_input_mode: decision.loadInputMode!, bodyweight_coefficient: decision.loadRules!.bodyweightCoefficient,
-          movement_standard: decision.loadRules!.movementStandard, loading_method: decision.loadRules!.loadingMethod } : {}),
+        load_input_mode: decision.loadInputMode,
+        bodyweight_contribution: decision.bodyweightContribution,
         created_at: generatedAtMs,
         updated_at: generatedAtMs,
         deleted_at: null,
@@ -313,14 +318,10 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
             weight_value: set.weightValue,
             reps_value: set.repsValue,
             set_type: set.setType,
-            planned_weight_value: null,
-            planned_reps_value: null,
-            planned_set_type: null,
-            performance_status: null,
-            ...(v2 ? { weight_unit: set.weightUnit!, external_load_mode: 'added',
-              planned_weight_value: set.plannedWeightValue!, planned_weight_unit: set.plannedWeightUnit!,
-              planned_external_load_mode: set.plannedWeightValue !== null || set.plannedRepsValue !== null ? 'added' : null, planned_reps_value: set.plannedRepsValue!,
-              planned_set_type: set.plannedSetType!, performance_status: set.performanceStatus! } : {}),
+            planned_weight_value: set.plannedWeightValue,
+            planned_reps_value: set.plannedRepsValue,
+            planned_set_type: set.plannedSetType,
+            performance_status: set.performanceStatus,
             created_at: startedAtMs,
             updated_at: completedAtMs,
             deleted_at: null,
@@ -337,7 +338,7 @@ const signIn = async (apiUrl: string, anonKey: string, email: string, password: 
   const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '2',
+      'x-boga-sync-protocol': '3',
       apikey: anonKey,
       'content-type': 'application/json',
     },
@@ -354,7 +355,7 @@ const verifyTokenEmail = async (apiUrl: string, anonKey: string, token: string, 
   const response = await fetch(`${apiUrl}/auth/v1/user`, {
     method: 'GET',
     headers: {
-      'x-boga-sync-protocol': '2',
+      'x-boga-sync-protocol': '3',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       accept: 'application/json',
@@ -374,7 +375,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '2',
+      'x-boga-sync-protocol': '3',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',
@@ -392,6 +393,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
 
 const layerRank = (type: WireEntity['type']) => {
   switch (type) {
+    case 'user_settings':
     case 'body_weight_measurements':
     case 'gyms':
     case 'exercise_definitions':

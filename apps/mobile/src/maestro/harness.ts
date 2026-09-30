@@ -18,6 +18,7 @@ import { seedBodyweightRmVolumeFixture } from './bodyweight-load-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
+import { setBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 
 export type MaestroHarnessResetMode = 'none' | 'data';
 export type MaestroHarnessFixtureName =
@@ -200,6 +201,11 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   if (fixtureName === 'session-view') {
     await seedSessionViewFixture();
   }
+};
+
+export const runMaestroHarnessBodyweightPreference = (value: string | null | undefined) => {
+  if (value === 'on') setBodyweightCalculationsEnabled(true);
+  if (value === 'off') setBodyweightCalculationsEnabled(false);
 };
 
 /**

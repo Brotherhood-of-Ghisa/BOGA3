@@ -119,7 +119,7 @@ drain() {
   local out
   out="$(mktemp)"
   STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
     -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
   BODY="$(cat "${out}")"
   rm -f "${out}"
@@ -902,7 +902,7 @@ rest GET "${ATHLETE_TOKEN}" exercise_sets "select=weight_value&id=eq.${T}-r1b1"
 expect_ok "read back under the apply fault"
 check "sync_push committed under the apply fault" '.[0].weight_value == "91"'
 out="$(mktemp)"
-STATUS="$(curl --silent -X POST -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+STATUS="$(curl --silent -X POST -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
   -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
 BODY="$(cat "${out}")"; rm -f "${out}"
 expect_ok "drain under the apply fault"

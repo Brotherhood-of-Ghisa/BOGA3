@@ -252,6 +252,7 @@ export type GroupDetailsInput = {
   name: string;
   description: string | null;
 };
+export type GroupUpdateInput = GroupDetailsInput & { bodyweightCalculationsEnabled: boolean };
 
 export const createGroup = async ({ name, description }: GroupDetailsInput): Promise<GroupCreateResult> =>
   expectShape(
@@ -260,10 +261,13 @@ export const createGroup = async ({ name, description }: GroupDetailsInput): Pro
     (r) => isString(r.group_id),
   );
 
-export const updateGroup = async (groupId: string, { name, description }: GroupDetailsInput): Promise<GroupUpdateResult> =>
+export const updateGroup = async (groupId: string, {
+  name, description, bodyweightCalculationsEnabled,
+}: GroupUpdateInput): Promise<GroupUpdateResult> =>
   expectShape(
     'group_update',
-    await callGroupRpc('group_update', { p_group_id: groupId, p_name: name, p_description: description }),
+    await callGroupRpc('group_update', { p_group_id: groupId, p_name: name, p_description: description,
+      p_bodyweight_calculations_enabled: bodyweightCalculationsEnabled }),
     (r) => isRecord(r.group),
   );
 
@@ -419,7 +423,7 @@ export const isCertificationNotFound = (error: unknown): boolean => isNotFoundMe
 /** `NOT_FOUND: member not found`: the lifter is no longer a current member. */
 export const isGroupMemberNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'member not found');
 
-/** The podium page: every group exercise on Certified · e1RM (P8, D11). */
+/** The podium page: every group exercise on Certified · 1RM. */
 export const getGroupBoardPodiums = async (groupId: string): Promise<GroupBoardPodiumsResult> =>
   expectShape(
     'group_board_podiums',
@@ -550,17 +554,16 @@ const checkedMetricRulesArgs = (input: GroupExerciseRules) => {
   if (!result.ok) throw new GroupApiError('VALIDATION', result.message);
   const rule = result.value;
   return { p_name: rule.name, p_load_input_mode: rule.loadInputMode,
-    p_bodyweight_coefficient: rule.bodyweightCoefficient, p_movement_standard: rule.movementStandard,
-    p_loading_method: rule.loadingMethod, p_default_metric: rule.defaultMetric };
+    p_bodyweight_contribution: rule.bodyweightContribution, p_default_metric: rule.defaultMetric };
 };
 const isMetricExerciseWrite = (value: Record<string, unknown>) =>
-  value.contract_version === 2 && isGroupMetricExerciseWire(value.exercise);
+  value.contract_version === 3 && isGroupMetricExerciseWire(value.exercise);
 const isMetricCertificationResult = (value: Record<string, unknown>) =>
-  value.contract_version === 2 && isGroupMetricCertificationWire(value.certification);
+  value.contract_version === 3 && isGroupMetricCertificationWire(value.certification);
 
 export const listGroupComparisons = async (groupId: string): Promise<GroupMetricExerciseListWire> =>
   expectShape('group_exercise_list_v2', await callGroupRpc('group_exercise_list_v2', { p_group_id: groupId }),
-    value => value.contract_version === 2 && Array.isArray(value.exercises) && value.exercises.every(isGroupMetricExerciseWire));
+    value => value.contract_version === 3 && Array.isArray(value.exercises) && value.exercises.every(isGroupMetricExerciseWire));
 export const createGroupComparison = async (
   groupId: string, input: GroupExerciseRules & { sourceExerciseId: string | null },
 ): Promise<GroupMetricExerciseWriteWire> => expectShape('group_exercise_create_v2',
@@ -598,7 +601,7 @@ export const getGroupMetricHistory = async (view: GroupMetricView & { before?: s
     (view.revision == null || value.revision.rules.rules_revision === view.revision));
 export const getGroupMetricRevisions = async (groupId: string, exerciseId: string): Promise<GroupMetricRevisionsWire> =>
   expectShape('group_metric_revisions', await callGroupRpc('group_metric_revisions', { p_group_id: groupId, p_group_exercise_id: exerciseId }),
-    value => value.contract_version === 2 && isGroupMetricExerciseWire(value.exercise) && value.exercise.group_exercise_id === exerciseId &&
+    value => value.contract_version === 3 && isGroupMetricExerciseWire(value.exercise) && value.exercise.group_exercise_id === exerciseId &&
       Array.isArray(value.revisions) && value.revisions.every(isGroupMetricRevisionWire));
 
 export const certifyGroupMetric = async (input: GroupMetricView & {
@@ -625,7 +628,7 @@ export const getGroupMetricStream = async ({ groupId, before = null, limit = GRO
   Omit<GroupStreamRequest, 'before'> & { before?: GroupMetricStreamCursor | null }): Promise<GroupMetricStreamWire> => {
   const raw = await callGroupRpc('group_stream_v2', { p_group_id: groupId, p_before: before, p_limit: limit });
   const page = expectShape<GroupMetricStreamWire>('group_stream_v2', raw, value =>
-    value.contract_version === 2 && typeof value.has_more === 'boolean' && isGroupMetricStreamCursor(value.next_cursor) &&
+    value.contract_version === 3 && typeof value.has_more === 'boolean' && isGroupMetricStreamCursor(value.next_cursor) &&
     Array.isArray(value.items) && value.items.every(item => isRecord(item) &&
       (!isRenderedGroupMetricStreamKind(item.kind) || isGroupMetricStreamItem(item))));
   return { ...page, items: page.items.filter(item => isRenderedGroupMetricStreamKind(item.kind)) };

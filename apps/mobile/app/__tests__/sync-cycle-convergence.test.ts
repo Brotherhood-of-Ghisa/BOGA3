@@ -602,7 +602,7 @@ it('refreshes dated projections after a committed pull even if the following pus
     if (args.layer === 4 && !served) {
       served = true;
       return { data: { ...emptyPage, entities: [{ type: 'body_weight_measurements', id: 'r', client_updated_at_ms: 100,
-        fields: { weight_value: '80', weight_unit: 'kg', weight_kg: 80, measured_at: 1000,
+        fields: { weight_kg: 80, measured_at: 1000,
           created_at: 1000, updated_at: 1000, deleted_at: null } }] }, error: null };
     }
     return { data: emptyPage, error: null };

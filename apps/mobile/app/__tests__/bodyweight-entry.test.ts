@@ -16,16 +16,16 @@ jest.mock('@/src/sync/write-nudge', () => ({ notifyLocalWrite: jest.fn() }));
 jest.mock('@/src/logging/logEvent', () => ({ logEvent: jest.fn() }));
 const now = new Date('2026-09-20T12:00:00Z');
 const at = (days: number) => new Date(now.getTime() + days * 86400000);
-const save = (weightValue: string, measuredAt: Date, id?: string, weightUnit = 'kg') =>
-  saveBodyWeightReading({ weightValue, weightUnit, measuredAt, now, id });
+const save = (weightValue: string, measuredAt: Date, id?: string) =>
+  saveBodyWeightReading({ weightValue, measuredAt, now, id });
 const newSession = (startedAt: Date) => createSessionDraftRepository().persistDraftSnapshot({ gymId: null, startedAt, exercises: [] });
 
 beforeEach(() => { __resetClockForTests(); mockFixture = createInMemoryDatabase(); jest.clearAllMocks(); });
 afterEach(() => mockFixture.close());
 
-it('saves offline with raw units, normalization and a monotonic sync write', async () => {
-  const reading = await save(' 176.4 ', at(-1), undefined, 'lb');
-  expect(reading).toMatchObject({ weightValue: '176.4', weightUnit: 'lb', weightKg: 176.4 * 0.45359237,
+it('saves an authoritative kg reading offline with a monotonic sync write', async () => {
+  const reading = await save(' 80.2 ', at(-1));
+  expect(reading).toMatchObject({ weightKg: 80.2,
     measuredAt: at(-1), localDirty: true, deletedAt: null });
   expect(reading.localUpdatedAtMs).toBeGreaterThan(0);
   expect(notifyLocalWrite).toHaveBeenCalledTimes(1);
@@ -38,8 +38,7 @@ it.each(['', '0', '-1', 'Infinity', 'NaN', '1e2', '80,5', 'abc'])('rejects inval
   expect(notifyLocalWrite).not.toHaveBeenCalled();
 });
 
-it('rejects invalid units and future dates, including edits', async () => {
-  await expect(save('80', at(-1), undefined, 'stone')).rejects.toThrow('kg or lb');
+it('rejects future and invalid dates, including edits', async () => {
   await expect(save('80', at(1))).rejects.toThrow('future');
   await expect(save('80', new Date(NaN))).rejects.toThrow('date');
   const reading = await save('80', at(-1));
@@ -53,8 +52,8 @@ it('selects by measurement time, not edit time, with stable ascending ids for ti
   await save('76', at(-3), old.id);
   expect((await readCurrentBodyWeight(now))?.id).toBe(latest.id);
   mockFixture.database.insert(bodyWeightMeasurements).values([
-    { id: 'a-tie', weightValue: '81', weightUnit: 'kg', weightKg: 81, measuredAt: now },
-    { id: 'z-tie', weightValue: '82', weightUnit: 'kg', weightKg: 82, measuredAt: now },
+    { id: 'a-tie', weightKg: 81, measuredAt: now },
+    { id: 'z-tie', weightKg: 82, measuredAt: now },
   ]).run();
   expect((await readCurrentBodyWeight(now))?.id).toBe('a-tie');
   await deleteBodyWeightReading('a-tie', now);
@@ -80,12 +79,12 @@ it('resolves from the recorded start on every read, including a changed session 
     bodyWeightSource: null, bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null });
 });
 
-it('does not borrow an older valid reading when the latest restored reading is malformed', async () => {
+it('skips a malformed restored row and uses the latest valid reading', async () => {
   await save('80', at(-3));
-  mockFixture.database.insert(bodyWeightMeasurements).values({ id: 'bad', weightValue: '85', weightKg: 850,
-    weightUnit: 'kg', measuredAt: at(-1) }).run();
+  mockFixture.database.insert(bodyWeightMeasurements).values({ id: 'bad', weightKg: -10,
+    measuredAt: at(-1) }).run();
   const session = await newSession(now);
-  expect((await createSessionDraftRepository().loadSessionSnapshotById(session.sessionId))?.bodyWeightKg).toBeNull();
+  expect((await createSessionDraftRepository().loadSessionSnapshotById(session.sessionId))?.bodyWeightKg).toBe(80);
 });
 
 it('recalculates historical context without modifying the session row or its sync clock', async () => {
@@ -93,9 +92,9 @@ it('recalculates historical context without modifying the session row or its syn
   const { sessionId } = await newSession(at(-1));
   const before = mockFixture.database.select().from(sessions).get();
   const load = () => createSessionDraftRepository().loadSessionSnapshotById(sessionId);
-  await save('180', at(-2), reading.id, 'lb');
-  expect((await load())?.bodyWeightKg).toBe(180 * 0.45359237);
-  await save('180', now, reading.id, 'lb');
+  await save('82', at(-2), reading.id);
+  expect((await load())?.bodyWeightKg).toBe(82);
+  await save('82', now, reading.id);
   expect((await load())?.bodyWeightKg).toBeNull();
   await save('80', at(-2), reading.id);
   await deleteBodyWeightReading(reading.id, now);
@@ -111,16 +110,16 @@ it('keeps exact measurement precision when its displayed date is unchanged', () 
   expect(resolveMeasurementDate(formatCurrentDateTime(at(-1)), exact, now).getSeconds()).toBe(0);
   expect(() => resolveMeasurementDate('2026-02-31 12:00', exact, now)).toThrow('valid');
   expect(() => resolveMeasurementDate(formatCurrentDateTime(at(1)), exact, now)).toThrow('future');
-  expect(validateBodyWeight({ weightValue: '80.2', weightUnit: 'kg' }).weightKg).toBe(80.2);
+  expect(validateBodyWeight({ weightValue: '80.2' }).weightKg).toBe(80.2);
 });
 
 it('validates dated context instead of accepting positive kg alone', () => {
   expect(isValidSessionWeight({ bodyWeightKg: 80 })).toBe(false);
-  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'manual' })).toBe(false);
-  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'manual', bodyWeightMeasurementId: 'x' })).toBe(false);
-  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'historical_estimate',
-    bodyWeightMeasurementId: 'x', bodyWeightMeasuredAt: now })).toBe(false);
-  expect(isValidSessionWeight({ bodyWeightKg: Infinity, bodyWeightSource: 'manual' })).toBe(false);
+  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'reading' })).toBe(false);
+  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'x' })).toBe(false);
+  expect(isValidSessionWeight({ bodyWeightKg: 80, bodyWeightSource: 'reading',
+    bodyWeightMeasurementId: '', bodyWeightMeasuredAt: now })).toBe(false);
+  expect(isValidSessionWeight({ bodyWeightKg: Infinity, bodyWeightSource: 'reading' })).toBe(false);
 });
 
 

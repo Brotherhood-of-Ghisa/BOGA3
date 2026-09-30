@@ -31,15 +31,17 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "dated_added_load_v3"` pass through
-unchanged in both structured and text JSON output. Tool names and strict input
-schemas remain compatible. Raw `entered_load` retains amount/unit/mode;
-normalized external `load` is distinct from `effective_load` and total 1RM.
-Descriptions direct coaches to inspect metric basis, dated session-weight
-provenance, null availability and volume coverage. `known_subtotal` must never
-be described as a complete total, and missing applicable readings remain unavailable.
-The adapter adds no body-weight write tools, measurement timeline reads, group
-access or database credentials. See the [agent API contract](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
+Under the accepted post-cutover contract, training projections with
+`metric_revision: "bodyweight_optional_v1"` pass
+through unchanged in structured and text JSON output. Tool names and strict
+input schemas remain compatible. All Weight is kg: `load`/`top_weight` are raw,
+while 1RM/Volume are derived under the owner's private preference. Preference
+off returns ordinary metrics and no reading context; preference on returns an
+applicable reading only when a positive contribution makes the result
+bodyweight-aware, with missing reading following the personal zero fallback.
+The adapter adds no bodyweight write tools,
+measurement-timeline reads, group access or database credentials. See the
+[agent API contract](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
 ## Configuration
 

@@ -111,8 +111,8 @@ describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
     expect(estimateOneRepMax(100, 5)).toBeLessThan(estimateOneRepMax(110, 5) as number);
   });
 
-  it('returns null for zero weight, negative reps, infinity, and other invalid inputs', () => {
-    expect(estimateOneRepMax(0, 5)).toBeNull();
+  it('returns numeric zero for zero weight and null for invalid inputs', () => {
+    expect(estimateOneRepMax(0, 5)).toBe(0);
     expect(estimateOneRepMax(-1, 5)).toBeNull();
     expect(estimateOneRepMax(100, 0)).toBeNull();
     expect(estimateOneRepMax(100, -1)).toBeNull();
@@ -211,8 +211,12 @@ describe('exercise calculations: findBestEstimatedOneRepMaxSet', () => {
     });
   });
 
-  it('returns null when there is no eligible set', () => {
-    expect(findBestEstimatedOneRepMaxSet([set('', ''), set('0', '5')])).toBeNull();
+  it('keeps a valid zero-load set eligible', () => {
+    expect(findBestEstimatedOneRepMaxSet([set('', ''), set('0', '5')])).toEqual({
+      weight: 0,
+      reps: 5,
+      estimatedOneRepMax: 0,
+    });
   });
 });
 

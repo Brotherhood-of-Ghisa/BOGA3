@@ -17,8 +17,8 @@ const buildAggregationInput = (
   overrides: Partial<StatsAggregationInput> = {}
 ): StatsAggregationInput => ({
   exerciseDefinitions: [
-    { id: 'ex-bench', loadInputMode: 'per_side_load' },
-    { id: 'ex-curl', loadInputMode: 'per_side_load' },
+    { bodyweightContribution: 0, id: 'ex-bench', loadInputMode: 'per_side_load' },
+    { bodyweightContribution: 0, id: 'ex-curl', loadInputMode: 'per_side_load' },
   ],
   sessions: [
     { id: 'session-1', completedAt: new Date('2026-05-12T10:00:00.000Z') },
@@ -147,8 +147,8 @@ describe('aggregateStats', () => {
   it('halves total-load volume before role weighting and ignores legacy mapping weight', () => {
     const input = buildAggregationInput({
       exerciseDefinitions: [
-        { id: 'ex-bench', loadInputMode: 'total_load' },
-        { id: 'ex-curl', loadInputMode: 'per_side_load' },
+        { bodyweightContribution: 0, id: 'ex-bench', loadInputMode: 'total_load' },
+        { bodyweightContribution: 0, id: 'ex-curl', loadInputMode: 'per_side_load' },
       ],
     });
     input.muscleMappings = input.muscleMappings.map((mapping) => ({
@@ -288,7 +288,7 @@ describe('createStatsRepository.computeSummary', () => {
   it('loads a completed-session window for selected-muscle daily effort', async () => {
     const store = buildStore();
     store.loadAggregationInput.mockResolvedValueOnce({
-      exerciseDefinitions: [{ id: 'ex-bench', loadInputMode: 'per_side_load' }],
+      exerciseDefinitions: [{ bodyweightContribution: 0, id: 'ex-bench', loadInputMode: 'per_side_load' }],
       sessions: [{ id: 'session-1', completedAt: new Date('2026-05-18T08:00:00.000Z') }],
       sessionExercises: [
         {

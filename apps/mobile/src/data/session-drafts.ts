@@ -1,13 +1,13 @@
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
-import { exerciseLoadContext } from '@/src/exercise-calculations/analytics';
-import type { LoadContext } from '@/src/exercise-calculations/effective-load';
+import { personalLoadContext } from '@/src/exercise-calculations/analytics';
+import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessions } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessions, userSettings } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
@@ -19,23 +19,7 @@ import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
 
-// Read-time context only. Never persisted or sent with a session write.
-export type SessionBodyWeightSnapshot = {
-  bodyWeightKg?: number | null;
-  bodyWeightSource?: string | null;
-  bodyWeightMeasurementId?: string | null;
-  bodyWeightMeasuredAt?: Date | null;
-};
-
-export type SessionSetLoadMetadata = {
-  localBodyweightMetadataKnown?: boolean;
-  weightUnit?: string;
-  externalLoadMode?: string | null;
-  plannedWeightUnit?: string | null;
-  plannedExternalLoadMode?: string | null;
-};
-
-export type SessionDraftSetInput = SessionSetLoadMetadata & {
+export type SessionDraftSetInput = {
   id?: string;
   repsValue: string;
   weightValue: string;
@@ -80,7 +64,7 @@ export type PersistCompletedSessionResult = {
   durationSec: number;
 };
 
-export type SessionDraftSetSnapshot = SessionSetLoadMetadata & {
+export type SessionDraftSetSnapshot = {
   id: string;
   repsValue: string;
   weightValue: string;
@@ -100,7 +84,7 @@ export type SessionDraftExerciseSnapshot = {
   sets: SessionDraftSetSnapshot[];
 };
 
-export type SessionDraftSnapshot = SessionBodyWeightSnapshot & {
+export type SessionDraftSnapshot = ResolvedSessionWeight & {
   sessionId: string;
   gymId: string | null;
   status: SessionDraftStatus;
@@ -110,7 +94,7 @@ export type SessionDraftSnapshot = SessionBodyWeightSnapshot & {
   exercises: SessionDraftExerciseSnapshot[];
 };
 
-export type SessionGraphSnapshot = SessionBodyWeightSnapshot & {
+export type SessionGraphSnapshot = ResolvedSessionWeight & {
   sessionId: string;
   gymId: string | null;
   status: SessionPersistenceRecord['status'];
@@ -123,7 +107,7 @@ export type SessionGraphSnapshot = SessionBodyWeightSnapshot & {
   exercises: SessionDraftExerciseSnapshot[];
 };
 
-export type CompletedSessionAnalysisRecord = SessionBodyWeightSnapshot & {
+export type CompletedSessionAnalysisRecord = ResolvedSessionWeight & {
   sessionId: string;
   gymId: string | null;
   startedAt: Date;
@@ -179,7 +163,7 @@ export type AppendCompletedSessionExerciseAsPlannedResult = {
 
 export type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
-export type SessionPersistenceRecord = SessionBodyWeightSnapshot & {
+export type SessionPersistenceRecord = ResolvedSessionWeight & {
   id: string;
   gymId: string | null;
   status: 'active' | 'completed';
@@ -191,7 +175,7 @@ export type SessionPersistenceRecord = SessionBodyWeightSnapshot & {
   updatedAt: Date;
 };
 
-type StoredDraftSetRecord = SessionSetLoadMetadata & {
+type StoredDraftSetRecord = {
   id: string;
   sessionExerciseId: string;
   orderIndex: number;
@@ -363,11 +347,6 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
       id: set.id,
       repsValue: set.repsValue,
       weightValue: set.weightValue,
-      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
-      weightUnit: set.weightUnit ?? 'kg',
-      externalLoadMode: set.externalLoadMode ?? null,
-      plannedWeightUnit: set.plannedWeightUnit ?? null,
-      plannedExternalLoadMode: set.plannedExternalLoadMode ?? null,
       setType: set.setType,
       plannedRepsValue: set.plannedRepsValue ?? null,
       plannedWeightValue: set.plannedWeightValue ?? null,
@@ -405,11 +384,6 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
       id: set.id,
       repsValue: set.repsValue,
       weightValue: set.weightValue,
-      localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
-      weightUnit: set.weightUnit ?? 'kg',
-      externalLoadMode: set.externalLoadMode ?? null,
-      plannedWeightUnit: set.plannedWeightUnit ?? null,
-      plannedExternalLoadMode: set.plannedExternalLoadMode ?? null,
       setType: set.setType,
       plannedRepsValue: set.plannedRepsValue ?? null,
       plannedWeightValue: set.plannedWeightValue ?? null,
@@ -429,6 +403,11 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
   }
 
   const weight = loadAsOfWeightResolver(database)(sessionRow.startedAt);
+  const bodyweightCalculationsEnabled = database
+    .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+    .from(userSettings)
+    .where(eq(userSettings.id, 'settings'))
+    .get()?.enabled ?? false;
   const exerciseRows = database
     .select()
     .from(sessionExercises)
@@ -471,11 +450,6 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       orderIndex: row.orderIndex,
       repsValue: row.repsValue,
       weightValue: row.weightValue,
-      localBodyweightMetadataKnown: row.localBodyweightMetadataKnown,
-      weightUnit: row.weightUnit ?? 'kg',
-      externalLoadMode: row.externalLoadMode ?? null,
-      plannedWeightUnit: row.plannedWeightUnit ?? null,
-      plannedExternalLoadMode: row.plannedExternalLoadMode ?? null,
       setType: normalizeSessionSetType(row.setType),
       plannedRepsValue: row.plannedRepsValue,
       plannedWeightValue: row.plannedWeightValue,
@@ -503,7 +477,11 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
-        loadContext: exerciseLoadContext(definitionById.get(exercise.exerciseDefinitionId), weight),
+        loadContext: personalLoadContext(
+          bodyweightCalculationsEnabled,
+          definitionById.get(exercise.exerciseDefinitionId),
+          weight,
+        ),
         sets: setsByExerciseId.get(exercise.id) ?? [],
       };
     }),
@@ -565,10 +543,6 @@ const replaceSessionExerciseGraph = (
             orderIndex: exerciseSets.orderIndex,
             repsValue: exerciseSets.repsValue,
             weightValue: exerciseSets.weightValue,
-            weightUnit: exerciseSets.weightUnit,
-            externalLoadMode: exerciseSets.externalLoadMode,
-            plannedWeightUnit: exerciseSets.plannedWeightUnit,
-            plannedExternalLoadMode: exerciseSets.plannedExternalLoadMode,
             setType: exerciseSets.setType,
             plannedRepsValue: exerciseSets.plannedRepsValue,
             plannedWeightValue: exerciseSets.plannedWeightValue,
@@ -706,15 +680,7 @@ const replaceSessionExerciseGraph = (
 
     const keptSetIds = keptSetIdsByExerciseId.get(sessionExerciseId) ?? new Set<string>();
     exercise.sets.forEach((sourceSet, setIndex) => {
-      // A page loaded before metadata replay must not write its placeholders
-      // over values hydrated since it opened. Ordinary amount edits still save.
-      const set = sourceSet.localBodyweightMetadataKnown === false ? { ...sourceSet,
-        weightUnit: undefined, externalLoadMode: undefined,
-        plannedWeightUnit: undefined, plannedExternalLoadMode: undefined } : sourceSet;
-      const knownMetadata = set.localBodyweightMetadataKnown === true &&
-        set.weightUnit !== undefined && set.externalLoadMode !== undefined &&
-        set.plannedWeightUnit !== undefined && set.plannedExternalLoadMode !== undefined
-        ? { localBodyweightMetadataKnown: true } : {};
+      const set = sourceSet;
       const requestedSetId = set.id?.trim();
       const existingSet = requestedSetId ? existingSetsById.get(requestedSetId) : undefined;
       // Only reuse a set row that already belongs to THIS exercise; otherwise a
@@ -750,13 +716,8 @@ const replaceSessionExerciseGraph = (
           .set({
             sessionExerciseId,
             orderIndex: setIndex,
-            ...knownMetadata,
             repsValue: set.repsValue,
             weightValue: set.weightValue,
-            weightUnit: set.weightUnit === undefined ? (reuseSet ? existingSet?.weightUnit : undefined) ?? 'kg' : set.weightUnit,
-            externalLoadMode: set.externalLoadMode === undefined ? (reuseSet ? existingSet?.externalLoadMode : undefined) ?? null : set.externalLoadMode,
-            plannedWeightUnit: set.plannedWeightUnit === undefined ? (reuseSet ? existingSet?.plannedWeightUnit : undefined) ?? null : set.plannedWeightUnit,
-            plannedExternalLoadMode: set.plannedExternalLoadMode === undefined ? (reuseSet ? existingSet?.plannedExternalLoadMode : undefined) ?? null : set.plannedExternalLoadMode,
             setType: nextSetType,
             plannedRepsValue:
               set.plannedRepsValue === undefined ? existingSet?.plannedRepsValue ?? null : set.plannedRepsValue,
@@ -777,13 +738,8 @@ const replaceSessionExerciseGraph = (
             id: setId,
             sessionExerciseId,
             orderIndex: setIndex,
-            ...knownMetadata,
             repsValue: set.repsValue,
             weightValue: set.weightValue,
-            weightUnit: set.weightUnit === undefined ? (reuseSet ? existingSet?.weightUnit : undefined) ?? 'kg' : set.weightUnit,
-            externalLoadMode: set.externalLoadMode === undefined ? (reuseSet ? existingSet?.externalLoadMode : undefined) ?? null : set.externalLoadMode,
-            plannedWeightUnit: set.plannedWeightUnit === undefined ? (reuseSet ? existingSet?.plannedWeightUnit : undefined) ?? null : set.plannedWeightUnit,
-            plannedExternalLoadMode: set.plannedExternalLoadMode === undefined ? (reuseSet ? existingSet?.plannedExternalLoadMode : undefined) ?? null : set.plannedExternalLoadMode,
             setType: nextSetType,
             plannedRepsValue: set.plannedRepsValue ?? null,
             plannedWeightValue: set.plannedWeightValue ?? null,
@@ -1184,11 +1140,6 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
         id: set.id,
         repsValue: set.repsValue,
         weightValue: set.weightValue,
-        localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
-      weightUnit: set.weightUnit ?? 'kg',
-        externalLoadMode: set.externalLoadMode ?? null,
-        plannedWeightUnit: set.plannedWeightUnit ?? null,
-        plannedExternalLoadMode: set.plannedExternalLoadMode ?? null,
         setType: set.setType,
         plannedRepsValue: set.plannedRepsValue,
         plannedWeightValue: set.plannedWeightValue,
@@ -1218,8 +1169,6 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
             setType: null,
             plannedRepsValue: set.repsValue,
             plannedWeightValue: set.weightValue,
-            plannedWeightUnit: set.weightUnit ?? 'kg',
-            plannedExternalLoadMode: set.externalLoadMode ?? null,
             plannedSetType: set.setType,
             performanceStatus: 'planned' as const,
           })),
@@ -1280,8 +1229,6 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
         setType: null,
         plannedRepsValue: set.repsValue,
         plannedWeightValue: set.weightValue,
-        plannedWeightUnit: set.weightUnit ?? 'kg',
-        plannedExternalLoadMode: set.externalLoadMode ?? null,
         plannedSetType: set.setType,
         performanceStatus: 'planned' as const,
       }));
@@ -1298,11 +1245,6 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
           id: set.id,
           repsValue: set.repsValue,
           weightValue: set.weightValue,
-          localBodyweightMetadataKnown: set.localBodyweightMetadataKnown,
-      weightUnit: set.weightUnit ?? 'kg',
-          externalLoadMode: set.externalLoadMode ?? null,
-          plannedWeightUnit: set.plannedWeightUnit ?? null,
-          plannedExternalLoadMode: set.plannedExternalLoadMode ?? null,
           setType: set.setType,
           plannedRepsValue: set.plannedRepsValue,
           plannedWeightValue: set.plannedWeightValue,

@@ -18,7 +18,7 @@ Capture top-level architecture decisions for MVP, with clear `Adopted` vs `Plann
 
 | Decision | Status | Why | Source |
 | --- | --- | --- | --- |
-| Bodyweight load resolves once in a pure TS boundary, with explicit missing/invalid context, aggregate coverage and named Wathan inverse/one-rep projection conventions | `Personal/coaching/group integration implemented; native acceptance and hosted rollout pending (M27)` | Preserves entered external load and conventional semantics while preventing missing B or invalid values from becoming plausible scores. One boundary is reusable by mobile, groups and coaching. | `apps/mobile/src/exercise-calculations/effective-load.ts`, `docs/specs/tech/bodyweight-load-contract.md` |
+| Ordinary and bodyweight-aware load resolve once in a pure TS boundary with an explicit policy (`ordinary`, `personal`, or `group`) | `Adopted` | Every exercise keeps ordinary Weight / 1RM / Volume semantics by default. Personal opt-in uses a missing-reading zero fallback; strict group opt-in omits dependent scores. A typed policy prevents those contexts from being mixed while one arithmetic kernel serves mobile, groups and coaching. | `docs/specs/tech/bodyweight-load-contract.md` |
 | `Expo + React Native + TypeScript` for mobile frontend | `Adopted` | Fastest path to a phone-first app with one codebase and strong AI-assisted delivery. | `apps/mobile/package.json` |
 | `Expo Router` for app navigation | `Adopted` | File-based routing keeps structure simple and predictable for AI and humans. | `apps/mobile/package.json`, `apps/mobile/app/` |
 | Root route access (sign-in / first-sync block / app) is enforced by the navigator: one `Stack.Protected` group per level in the root stack, the navigator never unmounted to gate | `Adopted` (2026-09-27) | On expo-router 57 (Expo SDK 57), unmounting the root navigator reverts the route, so the old guard and gate that swapped the navigator for a `<Redirect>` or a block looped on sign-in and sign-out. `Stack.Protected` is Expo Router's own auth pattern: the router drops the routes of the old level and lands on the first one still declared. | `apps/mobile/components/navigation/root-stack.tsx`, `apps/mobile/src/navigation/root-route-access.ts`, `apps/mobile/app/__tests__/root-stack-routing.test.tsx`, `docs/specs/ui/navigation-contract.md` "Router baseline" |
@@ -64,41 +64,26 @@ Capture top-level architecture decisions for MVP, with clear `Adopted` vs `Plann
 | Group leaderboards are materialized per member in `group_board_entries`. Each evaluator apply recomputes the member's entries for one (group, group exercise) target from the set facts, diffs them against the stored entries, and derives the stream events (`record`, `record_voided`, `link`/`unlink`) and the board history (`lead_change`) from the diff, under a per-group advisory lock. Records in an active session are provisional: they update or drop silently, and voids are emitted only for completed sessions. | `Adopted` (M25) | Recompute-and-diff never patches entries incrementally, so edits, deletes, undeletes, links, load-mode changes, and rules bumps all go through one code path and cannot drift. Materialized entries make board reads plain indexed SQL. The diff, plus the links recorded at the last apply, tells a new lift from a retroactive link (no record cards for links). | `supabase/migrations/20260914120000_m25_group_boards.sql`, `docs/specs/tech/groups-contract.md` §2.11, §4.5 |
 | A certification pins the raw synced values of the set it attests (`group_set_fingerprint`), and the evaluator voids it when the set's fingerprint changes or the set leaves; certify / withdraw / cancel are RPCs that only write `group_certifications` and enqueue a failure-isolated re-evaluation, and Certified boards are recomputed in the same apply as the All boards | `Adopted` (M25) | The pin needs no TS set rule in SQL, so an edit or delete voids exactly what was attested. Keeping entry writes in the one apply keeps Certified boards on the recompute-and-diff path, and reads count a Certified entry only while its certification is active, so withdraw and cancel are visible at once. No Sync v2 trigger is added. | `supabase/migrations/20260916120000_m25_group_certification.sql`, `docs/specs/tech/groups-contract.md` §2.11, §2.12, §4.6 |
 
-## Personal effective-load projection boundary
+## Optional bodyweight projection boundary
 
-`src/exercise-calculations/analytics.ts` adapts raw sets, current personal exercise
-rules and the as-of dated reading to the pure effective-load kernel.
-Repository adapters batch definition/session context with their graph reads;
-no screen queries context per set. Local upgrade placeholders remain unavailable
-until hydration or explicit user intent establishes their meaning.
+The calculation boundary accepts raw kg Weight, reps, the exercise's existing
+total/per-side input mode, a contribution fraction, an applicable dated reading
+and an explicit calculation policy. `ordinary` ignores contribution and reading;
+`personal` applies them when the private preference is on and substitutes zero
+for a missing reading; `group` applies the group's independent preference and
+contribution and returns no dependent score when the member reading is missing.
+Invalid numeric input remains invalid in every policy.
 
-The boundary feeds exercise history/block history, daily/weekly analytics,
-catalogue statistics, muscle contributions, session insights, recorder models,
-records and share previews. Current rules reinterpret historical personal
-projections; reading mutations update affected historical intervals.
-Complete volume and the known subtotal remain distinct through every rollup,
-including overflow. No derived metric or personal achievement is persisted.
+Repository adapters batch current definitions, the synced private preference
+and as-of reading context with each graph read. The boundary feeds logging,
+history, Stats, session insights, records, completion/sharing and coaching.
+Current preference, contribution and reading values reinterpret those projections
+without rewriting raw sets. Top weight remains raw entered Weight; no derived
+personal metric or achievement is persisted.
 
-The calculator’s source loader reads completed eligible history; its target
-inputs and results are transient. Reading and session-start changes refresh focused views and open calculators
-after local commits or sync pulls. All existing numeric weights mean added weight; no conversion review runs. Group score authority remains
-separate and is governed by `tech/groups-contract.md`.
-
-## Versioned group projection boundary (M27)
-
-Generic comparisons prepare a complete raw shared-performance graph and score
-it with `src/groups/metric-evaluation.ts` / `performance-score.ts` in the existing
-Edge worker. A separate whole-comparison queue fences generation, lease and
-source hash; SQL publishes all current members under one rules revision in a
-single transaction. It stores values with explicit metric/unit/revision and
-reuses `group_events` for records and rules-change history. Legacy comparisons
-keep the M25 engine until an explicit calculation edit retires their kg-only
-revision. Calculation revisions and metric-specific observation attestations
-are separate; changing group rules cannot silently broaden an old attestation.
-
-Shared-session cards use the member's personal effective-load context, while
-rankings use group rules. Both resolve the owner’s latest live reading at/before the exact session start.
-The SQL/TypeScript parity suite fixes tie order, validation and UTC semantics. Server migration and typed mobile boundaries are implemented;
-group UI is integrated, with native acceptance and hosted rollout in progress.
-The owning contract is
-[`tech/groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).
+The group evaluator uses the same kernel with the strict group policy and the
+server-authoritative group preference/contribution. It publishes a coherent
+rules revision and never puts the member's reading value, date, identifier or
+dependency digest into group payloads, caches, events, boards or certifications.
+Group authority and certification invalidation are governed by
+`tech/groups-contract.md` §11.

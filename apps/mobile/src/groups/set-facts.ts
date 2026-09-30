@@ -1,10 +1,8 @@
-// Conventional external-load facts consumed by the legacy group evaluator.
-// Bodyweight comparisons use performance-score.ts; shared personal session
-// summaries use the same effective-load kernel with their own saved context.
+// Raw kg set facts consumed by the group evaluator. Bodyweight-aware scores
+// are derived separately by performance-score.ts.
 // Deno imports stay relative and explicitly name their .ts files.
 
 import { estimateOneRepMax, parseCalculationSet } from '../exercise-calculations/index.ts';
-import { resolveEffectiveLoad } from '../exercise-calculations/effective-load.ts';
 import {
   canonicalizeWeightForReps,
   isConfirmedPerformedSet,
@@ -17,8 +15,6 @@ export type GroupRawSetValues = {
   weight_value: string;
   reps_value: string;
   performance_status: string | null;
-  weight_unit?: string;
-  external_load_mode?: string | null;
 };
 
 export type GroupParsedSet = { weightKg: number; reps: number };
@@ -39,10 +35,7 @@ export const parseGroupPerformedSet = (set: GroupRawSetValues): GroupParsedSet |
     repsValue: set.reps_value,
   });
   if (parsed === null) return null;
-  const load = resolveEffectiveLoad({ weightValue: canonicalizeWeightForReps(set.weight_value, set.reps_value),
-    weightUnit: set.weight_unit, externalLoadMode: set.external_load_mode,
-    bodyweightCoefficient: 0, loadInputMode: 'total_load' });
-  return load.status === 'known' ? { weightKg: load.enteredWeightKg, reps: parsed.reps } : null;
+  return { weightKg: parsed.weight, reps: parsed.reps };
 };
 
 /** One raw set row as `group_eval_session_rows` returns it. */

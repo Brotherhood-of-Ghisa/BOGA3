@@ -116,7 +116,7 @@ sync_pull() {
     -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -136,7 +136,7 @@ sync_pull_anon() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -183,7 +183,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -366,7 +366,8 @@ cleanup_run_rows
 # Scenario 3: Layer→type mapping integrity — THE plan-level outcome.
 #
 # Seed at least one row of EVERY entity type for user A, with a fully-
-# connected FK chain. Pull each layer (0..3) with cursor=null, limit=100.
+# connected FK chain. Drain each FK-bearing layer (0..3) in pages so rows
+# left by other local suites cannot push our fixture beyond the first page.
 # Assert each layer's response `type` set equals exactly the §B.4.4 mapping;
 # union = all ten; pairwise disjoint.
 # -----------------------------------------------------------------------------
@@ -410,31 +411,47 @@ run_psql_sql "
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l3-st', 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l1-etd', ${NOW_MS}, ${NOW_MS});
 " >/dev/null
 
+collect_fixture_types_for_layer() {
+  local layer="$1" cursor='null' payload pages=0
+  LAYER_TYPES='[]'
+  while :; do
+    payload="$(jq -nc --argjson layer "${layer}" --argjson cursor "${cursor}" \
+      '{layer:$layer,cursor:$cursor,limit:200}')"
+    sync_pull "${payload}"
+    assert_status "200" "scenario 3 layer ${layer} status"
+    LAYER_TYPES="$(jq -c --argjson previous "${LAYER_TYPES}" \
+      --arg prefix "pull-${RUN_TAG}-" \
+      '($previous + [.entities[] | select(.id | startswith($prefix)) | .type]) | unique | sort' \
+      <<<"${REQUEST_BODY}")"
+    [[ "$(jq -r '.has_more' <<<"${REQUEST_BODY}")" == 'true' ]] || break
+    cursor="$(jq -c '.next_cursor' <<<"${REQUEST_BODY}")"
+    [[ "${cursor}" != 'null' ]] || fail "scenario 3 layer ${layer}: missing cursor on non-final page"
+    pages=$((pages + 1))
+    [[ ${pages} -le 100 ]] || fail "scenario 3 layer ${layer}: exceeded 100 pages"
+  done
+}
+
 # Layer 0 should yield exactly {gyms, exercise_definitions, muscle_groups} per
 # the corrected partition in docs/specs/tech/sync-v2-server-contract.md
 # §B.3.4.1: exercise_tag_definitions FKs into exercise_definitions, so the
 # §A.7.7 "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
-sync_pull '{"layer":0,"cursor":null,"limit":200}'
-assert_status "200" "scenario 3 layer 0 status"
-L0_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
+collect_fixture_types_for_layer 0
+L0_TYPES="${LAYER_TYPES}"
 [[ "${L0_TYPES}" == '["exercise_definitions","gyms","muscle_groups"]' ]] \
   || fail "scenario 3 layer 0: expected {gyms, exercise_definitions, muscle_groups}, got ${L0_TYPES}"
 
-sync_pull '{"layer":1,"cursor":null,"limit":200}'
-assert_status "200" "scenario 3 layer 1 status"
-L1_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
+collect_fixture_types_for_layer 1
+L1_TYPES="${LAYER_TYPES}"
 [[ "${L1_TYPES}" == '["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions","sessions"]' ]] \
   || fail "scenario 3 layer 1: expected {sessions, exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links}, got ${L1_TYPES}"
 
-sync_pull '{"layer":2,"cursor":null,"limit":200}'
-assert_status "200" "scenario 3 layer 2 status"
-L2_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
+collect_fixture_types_for_layer 2
+L2_TYPES="${LAYER_TYPES}"
 [[ "${L2_TYPES}" == '["session_exercises"]' ]] \
   || fail "scenario 3 layer 2: expected {session_exercises}, got ${L2_TYPES}"
 
-sync_pull '{"layer":3,"cursor":null,"limit":200}'
-assert_status "200" "scenario 3 layer 3 status"
-L3_TYPES="$(printf '%s' "${REQUEST_BODY}" | jq -c '[.entities[] | select(.id | startswith("pull-'"${RUN_TAG}"'-")) | .type] | unique | sort')"
+collect_fixture_types_for_layer 3
+L3_TYPES="${LAYER_TYPES}"
 [[ "${L3_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
   || fail "scenario 3 layer 3: expected {exercise_sets, session_exercise_tags}, got ${L3_TYPES}"
 
@@ -619,21 +636,21 @@ pass "scenario 8: limit bounds (0 rejected, 201 rejected, 200 accepted)"
 # -----------------------------------------------------------------------------
 # Scenario 9: Layer bounds.
 #
-# layer=-1 rejected; layer=4 rejected; layer=0..3 each accepted (snapshot,
+# layer=-1 rejected; layer=5 rejected; layer=0..4 each accepted (snapshot,
 # may return empty entities).
 # -----------------------------------------------------------------------------
 
 echo "[sync-pull-contract] scenario 9: layer bounds"
 sync_pull '{"layer":-1,"cursor":null,"limit":10}'
 assert_jq '.error.code == "INTERNAL"' "scenario 9 layer=-1 INTERNAL error"
-sync_pull '{"layer":4,"cursor":null,"limit":10}'
-assert_jq '.error.code == "INTERNAL"' "scenario 9 layer=4 INTERNAL error"
-for layer in 0 1 2 3; do
+sync_pull '{"layer":5,"cursor":null,"limit":10}'
+assert_jq '.error.code == "INTERNAL"' "scenario 9 layer=5 INTERNAL error"
+for layer in 0 1 2 3 4; do
   sync_pull '{"layer":'"${layer}"',"cursor":null,"limit":10}'
   assert_status "200" "scenario 9 layer=${layer} status"
   assert_jq '.error == null or (has("entities") and has("next_cursor") and has("has_more"))' "scenario 9 layer=${layer} accepted"
 done
-pass "scenario 9: layer bounds (-1 rejected, 4 rejected, 0..3 accepted)"
+pass "scenario 9: layer bounds (-1 and 5 rejected, 0..4 accepted)"
 
 # -----------------------------------------------------------------------------
 # Scenario 10: AUTH_REQUIRED.

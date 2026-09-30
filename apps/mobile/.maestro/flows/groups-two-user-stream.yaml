@@ -114,7 +114,7 @@ appId: com.dinoderek.mobile
       id: "group-screen-name"
       text: "Maestro Groups E2E"
     timeout: 15000
-# The member count is a press target (D14, M25-T08); iOS exposes it as one
+# The member count is a press target; iOS exposes it as one
 # element whose label joins its texts.
 - assertVisible:
     id: "group-screen-members-link"
@@ -174,7 +174,7 @@ appId: com.dinoderek.mobile
       text: "Members, 2 members · You're the owner"
     timeout: 15000
 
-# --- 4b. Exercises page (M25-T08): the owner adds, renames, and archives --------
+# --- 4b. Exercises page: the owner adds, renames, and archives -------------------
 # The device (the owner) copies a standard exercise and creates a custom one,
 # renames the custom one, and archives the copy, which moves it to the bottom
 # marked Archived. Before archiving, it links the copy to its own seeded
@@ -217,7 +217,7 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
     visible:
-      text: "Barbell Bench Press, Rules 1.*total external weight, Not linked"
+      text: "Barbell Bench Press, Rules 1.*total Weight, Not linked"
     timeout: 15000
 - tapOn:
     id: "group-exercises-add-button"
@@ -258,13 +258,13 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
     visible:
-      text: "Sled Push, Rules 1.*per-side external weight, Not linked"
+      text: "Sled Push, Rules 1.*per-side Weight, Not linked"
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: "groups-04b-1-exercises-added"
 # Rename the custom exercise.
 - tapOn:
-    text: "Sled Push, Rules 1.*per-side external weight, Not linked"
+    text: "Sled Push, Rules 1.*per-side Weight, Not linked"
 - extendedWaitUntil:
     visible:
       id: "group-exercise-action-rename"
@@ -296,7 +296,7 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
     visible:
-      text: "Prowler Push, Rules 1.*per-side external weight, Not linked"
+      text: "Prowler Push, Rules 1.*per-side Weight, Not linked"
     timeout: 15000
 # Link your exercise (E0.4): the copy suggests the device's own seeded "Barbell
 # Bench Press"; Link writes the link locally and starts no session.
@@ -314,11 +314,11 @@ appId: com.dinoderek.mobile
     id: "group-pick-sheet-confirm"
 - extendedWaitUntil:
     visible:
-      text: "Barbell Bench Press, Rules 1.*total external weight, Linked: Barbell Bench Press"
+      text: "Barbell Bench Press, Rules 1.*total Weight, Linked: Barbell Bench Press"
     timeout: 15000
 # Archive the standard copy; the native confirmation Alert's destructive button.
 - tapOn:
-    text: "Barbell Bench Press, Rules 1.*total external weight, Linked: Barbell Bench Press"
+    text: "Barbell Bench Press, Rules 1.*total Weight, Linked: Barbell Bench Press"
 - extendedWaitUntil:
     visible:
       id: "group-exercise-action-archive"
@@ -338,7 +338,7 @@ appId: com.dinoderek.mobile
 - assertVisible: "Barbell Bench Press was archived\\."
 - extendedWaitUntil:
     visible:
-      text: "Barbell Bench Press, Rules 1.*total external weight, archived, Linked: Barbell Bench Press"
+      text: "Barbell Bench Press, Rules 1.*total Weight, archived, Linked: Barbell Bench Press"
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: "groups-04b-3-exercise-linked-renamed-archived"
@@ -532,14 +532,14 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
-- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 51\\.3 kg, Added 102\\.5 kg × 5, .*, uncertified, rules revision 1"
+- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 102\\.5 kg, Weight 102\\.5 kg × 5, .*, uncertified, rules revision 1"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-07b-4-board-all-weight"
 - tapOn: { id: "group-board-row-1" }
 - extendedWaitUntil:
     visible: { id: "group-metric-record-raw" }
     timeout: 15000
-- assertVisible: "As logged: Added 102\\.5 kg × 5"
+- assertVisible: "As logged: Weight 102\\.5 kg × 5"
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
@@ -659,7 +659,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 20000
-- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 55\\.0 kg, Added 110 kg × 5, .*, rules revision 1"
+- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 110\\.0 kg, Weight 110 kg × 5, .*, rules revision 1"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-07c-4-board-certified-weight"
 - scrollUntilVisible:
@@ -681,7 +681,7 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
-- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 55\\.0 kg, Added 110 kg × 5, .*, certified, rules revision 1"
+- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 110\\.0 kg, Weight 110 kg × 5, .*, certified, rules revision 1"
 - tapOn: { id: "group-board-row-1" }
 - scrollUntilVisible:
     element: { id: "group-metric-record-withdraw" }
@@ -860,29 +860,32 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - takeScreenshot: "groups-unlink-07-restored-certified"
 
-# --- 7e. M27: shared rules, bodyweight ranking and saved-input attestation -----
+# --- Shared bodyweight math keeps the normal Weight / 1RM presentation --------
 - runScript:
     file: ../scripts/groups-counterparty.js
     env: { STEP: prepare-bodyweight }
 - openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.bodyweightExerciseId}?scope=all"
 - extendedWaitUntil:
-    visible: { id: "group-board-row-1", text: "1st, You, Relative strength, .* ×BW, Added 20 kg × 5, .*rules revision 1" }
+    visible: { id: "group-board-row-1", text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, 1RM, .* kg, Weight 20 kg × 5, .*rules revision 1" }
     timeout: 15000
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-01-relative-reversal"
-- tapOn: { id: "group-board-metric-absolute_strength" }
+- takeScreenshot: "groups-bodyweight-01-1rm"
+- tapOn: { id: "group-board-metric-weight" }
 - extendedWaitUntil:
-    visible: { id: "group-board-row-1", text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Absolute strength, .* kg, Added 20 kg × 5, .*rules revision 1" }
+    visible: { id: "group-board-row-1", text: ".*Weight, 20.0 kg, Weight 20 kg × 5, .*rules revision 1" }
     timeout: 15000
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-02-absolute-reversal"
+- takeScreenshot: "groups-bodyweight-02-weight"
+- tapOn: { id: "group-board-metric-e1rm" }
+- extendedWaitUntil:
+    visible: { id: "group-board-row-1", text: ".*1RM, .* kg, Weight 20 kg × 5, .*rules revision 1" }
+    timeout: 15000
 - tapOn: { id: "group-board-row-1" }
-- assertVisible: { id: "group-metric-record-raw", text: "As logged: Added 20 kg × 5" }
-- assertVisible: { id: "group-metric-record-weight", text: "Session body weight: 90 kg · Reading from .*" }
-- assertVisible: "Effective resistance: 110 kg"
-- assertVisible: "External adjustment: 20 kg · 22\\.22% of session body weight"
+- assertVisible: { id: "group-metric-record-raw", text: "As logged: Weight 20 kg × 5" }
+- assertNotVisible: "Relative strength"
+- assertNotVisible: "Absolute strength"
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-03-dated-inputs"
+- takeScreenshot: "groups-bodyweight-03-normal-record"
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
@@ -892,22 +895,12 @@ appId: com.dinoderek.mobile
     visible: { id: "group-metric-record-status", text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
     timeout: 15000
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-04-dated-certified"
+- takeScreenshot: "groups-bodyweight-04-certified"
 - tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 - runScript:
     file: ../scripts/groups-counterparty.js
     env: { STEP: await-bodyweight-certified }
-- tapOn: { id: "group-board-metric-bodyweight_reps" }
-- extendedWaitUntil:
-    visible: { id: "group-board-row-1", text: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Reps, 15 reps, .*" }
-    timeout: 15000
-- tapOn: { id: "group-board-row-1" }
-- assertVisible: "Session body weight: No reading on or before this session"
-- waitForAnimationToEnd
-- takeScreenshot: "groups-m27-05-missing-weight-reps"
-- tapOn: { point: "50%,8%" }
-- assertNotVisible: { id: "group-metric-record-sheet" }
 - openLink: "boga3://group/${output.groupsGroupId}/exercises/${output.bodyweightExerciseId}/edit"
 - extendedWaitUntil:
     visible: { id: "group-exercise-form-bodyweight-percentage" }
@@ -953,9 +946,9 @@ appId: com.dinoderek.mobile
     element: { id: "group-rules-preview" }
     direction: DOWN
     centerElement: true
-- assertVisible: "Apply rules revision 2: 100% → 70% bodyweight, .*"
+- assertVisible: "Apply rules revision 2: 100% → 70% bodyweight contribution, total Weight.*"
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-06-rule-change-preview"
+- takeScreenshot: "groups-bodyweight-05-rule-change-preview"
 - scrollUntilVisible:
     element: { id: "group-exercise-form-submit" }
     direction: DOWN
@@ -967,42 +960,60 @@ appId: com.dinoderek.mobile
 - runScript:
     file: ../scripts/groups-counterparty.js
     env: { STEP: assert-bodyweight-rules }
-- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.bodyweightExerciseId}?metric=absolute_strength&scope=certified"
+- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.bodyweightExerciseId}?metric=e1rm&scope=certified"
 - extendedWaitUntil:
-    visible: { id: "group-board-row-1", text: ".*Absolute strength, .*rules revision 2" }
+    visible: "No certified sets yet"
     timeout: 15000
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-07-revised-certified-board"
+- takeScreenshot: "groups-bodyweight-06-rule-change-invalidated"
+- tapOn: { id: "group-board-scope-all" }
+- extendedWaitUntil:
+    visible: { id: "group-board-row-1", text: ".*1RM, .*rules revision 2" }
+    timeout: 15000
+- tapOn: { id: "group-board-row-1" }
+- scrollUntilVisible:
+    element: { id: "group-metric-record-certify" }
+    direction: DOWN
+    centerElement: true
+- tapOn: { id: "group-metric-record-certify" }
+- extendedWaitUntil:
+    visible: { id: "group-metric-record-status", text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
+    timeout: 15000
+- tapOn: { point: "50%,8%" }
+- assertNotVisible: { id: "group-metric-record-sheet" }
+- runScript:
+    file: ../scripts/groups-counterparty.js
+    env: { STEP: await-bodyweight-certified }
 - runScript:
     file: ../scripts/groups-counterparty.js
     env: { STEP: correct-bodyweight }
 # Focus refresh must remove the invalidated result from Certified.
 - openLink: "boga3://group/${output.groupsGroupId}"
-- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.bodyweightExerciseId}?metric=absolute_strength&scope=certified"
+- openLink: "boga3://group/${output.groupsGroupId}/leaderboards/${output.bodyweightExerciseId}?metric=e1rm&scope=certified"
 - extendedWaitUntil:
     visible: "No certified sets yet"
     timeout: 15000
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-08-correction-invalidated"
+- takeScreenshot: "groups-bodyweight-07-correction-invalidated"
 - tapOn: { id: "group-board-scope-all" }
 - extendedWaitUntil:
     visible: { id: "group-board-row-1" }
     timeout: 15000
 - tapOn: { id: "group-board-row-1" }
-- assertVisible: { id: "group-metric-record-weight", text: "Session body weight: 95 kg · Reading from .*" }
+- assertVisible: { id: "group-metric-record-raw", text: "As logged: Weight 20 kg × 5" }
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
     centerElement: true
 - assertVisible: "Uncertified"
 - waitForAnimationToEnd
-- takeScreenshot: "groups-m27-09-corrected-input-review"
+- takeScreenshot: "groups-bodyweight-08-corrected-input-review"
 - tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
 
 # --- 8. The device removes the counterparty -> "was removed" -------------------
 - openLink: "boga3://group/${output.groupsGroupId}"
-# Members live behind the header's member count (D14, M25-T08).
+# Members live behind the header's member count.
 - extendedWaitUntil:
     visible:
       id: "group-screen-members-link"
@@ -1088,16 +1099,11 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: true
     timeout: 15000
-- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), Weight, 55\\.0 kg, Added 110 kg × 5, .*, certified, rules revision 1"
+- assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} \\(former\\), Weight, 110\\.0 kg, Weight 110 kg × 5, .*, uncertified, rules revision 2"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-08b-board-former-member"
 - tapOn: { id: "group-board-row-1" }
-- scrollUntilVisible:
-    element: { id: "group-metric-record-status" }
-    direction: DOWN
-    centerElement: true
-    timeout: 15000
-- assertVisible: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*"
+- assertVisible: "Uncertified"
 - assertNotVisible: { id: "group-metric-record-certify" }
 - waitForAnimationToEnd
 - takeScreenshot: "groups-08b-2-row-detail-former"

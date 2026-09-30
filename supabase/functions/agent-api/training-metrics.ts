@@ -1,27 +1,24 @@
 // Owner-filtered database rows enter here. This adapter contains no new maths:
 // mobile and coaching share the same eligibility, dated context and load boundary.
 import {
-  exerciseLoadContext, summarizeExerciseLoad,
+  personalLoadContext, summarizeExerciseLoad,
 } from '../../../apps/mobile/src/exercise-calculations/analytics.ts';
-import {
-  isWeightUnit, weightToKg, type VolumeCoverage,
-} from '../../../apps/mobile/src/exercise-calculations/effective-load.ts';
+import type { VolumeCoverage } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import {
   canonicalizeWeightForReps, type SessionSetPerformanceStatus,
 } from '../../../apps/mobile/src/session-recorder/set-semantics.ts';
 import {
-  isValidSessionWeight, type SessionWeightSnapshot,
-} from '../../../apps/mobile/src/bodyweight/snapshot.ts';
+  isValidSessionWeight, type ResolvedSessionWeight,
+} from '../../../apps/mobile/src/bodyweight/as-of.ts';
 
-export const METRIC_REVISION = 'dated_added_load_v3';
+export const METRIC_REVISION = 'bodyweight_optional_v1';
 
 export type ExerciseLoadRow = {
-  bodyweight_coefficient: number;
+  bodyweight_contribution: number;
   load_input_mode: string;
-  movement_standard: string | null;
-  loading_method: string | null;
 };
+/** Snake-case result of `session_weight_contexts`; adapted immediately to the shared domain type. */
 export type SessionWeightRow = {
   body_weight_kg: number | null;
   body_weight_source: string | null;
@@ -32,44 +29,38 @@ export type EnteredSetRow = {
   id: string;
   order_index: number;
   weight_value: string;
-  weight_unit: string;
-  external_load_mode: string | null;
   reps_value: string;
   set_type: string | null;
   performance_status: string | null;
 };
 
-const snapshotFor = (row: SessionWeightRow): SessionWeightSnapshot => ({
+const contextFor = (row: SessionWeightRow): ResolvedSessionWeight => ({
   bodyWeightKg: row.body_weight_kg,
-  bodyWeightSource: row.body_weight_source,
+  bodyWeightSource: row.body_weight_source === 'reading' ? 'reading' : null,
   bodyWeightMeasurementId: row.body_weight_measurement_id,
   bodyWeightMeasuredAt: row.body_weight_measured_at === null
     ? null : new Date(row.body_weight_measured_at),
 });
 
 export function sessionWeightPayload(row: SessionWeightRow) {
-  const snapshot = snapshotFor(row);
-  const valid = isValidSessionWeight(snapshot);
-  const empty = Object.values(snapshot).every(value => value === null);
+  const context = contextFor(row);
+  const valid = isValidSessionWeight(context);
+  const empty = Object.values(context).every(value => value === null);
   return {
     status: valid ? 'known' : empty ? 'missing' : 'invalid',
-    value: valid ? snapshot.bodyWeightKg : null,
+    value: valid ? context.bodyWeightKg : null,
     unit: 'kg',
-    source: snapshot.bodyWeightSource,
-    measurement_id: snapshot.bodyWeightMeasurementId,
-    measured_at: snapshot.bodyWeightMeasuredAt && Number.isFinite(snapshot.bodyWeightMeasuredAt.getTime())
-      ? snapshot.bodyWeightMeasuredAt.toISOString() : null,
-    estimated: false,
+    measured_at: context.bodyWeightMeasuredAt && Number.isFinite(context.bodyWeightMeasuredAt.getTime())
+      ? context.bodyWeightMeasuredAt.toISOString() : null,
   };
 }
 
-export function exerciseLoadPayload(row: ExerciseLoadRow) {
+export function exerciseLoadPayload(row: ExerciseLoadRow, calculationsEnabled: boolean) {
   return {
-    bodyweight_coefficient: row.bodyweight_coefficient,
     load_input_mode: row.load_input_mode,
-    movement_standard: row.movement_standard,
-    loading_method: row.loading_method,
-    resistance_basis: row.bodyweight_coefficient > 0 ? 'total_resistance' : 'entered_load',
+    ...(calculationsEnabled && row.bodyweight_contribution > 0
+      ? { bodyweight_contribution: row.bodyweight_contribution }
+      : {}),
   };
 }
 
@@ -90,42 +81,40 @@ export function volumePayload(coverage: VolumeCoverage, inputTruncated = false) 
 
 export function projectTrainingSets(
   sets: readonly EnteredSetRow[], definition: ExerciseLoadRow | null, session: SessionWeightRow,
+  calculationsEnabled: boolean,
 ) {
-  // A missing/deleted definition cannot silently establish conventional rules.
-  const context = exerciseLoadContext(definition ? {
-    bodyweightCoefficient: definition.bodyweight_coefficient,
-    loadInputMode: definition.load_input_mode,
-  } : { localBodyweightMetadataKnown: false }, snapshotFor(session));
+  const bodyweightContribution = definition?.bodyweight_contribution ?? 0;
+  const usesBodyweightContext = calculationsEnabled && bodyweightContribution > 0;
+  const context = personalLoadContext(calculationsEnabled, definition ? {
+    bodyweightContribution,
+    loadInputMode: definition.load_input_mode === 'per_side_load' ? 'per_side_load' : 'total_load',
+  } : null, usesBodyweightContext ? contextFor(session) : null);
   const summary = summarizeExerciseLoad(sets.map(set => ({
-    weightValue: set.weight_value, weightUnit: set.weight_unit,
-    externalLoadMode: set.external_load_mode, repsValue: set.reps_value,
+    weightValue: set.weight_value, repsValue: set.reps_value,
     setType: set.set_type,
     // Every non-null wire status is ineligible, including unknown future values.
     performanceStatus: set.performance_status === null ? null : set.performance_status as SessionSetPerformanceStatus,
   })), context);
   return {
     ...summary,
+    usesBodyweightContext,
     sets: sets.flatMap((set, index) => {
       const metric = summary.metrics[index];
       if (!metric.eligible) return [];
       const amount = parseSetWeight(canonicalizeWeightForReps(set.weight_value, set.reps_value));
-      const kg = amount !== null && isWeightUnit(set.weight_unit) ? weightToKg(amount, set.weight_unit) : null;
       return [{
         id: set.id, order_index: set.order_index,
-        // The existing load field keeps its kg external-amount meaning.
-        load: kg === null ? null : { value: kg, unit: 'kg' },
-        entered_load: { raw_value: set.weight_value, value: amount, unit: set.weight_unit, mode: 'added' },
+        load: amount === null ? null : { value: amount, unit: 'kg' },
         reps: metric.reps, set_type: set.set_type, performance_status: set.performance_status,
         outcome: 'completed',
-        effective_load: {
+        calculated_load: {
           status: metric.load.status,
           reason: metric.load.status === 'known' ? null : metric.load.reason,
-          value: metric.load.status === 'known' ? metric.load.resistanceKg : null,
+          value: metric.load.status === 'known' ? metric.load.calculatedLoadKg : null,
           unit: 'kg',
-          basis: metric.load.status === 'known' ? metric.load.resistanceBasis : null,
         },
         estimated_one_rep_max: metric.estimatedOneRepMaxKg === null
-          ? null : { value: metric.estimatedOneRepMaxKg, unit: 'kg', basis: context.bodyweightCoefficient > 0 ? 'added_load' : 'entered_load' },
+          ? null : { value: metric.estimatedOneRepMaxKg, unit: 'kg' },
         volume: { value: metric.volumeKgReps, unit: 'kg_reps' },
       }];
     }),

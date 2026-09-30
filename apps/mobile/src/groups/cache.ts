@@ -14,8 +14,8 @@ const { groupCache } = schema;
 export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
 export const groupCacheKeys = {
-  mine: 'groups:mine',
-  group: (groupId: string) => `group:${groupId}`,
+  mine: 'groups:v4:mine',
+  group: (groupId: string) => `group:v4:${groupId}`,
   streamAll: 'stream:v4:all',
   stream: (groupId: string) => `stream:v4:${groupId}`,
   session: (memberUserId: string, sessionId: string) => `session:v4:${memberUserId}:${sessionId}`,
@@ -81,8 +81,8 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 };
 
 /**
- * Access loss (C3.6.8): removes `group:<id>`, `stream:<id>`,
- * `group-exercises:<id>`, `boards:<id>`, and every `session:*` entry. Session entries are not
+ * Access loss removes the current versioned group, stream, exercise, board,
+ * and every session entry. Session entries are not
  * group-scoped (a session can be shared into several groups), so all of them
  * go. The member's `exercise_group_links` rows are synced data and are never
  * touched here.
@@ -97,7 +97,7 @@ export const evictGroup = (database: GroupCacheDatabase, groupId: string): void 
           groupCacheKeys.stream(groupId),
           groupCacheKeys.groupExercises(groupId),
           groupCacheKeys.boards(groupId),
-          `stream:${groupId}`, `group-exercises:${groupId}`, `boards:${groupId}`,
+          `group:${groupId}`, `stream:${groupId}`, `group-exercises:${groupId}`, `boards:${groupId}`,
         ]),
         like(groupCache.cacheKey, SESSION_KEY_PATTERN),
       ),

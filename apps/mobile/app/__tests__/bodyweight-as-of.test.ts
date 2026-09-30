@@ -1,6 +1,6 @@
 import { compareReadingIds, createAsOfWeightResolver, type DatedWeightReading } from '@/src/bodyweight/as-of';
 const reading = (id: string, at: number, kg = 80): DatedWeightReading => ({
-  id, measuredAt: at, weightValue: String(kg), weightUnit: 'kg', weightKg: kg,
+  id, measuredAt: at, weightKg: kg,
 });
 
 it('selects exact UTC instants and ascending binary IDs independently of input and edit order', () => {
@@ -28,17 +28,17 @@ it('does not borrow a later same-day reading across a DST transition', () => {
   expect(resolve(new Date('2026-10-25T00:30:00Z'))).toEqual(resolve(session));
 });
 
-it.each([{ weightKg: 800 }, { weightValue: 'NaN' }, { weightUnit: 'stone' }, { weightKg: 0 }, { weightValue: '8e1' }])(
-  'selects before validating and never falls back past malformed context %j', invalid => {
+it.each([{ weightKg: Number.NaN }, { weightKg: Number.POSITIVE_INFINITY }, { weightKg: 0 }, { id: '' }, { measuredAt: 1.5 }])(
+  'skips malformed rows and falls back to the latest valid context %j', invalid => {
     const resolve = createAsOfWeightResolver([reading('old', 1000), { ...reading('latest', 2000), ...invalid }]);
-    expect(resolve(2000)).toMatchObject({ bodyWeightKg: null, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'latest' });
+    expect(resolve(2000)).toMatchObject({ bodyWeightKg: 80, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'old' });
   });
 
 it('rebuilds the bounded intervals after an edit, move, tombstone, restoration and late backdated insert', () => {
   const rows = [reading('first', 1000), reading('middle', 2000, 85), reading('last', 4000, 90)];
   const resolve = () => [1500, 2500, 3500, 4500].map(at => createAsOfWeightResolver(rows)(at).bodyWeightKg);
   expect(resolve()).toEqual([80, 85, 85, 90]);
-  Object.assign(rows[1], { weightValue: '86', weightKg: 86 });
+  Object.assign(rows[1], { weightKg: 86 });
   expect(resolve()).toEqual([80, 86, 86, 90]);
   rows[1].measuredAt = 3000;
   expect(resolve()).toEqual([80, 80, 86, 90]);

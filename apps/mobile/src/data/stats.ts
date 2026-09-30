@@ -24,6 +24,7 @@ import {
   muscleGroups,
   sessionExercises,
   sessions,
+  userSettings,
 } from './schema';
 import { normalizeSessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
 
@@ -206,6 +207,11 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 export const createDrizzleStatsStore = (): StatsStore => ({
   async loadAggregationInput({ start, end }) {
     const database = await bootstrapLocalDataLayer();
+    const bodyweightCalculationsEnabled = database
+      .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+      .from(userSettings)
+      .where(eq(userSettings.id, 'settings'))
+      .get()?.enabled ?? false;
     const resolveWeight = loadAsOfWeightResolver(database);
 
     const storedSessionRows = database
@@ -270,7 +276,6 @@ export const createDrizzleStatsStore = (): StatsStore => ({
               orderIndex: exerciseSets.orderIndex,
               setType: exerciseSets.setType,
               weightValue: exerciseSets.weightValue,
-              localBodyweightMetadataKnown: exerciseSets.localBodyweightMetadataKnown, weightUnit: exerciseSets.weightUnit, externalLoadMode: exerciseSets.externalLoadMode,
               repsValue: exerciseSets.repsValue,
               performanceStatus: exerciseSets.performanceStatus,
             })
@@ -321,7 +326,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
             .select({
               id: exerciseDefinitions.id,
               loadInputMode: exerciseDefinitions.loadInputMode,
-              bodyweightCoefficient: exerciseDefinitions.bodyweightCoefficient, localBodyweightMetadataKnown: exerciseDefinitions.localBodyweightMetadataKnown,
+              bodyweightContribution: exerciseDefinitions.bodyweightContribution,
             })
             .from(exerciseDefinitions)
             .where(inArray(exerciseDefinitions.id, exerciseDefinitionIds))
@@ -329,6 +334,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
         : [];
 
     return {
+      bodyweightCalculationsEnabled,
       sessions: sessionsInPeriod,
       exerciseDefinitions: exerciseDefinitionRows,
       sessionExercises: sessionExerciseRows,

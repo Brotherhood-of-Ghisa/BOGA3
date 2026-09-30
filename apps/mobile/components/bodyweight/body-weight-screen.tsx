@@ -37,6 +37,7 @@ export function BodyWeightScreen() {
   }, [load, datedWeightRevision]));
   const current = readings?.find(row => row.measuredAt.getTime() <= loadedAtMs);
   const currentValid = current && isValidBodyWeightReading(current);
+  const displayKg = (weightKg: number) => String(Number(weightKg.toFixed(6)));
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">
       <Text allowFontScaling={false} style={styles.body}>
@@ -47,8 +48,8 @@ export function BodyWeightScreen() {
         action={{ label: 'Retry', onPress: () => void load() }} testID="body-weight-error" />
         : readings === null ? <StatePanel kind="loading" testID="body-weight-loading" /> : <>
           <Card><View style={styles.cardBody}>
-            <Stat label={currentValid ? `Current body weight · ${current.weightUnit}` : 'Current body weight'}
-              value={currentValid ? current.weightValue : 'Unknown'} kind={currentValid ? 'figure' : 'text'}
+            <Stat label={currentValid ? 'Current body weight · kg' : 'Current body weight'}
+              value={currentValid ? displayKg(current.weightKg) : 'Unknown'} kind={currentValid ? 'figure' : 'text'}
               testID="body-weight-current" />
             <Text allowFontScaling={false} style={styles.body}>
               {currentValid ? `Measured ${formatCurrentDateTime(current.measuredAt)}` : current
@@ -63,10 +64,10 @@ export function BodyWeightScreen() {
               No readings yet. Weight is saved on this device even when you are offline.
             </Text> : <Card>{readings.map((reading, index) => <ListRow key={reading.id}
               divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
-              accessibilityLabel={`Edit ${reading.weightValue} ${reading.weightUnit}, ${formatCurrentDateTime(reading.measuredAt)}`}
+              accessibilityLabel={`Edit ${displayKg(reading.weightKg)} kilograms, ${formatCurrentDateTime(reading.measuredAt)}`}
               onPress={() => openEditor({ reading, measuredAt: reading.measuredAt })}
               trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
-              <Stat label={`${reading.weightUnit} · ${formatCurrentDateTime(reading.measuredAt)}`} value={reading.weightValue}
+              <Stat label={`kg · ${formatCurrentDateTime(reading.measuredAt)}`} value={displayKg(reading.weightKg)}
                 rank="secondary" />
               {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={styles.body}>Needs review</Text> : null}
             </ListRow>)}</Card>}
@@ -75,7 +76,8 @@ export function BodyWeightScreen() {
     </ScreenScroll>
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}
-      initial={editor.reading ?? { weightValue: '', weightUnit: current?.weightUnit ?? 'kg' }} measuredAt={editor.measuredAt}
+      initial={editor.reading ? { weightValue: displayKg(editor.reading.weightKg) }
+        : { weightValue: '' }} measuredAt={editor.measuredAt}
       onDismiss={() => setEditorVisible(false)}
       onSave={async input => {
         if (!input.measuredAt) throw new Error('Enter a measurement date.');

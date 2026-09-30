@@ -39,8 +39,9 @@ drifted from the code and predated several UI milestones. Git history has them.)
   - accepted design target records per `ai-design-policy.md`, one file per
     accepted target
 - `design-targets/bodyweight.md`
-  - M27 implementation brief derived from accepted screen targets; new-state
-    rendering/visual verification remains required as the feature ships
+  - accepted repo-native replacement target for optional private/group
+    bodyweight calculations; integrated rendering and human acceptance remain
+    required before closeout
 
 ## Maintenance rules (for future tasks)
 

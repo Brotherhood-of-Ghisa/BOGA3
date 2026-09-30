@@ -1,4 +1,3 @@
-import { ActionButton } from '@/components/ui/action-button';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -28,8 +27,6 @@ const VIEW_OPTIONS = [
 
 type RecordsPanelProps = {
   state: ExerciseRecordsState;
-  bodyweight?: boolean;
-  onEstimate?: () => void;
   view: RecordsView;
   expanded: boolean;
   dateFormat: ExerciseDateFormat;
@@ -55,8 +52,6 @@ export function RecordsPanel({
   onSelectView,
   onOpenHistory,
   now,
-  bodyweight = false,
-  onEstimate,
 }: RecordsPanelProps) {
   return (
     <Card testID="exercise-records-panel">
@@ -90,8 +85,7 @@ export function RecordsPanel({
           <Icon color={uiRoles.accent} name="chevron-right" size="xs" />
         </Pressable>
       </View>
-      <PanelBody bodyweight={bodyweight} isFilteredByGym={isFilteredByGym} dateFormat={dateFormat} expanded={expanded} now={now} state={state} view={view} />
-      {onEstimate ? <View style={styles.message}><ActionButton label="Loading estimate" variant="outline" onPress={onEstimate} testID="exercise-loading-estimate" /></View> : null}
+      <PanelBody isFilteredByGym={isFilteredByGym} dateFormat={dateFormat} expanded={expanded} now={now} state={state} view={view} />
     </Card>
   );
 }
@@ -103,11 +97,10 @@ function PanelBody({
   dateFormat,
   isFilteredByGym = false,
   now,
-  bodyweight = false,
-}: Pick<RecordsPanelProps, 'state' | 'view' | 'expanded' | 'dateFormat' | 'now' | 'bodyweight' | 'isFilteredByGym'>) {
+}: Pick<RecordsPanelProps, 'state' | 'view' | 'expanded' | 'dateFormat' | 'now' | 'isFilteredByGym'>) {
   if (state.status !== 'ready') {
     if (!expanded && state.status === 'loading') {
-      return <CollapsedStats bodyweight={bodyweight} oneRepMax={DASH} maxWeight={DASH} volume={DASH} />;
+      return <CollapsedStats oneRepMax={DASH} maxWeight={DASH} volume={DASH} />;
     }
     return (
       <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-message">
@@ -123,10 +116,10 @@ function PanelBody({
   // previous session's best 1RM, heaviest weight and volume.
   if (!expanded) {
     if (view === 'last') {
-      const added = last?.sets.map(set => set.addedWeightKg === undefined ? set.weight : set.addedWeightKg).filter((value): value is number => value !== null) ?? [];
-      const heaviest = added.length ? Math.max(...added) : null;
+      const weights = last?.sets.map(set => set.weight) ?? [];
+      const heaviest = weights.length ? Math.max(...weights) : null;
       return (
-        <CollapsedStats bodyweight={bodyweight}
+        <CollapsedStats
           oneRepMax={last?.oneRepMax != null ? formatOneRepMax(last.oneRepMax) : DASH}
           maxWeight={heaviest !== null ? formatWeight(heaviest) : DASH}
           volume={last?.volume != null ? formatVolume(last.volume) : DASH}
@@ -135,7 +128,7 @@ function PanelBody({
       );
     }
     return (
-      <CollapsedStats bodyweight={bodyweight}
+      <CollapsedStats
         oneRepMax={records.oneRepMax ? formatOneRepMax(records.oneRepMax.value) : DASH}
         maxWeight={records.maxWeight ? formatWeight(records.maxWeight.weight) : DASH}
         volume={records.volume ? formatVolume(records.volume.value) : DASH}
@@ -152,11 +145,10 @@ function PanelBody({
         <RecordLine
           detail={
             records.oneRepMax
-              ? `${date(records.oneRepMax.completedAt)}${records.oneRepMax.gymName ? ` · ${records.oneRepMax.gymName}` : ''} · ${records.oneRepMax.loadLabel ?? formatWeight(records.oneRepMax.weight)} × ${records.oneRepMax.reps}${bodyweight ? `\nSaved body weight ${records.oneRepMax.bodyWeightKg == null ? DASH : formatWeight(records.oneRepMax.bodyWeightKg)} kg · Effective load ${records.oneRepMax.effectiveResistanceKg == null ? DASH : formatWeight(records.oneRepMax.effectiveResistanceKg)} kg` : ''}`
+              ? `${date(records.oneRepMax.completedAt)}${records.oneRepMax.gymName ? ` · ${records.oneRepMax.gymName}` : ''} · ${formatWeight(records.oneRepMax.weight)} × ${records.oneRepMax.reps}`
               : ''
           }
-          multiline={bodyweight}
-          label={bodyweight ? "Added 1RM" : "1RM"}
+          label="1RM"
           testID="exercise-record-1rm"
           value={records.oneRepMax ? formatOneRepMax(records.oneRepMax.value) : DASH}
         />
@@ -167,7 +159,7 @@ function PanelBody({
               : ''
           }
           divider
-          label={bodyweight ? "Added kg" : "Max"}
+          label="Max"
           testID="exercise-record-max"
           value={records.maxWeight ? formatWeight(records.maxWeight.weight) : DASH}
         />
@@ -197,24 +189,22 @@ function PanelBody({
           {`${date(last.completedAt)}${last.gymName ? ` · ${last.gymName}` : ''} · ${formatDaysAgo(last.completedAt, now)}`}
         </Text>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
-          {`${bodyweight ? 'Added 1RM' : '1RM'} ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
+          {`1RM ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
         </Text>
       </View>
       {last.sets.map((set, index) => (
-        <LastSetLine bodyweight={bodyweight} index={index} key={index} set={set} />
+        <LastSetLine index={index} key={index} set={set} />
       ))}
     </View>
   );
 }
 
 function CollapsedStats({
-  bodyweight = false,
   oneRepMax,
   maxWeight,
   volume,
   coverageNote,
 }: {
-  bodyweight?: boolean;
   oneRepMax: string;
   maxWeight: string;
   volume: string;
@@ -224,10 +214,10 @@ function CollapsedStats({
     <View>
     <View style={styles.collapsed} testID="exercise-records-collapsed">
       <View style={styles.collapsedCell}>
-        <Stat label={bodyweight ? "Added 1RM" : "1RM"} testID="exercise-records-1rm" value={oneRepMax} />
+        <Stat label="1RM" testID="exercise-records-1rm" value={oneRepMax} />
       </View>
       <View style={styles.collapsedCell}>
-        <Stat label={bodyweight ? "Added kg" : "Max"} testID="exercise-records-max" value={maxWeight} />
+        <Stat label="Max" testID="exercise-records-max" value={maxWeight} />
       </View>
       <View style={styles.collapsedCell}>
         <Stat label="Vol" testID="exercise-records-vol" value={volume} />
@@ -239,7 +229,6 @@ function CollapsedStats({
 }
 
 function RecordLine({
-  multiline = false,
   label,
   value,
   detail,
@@ -249,7 +238,6 @@ function RecordLine({
   label: string;
   value: string;
   detail: string;
-  multiline?: boolean;
   divider?: boolean;
   testID: string;
 }) {
@@ -263,30 +251,19 @@ function RecordLine({
       <Text allowFontScaling={false} numberOfLines={1} style={[pageText.headlineFigure, styles.recordValue]}>
         {value}
       </Text>
-      <Text allowFontScaling={false} numberOfLines={multiline ? undefined : 1} style={[pageText.detailFigure, styles.recordDetail]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[pageText.detailFigure, styles.recordDetail]}>
         {detail}
       </Text>
     </View>
   );
 }
 
-function LastSetLine({ set, index, bodyweight }: { set: RecordSet; index: number; bodyweight: boolean }) {
-  if (bodyweight) return <View style={styles.bodyweightLastSet} testID={`exercise-records-last-set-${index}`}>
-    <View style={styles.bodyweightSetHeading}>
-      <Text allowFontScaling={false} style={[pageText.microLabel, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
-      <Text allowFontScaling={false} style={[pageText.runningFigure, styles.lastSetFigure]}>{`${set.loadLabel ?? formatWeight(set.weight)} × ${set.reps}`}</Text>
-    </View>
-    <Text allowFontScaling={false} style={pageText.body}>{`Saved body weight ${set.bodyWeightKg == null ? DASH : formatWeight(set.bodyWeightKg)} kg · Effective load ${set.effectiveResistanceKg == null ? DASH : formatWeight(set.effectiveResistanceKg)} kg`}</Text>
-    <View style={styles.bodyweightSetHeading}>
-      <Stat label="Added 1RM" layout="inline" value={set.oneRepMax !== null ? formatOneRepMax(set.oneRepMax) : DASH} />
-      <Stat label="Vol" layout="inline" rank="secondary" value={set.volume === null ? DASH : formatVolume(set.volume)} />
-    </View>
-  </View>;
+function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
   return (
     <View style={styles.lastSet} testID={`exercise-records-last-set-${index}`}>
       <Text allowFontScaling={false} style={[pageText.microLabel, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
       <Text allowFontScaling={false} numberOfLines={1} style={[pageText.runningFigure, styles.lastSetFigure]}>
-        {`${set.loadLabel ?? formatWeight(set.weight)} × ${set.reps}`}
+        {`${formatWeight(set.weight)} × ${set.reps}`}
       </Text>
       <Stat
         label="1RM"
@@ -374,8 +351,6 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.xs,
   },
-  bodyweightLastSet: { paddingHorizontal: uiSpace.md, paddingVertical: uiSpace.sm, gap: uiSpace.xs },
-  bodyweightSetHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: uiSpace.sm },
   lastSet: {
     flexDirection: 'row',
     alignItems: 'center',

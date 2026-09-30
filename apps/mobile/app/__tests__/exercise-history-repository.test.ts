@@ -12,6 +12,9 @@ const exerciseDefinition = {
   id: 'ex-bench',
   name: 'Bench Press',
   deletedAt: null,
+  bodyweightContribution: 0,
+  bodyweightCalculationsEnabled: false,
+  loadInputMode: 'total_load' as const,
 };
 
 const sessionRow = (
@@ -22,6 +25,10 @@ const sessionRow = (
   }
 ): ExerciseHistorySessionRow => ({
   gymName: null,
+  bodyWeightKg: null,
+  bodyWeightSource: null,
+  bodyWeightMeasurementId: null,
+  bodyWeightMeasuredAt: null,
   ...overrides,
 });
 

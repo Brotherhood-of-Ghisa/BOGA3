@@ -20,7 +20,7 @@ import type {
 
 export type GroupBoardScope = 'certified' | 'all';
 
-/** Display copy only: the `e1rm` key, the `metric=e1rm` param and testIDs stay (G7, DLM-T12-D2). */
+/** Display copy only: the `e1rm` key, the `metric=e1rm` param and testIDs stay. */
 export const BOARD_METRIC_LABELS: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: '1RM' };
 export const BOARD_SCOPE_LABELS: Record<GroupBoardScope, string> = { certified: 'Certified', all: 'All' };
 

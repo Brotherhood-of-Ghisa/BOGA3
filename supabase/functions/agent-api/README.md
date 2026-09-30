@@ -35,8 +35,8 @@ Error envelope:
 ```
 
 All responses are JSON with `Cache-Control: no-store` and `x-request-id`.
-Timestamps below are ISO 8601 strings. Normalized loads use `kg`; load-volume
-uses `kg_reps`; `entered_load` retains its original `kg` or `lb` unit. The entire serialized success response is limited to 256 KiB and a
+Timestamps below are ISO 8601 strings. Every weight is kg and load-volume uses
+`kg_reps`. The entire serialized success response is limited to 256 KiB and a
 validated user/client pair is limited to 120 requests per minute per function
 instance.
 
@@ -199,96 +199,75 @@ semantics.
 At most 50 compact exercise blocks are embedded per workout; `truncated` makes
 any internal safety cap explicit.
 
-## Effective-load response evolution
+## Optional bodyweight calculation response
 
-Exercise-context and workout responses carry `metric_revision:
-"dated_added_load_v3"`. Routes, arguments, authorization, envelopes and existing
-field names stay at API v1. Added fields are additive; callers must tolerate
-unknown fields and nullable unavailable metrics. Existing conventional kg
-performances keep their numeric meaning. The existing set `load` remains the
-normalized **external amount** in kg, never effective bodyweight resistance.
+> **Status: accepted current response contract.**
 
-Exercise search/context includes `bodyweight_coefficient`, `movement_standard`,
-`loading_method` and `resistance_basis`. Workout exercises include the same
-`load_rules`, or null when their source definition is unavailable. Calculations
-use current personal rules and the owner's latest nondeleted reading at/before
-each session start, resolved by the service-only `session_weight_contexts` RPC.
-The selected context is returned; the private timeline is never exposed.
+Exercise-context and workout responses carry
+`metric_revision: "bodyweight_optional_v1"`. Routes, arguments, authorization
+and envelopes stay at API v1. Every weight is kg. The existing set `load` and
+`top_weight` are raw entered Weight and never include bodyweight contribution.
 
-Each performance and workout includes `session_body_weight`:
+The API resolves the owner-synced private preference before calculating:
+
+- preference off: use ordinary Weight/1RM/Volume math and omit
+  `session_body_weight`, reading provenance and contribution fields;
+- preference on with a positive contribution: include
+  `bodyweight_contribution`, use the latest valid reading at/before each session
+  start, and return the applicable reading needed for an authorized coach to
+  interpret those bodyweight-aware derived metrics;
+- preference on with a zero contribution: use ordinary math and omit the
+  reading and bodyweight context because no derived metric requires them;
+- preference on with a positive contribution but no reading: use the personal
+  zero fallback and return a `missing` context without blocking metrics.
+
+The service-only `session_weight_contexts` RPC batches already-authorized
+sessions. It is not executable by normal app/OAuth clients and never returns the
+owner's timeline. An enabled response may contain:
 
 ```json
 {
-  "status": "known",
-  "value": 80,
-  "unit": "kg",
-  "source": "reading",
-  "measurement_id": "reading-id",
-  "measured_at": "2026-07-25T08:00:00.000Z",
-  "estimated": false
+  "session_body_weight": {
+    "status": "known",
+    "value": 80,
+    "unit": "kg",
+    "measured_at": "2026-07-25T08:00:00.000Z"
+  }
 }
 ```
 
-Source is `reading` or null. Missing and malformed applicable context has
-`status: "missing"` or `"invalid"` and null value. The deprecated `estimated`
-field remains false; future-reading fallback and session-only overrides no
-longer exist. Reading value/date/delete/restore changes affect subsequent API
-reads. Invalid latest readings do not fall back to older valid readings.
+The public coaching response does not need a reading identifier. Missing uses
+`{"status":"missing","value":null,"unit":"kg","measured_at":null}`;
+malformed rows are skipped, so an older valid row may apply; if none applies the
+context is `missing`. There is no future estimate or session override.
 
-Performed sets retain raw and effective values separately:
+Performed sets use ordinary vocabulary and separate raw/derived values:
 
 ```json
 {
   "load": { "value": 20, "unit": "kg" },
-  "entered_load": { "raw_value": "20", "value": 20, "unit": "kg", "mode": "added" },
-  "effective_load": {
-    "status": "known", "reason": null, "value": 100,
-    "unit": "kg", "basis": "total_resistance"
-  },
-  "estimated_one_rep_max": { "value": 47.67141908045373, "unit": "kg", "basis": "added_load" },
+  "calculated_load": { "value": 100, "unit": "kg" },
+  "estimated_one_rep_max": { "value": 47.67141908045373, "unit": "kg" },
   "volume": { "value": 800, "unit": "kg_reps" }
 }
 ```
 
-Every numeric raw weight means added weight; `entered_load.mode` is `added`.
-Old null/assistance tags are retained only as storage compatibility, never a
-calculation choice. Unknown/invalid effective loads retain raw values and
-performed reps, with null dependent metrics and a resolver `reason`. Blank
-entered amount plus valid performed reps is zero; `raw_value` preserves the
-blank. Planned/skipped/unperformed rows do not contribute.
+Blank Weight plus valid performed reps canonicalizes to zero. Valid zero returns
+numeric zero metrics and creates no record/ranking. Planned, skipped,
+unperformed, invalid and deleted rows do not contribute. Wathan applies to the
+calculated load and displayed 1RM follows the contract's per-side/contribution
+formula. The breakdown is an API interpretation aid, not a user-facing label.
 
-Bodyweight `estimated_one_rep_max` applies Wathan to total resistance, then
-subtracts the body contribution and divides by the external per-side factor.
-Its `basis` is `added_load`; conventional RM keeps `entered_load`. Effective
-load and volume still use total resistance. `top_weight` is entered added weight,
-normalized to kg.
+Volume coverage remains explicit for invalid/overflow/truncated input. Missing
+bodyweight under the personal policy is complete zero-fallback input, not
+incomplete coverage. A null value is unavailable, never zero. Records remain
+bounded by `history_truncated` and never imply unbounded lifetime coverage.
 
-Performance volumes, workout totals, per-exercise workout volumes and
-`volume_series` values include coverage:
-
-```json
-{
-  "value": null, "unit": "kg_reps", "known_subtotal": 500, "complete": false,
-  "eligible_set_count": 2, "known_set_count": 1,
-  "missing_set_count": 1, "invalid_set_count": 0,
-  "overflow": false, "input_truncated": false
-}
-```
-
-A null value is unavailable, never zero. `known_subtotal` is not a complete total.
-An entirely unknown load has zero known sets and may have a zero subtotal;
-that zero is not a known workout volume. Numeric overflow and truncated input
-also prevent a complete total. Counts remain useful independently of load.
-`max_session_volume` excludes incomplete sessions, with
-`excluded_incomplete_volume_sessions` documenting the exclusion. Records are
-bounded by the response's `history_truncated` flag and never imply unbounded
-lifetime coverage when that flag is true.
-
-The pure `training-metrics.ts` adapter imports the mobile analytics/snapshot
-boundary. Definitions, sessions and sets are owner-filtered and batched, with
-no per-set queries and no measurement timeline read. New readings and source
-reading edits/deletion leave historical metrics unchanged; explicit saved
-session corrections and current rule changes recompute them.
+`training-metrics.ts` imports the shared calculation boundary. Settings,
+definitions, sessions, sets and applicable readings are owner-filtered and
+batched with no per-set query or timeline response. Preference, contribution,
+reading value/date/delete/restore and session-start changes affect the next API
+read; no derived value is persisted.
 
 ## Status contract
 

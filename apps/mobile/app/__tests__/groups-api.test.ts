@@ -40,7 +40,8 @@ import {
   type GroupErrorCode,
 } from '@/src/groups';
 
-const summary = { group_id: 'g1', name: 'Crew', description: null, member_count: 2, my_role: 'owner' as const };
+const summary = { group_id: 'g1', name: 'Crew', description: null, member_count: 2, my_role: 'owner' as const,
+  bodyweight_calculations_enabled: false };
 const groupGetPayload = {
   group: summary,
   members: [
@@ -57,8 +58,8 @@ const groupExercise = {
   archived_at_ms: null,
 };
 
-const comparison = { ...groupExercise, legacy: true, bodyweight_coefficient: 0,
-  movement_standard: null, loading_method: null, default_metric: 'e1rm' as const,
+const comparison = { ...groupExercise, legacy: true, bodyweight_calculations_enabled: false,
+  bodyweight_contribution: 0, default_metric: 'e1rm' as const,
   rules_revision: 1, published_revision: 1, rebuilding: false };
 
 describe('groups api client', () => {
@@ -163,8 +164,9 @@ describe('groups api client', () => {
       },
       {
         rpc: 'group_update',
-        invoke: () => updateGroup('g1', { name: 'Crew 2', description: 'Lifts' }),
-        args: { p_group_id: 'g1', p_name: 'Crew 2', p_description: 'Lifts' },
+        invoke: () => updateGroup('g1', { name: 'Crew 2', description: 'Lifts', bodyweightCalculationsEnabled: false }),
+        args: { p_group_id: 'g1', p_name: 'Crew 2', p_description: 'Lifts',
+          p_bodyweight_calculations_enabled: false },
         data: { group: summary },
         expected: { group: summary },
       },
@@ -221,8 +223,8 @@ describe('groups api client', () => {
         rpc: 'group_exercise_list_v2',
         invoke: () => listGroupExercises('g1'),
         args: { p_group_id: 'g1' },
-        data: { contract_version: 2, exercises: [comparison] },
-        expected: { contract_version: 2, exercises: [comparison] },
+        data: { contract_version: 3, exercises: [comparison] },
+        expected: { contract_version: 3, exercises: [comparison] },
       },
       {
         rpc: 'group_exercise_create',
@@ -259,15 +261,15 @@ describe('groups api client', () => {
         rpc: 'group_exercise_archive_v2',
         invoke: () => archiveGroupExercise('g1', 'ge1'),
         args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
-        data: { contract_version: 2, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
-        expected: { contract_version: 2, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
+        data: { contract_version: 3, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
+        expected: { contract_version: 3, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
       },
       {
         rpc: 'group_exercise_unarchive_v2',
         invoke: () => unarchiveGroupExercise('g1', 'ge1'),
         args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
-        data: { contract_version: 2, exercise: comparison },
-        expected: { contract_version: 2, exercise: comparison },
+        data: { contract_version: 3, exercise: comparison },
+        expected: { contract_version: 3, exercise: comparison },
       },
     ];
 

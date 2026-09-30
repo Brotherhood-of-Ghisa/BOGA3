@@ -56,35 +56,39 @@ This is the shortest operational summary. Use the "Further reading" section when
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
   - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
 
-## Versioned group projections (M27)
+## Optional bodyweight-aware group projections
 
-Versioned group RPCs retain rules 15–19, with metric-specific certifications
-and expected revision/performance checks described in
-[`groups-contract.md` §11](tech/groups-contract.md#11-versioned-comparisons-m27).
-Group rules, score projections and queues have no direct client privileges.
-Shared-session context exposes the derived as-of context, never the owner's reading
-timeline. Worker-only claim/prepare/publish/fail RPCs require service-role access;
-the public Edge endpoint still requires its Vault-held secret.
+Group RPCs retain rules 15–19 and expected-revision checks described in
+[`groups-contract.md` §11](tech/groups-contract.md#11-optional-bodyweight-aware-group-calculations).
+Group preference/contribution rows, score projections, queues and internal
+certification dependency digests have no direct client privileges. The evaluator
+may resolve an applicable private reading only through a service-only helper and
+only after group/member/session authorization, with the group preference enabled
+and contribution positive. Off/zero evaluation performs no private-reading
+lookup. No public RPC, cache, event or
+certification response exposes its value, date, identifier, history, provenance
+or digest. Worker-only claim/prepare/publish/fail RPCs require service-role
+access; the Edge endpoint still requires its Vault-held secret.
 
-## Read-only coaching projections (M27)
+## Read-only coaching projections
 
-`agent-api` batches owner-filtered exercise rules, as-of session-weight contexts
-and entered set metadata, then uses the same effective-load boundary as mobile.
+`agent-api` batches owner-filtered private settings, exercise contributions,
+kg set values and as-of contexts, then uses the same typed calculation boundary
+as mobile. The private preference is authorization-sensitive output policy:
+while disabled, coaching uses ordinary calculations and exposes no reading or
+bodyweight provenance. While enabled, an authorized coach may receive an
+applicable reading only when a positive contribution makes the returned result
+bodyweight-aware; zero-contribution results remain ordinary and omit reading
+context. A missing reading follows the personal zero fallback.
+
 The service-only `session_weight_contexts(owner,session_ids)` helper resolves
-only already-authorized sessions from private readings. Normal/OAuth clients
-cannot execute this helper; the response exposes no measurement timeline.
-Its `training-metrics.ts` adapter adds no authorization paths. Live OAuth grant
-validation, non-member/nonexistent exercise equivalence, read-only routes,
-direct-table denial and the four existing MCP tools remain enforced.
-
-Raw entered unit, effective resistance, metric basis, dated provenance
-and volume coverage are distinct fields. Unknown totals are null; known
-subtotals are explicitly incomplete. Additive API-v1 evolution is identified
-by `metric_revision: dated_added_load_v3`; conventional external `load` remains
-kg-normalized. Full response semantics live in
-[`agent-api/README.md`](../../supabase/functions/agent-api/README.md#effective-load-response-evolution).
-Local parity/authorization and real OAuth-to-MCP gates are required; this
-implementation does not claim hosted rollout.
+only already-authorized sessions. Normal authenticated/OAuth clients cannot call
+it directly, and no endpoint exposes the measurement timeline. All payload
+weights are kg and removed unit/mode/movement/loading fields are absent.
+`metric_revision: bodyweight_optional_v1` identifies the clean response. Live
+OAuth grant validation, non-member/nonexistent equivalence, read-only routes,
+direct-table denial and existing MCP tools remain enforced. Full response
+semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
 ## Practical guidance for API consumers (mobile/app)
 

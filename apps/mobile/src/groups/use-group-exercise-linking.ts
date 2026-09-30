@@ -3,8 +3,8 @@
 //
 //   - Links come from `exercise_group_links` (`listLinks()`), so linked-state
 //     renders offline and right after a local write (`reloadLinks()`).
-//   - Group and group-exercise names come from `group_cache`: `groups:mine`
-//     and one `group-exercises:<groupId>` entry per group. They render from the
+//   - Group and group-exercise names come from the versioned `group_cache`
+//     mine entry and one exercise-list entry per group. They render from the
 //     cache first and refresh on focus and on `refresh()` while online.
 //   - A group whose list returns `NOT_FOUND` is evicted (`evictGroup`); links
 //     are the member's synced data and are never touched.
@@ -43,7 +43,7 @@ const selectLinkingUserId = (): string | null => {
 };
 
 export type GroupExerciseLinkingState = {
-  /** My groups with their cached exercise lists; null until `groups:mine` is known. */
+  /** My groups with their cached exercise lists; null until the mine list is known. */
   catalogs: GroupExerciseCatalog[] | null;
   /** Last known target names/archive state, for inactive-link confirmation only. */
   linkedCatalogs: GroupExerciseCatalog[];
@@ -88,7 +88,7 @@ const initialState = (): InternalState => ({
 const readCachedExercises = (database: GroupCacheDatabase, groupId: string, userId: string) =>
   readGroupCache<GroupExerciseListResult>(database, groupCacheKeys.groupExercises(groupId), userId);
 
-/** The cached catalogues, or null when `groups:mine` was never cached for this user. */
+/** The cached catalogues, or null when the mine list was never cached for this user. */
 export const readCachedGroupExerciseCatalogs = (
   database: GroupCacheDatabase,
   userId: string,
@@ -228,7 +228,7 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       let networkFailed = false;
       let catalogs: GroupExerciseCatalog[] = [];
       // A group whose list says NOT_FOUND is gone for me: keep it out of the
-      // cached `groups:mine` too, so its links stay inactive after a restart.
+      // cached mine list too, so its links stay inactive after a restart.
       const lostGroupIds = new Set(
         results.filter(({ error: groupError }) => groupError?.code === 'NOT_FOUND').map(({ group }) => group.group_id),
       );

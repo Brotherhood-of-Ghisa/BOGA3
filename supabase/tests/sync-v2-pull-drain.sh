@@ -58,7 +58,7 @@ http_request() {
   fi
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -105,7 +105,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-2}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -199,12 +199,12 @@ SEED_PAYLOAD="$(jq -nc \
     {type: "exercise_definitions", id: ("pd-" + $tag + "-ed-1"),
      client_updated_at_ms: ($b + 40),
      fields: {name: "ED1", load_input_mode: "total_load",
-              bodyweight_coefficient: 0, movement_standard: null, loading_method: null,
+              bodyweight_contribution: 0,
               created_at: ($b + 40), updated_at: ($b + 40), deleted_at: null}},
     {type: "exercise_definitions", id: ("pd-" + $tag + "-ed-2"),
      client_updated_at_ms: ($b + 50),
      fields: {name: "ED2", load_input_mode: "per_side_load",
-              bodyweight_coefficient: 0, movement_standard: null, loading_method: null,
+              bodyweight_contribution: 0,
               created_at: ($b + 50), updated_at: ($b + 50), deleted_at: null}},
     # Layer 0 muscle_groups — parents for the exercise_muscle_mappings below.
     {type: "muscle_groups", id: ("pd-" + $tag + "-mg-1"),
@@ -278,14 +278,12 @@ SEED_PAYLOAD="$(jq -nc \
               weight_value: "100", reps_value: "8", set_type: "rir_4",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
-              weight_unit: "kg", external_load_mode: null, planned_weight_unit: null, planned_external_load_mode: null,
               created_at: ($b + 140), updated_at: ($b + 140), deleted_at: null}},
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-2"), client_updated_at_ms: ($b + 150),
      fields: {session_exercise_id: ("pd-" + $tag + "-sx-2"), order_index: 0,
               weight_value: "120", reps_value: "5", set_type: "rir_0",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
-              weight_unit: "kg", external_load_mode: null, planned_weight_unit: null, planned_external_load_mode: null,
               created_at: ($b + 150), updated_at: ($b + 150), deleted_at: null}},
     {type: "session_exercise_tags", id: ("pd-" + $tag + "-sxtag-1"),
      client_updated_at_ms: ($b + 160),

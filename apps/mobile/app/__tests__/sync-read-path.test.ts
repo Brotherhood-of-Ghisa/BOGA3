@@ -106,6 +106,8 @@ const exerciseTombstoneEntity = (id: string, name: string, ms: number): WireEnti
   client_updated_at_ms: ms,
   fields: {
     name,
+    load_input_mode: 'total_load',
+    bodyweight_contribution: 0,
     created_at: ms - 10,
     updated_at: ms,
     deleted_at: ms,

@@ -107,6 +107,10 @@ const planned = (id: string, weight: string, reps: string, setType: SessionDraft
 
 const makeSession = (overrides?: Partial<SessionGraphSnapshot>): SessionGraphSnapshot => ({
   sessionId: 'session-1',
+  bodyWeightKg: null,
+  bodyWeightSource: null,
+  bodyWeightMeasurementId: null,
+  bodyWeightMeasuredAt: null,
   gymId: null,
   status: 'active',
   startedAt: new Date('2026-09-23T09:00:00Z'),
@@ -189,6 +193,10 @@ const historyEntry = (
   gym: { gymId?: string | null; gymName?: string | null } = {}
 ): ExerciseHistorySessionEntry => ({
   sessionId,
+  bodyWeightKg: null,
+  bodyWeightSource: null,
+  bodyWeightMeasurementId: null,
+  bodyWeightMeasuredAt: null,
   sessionExerciseId: `${sessionId}-bench`,
   completedAt: new Date(completedAt),
   gymId: gym.gymId ?? null,
@@ -212,6 +220,7 @@ const loadHistory: LoadExerciseHistory = jest.fn(async () => ({
   exerciseDefinitionId: 'def-bench',
   exerciseName: 'Barbell Bench Press',
   exerciseDeletedAt: null,
+  bodyweightContribution: 0,
   period: 'all' as const,
   appliedTagDefinitionId: null,
   appliedGymId: null,
@@ -648,6 +657,7 @@ describe('ExercisePageScreen', () => {
       exerciseDefinitionId: 'def-bench',
       exerciseName: 'Barbell Bench Press',
       exerciseDeletedAt: null,
+      bodyweightContribution: 0,
       period: 'all' as const,
       appliedTagDefinitionId: null,
       appliedGymId: null,
@@ -713,6 +723,7 @@ describe('ExercisePageScreen', () => {
       exerciseDefinitionId: 'def-bench',
       exerciseName: 'Barbell Bench Press',
       exerciseDeletedAt: null,
+      bodyweightContribution: 0,
       period: 'all' as const,
       appliedTagDefinitionId: null,
       appliedGymId: null,
