@@ -70,7 +70,6 @@ apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-ui-regression	s
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view-abandon.yaml	-frontend,ios-session-view	single flow → the lane that runs it
-apps/mobile/.maestro/flows/bodyweight-entry.yaml	-frontend,ios-bodyweight	single flow → the lane that runs it
 apps/mobile/.maestro/flows/auth-profile-happy-path.yaml	-frontend,ios-auth-profile	single flow → the lane that runs it
 apps/mobile/.maestro/flows/sync-first-run-log-and-roundtrip.yaml	-frontend,ios-sync-e2e	single flow → the lane that runs it
 apps/mobile/.maestro/flows/groups-two-user-stream.yaml	-frontend,ios-groups-e2e	single flow → the lane that runs it

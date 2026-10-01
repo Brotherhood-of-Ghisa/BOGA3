@@ -573,8 +573,9 @@ Brief entrypoint inventory of the current reusable UI component set.
 - `SetLogger` keeps one kg `Weight` field, reps, effort and confirmation. It
   receives derived 1RM/Volume but no reading/source/breakdown props.
 - Pure/data coverage: `bodyweight-contribution.test.ts`, `bodyweight-import.test.ts`;
-  interaction coverage: `bodyweight-logging-ui.test.tsx`. The focused native
-  bodyweight flow covers reading entry and the changed RM/volume display.
+  interaction coverage over real data: `bodyweight-logging-ui.test.tsx` (logger
+  and session row, including a reading's changed RM/volume) and
+  `exercise-catalog-screen.test.tsx` (the editor's contribution field).
 
 ### UI-supporting shared module (non-visual)
 
@@ -621,8 +622,8 @@ from the tokens in entry 1.
   reading never creates an unavailable/incomplete state.
 - Coverage must live in `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
   `bodyweight-analytics-formatting.test.ts`
-  and existing screen tests. The focused ios-bodyweight flow asserts the reading
-  entry’s RM and volume effect; pure/data tests cover other calculations.
+  and existing screen tests. `bodyweight-logging-ui.test.tsx` asserts a reading's
+  RM and volume effect over real data; pure/data tests cover other calculations.
 
 The logger's fixed-height amount field uses `Weight · kg`; its accessibility
 label says Weight in kilograms. The figure and label remain legible at 375pt.

@@ -97,14 +97,6 @@ it('keeps partial volume out of baselines and never awards an unavailable streng
   expect(deriveSessionPersonalRecords({ targetSession: target, historicalSessions: [] })).toEqual([]);
 });
 
-it('keeps raw Weight unchanged while bodyweight changes only derived math', () => {
-  const aware = fixture(80, 1, '20');
-  const ordinary = fixture(80, 1, '20', 'total_load', false);
-  expect(buildSetRows([aware.set], null, aware.context)[0]).toMatchObject({ weight: 20, volume: 800 });
-  expect(buildSetRows([ordinary.set], null, ordinary.context)[0]).toMatchObject({ weight: 20, volume: 160 });
-});
-
-
 it('withholds overflowing aggregates without losing independent counts or later resetting an unknown subtotal', () => {
   const f = fixture(null, 0, '1' + '0'.repeat(306));
   const sets = Array.from({ length: 50 }, (_, index) => ({ ...f.set, id: `set-${index}`, setId: `set-${index}`, orderIndex: index }));

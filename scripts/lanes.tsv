@@ -38,7 +38,6 @@ ios-data-smoke	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh da
 ios-ui-regression	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh ui-regression
 ios-exercise-page	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh exercise-page
 ios-session-view	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh session-view
-ios-bodyweight	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh bodyweight
 ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile
 ios-sync-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh sync-e2e
 ios-groups-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh groups-e2e
