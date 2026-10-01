@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
@@ -238,6 +239,7 @@ export default function SettingsScreen() {
 
       <View style={styles.section} testID="settings-section-preferences">
         <SectionLabel title="Preferences" />
+        <Card><AppearanceSettingsRow /></Card>
         <Card><BodyWeightSettingsRow /></Card>
         <Card style={styles.cardBody} testID="settings-preferences-card">
           <Text allowFontScaling={false} style={styles.bodyMuted}>

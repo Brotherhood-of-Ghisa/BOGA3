@@ -7,6 +7,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { RootStack } from '@/components/navigation/root-stack';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
@@ -32,6 +34,10 @@ export default function RootLayout() {
     // an interval and when the app backgrounds. Cheap and self-gating (no-op
     // until signed in); stopped on unmount so no timer leaks.
     startLogFlushLoop();
+
+    // A stored theme this launch could not use (unknown preset, unreadable
+    // store) falls back to the default theme; say so in the logs.
+    reportLaunchThemeProblem(launchTheme.problem);
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled

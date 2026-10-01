@@ -75,7 +75,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
     // Light-only by decision (2026-09-19). Dark mode is explicitly not a
     // product goal, and "automatic" is not free: it hands the OS-owned
     // chrome — Alert.alert dialogs, the keyboard, native pickers — a dark
-    // appearance over an app that renders one light theme. Pinning "light"
+    // appearance over an app whose themes are all light. Pinning "light"
     // keeps that chrome consistent with the tokens in
     // components/ui/tokens.ts, which have no dark variants.
     userInterfaceStyle: "light",

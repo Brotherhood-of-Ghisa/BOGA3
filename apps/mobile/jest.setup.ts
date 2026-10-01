@@ -15,6 +15,28 @@ afterEach(() => {
 // that loads reanimated (the root layout does) uses the library's own mock.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 
+// expo-sqlite's key-value store needs the native SQLite module, which Jest does
+// not have. An in-memory store per test file: the chosen theme preset
+// (`components/ui/theme-launch.ts`) is read from it when `tokens.ts` loads, so
+// every suite starts in the default theme unless it sets the key before
+// importing tokens.
+jest.mock('expo-sqlite/kv-store', () => {
+  const items = new Map<string, string>();
+  const Storage = {
+    getItemSync: (key: string) => items.get(key) ?? null,
+    getItem: async (key: string) => items.get(key) ?? null,
+    setItemSync: (key: string, value: string) => {
+      items.set(key, value);
+    },
+    setItem: async (key: string, value: string) => {
+      items.set(key, value);
+    },
+    removeItemSync: (key: string) => items.delete(key),
+    clearSync: () => items.clear(),
+  };
+  return { __esModule: true, Storage, AsyncStorage: Storage, default: Storage };
+});
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const { View } = require('react-native');
