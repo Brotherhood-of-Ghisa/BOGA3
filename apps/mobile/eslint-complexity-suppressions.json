@@ -261,7 +261,7 @@
   },
   "src/groups/metric-wire-guards.ts": {
     "complexity": {
-      "count": 3
+      "count": 2
     }
   }
 }

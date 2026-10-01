@@ -175,6 +175,8 @@ describe('stream item guard: rejections', () => {
     ['an event at another revision than its rules', { ...record, rules_revision: 3 }],
     ['an event for another exercise than its rules', { ...record, group_exercise_id: 'squat' }],
     ['an event of an unknown kind', { ...record, kind: 'lead_change' }],
+    ['an event whose kind is an inherited object name', { ...record, kind: 'toString' }],
+    ['an event whose kind is not a string', { ...record, kind: ['record'] }],
     // Record
     ['a record without a member', { ...record, member: null }],
     ['a record with malformed record context', { ...record, record_context: null }],
