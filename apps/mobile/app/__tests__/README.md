@@ -93,6 +93,13 @@
   clears 4.5:1 on `paper`, `surface` and `record-wash`; and that `tokens.ts`
   exports exactly that vocabulary. Change a value there and in the spec
   together — never loosen the test to make an unrelated change pass.
+- `ui-theme.test.ts` gates every theme preset
+  (`components/ui/theme-presets.ts`): the generator rules for its seeds, plus
+  `record` ≥ 4.5:1 on `paper`, `surface` and `record-wash`, `record` ≥ 30° of
+  hue from `accent`, and `surface` ≥ 4.5:1 on `accent`. A new preset passes
+  these or does not ship. `ui-theme-launch.test.ts` covers the stored choice:
+  resolution, the default fallback for an unknown id or an unreadable store,
+  and that each fallback is logged.
 - The retired legacy vocabulary (the `uiColors` / `uiRadius` / `uiElevation`
   scales and the `UiText` / `UiSurface` / `UiButton` / `SegmentedChips`
   primitives, removed 2026-09-26) is blocked by the `legacyVocabulary` rule in

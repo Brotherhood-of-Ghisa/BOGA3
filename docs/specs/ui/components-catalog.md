@@ -49,7 +49,9 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - the app's one styling vocabulary: `uiRoles` (colour roles, including the
     `viz0`…`viz4` data-visualisation ramp, generated from four seeds by
-    `generateRoles` in `components/ui/theme.ts`), `uiFonts` (the three embedded
+    `generateRoles` in `components/ui/theme.ts` — the seeds of the theme preset
+    chosen on this device, read once at launch, `components/ui/theme-presets.ts`
+    and `theme-launch.ts`), `uiFonts` (the three embedded
     typefaces and their shipped weights), `uiGeometry` (card / sheet / control /
     pill radii, the 44pt tap target, the 38pt metric column, the sheet handle,
     the 50pt labelled-field height, micro-label tracking), `uiSpace` (6 spacing
@@ -211,7 +213,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     `arrow-left-right`) and `trash` (Lucide `trash-2`) for the exercise page,
     `link` (Lucide `link`) for its ⋮ `Link to group exercise…`, `location`
     (Lucide `map-pin`) for a gym's saved location and the gym sheet's nearby
-    suggestion, `search` and `list` (Lucide `search`, `list`), and the status
+    suggestion, `search` and `list` (Lucide `search`, `list`), `palette`
+    (Lucide `palette`) for Settings' Appearance row, and the status
     glyphs `offline` (Lucide `wifi-off`), `success` (`circle-check`) and
     `warning` (`triangle-alert`), which stay `ink` — the design language has no
     success or warning hue,

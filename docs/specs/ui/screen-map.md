@@ -292,6 +292,14 @@ Brief entrypoint map of the current mobile screens.
     sync, About, and development-only Developer tools sections in that order
   - Account routes to `/profile`, showing the signed-in email when available or
     concise signed-out guidance otherwise
+  - Preferences: an `Appearance` row (`settings-appearance-row`, Lucide
+    `palette`) naming the chosen theme (`<Preset> from next launch` until the
+    app reopens), which opens the `Appearance` sheet
+    (`settings-appearance-sheet`): the presets as radio rows
+    (`settings-appearance-option-<id>`) with a decorative swatch of each, saved
+    on tap, and a note that a new theme applies the next time BoGa opens; a
+    failed save restores the previous choice and says nothing changed
+    (`settings-appearance-error`). Rules: `ux-rules.md` §9b
   - Preferences card: date format (`settings-date-format-<format>`)
   - AI coaching always offers an external `Connect an AI coach` setup link and
     states the read-only/revocable boundary; browser-launch failure stays inline

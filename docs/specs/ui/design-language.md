@@ -30,8 +30,8 @@ tap.
 ## 2. Colour roles
 
 Semantic roles, not a palette. A screen names the role, never the hex. The
-values are generated from four seed colours ("Derivation" below), so the table
-shows the shipped theme.
+values are generated from four seed colours ("Derivation" below) of the theme
+the user chose ("Presets"), so the table shows the default theme, Warm.
 
 | Role | Value | Use |
 | --- | --- | --- |
@@ -122,10 +122,38 @@ picked grounds sat at hue 90–94 against the ground seed's 81. `record-wash` an
 
 Gated by `apps/mobile/app/__tests__/ui-theme.test.ts`: `uiRoles` equals the
 shipped seeds generated, every role stays within ΔE*ab 3 of the picked palette,
-and for three seed sets no theme ships (a slate, a forest, a plum) the rules
-above still hold — distinct values, the neutrals in a fixed lightness order on
-the ground's hue, `ink` and `ink-muted` ≥ 4.5:1 on both grounds, `ink` legible
-on the ramp, even ramp steps, and each wash tinted from its own role.
+and for every shipped preset ("Presets" below) and three seed sets no preset
+ships (a teal, an indigo, a rose) the rules above still hold — distinct values,
+the neutrals in a fixed lightness order on the ground's hue, `ink` and
+`ink-muted` ≥ 4.5:1 on both grounds, `ink` legible on the ramp, even ramp
+steps, and each wash tinted from its own role.
+
+### Presets
+
+**Decided 2026-10-01.** The user chooses a theme from four presets in
+Settings → Appearance (`apps/mobile/components/ui/theme-presets.ts`), picked
+from a mock of six candidates on the exercise page, one per hue family:
+
+| Preset | `ground` | `accent` | `record` | `viz` |
+| --- | --- | --- | --- | --- |
+| Warm (default) | `#6B6358` | `#C2410C` | `#8A6516` | `#A4866B` |
+| Slate | `#5B6470` | `#1F6FB2` | `#8A6516` | `#5F7F96` |
+| Forest | `#5E6659` | `#2F7D4F` | `#8C5A12` | `#6E8A62` |
+| Plum | `#665D66` | `#8E3B8A` | `#7A6A12` | `#8A6F8A` |
+
+- **`record` stays a brass** in every preset, so "your best ever" keeps one
+  look whatever the accent.
+- **Each preset's `accent` and `record` meet their floors**, since they are
+  used as given: `record` ≥ 4.5:1 on `paper`, `surface` and `record-wash`;
+  `record` ≥ 30° of hue from `accent` (the default sits 33° apart); and the
+  primary action's `surface` label ≥ 4.5:1 on `accent`.
+- **Chosen per device, applied at launch.** `tokens.ts` resolves the stored
+  preset id to seeds when it first evaluates (`theme-launch.ts`, read
+  synchronously from `expo-sqlite/kv-store`); an unknown id or an unreadable
+  store falls back to Warm and is logged. Behaviour: `ux-rules.md` §9b.
+
+Gated by `ui-theme.test.ts`: every preset passes the generator rules above and
+these floors, and Warm is the default seeds.
 
 ### Data visualisation
 

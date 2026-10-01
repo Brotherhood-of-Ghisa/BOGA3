@@ -1,10 +1,12 @@
-import { defaultThemeSeeds, generateRoles } from '@/components/ui/theme';
+import { generateRoles } from '@/components/ui/theme';
+import { launchTheme } from '@/components/ui/theme-launch';
 
 // The colour roles (`docs/specs/ui/design-language.md` §2). A screen names the
 // role, never the hex. They are generated from four seed colours
-// (`components/ui/theme.ts`, §2 "Derivation"); what each role is for is on
+// (`components/ui/theme.ts`, §2 "Derivation") — the seeds of the preset chosen
+// on this device as of launch (§2 "Presets"); what each role is for is on
 // `UiRoles`.
-export const uiRoles = generateRoles(defaultThemeSeeds);
+export const uiRoles = generateRoles(launchTheme.preset.seeds);
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
 // widths and label tracking the accepted target is drawn with. Decided

@@ -480,16 +480,38 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    prop precedence; the visual target is the existing default-size layout at
    both default and accessibility text sizes.
 
-### 9b. Appearance: light only
+### 9b. Appearance: light themes, chosen in Settings
 
-1. The app ships **one light theme**. Dark mode is explicitly not a product
-   goal (decided 2026-09-19), and `uiRoles` carries no dark variants.
+1. Every theme is **light**. Dark mode is explicitly not a product goal
+   (decided 2026-09-19), and `uiRoles` carries no dark variants: the presets
+   differ in hue, never in the lightness ladder (`design-language.md` §2,
+   "Presets").
 2. `app.config.ts` therefore pins `userInterfaceStyle: "light"`. It must not be
-   set back to `"automatic"` while the tokens are single-theme: `"automatic"`
+   set back to `"automatic"` while every theme is light: `"automatic"`
    hands the OS-owned chrome — `Alert.alert` dialogs, the keyboard, native
    pickers — a dark appearance over light app content.
 3. `app/_layout.tsx` keeps `<StatusBar style="dark" />` (dark glyphs on the
-   light surface), which is consistent with the above.
+   light surface), which is consistent with the above. Neither it nor the
+   splash (a fixed white, `app.config.ts`) reads a role. The stack header
+   takes `surface` (white in every theme) and `ink`, whose hue follows the
+   preset; like every role it is read once at launch, so it matches the
+   screens beneath it.
+4. The user picks a theme from a few curated presets in Settings → Preferences
+   → `Appearance`. There is no free colour picker: each preset's seeds are
+   fixed in code and gated in CI, so nothing is corrected at runtime.
+5. The choice is **per device** (not synced to the account) and **applies on
+   the next launch**: about a hundred modules bake `uiRoles` into a
+   module-scope `StyleSheet`, and a release build cannot restart itself
+   (`expo-updates` is not installed). The sheet saves on tap and says so
+   ("Slate applies the next time you open BoGa. Close BoGa fully, then open it
+   again."); the Settings row reads `<Preset> from next launch` until then.
+   Switching live is a separate decision (context-driven styles or a native
+   styling dependency), not a tweak to this.
+6. A stored choice this build cannot use — an unknown preset id, or a store
+   that cannot be read — opens the app in the default theme and is logged
+   (`theme.unknown_preset` warn, `theme.read_failed` error), never silent. A
+   failed save warns too (`theme.save_failed`), and with an unusable choice
+   stored, choosing the default again re-saves it, clearing the warning.
 
 ### 9c. Icons
 

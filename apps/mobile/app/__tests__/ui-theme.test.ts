@@ -1,11 +1,14 @@
 import { uiRoles } from '@/components/ui';
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
 import { defaultThemeSeeds, generateRoles, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { DEFAULT_THEME_PRESET_ID, themePresets } from '@/components/ui/theme-presets';
 
-// The theme generator (`docs/specs/ui/design-language.md` §2, "Derivation"):
-// every colour role is generated from four seeds. These tests pin that the
-// shipped seeds reproduce the shipped palette, and that the rules the palette
-// is gated on hold for seeds other than the shipped ones.
+// The theme generator (`docs/specs/ui/design-language.md` §2, "Derivation"
+// and "Presets"): every colour role is generated from four seeds. These tests
+// pin that the default seeds reproduce the picked palette, that the rules the
+// palette is gated on hold for every shipped preset and for seeds no preset
+// ships, and that each preset's `accent` and `record` — used as given — meet
+// their own floors.
 
 // The palette as rationalised and picked on device, 2026-09-27. The generator
 // was calibrated to it; a role drifting further than ΔE*ab 3 from it is a
@@ -32,14 +35,18 @@ const PICKED_PALETTE: Omit<UiRoles, 'scrim'> = {
   viz4: '#A4866B',
 };
 
-// Seeds no theme ships with, chosen to pull the generator away from the warm
-// default: a cool slate ground, a green ground, and hues on the far side of
-// the wheel for the accent, record and ramp.
+// Seeds no preset ships with, chosen to pull the generator away from the
+// shipped ones: a teal, an indigo and a rose ground, with accents, records and
+// ramps on other parts of the wheel. They prove the generator, not a theme.
 const OTHER_SEEDS: Record<string, ThemeSeeds> = {
-  slate: { ground: '#5B6470', accent: '#1F6FB2', record: '#8A6516', viz: '#5F7F96' },
-  forest: { ground: '#5E6659', accent: '#2F7D4F', record: '#8C5A12', viz: '#6E8A62' },
-  plum: { ground: '#665D66', accent: '#8E3B8A', record: '#7A6A12', viz: '#8A6F8A' },
+  harbour: { ground: '#5A6666', accent: '#0F766E', record: '#8A6516', viz: '#5E8A88' },
+  indigo: { ground: '#5F5F6E', accent: '#4F46E5', record: '#8A6516', viz: '#7472A0' },
+  rose: { ground: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' },
 };
+
+const PRESET_SEEDS: Record<string, ThemeSeeds> = Object.fromEntries(
+  themePresets.map((preset) => [`${preset.id} preset`, preset.seeds]),
+);
 
 describe('lch colour space', () => {
   it('converts known colours to CIE LCh', () => {
@@ -89,7 +96,7 @@ describe('theme generator', () => {
   });
 
   it('uses the accent and record seeds as given, and never themes `danger` or `surface`', () => {
-    for (const seeds of [defaultThemeSeeds, ...Object.values(OTHER_SEEDS)]) {
+    for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
       const roles = generateRoles(seeds);
       expect(roles.accent).toBe(seeds.accent);
       expect(roles.record).toBe(seeds.record);
@@ -103,7 +110,7 @@ describe('theme generator', () => {
     expect(() => generateRoles({ ...defaultThemeSeeds, accent: 'orange' })).toThrow('expected #RRGGBB');
   });
 
-  describe.each(Object.entries({ default: defaultThemeSeeds, ...OTHER_SEEDS }))('for the %s seeds', (_name, seeds) => {
+  describe.each(Object.entries({ ...PRESET_SEEDS, ...OTHER_SEEDS }))('for the %s seeds', (_name, seeds) => {
     const roles = generateRoles(seeds);
     const ground = hexToLch(seeds.ground);
 
@@ -157,6 +164,46 @@ describe('theme generator', () => {
       expect(hexToLch(roles.accentWash).lightness).toBeGreaterThanOrEqual(95);
     });
   });
+});
+
+describe('theme presets', () => {
+  it('ship the default seeds as the default preset, listed first', () => {
+    expect(themePresets[0].id).toBe(DEFAULT_THEME_PRESET_ID);
+    expect(themePresets[0].seeds).toBe(defaultThemeSeeds);
+  });
+
+  it('are told apart by id, label and accent', () => {
+    for (const key of ['id', 'label'] as const) {
+      expect(new Set(themePresets.map((preset) => preset[key])).size).toBe(themePresets.length);
+    }
+    expect(new Set(themePresets.map((preset) => preset.seeds.accent)).size).toBe(themePresets.length);
+  });
+
+  describe.each(themePresets.map((preset) => [preset.id, preset.seeds] as const))(
+    'the %s preset',
+    (_id, seeds) => {
+      const roles = generateRoles(seeds);
+
+      it('keeps `record` legible as text on `paper`, `surface` and its own band', () => {
+        // WCAG 2.1 normal text: `record` marks figures, and those figures sit
+        // inside the `record-wash` band too.
+        for (const background of [roles.paper, roles.surface, roles.recordWash]) {
+          expect(contrastRatio(roles.record, background)).toBeGreaterThanOrEqual(4.5);
+        }
+      });
+
+      it('keeps `record` a different hue from `accent`', () => {
+        // "Your best ever" and "the button that commits" must not read as the
+        // same mark. The shipped default sits 33° apart.
+        expect(hueDistance(hexToLch(roles.record).hue, hexToLch(roles.accent).hue)).toBeGreaterThanOrEqual(30);
+      });
+
+      it('keeps the primary action\'s `surface` label legible on `accent`', () => {
+        // A filled primary draws its label and glyph in `surface` (white).
+        expect(contrastRatio(roles.surface, roles.accent)).toBeGreaterThanOrEqual(4.5);
+      });
+    },
+  );
 });
 
 // CIE76 ΔE*ab: Euclidean distance in L*a*b*. ~2.3 is a just-noticeable
