@@ -1,5 +1,19 @@
 appId: com.dinoderek.mobile
 ---
+# Smoke: the dev-client launch and the tab shell (ios-smoke lane, infra-free).
+#
+# Proves:
+#   1. the dev client opens the app on Today, with the tab bar;
+#   2. Train, Progress and More each open from the persistent tab bar;
+#   3. Train's Start opens an empty session view, and the tab bar stays on it.
+# Why device:
+#   1. the dev-client boot and the root layout;
+#   2. real tab navigation;
+#   3. the root-stack push over the tabs.
+# Jest counterpart: app/__tests__/main-tabs.test.tsx (tabs, the tray's
+#   collapse/expand), app/__tests__/today-screen.test.tsx and
+#   app/__tests__/train-screen.test.tsx (each leading with the active session).
+#
 # No per-openLink Open/Continue/Close dismissal taps: the URL-scheme trust dialog
 # is pre-authorized in maestro-ios-launch.sh and the one-time dev-client menu
 # sheet is dismissed by the warm-up before this flow runs, so neither renders
@@ -48,21 +62,6 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 - takeScreenshot: "04-m26-more"
-# The tray collapses to its handle and comes back (DLM-T02 frame capture). The
-# handle's label names the next action, so it proves the state.
-- tapOn:
-    id: "bottom-tray-handle"
-- extendedWaitUntil:
-    visible: "Expand navigation tray"
-    timeout: 5000
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "frame-tray-collapsed"
-- tapOn:
-    id: "bottom-tray-handle"
-- extendedWaitUntil:
-    visible: "Collapse navigation tray"
-    timeout: 5000
 - tapOn:
     id: "top-level-tab-today"
 - assertVisible:
@@ -91,24 +90,3 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "main-bottom-tabs"
 - takeScreenshot: "05-m26-session-view-empty"
-# With a workout running, Today and Train both lead with it (DLM-T03 captures).
-- tapOn:
-    id: "top-level-tab-today"
-- extendedWaitUntil:
-    visible:
-      id: "today-active-session-card"
-    timeout: 15000
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "today-active-workout"
-- tapOn:
-    id: "top-level-tab-train"
-- extendedWaitUntil:
-    visible:
-      id: "train-active-session-card"
-    timeout: 15000
-- assertVisible:
-    id: "train-resume-session-button"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "train-active-workout"

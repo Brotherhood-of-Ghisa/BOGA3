@@ -34,13 +34,19 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `01-m26-today` (`ios-smoke`) | Today, idle: planning placeholder, signed-out group panel, no sessions |
-| `today-active-workout` (`ios-smoke`) | Today with a workout running |
+| `today-active-workout` (ad hoc) | Today with a workout running |
 | `02-m26-train` (`ios-smoke`) | Train, idle: empty start (primary) and the planning placeholder |
-| `train-active-workout` (`ios-smoke`) | Train with a workout running |
+| `train-active-workout` (ad hoc) | Train with a workout running |
 | `02-abandoned-back-on-train` (`ios-session-view`) | Train after an abandon |
 | `today-recents` (`ios-session-view`) | Today listing a finished session |
 | `17-first-run-roundtrip-bootstrapped` (`ios-sync-e2e`) | Today signed in, after the first sync |
 | `groups-07c-0-today-record` (`ios-groups-e2e`) | Today with group activity |
+
+`(ad hoc)` states are no longer captured by a lane: their flow keeps only
+the claims that need a device (spec 06, "Maestro scope policy") and Jest
+proves the rest. When the screen changes, capture them with a one-off flow
+run (`apps/mobile/scripts/maestro-ios-run-flow.sh --flow …`); git history
+holds the flow steps that reached them.
 
 Jest only (no harness seam reaches them): the plan loading, error and ready
 states, and the recents load error.

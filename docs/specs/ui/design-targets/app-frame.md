@@ -33,7 +33,7 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `01-m26-today` … `04-m26-more` (`ios-smoke`) | each tab active in turn |
-| `frame-tray-collapsed` (`ios-smoke`) | the tray collapsed to its handle |
+| `frame-tray-collapsed` (ad hoc) | the tray collapsed to its handle |
 | `05-m26-session-view-empty` (`ios-smoke`) | the tab strip on the session view |
 | `02c-gyms-screen` (`ios-session-view`) | a native header, and `Back to More` |
 | `04-data-runtime-smoke-success` (ad hoc) | the Sessions header |
