@@ -117,10 +117,38 @@ export const closeLocalData = (): void => {
   booted = false;
 };
 
-/** Seeds a Maestro harness fixture through the harness itself (`fixture=<name>`). */
+/**
+ * The root layout's boot preloads (`app/_layout.tsx`): the data layer and the
+ * exercise catalog. Call after seeding and before rendering, so the screen
+ * opens on the warm caches it has in the app.
+ */
+export const bootLocalApp = async (): Promise<void> => {
+  const { act } = require('@testing-library/react-native');
+  const {
+    ensureExerciseCatalogLoaded,
+    getExerciseCatalogSnapshot,
+  } = require('@/src/exercise-catalog/cache');
+  await act(async () => {
+    await bootstrapLocalDataLayer();
+    // A seed that invalidated the catalog leaves a reload in flight; wait
+    // until it lands so it cannot re-render the screen after the test ends.
+    do {
+      await ensureExerciseCatalogLoaded();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    } while (getExerciseCatalogSnapshot().status !== 'ready');
+  });
+};
+
+/**
+ * Seeds a Maestro harness fixture through the harness itself (`fixture=<name>`),
+ * inside `act`: seeding invalidates the catalog cache, which mounted screens observe.
+ */
 export const loadMaestroFixture = async (name: MaestroHarnessFixtureName): Promise<void> => {
+  const { act } = require('@testing-library/react-native');
   const { runMaestroHarnessFixture } = require('@/src/maestro/harness');
-  await runMaestroHarnessFixture(name);
+  await act(async () => {
+    await runMaestroHarnessFixture(name);
+  });
 };
 
 /** The booted drizzle handle, for direct reads in assertions. */
