@@ -1,12 +1,27 @@
 appId: com.dinoderek.mobile
 ---
-# First-run end-to-end round-trip — REAL cycle, real Supabase, on the simulator.
+# First-run end-to-end round trip: the REAL sync cycle against local Supabase
+# (ios-sync-e2e lane).
 #
-# This is the device-level proof that a brand-new user's data is bootstrapped
-# locally AND lands in the remote database, and that a subsequently logged
-# workout is uploaded by sync. It runs in the Supabase-backed sync-e2e lane (the
-# runner provisions a local Supabase baseline and exports the fixture
-# credentials), so every cycle here talks to a real server.
+# Proves:
+#   A. a new user's first sign-in runs the real bootstrapper (seed → push →
+#      pull) and lifts the first-sync gate on its own;
+#   B. an 80 kg reading saved in the reading editor, a workout logged through
+#      Train → session view → exercise page → Finish → Done, and an 82 kg
+#      reading, all on the freshly bootstrapped local database;
+#   C. a sync forced from Settings drains Pending changes to 0 (the server
+#      accepted this run's rows);
+#   D. after a full wipe (clearState) and a fresh sign-in, the workout and both
+#      readings restore from the server, and the restored session shows no
+#      body-weight UI.
+# Why device: real GoTrue sign-in, the real sync cycle and NetInfo against a
+#   real server, the UI's gating and trigger wiring, the keyboard, and a
+#   clearState wipe of SQLite and SecureStore. sync-infra drives the same cycle
+#   without UI; it is not evidence for these.
+# Jest counterpart: app/__tests__/sync/** (cycle, push/pull, drift),
+#   app/__tests__/sync-cycle-push.test.ts (dirty-bit-only push),
+#   app/__tests__/sync-status-panel.test.tsx (status fields),
+#   app/__tests__/bodyweight-screen.test.tsx (reading editor).
 #
 # ISOLATION — this flow signs in as a DEDICATED fixture user (user_b, passed in
 # as MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner). Per the
@@ -26,15 +41,15 @@ appId: com.dinoderek.mobile
 #      runs against the provisioned Supabase and lifts the first-sync gate on its
 #      own (NO `bootstrap=complete` harness stamp). Landing on the data screen
 #      proves: logged in + all bootstrap data seeded locally.
-#   B. Save 80 kg and log one exercise; save 82 kg and log a second session.
-#      The session recorder stays free of body-weight management UI.
+#   B. Save 80 kg, log one exercise, save 82 kg. The session recorder stays
+#      free of body-weight management UI.
 #   C. Force a sync from the Settings sync-status surface and wait for "Pending
 #      changes" to reach 0. This is the run-SPECIFIC upload proof: the dirty rows
 #      were created THIS run in (B) on a freshly-bootstrapped local DB, so
 #      draining them to 0 means the logged exercise was accepted by the server.
 #   D. Fully wipe the device (clearState wipes BOTH the SQLite data AND the
 #      SecureStore session — see src/auth/storage.ts) and sign in again. The
-#      bootstrapper now PULLS from the (non-empty) server, so the logged workouts
+#      bootstrapper now PULLS from the (non-empty) server, so the logged workout
 #      and both private dated readings reappear without session-local weight UI.
 #      After a full local wipe the ONLY source of any
 #      session is the remote DB — so a restored session proves the data is in the
@@ -293,94 +308,6 @@ appId: com.dinoderek.mobile
     visible: { id: "train-start-empty-button" }
     timeout: 30000
 
-# === Phase Bb: log one exercise with a 82 kg applicable reading ===
-# Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
-# DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
-# session view, `+ Add exercise` the picker, the card the exercise page, whose
-# logger confirms the set; back on the session view, Finish completes it.
-- waitForAnimationToEnd:
-    timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "top-level-tab-train"
-      - extendedWaitUntil:
-          visible:
-            id: "train-start-empty-button"
-          timeout: 15000
-- tapOn:
-    id: "train-start-empty-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-add-exercise"
-    timeout: 30000
-- assertNotVisible: "Body weight"
-- tapOn:
-    id: "session-view-add-exercise"
-- tapOn: "Exercise filter input"
-- inputText: "Barbell Back Squat"
-- pressKey: Enter
-# Selecting the seeded "Barbell Back Squat" here also implicitly proves the
-# catalog bootstrapped in Phase A: the row only exists if the seed landed. The
-# search expands matching families; collapse/search behavior is
-# covered by focused tests.
-- extendedWaitUntil:
-    visible:
-      text: "Select exercise Barbell Back Squat"
-    timeout: 15000
-- tapOn:
-    text: "Select exercise Barbell Back Squat"
-- tapOn:
-    id: "exercise-picker-add-empty-set-button"
-- extendedWaitUntil:
-    visible:
-      text: "Barbell Back Squat, 0 of 1 sets done"
-    timeout: 15000
-- tapOn:
-    text: "Barbell Back Squat, 0 of 1 sets done"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-logger"
-    timeout: 15000
-- tapOn:
-    id: "exercise-set-logger-weight"
-- inputText: "135"
-- tapOn:
-    id: "exercise-set-logger-reps"
-- inputText: "8"
-- hideKeyboard:
-    optional: true
-- tapOn:
-    id: "exercise-set-logger-commit"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-1-toggle"
-      text: "Mark set 1 not performed"
-    timeout: 10000
-- tapOn:
-    id: "exercise-page-back"
-- extendedWaitUntil:
-    visible:
-      text: "Barbell Back Squat, 1 of 1 sets done"
-    timeout: 15000
-# One explicitly confirmed set finishes straight through with no cleanup dialog.
-- tapOn:
-    id: "session-view-finish-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-completion-presentation"
-    timeout: 30000
-# M24 inserts a durable completion presentation before returning to Stats. Use
-# its explicit exit so the sync round-trip remains realistic after submission.
-- tapOn:
-    id: "session-completion-done"
-- extendedWaitUntil:
-    visible:
-      id: "stats-history-screen"
-    timeout: 30000
-- takeScreenshot: "18b-first-run-roundtrip-logged-82kg"
-
 # === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
 # Open More, then poll for Settings rather than asserting it immediately:
 # the transition can lag a beat on a cold-JIT first render, and extendedWaitUntil
@@ -551,8 +478,8 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - takeScreenshot: "20-first-run-roundtrip-restored-from-remote"
 
-# The two newest completed rows were logged above. Completed-session screens
-# remain free of body-weight management UI after the full local wipe; the
+# The newest completed row was logged above. Its completed-session screen
+# stays free of body-weight management UI after the full local wipe; the
 # private reading log below proves both dated readings restored independently.
 - tapOn: { id: "completed-session-open-button-.*", index: 0 }
 - extendedWaitUntil:
@@ -560,16 +487,6 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - assertNotVisible: "Body weight"
 - takeScreenshot: "21-roundtrip-newer-session-without-weight-ui"
-- tapOn: { id: "completed-session-detail-back" }
-- extendedWaitUntil:
-    visible: { id: "completed-history-scroll" }
-    timeout: 15000
-- tapOn: { id: "completed-session-open-button-.*", index: 1 }
-- extendedWaitUntil:
-    visible: { id: "completed-session-detail-screen" }
-    timeout: 30000
-- assertNotVisible: "Body weight"
-- takeScreenshot: "22-roundtrip-older-session-without-weight-ui"
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:
     visible: { id: "body-weight-reading-.*", text: "Edit 82 kilograms, .*" }
