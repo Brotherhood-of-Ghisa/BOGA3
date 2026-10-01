@@ -1,19 +1,34 @@
 appId: com.dinoderek.mobile
 ---
-# The session view (`ux-rules` §14b). Proves, on device:
+# The session view (`ux-rules` §14b) on the session-view fixture
+# (src/maestro/session-view-fixture.ts; ios-session-view lane, infra-free).
+#
+# Proves:
 #   1. Train's Resume opens the session view;
-#   2. the summary card and one read-only card per exercise, with its done
-#      count and — for the bench, whose RIR 2 set beats its completed history —
-#      the 1RM record band (fixture: src/maestro/session-view-fixture.ts);
-#   3. a card links to its exercise page (step 4), and its back returns here;
-#   4. the ⋮ menu sheet opens and a backdrop tap dismisses it; tapping the
-#      Gym stat picks a gym; the sheet's Manage gyms opens the Gyms screen,
-#      where a new gym is added, and back on the session view the sheet
-#      reopens with it listed, ready to pick (the GPS suggestion row is jest
-#      only: the simulator cannot fake a location reliably);
-#   5. + Add exercise adds a card through the exercise picker;
-#   6. Finish asks one cleanup prompt for the empty set and the exercises left
-#      with no sets, and opens the completion screen.
+#   2. a card opens its exercise page, and the page's back returns here;
+#   3. the Gym stat's sheet → Manage gyms pushes the Gyms screen; a gym typed
+#      there is saved, and the native back returns to the session view with
+#      the sheet reopened and the new gym listed, ready to pick;
+#   4. `+ Add exercise` opens the picker sheet; a keyboard search and
+#      `Add empty set` add a card;
+#   5. Finish's cleanup prompt leads to the completion screen, its Done to
+#      Stats, and the Today tab then lists the finished session under its
+#      recents;
+#   6. ⋮ → Abandon asks for confirmation, then lands on Train with Start and
+#      no Resume.
+# Why device:
+#   1., 2. and 6. root-stack and tab navigation;
+#   3. a stack push from a sheet, the keyboard, the native back, and the sheet
+#      re-presented on focus;
+#   4. a real sheet and the keyboard;
+#   5. the stack replace after Finish, a native alert, and the tab's re-read
+#      of the device's SQLite on focus.
+# Jest counterpart: app/__tests__/session-view-screen.test.tsx (summary and
+#   cards, record band, live comparison, ⋮ sheet, gym picking and
+#   suggestions, the Gyms round trip, the picker add, cleanup prompts, abandon
+#   confirmation), app/__tests__/session-view-model.test.ts,
+#   app/__tests__/exercise-picker.test.tsx, app/__tests__/gyms-screen.test.tsx,
+#   app/__tests__/train-screen.test.tsx, app/__tests__/today-screen.test.tsx.
 #
 # Hermetic: starts from `reset=data` and ends with a data reset. Infra-free
 # (no sign-in).
@@ -22,21 +37,12 @@ appId: com.dinoderek.mobile
     maxRetries: 3
     commands:
       - openLink: "boga3://maestro-harness?reset=data&fixture=session-view&teleport=session-list"
-      - tapOn:
-          text: "Open"
-          optional: true
-      - tapOn:
-          text: "Continue"
-          optional: true
-      - tapOn:
-          text: "Close"
-          optional: true
       - extendedWaitUntil:
           visible:
             id: "stats-history-screen"
           timeout: 30000
 
-# 1. Train -> Resume lands on the session view.
+# --- 1. Train → Resume lands on the session view ---
 - waitForAnimationToEnd:
     timeout: 4000
 - retry:
@@ -54,25 +60,14 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-view-screen"
     timeout: 15000
-
-# 2. Summary and cards (their accessibility labels carry the counts and record).
+# The cards load after the screen; wait for them before tapping one.
 - extendedWaitUntil:
     visible:
-      text: "Barbell Bench Press, 3 of 5 sets done, new 1RM record 204.3"
+      text: "Incline Dumbbell Press, 3 of 3 sets done"
     timeout: 15000
-- assertVisible:
-    text: "Gym Maestro Block History Gym"
-- assertVisible:
-    text: "Sets 6"
-- assertVisible:
-    text: "Volume 4200"
-- assertVisible:
-    text: "Incline Dumbbell Press, 3 of 3 sets done"
-- assertVisible:
-    text: "Cable Flys, 0 of 3 sets done"
 - takeScreenshot: "01-session-view"
 
-# 3. A card is a link to its exercise page.
+# --- 2. A card is a link to its exercise page ---
 - tapOn:
     text: "Incline Dumbbell Press, 3 of 3 sets done"
 - extendedWaitUntil:
@@ -87,40 +82,7 @@ appId: com.dinoderek.mobile
       id: "session-view-screen"
     timeout: 15000
 
-# 4. The ⋮ menu, dismissed by the backdrop.
-- tapOn:
-    id: "session-view-options-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-abandon"
-    timeout: 10000
-- takeScreenshot: "02-session-options-sheet"
-# The backdrop is hidden from VoiceOver while the sheet is modal (it dismisses
-# with the escape gesture instead), so tap the dimmed page above the panel.
-- tapOn:
-    point: "50%,20%"
-- extendedWaitUntil:
-    notVisible:
-      id: "session-view-abandon"
-    timeout: 10000
-
-# 4b. Tapping the Gym stat opens the gym picker; choosing a gym saves it.
-- tapOn:
-    id: "session-view-summary-gym-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-gym-option-downtown-iron-temple"
-    timeout: 10000
-- takeScreenshot: "02b-session-gym-sheet"
-- tapOn:
-    id: "session-view-gym-option-downtown-iron-temple"
-- extendedWaitUntil:
-    visible:
-      text: "Gym Downtown Iron Temple"
-    timeout: 10000
-
-# 4c. Manage gyms -> Gyms screen -> add a gym -> back -> the sheet reopens
-# with it listed -> pick it.
+# --- 3. Gym sheet → Manage gyms → Gyms → add → back → the sheet reopens ---
 - tapOn:
     id: "session-view-summary-gym-button"
 - extendedWaitUntil:
@@ -131,14 +93,8 @@ appId: com.dinoderek.mobile
     id: "session-view-gym-manage"
 - extendedWaitUntil:
     visible:
-      id: "gyms-screen"
-    timeout: 15000
-- extendedWaitUntil:
-    visible:
       id: "gyms-add"
     timeout: 15000
-- assertNotVisible:
-    id: "back-to-more-button"
 - takeScreenshot: "02c-gyms-screen"
 - tapOn:
     id: "gyms-add"
@@ -151,14 +107,12 @@ appId: com.dinoderek.mobile
 - inputText: "Canal Street Gym"
 - hideKeyboard:
     optional: true
-- takeScreenshot: "02d-gyms-add-editor"
 - tapOn:
     id: "gym-editor-save"
 - extendedWaitUntil:
     visible:
       text: "Edit gym Canal Street Gym"
     timeout: 10000
-- takeScreenshot: "02e-gyms-added"
 # The native back item is arrow-only; its accessibility label is the session
 # view's stack title, "Session".
 - tapOn: "Session"
@@ -166,7 +120,6 @@ appId: com.dinoderek.mobile
     visible:
       text: "Select gym Canal Street Gym"
     timeout: 15000
-- takeScreenshot: "02f-session-gym-sheet-reloaded"
 - tapOn:
     text: "Select gym Canal Street Gym"
 - extendedWaitUntil:
@@ -174,7 +127,7 @@ appId: com.dinoderek.mobile
       text: "Gym Canal Street Gym"
     timeout: 10000
 
-# 5. + Add exercise, through the exercise picker.
+# --- 4. + Add exercise, through the exercise picker ---
 - scrollUntilVisible:
     element:
       id: "session-view-add-exercise"
@@ -187,29 +140,7 @@ appId: com.dinoderek.mobile
       id: "exercise-family-group-chest"
     timeout: 15000
 - takeScreenshot: "picker-default"
-- assertVisible: "Favourite"
-- assertVisible: "Name A–Z"
-- assertVisible: "Show never-done"
-- takeScreenshot: "picker-options"
 - tapOn: "Exercise filter input"
-- inputText: "Barbell Bench Press"
-- pressKey: Enter
-- extendedWaitUntil:
-    visible:
-      text: "Select exercise Barbell Bench Press"
-    timeout: 15000
-- tapOn:
-    text: "Select exercise Barbell Bench Press"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-picker-plan-set-row-1"
-    timeout: 15000
-- assertVisible:
-    id: "exercise-picker-append-plan-button"
-- takeScreenshot: "picker-preselection"
-# A new search clears the preselection.
-- tapOn: "Exercise filter input"
-- eraseText: 40
 - inputText: "Lat Pulldown"
 - pressKey: Enter
 - extendedWaitUntil:
@@ -227,25 +158,9 @@ appId: com.dinoderek.mobile
     centerElement: true
 - takeScreenshot: "03-session-view-exercise-added"
 
-# The live comparison reads completed history and switches grouping without leaving the session.
-- scrollUntilVisible:
-    element:
-      id: "session-insight-mode-muscle"
-    direction: DOWN
-    centerElement: true
-- tapOn:
-    id: "session-insight-mode-muscle"
-- scrollUntilVisible:
-    element:
-      id: "session-insight-muscle-comparison-chest"
-    direction: DOWN
-    centerElement: true
-- assertVisible:
-    id: "session-insight-muscle-comparison-chest-distribution"
-- takeScreenshot: "session-live-muscle-comparison"
-
-# 6. Finish: ONE cleanup prompt removes the added exercise's empty set and the
-# exercises left with no sets together, then the completion screen.
+# --- 5. Finish → completion → Done → Stats; Today lists the session ---
+# One cleanup prompt covers the added exercise's empty set and the exercises
+# left with no sets.
 - tapOn:
     id: "session-view-finish-button"
 - extendedWaitUntil:
@@ -258,9 +173,6 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-completion-presentation"
     timeout: 20000
-- takeScreenshot: "04-session-view-finished"
-
-# 7. Today lists the finished session under Recent sessions (DLM-T03 capture).
 - tapOn:
     id: "session-completion-done"
 - extendedWaitUntil:
@@ -277,13 +189,40 @@ appId: com.dinoderek.mobile
     element:
       id: "today-recents-section"
     direction: DOWN
-- assertNotVisible:
-    id: "today-recents-empty"
 - assertVisible:
     id: "today-recent-session-summary-.*-start"
 - waitForAnimationToEnd:
     timeout: 4000
 - takeScreenshot: "today-recents"
+
+# --- 6. Abandon, on a freshly seeded active session ---
+- openLink: "boga3://maestro-harness?reset=data&fixture=session-view&teleport=session-view&sessionId=maestro_session_view_active"
+# Today has no session-view options button; wait for it (spec 06 rule 4).
+- extendedWaitUntil:
+    visible:
+      id: "session-view-options-button"
+    timeout: 30000
+- tapOn:
+    id: "session-view-options-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-abandon"
+    timeout: 10000
+- tapOn:
+    id: "session-view-abandon"
+- extendedWaitUntil:
+    visible:
+      text: "Abandon session?"
+    timeout: 10000
+- tapOn:
+    text: "Abandon"
+- extendedWaitUntil:
+    visible:
+      id: "train-start-empty-button"
+    timeout: 15000
+- assertNotVisible:
+    id: "train-resume-session-button"
+- takeScreenshot: "02-abandoned-back-on-train"
 
 # Leave the simulator as this flow found it: data reset.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"

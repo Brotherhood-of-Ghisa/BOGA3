@@ -102,15 +102,10 @@ case "$lane" in
     run_flow data "Exercise page" exercise-page.yaml
     ;;
 
-  # The session view (redesign step 5): two flows sharing one simulator +
-  # Metro, each seeding its session through the harness
+  # The session view: one flow that seeds its session through the harness
   # (`reset=data&fixture=session-view`). Infra-free; `data` reset is enough.
   session-view)
-    MAESTRO_RESET_STRATEGY=data \
-    "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
-      --session "iOS session view" \
-      --scenario "Session view" --flow "$APP_DIR/.maestro/flows/session-view.yaml" \
-      --scenario "Session view abandon" --flow "$APP_DIR/.maestro/flows/session-view-abandon.yaml"
+    run_flow data "Session view" session-view.yaml
     ;;
 
   # The Supabase-configured auth/profile lane: login-on-start enforcement and the

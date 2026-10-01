@@ -52,8 +52,8 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `picker-default` (`ios-session-view`) | the picker as it opens: grouped, every family collapsed |
-| `picker-options` (`ios-session-view`) | visible sort and never-done controls |
-| `picker-preselection` (`ios-session-view`) | a picked exercise with a plan from history |
+| `picker-options` (ad hoc) | visible sort and never-done controls |
+| `picker-preselection` (ad hoc) | a picked exercise with a plan from history |
 | `03-session-view-exercise-added` (`ios-session-view`) | the session view after `Add empty set` |
 | `exercise-swap-sheet` (ad hoc) | ⋮ → Swap exercise: the shared list in the swap sheet |
 | `groups-link-03-picker-search` (`ios-groups-e2e`) | a search with `From your groups` |
