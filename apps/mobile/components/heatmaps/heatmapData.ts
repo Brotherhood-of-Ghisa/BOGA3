@@ -83,6 +83,146 @@ const startOfMondayWeek = (date: Date): Date => addUtcDays(date, -mondayIndex(da
 const isAdditiveMetric = (metric: CalendarHeatmapMetric): boolean =>
   metric === 'totalVolume' || metric === 'workingSetCount';
 
+/** Best-of aggregation; a missing value counts as zero. */
+const bestOf = (left: number | null, right: number | null | undefined): number =>
+  Math.max(left ?? 0, right ?? 0);
+
+const DEFAULT_WEEKS = 52;
+
+/** Monday of the week `weeks - 1` weeks before today's week. */
+const windowStart = (today: Date, weeks: number): Date =>
+  addUtcDays(startOfMondayWeek(today), -(weeks - 1) * 7);
+
+const earliestDay = (dailyMetrics: DailyEffortMetrics[]): Date | null => {
+  let earliest: Date | null = null;
+  for (const day of dailyMetrics) {
+    const date = dateKeyToUtcDate(day.dateKey);
+    if (!earliest || date < earliest) earliest = date;
+  }
+  return earliest;
+};
+
+/**
+ * First day of the grid. `'all'` spans from the earliest day in the data
+ * (Monday-aligned), but never shows a window shorter than the default 52 weeks.
+ */
+const resolveGridStart = (dailyMetrics: DailyEffortMetrics[], today: Date, weeks: number | 'all' | undefined): Date => {
+  if (weeks !== 'all') {
+    return windowStart(today, weeks ?? DEFAULT_WEEKS);
+  }
+  const defaultStart = windowStart(today, DEFAULT_WEEKS);
+  const earliest = earliestDay(dailyMetrics);
+  const earliestStart = earliest ? startOfMondayWeek(earliest) : defaultStart;
+  return earliestStart < defaultStart ? earliestStart : defaultStart;
+};
+
+const eachDay = (start: Date, end: Date): Date[] => {
+  const days: Date[] = [];
+  for (let date = new Date(start); date <= end; date = addUtcDays(date, 1)) {
+    days.push(date);
+  }
+  return days;
+};
+
+/** Min/max of the positive values (min 0 when there are none). */
+const positiveRange = (values: number[]): { min: number; max: number } => {
+  const positive = values.filter((value) => value > 0);
+  if (positive.length === 0) return { min: 0, max: 0 };
+  return { min: positive.reduce((a, b) => Math.min(a, b)), max: positive.reduce((a, b) => Math.max(a, b)) };
+};
+
+/**
+ * Buckets each cell onto the heat ramp, calibrated across the observed range of
+ * positive values in its series (see getCalendarHeatmapBucket).
+ */
+const withLevels = <T extends { value: number }>(cells: T[]): (T & { level: CalendarHeatmapBucket })[] => {
+  const { min, max } = positiveRange(cells.map((cell) => cell.value));
+  return cells.map((cell) => ({ ...cell, level: getCalendarHeatmapBucket(cell.value, min, max) }));
+};
+
+const toDayCell = (
+  date: Date,
+  source: DailyEffortMetrics | undefined,
+  metric: CalendarHeatmapMetric,
+  todayDateKey: string
+): Omit<DayCell, 'level'> => {
+  const dateKey = formatUtcDateKey(date);
+  const metricValue = source ? getMetricValue(source, metric) : 0;
+  const unavailable = metricValue === null;
+  const value = metricValue ?? 0;
+  return {
+    dateKey,
+    weekStartDateKey: formatUtcDateKey(startOfMondayWeek(date)),
+    dow: mondayIndex(date),
+    isToday: dateKey === todayDateKey,
+    value,
+    unavailable,
+    hasTraining: source !== undefined,
+    // A volume day with some unknown load still reports the volume it does know.
+    knownValue: unavailable && metric === 'totalVolume' ? source?.knownVolume : value,
+  };
+};
+
+type WeekTotals = {
+  monday: Date;
+  sessions: number;
+  value: number;
+  knownValue: number | null;
+  unavailable: boolean;
+  hasKnown: boolean;
+};
+
+const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
+  monday: dateKeyToUtcDate(weekStartDateKey),
+  sessions: 0,
+  value: 0,
+  knownValue: 0,
+  unavailable: false,
+  hasKnown: false,
+});
+
+const addDayToWeek = (week: WeekTotals, day: DayCell, metric: CalendarHeatmapMetric): void => {
+  const combine = isAdditiveMetric(metric) ? addFiniteVolume : bestOf;
+  if (day.hasTraining) week.sessions++;
+  if (day.hasTraining && !day.unavailable) week.hasKnown = true;
+  if (metric === 'totalVolume' && day.unavailable) week.unavailable = true;
+  week.knownValue = combine(week.knownValue, day.knownValue === undefined ? day.value : day.knownValue);
+  if (day.value > 0) {
+    const next = combine(week.value, day.value);
+    if (next === null) week.unavailable = true;
+    week.value = next ?? 0;
+  }
+};
+
+/** Groups days → weeks (in grid order), aggregating the metric the way the weekly effort does. */
+const accumulateWeeks = (daily: DayCell[], metric: CalendarHeatmapMetric): Map<string, WeekTotals> => {
+  const weeks = new Map<string, WeekTotals>();
+  for (const day of daily) {
+    let week = weeks.get(day.weekStartDateKey);
+    if (!week) {
+      week = emptyWeek(day.weekStartDateKey);
+      weeks.set(day.weekStartDateKey, week);
+    }
+    addDayToWeek(week, day, metric);
+  }
+  return weeks;
+};
+
+const toWeekCell = (weekStartDateKey: string, week: WeekTotals, todayWeekKey: string): Omit<WeekCell, 'level'> => {
+  // A week of training days that all lack the metric is unavailable, not a rest week.
+  const unavailable = week.unavailable || (week.sessions > 0 && !week.hasKnown);
+  return {
+    weekStartDateKey,
+    monday: week.monday,
+    isCurrentWeek: weekStartDateKey === todayWeekKey,
+    sessions: week.sessions,
+    value: unavailable ? 0 : week.value,
+    unavailable,
+    knownValue: week.knownValue,
+    hasTraining: week.sessions > 0,
+  };
+};
+
 /**
  * Build the daily grid (full Monday-aligned 52-week span, rest days included) and
  * the matching weekly series for one selected metric.
@@ -93,117 +233,19 @@ export function buildHeatmapData(
   options: BuildHeatmapDataOptions = {}
 ): HeatmapData {
   const todayDateKey = options.todayDateKey ?? getCurrentLocalDateKey();
-  const DEFAULT_WEEKS = 52;
-
   const today = dateKeyToUtcDate(todayDateKey);
+  const sourceByDateKey = new Map(dailyMetrics.map((day) => [day.dateKey, day]));
+
+  const daily = withLevels(
+    eachDay(resolveGridStart(dailyMetrics, today, options.weeks), today).map((date) =>
+      toDayCell(date, sourceByDateKey.get(formatUtcDateKey(date)), metric, todayDateKey)
+    )
+  );
+
   const todayWeekKey = formatUtcDateKey(startOfMondayWeek(today));
-  const defaultGridStart = addUtcDays(startOfMondayWeek(today), -(DEFAULT_WEEKS - 1) * 7);
-
-  let gridStart: Date;
-  if (options.weeks === 'all') {
-    // Span from the earliest day in the data (Monday-aligned), but never show a window
-    // shorter than the default 52 weeks.
-    let earliest: Date | null = null;
-    for (const day of dailyMetrics) {
-      const d = dateKeyToUtcDate(day.dateKey);
-      if (!earliest || d < earliest) earliest = d;
-    }
-    const earliestStart = earliest ? startOfMondayWeek(earliest) : defaultGridStart;
-    gridStart = earliestStart < defaultGridStart ? earliestStart : defaultGridStart;
-  } else {
-    const windowWeeks = options.weeks ?? DEFAULT_WEEKS;
-    gridStart = addUtcDays(startOfMondayWeek(today), -(windowWeeks - 1) * 7);
-  }
-
-  // dateKey → selected-metric value (0 when the metric has nothing to show)
-  const valueByDateKey = new Map<string, number>();
-  const sourceByDateKey = new Map(dailyMetrics.map(day => [day.dateKey, day]));
-  for (const day of dailyMetrics) {
-    valueByDateKey.set(day.dateKey, getMetricValue(day, metric) ?? 0);
-  }
-
-  // Min/max positive daily value within the window — calibrates the daily heat ramp
-  // across the observed range of activity (see getCalendarHeatmapBucket).
-  let maxDaily = 0;
-  let minDaily = Infinity;
-  for (let d = new Date(gridStart); d <= today; d = addUtcDays(d, 1)) {
-    const v = valueByDateKey.get(formatUtcDateKey(d)) ?? 0;
-    if (v > 0) {
-      if (v > maxDaily) maxDaily = v;
-      if (v < minDaily) minDaily = v;
-    }
-  }
-  if (minDaily === Infinity) minDaily = 0;
-
-  const daily: DayCell[] = [];
-  for (let d = new Date(gridStart); d <= today; d = addUtcDays(d, 1)) {
-    const dateKey = formatUtcDateKey(d);
-    const value = valueByDateKey.get(dateKey) ?? 0;
-    const source = sourceByDateKey.get(dateKey);
-    const unavailable = source !== undefined && getMetricValue(source, metric) === null;
-    daily.push({
-      unavailable, hasTraining: source !== undefined,
-      knownValue: unavailable && metric === 'totalVolume' ? source?.knownVolume : value,
-      dateKey,
-      weekStartDateKey: formatUtcDateKey(startOfMondayWeek(d)),
-      dow: mondayIndex(d),
-      isToday: dateKey === todayDateKey,
-      level: getCalendarHeatmapBucket(value, minDaily, maxDaily),
-      value,
-    });
-  }
-
-  // Group days → weeks, aggregating the metric the way the weekly effort does.
-  const additive = isAdditiveMetric(metric);
-  const weekOrder: string[] = [];
-  const weekAcc = new Map<string, { value: number; sessions: number; monday: Date; unavailable: boolean; hasKnown: boolean; knownValue: number | null }>();
-  for (const day of daily) {
-    let acc = weekAcc.get(day.weekStartDateKey);
-    if (!acc) {
-      acc = { value: 0, sessions: 0, unavailable: false, hasKnown: false, knownValue: 0, monday: dateKeyToUtcDate(day.weekStartDateKey) };
-      weekAcc.set(day.weekStartDateKey, acc);
-      weekOrder.push(day.weekStartDateKey);
-    }
-    if (day.hasTraining) acc.sessions++;
-    if (metric === 'totalVolume' && day.unavailable) acc.unavailable = true;
-    if (day.hasTraining && !day.unavailable) acc.hasKnown = true;
-    const knownDay = day.knownValue === undefined ? day.value : day.knownValue;
-    acc.knownValue = additive ? addFiniteVolume(acc.knownValue, knownDay) : Math.max(acc.knownValue ?? 0, knownDay ?? 0);
-    if (day.value > 0) {
-      const next = additive ? addFiniteVolume(acc.value, day.value) : Math.max(acc.value, day.value);
-      if (next === null) acc.unavailable = true;
-      acc.value = next ?? 0;
-    }
-  }
-
-  for (const acc of weekAcc.values()) {
-    if (acc.sessions > 0 && !acc.hasKnown) acc.unavailable = true;
-    if (acc.unavailable) acc.value = 0;
-  }
-
-  let maxWeekly = 0;
-  let minWeekly = Infinity;
-  for (const key of weekOrder) {
-    const v = weekAcc.get(key)!.value;
-    if (v > 0) {
-      if (v > maxWeekly) maxWeekly = v;
-      if (v < minWeekly) minWeekly = v;
-    }
-  }
-  if (minWeekly === Infinity) minWeekly = 0;
-
-  const weekly: WeekCell[] = weekOrder.map((weekStartDateKey) => {
-    const acc = weekAcc.get(weekStartDateKey)!;
-    return {
-      weekStartDateKey,
-      monday: acc.monday,
-      isCurrentWeek: weekStartDateKey === todayWeekKey,
-      sessions: acc.sessions,
-      level: getCalendarHeatmapBucket(acc.value, minWeekly, maxWeekly),
-      value: acc.value,
-      unavailable: acc.unavailable, knownValue: acc.knownValue, hasTraining: acc.sessions > 0,
-    };
-  });
+  const weekly = withLevels(
+    [...accumulateWeeks(daily, metric)].map(([weekStartDateKey, week]) => toWeekCell(weekStartDateKey, week, todayWeekKey))
+  );
 
   return { daily, weekly, todayDateKey };
 }

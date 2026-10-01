@@ -326,6 +326,82 @@ describe('history sentences (E1.3)', () => {
     expect(describeHistorySentence(item(overrides), ME)).toBe(expected);
   });
 
+  it.each<[string, Partial<GroupBoardHistoryItem>, string]>([
+    [
+      'a void with no previous holder',
+      {
+        reason: 'void',
+        leader: SAM,
+        previous: null,
+        related: { kind: 'record_voided', key: 'v3', reason: 'deleted', record: { weight_kg: 1, reps: 1, e1rm_kg: 1 } },
+      },
+      'Sam now #1 · 138 kg (a record removed — set deleted)',
+    ],
+    ['a void with no related event', { reason: 'void', leader: SAM, previous: null, related: null }, 'Sam now #1 · 138 kg (a record removed)'],
+    ['a record that empties the board', { reason: 'record', leader: null, previous: DAVE }, 'No one holds #1'],
+    [
+      'a certification given that leaves no leader',
+      { reason: 'certification', leader: null, previous: DAVE, related: certification('certified', 'Kim') },
+      'No one holds #1',
+    ],
+    [
+      'a certification ended with no previous holder and no leader',
+      { reason: 'certification', leader: null, previous: null, related: certification('withdrawn', 'Kim') },
+      'No one holds #1',
+    ],
+    [
+      'an unlink with no previous holder',
+      {
+        reason: 'link',
+        leader: SAM,
+        previous: null,
+        related: { kind: 'link', key: 'l3', event: 'unlink', exercises: [{ exercise_definition_id: 'd1', name: 'Bench' }] },
+      },
+      'Sam took #1 · 138 kg (unlinked Bench)',
+    ],
+    [
+      'a link with no exercises',
+      { reason: 'link', related: { kind: 'link', key: 'l4', event: 'link', exercises: [] } },
+      'Dave took #1 · 142.5 kg (linked an exercise)',
+    ],
+    [
+      'a certification cancelled with no previous holder',
+      { reason: 'certification', leader: SAM, previous: null, related: certification('cancelled', null) },
+      'Sam now #1 · 138 kg (a certification cancelled)',
+    ],
+    [
+      'a certification given with no certifier',
+      { reason: 'certification', previous: SAM, related: certification('certified', null) },
+      'Dave took #1 · 142.5 kg (certified)',
+    ],
+  ])('edge wording: %s', (_label, overrides, expected) => {
+    expect(describeHistorySentence(item(overrides), ME)).toBe(expected);
+  });
+
+  it('speaks to me after a certification loss and as the certifier', () => {
+    const mine = holder(ME, 'dino', 150);
+    expect(
+      describeHistorySentence(
+        item({ reason: 'certification', leader: mine, previous: DAVE, related: certification('voided', 'Kim') }),
+        ME,
+      ),
+    ).toBe("You're now #1 · 150 kg (Dave's 142.5 kg certification voided)");
+    const certifiedByMe: GroupBoardHistoryItem['related'] = {
+      kind: 'certification',
+      key: 'c2',
+      event: 'certified',
+      certified_by: { user_id: ME, username: 'dino' },
+      ended_by: null,
+      set_id: 'set-u1',
+      weight_kg: 140,
+      reps: 1,
+      e1rm_kg: 142.5,
+    };
+    expect(describeHistorySentence(item({ reason: 'certification', previous: SAM, related: certifiedByMe }), ME)).toBe(
+      'Dave took #1 · 142.5 kg (certified by you)',
+    );
+  });
+
   it('speaks to me: "You", "you", "your"', () => {
     const mine = holder(ME, 'dino', 150);
     expect(describeHistorySentence(item({ reason: 'record', leader: mine, previous: DAVE }), ME)).toBe(

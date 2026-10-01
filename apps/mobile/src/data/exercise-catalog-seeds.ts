@@ -4206,195 +4206,235 @@ const buildSeedSummary = (bundle: SystemExerciseCatalogSeedBundle): SystemExerci
 export const getSystemExerciseCatalogSeedSummary = (): SystemExerciseCatalogSeedSummary =>
   buildSeedSummary(SYSTEM_EXERCISE_CATALOG_SEED_BUNDLE);
 
+type SeedIssue = SystemExerciseCatalogSeedValidationIssue;
+type SectionResult = { issues: SeedIssue[]; ids: Set<string> };
+
+const seedIssue = (code: SeedIssue['code'], message: string): SeedIssue => ({ code, message });
+
+/** Records `key` in `seen` and reports whether it was already there. */
+const isRepeat = (seen: Set<string>, key: string): boolean => {
+  const repeat = seen.has(key);
+  seen.add(key);
+  return repeat;
+};
+
+const unknownSourceIssues = (
+  sourceReferenceIds: string[],
+  knownSourceIds: Set<string>,
+  toIssue: (sourceReferenceId: string) => SeedIssue
+): SeedIssue[] => sourceReferenceIds.filter((id) => !knownSourceIds.has(id)).map(toIssue);
+
+const validateMuscleGroups = (muscleGroups: MuscleGroupSeed[]): SectionResult => {
+  const issues: SeedIssue[] = [];
+  const ids = new Set<string>();
+  for (const { id, isEditable, sortOrder } of muscleGroups) {
+    if (isRepeat(ids, id)) {
+      issues.push(seedIssue('duplicate_muscle_group_id', `Duplicate muscle group id: ${id}`));
+    }
+    if (isEditable !== 0) {
+      issues.push(
+        seedIssue('invalid_muscle_group_is_editable', `Muscle group ${id} must be non-editable (isEditable=0) in M6 seeds`)
+      );
+    }
+    if (!Number.isInteger(sortOrder) || sortOrder < 0) {
+      issues.push(seedIssue('invalid_muscle_group_sort_order', `Muscle group ${id} has invalid sortOrder ${sortOrder}`));
+    }
+  }
+  return { issues, ids };
+};
+
+const validateExerciseIdentities = (exercises: SystemExerciseDefinitionSeed[]): SectionResult => {
+  const issues: SeedIssue[] = [];
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  for (const { id, name } of exercises) {
+    if (isRepeat(ids, id)) {
+      issues.push(seedIssue('duplicate_exercise_definition_id', `Duplicate exercise definition id: ${id}`));
+    }
+    if (isRepeat(names, name.trim().toLowerCase())) {
+      issues.push(
+        seedIssue('duplicate_exercise_definition_name', `Duplicate exercise definition name (case-insensitive): ${name}`)
+      );
+    }
+  }
+  return { issues, ids };
+};
+
+const validateSourceReferences = (sources: SeedSourceReference[]): SectionResult => {
+  const issues: SeedIssue[] = [];
+  const ids = new Set<string>();
+  for (const { id, url } of sources) {
+    if (isRepeat(ids, id)) {
+      issues.push(seedIssue('duplicate_source_reference_id', `Duplicate source reference id: ${id}`));
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      issues.push(seedIssue('invalid_source_reference_url', `Source reference ${id} must have an absolute http(s) URL`));
+    }
+  }
+  return { issues, ids };
+};
+
+/** Returns the documented exercise ids. */
+const validateExerciseDocumentation = (
+  documentation: SeedExerciseDocumentation[],
+  knownSourceIds: Set<string>
+): SectionResult => {
+  const issues: SeedIssue[] = [];
+  const ids = new Set<string>();
+  for (const { exerciseDefinitionId, sourceReferenceIds } of documentation) {
+    if (isRepeat(ids, exerciseDefinitionId)) {
+      issues.push(
+        seedIssue('duplicate_exercise_documentation', `Duplicate exercise documentation entry for ${exerciseDefinitionId}`)
+      );
+    }
+    issues.push(
+      ...unknownSourceIssues(sourceReferenceIds, knownSourceIds, (sourceId) =>
+        seedIssue(
+          'unknown_exercise_documentation_source',
+          `Exercise documentation for ${exerciseDefinitionId} references unknown source ${sourceId}`
+        )
+      )
+    );
+  }
+  return { issues, ids };
+};
+
+const VALID_LOAD_INPUT_MODES: readonly string[] = ['total_load', 'per_side_load'];
+
+const validateExerciseFields = (
+  exercises: SystemExerciseDefinitionSeed[],
+  documentedExerciseIds: Set<string>
+): SeedIssue[] =>
+  exercises.flatMap(({ id, loadInputMode }) => [
+    ...(VALID_LOAD_INPUT_MODES.includes(loadInputMode)
+      ? []
+      : [seedIssue('invalid_exercise_load_input_mode', `Exercise ${id} has invalid load input mode ${String(loadInputMode)}`)]),
+    ...(documentedExerciseIds.has(id)
+      ? []
+      : [seedIssue('missing_exercise_documentation', `Missing exercise documentation for ${id}`)]),
+  ]);
+
+/** Returns the rationale keys (exercise::muscle::weight). */
+const validateGranularRationales = (
+  rationales: GranularWeightRationale[],
+  knownSourceIds: Set<string>
+): SectionResult => {
+  const issues: SeedIssue[] = [];
+  const ids = new Set<string>();
+  for (const rationale of rationales) {
+    const key = createGranularWeightKey(rationale.exerciseDefinitionId, rationale.muscleGroupId, rationale.weight);
+    if (isRepeat(ids, key)) {
+      issues.push(seedIssue('duplicate_granular_weight_rationale', `Duplicate granular weight rationale for ${key}`));
+    }
+    issues.push(
+      ...unknownSourceIssues(rationale.sourceReferenceIds, knownSourceIds, (sourceId) =>
+        seedIssue(
+          'unknown_granular_weight_rationale_source',
+          `Granular weight rationale for ${key} references unknown source ${sourceId}`
+        )
+      )
+    );
+  }
+  return { issues, ids };
+};
+
+type MappingReferences = { exerciseIds: Set<string>; muscleIds: Set<string>; rationaleKeys: Set<string> };
+
+const VALID_MAPPING_ROLES: readonly string[] = ['primary', 'secondary'];
+
+/** The per-row checks after the duplicate-pair check, in report order. */
+const mappingRowIssues = (
+  mapping: SystemExerciseMuscleMappingSeed,
+  pairKey: string,
+  references: MappingReferences
+): SeedIssue[] => {
+  const { exerciseDefinitionId, muscleGroupId, weight, role } = mapping;
+  const issues: SeedIssue[] = [];
+  if (!references.exerciseIds.has(exerciseDefinitionId)) {
+    issues.push(
+      seedIssue(
+        'unknown_mapping_exercise_definition_id',
+        `Mapping references unknown exerciseDefinitionId: ${exerciseDefinitionId}`
+      )
+    );
+  }
+  if (!references.muscleIds.has(muscleGroupId)) {
+    issues.push(seedIssue('unknown_mapping_muscle_group_id', `Mapping references unknown muscleGroupId: ${muscleGroupId}`));
+  }
+  if (!Number.isFinite(weight) || weight <= 0) {
+    issues.push(seedIssue('invalid_mapping_weight', `Mapping ${pairKey} has invalid weight ${weight}`));
+  }
+  if (!VALID_MAPPING_ROLES.includes(role)) {
+    issues.push(
+      seedIssue(
+        'invalid_mapping_role',
+        `Mapping ${pairKey} has invalid role ${role}; M6 seeds allow only primary|secondary`
+      )
+    );
+  }
+  const granularKey = createGranularWeightKey(exerciseDefinitionId, muscleGroupId, weight);
+  if (!DEFAULT_WEIGHTS.has(weight) && !references.rationaleKeys.has(granularKey)) {
+    issues.push(
+      seedIssue(
+        'undocumented_granular_weight',
+        `Mapping ${pairKey} uses non-default weight ${weight} without a granular rationale`
+      )
+    );
+  }
+  return issues;
+};
+
+/** Returns the ids of known exercises that have at least one mapping. */
+const validateMappings = (mappings: SystemExerciseMuscleMappingSeed[], references: MappingReferences): SectionResult => {
+  const issues: SeedIssue[] = [];
+  const pairs = new Set<string>();
+  const ids = new Set<string>();
+  for (const mapping of mappings) {
+    const pairKey = createMappingPairKey(mapping.exerciseDefinitionId, mapping.muscleGroupId);
+    if (isRepeat(pairs, pairKey)) {
+      issues.push(seedIssue('duplicate_mapping_pair', `Duplicate mapping pair: ${pairKey}`));
+    }
+    if (references.exerciseIds.has(mapping.exerciseDefinitionId)) {
+      ids.add(mapping.exerciseDefinitionId);
+    }
+    issues.push(...mappingRowIssues(mapping, pairKey, references));
+  }
+  return { issues, ids };
+};
+
+const validateMappingCoverage = (
+  exercises: SystemExerciseDefinitionSeed[],
+  mappedExerciseIds: Set<string>
+): SeedIssue[] =>
+  exercises
+    .filter(({ id }) => !mappedExerciseIds.has(id))
+    .map(({ id }) => seedIssue('exercise_missing_mapping', `Exercise ${id} has no muscle mappings`));
+
+/** Every issue in the bundle, grouped by section in a fixed order (the assert message keeps it). */
 export const validateSystemExerciseCatalogSeeds = (
   bundle: SystemExerciseCatalogSeedBundle = SYSTEM_EXERCISE_CATALOG_SEED_BUNDLE
 ): SystemExerciseCatalogSeedValidationIssue[] => {
-  const issues: SystemExerciseCatalogSeedValidationIssue[] = [];
+  const muscleGroups = validateMuscleGroups(bundle.muscleGroups);
+  const exercises = validateExerciseIdentities(bundle.exerciseDefinitions);
+  const sources = validateSourceReferences(bundle.sourceReferences);
+  const documentation = validateExerciseDocumentation(bundle.exerciseDocumentation, sources.ids);
+  const rationales = validateGranularRationales(bundle.granularWeightRationales, sources.ids);
+  const mappings = validateMappings(bundle.mappings, {
+    exerciseIds: exercises.ids,
+    muscleIds: muscleGroups.ids,
+    rationaleKeys: rationales.ids,
+  });
 
-  const muscleIds = new Set<string>();
-  for (const muscleGroup of bundle.muscleGroups) {
-    if (muscleIds.has(muscleGroup.id)) {
-      issues.push({
-        code: 'duplicate_muscle_group_id',
-        message: `Duplicate muscle group id: ${muscleGroup.id}`,
-      });
-    }
-    muscleIds.add(muscleGroup.id);
-
-    if (muscleGroup.isEditable !== 0) {
-      issues.push({
-        code: 'invalid_muscle_group_is_editable',
-        message: `Muscle group ${muscleGroup.id} must be non-editable (isEditable=0) in M6 seeds`,
-      });
-    }
-
-    if (!Number.isInteger(muscleGroup.sortOrder) || muscleGroup.sortOrder < 0) {
-      issues.push({
-        code: 'invalid_muscle_group_sort_order',
-        message: `Muscle group ${muscleGroup.id} has invalid sortOrder ${muscleGroup.sortOrder}`,
-      });
-    }
-  }
-
-  const exerciseIds = new Set<string>();
-  const exerciseNames = new Set<string>();
-  for (const exercise of bundle.exerciseDefinitions) {
-    if (exerciseIds.has(exercise.id)) {
-      issues.push({
-        code: 'duplicate_exercise_definition_id',
-        message: `Duplicate exercise definition id: ${exercise.id}`,
-      });
-    }
-    exerciseIds.add(exercise.id);
-
-    const normalizedName = exercise.name.trim().toLowerCase();
-    if (exerciseNames.has(normalizedName)) {
-      issues.push({
-        code: 'duplicate_exercise_definition_name',
-        message: `Duplicate exercise definition name (case-insensitive): ${exercise.name}`,
-      });
-    }
-    exerciseNames.add(normalizedName);
-  }
-
-  const sourceReferenceIds = new Set<string>();
-  for (const source of bundle.sourceReferences) {
-    if (sourceReferenceIds.has(source.id)) {
-      issues.push({
-        code: 'duplicate_source_reference_id',
-        message: `Duplicate source reference id: ${source.id}`,
-      });
-    }
-    sourceReferenceIds.add(source.id);
-
-    if (!source.url.startsWith('http://') && !source.url.startsWith('https://')) {
-      issues.push({
-        code: 'invalid_source_reference_url',
-        message: `Source reference ${source.id} must have an absolute http(s) URL`,
-      });
-    }
-  }
-
-  const exerciseDocumentationById = new Map<string, SeedExerciseDocumentation>();
-  for (const documentation of bundle.exerciseDocumentation) {
-    if (exerciseDocumentationById.has(documentation.exerciseDefinitionId)) {
-      issues.push({
-        code: 'duplicate_exercise_documentation',
-        message: `Duplicate exercise documentation entry for ${documentation.exerciseDefinitionId}`,
-      });
-    }
-    exerciseDocumentationById.set(documentation.exerciseDefinitionId, documentation);
-
-    for (const sourceReferenceId of documentation.sourceReferenceIds) {
-      if (!sourceReferenceIds.has(sourceReferenceId)) {
-        issues.push({
-          code: 'unknown_exercise_documentation_source',
-          message: `Exercise documentation for ${documentation.exerciseDefinitionId} references unknown source ${sourceReferenceId}`,
-        });
-      }
-    }
-  }
-
-  for (const exercise of bundle.exerciseDefinitions) {
-    if (!['total_load', 'per_side_load'].includes(exercise.loadInputMode)) {
-      issues.push({
-        code: 'invalid_exercise_load_input_mode',
-        message: `Exercise ${exercise.id} has invalid load input mode ${String(exercise.loadInputMode)}`,
-      });
-    }
-    if (!exerciseDocumentationById.has(exercise.id)) {
-      issues.push({
-        code: 'missing_exercise_documentation',
-        message: `Missing exercise documentation for ${exercise.id}`,
-      });
-    }
-  }
-
-  const granularWeightRationaleKeys = new Set<string>();
-  for (const rationale of bundle.granularWeightRationales) {
-    const key = createGranularWeightKey(rationale.exerciseDefinitionId, rationale.muscleGroupId, rationale.weight);
-    if (granularWeightRationaleKeys.has(key)) {
-      issues.push({
-        code: 'duplicate_granular_weight_rationale',
-        message: `Duplicate granular weight rationale for ${key}`,
-      });
-    }
-    granularWeightRationaleKeys.add(key);
-
-    for (const sourceReferenceId of rationale.sourceReferenceIds) {
-      if (!sourceReferenceIds.has(sourceReferenceId)) {
-        issues.push({
-          code: 'unknown_granular_weight_rationale_source',
-          message: `Granular weight rationale for ${key} references unknown source ${sourceReferenceId}`,
-        });
-      }
-    }
-  }
-
-  const mappingPairs = new Set<string>();
-  const mappedExerciseIds = new Set<string>();
-
-  for (const mapping of bundle.mappings) {
-    const pairKey = createMappingPairKey(mapping.exerciseDefinitionId, mapping.muscleGroupId);
-    if (mappingPairs.has(pairKey)) {
-      issues.push({
-        code: 'duplicate_mapping_pair',
-        message: `Duplicate mapping pair: ${pairKey}`,
-      });
-    }
-    mappingPairs.add(pairKey);
-
-    if (!exerciseIds.has(mapping.exerciseDefinitionId)) {
-      issues.push({
-        code: 'unknown_mapping_exercise_definition_id',
-        message: `Mapping references unknown exerciseDefinitionId: ${mapping.exerciseDefinitionId}`,
-      });
-    } else {
-      mappedExerciseIds.add(mapping.exerciseDefinitionId);
-    }
-
-    if (!muscleIds.has(mapping.muscleGroupId)) {
-      issues.push({
-        code: 'unknown_mapping_muscle_group_id',
-        message: `Mapping references unknown muscleGroupId: ${mapping.muscleGroupId}`,
-      });
-    }
-
-    if (!Number.isFinite(mapping.weight) || mapping.weight <= 0) {
-      issues.push({
-        code: 'invalid_mapping_weight',
-        message: `Mapping ${pairKey} has invalid weight ${mapping.weight}`,
-      });
-    }
-
-    if (!['primary', 'secondary'].includes(mapping.role)) {
-      issues.push({
-        code: 'invalid_mapping_role',
-        message: `Mapping ${pairKey} has invalid role ${mapping.role}; M6 seeds allow only primary|secondary`,
-      });
-    }
-
-    if (!DEFAULT_WEIGHTS.has(mapping.weight)) {
-      const granularKey = createGranularWeightKey(mapping.exerciseDefinitionId, mapping.muscleGroupId, mapping.weight);
-      if (!granularWeightRationaleKeys.has(granularKey)) {
-        issues.push({
-          code: 'undocumented_granular_weight',
-          message: `Mapping ${pairKey} uses non-default weight ${mapping.weight} without a granular rationale`,
-        });
-      }
-    }
-  }
-
-  for (const exercise of bundle.exerciseDefinitions) {
-    if (!mappedExerciseIds.has(exercise.id)) {
-      issues.push({
-        code: 'exercise_missing_mapping',
-        message: `Exercise ${exercise.id} has no muscle mappings`,
-      });
-    }
-  }
-
-  return issues;
+  return [
+    ...muscleGroups.issues,
+    ...exercises.issues,
+    ...sources.issues,
+    ...documentation.issues,
+    ...validateExerciseFields(bundle.exerciseDefinitions, documentation.ids),
+    ...rationales.issues,
+    ...mappings.issues,
+    ...validateMappingCoverage(bundle.exerciseDefinitions, mappings.ids),
+  ];
 };
 
 export const assertValidSystemExerciseCatalogSeeds = (

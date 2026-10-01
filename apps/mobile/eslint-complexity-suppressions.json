@@ -92,14 +92,6 @@
       "count": 1
     }
   },
-  "components/exercise-page/records-panel.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/groups/group-comparison-form.tsx": {
     "complexity": {
       "count": 1
@@ -182,14 +174,6 @@
       "count": 1
     }
   },
-  "components/heatmaps/heatmapData.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/session-complete/exercise-volume-card.tsx": {
     "complexity": {
       "count": 1
@@ -219,14 +203,6 @@
       "count": 1
     }
   },
-  "src/data/exercise-catalog-seeds.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "src/data/exercise-catalog-stats.ts": {
     "complexity": {
       "count": 1
@@ -249,14 +225,6 @@
     },
     "max-lines-per-function": {
       "count": 2
-    }
-  },
-  "src/groups/board-view-model.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
     }
   },
   "src/groups/metric-wire-guards.ts": {
