@@ -1,235 +1,219 @@
 /* eslint-disable import/first */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+/**
+ * The Train tab over real data: the production route, its session-list client
+ * and the shared session-entry coordinator over the migrated in-memory SQLite
+ * database (helpers/local-data.ts), seeded with the `session-view` Maestro
+ * fixture where a workout is in progress. Started sessions are read back from
+ * the database. Only the native database open and the router are replaced.
+ *
+ * Planning has no data source yet (the route offers none), so planned launches
+ * are driven through the `planningState` prop with a materializer that writes
+ * a real draft. Named states real data cannot produce: a launch still pending,
+ * a failed draft write, a failed plan write and a failed active-session read.
+ */
+
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
+
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useIsFocused: () => true,
 }));
 
-import { StyleSheet } from 'react-native';
-
-import type { SessionListDataClient, SessionListItem } from '@/components/session-list';
+import TrainRoute, { TrainScreen, type TrainPlanningState } from '../(tabs)/train';
+import { DEFAULT_SESSION_LIST_DATA_CLIENT } from '@/components/session-list';
 import { uiRoles } from '@/components/ui/tokens';
+import * as sessionDrafts from '@/src/data/session-drafts';
+import { listSessionListBuckets, setSessionDeletedState } from '@/src/data/session-list';
+import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
+import {
+  bootLocalApp,
+  closeLocalData,
+  loadMaestroFixture,
+  localDataClient,
+  resetLocalData,
+} from './helpers/local-data';
 
-import { TrainScreen, type TrainPlanningState } from '../(tabs)/train';
+const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
 
-const activeSession: SessionListItem = {
-  id: 'active-session',
-  startedAt: '2026-09-16T09:00:00.000Z',
-  status: 'active',
-  completedAt: null,
-  durationSec: null,
-  durationDisplay: '20m',
-  gymName: 'Iron House',
-  exerciseCount: 2,
-  setCount: 5,
-  totalWeight: 0,
-  deletedAt: null,
+const seed = async (fixture?: 'session-view') => {
+  if (fixture) await loadMaestroFixture(fixture);
+  await bootLocalApp();
 };
 
-const dataClient = (sessions: SessionListItem[]): jest.Mocked<SessionListDataClient> => ({
-  loadSessions: jest.fn().mockResolvedValue(sessions),
-  startSession: jest.fn().mockResolvedValue(undefined),
-  completeActiveSession: jest.fn().mockResolvedValue(undefined),
-  discardActiveSession: jest.fn().mockResolvedValue(undefined),
-  setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-  appendCompletedSessionAsPlanned: jest.fn().mockResolvedValue(undefined),
+const openTrain = async (fixture?: 'session-view') => {
+  await seed(fixture);
+  render(<TrainRoute />);
+  await waitFor(() => expect(screen.queryByTestId('train-session-loading')).toBeNull());
+};
+
+const activeSessionId = async () => (await listSessionListBuckets()).active?.id ?? null;
+const activeSessionCount = () =>
+  (
+    localDataClient()
+      .prepare("SELECT COUNT(*) AS n FROM sessions WHERE status = 'active' AND deleted_at IS NULL")
+      .get() as { n: number }
+  ).n;
+
+// A plan's materializer: writes the planned draft through the app's own path.
+const plannedDraft = () =>
+  sessionDrafts.persistSessionDraftSnapshot({
+    sessionId: 'planned-session',
+    gymId: null,
+    startedAt: new Date(),
+    status: 'active',
+    exercises: [
+      {
+        id: 'planned-session-bench',
+        exerciseDefinitionId: 'seed_barbell_bench_press',
+        name: 'Barbell Bench Press',
+        sets: [
+          {
+            id: 'planned-session-bench-1',
+            weightValue: '',
+            repsValue: '',
+            setType: null,
+            plannedWeightValue: '100',
+            plannedRepsValue: '5',
+            plannedSetType: 'rir_2',
+            performanceStatus: 'planned',
+          },
+        ],
+      },
+    ],
+  });
+
+const readyPlan = (overrides: Partial<Extract<TrainPlanningState, { status: 'ready' }>> = {}): TrainPlanningState => ({
+  status: 'ready',
+  title: 'Upper body',
+  detail: 'Bench press',
+  materialize: jest.fn(plannedDraft),
+  openManager: jest.fn(),
+  ...overrides,
 });
 
-const sessionEntry = (): jest.Mocked<SessionEntryCoordinator> => ({
-  startEmptyOrResume: jest
-    .fn()
-    .mockResolvedValue({ kind: 'started', sessionId: 'empty-session' }),
-  startPlannedOrResume: jest
-    .fn()
-    .mockResolvedValue({ kind: 'started', sessionId: 'planned-session' }),
+const renderWithPlan = async (planningState: TrainPlanningState, sessionEntry?: SessionEntryCoordinator) => {
+  render(
+    <TrainScreen
+      dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
+      planningState={planningState}
+      {...(sessionEntry ? { sessionEntry } : {})}
+    />
+  );
+  await waitFor(() => expect(screen.queryByTestId('train-session-loading')).toBeNull());
+};
+
+beforeEach(() => {
+  resetLocalData();
+  mockPush.mockReset();
 });
 
-describe('Train screen', () => {
-  beforeEach(() => {
-    mockPush.mockReset();
-  });
+afterEach(() => {
+  jest.restoreAllMocks();
+  closeLocalData();
+});
 
-  it('opens the session view to resume or start a session', async () => {
-    const entry = sessionEntry();
-    const { unmount } = render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={entry} />);
+describe('Train over real data', () => {
+  it('resumes the workout in progress, marked with the current-ring glyph, not a colour', async () => {
+    await openTrain('session-view');
 
-    fireEvent.press(await screen.findByTestId('train-resume-session-button'));
-    expect(mockPush).toHaveBeenCalledWith('/session/active-session');
-    unmount();
-
-    render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
-    fireEvent.press(screen.getByTestId('train-start-empty-button'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/empty-session'));
-  });
-
-  it('replaces every new-session action with Resume when a draft exists', async () => {
-    const entry = sessionEntry();
-    render(
-      <TrainScreen
-        dataClient={dataClient([activeSession])}
-        planningState={{
-          status: 'ready',
-          title: 'Lower body',
-          detail: '4 exercises',
-          materialize: jest.fn(),
-          openManager: jest.fn(),
-        }}
-        sessionEntry={entry}
-      />,
+    expect(screen.getByTestId('train-active-session-glyph', { includeHiddenElements: true })).toBeTruthy();
+    expect(StyleSheet.flatten(screen.getByTestId('train-active-session-card').props.style).backgroundColor).toBe(
+      uiRoles.surface,
     );
+    fireEvent.press(screen.getByTestId('train-resume-session-button'));
 
-    fireEvent.press(await screen.findByTestId('train-resume-session-button'));
-
-    expect(screen.getByTestId('train-active-session-card')).toBeTruthy();
-    expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
-    expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
-    expect(entry.startEmptyOrResume).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/session/active-session');
+    expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`);
   });
 
-  it('starts one empty draft and opens its session view', async () => {
-    let resolveStart!: (value: { kind: 'started'; sessionId: string }) => void;
-    const entry = sessionEntry();
-    entry.startEmptyOrResume.mockImplementation(
-      () => new Promise((resolve) => {
-        resolveStart = resolve;
-      }),
-    );
-    render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
+  it('starts one empty draft on a double tap and opens its session view', async () => {
+    await openTrain();
 
     const action = screen.getByTestId('train-start-empty-button');
     fireEvent.press(action);
     fireEvent.press(action);
-
-    expect(entry.startEmptyOrResume).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Starting…')).toBeTruthy();
-    resolveStart({ kind: 'started', sessionId: 'empty-session' });
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/empty-session'));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    const started = await activeSessionId();
+    expect(started).not.toBeNull();
+    expect(mockPush).toHaveBeenCalledWith(`/session/${started}`);
+    expect(activeSessionCount()).toBe(1);
+    expect(await sessionDrafts.loadSessionSnapshotById(started!)).toMatchObject({ status: 'active', exercises: [] });
   });
 
-  it('disables planned launch without relabeling it while an empty launch is running', () => {
-    const entry = sessionEntry();
-    entry.startEmptyOrResume.mockImplementation(() => new Promise(() => undefined));
-    render(
-      <TrainScreen
-        initialSessions={[]}
-        planningState={{
-          status: 'ready',
-          title: 'Upper body',
-          detail: '3 exercises',
-          materialize: jest.fn(),
-          openManager: jest.fn(),
-        }}
-        sessionEntry={entry}
-      />,
-    );
+  it('starts a fresh workout once the one in progress was discarded', async () => {
+    await seed('session-view');
+    await setSessionDeletedState(ACTIVE, true);
+    render(<TrainRoute />);
+    await waitFor(() => expect(screen.queryByTestId('train-session-loading')).toBeNull());
 
+    expect(screen.queryByTestId('train-active-session-card')).toBeNull();
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
 
-    expect(screen.getByTestId('train-start-planned-button')).toBeDisabled();
-    expect(screen.getByTestId('train-start-planned-button')).toHaveTextContent(
-      'Start planned workout',
-    );
-    expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Starting…');
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    const started = await activeSessionId();
+    expect(started).not.toBe(ACTIVE);
+    expect(mockPush).toHaveBeenCalledWith(`/session/${started}`);
   });
 
-  it('shows empty-launch failure inline and keeps the action retryable', async () => {
-    const entry = sessionEntry();
-    entry.startEmptyOrResume.mockRejectedValue(new Error('write failed'));
-    render(<TrainScreen initialSessions={[]} sessionEntry={entry} />);
+  it('replaces every new-session action with Resume when a draft exists', async () => {
+    const plan = readyPlan({ title: 'Lower body', detail: '4 exercises' });
+    await seed('session-view');
+    await renderWithPlan(plan);
+
+    fireEvent.press(screen.getByTestId('train-resume-session-button'));
+
+    expect(screen.getByTestId('train-active-session-card')).toBeTruthy();
+    expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
+    expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
+    expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`);
+    expect(await activeSessionId()).toBe(ACTIVE);
+    expect(plan.status === 'ready' && plan.materialize).not.toHaveBeenCalled();
+  });
+
+  it('shows a failed empty start inline and keeps it retryable (a failed write)', async () => {
+    jest.spyOn(sessionDrafts, 'persistSessionDraftSnapshot').mockRejectedValueOnce(new Error('write failed'));
+    await openTrain();
 
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
 
     expect(await screen.findByTestId('train-empty-launch-error')).toHaveTextContent(
       "Couldn't start a workout. Try again.",
     );
+    expect(await activeSessionId()).toBeNull();
+
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
-    await waitFor(() => expect(entry.startEmptyOrResume).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    expect(await activeSessionId()).not.toBeNull();
   });
 
-  it('starts an available plan through the same coordinator and opens management', async () => {
-    const entry = sessionEntry();
-    const materialize = jest.fn().mockResolvedValue({ sessionId: 'planned-session' });
-    const openManager = jest.fn();
-    const planningState: TrainPlanningState = {
-      status: 'ready',
-      title: 'Upper body',
-      detail: 'Bench press · Row · Pull-up',
-      materialize,
-      openManager,
-    };
-    render(
-      <TrainScreen
-        initialSessions={[]}
-        planningState={planningState}
-        sessionEntry={entry}
-      />,
-    );
+  it('starts an available plan through the shared coordinator and opens management', async () => {
+    const plan = readyPlan();
+    await seed();
+    await renderWithPlan(plan);
 
     fireEvent.press(screen.getByTestId('train-start-planned-button'));
+
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/planned-session'));
-    expect(entry.startPlannedOrResume).toHaveBeenCalledWith(materialize);
+    expect(await activeSessionId()).toBe('planned-session');
 
     fireEvent.press(screen.getByTestId('train-manage-planning-button'));
-    expect(openManager).toHaveBeenCalledTimes(1);
+    expect(plan.status === 'ready' && plan.openManager).toHaveBeenCalledTimes(1);
   });
 
-  it('draws exactly one accent primary: the plan when one is ready, else the empty start (T03-D1)', () => {
-    const accentButtons = () =>
-      ['train-start-empty-button', 'train-start-planned-button', 'train-manage-planning-button']
-        .map((testID) => screen.queryByTestId(testID))
-        .filter((node) => node && StyleSheet.flatten(node.props.style).backgroundColor === uiRoles.accent)
-        .map((node) => node?.props.testID);
-
-    const { unmount } = render(
-      <TrainScreen
-        initialSessions={[]}
-        planningState={{
-          status: 'ready',
-          title: 'Upper body',
-          detail: 'Bench press',
-          materialize: jest.fn(),
-          openManager: jest.fn(),
-        }}
-        sessionEntry={sessionEntry()}
-      />,
-    );
-    expect(accentButtons()).toEqual(['train-start-planned-button']);
-    unmount();
-
-    render(<TrainScreen initialSessions={[]} sessionEntry={sessionEntry()} />);
-    expect(accentButtons()).toEqual(['train-start-empty-button']);
-  });
-
-  it('marks the active workout with the current-ring glyph, not a colour', async () => {
-    render(<TrainScreen dataClient={dataClient([activeSession])} sessionEntry={sessionEntry()} />);
-    await screen.findByTestId('train-active-session-card');
-    expect(screen.getByTestId('train-active-session-glyph', { includeHiddenElements: true })).toBeTruthy();
-    expect(StyleSheet.flatten(screen.getByTestId('train-active-session-card').props.style).backgroundColor).toBe(
-      uiRoles.surface,
-    );
-  });
-
-  it('keeps planned-launch failure inline without disabling empty training', async () => {
-    const entry = sessionEntry();
-    entry.startPlannedOrResume.mockRejectedValue(new Error('stale plan'));
-    render(
-      <TrainScreen
-        initialSessions={[]}
-        planningState={{
-          status: 'ready',
-          title: 'Upper body',
-          detail: '3 exercises',
-          materialize: jest.fn(),
-          openManager: jest.fn(),
-        }}
-        sessionEntry={entry}
-      />,
-    );
+  it('keeps a failed planned launch inline without disabling empty training (a failed plan write)', async () => {
+    await seed();
+    await renderWithPlan(readyPlan({ materialize: jest.fn().mockRejectedValue(new Error('stale plan')) }));
 
     fireEvent.press(screen.getByTestId('train-start-planned-button'));
 
@@ -237,10 +221,11 @@ describe('Train screen', () => {
       "Couldn't start this planned workout. Try again.",
     );
     expect(screen.getByTestId('train-start-empty-button')).not.toBeDisabled();
+    expect(await activeSessionId()).toBeNull();
   });
 
-  it('states the missing planning dependency without blocking empty training', () => {
-    render(<TrainScreen initialSessions={[]} sessionEntry={sessionEntry()} />);
+  it('states the missing planning dependency without blocking empty training', async () => {
+    await openTrain();
 
     expect(screen.getByTestId('train-planning-unavailable')).toBeTruthy();
     expect(screen.getByText('Watch this space 👀')).toBeTruthy();
@@ -248,18 +233,54 @@ describe('Train screen', () => {
     expect(screen.queryByTestId('train-manage-planning-button')).toBeNull();
   });
 
-  it('does not offer a new workout when active-session detection fails', async () => {
-    const client = dataClient([]);
-    client.loadSessions
-      .mockRejectedValueOnce(new Error('Unable to read sessions'))
-      .mockResolvedValueOnce([]);
-    render(<TrainScreen dataClient={client} sessionEntry={sessionEntry()} />);
+  it('does not offer a new workout when the active-session read fails, and retries (a failed read)', async () => {
+    const load = jest
+      .spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions')
+      .mockRejectedValueOnce(new Error('Unable to read sessions'));
+    await seed();
+    render(<TrainRoute />);
 
     expect(await screen.findByTestId('train-session-error')).toBeTruthy();
     expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
     fireEvent.press(screen.getByTestId('train-session-error-retry'));
 
-    await waitFor(() => expect(client.loadSessions).toHaveBeenCalledTimes(2));
     expect(await screen.findByTestId('train-start-empty-button')).toBeTruthy();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Train launch states', () => {
+  it('disables planned launch without relabeling it while an empty launch is pending (a pending launch)', async () => {
+    const pending: SessionEntryCoordinator = {
+      startEmptyOrResume: () => new Promise(() => undefined),
+      startPlannedOrResume: () => new Promise(() => undefined),
+    };
+    await seed();
+    await renderWithPlan(readyPlan(), pending);
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('train-start-empty-button'));
+    });
+
+    expect(screen.getByTestId('train-start-planned-button')).toBeDisabled();
+    expect(screen.getByTestId('train-start-planned-button')).toHaveTextContent('Start planned workout');
+    expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Starting…');
+  });
+
+  it('draws exactly one accent primary: the plan when one is ready, else the empty start (T03-D1)', async () => {
+    const accentButtons = () =>
+      ['train-start-empty-button', 'train-start-planned-button', 'train-manage-planning-button']
+        .map((testID) => screen.queryByTestId(testID))
+        .filter((node) => node && StyleSheet.flatten(node.props.style).backgroundColor === uiRoles.accent)
+        .map((node) => node?.props.testID);
+
+    await seed();
+    await renderWithPlan(readyPlan());
+    expect(accentButtons()).toEqual(['train-start-planned-button']);
+    screen.unmount();
+
+    render(<TrainRoute />);
+    await screen.findByTestId('train-start-empty-button');
+    expect(accentButtons()).toEqual(['train-start-empty-button']);
   });
 });
