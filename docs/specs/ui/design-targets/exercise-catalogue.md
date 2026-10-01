@@ -56,7 +56,7 @@ Device: iPhone simulator at 390pt width, light.
 | `picker-preselection` (ad hoc) | a picked exercise with a plan from history |
 | `03-session-view-exercise-added` (`ios-session-view`) | the session view after `Add empty set` |
 | `exercise-swap-sheet` (ad hoc) | ⋮ → Swap exercise: the shared list in the swap sheet |
-| `groups-link-03-picker-search` (`ios-groups-e2e`) | a search with `From your groups` |
+| `groups-link-03-picker-search` (ad hoc) | a search with `From your groups` |
 
 Additional browser comparison states: Favourite and A–Z, never-done on/off,
 expanded search and no matches, current/prior-year dates, history older than
@@ -110,7 +110,7 @@ panels, and the `Groups`-only list.
 | `editor-muscle-selector` (ad hoc) | the primary-muscle list in the same sheet |
 | `editor-filled` (`ios-ui-regression`) | a name, `Per side`, a primary and a secondary |
 | `catalogue-created-notice` (`ios-ui-regression`) | saved: the notice and the new row |
-| `groups-link-01-link-screen` (`ios-groups-e2e`) | reached through a row's ⋮ `Link to group exercise…` |
+| `groups-link-01-link-screen` (`ios-groups-e2e`) | reached through a row's ⋮ `Link to group exercise…`, showing an existing link |
 
 `(ad hoc)` states are no longer captured by a lane: their flow keeps only
 the claims that need a device (spec 06, "Maestro scope policy") and Jest

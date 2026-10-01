@@ -1577,8 +1577,9 @@ E0.1–E0.3).
   `exercise-picker.test.tsx` (`picker: group exercises (E0.1)`, `pick sheet (E0.2)`, `signed out`),
   `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`,
   and the exercise page's ⋮ Link item in `exercise-page-screen.test.tsx`;
-  Maestro `groups-link-exercise.yaml` (§8), whose last step opens the Link
-  screen from the exercise page's ⋮.
+  Maestro `groups-two-user-stream.yaml` (§8, step 4b), which opens the Link
+  screen from a catalogue row's ⋮ and reads back the link made on the group
+  page.
 
 **As-built (M25-T08, group page).** Product D10, D14, and E0.4; M25 design
 §1 and §7.
@@ -2000,16 +2001,11 @@ group screen, and Today details above where they differ. No server change.
     9. The script asserts the counterparty's `group_stream` returns
        `NOT_FOUND`.
   - Evidence comes from its screenshots and JUnit output.
-- **Linking flow (M25-T07).** The lane then runs
-  `groups-link-exercise.yaml` as its own device user **`user_e`** (reset with
-  the others by `groups-fixture-reset.sh`, which also sets its username).
-  `.maestro/scripts/groups-link-setup.js` signs in as `user_e` over HTTP and
-  calls `group_create` and `group_exercise_create` (a copy of
-  `seed_barbell_bench_press`). The device then links its seeded "Barbell Bench
-  Press" from the catalogue `⋮` Link screen (offered under Suggested), finds the
-  group exercise in the session view's picker search (Train → Start →
-  `+ Add exercise`) as "linked: Barbell Bench Press", and adds it to the
-  session (`groups-link-01`…`04`).
+- **Linking (M25-T07).** Step 4b links the group's standard copy to the
+  device's own "Barbell Bench Press" from the group page's pick sheet; the
+  catalogue `⋮` Link screen then reads that link back over RPC
+  (`groups-link-01-link-screen`). The picker's `linked: …` rows and the add
+  are Jest (`exercise-picker.test.tsx`).
 - **As-built (M22-T06, Maestro lane).** Lane `ios-groups-e2e`
   (`maestro-run-lane.sh groups-e2e`, gate `slow-frontend`, so part of
   `boga test frontend`); flow `apps/mobile/.maestro/flows/groups-two-user-stream.yaml`.
