@@ -1,26 +1,43 @@
 appId: com.dinoderek.mobile
 ---
+# Data runtime smoke (ios-data-smoke lane, infra-free).
+#
+# Proves:
+#   1. the harness `reset=data` runs the migrations on the device's
+#      expo-sqlite and the backend-less build seeds its starter catalogue;
+#   2. Train's Start opens an empty session; the picker sheet's keyboard search
+#      finds the seeded Barbell Back Squat and adds it with an empty set;
+#   3. the exercise page's logger takes weight and reps on the keyboard and
+#      commits `135.0 × 8`;
+#   4. Finish (one confirmed set, no prompt) opens the completion screen, and
+#      Done replaces it with Stats;
+#   5. Stats' exercise list reads back the session just written: the only
+#      on-device check of the session-write → stats read path
+#      (stats-screen-ux.yaml reads fixture rows inserted straight into SQLite,
+#      which bypass the session screens).
+# Why device:
+#   1. and 5. the on-device expo-sqlite runtime and boot data layer;
+#   2. and 3. a real sheet and the keyboard;
+#   4. the root-stack replace after Finish.
+# Jest counterpart: app/__tests__/exercise-picker.test.tsx,
+#   app/__tests__/exercise-page-screen.test.tsx (logger),
+#   app/__tests__/set-effort-defaults.test.ts (first-set warm-up),
+#   app/__tests__/session-view-model.test.ts (Finish prompts),
+#   app/__tests__/completed-session-local-data.test.tsx (Done → Stats),
+#   app/__tests__/stats-screen-local-data.test.tsx, app/__tests__/sessions-screen.test.tsx.
+#
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
 # navigation below: the delayed reload can replace an in-progress session with
-# the initial Stats route and surface the one-time developer menu. The smoke lane
-# owns explicit dev-client launch coverage; this data lane starts with its
-# app-owned reset + teleport deep link.
-# A fresh dev-client install can defer its one-time onboarding sheet until the
-# first post-launch app interaction. Retry the whole cold-start handshake: iOS
-# can occasionally remain on SpringBoard while the newly installed scheme is
-# still registering. `Continue` advances into the developer menu, whose
-# accessible `Close` control returns to the app.
+# the initial Stats route. The smoke lane owns explicit dev-client launch
+# coverage; this data lane starts with its app-owned reset + teleport deep link.
+# The launch script pre-seeds the dev-menu onboarding off (spec 06 rule 4), so
+# no sheet needs dismissing. Retry the reset link itself: iOS can occasionally
+# remain on SpringBoard while the newly installed scheme is still registering.
 - retry:
     maxRetries: 3
     commands:
       - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
-      - tapOn:
-          text: "Continue"
-          optional: true
-      - tapOn:
-          text: "Close"
-          optional: true
       - extendedWaitUntil:
           visible:
             id: "stats-history-screen"
@@ -70,11 +87,6 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-set-logger"
     timeout: 15000
-# A new exercise's first set starts as a warm-up (the effort cycle itself is
-# covered by exercise-page.yaml).
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently W-Up"
 - takeScreenshot: "set-logger-empty"
 - tapOn:
     id: "exercise-set-logger-weight"
@@ -117,12 +129,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-# The workout this flow just logged through the session view and exercise page
-# must show up in the Stats exercise list. This is the only on-device check of
-# the session-write -> exercise-analytics read-back path: stats-screen-ux.yaml
-# covers the same list, but from fixture rows inserted straight into SQLite,
-# which bypass the session screens entirely. A change to how sets or session-exercises are persisted would leave
-# that flow green and break this one.
+# 5. The workout just logged shows up in the Stats exercise list.
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list"
@@ -132,39 +139,3 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "stats-exercise-list-empty"
 - takeScreenshot: "05-data-runtime-smoke-exercise-list"
-- tapOn:
-    id: "stats-card-sessions"
-- extendedWaitUntil:
-    visible:
-      id: "sessions-screen"
-    timeout: 10000
-- extendedWaitUntil:
-    notVisible:
-      id: "session-list-loading-state"
-    timeout: 10000
-- assertVisible: "Sessions"
-- assertNotVisible: "(tabs)"
-- assertVisible:
-    id: "completed-history-scroll"
-- takeScreenshot: "04-data-runtime-smoke-success"
-# A completed row's ⋮ opens its menu sheet (Edit / Append / Delete); the
-# backdrop dismisses it. The sheet is modal to VoiceOver, which hides the
-# backdrop from the accessibility tree Maestro reads, so tap a point above it.
-- tapOn:
-    id: "completed-session-menu-button-.*"
-    index: 0
-- extendedWaitUntil:
-    visible:
-      id: "completed-session-edit-menu-action-button"
-    timeout: 5000
-- assertVisible:
-    id: "completed-session-reopen-menu-action-button"
-- assertVisible:
-    id: "completed-session-modal-action-button"
-- takeScreenshot: "sessions-row-menu"
-- tapOn:
-    point: "50%,10%"
-- extendedWaitUntil:
-    notVisible:
-      id: "completed-session-edit-menu-action-button"
-    timeout: 5000
