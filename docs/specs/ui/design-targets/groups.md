@@ -250,9 +250,10 @@ Device: iPhone simulator at 390pt width, light. All from `ios-groups-e2e`.
 | `groups-unlink-03-confirmation` (`groups-two-user-stream`) | the native confirmation after the chooser has gone |
 | `groups-unlink-04-success` (`groups-two-user-stream`) | the unlink notice, the second link kept |
 | `groups-unlink-05-preserved-record` (`groups-two-user-stream`) | the record card, still certified |
-| `groups-link-01-link-screen` (`groups-link-exercise`) | the Link screen: search, `Suggested`, `All group exercises` |
-| `groups-link-02-linked` (`groups-link-exercise`) | after `Link`: the notice and the `Linked` card |
-| `groups-link-06-exercise-page-link-screen` (`groups-link-exercise`) | the Link screen from the exercise page's ⋮ |
+| `groups-link-01-link-screen` (`groups-two-user-stream`) | the Link screen from a catalogue row's ⋮, showing the link made on the group page |
+| `groups-link-02-linked` (ad hoc) | after `Link`: the notice and the `Linked` card |
+| `groups-link-06-exercise-page-link-screen` (ad hoc) | the Link screen from the exercise page's ⋮ |
+| (ad hoc) | the Link screen before linking: search, `Suggested`, `All group exercises` |
 
 Jest only: the empty section, the failed links read with `Retry`, a failed
 link in the pick sheet, unavailable choices, the Link screen's deleted,

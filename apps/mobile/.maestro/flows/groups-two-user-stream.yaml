@@ -1,13 +1,42 @@
 appId: com.dinoderek.mobile
 ---
-# Two-user groups end to end (M22; docs/specs/tech/groups-contract.md §8, lane
+# Two-user groups end to end (docs/specs/tech/groups-contract.md §8; lane
 # ios-groups-e2e). The device signs in as fixture user_c and drives the real
-# group UI against local Supabase. The counterparty, fixture user_d, is
+# group UI against local Supabase; the counterparty, fixture user_d, is
 # scripted over HTTP from ../scripts/groups-counterparty.js (GoTrue sign-in,
-# group_join, sync_push, group_stream, group_exercise_list, group_board) — the
-# same RPCs its own app would call. M25 steps: 4b group exercises (T08), 7b
-# leaderboards and the row detail (T09/T10), 7c a record card certified on the
-# device and the Certified boards (T11), 8b the former member's row.
+# group_join, sync_push, group_stream, group_exercise_list, group_board) with
+# the same RPCs its own app would call.
+#
+# Proves:
+#   1. a cold, wiped launch reaches sign-in, and user_c signs in;
+#   2. after the username prompt, creating a group writes it on the server
+#      (`1 member · You're the owner`), and its invite code is read off screen;
+#   3. the counterparty joins with that code, and the device sees `joined`
+#      and two members after a refresh;
+#   4. (4b) the owner adds a standard copy and a custom group exercise,
+#      renames the custom one, links the copy to its own exercise, and
+#      archives it; the catalogue ⋮ Link screen reads the link back over RPC;
+#      the counterparty reads the same list over group_exercise_list;
+#   5. the counterparty's active session reaches the device as one `Training
+#      now` card with metrics; completed and edited, the same card updates;
+#   6. the friend view of that session is read-only;
+#   7. (7b-7d) leaderboards, the uncertified row and its detail, link-change
+#      history; certifying per metric fills the Certified podium, board and
+#      history; unlink (cancel, unlink, preserve, relink) round-trips sync;
+#   8. shared bodyweight math keeps Weight/1RM, a rules revision invalidates
+#      certifications, and a bodyweight correction invalidates again;
+#   9. (8) removing the counterparty shows `was removed` and keeps shared
+#      data; the former member ranks `(former)` with a read-only detail, and
+#      its own read returns NOT_FOUND.
+# Why device: every claim needs two real users and real round trips to local
+#   Supabase (RPCs, sync_push/pull, server boards); 1 also needs the cold
+#   boot and real sign-in, and 4 the keyboard and native alerts.
+# Jest counterpart: app/__tests__/groups-write-screens.test.tsx (username
+#   gate, create, invite, remove), groups-exercise-screens.test.tsx (exercise
+#   labels), groups-exercise-link-screen.test.tsx, exercise-picker.test.tsx
+#   (linked group rows), groups-screens.test.tsx (cards, friend view),
+#   groups-leaderboards-screens.test.tsx, groups-metric-screens.test.tsx,
+#   groups-comparison-form.test.tsx (rules preview, the 0-100% bound).
 #
 # ISOLATION: user_c and user_d are dedicated to this flow (docs/specs/11,
 # enforced by scripts/tests/maestro-fixture-users.test.sh; the counterparty
@@ -312,6 +341,36 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-04b-2-pick-sheet-link-only"
 - tapOn:
     id: "group-pick-sheet-confirm"
+- extendedWaitUntil:
+    visible:
+      text: "Barbell Bench Press, Rules 1.*total Weight, Linked: Barbell Bench Press"
+    timeout: 15000
+# The catalogue's ⋮ → "Link to group exercise…" opens the Link screen, which
+# reads my groups' exercises over RPC and shows the link just made. Then back
+# to the group page to archive the copy.
+- openLink: "boga3://maestro-harness?teleport=exercise-catalog"
+- extendedWaitUntil:
+    visible: "Exercise filter input"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn: "Exercise filter input"
+- inputText: "Barbell Bench Press"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible:
+      text: "Exercise actions Barbell Bench Press"
+    timeout: 15000
+- tapOn: "Exercise actions Barbell Bench Press"
+- tapOn:
+    id: "exercise-action-link-group"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-link-linked-row-.*"
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: "groups-link-01-link-screen"
+- openLink: "boga3://group/${output.groupsGroupId}"
 - extendedWaitUntil:
     visible:
       text: "Barbell Bench Press, Rules 1.*total Weight, Linked: Barbell Bench Press"
@@ -905,30 +964,6 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "group-exercise-form-bodyweight-percentage" }
     timeout: 15000
-- tapOn: { id: "group-exercise-form-bodyweight-percentage" }
-- eraseText
-- inputText: "101"
-- swipe:
-    start: "50%,40%"
-    end: "50%,20%"
-    duration: 500
-- scrollUntilVisible:
-    element: { id: "group-exercise-form-submit" }
-    direction: DOWN
-    centerElement: false
-- tapOn: { id: "group-exercise-form-submit" }
-- scrollUntilVisible:
-    element: { id: "group-exercise-form-bodyweight-error" }
-    direction: UP
-    centerElement: true
-- assertVisible: "Bodyweight contribution must be from 0% to 100%."
-- assertNotVisible: { id: "group-rules-preview" }
-- waitForAnimationToEnd
-- takeScreenshot: "groups-bodyweight-invalid-rules"
-- scrollUntilVisible:
-    element: { id: "group-exercise-form-bodyweight-percentage" }
-    direction: UP
-    centerElement: true
 - tapOn: { id: "group-exercise-form-bodyweight-percentage" }
 - eraseText
 - inputText: "70"

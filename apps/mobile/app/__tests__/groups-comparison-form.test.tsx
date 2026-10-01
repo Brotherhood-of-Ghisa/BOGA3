@@ -21,6 +21,17 @@ describe('group comparison rule editor', () => {
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: 0.7, defaultMetric: 'e1rm' }), 2);
   });
+  it('rejects a contribution over 100% inline, with no preview and no submit', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '101');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(screen.getByTestId('group-exercise-form-bodyweight-error')).toHaveTextContent(
+      'Bodyweight contribution must be from 0% to 100%.'
+    );
+    expect(screen.queryByTestId('group-rules-preview')).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
   it('invalidates the preview when any input changes before Apply', () => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
