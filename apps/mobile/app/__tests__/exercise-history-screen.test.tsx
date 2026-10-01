@@ -1,4 +1,37 @@
+/* eslint-disable import/first */
+
+/**
+ * Exercise history. The route runs over real data: the production screen and
+ * history repository over the migrated in-memory SQLite database, seeded
+ * through the Maestro harness with the `exercise-block-history` fixture (eight
+ * Barbell Back Squat sessions from hours to 26 days ago, at the fixture gym),
+ * with list preferences set through their own store (helpers/local-data.ts).
+ * A failed read is forced with `jest.spyOn` on the real module.
+ *
+ * The shell suites render `ExerciseHistoryScreenShell` on hand-built props for
+ * presentation rules real data here cannot reach: tag chips (tags arrive only
+ * by sync), the deleted-exercise banner, empty-filter copy and styling.
+ */
+
+import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
+
+const mockPush = jest.fn();
+let mockSearchParams: Record<string, string> = {};
+
+jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useLocalSearchParams: () => mockSearchParams,
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    mockReact.useEffect(() => callback(), [callback]);
+  },
+}));
 
 import {
   default as ExerciseHistoryRoute,
@@ -7,52 +40,20 @@ import {
 } from '../exercise-history';
 import { uiRoles } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
-
-jest.mock('@/src/data', () => ({
-  loadExercisePerformanceHistory: jest.fn(),
-}));
-
-const mockUseExerciseListPreferences = jest.fn(() => [
-  { pastRecordsGymScope: 'all', dateFormat: 'DD-MM-YYYY' },
-  jest.fn(),
-]);
-
-jest.mock('@/src/exercise-catalog/list-preferences', () => ({
-  useExerciseListPreferences: () => mockUseExerciseListPreferences(),
-}));
-
-jest.mock('expo-router', () => {
-  const mockPush = jest.fn();
-  const mockReplace = jest.fn();
-  let latestFocusCallback: (() => void) | null = null;
-  let latestSearchParams: Record<string, string | string[] | undefined> = {};
-
-  return {
-    Stack: { Screen: () => null },
-    useRouter: () => ({ push: mockPush, replace: mockReplace }),
-    useFocusEffect: (callback: () => void) => {
-      latestFocusCallback = callback;
-    },
-    useLocalSearchParams: () => latestSearchParams,
-    __mockPush: mockPush,
-    __triggerFocus: () => {
-      latestFocusCallback?.();
-    },
-    __setSearchParams: (next: Record<string, string | string[] | undefined>) => {
-      latestSearchParams = next;
-    },
-  };
-});
-
-const { loadExercisePerformanceHistory: mockLoad } = jest.requireMock('@/src/data') as {
-  loadExercisePerformanceHistory: jest.Mock;
-};
-
-const expoRouterMock = jest.requireMock('expo-router') as {
-  __mockPush: jest.Mock;
-  __triggerFocus: () => void;
-  __setSearchParams: (next: Record<string, string | string[] | undefined>) => void;
-};
+import * as historyRepository from '@/src/data/exercise-history';
+import { upsertLocalGym } from '@/src/data/local-gyms';
+import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
+import {
+  __resetExerciseListPreferencesForTests,
+  setExerciseListPreferences,
+} from '@/src/exercise-catalog/list-preferences';
+import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
+import {
+  bootLocalApp,
+  closeLocalData,
+  loadMaestroFixture,
+  resetLocalData,
+} from './helpers/local-data';
 
 const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): ExerciseHistorySummary => ({
   exerciseDefinitionId: 'ex-bench',
@@ -144,13 +145,147 @@ const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): Exercise
 });
 
 beforeEach(() => {
-  mockLoad.mockReset();
-  mockUseExerciseListPreferences.mockReturnValue([
-    { pastRecordsGymScope: 'all', dateFormat: 'DD-MM-YYYY' },
-    jest.fn(),
-  ]);
-  expoRouterMock.__mockPush.mockReset();
-  expoRouterMock.__setSearchParams({ exerciseDefinitionId: 'ex-bench' });
+  resetLocalData();
+  __resetExerciseListPreferencesForTests();
+  mockPush.mockClear();
+  mockSearchParams = {};
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  closeLocalData();
+});
+
+describe('ExerciseHistoryRoute over real data', () => {
+  const SQUAT = EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  const sessionCards = () =>
+    screen
+      .queryAllByTestId(/^exercise-history-session-card-[a-z0-9_]+$/)
+      .map((node) => String(node.props.testID).replace('exercise-history-session-card-', ''));
+
+  const openHistory = async (params: Record<string, string>, prepare?: () => Promise<void>) => {
+    await loadMaestroFixture('exercise-block-history');
+    await prepare?.();
+    await bootLocalApp();
+    mockSearchParams = params;
+    render(<ExerciseHistoryRoute />);
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('exercise-history-best-card') ?? screen.queryByTestId('exercise-history-error-state')
+      ).toBeTruthy()
+    );
+  };
+
+  // One more squat session, 2 days ago at another gym, through the draft → complete path.
+  const logSquatElsewhere = async () => {
+    const completedAt = new Date(Date.now() - 2 * DAY_MS);
+    await upsertLocalGym({ id: 'gym-elsewhere', name: 'Canal Street Gym' });
+    await persistSessionDraftSnapshot(
+      {
+        sessionId: 'history_elsewhere',
+        gymId: 'gym-elsewhere',
+        startedAt: new Date(completedAt.getTime() - 40 * 60 * 1000),
+        exercises: [
+          {
+            id: 'history_elsewhere_squat',
+            exerciseDefinitionId: SQUAT,
+            name: 'Barbell Back Squat',
+            sets: [{ id: 'history_elsewhere_set', weightValue: '200', repsValue: '5', setType: 'rir_2', performanceStatus: null }],
+          },
+        ],
+      },
+      { now: completedAt }
+    );
+    await completeSessionDraft('history_elsewhere', { completedAt, now: completedAt });
+  };
+
+  it('shows the all-time bests and one card per session in the period, newest first', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    expect(screen.getByTestId('exercise-history-period-chip-30')).toHaveProp('accessibilityState', { selected: true });
+    // Eight sessions in 30 days (26 days back), the 1-day-old one with two squat blocks.
+    expect(sessionCards()).toEqual([
+      'maestro_m24_completion_no_pr_squat',
+      'maestro_m24_completion_one_pr_squat',
+      'maestro_exercise_block_history_squat_1_a',
+      'maestro_exercise_block_history_squat_1_b',
+      'maestro_exercise_block_history_squat_2_a',
+      'maestro_exercise_block_history_squat_3_a',
+      'maestro_exercise_block_history_squat_4_a',
+      'maestro_exercise_block_history_squat_5_a',
+      'maestro_exercise_block_history_squat_6_a',
+    ]);
+    // The one-PR session's 275 × 5 holds both bests.
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveTextContent('320.6');
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('275.0 × 5');
+  });
+
+  it('reloads when the period changes', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-7'));
+    await waitFor(() => expect(sessionCards()).toHaveLength(5));
+
+    fireEvent.press(screen.getByTestId('exercise-history-period-chip-all'));
+    await waitFor(() => expect(sessionCards()).toHaveLength(9));
+  });
+
+  it('keeps to the current gym only when the preference says so', async () => {
+    await openHistory(
+      { exerciseDefinitionId: SQUAT, currentGymId: EXERCISE_BLOCK_HISTORY_FIXTURE.gymId },
+      logSquatElsewhere
+    );
+    expect(sessionCards()).toContain('history_elsewhere_squat');
+    screen.unmount();
+
+    act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
+    render(<ExerciseHistoryRoute />);
+    await waitFor(() => expect(screen.queryByTestId('exercise-history-best-card')).toBeTruthy());
+
+    await waitFor(() => expect(sessionCards()).toHaveLength(9));
+    expect(sessionCards()).not.toContain('history_elsewhere_squat');
+  });
+
+  it('opens the completed session from its card and from a best', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    fireEvent.press(screen.getByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_1_a'));
+    expect(mockPush).toHaveBeenLastCalledWith('/completed-session/maestro_exercise_block_history_squat_1');
+
+    fireEvent.press(screen.getByTestId('exercise-history-best-est-1rm'));
+    expect(mockPush).toHaveBeenLastCalledWith(`/completed-session/${EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId}`);
+  });
+
+  it('routes the detail navigation strip through the canonical four-tab model', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    fireEvent.press(screen.getByTestId('top-level-tab-more'));
+
+    expect(mockPush).toHaveBeenCalledWith('/more');
+  });
+
+  it('says the exercise was not found for an unknown id', async () => {
+    await openHistory({ exerciseDefinitionId: 'no_such_exercise' });
+
+    expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(/Exercise not found/);
+  });
+
+  it('renders the missing-id error state when exerciseDefinitionId is absent from the route', async () => {
+    const load = jest.spyOn(historyRepository, 'loadExercisePerformanceHistory');
+    await openHistory({});
+
+    expect(load).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(/Missing exerciseDefinitionId/);
+  });
+
+  it('shows the error state when the history read fails (a failed read)', async () => {
+    jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockRejectedValueOnce(new Error('Boom'));
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(/Boom/);
+  });
 });
 
 describe('ExerciseHistoryScreenShell', () => {
@@ -175,29 +310,6 @@ describe('ExerciseHistoryScreenShell', () => {
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/2026-05-18/);
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toBeTruthy();
-  });
-
-  it('invokes onSelectPeriod when a period chip is tapped', () => {
-    const onSelectPeriod = jest.fn();
-    render(
-      <ExerciseHistoryScreenShell
-        summary={buildSummary()}
-        period={30}
-        appliedTagDefinitionId={null}
-        appliedGymId={null}
-        isLoading={false}
-        errorMessage={null}
-        onSelectPeriod={onSelectPeriod}
-        onSelectTag={jest.fn()}
-        onPressSession={jest.fn()}
-        onSelectMainTab={jest.fn()}
-      />
-    );
-
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-7'));
-    expect(onSelectPeriod).toHaveBeenCalledWith(7);
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-all'));
-    expect(onSelectPeriod).toHaveBeenCalledWith('all');
   });
 
   it('invokes onSelectTag with tagDefinitionId and toggles back to null', () => {
@@ -272,165 +384,6 @@ describe('ExerciseHistoryScreenShell', () => {
     );
   });
 
-  it('renders the error state when errorMessage is set', () => {
-    render(
-      <ExerciseHistoryScreenShell
-        summary={null}
-        period={30}
-        appliedTagDefinitionId={null}
-        appliedGymId={null}
-        isLoading={false}
-        errorMessage="Boom"
-        onSelectPeriod={jest.fn()}
-        onSelectTag={jest.fn()}
-        onPressSession={jest.fn()}
-        onSelectMainTab={jest.fn()}
-      />
-    );
-
-    expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(/Boom/);
-  });
-
-  it('opens the completed session detail when a session card is tapped', () => {
-    const onPressSession = jest.fn();
-    render(
-      <ExerciseHistoryScreenShell
-        summary={buildSummary()}
-        period={30}
-        appliedTagDefinitionId={null}
-        appliedGymId={null}
-        isLoading={false}
-        errorMessage={null}
-        onSelectPeriod={jest.fn()}
-        onSelectTag={jest.fn()}
-        onPressSession={onPressSession}
-        onSelectMainTab={jest.fn()}
-      />
-    );
-
-    fireEvent.press(screen.getByTestId('exercise-history-session-card-se-newest'));
-    expect(onPressSession).toHaveBeenCalledWith('session-newest');
-  });
-});
-
-describe('ExerciseHistoryRoute', () => {
-  it('loads the history on focus and reloads when the period changes', async () => {
-    mockLoad
-      .mockResolvedValueOnce(buildSummary({ period: 30 }))
-      .mockResolvedValueOnce(buildSummary({ period: 7, sessions: [] }));
-
-    render(<ExerciseHistoryRoute />);
-
-    await act(async () => {
-      expoRouterMock.__triggerFocus();
-    });
-
-    await waitFor(() => {
-      expect(mockLoad).toHaveBeenCalledWith({
-        exerciseDefinitionId: 'ex-bench',
-        period: 30,
-        tagDefinitionId: null,
-        gymId: null,
-      });
-    });
-
-    fireEvent.press(screen.getByTestId('exercise-history-period-chip-7'));
-
-    await waitFor(() => {
-      expect(mockLoad).toHaveBeenLastCalledWith({
-        exerciseDefinitionId: 'ex-bench',
-        period: 7,
-        tagDefinitionId: null,
-        gymId: null,
-      });
-    });
-  });
-
-  it('pre-filters by currentGymId when pastRecordsGymScope preference is current-gym', async () => {
-    mockUseExerciseListPreferences.mockReturnValue([
-      { pastRecordsGymScope: 'current-gym', dateFormat: 'DD-MM-YYYY' },
-      jest.fn(),
-    ]);
-    expoRouterMock.__setSearchParams({
-      exerciseDefinitionId: 'ex-bench',
-      currentGymId: 'gym-downtown',
-    });
-    mockLoad.mockResolvedValueOnce(buildSummary({ appliedGymId: 'gym-downtown' }));
-
-    render(<ExerciseHistoryRoute />);
-
-    await act(async () => {
-      expoRouterMock.__triggerFocus();
-    });
-
-    await waitFor(() => {
-      expect(mockLoad).toHaveBeenCalledWith({
-        exerciseDefinitionId: 'ex-bench',
-        period: 30,
-        tagDefinitionId: null,
-        gymId: 'gym-downtown',
-      });
-    });
-  });
-
-  it('routes a session card tap to /completed-session/<sessionId>', async () => {
-    mockLoad.mockResolvedValueOnce(buildSummary());
-    render(<ExerciseHistoryRoute />);
-
-    await act(async () => {
-      expoRouterMock.__triggerFocus();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('exercise-history-session-card-se-newest')).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByTestId('exercise-history-session-card-se-newest'));
-    expect(expoRouterMock.__mockPush).toHaveBeenCalledWith('/completed-session/session-newest');
-  });
-
-  it('routes the detail navigation strip through the canonical four-tab model', async () => {
-    mockLoad.mockResolvedValueOnce(buildSummary());
-    render(<ExerciseHistoryRoute />);
-
-    await act(async () => {
-      expoRouterMock.__triggerFocus();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('top-level-tab-more')).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByTestId('top-level-tab-more'));
-    expect(expoRouterMock.__mockPush).toHaveBeenCalledWith('/more');
-  });
-
-  it('surfaces an error when loadExercisePerformanceHistory returns null', async () => {
-    mockLoad.mockResolvedValueOnce(null);
-    render(<ExerciseHistoryRoute />);
-
-    await act(async () => {
-      expoRouterMock.__triggerFocus();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(/Exercise not found/);
-    });
-  });
-
-  it('renders the missing-id error state when exerciseDefinitionId is absent from the route', async () => {
-    expoRouterMock.__setSearchParams({});
-    render(<ExerciseHistoryRoute />);
-
-    await act(async () => {
-      expoRouterMock.__triggerFocus();
-    });
-
-    expect(mockLoad).not.toHaveBeenCalled();
-    expect(screen.getByTestId('exercise-history-error-state')).toHaveTextContent(
-      /Missing exerciseDefinitionId/
-    );
-  });
 });
 
 describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
@@ -556,7 +509,6 @@ describe('ExerciseHistoryScreenShell — design language (DLM-T10)', () => {
     expect(screen.getByTestId('exercise-history-tag-chip-all')).toHaveProp('accessibilityState', { selected: true });
   });
 });
-
 
 it('uses ordinary strength copy while bodyweight changes only the calculation', () => {
   const summary = buildSummary({ bodyweightContribution: 1 });

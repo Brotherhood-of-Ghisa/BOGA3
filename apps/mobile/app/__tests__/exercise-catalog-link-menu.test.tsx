@@ -1,29 +1,32 @@
+/* eslint-disable import/first */
+
 /**
  * M25-T07 AC5 (catalogue half): the Exercise Catalog row ⋮ actions sheet
  * gains "Link to group exercise…", which pushes the Link screen for that
  * exercise. It is signed-in only, and disabled for a soft-deleted exercise
- * (card decision (b)). The data layer is mocked like
- * exercise-catalog-screen.test.tsx.
+ * (card decision (b)).
+ *
+ * Over real data like exercise-catalog-screen.test.tsx: the starter catalogue
+ * on the migrated in-memory SQLite database (helpers/local-data.ts), the
+ * deleted exercise deleted through the catalogue's own write. Only the native
+ * database open, the router and the auth snapshot are replaced.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import * as mockReact from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
-import ExerciseCatalogScreen from '../(tabs)/exercise-catalog';
-import {
-  listExerciseCatalogExercises,
-  listExerciseCatalogMuscleGroups,
-  type ExerciseCatalogExercise,
-} from '@/src/data/exercise-catalog';
-import { loadExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
-import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
-import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
-import { __resetExerciseCatalogStatsCacheForTests } from '@/src/exercise-catalog/stats-cache';
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ push: mockPush, back: jest.fn() }),
-  useFocusEffect: () => undefined,
+  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    mockReact.useEffect(() => callback(), [callback]);
+  },
 }));
 
 let mockAuthSnapshot: { isConfigured: boolean; user: { id: string } | null } = {
@@ -35,46 +38,26 @@ jest.mock('@/src/auth', () => ({
   subscribeToAuthState: () => () => undefined,
 }));
 
-jest.mock('@/src/data/exercise-catalog-stats', () => ({
-  loadExerciseCatalogStatsRawHistory: jest.fn(),
-  aggregateExerciseCatalogStats: jest.requireActual('@/src/data/exercise-catalog-stats').aggregateExerciseCatalogStats,
-}));
+import ExerciseCatalogScreen from '../(tabs)/exercise-catalog';
+import { deleteExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
+import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
-jest.mock('@/src/data/exercise-catalog', () => ({
-  listExerciseCatalogMuscleGroups: jest.fn(),
-  listExerciseCatalogExercises: jest.fn(),
-  saveExerciseCatalogExercise: jest.fn(),
-  deleteExerciseCatalogExercise: jest.fn(),
-  undeleteExerciseCatalogExercise: jest.fn(),
-}));
-
-const ACTIVE: ExerciseCatalogExercise = {
-  id: 'seed_barbell_bench_press',
-  name: 'Bench Press',
-  bodyweightContribution: 0,
-  deletedAt: null,
-  mappings: [{ id: 'map-a', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
-};
-const DELETED: ExerciseCatalogExercise = {
-  id: 'exercise-deleted-1',
-  name: 'Old Fly',
-  bodyweightContribution: 0,
-  deletedAt: new Date('2026-02-27T10:00:00.000Z'),
-  mappings: [{ id: 'map-b', muscleGroupId: 'chest', weight: 1, role: 'primary' }],
+const openCatalog = async (prepare?: () => Promise<void>) => {
+  localDatabase();
+  await prepare?.();
+  await bootLocalApp();
+  render(<ExerciseCatalogScreen />);
+  await screen.findByLabelText('Create new exercise');
+  // Past the search debounce the screen arms at mount (150 ms), inside act.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 160));
+  });
 };
 
-beforeEach(() => {
-  mockPush.mockReset();
-  mockAuthSnapshot = { isConfigured: true, user: { id: 'user-1' } };
-  __resetExerciseCatalogCacheForTests();
-  __resetExerciseCatalogStatsCacheForTests();
-  __resetExerciseListPreferencesForTests();
-  jest.mocked(loadExerciseCatalogStatsRawHistory).mockResolvedValue({ sessions: [], sessionExercises: [], exerciseSets: [] });
-  jest.mocked(listExerciseCatalogMuscleGroups).mockResolvedValue([
-    { id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 },
-  ]);
-  jest.mocked(listExerciseCatalogExercises).mockResolvedValue([ACTIVE, DELETED]);
-});
+const expandChest = async () => {
+  fireEvent.press(await screen.findByLabelText(/^Chest exercises \d+$/));
+};
 
 const openActions = async (name: string) => {
   fireEvent.press(await screen.findByLabelText(`Exercise actions ${name}`));
@@ -82,11 +65,22 @@ const openActions = async (name: string) => {
   await screen.findByTestId('exercise-catalog-actions-sheet');
 };
 
+beforeEach(() => {
+  resetLocalData();
+  mockPush.mockReset();
+  mockAuthSnapshot = { isConfigured: true, user: { id: 'user-1' } };
+  __resetExerciseListPreferencesForTests();
+});
+
+afterEach(() => {
+  closeLocalData();
+});
+
 describe('catalogue ⋮ Link to group exercise…', () => {
   it('pushes the Link screen for the exercise', async () => {
-    render(<ExerciseCatalogScreen />);
-    fireEvent.press(await screen.findByLabelText('Chest exercises 1'));
-    await openActions('Bench Press');
+    await openCatalog();
+    await expandChest();
+    await openActions('Barbell Bench Press');
 
     fireEvent.press(screen.getByLabelText('Link to group exercise from actions'));
 
@@ -95,15 +89,14 @@ describe('catalogue ⋮ Link to group exercise…', () => {
   });
 
   it('is disabled for a soft-deleted exercise', async () => {
-    render(<ExerciseCatalogScreen />);
+    await openCatalog(() => deleteExerciseCatalogExercise('seed_barbell_bench_press'));
     fireEvent.press(await screen.findByLabelText('Exercise catalog options'));
     await screen.findByText('Manage exercises');
     fireEvent.press(screen.getByLabelText('Show deleted exercises'));
     // The Filters sheet's backdrop, hidden from VoiceOver while the sheet is modal.
     fireEvent.press(screen.getByLabelText('Close exercise management', { includeHiddenElements: true }));
-    fireEvent.press(await screen.findByLabelText('Chest exercises 2'));
-    await screen.findByText('Old Fly');
-    await openActions('Old Fly');
+    await expandChest();
+    await openActions('Barbell Bench Press');
 
     const item = screen.getByLabelText('Link to group exercise from actions');
     expect(item).toBeDisabled();
@@ -113,9 +106,9 @@ describe('catalogue ⋮ Link to group exercise…', () => {
 
   it('is absent while signed out', async () => {
     mockAuthSnapshot = { isConfigured: true, user: null };
-    render(<ExerciseCatalogScreen />);
-    fireEvent.press(await screen.findByLabelText('Chest exercises 1'));
-    await openActions('Bench Press');
+    await openCatalog();
+    await expandChest();
+    await openActions('Barbell Bench Press');
 
     expect(screen.getByLabelText('Edit exercise from actions')).toBeTruthy();
     expect(screen.queryByLabelText('Link to group exercise from actions')).toBeNull();
