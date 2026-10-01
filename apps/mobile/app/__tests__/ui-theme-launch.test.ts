@@ -21,8 +21,11 @@ import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 // layout logs why.
 
 beforeEach(() => {
-  Storage.clearSync();
   mockLogEvent.mockReset();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe('resolveThemePreset', () => {
@@ -67,14 +70,16 @@ describe('the launch theme', () => {
     });
   });
 
-  it('keeps the launch theme when the choice changes while the app runs', () => {
+  it('keeps the launch theme when the choice changes while the app runs', async () => {
+    let launch!: typeof import('@/components/ui/theme-launch');
     jest.isolateModules(() => {
-      const launch = require('@/components/ui/theme-launch') as typeof import('@/components/ui/theme-launch');
-      expect(launch.launchTheme.preset.id).toBe('warm');
-      void launch.saveThemePresetId('slate');
-      expect(launch.readStoredThemePresetId()).toBe('slate');
-      expect(launch.launchTheme.preset.id).toBe('warm');
+      launch = require('@/components/ui/theme-launch');
     });
+    expect(launch.launchTheme.preset.id).toBe('warm');
+    await launch.saveThemePresetId('slate');
+    expect(launch.readStoredThemePresetId()).toBe('slate');
+    expect(launch.readLaunchTheme().preset.id).toBe('slate');
+    expect(launch.launchTheme.preset.id).toBe('warm');
   });
 });
 

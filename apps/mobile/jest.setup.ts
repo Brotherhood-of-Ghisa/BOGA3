@@ -5,6 +5,9 @@ import {
 
 beforeEach(() => {
   __resetExerciseListPreferencesForTests();
+  // The kv-store mock below keeps one store per test file; start each test
+  // empty. The launch theme was read at import, before any test.
+  (jest.requireMock('expo-sqlite/kv-store') as typeof import('expo-sqlite/kv-store')).Storage.clearSync();
 });
 
 afterEach(() => {

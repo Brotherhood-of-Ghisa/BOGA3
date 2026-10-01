@@ -23,6 +23,7 @@ const mockStopSyncGateStateBridge = jest.fn();
 const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => Promise.resolve());
 const mockStackScreen = jest.fn();
 const mockStack = jest.fn();
+const mockReportLaunchThemeProblem = jest.fn();
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -70,6 +71,11 @@ jest.mock('@/components/navigation/auth-route-guard', () => ({
   AuthRouteGuard: ({ children }: { children: ReactNode }) => children,
 }));
 
+// The launch-theme report is only observed: it logs, and logging has its own spec.
+jest.mock('@/src/appearance/launch-theme-report', () => ({
+  reportLaunchThemeProblem: (...args: unknown[]) => mockReportLaunchThemeProblem(...args),
+}));
+
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }));
@@ -113,6 +119,7 @@ jest.mock('expo-router', () => {
 import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 import RootLayout from '../_layout';
+import * as themeLaunch from '@/components/ui/theme-launch';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
@@ -136,8 +143,20 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockStopSyncGateStateBridge.mockReset();
     mockRegisterBackgroundSyncTask.mockReset();
     mockStackScreen.mockReset();
+    mockReportLaunchThemeProblem.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
+  });
+
+  it('reports why the launch theme is not the stored choice, once on mount', () => {
+    const problem = { kind: 'unknown-preset', storedId: 'neon' } as const;
+    jest.replaceProperty(themeLaunch, 'launchTheme', { ...themeLaunch.launchTheme, problem });
+
+    render(<RootLayout />);
+
+    expect(mockReportLaunchThemeProblem).toHaveBeenCalledTimes(1);
+    expect(mockReportLaunchThemeProblem).toHaveBeenCalledWith(problem);
+    jest.restoreAllMocks();
   });
 
   it('boots the local data layer, the exercise catalog and auth on mount', async () => {

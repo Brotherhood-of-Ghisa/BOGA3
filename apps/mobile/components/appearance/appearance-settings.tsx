@@ -23,6 +23,7 @@ import {
   type ThemePreset,
   type ThemePresetId,
 } from '@/components/ui/theme-presets';
+import { logEvent } from '@/src/logging';
 
 // Settings → Preferences → Appearance (`docs/specs/ui/ux-rules.md` §9b): a row
 // naming the chosen theme, and a sheet listing the presets. A choice is saved
@@ -35,14 +36,23 @@ export function AppearanceSettingsRow() {
   const pending = chosenId !== launchTheme.preset.id;
 
   const choose = async (id: ThemePresetId) => {
-    if (id === chosenId) return;
-    const previous = chosenId;
+    // Re-choosing the current preset saves nothing, unless this launch could
+    // not use the stored choice: saving then replaces the unusable value.
+    if (id === chosenId && !launchTheme.problem) return;
     setChosenId(id);
     setSaveError(null);
     try {
       await saveThemePresetId(id);
-    } catch {
-      setChosenId(previous);
+    } catch (error) {
+      void logEvent({
+        level: 'warn',
+        event: 'theme.save_failed',
+        message: 'Could not save the chosen theme preset.',
+        context: { presetId: id, error: error instanceof Error ? error.message : String(error) },
+      });
+      // Show what is stored, not what was showing before the tap: another
+      // choice may have saved meanwhile.
+      setChosenId(readChosenId());
       setSaveError('Couldn’t save the theme. Nothing changed.');
     }
   };
@@ -110,12 +120,18 @@ export function AppearanceSettingsRow() {
   );
 }
 
-// The stored choice. Falls back to the theme in use when the store cannot be
-// read: `readLaunchTheme` has already reported why.
+// The stored choice. Falls back to the theme in use, logged, when the store
+// cannot be read.
 function readChosenId(): ThemePresetId {
   try {
     return resolveThemePreset(readStoredThemePresetId()).preset.id;
-  } catch {
+  } catch (error) {
+    void logEvent({
+      level: 'error',
+      event: 'theme.read_failed',
+      message: 'Could not read the stored theme preset; showing the theme in use.',
+      context: { error: error instanceof Error ? error.message : String(error) },
+    });
     return launchTheme.preset.id;
   }
 }
