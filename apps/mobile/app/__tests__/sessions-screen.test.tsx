@@ -1,5 +1,37 @@
+/* eslint-disable import/first */
+
+/**
+ * The Sessions list over real data: the production route and its default data
+ * client (session-list buckets, discard, delete) over the migrated in-memory
+ * SQLite database, seeded through the Maestro harness with the `session-view`
+ * fixture: one active session over the block-history fixture's completed ones
+ * (helpers/local-data.ts). Writes are read back from the database. Only the
+ * native database open and the router are replaced.
+ *
+ * Faked, and named in their tests: a failed list read (forced once on the real
+ * client with `jest.spyOn`) and two races (a superseded load and a load landing
+ * after unmount), driven through an injected client.
+ */
+
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert, type AlertButton } from 'react-native';
+
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
+
+const mockDismissTo = jest.fn();
+const mockPush = jest.fn();
+let mockIsFocused = true;
+
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    dismissTo: mockDismissTo,
+    push: mockPush,
+  }),
+  useIsFocused: () => mockIsFocused,
+}));
 
 import SessionsRoute, { SessionsScreen } from '../sessions';
 import {
@@ -7,298 +39,146 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
+import { completeSessionDraft, loadSessionSnapshotById } from '@/src/data/session-drafts';
+import { setSessionDeletedState } from '@/src/data/session-list';
+import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
+import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
 
-const mockDismissTo = jest.fn();
-const mockPush = jest.fn();
+const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
+const NEWEST_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedCompletionSessionId;
+const OLDER_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.noPrCompletionSessionId;
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    dismissTo: mockDismissTo,
-    push: mockPush,
-  }),
-  useIsFocused: () => true,
-}));
-
-const activeSession: SessionListItem = {
-  id: 'active-session-1',
-  startedAt: '2026-07-25T09:00:00.000Z',
-  status: 'active',
-  completedAt: null,
-  durationSec: null,
-  durationDisplay: '5m',
-  gymName: null,
-  exerciseCount: 1,
-  setCount: 3,
-  totalWeight: 0,
-  deletedAt: null,
+const openSessions = async (prepare?: () => Promise<unknown>) => {
+  await loadMaestroFixture('session-view');
+  await prepare?.();
+  await bootLocalApp();
+  const view = render(<SessionsRoute />);
+  await screen.findByTestId(`completed-session-row-${NEWEST_COMPLETED}`);
+  return view;
 };
 
-const completedSession: SessionListItem = {
-  ...activeSession,
-  id: 'completed-session-1',
-  status: 'completed',
-  completedAt: '2026-07-25T10:00:00.000Z',
-  durationSec: 3_600,
-  durationDisplay: '1h',
+const loadSpy = () => jest.spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions');
+
+let alertSpy: jest.SpyInstance;
+const alertButton = (text: string): AlertButton => {
+  const buttons = alertSpy.mock.calls.at(-1)?.[2] as AlertButton[];
+  const button = buttons.find((candidate) => candidate.text === text);
+  if (!button) {
+    throw new Error(`No alert button ${text}`);
+  }
+  return button;
 };
 
-const newerCompletedSession: SessionListItem = {
-  ...completedSession,
-  id: 'completed-session-2',
-  completedAt: '2026-07-26T10:00:00.000Z',
-};
-
-const createDeferred = <T,>() => {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
-};
-
-const buildDataClient = (): jest.Mocked<SessionListDataClient> => ({
-  loadSessions: jest.fn().mockResolvedValue([activeSession]),
-  startSession: jest.fn().mockResolvedValue(undefined),
-  completeActiveSession: jest.fn().mockResolvedValue(undefined),
-  discardActiveSession: jest.fn().mockResolvedValue(undefined),
-  setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-  appendCompletedSessionAsPlanned: jest.fn().mockResolvedValue(undefined),
+beforeEach(() => {
+  resetLocalData();
+  mockDismissTo.mockClear();
+  mockPush.mockClear();
+  mockIsFocused = true;
+  alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
-describe('SessionsScreen active-session navigation', () => {
-  beforeEach(() => {
-    mockDismissTo.mockClear();
-    mockPush.mockClear();
+afterEach(() => {
+  jest.restoreAllMocks();
+  closeLocalData();
+});
+
+describe('Sessions over real data', () => {
+  it('lists the active session first, then the completed ones newest first', async () => {
+    await openSessions();
+
+    expect(screen.getByTestId(`active-session-row-${ACTIVE}`)).toBeTruthy();
+    const completed = screen
+      .getAllByTestId(/^completed-session-row-/)
+      .map((node) => String(node.props.testID).replace('completed-session-row-', ''));
+    // The block-history fixture's eleven, by completion time (hours to 26 days ago).
+    expect(completed).toEqual([
+      NEWEST_COMPLETED,
+      OLDER_COMPLETED,
+      EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId,
+      'maestro_exercise_block_history_squat_1',
+      'maestro_exercise_block_history_bench_1',
+      'maestro_exercise_block_history_squat_2',
+      'maestro_exercise_block_history_squat_3',
+      'maestro_exercise_block_history_bench_2',
+      'maestro_exercise_block_history_squat_4',
+      'maestro_exercise_block_history_squat_5',
+      'maestro_exercise_block_history_squat_6_outside_limit',
+    ]);
   });
 
-  it('opens the session view when resuming an active session', async () => {
-    const dataClient = buildDataClient();
-    render(<SessionsScreen dataClient={dataClient} />);
+  it('opens the session view when resuming the active session', async () => {
+    await openSessions();
 
-    fireEvent.press(await screen.findByTestId('resume-active-session-button'));
+    fireEvent.press(screen.getByTestId('resume-active-session-button'));
 
-    expect(mockPush).toHaveBeenCalledWith('/session/active-session-1');
+    expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`);
     expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
   it('routes completion through the session cleanup flow instead of completing directly', async () => {
-    const dataClient = buildDataClient();
-    render(<SessionsScreen dataClient={dataClient} />);
+    await openSessions();
 
-    fireEvent.press(await screen.findByLabelText('Review and complete active session'));
+    fireEvent.press(screen.getByLabelText('Review and complete active session'));
 
-    expect(mockPush).toHaveBeenCalledWith('/session/active-session-1');
-    expect(dataClient.completeActiveSession).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-    });
+    expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`);
+    expect(await loadSessionSnapshotById(ACTIVE)).toMatchObject({ status: 'active', completedAt: null });
   });
 
   it('opens a completed History row in Summary', async () => {
-    const dataClient = buildDataClient();
-    dataClient.loadSessions.mockResolvedValue([completedSession]);
-    render(<SessionsScreen dataClient={dataClient} />);
+    await openSessions();
 
-    fireEvent.press(
-      await screen.findByTestId(`completed-session-open-button-${completedSession.id}`)
-    );
+    fireEvent.press(screen.getByTestId(`completed-session-open-button-${NEWEST_COMPLETED}`));
 
-    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${completedSession.id}`);
-  });
-});
-
-describe('SessionsScreen focus-aware loading', () => {
-  beforeEach(() => {
-    mockDismissTo.mockClear();
-    mockPush.mockClear();
+    expect(mockPush).toHaveBeenCalledWith(`/completed-session/${NEWEST_COMPLETED}`);
   });
 
-  it('wires the focused route to one initial repository load', async () => {
-    const loadSessions = jest
-      .spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions')
-      .mockResolvedValue([]);
+  it('loads once when focused, not again on a re-render, and again when focus returns', async () => {
+    const load = loadSpy();
+    const view = await openSessions();
+    expect(load).toHaveBeenCalledTimes(1);
 
-    render(<SessionsRoute />);
+    view.rerender(<SessionsRoute />);
+    expect(load).toHaveBeenCalledTimes(1);
 
-    await waitFor(() => {
-      expect(loadSessions).toHaveBeenCalledTimes(1);
-    });
-    loadSessions.mockRestore();
+    mockIsFocused = false;
+    view.rerender(<SessionsRoute />);
+    // A session finished elsewhere while the list was in the background.
+    await completeSessionDraft(ACTIVE);
+    expect(load).toHaveBeenCalledTimes(1);
+
+    mockIsFocused = true;
+    view.rerender(<SessionsRoute />);
+
+    expect(await screen.findByTestId(`completed-session-row-${ACTIVE}`)).toBeTruthy();
+    expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull();
+    expect(load).toHaveBeenCalledTimes(2);
   });
 
-  it('loads exactly once for the initial focused presentation', async () => {
-    const dataClient = buildDataClient();
-    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
+  it('hides deleted sessions until shown, then marks them, loading once per filter change', async () => {
+    const load = loadSpy();
+    await openSessions(() => setSessionDeletedState(OLDER_COMPLETED, true));
 
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-    });
-
-    view.rerender(<SessionsScreen dataClient={dataClient} isFocused />);
-    expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-  });
-
-  it('loads once when an already-mounted screen blurs and regains focus', async () => {
-    const dataClient = buildDataClient();
-    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
-
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-    });
-
-    view.rerender(<SessionsScreen dataClient={dataClient} isFocused={false} />);
-    expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-
-    view.rerender(<SessionsScreen dataClient={dataClient} isFocused />);
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  it('loads exactly once for a deleted-session filter change', async () => {
-    const dataClient = buildDataClient();
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
-
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-    });
-
-    fireEvent.press(screen.getByTestId('toggle-deleted-sessions-button'));
-
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(2);
-    });
-    expect(dataClient.loadSessions.mock.calls).toEqual([
-      [{ showDeletedSessions: false }],
-      [{ showDeletedSessions: true }],
-    ]);
-  });
-
-  it('performs one explicit refresh after a session mutation', async () => {
-    const dataClient = buildDataClient();
-    dataClient.loadSessions
-      .mockResolvedValueOnce([activeSession])
-      .mockResolvedValueOnce([]);
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
-
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    fireEvent.press(await screen.findByTestId('active-session-menu-button'));
-    fireEvent.press(screen.getByTestId('discard-active-session-button'));
-    const buttons = alertSpy.mock.calls[0][2] as AlertButton[];
-    await act(async () => {
-      buttons.find((button) => button.text === 'Discard')?.onPress?.();
-    });
-    alertSpy.mockRestore();
-
-    await waitFor(() => {
-      expect(dataClient.discardActiveSession).toHaveBeenCalledWith(activeSession.id);
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  it('does not let a superseded request overwrite the newer filter result', async () => {
-    const firstLoad = createDeferred<SessionListItem[]>();
-    const secondLoad = createDeferred<SessionListItem[]>();
-    const dataClient = buildDataClient();
-    dataClient.loadSessions
-      .mockImplementationOnce(() => firstLoad.promise)
-      .mockImplementationOnce(() => secondLoad.promise);
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
-
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-    });
-    fireEvent.press(screen.getByTestId('toggle-deleted-sessions-button'));
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(2);
-    });
-
-    await act(async () => {
-      secondLoad.resolve([newerCompletedSession]);
-      await secondLoad.promise;
-    });
-    expect(await screen.findByTestId(`completed-session-row-${newerCompletedSession.id}`)).toBeTruthy();
-
-    await act(async () => {
-      firstLoad.resolve([completedSession]);
-      await firstLoad.promise;
-    });
-    expect(screen.getByTestId(`completed-session-row-${newerCompletedSession.id}`)).toBeTruthy();
-    expect(screen.queryByTestId(`completed-session-row-${completedSession.id}`)).toBeNull();
-  });
-
-  it('invalidates an in-flight request when the consumer unmounts', async () => {
-    const lateLoad = createDeferred<SessionListItem[]>();
-    const dataClient = buildDataClient();
-    dataClient.loadSessions.mockImplementationOnce(() => lateLoad.promise);
-    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
-
-    await waitFor(() => {
-      expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-    });
-    view.unmount();
-
-    await act(async () => {
-      lateLoad.resolve([completedSession]);
-      await lateLoad.promise;
-    });
-    expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('SessionsScreen design-language states (DLM-T10)', () => {
-  let alertSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    mockPush.mockReset();
-    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    alertSpy.mockRestore();
-  });
-
-  const alertButton = (text: string): AlertButton => {
-    const buttons = alertSpy.mock.calls.at(-1)?.[2] as AlertButton[];
-    const button = buttons.find((candidate) => candidate.text === text);
-    if (!button) {
-      throw new Error(`No alert button ${text}`);
-    }
-    return button;
-  };
-
-  it('marks a deleted completed row with a Deleted tag once deleted sessions are shown', async () => {
-    const deletedSession: SessionListItem = {
-      ...completedSession,
-      deletedAt: '2026-07-26T12:00:00.000Z',
-    };
-    const dataClient = buildDataClient();
-    dataClient.loadSessions.mockResolvedValue([deletedSession]);
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
-
-    const toggle = await screen.findByTestId('toggle-deleted-sessions-button');
+    const toggle = screen.getByTestId('toggle-deleted-sessions-button');
     expect(toggle).toHaveProp('accessibilityState', { disabled: false, checked: false });
-    expect(screen.queryByTestId(`completed-session-row-${deletedSession.id}`)).toBeNull();
+    expect(screen.queryByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeNull();
 
     fireEvent.press(toggle);
 
-    expect(
-      await screen.findByTestId(`completed-session-deleted-tag-${deletedSession.id}`)
-    ).toHaveTextContent('Deleted');
+    expect(await screen.findByTestId(`completed-session-deleted-tag-${OLDER_COMPLETED}`)).toHaveTextContent('Deleted');
     expect(screen.getByTestId('toggle-deleted-sessions-button')).toHaveProp('accessibilityState', {
       disabled: false,
       checked: true,
     });
     expect(screen.getByTestId('toggle-deleted-sessions-button')).toHaveTextContent('Hide deleted');
+    expect(load.mock.calls).toEqual([[{ showDeletedSessions: false }], [{ showDeletedSessions: true }]]);
   });
 
-  it('confirms before discarding the active session, and Cancel keeps it', async () => {
-    const dataClient = buildDataClient();
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
+  it('confirms before discarding the active session: Cancel keeps it, Discard deletes it and refreshes once', async () => {
+    const load = loadSpy();
+    await openSessions();
 
-    fireEvent.press(await screen.findByTestId('active-session-menu-button'));
+    fireEvent.press(screen.getByTestId('active-session-menu-button'));
     fireEvent.press(screen.getByTestId('discard-active-session-button'));
 
     expect(alertSpy).toHaveBeenCalledTimes(1);
@@ -308,23 +188,25 @@ describe('SessionsScreen design-language states (DLM-T10)', () => {
     act(() => {
       alertButton('Cancel').onPress?.();
     });
-    expect(dataClient.discardActiveSession).not.toHaveBeenCalled();
-    expect(screen.getByTestId(`active-session-row-${activeSession.id}`)).toBeTruthy();
+    expect((await loadSessionSnapshotById(ACTIVE))?.deletedAt).toBeNull();
+    expect(screen.getByTestId(`active-session-row-${ACTIVE}`)).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('active-session-menu-button'));
     fireEvent.press(screen.getByTestId('discard-active-session-button'));
     await act(async () => {
       alertButton('Discard').onPress?.();
     });
-    expect(dataClient.discardActiveSession).toHaveBeenCalledWith(activeSession.id);
+
+    expect((await loadSessionSnapshotById(ACTIVE))?.deletedAt).toBeInstanceOf(Date);
+    await waitFor(() => expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull());
+    expect(load).toHaveBeenCalledTimes(2);
   });
 
-  it('reloads from the load error through Retry', async () => {
-    const dataClient = buildDataClient();
-    dataClient.loadSessions
-      .mockRejectedValueOnce(new Error('Database unavailable'))
-      .mockResolvedValueOnce([completedSession]);
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
+  it('reloads from the load error through Retry (a failed read)', async () => {
+    const load = loadSpy().mockRejectedValueOnce(new Error('Database unavailable'));
+    await loadMaestroFixture('session-view');
+    await bootLocalApp();
+    render(<SessionsRoute />);
 
     const error = await screen.findByTestId('session-list-load-error');
     expect(error).toHaveTextContent(/Could not load sessions/);
@@ -332,21 +214,98 @@ describe('SessionsScreen design-language states (DLM-T10)', () => {
 
     fireEvent.press(screen.getByTestId('session-list-load-error-retry'));
 
-    expect(await screen.findByTestId(`completed-session-row-${completedSession.id}`)).toBeTruthy();
-    expect(dataClient.loadSessions).toHaveBeenCalledTimes(2);
+    expect(await screen.findByTestId(`completed-session-row-${NEWEST_COMPLETED}`)).toBeTruthy();
+    expect(load).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('session-list-load-error')).toBeNull();
   });
 
   it('opens a completed row menu as a sheet the backdrop dismisses', async () => {
-    const dataClient = buildDataClient();
-    dataClient.loadSessions.mockResolvedValue([completedSession]);
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
+    await openSessions();
 
-    fireEvent.press(await screen.findByTestId(`completed-session-menu-button-${completedSession.id}`));
+    fireEvent.press(screen.getByTestId(`completed-session-menu-button-${NEWEST_COMPLETED}`));
     expect(screen.getByTestId('completed-session-edit-menu-action-button')).toBeTruthy();
     expect(screen.getByTestId('completed-session-modal-action-button')).toHaveTextContent('Delete');
 
     fireEvent.press(screen.getByTestId('completed-session-menu-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('completed-session-edit-menu-action-button')).toBeNull();
+  });
+});
+
+// Races real data cannot stage: the loads are held open by an injected client.
+describe('Sessions list load races', () => {
+  const session = (id: string, completedAt: string): SessionListItem => ({
+    id,
+    startedAt: '2026-07-25T09:00:00.000Z',
+    status: 'completed',
+    completedAt,
+    durationSec: 3_600,
+    durationDisplay: '1h',
+    gymName: null,
+    exerciseCount: 1,
+    setCount: 3,
+    totalWeight: 0,
+    deletedAt: null,
+  });
+
+  const createDeferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((resolvePromise) => {
+      resolve = resolvePromise;
+    });
+    return { promise, resolve };
+  };
+
+  const heldClient = (...loads: Promise<SessionListItem[]>[]): jest.Mocked<SessionListDataClient> => {
+    const loadSessions = jest.fn();
+    for (const load of loads) loadSessions.mockImplementationOnce(() => load);
+    return {
+      loadSessions,
+      startSession: jest.fn(),
+      completeActiveSession: jest.fn(),
+      discardActiveSession: jest.fn(),
+      setCompletedSessionDeletedState: jest.fn(),
+      appendCompletedSessionAsPlanned: jest.fn(),
+    };
+  };
+
+  it('does not let a superseded request overwrite the newer filter result (a race)', async () => {
+    const older = session('completed-session-1', '2026-07-25T10:00:00.000Z');
+    const newer = session('completed-session-2', '2026-07-26T10:00:00.000Z');
+    const firstLoad = createDeferred<SessionListItem[]>();
+    const secondLoad = createDeferred<SessionListItem[]>();
+    const dataClient = heldClient(firstLoad.promise, secondLoad.promise);
+    render(<SessionsScreen dataClient={dataClient} isFocused />);
+
+    await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(1));
+    fireEvent.press(screen.getByTestId('toggle-deleted-sessions-button'));
+    await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      secondLoad.resolve([newer]);
+      await secondLoad.promise;
+    });
+    expect(await screen.findByTestId(`completed-session-row-${newer.id}`)).toBeTruthy();
+
+    await act(async () => {
+      firstLoad.resolve([older]);
+      await firstLoad.promise;
+    });
+    expect(screen.getByTestId(`completed-session-row-${newer.id}`)).toBeTruthy();
+    expect(screen.queryByTestId(`completed-session-row-${older.id}`)).toBeNull();
+  });
+
+  it('invalidates an in-flight request when the consumer unmounts (a race)', async () => {
+    const lateLoad = createDeferred<SessionListItem[]>();
+    const dataClient = heldClient(lateLoad.promise);
+    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
+
+    await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(1));
+    view.unmount();
+
+    await act(async () => {
+      lateLoad.resolve([session('completed-session-1', '2026-07-25T10:00:00.000Z')]);
+      await lateLoad.promise;
+    });
+    expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
   });
 });

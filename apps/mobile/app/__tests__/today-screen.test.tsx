@@ -1,6 +1,26 @@
 /* eslint-disable import/first */
 
+/**
+ * The Today tab. Its training half runs over real data: the session-list
+ * client and the shared session-entry coordinator over the migrated in-memory
+ * SQLite database (helpers/local-data.ts), with sessions written through the
+ * app's draft → complete path. Only the native database open and the router
+ * are replaced.
+ *
+ * Two inputs stay injected as props, as the route builds them from sources
+ * outside the local database: the joined-group activity (`socialState`, the
+ * group stream read from the server) and the plan (`planState`; planning has
+ * no data source yet), whose materializer writes a real draft. Named states
+ * real data cannot produce: a plan launch still pending, a failed plan write
+ * and a failed session read.
+ */
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 const mockPush = jest.fn();
 
@@ -8,44 +28,24 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-import type { SessionListDataClient, SessionListItem } from '@/components/session-list';
+import { DEFAULT_SESSION_LIST_DATA_CLIENT } from '@/components/session-list';
+import { upsertLocalGym } from '@/src/data/local-gyms';
+import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
+import { listSessionListBuckets, setSessionDeletedState } from '@/src/data/session-list';
 import { GroupApiError, type StreamItem } from '@/src/groups';
+import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
 
 import { recordItem } from './helpers/group-record-fixtures';
+import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
 
 import {
   TodayScreen,
   type TodayPlanState,
+  type TodayScreenProps,
   type TodaySocialState,
 } from '../(tabs)/today';
-
-const activeSession: SessionListItem = {
-  id: 'active-1',
-  startedAt: '2026-09-16T09:00:00.000Z',
-  status: 'active',
-  completedAt: null,
-  durationSec: null,
-  durationDisplay: '12m',
-  gymName: 'Iron House',
-  exerciseCount: 2,
-  setCount: 6,
-  totalWeight: 0,
-  deletedAt: null,
-};
-
-const completedSession = (
-  id: string,
-  completedAt: string,
-): SessionListItem => ({
-  ...activeSession,
-  id,
-  status: 'completed',
-  completedAt,
-  durationSec: 3_600,
-  durationDisplay: '1h',
-});
 
 const streamSession = (key: string, memberId: string, sessionId: string): StreamItem => ({
   kind: 'session',
@@ -97,137 +97,133 @@ const socialState = (items: StreamItem[] = []): TodaySocialState => ({
   refresh: jest.fn().mockResolvedValue(undefined),
 });
 
-const dataClient = (sessions: SessionListItem[]): jest.Mocked<SessionListDataClient> => ({
-  loadSessions: jest.fn().mockResolvedValue(sessions),
-  startSession: jest.fn().mockResolvedValue(undefined),
-  completeActiveSession: jest.fn().mockResolvedValue(undefined),
-  discardActiveSession: jest.fn().mockResolvedValue(undefined),
-  setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-  appendCompletedSessionAsPlanned: jest.fn().mockResolvedValue(undefined),
-});
-
-const sessionEntry = (): jest.Mocked<
-  Pick<SessionEntryCoordinator, 'startPlannedOrResume'>
-> => ({
-  startPlannedOrResume: jest
-    .fn()
-    .mockResolvedValue({ kind: 'started', sessionId: 'planned-session' }),
-});
-
-describe('Today screen', () => {
-  beforeEach(() => {
-    mockPush.mockReset();
+// A plan's materializer: writes the planned draft through the app's own path.
+const plannedDraft = () =>
+  persistSessionDraftSnapshot({
+    sessionId: 'planned-session',
+    gymId: null,
+    startedAt: new Date(),
+    status: 'active',
+    exercises: [],
   });
 
-  it('promotes an active session and replaces the planned-session action', async () => {
-    const materialize = jest.fn();
-    const entry = sessionEntry();
-    render(
-      <TodayScreen
-        dataClient={dataClient([activeSession])}
-        planState={{
-          status: 'ready',
-          title: 'Lower body',
-          detail: '4 exercises',
-          materialize,
-        }}
-        sessionEntry={entry}
-        socialState={socialState()}
-      />,
-    );
+const readyPlan = (materialize: () => Promise<{ sessionId: string }> = jest.fn(plannedDraft)): TodayPlanState => ({
+  status: 'ready',
+  title: 'Upper body',
+  detail: 'Bench press · Row · Pull-up',
+  materialize,
+});
 
-    fireEvent.press(await screen.findByTestId('today-resume-session-button'));
+// A completed 1-hour session at Iron House, 09:00–10:00Z on `day`: two
+// exercises, six sets. UTC instants: the list label prints the stored ISO
+// clock time (`formatDateTimeStamp`), so this keeps it the same in every zone.
+const logSession = async (id: string, day: number) => {
+  const startedAt = new Date(Date.UTC(2026, 8, day, 9, 0));
+  const completedAt = new Date(Date.UTC(2026, 8, day, 10, 0));
+  const sets = (exercise: string, count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      id: `${id}_${exercise}_${index + 1}`,
+      weightValue: '100',
+      repsValue: '5',
+      setType: 'rir_2' as const,
+      performanceStatus: null,
+    }));
+  await upsertLocalGym({ id: 'iron-house', name: 'Iron House' });
+  await persistSessionDraftSnapshot(
+    {
+      sessionId: id,
+      gymId: 'iron-house',
+      startedAt,
+      exercises: [
+        { id: `${id}_bench`, exerciseDefinitionId: 'seed_barbell_bench_press', name: 'Barbell Bench Press', sets: sets('bench', 3) },
+        { id: `${id}_squat`, exerciseDefinitionId: 'seed_barbell_back_squat', name: 'Barbell Back Squat', sets: sets('squat', 3) },
+      ],
+    },
+    { now: completedAt }
+  );
+  await completeSessionDraft(id, { completedAt, now: completedAt });
+};
+
+const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
+  await bootLocalApp();
+  render(<TodayScreen dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT} socialState={socialState()} {...props} />);
+  await waitFor(() => expect(screen.queryByTestId('today-recents-loading')).toBeNull());
+};
+
+const activeSessionId = async () => (await listSessionListBuckets()).active?.id ?? null;
+
+beforeEach(() => {
+  resetLocalData();
+  mockPush.mockReset();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  closeLocalData();
+});
+
+describe('Today: training over real data', () => {
+  it('promotes the workout in progress and replaces the planned-session action', async () => {
+    const plan = readyPlan();
+    await loadMaestroFixture('session-view');
+    await renderToday({ planState: plan });
+
+    fireEvent.press(screen.getByTestId('today-resume-session-button'));
 
     expect(screen.getByTestId('today-active-session-card')).toBeTruthy();
     // "Current" rides the ring glyph and the words, not a success colour (G3).
     expect(screen.getByTestId('today-active-session-glyph', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId('today-start-planned-session-button')).toBeNull();
-    expect(entry.startPlannedOrResume).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/session/active-1');
+    expect(plan.status === 'ready' && plan.materialize).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION_VIEW_FIXTURE.sessionId}`);
   });
 
-  it('starts a ready plan once while its materializer is in flight', async () => {
-    let resolveStart!: (value: { kind: 'started'; sessionId: string }) => void;
-    const entry = sessionEntry();
-    entry.startPlannedOrResume.mockImplementation(
-      () => new Promise((resolve) => {
-        resolveStart = resolve;
-      }),
-    );
-    const materialize = jest.fn().mockResolvedValue({ sessionId: 'planned-session' });
-    const planState: TodayPlanState = {
-      status: 'ready',
-      title: 'Upper body',
-      detail: 'Bench press · Row · Pull-up',
-      materialize,
-    };
-    render(
-      <TodayScreen
-        initialSessions={[]}
-        planState={planState}
-        sessionEntry={entry}
-        socialState={socialState()}
-      />,
-    );
+  it('starts a ready plan once on a double tap and opens its session', async () => {
+    const plan = readyPlan();
+    await renderToday({ planState: plan });
 
     const action = screen.getByTestId('today-start-planned-session-button');
     fireEvent.press(action);
     fireEvent.press(action);
-
-    expect(entry.startPlannedOrResume).toHaveBeenCalledTimes(1);
-    expect(entry.startPlannedOrResume).toHaveBeenCalledWith(materialize);
     expect(screen.getByText('Starting…')).toBeTruthy();
-    resolveStart({ kind: 'started', sessionId: 'planned-session' });
+
     await waitFor(() => expect(screen.getByText('Start planned workout')).toBeTruthy());
+    expect(plan.status === 'ready' && plan.materialize).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledWith('/session/planned-session');
+    expect(await activeSessionId()).toBe('planned-session');
   });
 
-  it('keeps a failed planned launch retryable and inline', async () => {
-    const entry = sessionEntry();
-    entry.startPlannedOrResume.mockRejectedValue(new Error('materialization failed'));
-    const materialize = jest.fn().mockResolvedValue({ sessionId: 'planned-session' });
-    render(
-      <TodayScreen
-        initialSessions={[]}
-        planState={{
-          status: 'ready',
-          title: 'Upper body',
-          detail: '3 exercises',
-          materialize,
-        }}
-        sessionEntry={entry}
-        socialState={socialState()}
-      />,
-    );
+  it('keeps a failed planned launch retryable and inline (a failed plan write)', async () => {
+    const materialize = jest.fn().mockRejectedValueOnce(new Error('materialization failed')).mockImplementation(plannedDraft);
+    await renderToday({ planState: readyPlan(materialize) });
 
     fireEvent.press(screen.getByTestId('today-start-planned-session-button'));
 
     expect(await screen.findByTestId('today-plan-launch-error')).toHaveTextContent(
       "Couldn't start this planned session. Try again.",
     );
+    expect(await activeSessionId()).toBeNull();
+
     fireEvent.press(screen.getByTestId('today-start-planned-session-button'));
-    await waitFor(() => expect(entry.startPlannedOrResume).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/planned-session'));
+    expect(materialize).toHaveBeenCalledTimes(2);
   });
 
-  it('shows a bounded newest-first recent snapshot and opens existing destinations', () => {
-    const sessions = [
-      completedSession('session-1', '2026-09-13T10:00:00.000Z'),
-      completedSession('session-4', '2026-09-16T10:00:00.000Z'),
-      completedSession('session-2', '2026-09-14T10:00:00.000Z'),
-      completedSession('session-3', '2026-09-15T10:00:00.000Z'),
-    ];
-    render(<TodayScreen initialSessions={sessions} socialState={socialState()} />);
+  it('shows a bounded newest-first recent snapshot and opens existing destinations', async () => {
+    await logSession('session-1', 13);
+    await logSession('session-4', 16);
+    await logSession('session-2', 14);
+    await logSession('session-3', 15);
+    await renderToday();
 
     expect(screen.getByTestId('today-recent-session-session-4')).toBeTruthy();
     expect(screen.getByTestId('today-recent-session-session-3')).toBeTruthy();
     expect(screen.getByTestId('today-recent-session-session-2')).toBeTruthy();
     expect(screen.queryByTestId('today-recent-session-session-1')).toBeNull();
-    expect(
-      screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel,
-    ).toBe('Completed session on 9/16 10:00, 1h, 6 sets, 2 exercises, at Iron House');
-    expect(
-      screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel,
-    ).not.toContain('session-4');
+    expect(screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel).toBe(
+      'Completed session on 9/16 10:00, 1h, 6 sets, 2 exercises, at Iron House',
+    );
+    expect(screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel).not.toContain('session-4');
 
     fireEvent.press(screen.getByTestId('today-recent-session-session-4'));
     fireEvent.press(screen.getByTestId('today-view-progress-button'));
@@ -236,19 +232,64 @@ describe('Today screen', () => {
     expect(mockPush).toHaveBeenNthCalledWith(2, '/progress');
   });
 
-  it('bounds joined-group activity to sessions, records and membership changes', () => {
-    render(
-      <TodayScreen
-        initialSessions={[]}
-        socialState={socialState([
-          linkItem,
-          streamSession('member-1:session-1', 'member-1', 'session-1'),
-          recordItem({ member: { user_id: 'member-1', username: 'Alex' }, session_id: 'session-1' }),
-          membershipItem,
-          streamSession('member-3:session-3', 'member-3', 'session-3'),
-        ])}
-      />,
-    );
+  it('leaves deleted sessions out of the recent snapshot', async () => {
+    await logSession('session-1', 13);
+    await logSession('session-2', 14);
+    await logSession('session-3', 15);
+    await setSessionDeletedState('session-3', true);
+    await renderToday();
+
+    expect(screen.queryByTestId('today-recent-session-session-3')).toBeNull();
+    expect(screen.getByTestId('today-recent-session-session-2')).toBeTruthy();
+    expect(screen.getByTestId('today-recent-session-session-1')).toBeTruthy();
+  });
+
+  it('reports a failed session read inline and retries through the client (a failed read)', async () => {
+    const load = jest
+      .spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions')
+      .mockRejectedValueOnce(new Error('Unable to read sessions'));
+    await bootLocalApp();
+    render(<TodayScreen dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT} socialState={socialState()} />);
+
+    expect(await screen.findByTestId('today-recents-error')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('today-recents-error-retry'));
+
+    expect(await screen.findByTestId('today-recents-empty')).toBeTruthy();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('is honest when the planning dependency is unavailable', async () => {
+    await renderToday();
+
+    expect(screen.getByTestId('today-plan-unavailable')).toBeTruthy();
+    expect(screen.getByText('Watch this space 👀')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('today-open-train-button'));
+    expect(mockPush).toHaveBeenCalledWith('/train');
+  });
+});
+
+describe('Today: launch and group-activity states', () => {
+  it('shows Starting… while a plan launch is pending (a pending launch)', async () => {
+    const pending: Pick<SessionEntryCoordinator, 'startPlannedOrResume'> = {
+      startPlannedOrResume: () => new Promise(() => undefined),
+    };
+    await renderToday({ planState: readyPlan(), sessionEntry: pending as SessionEntryCoordinator });
+
+    fireEvent.press(screen.getByTestId('today-start-planned-session-button'));
+
+    expect(screen.getByText('Starting…')).toBeTruthy();
+  });
+
+  it('bounds joined-group activity to sessions, records and membership changes', async () => {
+    await renderToday({
+      socialState: socialState([
+        linkItem,
+        streamSession('member-1:session-1', 'member-1', 'session-1'),
+        recordItem({ member: { user_id: 'member-1', username: 'Alex' }, session_id: 'session-1' }),
+        membershipItem,
+        streamSession('member-3:session-3', 'member-3', 'session-3'),
+      ]),
+    });
 
     expect(screen.getByTestId('group-stream-session-card-member-1:session-1')).toBeTruthy();
     expect(screen.getByTestId('group-stream-record-card-ev-record-1')).toBeTruthy();
@@ -267,17 +308,15 @@ describe('Today screen', () => {
     expect(mockPush).toHaveBeenNthCalledWith(3, '/groups?groupId=group-2');
   });
 
-  it('keeps signed-out and offline-without-cache group states explicit', () => {
-    const view = render(
-      <TodayScreen initialSessions={[]} socialState={{ status: 'signed-out' }} />,
-    );
+  it('keeps signed-out and offline-without-cache group states explicit', async () => {
+    await renderToday({ socialState: { status: 'signed-out' } });
 
     fireEvent.press(screen.getByTestId('today-social-sign-in'));
     expect(mockPush).toHaveBeenCalledWith(SIGN_IN_ROUTE);
 
-    view.rerender(
+    screen.rerender(
       <TodayScreen
-        initialSessions={[]}
+        dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
         socialState={{
           status: 'available',
           hasData: false,
@@ -292,28 +331,5 @@ describe('Today screen', () => {
 
     expect(screen.getByTestId('groups-offline-banner')).toBeTruthy();
     expect(screen.getByTestId('today-social-offline-empty-state')).toBeTruthy();
-  });
-
-  it('reports session-load failure inline and retries through the existing client', async () => {
-    const client = dataClient([]);
-    client.loadSessions
-      .mockRejectedValueOnce(new Error('Unable to read sessions'))
-      .mockResolvedValueOnce([]);
-    render(<TodayScreen dataClient={client} socialState={socialState()} />);
-
-    expect(await screen.findByTestId('today-recents-error')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('today-recents-error-retry'));
-
-    await waitFor(() => expect(client.loadSessions).toHaveBeenCalledTimes(2));
-    expect(await screen.findByTestId('today-recents-empty')).toBeTruthy();
-  });
-
-  it('is honest when the planning dependency is unavailable', () => {
-    render(<TodayScreen initialSessions={[]} socialState={socialState()} />);
-
-    expect(screen.getByTestId('today-plan-unavailable')).toBeTruthy();
-    expect(screen.getByText('Watch this space 👀')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('today-open-train-button'));
-    expect(mockPush).toHaveBeenCalledWith('/train');
   });
 });
