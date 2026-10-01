@@ -113,6 +113,7 @@ get from `./boga timings` or a run.
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.5s |
 | groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~22s |
 | groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~51s |
+| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~9.8s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.7s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.3s |
 | sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.6s |
@@ -209,7 +210,7 @@ Machine-readable form: `scripts/triggers.tsv`, queried with
 | One Maestro flow (`apps/mobile/.maestro/flows/<flow>.yaml`) | the lane that runs that flow **+** `meta-tests` (runner / config changes: `./boga test frontend`) |
 | Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `./boga test fast` **+** `./boga test backend` **+** `./boga test ios-sync-e2e` (the UI↔server e2e lane) |
 | Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./boga test backend` |
-| Groups (`apps/mobile/src/groups/**`, group migrations `supabase/migrations/*group*`, `groups-fixture-reset.sh`) | the rows above **+** `./boga test ios-groups-e2e` (the two-user UI↔server e2e lane) |
+| Groups (`apps/mobile/src/groups/**`, group migrations `supabase/migrations/*group*`, `groups-fixture-reset.sh`) | the rows above **+** `./boga test groups-api-live` (the app's groups client against the live server) **+** `./boga test ios-groups-e2e` (the two-user UI↔server e2e lane) |
 | Group evaluator (`supabase/functions/group-eval/**`, the TS it loads: `src/groups/set-facts.ts`, `src/exercise-calculations/**`, `src/session-recorder/set-semantics.ts`) | the rows above **+** `./boga test groups-leaderboards` (already inside `boga test backend`) |
 | Agent consent web (`apps/agent-auth-web/**`) | `./boga test fast` |
 | MCP server (`services/boga-mcp/**`) | `./boga test fast` **+** `./boga test mcp-smoke` |
