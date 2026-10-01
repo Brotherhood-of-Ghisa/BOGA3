@@ -10,7 +10,8 @@ else is Jest, screens over real data (spec 06, "Jest test shapes").
 | --- | --- |
 | #409 | Lanes chosen by judgement and agreed with the operator; Maestro scope policy (new flows need approval, flows state what they prove); full sweep only before release builds; `pr-check` removed. |
 | #412 | `helpers/local-data.ts` (real screens over the migrated in-memory DB, seeded through the Maestro harness); migrate-once snapshot (26 ms → 0.15 ms per fixture); `better-sqlite3` pinned to the device's SQLite 3.50 line + parity test; Stats proof `stats-screen-local-data.test.tsx` (6 tests; caught a broken stats SQL filter that the 89 existing stats tests missed). |
-| this PR | "Jest test shapes" rule (spec 06, `app/__tests__/README.md`); this plan. |
+| #414 | "Jest test shapes" rule (spec 06, `app/__tests__/README.md`); this plan. |
+| this PR | Session completion on real data: `completed-session-local-data.test.tsx` (23 tests, every claim of the session-completion flow that Jest can reach) replaces 27 mocked tests; `completed-session-detail-screen.test.tsx` keeps 14 for states real data cannot produce. `bootLocalApp()` in the helper. |
 
 ## Queue
 
@@ -21,7 +22,6 @@ include one run of the named lane on the Mac (green, and its new time from
 | # | Where | Task | Done when |
 | --- | --- | --- | --- |
 | 1 | mac | **Trim `stats-screen-ux.yaml`** to its device claim (harness seeds on-device SQLite and Stats renders it, appendix claim 0) plus the overlay taps that need real gestures, if any; add the `Proves / Why device / Jest counterpart` header. Claims 1–13 are covered by `stats-screen.test.tsx` + `stats-screen-local-data.test.tsx` (the latter also asserts the two overlay titles the appendix flags, `Weekly training load` and `Last 12 months`). | `ios-ui-regression` green on the Mac, new time recorded. |
-| 2 | cloud | **Port session-completion-states-fixture** P claims to the helper (fixture `completion-two-prs`). | Jest green; each P claim maps to a test. |
 | 3 | cloud | **Port exercise-catalogue** P claims (fixtures `exercise-block-history`, `exercise-browser`). | Same. |
 | 4 | cloud | **Port exercise-page** to the helper (fixture `exercise-page`). | Same. |
 | 5 | mac | **Trim session-completion, exercise-catalogue, exercise-page flows** to their D claims + headers, after 2–4. | `ios-ui-regression` and `ios-exercise-page` green, times recorded. |

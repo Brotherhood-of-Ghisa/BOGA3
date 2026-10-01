@@ -1,5 +1,13 @@
+/**
+ * Completed-session states real data cannot produce (spec 06, "Jest test
+ * shapes"): pending, failed and obsolete insight reads, failed loads and
+ * writes, a second delete mid-write, share failures, a catalog read error, and
+ * the Android back handler. Everything a real session can show is asserted over
+ * the database in `completed-session-local-data.test.tsx`.
+ */
+
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { BackHandler } from 'react-native';
 
 import CompletedSessionDetailRoute, {
@@ -201,85 +209,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(resolveCompletedSessionPresentation(undefined)).toBe('detail');
   });
 
-  it.each(['detail', 'summary'] as const)('opens %s as consolidated Summary, switches locally and shares exercise comparisons', async (presentation) => {
-    const comparison = {
-      exerciseDefinitionId: 'bench-press', exerciseName: 'Bench Press', sessionExerciseIds: ['exercise-1'],
-      sessionExerciseOrderIndex: 0, setCount: 4, workingSetCount: 3, currentVolume: 4595,
-      historicalSessionCount: 1, medianVolume: 4000, percentile5Volume: 4000, percentile95Volume: 4000,
-      state: 'single-baseline',
-    };
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      loadInsights: jest.fn().mockResolvedValue({
-        personalRecords: [], exerciseVolumeComparisons: [comparison],
-        muscleVolumeComparisons: [{ ...comparison, exerciseDefinitionId: 'chest', exerciseName: 'Chest', sessionExerciseIds: ['chest'] }],
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn(), setCompletedSessionDeletedState: jest.fn(),
-    };
-    render(<CompletedSessionDetailScreenShell dataClient={dataClient} presentation={presentation} sessionId="completed-under-test" />);
-    await screen.findByTestId('session-completion-exercise-exercise-1-baseline');
-    expect(screen.getByText('View Session')).toBeTruthy();
-    expect(screen.getByTestId('view-session-section-summary')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.queryByTestId('session-completion-context')).toBeNull();
-    expect(screen.getByTestId('session-insight-mode-exercise')).toHaveProp('accessibilityState', { selected: true });
-    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByTestId('session-completion-muscle-comparison-chest-baseline')).toBeTruthy();
-    expect(screen.queryByTestId('session-completion-exercise-exercise-1')).toBeNull();
-    fireEvent.press(screen.getByTestId('session-completion-share-session'));
-    expect(screen.getByTestId('session-share-exercise-exercise-1')).toBeTruthy();
-    expect(screen.queryByTestId('session-share-exercise-chest')).toBeNull();
-    fireEvent(screen.getByTestId('session-share-preview'), 'accessibilityEscape');
-    fireEvent.press(screen.getByTestId('view-session-section-sets'));
-    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1')).toBeTruthy();
-    expect(screen.getByTestId('view-session-section-sets')).toHaveProp('accessibilityState', { selected: true });
-    expect(mockPush).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('view-session-section-summary'));
-    expect(screen.getByTestId('session-insight-mode-muscle')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.queryByTestId('session-summary-edit')).toBeNull();
-    expect(screen.queryByTestId('session-summary-view-sets')).toBeNull();
-    fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
-    expect(mockPush).toHaveBeenLastCalledWith('/session/completed-under-test');
-    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-
-  it.each(['summary', 'sets'] as const)('restores %s and grouping on edit return, refreshing facts, sets and comparisons', async (section) => {
-    const comparison = {
-      exerciseDefinitionId: 'bench-press', exerciseName: 'Bench Press', sessionExerciseIds: ['exercise-1'],
-      sessionExerciseOrderIndex: 0, setCount: 4, workingSetCount: 3, currentVolume: 4595,
-      historicalSessionCount: 1, medianVolume: 4000, percentile5Volume: 4000, percentile95Volume: 4000,
-      state: 'single-baseline',
-    };
-    const insights = { personalRecords: [], exerciseVolumeComparisons: [comparison],
-      muscleVolumeComparisons: [{ ...comparison, exerciseDefinitionId: 'chest', exerciseName: 'Chest', sessionExerciseIds: ['chest'] }] };
-    const dataClient = detailClient({
-      loadInsights: jest.fn().mockResolvedValueOnce(insights).mockResolvedValue({ ...insights,
-        muscleVolumeComparisons: [{ ...insights.muscleVolumeComparisons[0], currentVolume: 5000 }] }),
-      loadCompletedSession: jest.fn().mockResolvedValueOnce(COMPLETED_SESSION_DETAIL_FIXTURE).mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE, gymName: 'Edited gym',
-        exercises: [{ ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0],
-          sets: [{ id: 'edited-set', weight: '200', reps: '10', setType: 'rir_1' }] }],
-      }),
-    });
-    render(<CompletedSessionDetailScreenShell dataClient={dataClient} sessionId="completed-under-test" />);
-    await screen.findByTestId('session-completion-exercise-exercise-1-baseline');
-    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    fireEvent.press(screen.getByTestId(`view-session-section-${section}`));
-    fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
-    expect(mockPush).toHaveBeenCalledWith('/session/completed-under-test');
-    act(() => jest.requireMock('expo-router').__triggerFocus());
-    await screen.findByText('Edited gym');
-    expect(screen.getByTestId(`view-session-section-${section}`)).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId('completed-session-detail-volume')).toHaveProp('accessibilityLabel', 'Volume 2000');
-    fireEvent.press(screen.getByTestId('view-session-section-sets'));
-    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1-set-1-values')).toHaveTextContent('200.0 × 10');
-    fireEvent.press(screen.getByTestId('view-session-section-summary'));
-    expect(screen.getByTestId('session-insight-mode-muscle')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByLabelText(/Chest,.*Session volume 5000/)).toBeTruthy();
-    expect(dataClient.loadInsights).toHaveBeenCalledTimes(2);
-  });
-
   it('distinguishes pending and failed comparisons from absent history without blocking sets, actions or sharing', async () => {
     let rejectInsights!: (error: Error) => void;
     const loadInsights = jest.fn().mockReturnValue(new Promise((_resolve, reject) => { rejectInsights = reject; }));
@@ -302,22 +231,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByText('Delete session')).toBeTruthy();
   });
 
-  it('shows genuine no-history and unmapped states, and resets selections for a different session', async () => {
-    const dataClient = detailClient({ loadInsights: jest.fn().mockResolvedValue({ personalRecords: [], muscleVolumeComparisons: [],
-      exerciseVolumeComparisons: [{ exerciseDefinitionId: 'bench-press', exerciseName: 'Bench Press', sessionExerciseIds: ['exercise-1'],
-        sessionExerciseOrderIndex: 0, setCount: 4, workingSetCount: 3, currentVolume: 4595,
-        historicalSessionCount: 0, medianVolume: null, percentile5Volume: null, percentile95Volume: null, state: 'no-history' }] }) });
-    const { rerender } = render(<CompletedSessionDetailScreenShell dataClient={dataClient} sessionId="completed-under-test" />);
-    await screen.findByLabelText(/Bench Press,.*No comparison history yet/);
-    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByText('No mapped performed sets for this session.')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('view-session-section-sets'));
-    rerender(<CompletedSessionDetailScreenShell dataClient={dataClient} sessionId="different-session" />);
-    await screen.findByLabelText(/Bench Press,.*No comparison history yet/);
-    expect(screen.getByTestId('view-session-section-summary')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId('session-insight-mode-exercise')).toHaveProp('accessibilityState', { selected: true });
-  });
-
   it('ignores an obsolete insight response after returning from editing', async () => {
     let resolveOld!: (value: unknown) => void;
     const loadInsights = jest.fn()
@@ -329,78 +242,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     await screen.findByText('Comparisons unavailable. Return to this session to retry.');
     await act(async () => resolveOld({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] }));
     expect(screen.getByText('Comparisons unavailable. Return to this session to retry.')).toBeTruthy();
-  });
-
-  it('shows an empty historical Summary without inventing comparisons, and keeps empty Sets available', async () => {
-    render(<CompletedSessionDetailScreenShell sessionId="empty-session" dataClient={detailClient({
-      loadCompletedSession: jest.fn().mockResolvedValue({ ...COMPLETED_SESSION_DETAIL_FIXTURE, exercises: [] }),
-      loadInsights: jest.fn().mockResolvedValue({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] }),
-    })} />);
-    await screen.findByText('No performed sets to compare.');
-    expect(screen.getByTestId('completed-session-detail-sets')).toHaveProp('accessibilityLabel', 'Sets 0');
-    expect(screen.queryByTestId('session-completion-muscle-breakdown')).toBeNull();
-    fireEvent.press(screen.getByTestId('view-session-section-sets'));
-    expect(screen.getByText('No exercises logged in this session.')).toBeTruthy();
-  });
-
-  it('retains deleted controls in Summary and reloads comparisons after undelete', async () => {
-    const loadInsights = jest.fn().mockResolvedValue({ personalRecords: [], exerciseVolumeComparisons: [], muscleVolumeComparisons: [] });
-    render(<CompletedSessionDetailScreenShell sessionId="deleted-session" presentation="summary" dataClient={detailClient({
-      loadCompletedSession: jest.fn().mockResolvedValue({ ...COMPLETED_SESSION_DETAIL_FIXTURE, deletedAt: '2026-02-21T08:00:00.000Z' }),
-      loadInsights,
-    })} />);
-    await screen.findByTestId('completed-session-detail-deleted-band');
-    expect(screen.getByTestId('view-session-section-summary')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.queryByTestId('completed-session-detail-edit-button')).toBeNull();
-    openSessionOptions();
-    expect(screen.getByText('Undelete session')).toBeTruthy();
-    const previousReads = loadInsights.mock.calls.length;
-    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
-    await screen.findByTestId('completed-session-detail-edit-button');
-    await waitFor(() => expect(loadInsights).toHaveBeenCalledTimes(previousReads + 1));
-    expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
-  });
-
-  it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      loadInsights: jest.fn().mockResolvedValue({
-        muscleVolumeComparisons: [],
-        personalRecords: [],
-        exerciseVolumeComparisons: [],
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation="completion"
-        sessionId="completed-under-test"
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-completion-presentation')).toBeTruthy();
-    });
-    // Its own top bar, `Session complete` · Done, and no back gesture.
-    expect(mockStackScreen).toHaveBeenLastCalledWith({
-      options: { title: 'Session complete', headerShown: false, gestureEnabled: false },
-    });
-    expect(within(screen.getByTestId('session-completion-top-bar')).getByText('Session complete')).toBeTruthy();
-    const label = (testID: string) => screen.getByTestId(testID).props.accessibilityLabel;
-    expect(label('session-completion-duration')).toBe('Duration 58m');
-    expect(label('session-completion-exercises')).toBe('Exercises 2');
-    expect(label('session-completion-sets')).toBe('Sets 5');
-    expect(label('session-completion-working-sets')).toBe('Working 3');
-    expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
-    expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 working sets');
-    expect(screen.queryByText('Numbers in brackets are working sets.')).toBeNull();
-    expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
-    expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
-    expect(screen.queryByText('Append')).toBeNull();
   });
 
   it('keeps completion and current exercise rows available when optional insight history fails', async () => {
@@ -427,172 +268,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
     expect(screen.getAllByText('No comparison history yet')).toHaveLength(2);
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
-  });
-
-  it('omits an empty muscle breakdown without removing the completion exits', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        exercises: [],
-      }),
-      loadInsights: jest.fn().mockResolvedValue({
-        muscleVolumeComparisons: [],
-        personalRecords: [],
-        exerciseVolumeComparisons: [],
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation="completion"
-        sessionId="completed-under-test"
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-completion-sets').props.accessibilityLabel).toBe('Sets 0');
-    });
-    expect(screen.queryByTestId('session-completion-muscle-breakdown')).toBeNull();
-    expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
-    expect(screen.getByTestId('session-completion-done')).toBeTruthy();
-  });
-
-  it('keeps the Maestro-only catalog failure state informational and non-interactive', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      loadInsights: jest.fn().mockResolvedValue({
-        muscleVolumeComparisons: [],
-        personalRecords: [],
-        exerciseVolumeComparisons: [],
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation="completion"
-        sessionId="completed-under-test"
-        shouldFailNextMaestroCatalog
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-completion-muscle-empty-state')).toHaveTextContent(
-        'Muscle breakdown unavailable.'
-      );
-    });
-    expect(screen.queryByLabelText('Retry session muscle load')).toBeNull();
-    expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
-  });
-
-  it.each(['completion', 'summary'] as const)('shows every PR at once and previews the complete session image in %s', async (presentation) => {
-    const personalRecords = [
-      {
-        exerciseDefinitionId: 'bench-press',
-        exerciseName: 'Bench Press',
-        sessionExerciseId: 'exercise-1',
-        sessionExerciseOrderIndex: 0,
-        setId: 'set-2',
-        setOrderIndex: 1,
-        weight: 185,
-        reps: 8,
-        estimatedOneRepMax: 234.33,
-        historicalBestEstimatedOneRepMax: 220,
-      },
-      {
-        exerciseDefinitionId: 'lat-pulldown',
-        exerciseName: 'Lat Pulldown',
-        sessionExerciseId: 'exercise-2',
-        sessionExerciseOrderIndex: 1,
-        setId: 'set-5',
-        setOrderIndex: 0,
-        weight: 120,
-        reps: 12,
-        estimatedOneRepMax: 168,
-        historicalBestEstimatedOneRepMax: 150,
-      },
-    ];
-    const exerciseVolumeComparisons = [
-      {
-        exerciseDefinitionId: 'bench-press',
-        exerciseName: 'Bench Press',
-        sessionExerciseIds: ['exercise-1'],
-        sessionExerciseOrderIndex: 0,
-        setCount: 4,
-        workingSetCount: 3,
-        currentVolume: 4950,
-        historicalSessionCount: 5,
-        medianVolume: 4300,
-        percentile5Volume: 3200,
-        percentile95Volume: 5200,
-        state: 'distribution' as const,
-      },
-      {
-        exerciseDefinitionId: 'lat-pulldown',
-        exerciseName: 'Lat Pulldown',
-        sessionExerciseIds: ['exercise-2'],
-        sessionExerciseOrderIndex: 1,
-        setCount: 1,
-        workingSetCount: 0,
-        currentVolume: 1440,
-        historicalSessionCount: 0,
-        medianVolume: null,
-        percentile5Volume: null,
-        percentile95Volume: null,
-        state: 'no-history' as const,
-      },
-    ];
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      loadInsights: jest.fn().mockResolvedValue({
-        personalRecords,
-        exerciseVolumeComparisons,
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation={presentation}
-        sessionId="completed-under-test"
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('session-completion-pr-bench-press')).toBeTruthy();
-      expect(screen.getByTestId('session-completion-pr-lat-pulldown')).toBeTruthy();
-    });
-    expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
-    expect(screen.queryByText('Share PR')).toBeNull();
-    // Records in the language's one superlative, without `kg` or "est.".
-    expect(
-      within(screen.getByTestId('session-completion-pr-bench-press')).getByLabelText(
-        'New 1RM record for Bench Press: 185.0 × 8, 1RM 234.3'
-      )
-    ).toBeTruthy();
-    expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
-    // Volume as a figure: no thousands separator, no unit.
-    expect(within(screen.getByTestId('session-completion-exercise-exercise-1')).getByText('4950')).toBeTruthy();
-    expect(screen.getByText('15% above median')).toBeTruthy();
-    expect(screen.getByTestId('session-completion-exercise-exercise-2')).toBeTruthy();
-    expect(screen.getByText('4 sets · 3 working')).toBeTruthy();
-    expect(screen.getByText('1 set · 0 working')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('session-completion-share-session'));
-    expect(screen.getByTestId('session-share-preview')).toBeTruthy();
-    expect(screen.getByTestId('session-share-card-pr-bench-press')).toBeTruthy();
-    expect(screen.getByTestId('session-share-card-pr-lat-pulldown')).toBeTruthy();
-    expect(screen.getByTestId('session-share-exercise-exercise-1')).toBeTruthy();
-    expect(screen.getByTestId('session-share-exercise-exercise-2')).toBeTruthy();
-    expect(within(screen.getByTestId('session-share-card')).queryByText('Westside Barbell Club')).toBeNull();
-    expect(screen.getByText('Nothing is shared until you choose an app.')).toBeTruthy();
   });
 
   it('keeps session image-share failures inline and retries the same complete preview', async () => {
@@ -646,31 +321,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('session-share-cancel')).toBeNull();
     fireEvent.press(screen.getByTestId('session-share-preview-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('session-share-preview')).toBeNull();
-  });
-
-  it('offers Done as the only completion navigation action', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-      loadInsights: jest.fn().mockResolvedValue({
-        muscleVolumeComparisons: [],
-        personalRecords: [],
-        exerciseVolumeComparisons: [],
-      }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation="completion"
-        sessionId="completed-under-test"
-      />
-    );
-
-    await waitFor(() => expect(screen.getByTestId('session-completion-done')).toBeTruthy());
-    expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
-    fireEvent.press(screen.getByTestId('session-completion-done'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
   });
 
   it('replaces to Stats when Android hardware back is pressed during completion', async () => {
@@ -748,32 +398,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
   });
 
-  it('offers one safe exit when a completion target is deleted', async () => {
-    const dataClient: CompletedSessionDetailDataClient = {
-      loadCompletedSession: jest.fn().mockResolvedValue({
-        ...COMPLETED_SESSION_DETAIL_FIXTURE,
-        deletedAt: '2026-02-21T10:00:00.000Z',
-      }),
-      loadInsights: jest.fn().mockResolvedValue(null),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
-      setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
-    };
-
-    render(
-      <CompletedSessionDetailScreenShell
-        dataClient={dataClient}
-        presentation="completion"
-        sessionId="completed-under-test"
-      />
-    );
-
-    await waitFor(() => expect(screen.getByTestId('completed-session-detail-empty')).toBeTruthy());
-    expect(screen.getByTestId('session-completion-safe-exit')).toBeTruthy();
-    expect(screen.queryByTestId('session-completion-presentation')).toBeNull();
-    fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
-  });
-
   it('offers one safe exit when completion loading fails', async () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockRejectedValue(new Error('Storage unavailable')),
@@ -820,131 +444,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     return screen.getByTestId('completed-session-detail-options-sheet');
   };
 
-  it('renders loading, then the summary and every performed set in the design language', async () => {
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient()} />);
-
-    expect(screen.getByTestId('completed-session-detail-loading')).toBeTruthy();
-    await screen.findByTestId('completed-session-detail-screen');
-
-    // The detail draws its own top bar: no native header.
-    expect(mockStackScreen).toHaveBeenLastCalledWith({
-      options: { title: 'View Session', headerShown: false },
-    });
-    expect(screen.getByText('View Session')).toBeTruthy();
-    expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
-
-    // Start / End as the completed edit's fields show them, then the facts.
-    expect(screen.getByTestId('completed-session-detail-times-start').props.accessibilityLabel).toMatch(
-      /^Start \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
-    );
-    expect(screen.getByTestId('completed-session-detail-times-end').props.accessibilityLabel).toMatch(
-      /^End \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/
-    );
-    expect(screen.getByTestId('completed-session-detail-duration').props.accessibilityLabel).toBe('Duration 58m');
-    expect(screen.getByTestId('completed-session-detail-gym').props.accessibilityLabel).toBe(
-      'Gym Westside Barbell Club'
-    );
-    expect(screen.getByTestId('completed-session-detail-sets').props.accessibilityLabel).toBe('Sets 5');
-    // 135×8 + 185×8 + 185×6 + 185×5 + 120×12, no thousands separator.
-    expect(screen.getByTestId('completed-session-detail-volume').props.accessibilityLabel).toBe('Volume 6035');
-
-    fireEvent.press(screen.getByTestId('view-session-section-sets'));
-    // The session view's set row: type · weight × reps · 1RM · VOL.
-    const bench = within(screen.getByTestId('completed-session-detail-exercise-exercise-1'));
-    expect(bench.getByText('Bench Press')).toBeTruthy();
-    expect(bench.getByTestId('completed-session-detail-exercise-exercise-1-count')).toHaveTextContent('4 sets');
-    expect(bench.getByText('W-Up')).toBeTruthy();
-    expect(bench.getByText('RIR 0')).toBeTruthy();
-    expect(bench.getByText('RIR 1')).toBeTruthy();
-    expect(bench.getByText('RIR 3')).toBeTruthy();
-    expect(
-      bench.getByTestId('completed-session-detail-exercise-exercise-1-set-1-values')
-    ).toHaveTextContent('135.0 × 8');
-    expect(bench.getByTestId('completed-session-detail-exercise-exercise-1-set-2-vol').props.accessibilityLabel).toBe(
-      'Vol 1480'
-    );
-    const pulldown = within(screen.getByTestId('completed-session-detail-exercise-exercise-2'));
-    expect(pulldown.getByTestId('completed-session-detail-exercise-exercise-2-count')).toHaveTextContent('1 set');
-    // No effort reads as an em dash, not `-`.
-    expect(pulldown.getByText('—')).toBeTruthy();
-
-    // No collapse, no set table, no tags, and Append sits behind each card's ⋮.
-    expect(screen.queryByText('Weight')).toBeNull();
-    expect(screen.queryByText('Append')).toBeNull();
-    expect(screen.queryByTestId('exercise-collapse-toggle-1')).toBeNull();
-    expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
-  });
-
-  it('shows confirmed sets including blank-as-zero and leaves out exercises with none', async () => {
-    await renderDetail(
-      detailClient({
-        loadCompletedSession: jest.fn().mockResolvedValue({
-          ...COMPLETED_SESSION_DETAIL_FIXTURE,
-          exercises: [
-            {
-              ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0],
-              sets: [
-                ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[0].sets,
-                { id: 'set-zero', weight: '', reps: '5', setType: 'rir_0' as const },
-                { id: 'set-invalid', weight: '-1', reps: '5', setType: 'rir_0' as const },
-                {
-                  id: 'set-unconfirmed',
-                  weight: '500',
-                  reps: '10',
-                  setType: 'rir_0' as const,
-                  performanceStatus: 'unperformed' as const,
-                },
-              ],
-            },
-            {
-              ...COMPLETED_SESSION_DETAIL_FIXTURE.exercises[1],
-              sets: [{ id: 'set-planned', weight: '120', reps: '12', setType: null, performanceStatus: 'planned' as const }],
-            },
-          ],
-        }),
-      })
-    );
-
-    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1-count')).toHaveTextContent('5 sets');
-    expect(screen.getByText('0.0 × 5')).toBeTruthy();
-    expect(screen.queryByText('-1.0 × 5')).toBeNull();
-    expect(screen.queryByText('500.0 × 10')).toBeNull();
-    expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2')).toBeNull();
-    expect(screen.getByTestId('completed-session-detail-sets').props.accessibilityLabel).toBe('Sets 5');
-  });
-
-  it('says so when no exercise was performed', async () => {
-    await renderDetail(
-      detailClient({
-        loadCompletedSession: jest.fn().mockResolvedValue({ ...COMPLETED_SESSION_DETAIL_FIXTURE, exercises: [] }),
-      })
-    );
-
-    expect(screen.getByTestId('completed-session-detail-no-exercises')).toHaveTextContent(
-      'No exercises logged in this session.'
-    );
-  });
-
-  it('marks the set whose 1RM beats every other session with a record band', async () => {
-    const loadHistoricalBests = jest.fn().mockResolvedValue(
-      new Map<string, number | null>([
-        ['bench-press', 200],
-        ['lat-pulldown', 500],
-      ])
-    );
-    await renderDetail(detailClient({ loadHistoricalBests }));
-
-    expect(loadHistoricalBests).toHaveBeenCalledWith('completed-under-test', ['bench-press', 'lat-pulldown']);
-    const band = await screen.findByTestId('completed-session-detail-exercise-exercise-1-record');
-    // 185 × 8 is the bench's best 1RM (Mayhew), above the 200 of history.
-    expect(band).toHaveTextContent(/^New 1RM record · \d+\.\d$/);
-    expect(
-      screen.getByTestId('completed-session-detail-exercise-exercise-1').props.accessibilityLabel
-    ).toMatch(/^Bench Press, 4 sets, new 1RM record \d+\.\d$/);
-    // The pulldown did not beat its history.
-    expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2-record')).toBeNull();
-  });
-
   it('shows no record while history is unavailable, and still renders the session', async () => {
     await renderDetail(
       detailClient({ loadHistoricalBests: jest.fn().mockRejectedValue(new Error('history unavailable')) })
@@ -952,43 +451,6 @@ describe('CompletedSessionDetailScreenShell', () => {
 
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.queryByTestId('completed-session-detail-exercise-exercise-1-record')).toBeNull();
-  });
-
-  it('Edit opens the session view on the completed session', async () => {
-    await renderDetail(detailClient());
-
-    fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
-
-    expect(mockPush).toHaveBeenCalledWith('/session/completed-under-test');
-  });
-
-  it('back returns to the previous screen, or to Progress when there is none', async () => {
-    await renderDetail(detailClient());
-
-    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
-
-    mockCanGoBack = false;
-    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
-  });
-
-  it("appends an exercise from its ⋮ and opens the active session", async () => {
-    const appendCompletedSessionExerciseAsPlanned = jest.fn().mockResolvedValue({ sessionId: 'active-1' });
-    await renderDetail(detailClient({ appendCompletedSessionExerciseAsPlanned }));
-
-    fireEvent.press(screen.getByTestId('completed-session-detail-exercise-options-exercise-2'));
-    const sheet = screen.getByTestId('completed-session-detail-exercise-sheet');
-    expect(within(sheet).getByText('Lat Pulldown')).toBeTruthy();
-    expect(within(sheet).getByLabelText('Append Lat Pulldown block to current session')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-2'));
-
-    await waitFor(() => {
-      expect(appendCompletedSessionExerciseAsPlanned).toHaveBeenCalledWith('completed-under-test', 'exercise-2');
-      expect(mockPush).toHaveBeenCalledWith('/session/active-1');
-    });
-    expect(screen.queryByTestId('completed-session-detail-exercise-sheet')).toBeNull();
   });
 
   it('shows a failed append inline and stays on the session', async () => {
@@ -1006,64 +468,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     );
     expect(mockPush).not.toHaveBeenCalled();
     expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-  });
-
-  it('reloads the completed session when the detail screen regains focus', async () => {
-    const { __triggerFocus: triggerFocus } = jest.requireMock('expo-router') as {
-      __triggerFocus: () => void;
-    };
-    await renderDetail(
-      detailClient({
-        loadCompletedSession: jest
-          .fn()
-          .mockResolvedValueOnce(COMPLETED_SESSION_DETAIL_FIXTURE)
-          .mockResolvedValueOnce({ ...COMPLETED_SESSION_DETAIL_FIXTURE, gymName: 'Updated Gym' }),
-      })
-    );
-    expect(screen.getByText('Westside Barbell Club')).toBeTruthy();
-
-    act(() => {
-      triggerFocus();
-    });
-
-    expect(await screen.findByText('Updated Gym')).toBeTruthy();
-  });
-
-  it('deletes and undeletes from the ⋮, with a band and no Edit while deleted', async () => {
-    const setCompletedSessionDeletedState = jest.fn().mockResolvedValue(undefined);
-    await renderDetail(detailClient({ setCompletedSessionDeletedState }));
-
-    const sheet = openSessionOptions();
-    expect(within(sheet).getByText('Delete session')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
-
-    expect(await screen.findByTestId('completed-session-detail-deleted-band')).toHaveTextContent(
-      'Deleted · hidden from history'
-    );
-    expect(setCompletedSessionDeletedState).toHaveBeenCalledWith('completed-under-test', true);
-    // The session view only edits a live session, so Edit goes while deleted.
-    expect(screen.queryByTestId('completed-session-detail-edit-button')).toBeNull();
-
-    expect(within(openSessionOptions()).getByText('Undelete session')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
-
-    expect(await screen.findByTestId('completed-session-detail-edit-button')).toBeTruthy();
-    expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
-    expect(setCompletedSessionDeletedState).toHaveBeenNthCalledWith(2, 'completed-under-test', false);
-  });
-
-  it('opens a deleted session with its band and without Edit', async () => {
-    await renderDetail(
-      detailClient({
-        loadCompletedSession: jest.fn().mockResolvedValue({
-          ...COMPLETED_SESSION_DETAIL_FIXTURE,
-          deletedAt: '2026-02-21T08:00:00.000Z',
-        }),
-      })
-    );
-
-    expect(screen.getByTestId('completed-session-detail-deleted-band')).toBeTruthy();
-    expect(screen.queryByTestId('completed-session-detail-edit-button')).toBeNull();
   });
 
   it('ignores a second delete while the first is being written', async () => {
@@ -1104,20 +508,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
   });
 
-  it('renders a stable empty state, with a way back, when the session is missing', async () => {
-    render(
-      <CompletedSessionDetailScreenShell
-        sessionId="missing-session"
-        dataClient={detailClient({ loadCompletedSession: jest.fn().mockResolvedValue(null) })}
-      />
-    );
-
-    expect(await screen.findByTestId('completed-session-detail-empty')).toBeTruthy();
-    expect(screen.getByText('Session not found')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('completed-session-detail-back'));
-    expect(mockBack).toHaveBeenCalled();
-  });
-
   it('renders an error state when loading fails', async () => {
     render(
       <CompletedSessionDetailScreenShell
@@ -1142,17 +532,6 @@ describe('CompletedSessionDetailRoute', () => {
     mockFocusEffects.clear();
   });
 
-  it('reads the session id from route params', async () => {
-    mockLocalSearchParams = { sessionId: 'session-completed-1' };
-
-    render(<CompletedSessionDetailRoute />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-    expect(screen.getByTestId('completed-session-detail-screen').props.testID).toBe('completed-session-detail-screen');
-  });
-
   it('redirects route intent=edit to the session view', async () => {
     mockLocalSearchParams = { sessionId: 'session-completed-1', intent: 'edit' };
 
@@ -1164,47 +543,4 @@ describe('CompletedSessionDetailRoute', () => {
     });
   });
 
-  it('loads a persisted completed session by generated id via the default route data client', async () => {
-    const generatedSessionId = 'generated-completed-session-id';
-    mockLoadSessionSnapshotById.mockResolvedValue({
-      sessionId: generatedSessionId,
-      gymId: 'test-gym-1',
-      status: 'completed',
-      startedAt: new Date('2026-02-25T10:00:00.000Z'),
-      completedAt: new Date('2026-02-25T10:45:00.000Z'),
-      durationSec: 2700,
-      deletedAt: null,
-      createdAt: new Date('2026-02-25T10:00:00.000Z'),
-      updatedAt: new Date('2026-02-25T10:45:00.000Z'),
-      exercises: [
-        {
-          id: 'exercise-1',
-          exerciseDefinitionId: 'seed_barbell_back_squat',
-          name: 'Back Squat',
-          machineName: 'Rack',
-          sets: [
-            { id: 'set-1', repsValue: '5', weightValue: '225' },
-            { id: 'set-2', repsValue: '5', weightValue: '225' },
-          ],
-        },
-      ],
-    });
-    mockLoadLocalGymById.mockResolvedValue({
-      id: 'test-gym-1',
-      name: 'Route Test Gym',
-    });
-
-    mockLocalSearchParams = { sessionId: generatedSessionId };
-
-    render(<CompletedSessionDetailRoute />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
-    });
-    fireEvent.press(screen.getByTestId('view-session-section-sets'));
-    expect(screen.getByText('Back Squat')).toBeTruthy();
-    expect(screen.getByText('Route Test Gym')).toBeTruthy();
-    expect(screen.queryByTestId('completed-session-detail-empty')).toBeNull();
-    expect(mockLoadSessionSnapshotById).toHaveBeenCalledWith(generatedSessionId);
-  });
 });
