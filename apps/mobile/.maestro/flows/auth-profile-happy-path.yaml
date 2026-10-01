@@ -1,5 +1,24 @@
 appId: com.dinoderek.mobile
 ---
+# Auth / profile happy path against local Supabase (ios-auth-profile lane).
+#
+# Proves:
+#   1. a wiped, signed-out launch lands on the sign-in gate (login-on-start);
+#   2. the fixture user signs in through real GoTrue;
+#   3. More → Settings → Connected agents loads the real grant list (empty for
+#      this user), and the native back returns;
+#   4. Profile loads the user's real row, and a username update is written to
+#      Supabase (`Profile updated.`);
+#   5. sign-out drops the session, and the route guard returns to the gate.
+# Why device: 1. the cold boot and the root route guard; 2., 3. and 4. real
+#   round trips to local Supabase, with stack navigation and the keyboard;
+#   5. the real session teardown and route guard.
+# Jest counterpart: app/__tests__/root-stack-routing.test.tsx (gate, sign-out
+#   routing), app/__tests__/sign-in-screen.test.tsx,
+#   app/__tests__/settings-onboarding.test.tsx (Settings sections, About
+#   metadata), app/__tests__/connected-agents-screen.test.tsx,
+#   app/__tests__/settings-profile-navigation.test.tsx (profile edit).
+#
 # Login-on-start is enforced in this auth-configured lane: a clean launch with no
 # session lands on the sign-in gate, so this flow signs in through the gate first
 # and then exercises the in-Profile account affordances (username edit + update +
@@ -114,30 +133,14 @@ appId: com.dinoderek.mobile
     visible:
       id: "settings-screen"
     timeout: 15000
-- assertVisible: "Settings"
-- assertVisible: "Account"
-- assertVisible: "AI coaching"
 - takeScreenshot: "06-settings-sections-top"
-- scrollUntilVisible:
-    element:
-      id: "settings-about-card"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible:
-    id: "settings-about-version"
-- assertVisible:
-    id: "settings-about-release"
-- assertVisible:
-    id: "settings-about-flavor"
-- takeScreenshot: "07-settings-about-metadata"
 # Connected agents is a signed-in-only Settings destination. Opening it against
 # real local Supabase proves the SDK grant-list path renders on-device. This
 # flow's fixture user never authorizes an agent, so the list loads empty.
 - scrollUntilVisible:
     element:
       id: "settings-connected-agents-row"
-    direction: UP
+    direction: DOWN
     visibilityPercentage: 100
     centerElement: true
 - tapOn:
