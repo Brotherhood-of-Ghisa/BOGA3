@@ -1,116 +1,43 @@
 appId: com.dinoderek.mobile
 ---
-# The exercise catalogue and the exercise editor (DLM-T07; lane
-# ios-ui-regression). Infra-free: the maestro-harness deep link resets local
-# data, seeds the block-history fixture (so Barbell Bench Press has history and
-# a stats line) and teleports to /exercise-catalog. No sign-in, no Supabase.
+# Exercise catalogue: create, and keyboard-safe selection (ios-ui-regression
+# lane, infra-free).
 #
-#   1. the catalogue, grouped, with the Chest family expanded;
-#   2. visible sorting/never-done controls and separate management sheet;
-#   3. a row's ⋮ → the Actions sheet; the backdrop closes it;
-#   4. + → the editor: empty, Save with no name (inline errors), the primary
-#      muscle selector panel, filled (a primary and a secondary muscle);
-#   5. Save → the "Exercise created." notice and the new row;
-#
-# The Sheet backdrop is hidden from VoiceOver while the sheet is modal, so the
-# flow taps the dimmed page above the panel by point.
+# Proves:
+#   1. `+` opens the exercise editor sheet; a name typed on the keyboard and a
+#      primary muscle picked in the sheet's muscle list save to the device's
+#      SQLite, and the catalogue shows `Exercise created.` and lists the new
+#      exercise;
+#   2. in the exercise page's swap sheet, a search result tapped while the
+#      keyboard is still up swaps the exercise (the tap reaches the row instead
+#      of only dismissing the keyboard).
+# Why device:
+#   1. a real sheet whose body swaps panels, the keyboard, and the on-device
+#      expo-sqlite write and read;
+#   2. the keyboard and a real sheet; Jest cannot tell whether a tap with the
+#      keyboard up reaches the row.
+# Jest counterpart: app/__tests__/exercise-catalog-screen.test.tsx (the
+#   catalogue over the browser fixture: grouping, sort and never-done controls,
+#   Manage and row sheets, editor validation and muscle selection, search, no
+#   matches, history failure and Retry), app/__tests__/exercise-list-controls.test.tsx,
+#   app/__tests__/exercise-picker.test.tsx (shared preferences, preselection,
+#   plan suggestions, swap), app/__tests__/exercise-page-screen.test.tsx (swap).
 
-# Each Maestro invocation may return to the development-client launcher.
-# Establish the JS runtime before sending the reset/fixture link; do not retry
-# fixture mutations as a readiness workaround.
-- stopApp
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- retry:
-    maxRetries: 2
-    commands:
-      - waitForAnimationToEnd:
-          timeout: 4000
-      - extendedWaitUntil:
-          visible: { id: "today-screen" }
-          timeout: 30000
-- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-browser&teleport=exercise-catalog"
+# Wait for the fixture's catalogue, not the previous screen (spec 06 rule 4).
 - extendedWaitUntil:
-    visible:
-      id: "exercise-catalog-title"
-    timeout: 30000
-- extendedWaitUntil:
-    visible:
-      text: "Exercise filter input"
+    visible: "Chest exercises 25"
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
 
-# --- 1. Grouped, one family open -----------------------------------------------
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "exercise-family-group-chest"
-      - extendedWaitUntil:
-          visible:
-            text: "Exercise actions Barbell Bench Press"
-          timeout: 5000
-- takeScreenshot: "catalogue-list-grouped"
-
-# --- 2. Shared controls and management ----------------------------------------
-- assertVisible: "Favourite"
-- assertVisible: "Name A–Z"
-- assertVisible: "Show never-done"
-- tapOn: "Name A–Z"
-- takeScreenshot: "catalogue-name-sort"
-- tapOn: "Favourite"
-- tapOn: "Show never-done"
-- takeScreenshot: "catalogue-never-done-off"
-- tapOn: "Show never-done"
-- tapOn: "Exercise catalog options"
-- extendedWaitUntil:
-    visible: "Manage exercises"
-    timeout: 10000
-- assertVisible: "Show deleted exercises"
-- takeScreenshot: "catalogue-management-sheet"
-- tapOn:
-    point: "50%,12%"
-- extendedWaitUntil:
-    notVisible: "Manage exercises"
-    timeout: 10000
-
-# --- 3. Row actions ------------------------------------------------------------
-- tapOn: "Exercise actions Barbell Bench Press"
-- extendedWaitUntil:
-    visible:
-      text: "Edit exercise from actions"
-    timeout: 10000
-- assertVisible:
-    text: "Delete exercise from actions"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "catalogue-row-actions-sheet"
-- tapOn:
-    point: "50%,20%"
-- extendedWaitUntil:
-    notVisible:
-      text: "Edit exercise from actions"
-    timeout: 10000
-
-# --- 4. The editor -------------------------------------------------------------
+# --- 1. Create an exercise ---------------------------------------------------
 - tapOn:
     id: "create-new-exercise-button"
 - extendedWaitUntil:
     visible:
       id: "exercise-editor-name-input"
     timeout: 10000
-- pressKey: Enter
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "editor-create-empty"
-- tapOn: "Save exercise definition"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-editor-name-error"
-    timeout: 10000
-- assertVisible:
-    text: "Select a primary muscle before saving."
-- takeScreenshot: "editor-validation-errors"
 - tapOn:
     id: "exercise-editor-name-input"
 - inputText: "Maestro Catalogue Press"
@@ -121,49 +48,15 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-editor-muscle-selector-list"
     timeout: 10000
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "editor-muscle-selector"
 - tapOn:
     id: "exercise-editor-muscle-option-chest"
 - extendedWaitUntil:
     visible:
       id: "exercise-editor-secondary-muscle-trigger"
     timeout: 10000
-# Bring the secondary action into the scroll viewport above the fixed footer.
-- swipe:
-    start: "50%,40%"
-    end: "50%,25%"
-    duration: 500
-# No centerElement: this target ends its scroll content, so it can never be
-# centred; Maestro would add 5 no-op swipes (~9s) and pass anyway (spec 06 rule 3).
-- scrollUntilVisible:
-    element:
-      id: "exercise-editor-secondary-muscle-trigger"
-    direction: DOWN
-    timeout: 10000
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: "editor-primary-selected"
-- tapOn:
-    id: "exercise-editor-secondary-muscle-trigger"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-editor-muscle-option-delts_front"
-    timeout: 10000
-- tapOn:
-    id: "exercise-editor-muscle-option-delts_front"
-- extendedWaitUntil:
-    visible:
-      text: "Remove secondary muscle Front Delts"
-    timeout: 10000
-- tapOn:
-    id: "exercise-editor-load-mode-per_side_load"
 - waitForAnimationToEnd:
     timeout: 4000
 - takeScreenshot: "editor-filled"
-
-# --- 5. Save -------------------------------------------------------------------
 - tapOn: "Save exercise definition"
 - extendedWaitUntil:
     visible:
@@ -176,90 +69,12 @@ appId: com.dinoderek.mobile
     visible:
       text: "Exercise actions Maestro Catalogue Press"
     timeout: 10000
-- assertVisible:
-    text: "Exercise created."
 - takeScreenshot: "catalogue-created-notice"
 
-# Browser contract: all-time history, visible matches, shared preferences,
-# keyboard-safe selection, old plan suggestions and a retryable history error.
-- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-browser&teleport=exercise-catalog"
-# Wait for the new fixture's catalogue, not the previous route's search field.
-- extendedWaitUntil:
-    visible: "Chest exercises 25"
-    timeout: 15000
-- waitForAnimationToEnd:
-    timeout: 4000
-- tapOn: "Exercise filter input"
-- inputText: "bench"
-- extendedWaitUntil:
-    visible: "Exercise actions Barbell Bench Press"
-    timeout: 10000
-# History text is nested in a labelled row; verify its date/count in the capture.
-- takeScreenshot: "browser-search-expanded"
-- tapOn: "Show never-done"
-- assertNotVisible: "Exercise actions Decline Barbell Bench Press"
-- assertVisible: "Exercise actions Cable Bench Press"
-- takeScreenshot: "browser-prior-year-never-off"
-- tapOn: "Name A–Z"
-- takeScreenshot: "browser-name-sort"
-- tapOn: "Clear search"
-- tapOn: "Exercise filter input"
-- inputText: "NoSuchExercise"
-- extendedWaitUntil:
-    visible: "No exercises match the current filters."
-    timeout: 10000
-- takeScreenshot: "browser-no-matches"
-- tapOn: "Clear search"
-- tapOn: "Exercise filter input"
-- inputText: "Incline Dumbbell Press"
-- extendedWaitUntil:
-    visible: "Exercise actions Incline Dumbbell Press"
-    timeout: 10000
-- takeScreenshot: "browser-old-history"
-
-# The add browser shares Name A–Z / never-done off, but starts its own search.
-- openLink: "boga3://maestro-harness?teleport=session-view&sessionId=maestro_session_view_active"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-add-exercise"
-    timeout: 15000
-- scrollUntilVisible:
-    element:
-      id: "session-view-add-exercise"
-    direction: DOWN
-    centerElement: true
-- tapOn:
-    id: "session-view-add-exercise"
-- extendedWaitUntil:
-    visible: "Select Exercise"
-    timeout: 10000
-- takeScreenshot: "browser-picker-shared-preferences"
-- tapOn: "Exercise filter input"
-- inputText: "Incline Dumbbell Press"
-- extendedWaitUntil:
-    visible: "Select exercise Incline Dumbbell Press"
-    timeout: 10000
-- takeScreenshot: "browser-picker-search-keyboard"
-- tapOn: "Select exercise Incline Dumbbell Press"
-- pressKey: Enter
-- scrollUntilVisible:
-    element:
-      id: "exercise-picker-append-plan-button"
-    direction: DOWN
-    centerElement: true
-- extendedWaitUntil:
-    visible:
-      id: "exercise-picker-plan-set-row-2"
-    timeout: 10000
-- takeScreenshot: "browser-old-plan"
-- tapOn:
-    id: "exercise-picker-append-plan-button"
-- extendedWaitUntil:
-    notVisible:
-      id: "exercise-picker"
-    timeout: 10000
-
-# Swap uses the same controls and history, excluding the current exercise.
+# --- 2. Swap: select with the keyboard up ------------------------------------
+# The browser fixture's active session; its bench is swapped for an exercise
+# found by search. The target must be the FIRST result: a row the keyboard
+# covers still counts as visible to Maestro, and the tap lands on a key.
 - openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_session_view_active&sessionExerciseId=maestro_session_view_bench"
 - extendedWaitUntil:
     visible:
@@ -273,39 +88,15 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-swap-list"
     timeout: 10000
-- takeScreenshot: "browser-swap-shared-preferences"
 - tapOn: "Search exercises"
-- inputText: "Incline Dumbbell Press"
+- inputText: "Close-Grip Incline"
 - extendedWaitUntil:
-    visible: "Select exercise Incline Dumbbell Press"
+    visible: "Select exercise Close-Grip Incline Dumbbell Bench Press"
     timeout: 10000
 - takeScreenshot: "browser-swap-search-keyboard"
-- tapOn: "Select exercise Incline Dumbbell Press"
+- tapOn: "Select exercise Close-Grip Incline Dumbbell Bench Press"
 - extendedWaitUntil:
     visible:
       id: "exercise-page-title"
-      text: "Incline Dumbbell Press"
+      text: "Close-Grip Incline Dumbbell Bench Press"
     timeout: 10000
-
-# A real failed read must not turn into authoritative Never done rows.
-- openLink: "boga3://maestro-harness?teleport=exercise-catalog&maestroHistory=fail-once"
-- extendedWaitUntil:
-    visible: "Loading exercise history…"
-    timeout: 10000
-- waitForAnimationToEnd:
-    timeout: 500
-- takeScreenshot: "browser-history-loading"
-- extendedWaitUntil:
-    visible: "Unable to load exercise history."
-    timeout: 10000
-- assertNotVisible: "Never done"
-- takeScreenshot: "browser-history-error"
-- tapOn: "Retry exercise history"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-family-group-chest"
-    timeout: 10000
-- takeScreenshot: "browser-history-recovered"
-# Restore defaults: data reset does not clear the local SecureStore preferences.
-- tapOn: "Favourite"
-- tapOn: "Show never-done"

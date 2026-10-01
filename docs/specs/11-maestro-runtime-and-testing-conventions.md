@@ -238,7 +238,7 @@ Responsibility split:
     Each flow's copy sits at `<artifact-root>/<flow>/<flow>.yaml`, and
     `.maestro/scripts/` is copied once to `<artifact-root>/scripts/`, so
     `runScript` paths (`../scripts/*.js`) resolve as they do from the source
-    (DLM-T09; `stats-screen-ux` computes its heatmap date keys this way).
+    (the groups flows' counterparty helpers load this way).
 - `maestro-ios-gates.sh`
   - additive combined entrypoint (`npm run test:e2e:ios:gates`): the smoke +
     data-runtime-smoke flow list and a `full` reset, handed to

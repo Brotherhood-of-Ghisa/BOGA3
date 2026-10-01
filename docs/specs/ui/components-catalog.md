@@ -311,8 +311,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     inline retryable failure and temporary-file cleanup; no Close or Cancel.
     The card (`paper`, `ink` mark, record band, mono figures) includes all PRs
     and exercise comparisons, never gym or location data
-  - covered by `apps/mobile/app/__tests__/completed-session-detail-screen.test.tsx`
-    and the `ios-ui-regression` lane (`session-completion-states-fixture`)
+  - covered by `apps/mobile/app/__tests__/completed-session-local-data.test.tsx`,
+    `completed-session-detail-screen.test.tsx`, and the `ios-ui-regression` lane
+    (`session-completion-states-fixture`: the native share sheet)
 
 7. `SessionSummaryLine`
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
@@ -519,8 +520,8 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `ViewSessionExerciseSheet` — `Sheet` titled with the exercise:
     `Append to current session`
     (`completed-session-detail-append-exercise-button-<id>`)
-  - covered by `apps/mobile/app/__tests__/completed-session-detail-screen.test.tsx`
-    and the `ios-ui-regression` lane (`session-completion-states-fixture`)
+  - covered by `apps/mobile/app/__tests__/completed-session-local-data.test.tsx`
+    and `completed-session-detail-screen.test.tsx`
 
 18. Gyms
 - Folder: `apps/mobile/components/gyms/`; the gym directory and writes in

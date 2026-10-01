@@ -29,34 +29,41 @@ completion's states join this record when they are accepted.
 ## States
 
 Device: iPhone simulator at 390pt width, light. Captured by the
-`ios-ui-regression` lane (`session-completion-states-fixture.yaml`):
+`ios-ui-regression` lane (`session-completion-states-fixture.yaml`) unless
+marked ad hoc:
 
 | Screenshot | State |
 | --- | --- |
-| `view-session-detail` | summary card and the first exercise card, with a record band |
-| `view-session-exercise-options` | an exercise's ⋮ sheet (`Append to current session`) |
-| `view-session-options` | the session ⋮ sheet (`Delete session`) |
-| `view-session-deleted` | the deleted band, no `Edit` |
-| `view-session-not-found` | not found, with the top bar's back |
+| `view-session-detail` (ad hoc) | summary card and the first exercise card, with a record band |
+| `view-session-exercise-options` (ad hoc) | an exercise's ⋮ sheet (`Append to current session`) |
+| `view-session-options` (ad hoc) | the session ⋮ sheet (`Delete session`) |
+| `view-session-deleted` (ad hoc) | the deleted band, no `Edit` |
+| `view-session-not-found` (ad hoc) | not found, with the top bar's back |
 | `completed-edit-read-back` | the detail after the session view's `Done` |
 
 Completion (PR B, pending acceptance), same lane and flow:
 
 | Screenshot | State |
 | --- | --- |
-| `session-completion-one-pr` | top bar, summary card with muscle pills, one record card |
-| `session-completion-multiple-prs-all` | two record cards |
-| `session-completion-exercise-volume` | volume cards: distribution and no-history |
-| `session-completion-catalog-error` | muscle breakdown unavailable |
-| `session-completion-unmapped` | no mapped working sets |
+| `session-completion-one-pr` (ad hoc) | top bar, summary card with muscle pills, one record card |
+| `session-completion-multiple-prs-all` (ad hoc) | two record cards |
+| `session-completion-exercise-volume` (ad hoc) | volume cards: distribution and no-history |
+| `session-completion-catalog-error` (ad hoc) | muscle breakdown unavailable |
+| `session-completion-unmapped` (ad hoc) | no mapped working sets |
 | `session-share-preview-all-prs` | the share sheet and image |
-| `session-share-image-error` | the share sheet's inline failure |
-| `session-completion-unavailable` | not found: top bar without Done, `Back to Progress` |
+| `session-share-image-error` (ad hoc) | the share sheet's inline failure |
+| `session-completion-unavailable` (ad hoc) | not found: top bar without Done, `Back to Progress` |
 
 Group session view (PR C, pending acceptance): `groups-07-friend-view-read-only`
 (`ios-groups-e2e`, `groups-two-user-stream.yaml`) — the member, status and
 facts card, then the exercise cards; the group state panels keep the groups
 screens' styling.
+
+`(ad hoc)` states are no longer captured by a lane: their flow keeps only
+the claims that need a device (spec 06, "Maestro scope policy") and Jest
+proves the rest. When the screen changes, capture them with a one-off flow
+run (`apps/mobile/scripts/maestro-ios-run-flow.sh --flow …`); git history
+holds the flow steps that reached them.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
@@ -69,7 +76,7 @@ The shared body uses the canonical `SegmentedControl` and volume cards. In the
 live view it follows the logging cards and Add exercise, preserving their
 hierarchy. Historical View Session consolidates the review sections as specified below.
 Share remains exercise-only.
-Verification states: `session-summary-muscle`, `session-summary-exercise`,
+Verification states: `session-summary-muscle`, `session-summary-exercise` (ad hoc),
 `session-live-muscle-comparison`, plus the completion/share captures above.
 
 ## Historical Summary / Sets (2026-09-25)
@@ -90,10 +97,12 @@ The existing cards, tokens and chart styling remain the visual authority.
 - Loading/failed comparisons stay explicit while facts, Sets and actions work.
   No-history/baseline, unmapped, empty/missing and deleted controls are retained.
 
-Runtime comparison states (`ios-ui-regression`, `session-completion-states-fixture`):
-`view-session-summary-top`, `session-summary-exercise`, `session-summary-muscle`,
-`view-session-sets`, `completed-edit-session-view`, `completed-edit-read-back`,
+Runtime comparison states: `completed-edit-session-view` and
+`completed-edit-read-back` (`ios-ui-regression`,
+`session-completion-states-fixture`); ad hoc: `view-session-summary-top`,
+`session-summary-exercise`, `session-summary-muscle`, `view-session-sets`,
 `view-session-summary-after-edit`, `view-session-insights-loading`,
 `view-session-insights-error`, `view-session-no-history`, `view-session-unmapped`,
-`view-session-deleted-summary`, `view-session-deleted` and `view-session-not-found`. Reference/after captures
-stay under `apps/mobile/artifacts/maestro/`; the PR records viewport and comparison.
+`view-session-deleted-summary`, `view-session-deleted` and `view-session-not-found`.
+Reference/after captures stay under `apps/mobile/artifacts/maestro/`; the PR
+records viewport and comparison.

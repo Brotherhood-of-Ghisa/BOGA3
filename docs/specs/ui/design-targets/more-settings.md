@@ -43,10 +43,16 @@ Device: iPhone simulator at 390pt width, light.
 | `04-m26-more` (`ios-smoke`) | More, signed out |
 | `06-settings-sections-top` (`ios-auth-profile`) | Settings, signed in: Account and AI coaching |
 | `07-settings-about-metadata` (`ios-auth-profile`) | Settings: About |
-| `settings-preferences` (`ios-ui-regression`) | Settings: the date format |
+| `settings-preferences` (ad hoc) | Settings: the date format |
 | `19-first-run-roundtrip-delta-synced` (`ios-sync-e2e`) | the sync-status panel after a sync |
 | `02-dev-wipe-local-settings`, `03-dev-wipe-local-feedback` (`ios-ui-regression`) | Developer tools, and a success `Notice` (information only) |
 | `dev-logs` (`ios-ui-regression`) | Logs (information only) |
+
+`(ad hoc)` states are no longer captured by a lane: their flow keeps only
+the claims that need a device (spec 06, "Maestro scope policy") and Jest
+proves the rest. When the screen changes, capture them with a one-off flow
+run (`apps/mobile/scripts/maestro-ios-run-flow.sh --flow …`); git history
+holds the flow steps that reached them.
 
 Jest only (no flow reaches them): the signed-out sync card, the offline,
 unknown-network and error sync panel, a failed dev action, and the
