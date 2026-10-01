@@ -36,8 +36,14 @@ Device: iPhone simulator at 390pt width, light.
 | `frame-tray-collapsed` (`ios-smoke`) | the tray collapsed to its handle |
 | `05-m26-session-view-empty` (`ios-smoke`) | the tab strip on the session view |
 | `02c-gyms-screen` (`ios-session-view`) | a native header, and `Back to More` |
-| `04-data-runtime-smoke-success` (`ios-data-smoke`) | the Sessions header |
+| `04-data-runtime-smoke-success` (ad hoc) | the Sessions header |
 | `groups-07-friend-view-read-only` (`ios-groups-e2e`) | the group session header |
+
+`(ad hoc)` states are no longer captured by a lane: their flow keeps only
+the claims that need a device (spec 06, "Maestro scope policy") and Jest
+proves the rest. When the screen changes, capture them with a one-off flow
+run (`apps/mobile/scripts/maestro-ios-run-flow.sh --flow …`); git history
+holds the flow steps that reached them.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

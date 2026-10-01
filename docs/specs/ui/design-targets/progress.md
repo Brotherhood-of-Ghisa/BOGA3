@@ -113,8 +113,8 @@ Device: iPhone simulator at 390pt width, light.
 | `05-data-runtime-smoke-exercise-list` (`ios-data-smoke`) | a workout just logged through the session screens |
 | `exercise-history-default` (`ios-exercise-page`) | exercise history from the exercise page's `History`: last 30 days, the bests and one session card with a warm-up |
 | `exercise-history-all-time` (ad hoc) | All time: both fixture sessions |
-| `04-data-runtime-smoke-success` (`ios-data-smoke`) | Sessions after a workout is logged: one completed row |
-| `sessions-row-menu` (`ios-data-smoke`) | a completed row's ⋮ sheet: Edit / Append / Delete |
+| `04-data-runtime-smoke-success` (ad hoc) | Sessions after a workout is logged: one completed row |
+| `sessions-row-menu` (ad hoc) | a completed row's ⋮ sheet: Edit / Append / Delete |
 | `20-first-run-roundtrip-restored-from-remote` (`ios-sync-e2e`) | Sessions after a restore from the server |
 
 `(ad hoc)` states are no longer captured by a lane: their flow keeps only
