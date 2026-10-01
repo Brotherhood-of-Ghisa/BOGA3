@@ -106,6 +106,7 @@ get from `./boga timings` or a run.
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |
 | handles | `./boga test handles` | — (run by name) | ✅ | ~1.1m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
+| jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | N/A |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
 | backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~43s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.5s |

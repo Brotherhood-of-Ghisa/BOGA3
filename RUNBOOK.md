@@ -948,6 +948,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run test:handles   # serial --detectOpenHandles guard; fails (with a stack) on any leaked handle
+npm run test:coverage  # instrumented run; totals + coverage/lcov-report/index.html
 npm run db:generate:canary
 ```
 
