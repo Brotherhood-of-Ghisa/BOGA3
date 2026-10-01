@@ -42,7 +42,7 @@ Device: iPhone simulator at 390pt width, light.
 | --- | --- |
 | `04-m26-more` (`ios-smoke`) | More, signed out |
 | `06-settings-sections-top` (`ios-auth-profile`) | Settings, signed in: Account and AI coaching |
-| `07-settings-about-metadata` (`ios-auth-profile`) | Settings: About |
+| `07-settings-about-metadata` (ad hoc) | Settings: About |
 | `settings-preferences` (ad hoc) | Settings: the date format |
 | `19-first-run-roundtrip-delta-synced` (`ios-sync-e2e`) | the sync-status panel after a sync |
 | `02-dev-wipe-local-settings`, `03-dev-wipe-local-feedback` (`ios-ui-regression`) | Developer tools, and a success `Notice` (information only) |
