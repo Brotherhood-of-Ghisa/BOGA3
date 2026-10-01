@@ -45,14 +45,11 @@ appId: com.dinoderek.mobile
           visible:
             id: "more-screen"
           timeout: 15000
-# Keeps centerElement although the row ends the list and never centres: left
-# where it first shows, it rests over the minimised tab bar and the tap misses.
-- scrollUntilVisible:
-    element:
-      id: "more-settings-row"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
+# One swipe, not a centring scroll: the row ends the list, so after the first
+# swipe a centring scroll adds five no-op swipes (~7s). Left where it first
+# shows, the row rests over the minimised tab bar and the tap misses; the swipe
+# lifts it clear (spec 06 rule 3).
+- scroll
 - tapOn:
     id: "more-settings-row"
 - assertVisible:

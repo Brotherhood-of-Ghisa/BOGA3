@@ -154,7 +154,8 @@ appId: com.dinoderek.mobile
     visible: { id: "weight-entry-value" }
     timeout: 15000
 - tapOn: { id: "weight-entry-value" }
-- eraseText
+# The field holds a short reading; a bare eraseText deletes 50 characters.
+- eraseText: 10
 - inputText: "80"
 - scrollUntilVisible:
     element: { id: "weight-entry-save" }
@@ -292,7 +293,8 @@ appId: com.dinoderek.mobile
     visible: { id: "weight-entry-value" }
     timeout: 15000
 - tapOn: { id: "weight-entry-value" }
-- eraseText
+# The field holds a short reading; a bare eraseText deletes 50 characters.
+- eraseText: 10
 - inputText: "82"
 - scrollUntilVisible:
     element: { id: "weight-entry-save" }
@@ -309,28 +311,10 @@ appId: com.dinoderek.mobile
     timeout: 30000
 
 # === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
-# Open More, then poll for Settings rather than asserting it immediately:
-# the transition can lag a beat on a cold-JIT first render, and extendedWaitUntil
-# rides that out (an immediate assert is what flaked the auth lane once).
-- waitForAnimationToEnd:
-    timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "top-level-tab-more"
-      - extendedWaitUntil:
-          visible:
-            id: "more-screen"
-          timeout: 15000
-- scrollUntilVisible:
-    element:
-      id: "more-settings-row"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- tapOn:
-    id: "more-settings-row"
+# Settings by deep link: More -> Settings is settings-dev-wipe-local's claim, and
+# its last-row scroll costs ~9s. Poll for Settings rather than asserting it
+# immediately: a cold-JIT first render can lag a beat.
+- openLink: "boga3://settings"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
