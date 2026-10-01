@@ -106,6 +106,8 @@ get from `./boga timings` or a run.
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |
 | handles | `./boga test handles` | — (run by name) | ✅ | ~1.1m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
+| jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | N/A |
+| complexity | `./boga test complexity` | — (run by name) | ❌ | N/A |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
 | backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~43s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.5s |
@@ -256,6 +258,33 @@ runtime); a native iOS change always does, or every worktree's Maestro run fails
 boot with `Cannot find native module`. Android-only fields in `app.config.ts` (e.g.
 `android.package`, Android icons) do not alter the iOS dev-client binary or affect
 iOS Maestro lanes and are exempt from the iOS dev-client rebuild and frontend gate.
+
+## Quality targets (run once before the PR)
+
+Two lanes hold the mobile app to numeric targets. They sit outside every gate
+and outside CI: the agent runs each **once, on the finished change, before
+opening the PR**, and lists both in the PR's Tests table. Both must be green.
+
+| Lane | Target | Where it lives |
+| --- | --- | --- |
+| `jest-coverage` | Whole-suite floor: **80% branches, 80% lines** (`app/**`, `components/**`, `src/**`, tests excluded). Branches is the tight one (82.2% when the floor landed; lines 92.6%). | `coverageThreshold` in `apps/mobile/jest.config.js` |
+| `complexity` | Per function in the same source: cyclomatic complexity **≤ 20**, cognitive complexity (`sonarjs`) **≤ 25**, **≤ 200** lines (blank lines and comments excluded), nesting depth **≤ 4**, **≤ 5** parameters. | `apps/mobile/eslint.complexity.config.js` |
+
+- **Grandfathered offenders.** The functions already over a complexity limit
+  when it landed are listed, as counts per file and rule, in
+  `apps/mobile/eslint-complexity-suppressions.json` (ESLint bulk
+  suppressions). A new offender, or one more in a listed file, fails the lane.
+- **The list only shrinks.** Splitting a listed function leaves a stale
+  suppression, which also fails the lane until you run
+  `npm run lint:complexity -- --prune-suppressions` (from `apps/mobile/`) and
+  commit the smaller file.
+- **The fix is the code, never the target.** Add tests or split the function.
+  Lowering a threshold, raising a limit, or adding a suppression needs the
+  operator's agreement, stated in the PR's Deviations section.
+- **Coverage is global, so run the whole suite.** A scoped
+  `npm run test:coverage -- <path>` counts every other file as 0% and always
+  fails the floor; scope it only to read the per-file report
+  (`coverage/lcov-report/index.html`).
 
 ## What CI runs
 

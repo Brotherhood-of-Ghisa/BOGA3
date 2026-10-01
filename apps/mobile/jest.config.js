@@ -30,4 +30,23 @@ module.exports = {
   // mask the leak). 15s is generous vs the sub-second real test work, so it
   // never flakes on a slow CI runner.
   testTimeout: 15000,
+  // Coverage is opt-in (`npm run test:coverage`, lane `jest-coverage`):
+  // instrumentation slows the run, so plain `npm test` stays uninstrumented.
+  // Every source file is listed, so a file no test imports reports 0% instead
+  // of silently dropping out of the totals.
+  collectCoverageFrom: [
+    '{app,components,src}/**/*.{ts,tsx}',
+    '!**/__tests__/**',
+    '!**/*.test.{ts,tsx}',
+    '!**/*.d.ts',
+  ],
+  // text-summary: console totals; json-summary: machine-readable totals;
+  // lcov: per-file HTML report (coverage/lcov-report/index.html) + lcov.info.
+  coverageReporters: ['text-summary', 'json-summary', 'lcov'],
+  // Floor for the whole-suite coverage run (AGENTS.md, spec 02 "Quality
+  // targets"). Global, so it only means something on a full run: a scoped
+  // `--coverage <path>` run counts every other file as 0% and fails it.
+  coverageThreshold: {
+    global: { branches: 80, lines: 80 },
+  },
 };

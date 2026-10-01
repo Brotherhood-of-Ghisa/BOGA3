@@ -37,6 +37,9 @@ yarn-error.*
 # crash).
 .env.local.maestro-backup.*
 
+# Jest coverage output (npm run test:coverage)
+coverage/
+
 # typescript
 *.tsbuildinfo
 
