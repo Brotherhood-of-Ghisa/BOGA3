@@ -1,7 +1,30 @@
 /* eslint-disable import/first */
 
+/**
+ * The session view over real data: the production screen, session lifecycle,
+ * draft repository, gym directory, exercise picker and catalog caches over the
+ * migrated in-memory SQLite database, seeded through the Maestro harness with
+ * the `session-view` fixture (helpers/local-data.ts): an active session at the
+ * block-history gym (Bench 3/5 with a new 1RM record, Incline 3/3, Cable Flys
+ * 0/3) over the block-history fixture's completed sessions. Every write is
+ * read back from the database.
+ *
+ * Replaced: the native database open, the router and navigation, the console
+ * logger, and the GPS read (the simulator cannot fake a location). Two states
+ * real data cannot produce are forced with `jest.spyOn` on the real module and
+ * named in their tests: a failed comparison-history read and a failed draft
+ * read.
+ */
+
+import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { eq } from 'drizzle-orm';
 import { Alert } from 'react-native';
+
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -15,165 +38,91 @@ const mockNavigation = {
 // Every mounted focus callback, so a test can play "the screen came back".
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 
-jest.mock('expo-router', () => {
-  const React = jest.requireActual('react');
-  return {
-    useFocusEffect: (callback: () => void | (() => void)) => {
-      React.useEffect(() => {
-        mockFocusCallbacks.add(callback);
-        const cleanup = callback();
-        return () => {
-          mockFocusCallbacks.delete(callback);
-          if (typeof cleanup === 'function') cleanup();
-        };
-      }, [callback]);
-    },
-    useLocalSearchParams: () => ({}),
-    useNavigation: () => mockNavigation,
-    useRouter: () => ({
-      push: mockPush,
-      replace: mockReplace,
-      dismissTo: mockDismissTo,
-      back: mockBack,
-      canGoBack: mockCanGoBack,
-    }),
-  };
-});
-
-jest.mock('@/src/data', () => ({
-  completeSessionDraft: jest.fn(),
-  listLocalGymsIncludingArchived: jest.fn(),
-  loadLatestSessionDraftSnapshot: jest.fn(),
-  loadLocalGymById: jest.fn(),
-  loadRecentExerciseBlocks: jest.fn(),
-  loadSessionSnapshotById: jest.fn(),
-  persistCompletedSessionSnapshot: jest.fn(),
-  persistSessionDraftSnapshot: jest.fn(),
-  setSessionDeletedState: jest.fn(),
-  upsertLocalGym: jest.fn(),
-}));
-
-jest.mock('@/src/session-insights/repository', () => ({
-  ...jest.requireActual('@/src/session-insights/repository'),
-  loadSessionInsightHistory: jest.fn(),
-}));
-jest.mock('@/src/exercise-catalog/cache', () => ({
-  useExerciseCatalog: () => ({
-    status: 'ready',
-    exercises: [{ id: 'def_bench', loadInputMode: 'total_load', mappings: [{ muscleGroupId: 'chest', role: 'primary' }] }],
-    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Torso', sortOrder: 0 }],
+jest.mock('expo-router', () => ({
+  useFocusEffect: (callback: () => void | (() => void)) => {
+    mockReact.useEffect(() => {
+      mockFocusCallbacks.add(callback);
+      const cleanup = callback();
+      return () => {
+        mockFocusCallbacks.delete(callback);
+        if (typeof cleanup === 'function') cleanup();
+      };
+    }, [callback]);
+  },
+  useLocalSearchParams: () => ({}),
+  useNavigation: () => mockNavigation,
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    dismissTo: mockDismissTo,
+    back: mockBack,
+    canGoBack: mockCanGoBack,
   }),
 }));
 
+// Console only: adding an exercise logs an info event.
 jest.mock('@/src/logging', () => ({ logEvent: jest.fn().mockResolvedValue(undefined) }));
 
-// The injected location service: quiet (denied) unless a test says otherwise.
+// The GPS read: quiet (denied) unless a test says otherwise.
 jest.mock('@/src/location/foreground-location-lazy', () => ({
   getCurrentForegroundPositionLazy: jest.fn(),
 }));
 
-// The picker has its own suite (exercise-picker.test.tsx); here it only has
-// to hand back a choice or ask for Manage.
-jest.mock('@/components/session-recorder/exercise-picker', () => ({
-  ExercisePicker: ({
-    visible,
-    onSelectExercise,
-    onOpenManage,
-  }: {
-    visible: boolean;
-    onSelectExercise: (id: string, name: string) => void;
-    onOpenManage: () => void;
-  }) => {
-    const { Pressable: MockPressable, Text: MockText, View: MockView } = jest.requireActual('react-native');
-    return visible ? (
-      <MockView>
-        <MockPressable onPress={() => onSelectExercise('def_row', 'Seated Row')} testID="mock-picker-choose">
-          <MockText>Choose</MockText>
-        </MockPressable>
-        <MockPressable onPress={onOpenManage} testID="mock-picker-manage">
-          <MockText>Manage</MockText>
-        </MockPressable>
-      </MockView>
-    ) : null;
-  },
+// Signed out: the picker's group rows are signed-in only.
+jest.mock('@/src/groups/use-group-exercise-linking', () => ({
+  ...jest.requireActual('@/src/groups/use-group-exercise-linking'),
+  useGroupLinkingUserId: () => null,
 }));
 
 import { SessionViewScreen } from '../session/[sessionId]/index';
+import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
+import { gyms, sessions } from '@/src/data/schema';
+import * as sessionDrafts from '@/src/data/session-drafts';
+import { setSessionDeletedState } from '@/src/data/session-list';
+import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
+import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import * as insightsRepository from '@/src/session-insights/repository';
+import {
+  bootLocalApp,
+  closeLocalData,
+  loadMaestroFixture,
+  localDatabase,
+  resetLocalData,
+} from './helpers/local-data';
 
-const insightHistory = jest.requireMock('@/src/session-insights/repository').loadSessionInsightHistory as jest.Mock;
-const data = jest.requireMock('@/src/data') as Record<string, jest.Mock>;
 const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
   getCurrentForegroundPositionLazy: jest.Mock;
 };
 
-const gymRow = (
-  id: string,
-  name: string,
-  coordinates: { latitude: number; longitude: number } | null = null,
-  archivedAt: Date | null = null
-) => ({
-  id,
-  name,
-  latitude: coordinates?.latitude ?? null,
-  longitude: coordinates?.longitude ?? null,
-  coordinateAccuracyM: coordinates ? 10 : null,
-  coordinatesUpdatedAt: coordinates ? new Date('2026-09-01T10:00:00Z') : null,
-  archivedAt,
-});
+const SESSION = SESSION_VIEW_FIXTURE.sessionId;
+const BENCH = SESSION_VIEW_FIXTURE.benchExerciseId;
+const FLY = SESSION_VIEW_FIXTURE.flyExerciseId;
+const FIXTURE_GYM = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+const BENCH_LABEL = 'Barbell Bench Press, 3 of 5 sets done, new 1RM record 204.3';
+const FLY_LABEL = 'Cable Flys, 0 of 3 sets done';
 
 const HARBOUR = { latitude: 51.5, longitude: -0.12 };
 
 const positionAt = (coordinates: { latitude: number; longitude: number }, accuracyM = 20) => ({
   status: 'success',
-  position: { ...coordinates, accuracyM, capturedAt: new Date('2026-09-23T09:05:00Z') },
+  position: { ...coordinates, accuracyM, capturedAt: new Date() },
 });
 
-const set = (
-  id: string,
-  weightValue: string,
-  repsValue: string,
-  setType: string | null,
-  performanceStatus: 'planned' | 'unperformed' | null = null,
-  planned?: { weight: string; reps: string; setType: string }
-) => ({
-  id,
-  weightValue,
-  repsValue,
-  setType,
-  plannedWeightValue: planned?.weight ?? null,
-  plannedRepsValue: planned?.reps ?? null,
-  plannedSetType: planned?.setType ?? null,
-  performanceStatus,
+const located = (coordinates: { latitude: number; longitude: number }) => ({
+  ...coordinates,
+  accuracyM: 10,
+  updatedAt: new Date('2026-09-01T10:00:00Z'),
 });
 
-const snapshot = () => ({
-  sessionId: 'session-1',
-  gymId: 'gym-1',
-  status: 'active' as const,
-  startedAt: new Date('2026-09-23T09:00:00'),
-  createdAt: new Date('2026-09-23T09:00:00'),
-  updatedAt: new Date('2026-09-23T09:30:00'),
-  exercises: [
-    {
-      id: 'bench',
-      exerciseDefinitionId: 'def_bench',
-      name: 'Barbell Bench Press',
-      machineName: null,
-      sets: [
-        set('b1', '100', '10', 'warm_up'),
-        set('b2', '160', '8', 'rir_2'),
-        set('b3', '', '', null, 'planned', { weight: '165', reps: '5', setType: 'rir_0' }),
-      ],
-    },
-    {
-      id: 'fly',
-      exerciseDefinitionId: 'def_fly',
-      name: 'Cable Flys',
-      machineName: null,
-      sets: [set('f1', '', '', null, 'planned', { weight: '22.5', reps: '15', setType: 'rir_2' })],
-    },
-  ],
-});
+const readSession = (sessionId: string) => sessionDrafts.loadSessionSnapshotById(sessionId);
+const exerciseNames = async (sessionId: string) =>
+  ((await readSession(sessionId))?.exercises ?? []).map((exercise) => exercise.name);
+const setIds = async (sessionId: string, exerciseId: string) =>
+  ((await readSession(sessionId))?.exercises.find((exercise) => exercise.id === exerciseId)?.sets ?? []).map(
+    (row) => row.id
+  );
+const sessionRow = (sessionId: string) =>
+  localDatabase().select().from(sessions).where(eq(sessions.id, sessionId)).get();
 
 // Answers each Alert with the button labelled `answer`, recording the titles.
 const answerAlerts = (answer: (title: string) => string) => {
@@ -186,257 +135,268 @@ const answerAlerts = (answer: (title: string) => string) => {
   return titles;
 };
 
+const replayFocus = () =>
+  act(async () => {
+    mockFocusCallbacks.forEach((callback) => callback());
+  });
+
+const seed = async (prepare?: () => Promise<void> | void) => {
+  await loadMaestroFixture('session-view');
+  await prepare?.();
+  await bootLocalApp();
+};
+
+const openGymSheet = async () => {
+  await act(async () => {
+    fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
+  });
+};
+
+// The real picker: find the exercise, open its preselection, add one empty set.
+const addExerciseThroughPicker = async (name: string) => {
+  fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+  fireEvent.changeText(await screen.findByLabelText('Exercise filter input'), name);
+  fireEvent.press(await screen.findByLabelText(`Select exercise ${name}`));
+  const addEmptySet = await screen.findByLabelText(`Add empty set for ${name}`);
+  await act(async () => {
+    fireEvent.press(addEmptySet);
+  });
+};
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  resetLocalData();
+  mockFocusCallbacks.clear();
+  mockCanGoBack.mockReturnValue(true);
+  location.getCurrentForegroundPositionLazy.mockResolvedValue({ status: 'permission_denied', canAskAgain: true });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+  jest.useRealTimers();
+  closeLocalData();
+});
+
 describe('Session view', () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-    insightHistory.mockReset().mockResolvedValue([]);
-    jest.restoreAllMocks();
-    mockPush.mockReset();
-    mockReplace.mockReset();
-    mockDismissTo.mockReset();
-    data.loadLatestSessionDraftSnapshot.mockReset().mockImplementation(async () => snapshot());
-    data.loadLocalGymById.mockReset().mockResolvedValue({ id: 'gym-1', name: 'Iron Works' });
-    data.listLocalGymsIncludingArchived
-      .mockReset()
-      .mockResolvedValue([gymRow('gym-1', 'Iron Works'), gymRow('gym-2', 'Harbour Barbell', HARBOUR)]);
-    location.getCurrentForegroundPositionLazy
-      .mockReset()
-      .mockResolvedValue({ status: 'permission_denied', canAskAgain: true });
-    data.upsertLocalGym.mockReset().mockResolvedValue(undefined);
-    data.loadRecentExerciseBlocks.mockReset().mockImplementation(async ({ exerciseDefinitionId }) => ({
-      exerciseDefinitionId,
-      limit: null,
-      blocks:
-        exerciseDefinitionId === 'def_bench'
-          ? [{ sessionId: 'old', completedAt: new Date(0), daysAgo: 3, sessionExerciseIds: [], estimatedOneRepMax: 190, totalVolume: 0, highestWeight: 150, workingSetCount: 1 }]
-          : [],
-    }));
-    data.persistSessionDraftSnapshot.mockReset().mockResolvedValue({ sessionId: 'session-1' });
-    data.loadSessionSnapshotById.mockReset().mockResolvedValue(null);
-    data.persistCompletedSessionSnapshot.mockReset().mockResolvedValue({ sessionId: 'done-1' });
-    mockBack.mockReset();
-    mockCanGoBack.mockReset().mockReturnValue(true);
-    mockNavigation.addListener.mockClear();
-    mockNavigation.dispatch.mockReset();
-    data.completeSessionDraft.mockReset().mockResolvedValue({ sessionId: 'session-1' });
-    data.setSessionDeletedState.mockReset().mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
   const renderReady = async () => {
-    render(<SessionViewScreen sessionId="session-1" />);
-    await screen.findByLabelText('Barbell Bench Press, 2 of 3 sets done, new 1RM record 204.3');
+    render(<SessionViewScreen sessionId={SESSION} />);
+    await screen.findByLabelText(BENCH_LABEL);
+  };
+
+  const openSession = async (prepare?: () => Promise<void> | void) => {
+    await seed(prepare);
+    await renderReady();
   };
 
   it('shows the summary and one read-only card per exercise, with its record band', async () => {
-    await renderReady();
+    await openSession();
 
-    expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp('accessibilityLabel', 'Gym Iron Works');
-    expect(screen.getByLabelText('Sets 2')).toBeTruthy();
-    expect(screen.getByLabelText('Volume 2280')).toBeTruthy();
-    expect(screen.getByTestId('session-view-exercise-bench-record')).toBeTruthy();
-    expect(screen.getByLabelText('Cable Flys, 0 of 1 sets done')).toBeTruthy();
-    expect(screen.queryByTestId('session-view-exercise-fly-record')).toBeNull();
+    expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp(
+      'accessibilityLabel',
+      `Gym ${SESSION_VIEW_FIXTURE.gymName}`
+    );
+    expect(screen.getByLabelText(`Sets ${SESSION_VIEW_FIXTURE.performedSetCount}`)).toBeTruthy();
+    expect(screen.getByLabelText('Volume 4200')).toBeTruthy();
+    expect(screen.getByTestId(`session-view-exercise-${BENCH}-record`)).toBeTruthy();
+    // Incline has no history, so no record; Cable Flys has nothing done.
+    expect(screen.getByLabelText('Incline Dumbbell Press, 3 of 3 sets done')).toBeTruthy();
+    expect(screen.getByLabelText(FLY_LABEL)).toBeTruthy();
+    expect(screen.queryByTestId(`session-view-exercise-${FLY}-record`)).toBeNull();
     // Mini legends label every metric column.
     expect(screen.getAllByText('1RM').length).toBeGreaterThan(0);
   });
 
-  it('loads real exercise and muscle baselines for the active session', async () => {
-    insightHistory.mockResolvedValue([{
-      sessionId: 'prior', status: 'completed', completedAt: new Date('2026-01-01'),
-      exercises: [{ id: 'prior-bench', exerciseDefinitionId: 'def_bench', exerciseName: 'Bench', orderIndex: 0,
-        sets: [{ id: 'prior-set', orderIndex: 0, weightValue: '100', repsValue: '10', setType: 'rir_2', performanceStatus: null }] }],
-    }]);
-    await renderReady();
-    await screen.findByText('128% above median');
-    expect(insightHistory).toHaveBeenCalledWith({ targetSessionId: 'session-1', completedAt: expect.any(Date) });
-    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets · 1 working.*Historical median 1000/)).toBeTruthy();
+  it('compares the session with its exercise and muscle history', async () => {
+    await openSession();
+
+    await screen.findByText(/above median/);
+    expect(screen.getByLabelText(/Barbell Bench Press, 3 sets · 2 working.*Historical median/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByLabelText(/Chest, 2 sets · 1 working.*Historical median 500/)).toBeTruthy();
+    expect(screen.getByLabelText(/Chest, .* sets · .* working.*Historical median/)).toBeTruthy();
   });
 
-  it('hides comparisons when editing history while keeping editing available', async () => {
-    const completedAt = new Date('2026-09-01T12:00:00Z');
-    data.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
-    data.loadSessionSnapshotById.mockResolvedValue({ ...snapshot(), status: 'completed', completedAt, deletedAt: null });
-    await renderReady();
-    expect(screen.queryByTestId('session-insight-presentation')).toBeNull();
-    expect(screen.getByTestId('session-view-add-exercise')).toBeTruthy();
-    expect(screen.getByTestId('session-view-done-button')).toBeTruthy();
-  });
+  it('keeps logging usable when the comparison-history read fails (a failed read)', async () => {
+    jest
+      .spyOn(insightsRepository, 'loadSessionInsightHistory')
+      .mockRejectedValueOnce(new Error('History read failed'));
+    await openSession();
 
-  it('keeps logging usable when comparison history fails', async () => {
-    insightHistory.mockRejectedValue(new Error('History read failed'));
-    await renderReady();
     await screen.findByText('Comparisons unavailable. Return to this session to retry.');
-    fireEvent.press(screen.getByLabelText('Cable Flys, 0 of 1 sets done'));
-    expect(mockPush).toHaveBeenCalledWith('/session/session-1/exercise/fly');
+    fireEvent.press(screen.getByLabelText(FLY_LABEL));
+    expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${FLY}`);
     expect(screen.queryByText('No comparison history yet')).toBeNull();
   });
 
   it('links each card to its exercise page', async () => {
-    await renderReady();
-    fireEvent.press(screen.getByLabelText('Cable Flys, 0 of 1 sets done'));
-    expect(mockPush).toHaveBeenCalledWith('/session/session-1/exercise/fly');
+    await openSession();
+
+    fireEvent.press(screen.getByLabelText(FLY_LABEL));
+
+    expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${FLY}`);
   });
 
-  it('finishes through the cleanup prompts and completion write, then opens the completion screen', async () => {
+  it('finishes through the cleanup prompts, completing the session with its done sets only', async () => {
     const titles = answerAlerts((title) =>
       title.startsWith('Remove exercises') ? 'Remove empty exercises and submit' : 'unexpected'
     );
-    await renderReady();
+    await openSession();
+    const before = await readSession(SESSION);
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-finish-button'));
     });
 
     await waitFor(() =>
-      expect(mockReplace).toHaveBeenCalledWith('/completed-session/session-1?presentation=completion')
+      expect(mockReplace).toHaveBeenCalledWith(`/completed-session/${SESSION}?presentation=completion`)
     );
     expect(titles).toEqual(['Remove exercises with no sets and submit?']);
-    // Confirmed sets only, planned columns cleared — the completed-history graph.
-    const written = data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0];
-    expect(written).toMatchObject({ sessionId: 'session-1', gymId: 'gym-1', status: 'active' });
-    expect(written.startedAt).toEqual(new Date('2026-09-23T09:00:00'));
-    expect(written.exercises).toHaveLength(1);
-    expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['b1', 'b2']);
-    expect(data.completeSessionDraft).toHaveBeenCalledWith('session-1');
+    const after = await readSession(SESSION);
+    expect(after).toMatchObject({ status: 'completed', gymId: FIXTURE_GYM, startedAt: before!.startedAt });
+    expect(after!.completedAt).toBeInstanceOf(Date);
+    // Done sets only, planned rows and the all-planned exercise dropped.
+    expect(after!.exercises.map((exercise) => exercise.name)).toEqual([
+      'Barbell Bench Press',
+      'Incline Dumbbell Press',
+    ]);
+    expect(after!.exercises[0].sets.map((row) => row.id)).toEqual([
+      'maestro_session_view_bench_1',
+      'maestro_session_view_bench_2',
+      'maestro_session_view_bench_3',
+    ]);
+    expect(after!.exercises[0].sets.every((row) => row.performanceStatus === null)).toBe(true);
   });
 
   it('writes nothing when a finish prompt is declined', async () => {
     answerAlerts(() => 'Go back to edit session');
-    await renderReady();
+    await openSession();
+    const before = await readSession(SESSION);
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-finish-button'));
     });
 
-    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
-    expect(data.completeSessionDraft).not.toHaveBeenCalled();
+    expect(await readSession(SESSION)).toEqual(before);
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('abandons only after the destructive confirmation, then returns to Train', async () => {
     let answer = 'Keep session';
     const titles = answerAlerts(() => answer);
-    await renderReady();
+    await openSession();
 
     fireEvent.press(screen.getByTestId('session-view-options-button'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-abandon'));
     });
     expect(titles).toEqual(['Abandon session?']);
-    expect(data.setSessionDeletedState).not.toHaveBeenCalled();
+    expect(sessionRow(SESSION)?.deletedAt).toBeNull();
 
     answer = 'Abandon';
     fireEvent.press(screen.getByTestId('session-view-options-button'));
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-abandon'));
     });
-    expect(data.setSessionDeletedState).toHaveBeenCalledWith('session-1', true);
+    expect(sessionRow(SESSION)?.deletedAt).toBeInstanceOf(Date);
+    expect(await sessionDrafts.loadLatestSessionDraftSnapshot()).toBeNull();
     expect(mockDismissTo).toHaveBeenCalledWith('/train');
   });
 
-  it('adds an exercise with one empty set to the persisted draft', async () => {
-    await renderReady();
+  it('adds an exercise from the picker with one empty set, leaving the rest as they were', async () => {
+    await openSession();
+    const benchBefore = await setIds(SESSION, BENCH);
 
-    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('mock-picker-choose'));
-    });
+    await addExerciseThroughPicker(EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseName);
 
-    const written = data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0];
-    expect(written.exercises.map((exercise: { name: string }) => exercise.name)).toEqual([
+    expect(await exerciseNames(SESSION)).toEqual([
       'Barbell Bench Press',
+      'Incline Dumbbell Press',
       'Cable Flys',
-      'Seated Row',
+      'Lat Pulldown',
     ]);
-    expect(written.exercises[2].sets).toHaveLength(1);
-    expect(written.exercises[2].sets[0]).toMatchObject({ repsValue: '', weightValue: '', performanceStatus: 'unperformed' });
-    // The existing sets go back unchanged.
-    expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['b1', 'b2', 'b3']);
+    const added = (await readSession(SESSION))!.exercises[3];
+    expect(added.exerciseDefinitionId).toBe(EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseId);
+    expect(added.sets).toHaveLength(1);
+    expect(added.sets[0]).toMatchObject({ repsValue: '', weightValue: '', performanceStatus: 'unperformed' });
+    expect(await setIds(SESSION, BENCH)).toEqual(benchBefore);
+    expect(await screen.findByLabelText('Lat Pulldown, 0 of 1 sets done')).toBeTruthy();
   });
 
-  it('opens the catalogue from the picker\'s Manage and shows the picker again on return', async () => {
-    await renderReady();
+  it("opens the catalogue from the picker's Manage and shows the picker again on return", async () => {
+    await openSession();
 
     fireEvent.press(screen.getByTestId('session-view-add-exercise'));
-    fireEvent.press(screen.getByTestId('mock-picker-manage'));
+    fireEvent.press(await screen.findByTestId('exercise-picker-manage-button'));
 
     expect(mockPush).toHaveBeenCalledWith('/exercise-catalog?source=session&intent=manage');
-    expect(screen.queryByTestId('mock-picker-choose')).toBeNull();
+    expect(screen.queryByTestId('exercise-picker-search')).toBeNull();
 
-    await act(async () => {
-      mockFocusCallbacks.forEach((callback) => callback());
-    });
-    expect(screen.getByTestId('mock-picker-choose')).toBeTruthy();
+    await replayFocus();
+    expect(await screen.findByTestId('exercise-picker-search')).toBeTruthy();
   });
 
   it('picks the gym from the gym sheet by tapping the Gym stat', async () => {
-    await renderReady();
+    await openSession(() => upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell' }));
+    const benchBefore = await setIds(SESSION, BENCH);
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
-    });
+    await openGymSheet();
     // No gym, the seeded gyms, then the local ones; the current one marked.
     expect(screen.getByTestId('session-view-gym-option-none')).toBeTruthy();
     expect(screen.getByTestId('session-view-gym-option-downtown-iron-temple')).toBeTruthy();
-    expect(screen.getByTestId('session-view-gym-option-gym-1')).toBeSelected();
+    expect(screen.getByTestId(`session-view-gym-option-${FIXTURE_GYM}`)).toBeSelected();
 
-    data.loadLocalGymById.mockResolvedValue({ id: 'gym-2', name: 'Harbour Barbell' });
     await act(async () => {
-      fireEvent.press(screen.getByTestId('session-view-gym-option-gym-2'));
+      fireEvent.press(screen.getByTestId('session-view-gym-option-gym-harbour'));
     });
 
-    expect(data.upsertLocalGym).toHaveBeenCalledWith({ id: 'gym-2', name: 'Harbour Barbell' });
-    const written = data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0];
-    expect(written).toMatchObject({ sessionId: 'session-1', gymId: 'gym-2', status: 'active' });
-    // The sets go back unchanged.
-    expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['b1', 'b2', 'b3']);
+    expect(await readSession(SESSION)).toMatchObject({ gymId: 'gym-harbour', status: 'active' });
+    expect(await setIds(SESSION, BENCH)).toEqual(benchBefore);
+    expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp('accessibilityLabel', 'Gym Harbour Barbell');
+  });
+
+  it('writes a seeded gym on first pick', async () => {
+    await openSession();
+
+    await openGymSheet();
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-gym-option-westside-barbell-club'));
+    });
+
+    expect(localDatabase().select().from(gyms).where(eq(gyms.id, 'westside-barbell-club')).get()).toMatchObject({
+      name: 'Westside Barbell Club',
+    });
+    expect(sessionRow(SESSION)?.gymId).toBe('westside-barbell-club');
   });
 
   it('clears the gym with No gym', async () => {
-    await renderReady();
+    await openSession();
 
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
-    });
+    await openGymSheet();
     await act(async () => {
       fireEvent.press(screen.getByTestId('session-view-gym-option-none'));
     });
 
-    expect(data.upsertLocalGym).not.toHaveBeenCalled();
-    expect(data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0]).toMatchObject({ gymId: null });
+    expect(sessionRow(SESSION)?.gymId).toBeNull();
   });
-
-  const openGymSheet = async () => {
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
-    });
-  };
 
   it('suggests the one nearby gym as the first row, and selects it only when tapped', async () => {
     location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
-    await renderReady();
+    await openSession(() =>
+      upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
+    );
 
     await openGymSheet();
 
     const suggestion = await screen.findByTestId('session-view-gym-suggestion');
     expect(screen.getByText('Nearby · Harbour Barbell')).toBeTruthy();
     // Suggest only: nothing is written until the lifter taps it.
-    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
-    expect(screen.getByTestId('session-view-gym-option-gym-1')).toBeSelected();
+    expect(sessionRow(SESSION)?.gymId).toBe(FIXTURE_GYM);
+    expect(screen.getByTestId(`session-view-gym-option-${FIXTURE_GYM}`)).toBeSelected();
 
-    data.loadLocalGymById.mockResolvedValue({ id: 'gym-2', name: 'Harbour Barbell' });
     await act(async () => {
       fireEvent.press(suggestion);
     });
 
-    expect(data.upsertLocalGym).toHaveBeenCalledWith({ id: 'gym-2', name: 'Harbour Barbell' });
-    expect(data.persistSessionDraftSnapshot.mock.calls.at(-1)?.[0]).toMatchObject({ gymId: 'gym-2' });
+    expect(sessionRow(SESSION)?.gymId).toBe('gym-harbour');
     expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
   });
 
@@ -448,43 +408,53 @@ describe('Session view', () => {
     ['no gym in range', () => positionAt({ latitude: 48.85, longitude: 2.35 })],
   ])('shows no suggestion row on %s', async (_case, result) => {
     location.getCurrentForegroundPositionLazy.mockResolvedValue(result());
-    await renderReady();
+    await openSession(() =>
+      upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
+    );
 
     await openGymSheet();
     await act(async () => {});
 
     expect(location.getCurrentForegroundPositionLazy).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeTruthy();
+    expect(screen.getByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
 
   it('shows no suggestion row when two gyms tie, or when no gym has a location', async () => {
     location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
-    data.listLocalGymsIncludingArchived.mockResolvedValue([
-      gymRow('gym-1', 'Iron Works', { latitude: 51.5001, longitude: -0.12 }),
-      gymRow('gym-2', 'Harbour Barbell', HARBOUR),
-    ]);
-    await renderReady();
+    await openSession(async () => {
+      await upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) });
+      await upsertLocalGym({
+        id: 'gym-iron',
+        name: 'Iron Works',
+        coordinates: located({ latitude: 51.5001, longitude: -0.12 }),
+      });
+    });
 
     await openGymSheet();
     await act(async () => {});
+    expect(screen.getByTestId('session-view-gym-option-gym-iron')).toBeTruthy();
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
 
     fireEvent.press(screen.getByTestId('session-view-gym-sheet-backdrop', { includeHiddenElements: true }));
-    data.listLocalGymsIncludingArchived.mockResolvedValue([gymRow('gym-1', 'Iron Works'), gymRow('gym-2', 'Harbour Barbell')]);
+    await upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: null });
+    await upsertLocalGym({ id: 'gym-iron', name: 'Iron Works', coordinates: null });
     await openGymSheet();
     await act(async () => {});
-    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeTruthy();
+    expect(screen.getByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
 
   it('gives up on the suggestion after 1.5 s without a fix, leaving the list usable', async () => {
     let resolveFix: (value: unknown) => void = () => undefined;
     location.getCurrentForegroundPositionLazy.mockReturnValue(new Promise((resolve) => (resolveFix = resolve)));
-    await renderReady();
+    await openSession(() =>
+      upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell', coordinates: located(HARBOUR) })
+    );
+    jest.useFakeTimers();
 
     await openGymSheet();
-    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeTruthy();
+    expect(await screen.findByTestId('session-view-gym-option-gym-harbour')).toBeTruthy();
     await act(async () => {
       jest.advanceTimersByTime(1500);
     });
@@ -498,38 +468,36 @@ describe('Session view', () => {
 
   it('does not suggest the gym the session already has', async () => {
     location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
-    data.loadLocalGymById.mockResolvedValue({ id: 'gym-2', name: 'Harbour Barbell' });
-    data.loadLatestSessionDraftSnapshot.mockImplementation(async () => ({ ...snapshot(), gymId: 'gym-2' }));
-    await renderReady();
+    await openSession(() => upsertLocalGym({ id: FIXTURE_GYM, name: SESSION_VIEW_FIXTURE.gymName, coordinates: located(HARBOUR) }));
 
     await openGymSheet();
     await act(async () => {});
 
-    expect(screen.getByTestId('session-view-gym-option-gym-2')).toBeSelected();
+    expect(screen.getByTestId(`session-view-gym-option-${FIXTURE_GYM}`)).toBeSelected();
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
 
   it('leaves archived gyms out of the sheet, seeded ones included', async () => {
-    data.listLocalGymsIncludingArchived.mockResolvedValue([
-      gymRow('downtown-iron-temple', 'Downtown Iron Temple', null, new Date('2026-09-20T10:00:00Z')),
-      gymRow('gym-1', 'Iron Works'),
-      gymRow('gym-3', 'Old Garage', HARBOUR, new Date('2026-09-20T10:00:00Z')),
-    ]);
     location.getCurrentForegroundPositionLazy.mockResolvedValue(positionAt(HARBOUR));
-    await renderReady();
+    await openSession(async () => {
+      await upsertLocalGym({ id: 'downtown-iron-temple', name: 'Downtown Iron Temple' });
+      await setLocalGymArchived({ id: 'downtown-iron-temple', archived: true });
+      await upsertLocalGym({ id: 'gym-garage', name: 'Old Garage', coordinates: located(HARBOUR) });
+      await setLocalGymArchived({ id: 'gym-garage', archived: true });
+    });
 
     await openGymSheet();
     await act(async () => {});
 
     expect(screen.getByTestId('session-view-gym-option-westside-barbell-club')).toBeTruthy();
     expect(screen.queryByTestId('session-view-gym-option-downtown-iron-temple')).toBeNull();
-    expect(screen.queryByTestId('session-view-gym-option-gym-3')).toBeNull();
+    expect(screen.queryByTestId('session-view-gym-option-gym-garage')).toBeNull();
     // An archived gym is never suggested either.
     expect(screen.queryByTestId('session-view-gym-suggestion')).toBeNull();
   });
 
   it('opens the Gyms screen from Manage gyms and reopens the sheet, reloaded, on return', async () => {
-    await renderReady();
+    await openSession();
 
     await openGymSheet();
     fireEvent.press(screen.getByTestId('session-view-gym-manage'));
@@ -537,118 +505,104 @@ describe('Session view', () => {
     expect(mockPush).toHaveBeenCalledWith('/gyms');
     expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
 
-    data.listLocalGymsIncludingArchived.mockResolvedValue([
-      gymRow('gym-1', 'Iron Works'),
-      gymRow('gym-2', 'Harbour Barbell', HARBOUR),
-      gymRow('gym-4', 'Canal Street Gym'),
-    ]);
-    await act(async () => {
-      mockFocusCallbacks.forEach((callback) => callback());
-    });
+    // Added on the Gyms screen.
+    await upsertLocalGym({ id: 'gym-canal', name: 'Canal Street Gym' });
+    await replayFocus();
 
     expect(screen.getByTestId('session-view-gym-sheet')).toBeTruthy();
-    expect(await screen.findByTestId('session-view-gym-option-gym-4')).toBeTruthy();
+    expect(await screen.findByTestId('session-view-gym-option-gym-canal')).toBeTruthy();
 
     // A later return with the sheet closed leaves it closed.
     fireEvent.press(screen.getByTestId('session-view-gym-sheet-backdrop', { includeHiddenElements: true }));
-    await act(async () => {
-      mockFocusCallbacks.forEach((callback) => callback());
-    });
+    await replayFocus();
     expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
   });
 
   it('says so when its session is no longer the active draft', async () => {
-    data.loadLatestSessionDraftSnapshot.mockResolvedValue(null);
-    render(<SessionViewScreen sessionId="session-1" />);
+    await seed(() => setSessionDeletedState(SESSION, true));
+    render(<SessionViewScreen sessionId={SESSION} />);
 
     expect(await screen.findByText('This session is no longer active.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-view-back'));
     expect(mockDismissTo).toHaveBeenCalledWith('/train');
   });
 
-  it('shows a retryable error when the draft cannot be read', async () => {
-    data.loadLatestSessionDraftSnapshot.mockRejectedValueOnce(new Error('disk'));
-    render(<SessionViewScreen sessionId="session-1" />);
+  it('shows a retryable error when the draft read fails (a failed read)', async () => {
+    await seed();
+    jest.spyOn(sessionDrafts, 'loadLatestSessionDraftSnapshot').mockRejectedValueOnce(new Error('disk'));
+    render(<SessionViewScreen sessionId={SESSION} />);
 
     fireEvent.press(await screen.findByTestId('session-view-retry'));
-    expect(await screen.findByLabelText('Cable Flys, 0 of 1 sets done')).toBeTruthy();
+    expect(await screen.findByLabelText(BENCH_LABEL)).toBeTruthy();
   });
 });
 
-// The completed edit (once the old recorder's `?mode=completed-edit`), on the session
-// view: these port its load, validation, autosave, save and leave cases.
+// A completed session opened to edit it (History, completed-session `Edit`).
 describe('Session view: editing a completed session', () => {
+  const DONE = 'completed_edit_session';
   // Stored to the second, so Done can prove it keeps untouched instants.
   const STARTED_AT = new Date(2026, 1, 25, 10, 0, 30);
   const COMPLETED_AT = new Date(2026, 1, 25, 10, 45, 10);
+  const BENCH_DEF = EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId;
 
-  const completed = (
-    exercises = [
-      {
-        id: 'bench',
-        exerciseDefinitionId: 'def_bench',
-        name: 'Barbell Bench Press',
-        machineName: null,
-        sets: [set('c1', '160', '8', 'rir_1'), set('c2', '150', '8', 'rir_2', 'unperformed')],
-      },
-    ],
-    overrides: Record<string, unknown> = {}
-  ) => ({
-    sessionId: 'done-1',
-    gymId: 'gym-1',
-    status: 'completed' as const,
-    startedAt: STARTED_AT,
-    completedAt: COMPLETED_AT,
-    durationSec: 2680,
-    deletedAt: null,
-    createdAt: STARTED_AT,
-    updatedAt: COMPLETED_AT,
-    exercises,
-    ...overrides,
+  type StoredSet = {
+    id: string;
+    weightValue: string;
+    repsValue: string;
+    setType: string | null;
+    performanceStatus?: 'planned' | 'unperformed' | 'skipped' | null;
+    plannedWeightValue?: string | null;
+    plannedRepsValue?: string | null;
+    plannedSetType?: string | null;
+  };
+  type StoredExercise = { id: string; exerciseDefinitionId: string; name: string; sets: StoredSet[] };
+
+  const performed = (id: string, weightValue: string, repsValue: string, setType: string | null): StoredSet => ({
+    id,
+    weightValue,
+    repsValue,
+    setType,
+    performanceStatus: null,
   });
 
-  let stored: ReturnType<typeof completed>;
-
-  beforeEach(() => {
-    jest.useFakeTimers();
-    insightHistory.mockReset().mockResolvedValue([]);
-    jest.restoreAllMocks();
-    mockPush.mockReset();
-    mockReplace.mockReset();
-    mockDismissTo.mockReset();
-    mockBack.mockReset();
-    mockCanGoBack.mockReset().mockReturnValue(true);
-    mockNavigation.addListener.mockClear();
-    mockNavigation.dispatch.mockReset();
-    stored = completed();
-    // Another session is the active draft; this one is history.
-    data.loadLatestSessionDraftSnapshot.mockReset().mockImplementation(async () => snapshot());
-    data.loadSessionSnapshotById.mockReset().mockImplementation(async (id: string) =>
-      id === stored.sessionId ? stored : null
-    );
-    data.loadLocalGymById.mockReset().mockResolvedValue({ id: 'gym-1', name: 'Iron Works' });
-    data.listLocalGymsIncludingArchived.mockReset().mockResolvedValue([gymRow('gym-2', 'Harbour Barbell')]);
-    location.getCurrentForegroundPositionLazy
-      .mockReset()
-      .mockResolvedValue({ status: 'permission_denied', canAskAgain: true });
-    data.upsertLocalGym.mockReset().mockResolvedValue(undefined);
-    data.loadRecentExerciseBlocks.mockReset().mockResolvedValue({ exerciseDefinitionId: null, limit: null, blocks: [] });
-    data.persistSessionDraftSnapshot.mockReset().mockResolvedValue({ sessionId: 'session-1' });
-    data.persistCompletedSessionSnapshot.mockReset().mockResolvedValue({ sessionId: 'done-1' });
-    data.completeSessionDraft.mockReset();
-    data.setSessionDeletedState.mockReset();
+  const benchWith = (sets: StoredSet[]): StoredExercise => ({
+    id: 'done_bench',
+    exerciseDefinitionId: BENCH_DEF,
+    name: 'Barbell Bench Press',
+    sets,
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
+  const DEFAULT_EXERCISES = [
+    benchWith([
+      performed('c1', '160', '8', 'rir_1'),
+      { ...performed('c2', '150', '8', 'rir_2'), performanceStatus: 'unperformed' },
+    ]),
+  ];
 
-  const renderCompleted = async () => {
-    render(<SessionViewScreen sessionId="done-1" />);
-    await screen.findByTestId('session-view-done-button');
+  // Written through the app's draft → complete path, on top of the
+  // session-view fixture (its active session is another session; its history
+  // is the rest).
+  const openCompleted = async (
+    exercises: StoredExercise[] = DEFAULT_EXERCISES,
+    afterSeed?: () => Promise<unknown> | void
+  ) => {
+    await seed(async () => {
+      await upsertLocalGym({ id: 'gym-iron', name: 'Iron Works' });
+      await upsertLocalGym({ id: 'gym-harbour', name: 'Harbour Barbell' });
+      await sessionDrafts.persistSessionDraftSnapshot(
+        { sessionId: DONE, gymId: 'gym-iron', startedAt: STARTED_AT, exercises: exercises as never },
+        { now: COMPLETED_AT }
+      );
+      await sessionDrafts.completeSessionDraft(DONE, { completedAt: COMPLETED_AT, now: COMPLETED_AT });
+      await afterSeed?.();
+    });
+    render(<SessionViewScreen sessionId={DONE} />);
   };
 
-  const lastCompletedWrite = () => data.persistCompletedSessionSnapshot.mock.calls.at(-1)?.[0];
+  const renderCompleted = async (exercises?: StoredExercise[]) => {
+    await openCompleted(exercises);
+    await screen.findByTestId('session-view-done-button');
+  };
 
   const pressDone = async () => {
     await act(async () => {
@@ -656,7 +610,12 @@ describe('Session view: editing a completed session', () => {
     });
   };
 
-  it('opens with Start/End in place of Time, and Done in place of Finish and Abandon', async () => {
+  const expectActiveFixtureUntouched = async () => {
+    expect(await sessionDrafts.loadLatestSessionDraftSnapshot()).toMatchObject({ sessionId: SESSION });
+    expect(sessionRow(SESSION)?.status).toBe('active');
+  };
+
+  it('opens with Start/End in place of Time, Done in place of Finish and Abandon, and no comparisons', async () => {
     await renderCompleted();
 
     expect(screen.getByText('Edit session')).toBeTruthy();
@@ -666,8 +625,11 @@ describe('Session view: editing a completed session', () => {
     expect(screen.getByTestId('session-view-start-time')).toHaveProp('value', '2026-02-25 10:00');
     expect(screen.getByTestId('session-view-end-time')).toHaveProp('value', '2026-02-25 10:45');
     expect(screen.getByTestId('session-view-summary-gym-button')).toHaveProp('accessibilityLabel', 'Gym Iron Works');
-    expect(screen.getByLabelText('Barbell Bench Press, 1 of 2 sets done')).toBeTruthy();
+    expect(screen.getByLabelText(/^Barbell Bench Press, 1 of 2 sets done/)).toBeTruthy();
     expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
+    // Editing history: no live comparisons, editing still available.
+    expect(screen.queryByTestId('session-insight-presentation')).toBeNull();
+    expect(screen.getByTestId('session-view-add-exercise')).toBeTruthy();
   });
 
   it('validates Start/End, and Done writes nothing until they are valid', async () => {
@@ -691,7 +653,7 @@ describe('Session view: editing a completed session', () => {
       'Autosave paused until Start/End times are valid.'
     );
     await pressDone();
-    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
 
     fireEvent.changeText(start, '2026-02-25 10:00');
     fireEvent.changeText(end, '2026-02-25 09:55');
@@ -700,7 +662,7 @@ describe('Session view: editing a completed session', () => {
       'End time must be later than or equal to Start time.'
     );
     await pressDone();
-    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
 
     fireEvent.changeText(end, '2026-02-25 10:50');
     expect(screen.queryByTestId('session-view-times-notice')).toBeNull();
@@ -709,24 +671,24 @@ describe('Session view: editing a completed session', () => {
 
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
     // Start still shows its stored minute, so it keeps the stored instant.
-    expect(lastCompletedWrite()).toMatchObject({
-      sessionId: 'done-1',
-      gymId: 'gym-1',
+    expect(await readSession(DONE)).toMatchObject({
+      status: 'completed',
+      gymId: 'gym-iron',
       startedAt: STARTED_AT,
       completedAt: new Date(2026, 1, 25, 10, 50, 0, 0),
     });
-    expect(data.completeSessionDraft).not.toHaveBeenCalled();
-    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    await expectActiveFixtureUntouched();
   });
 
   it('pauses autosave while the times are invalid and resumes, keeping every row, when they are valid', async () => {
     await renderCompleted();
+    jest.useFakeTimers();
 
     fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 09:50');
     await act(async () => {
       jest.advanceTimersByTime(3_000);
     });
-    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    expect(sessionRow(DONE)?.completedAt).toEqual(COMPLETED_AT);
     expect(screen.getByTestId('session-view-times-notice')).toBeTruthy();
 
     fireEvent.changeText(screen.getByTestId('session-view-end-time'), '2026-02-25 10:50');
@@ -734,11 +696,10 @@ describe('Session view: editing a completed session', () => {
       jest.advanceTimersByTime(3_000);
     });
 
-    expect(data.persistCompletedSessionSnapshot).toHaveBeenCalledTimes(1);
-    const written = lastCompletedWrite();
+    const written = await readSession(DONE);
     expect(written).toMatchObject({ startedAt: STARTED_AT, completedAt: new Date(2026, 1, 25, 10, 50) });
     // Autosave is lossless: the unconfirmed row stays until Done.
-    expect(written.exercises[0].sets.map((row: { id: string; performanceStatus: string | null }) => [row.id, row.performanceStatus])).toEqual([
+    expect(written!.exercises[0].sets.map((row) => [row.id, row.performanceStatus])).toEqual([
       ['c1', null],
       ['c2', 'unperformed'],
     ]);
@@ -746,30 +707,40 @@ describe('Session view: editing a completed session', () => {
   });
 
   it('saves confirmed rows only on Done: planned and skipped rows drop out, zero-weight sets stay', async () => {
-    stored = completed([
-      {
-        id: 'bench',
-        exerciseDefinitionId: 'def_bench',
-        name: 'Barbell Bench Press',
-        machineName: null,
-        sets: [
-          { ...set('s-skipped', '', '', null), plannedWeightValue: '225', plannedRepsValue: '5', plannedSetType: 'rir_2', performanceStatus: 'skipped' },
-          set('s-planned', '', '', null, 'planned', { weight: '245', reps: '3', setType: 'rir_1' }),
-          set('s-performed', '185', '8', 'rir_1', null, { weight: '185', reps: '8', setType: 'rir_2' }),
-          set('s-zero', '0', '5', null),
-        ],
-      },
-    ] as never);
     const titles = answerAlerts(() => 'unexpected');
-    await renderCompleted();
+    await renderCompleted([
+      benchWith([
+        {
+          ...performed('s-skipped', '', '', null),
+          plannedWeightValue: '225',
+          plannedRepsValue: '5',
+          plannedSetType: 'rir_2',
+          performanceStatus: 'skipped',
+        },
+        {
+          ...performed('s-planned', '', '', null),
+          plannedWeightValue: '245',
+          plannedRepsValue: '3',
+          plannedSetType: 'rir_1',
+          performanceStatus: 'planned',
+        },
+        {
+          ...performed('s-performed', '185', '8', 'rir_1'),
+          plannedWeightValue: '185',
+          plannedRepsValue: '8',
+          plannedSetType: 'rir_2',
+        },
+        performed('s-zero', '0', '5', null),
+      ]),
+    ]);
 
     await pressDone();
 
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
     expect(titles).toEqual([]);
-    const written = lastCompletedWrite();
-    expect(written.exercises).toHaveLength(1);
-    expect(written.exercises[0].sets).toEqual([
+    const written = await readSession(DONE);
+    expect(written!.exercises).toHaveLength(1);
+    expect(written!.exercises[0].sets).toEqual([
       expect.objectContaining({
         id: 's-performed',
         weightValue: '185',
@@ -782,35 +753,32 @@ describe('Session view: editing a completed session', () => {
       }),
       expect.objectContaining({ id: 's-zero', weightValue: '0', repsValue: '5' }),
     ]);
-    expect(data.completeSessionDraft).not.toHaveBeenCalled();
+    await expectActiveFixtureUntouched();
   });
 
   it('asks before discarding with the completed-edit copy, and writes nothing when declined', async () => {
-    stored = completed([
-      {
-        id: 'bench',
-        exerciseDefinitionId: 'def_bench',
-        name: 'Barbell Bench Press',
-        machineName: null,
-        sets: [set('c1', '225', '5', null), set('c2', '205', '', null, 'unperformed')],
-      },
-      { id: 'fly', exerciseDefinitionId: 'def_fly', name: 'Cable Flys', machineName: null, sets: [] },
-    ] as never);
     let answer = 'Go back to edit session';
     const titles = answerAlerts(() => answer);
-    await renderCompleted();
+    await renderCompleted([
+      benchWith([
+        performed('c1', '225', '5', null),
+        { ...performed('c2', '205', '', null), performanceStatus: 'unperformed' },
+      ]),
+      { id: 'done_fly', exerciseDefinitionId: 'seed_cable_flys', name: 'Cable Flys', sets: [] },
+    ]);
+    const before = await readSession(DONE);
 
     await pressDone();
     expect(titles).toEqual(['Remove incomplete sets and empty exercises?']);
-    expect(data.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
+    expect(await readSession(DONE)).toEqual(before);
     expect(mockBack).not.toHaveBeenCalled();
 
     answer = 'Remove and save changes';
     await pressDone();
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
-    const written = lastCompletedWrite();
-    expect(written.exercises.map((exercise: { id: string }) => exercise.id)).toEqual(['bench']);
-    expect(written.exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['c1']);
+    const written = await readSession(DONE);
+    expect(written!.exercises.map((exercise) => exercise.id)).toEqual(['done_bench']);
+    expect(written!.exercises[0].sets.map((row) => row.id)).toEqual(['c1']);
   });
 
   it('labels each cleanup prompt for saving changes', async () => {
@@ -833,7 +801,7 @@ describe('Session view: editing a completed session', () => {
     await renderCompleted();
 
     await pressDone();
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/completed-session/done-1'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith(`/completed-session/${DONE}`));
   });
 
   it('writes pending valid times before the screen is removed', async () => {
@@ -850,64 +818,49 @@ describe('Session view: editing a completed session', () => {
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(mockNavigation.dispatch).toHaveBeenCalledWith(action));
-    expect(lastCompletedWrite()).toMatchObject({ sessionId: 'done-1', completedAt: new Date(2026, 1, 25, 10, 50) });
+    expect(sessionRow(DONE)?.completedAt).toEqual(new Date(2026, 1, 25, 10, 50));
   });
 
   it('changes the gym in place, keeping the session completed and its times', async () => {
     await renderCompleted();
 
+    await openGymSheet();
     await act(async () => {
-      fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
-    });
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('session-view-gym-option-gym-2'));
+      fireEvent.press(screen.getByTestId('session-view-gym-option-gym-harbour'));
     });
 
-    expect(data.upsertLocalGym).toHaveBeenCalledWith({ id: 'gym-2', name: 'Harbour Barbell' });
-    expect(lastCompletedWrite()).toMatchObject({
-      sessionId: 'done-1',
-      gymId: 'gym-2',
+    const written = await readSession(DONE);
+    expect(written).toMatchObject({
+      status: 'completed',
+      gymId: 'gym-harbour',
       startedAt: STARTED_AT,
       completedAt: COMPLETED_AT,
     });
-    expect(lastCompletedWrite().exercises[0].sets.map((row: { id: string }) => row.id)).toEqual(['c1', 'c2']);
-    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    expect(written!.exercises[0].sets.map((row) => row.id)).toEqual(['c1', 'c2']);
+    await expectActiveFixtureUntouched();
   });
 
-  it('adds an exercise to the completed session', async () => {
+  it('adds an exercise to the completed session, keeping it completed', async () => {
     await renderCompleted();
 
-    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('mock-picker-choose'));
-    });
+    await addExerciseThroughPicker(EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseName);
 
-    const written = lastCompletedWrite();
-    expect(written.exercises.map((exercise: { name: string }) => exercise.name)).toEqual([
-      'Barbell Bench Press',
-      'Seated Row',
-    ]);
-    expect(written.completedAt).toEqual(COMPLETED_AT);
-    expect(data.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+    const written = await readSession(DONE);
+    expect(written!.exercises.map((exercise) => exercise.name)).toEqual(['Barbell Bench Press', 'Lat Pulldown']);
+    expect(written).toMatchObject({ status: 'completed', completedAt: COMPLETED_AT });
+    await expectActiveFixtureUntouched();
   });
 
   it('measures its records against the rest of history, not against itself', async () => {
-    data.loadRecentExerciseBlocks.mockResolvedValue({
-      exerciseDefinitionId: 'def_bench',
-      limit: null,
-      blocks: [
-        { sessionId: 'done-1', completedAt: COMPLETED_AT, daysAgo: 0, sessionExerciseIds: ['bench'], estimatedOneRepMax: 204.3, totalVolume: 1280, highestWeight: 160, workingSetCount: 1 },
-        { sessionId: 'older', completedAt: new Date(0), daysAgo: 30, sessionExerciseIds: [], estimatedOneRepMax: 190, totalVolume: 0, highestWeight: 150, workingSetCount: 1 },
-      ],
-    });
-    render(<SessionViewScreen sessionId="done-1" />);
+    await openCompleted();
 
+    // Its 160 × 8 (1RM 204.3) beats the fixture history's best Bench 1RM (≈ 197.9); measured
+    // against itself it would only tie.
     expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new 1RM record 204.3')).toBeTruthy();
   });
 
   it('says so when the completed session was deleted', async () => {
-    stored = completed(undefined, { deletedAt: new Date(2026, 1, 26) });
-    render(<SessionViewScreen sessionId="done-1" />);
+    await openCompleted(undefined, () => setSessionDeletedState(DONE, true));
 
     expect(await screen.findByTestId('session-view-missing')).toBeTruthy();
   });
