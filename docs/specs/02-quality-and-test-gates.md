@@ -132,7 +132,7 @@ get from `./boga timings` or a run.
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.7m |
 | ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.1m |
-| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~5.3m |
+| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~1.9m |
 
 † All-machine median of the recorded green runs in the generating machine's timing store (`~/.config/boga/timings/records/`); `N/A` = no measured data yet, **not** "instant" — run the lane to record it. Per-machine numbers: `./boga timings`.
 <!-- /boga:gen:lane-matrix -->
