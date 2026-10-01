@@ -20,6 +20,7 @@ else is Jest, screens over real data (spec 06, "Jest test shapes").
 | #424 | Exercise history, picker and catalogue link menu on real data: the history route on the `exercise-block-history` fixture (period, current-gym preference, bests, navigation; shell tests keep tag/banner/styling rules real data cannot reach); the picker on a catalogue written through its own repository, real suggested plans, real link writes, and the real linking hook with only the group server reads faked; the link menu on the starter catalogue. 3 history shell tests retired that real data now covers. |
 | #425 | Sessions, Train, Today and Gyms on real data: each route runs its default session-list client, the shared session-entry coordinator and the local-gyms repository over the in-memory DB (`session-view` fixture or drafts written through the app); injected only: the group stream and plan on Today/Train (no local source), the GPS read on Gyms, and named pending/failed/race states. `gym-directory.test.ts` retired (3 tests, mocked data layer). |
 | #426 | Settings and root layout on real data: dev reset, local wipe and remote-then-local wipe read back from the DB (`settings-dev-wipe.test.tsx`, the two dev-reset tests moved there from `settings-profile-navigation`); profile/onboarding drop their `@/src/data` stubs (their data is the server profile, faked at that boundary); the root layout boots the real data layer and catalog, keeping only native/sync wiring mocked. Remaining screen-test conversions: none in this target list (groups suites already real). |
+| this PR | `ios-ui-regression` trimmed to device claims (queue 1, 5 part): stats = seeded on-device render + history sheet/backdrop; completion = completed `Edit` → exercise page keyboard edit → `Done` read-back, and the native share sheet; catalogue = editor sheet create + swap-sheet selection with the keyboard up, `stopApp` relaunch removed; settings = header, date-format claim dropped. Headers on all four. Dropped captures marked `(ad hoc)` in the design-target records (operator decision); `heatmap-date-keys.js` deleted (unused). |
 
 ## Queue
 
@@ -29,18 +30,17 @@ include one run of the named lane on the Mac (green, and its new time from
 
 | # | Where | Task | Done when |
 | --- | --- | --- | --- |
-| 1 | mac | **Trim `stats-screen-ux.yaml`** to its device claim (harness seeds on-device SQLite and Stats renders it, appendix claim 0) plus the overlay taps that need real gestures, if any; add the `Proves / Why device / Jest counterpart` header. Claims 1–13 are covered by `stats-screen.test.tsx` + `stats-screen-local-data.test.tsx` (the latter also asserts the two overlay titles the appendix flags, `Weekly training load` and `Last 12 months`). | `ios-ui-regression` green on the Mac, new time recorded. |
-| 5 | mac | **Trim session-completion, exercise-catalogue, exercise-page flows** to their D claims + headers, after 2–4. | `ios-ui-regression` and `ios-exercise-page` green, times recorded. |
+| 5 | mac | **Trim the exercise-page flow** to its D claims + header (session-completion and exercise-catalogue done). | `ios-exercise-page` green, time recorded. |
 | 6 | mac | **Remove the 16 optional `Open`/`Continue`/`Close` taps** (appendix, "Rule-4 violations"). Check each against a real run first: `data-runtime-smoke`'s header says a fresh install can show the onboarding sheet. | The four affected lanes green, times recorded. |
 | 7 | mac | **Fold `session-view-abandon` into `session-view`** (its one claim is Jest-covered by `session-view-screen.test.tsx` "abandons only after the destructive confirmation") or drop it. | `ios-session-view` green. |
 | 8 | mac | **Merge `groups-link-exercise` into `groups-two-user-stream`** (step 4b already links on device). | `ios-groups-e2e` green. |
 | 9 | done | **Bodyweight.** Operator decision (2026-10-01): no claim needs a device, so delete the lane and drop its captures (no standing visual-review consumer). All 6 claims ported to Jest over real data; the weight sheet's keyboard entry stays on device in `ios-sync-e2e`. Timing anomaly: the 2 recorded runs were 19.5m/20.0m, a fresh run on 2026-10-01 took 1.2m (flow 39s). | Done (this PR). |
-| 10 | mac | **Sync e2e B4** (second logged workout) looks redundant with B3; confirm its intent with the operator before cutting. | Decision, then `ios-sync-e2e` green. |
+| 10 | mac | **Sync e2e B4**: operator decision (2026-10-01) — keep the 82 kg reading save (D2 needs both readings), cut the second workout and the index-1 session check. | `ios-sync-e2e` green. |
 | 11 | any | **Headers** for every remaining flow (appendix, "Headers that do not state what the flow proves"); can ride along with 1, 5–8. | Every flow has the three-part header. |
 
-Screenshots: porting a claim drops its capture unless a device run still takes
-it. Before cutting captures, check `docs/specs/ui/ai-design-policy.md` for any
-still used as accepted-target comparison input (bodyweight's are).
+Screenshots (operator decision, 2026-10-01): a capture goes with its claim.
+Each design-target States table marks a state no lane captures any more as
+`(ad hoc)`, to be captured with a one-off flow run when the screen changes.
 
 # Appendix: audit (2026-09-30)
 

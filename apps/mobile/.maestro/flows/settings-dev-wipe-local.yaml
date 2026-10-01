@@ -1,18 +1,28 @@
 appId: com.dinoderek.mobile
 ---
-# Developer-only "Wipe local & re-bootstrap" affordance on the Settings screen.
+# Developer "Wipe local & re-bootstrap" on Settings (ios-ui-regression lane,
+# infra-free).
 #
-# The dev-tools card is gated on the cross-build developer signal, which is true
-# in the Metro dev-client build this harness installs. The card is therefore
-# present here and absent in a release build. This flow asserts the card and its
-# wipe-local button render, drives the wipe, asserts the success feedback, and
-# confirms the app re-bootstraps back to a usable data screen afterward (the
-# wipe drops the local database and re-runs the boot data layer; sync then
-# re-pulls server state).
+# Proves:
+#   1. More → Settings is reachable from the tab shell;
+#   2. the developer-tools card renders on the dev-client build;
+#   3. Wipe local drops the device's database and re-bootstraps it, with the
+#      success feedback;
+#   4. Developer tools → Logs pushes the logs viewer, and the native back
+#      returns to Settings;
+#   5. after the wipe, a data screen still renders against the fresh store.
+# Why device:
+#   1. tab and stack navigation, with a scroll past the minimised tab bar;
+#   2. the real developer-mode gate of the installed build;
+#   3. and 5. the on-device expo-sqlite reset and boot data layer;
+#   4. a stack push and the native back button.
+# Jest counterpart: app/__tests__/settings-dev-wipe.test.tsx (card gating,
+#   wipe feedback), app/__tests__/dev-affordances.test.ts,
+#   app/__tests__/settings-profile-navigation.test.tsx (date format),
+#   app/__tests__/more-screen.test.tsx (the logs push).
 #
-# Runs in the infra-free harness lane: the maestro-harness deep link teleports
-# straight to a data screen without a sign-in, the same as the smoke/data-smoke
-# flows.
+# The maestro-harness deep link teleports straight to a data screen without a
+# sign-in.
 
 # Reset the local data layer to a known clean state and land on the tabbed shell.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
@@ -47,17 +57,6 @@ appId: com.dinoderek.mobile
     id: "more-settings-row"
 - assertVisible:
     id: "settings-screen"
-# Preferences: the date format is a segmented control (DLM-T04 gallery state).
-- scrollUntilVisible:
-    element:
-      id: "settings-date-format-row"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-    timeout: 30000
-- assertVisible:
-    id: "settings-date-format-row"
-- takeScreenshot: "settings-preferences"
 # Developer tools is the LAST section of Settings, below Account / AI coaching /
 # Preferences / Data & sync / About. iOS exposes only the rendered slice of a
 # ScrollView to the accessibility hierarchy, so the card is absent from the tree
