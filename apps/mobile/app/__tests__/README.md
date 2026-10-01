@@ -108,7 +108,7 @@ conversion plus retained row IDs, clocks, readings, history and contributions;
 superseded storage columns disappear. Reading
 mutations must recalculate consumers without modifying sessions or sets. Sync
 must cover LWW/reinstall, the private preference and post-commit invalidation.
-UI tests must cover
+UI tests (`bodyweight-screen.test.tsx`, over real data) must cover
 kg entry/history, validation and failed-write input retention; no session surface
 may render a reading, prompt or history action.
 
@@ -120,10 +120,12 @@ total/per-side math; blank/zero; personal missing-reading fallback; strict group
 missing-reading omission; invalid/overflow values; Wathan projection; and zero
 record/ranking exclusion. No test may infer contribution from an exercise name.
 
-`bodyweight-logging-ui.test.tsx` must cover one kg Weight field, numeric-zero display,
-conditional contribution, repeated off/on persistence and ordinary Weight/1RM/
-Volume copy. It must assert absence of unit selectors, calculation-only fields
-and session prompts.
+`bodyweight-logging-ui.test.tsx` renders the exercise page and session view over
+real data (the `bodyweight-rm-volume` fixture). It must cover one kg Weight field,
+numeric-zero display, repeated off/on persistence, silent recalculation when a
+reading changes and ordinary Weight/1RM/Volume copy. It must assert absence of unit
+selectors, calculation-only fields and session prompts. The editor's conditional
+contribution field is covered in `exercise-catalog-screen.test.tsx`.
 
 ## Personal bodyweight analytics coverage
 

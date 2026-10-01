@@ -29,7 +29,9 @@ tap.
 
 ## 2. Colour roles
 
-Semantic roles, not a palette. A screen names the role, never the hex.
+Semantic roles, not a palette. A screen names the role, never the hex. The
+values are generated from four seed colours ("Derivation" below), so the table
+shows the shipped theme.
 
 | Role | Value | Use |
 | --- | --- | --- |
@@ -37,14 +39,14 @@ Semantic roles, not a palette. A screen names the role, never the hex.
 | `ink-muted` | `#6B6358` | secondary text |
 | `ink-faint` | `#9B948A` | mini legends, tertiary labels, not-yet-realised values |
 | `ink-ghost` | `#BAB2A7` | legends of not-yet-realised values, absent values, placeholders, disabled controls |
-| `paper` | `#F6F4EF` | page ground; a pressed control and an action strip inside a card |
+| `paper` | `#F7F4EF` | page ground; a pressed control and an action strip inside a card |
 | `surface` | `#FFFFFF` | cards, sheets, inputs |
-| `rule` | `#E2DCD0` | card borders, control borders, sheet handle |
-| `rule-soft` | `#EFEAE0` | dividers inside a card or panel |
+| `rule` | `#E4DBD0` | card borders, control borders, sheet handle |
+| `rule-soft` | `#F0E9E0` | dividers inside a card or panel |
 | `accent` | `#C2410C` | the one primary action on a screen |
-| `accent-wash` | `#FFF4EF` | the row or field being edited (`accent`'s hue at L* 97) |
+| `accent-wash` | `#FFF4F0` | the row or field being edited (`accent`'s hue at L* 97) |
 | `record` | `#8A6516` | an all-time best value |
-| `record-wash` / `record-rule` | `#FBF3E2` / `#EEDFBE` | a band announcing a record |
+| `record-wash` / `record-rule` | `#FEF2E2` / `#F3DDBE` | a band announcing a record |
 | `danger` | `#A4262C` | destructive actions only |
 | `scrim` | `rgba(27, 23, 18, 0.42)` | the dimmed backdrop behind a sheet (`ink` at 42%) |
 
@@ -83,6 +85,47 @@ Measured in CIE LCh:
 Gated by `ui-design-tokens.test.ts`: no two roles share a value, every neutral
 sits within hue 75–95 at chroma ≤ 10, and `accent-wash` stays within 10° of
 `accent`'s hue.
+
+### Derivation: four seeds
+
+**Decided 2026-10-01.** The roles are generated, not hand-picked:
+`generateRoles(seeds)` in `apps/mobile/components/ui/theme.ts` turns four seed
+colours into every role, and `uiRoles` is the shipped seeds generated. A theme
+is four colours.
+
+| Seed | Shipped | Generates |
+| --- | --- | --- |
+| `ground` | `#6B6358` | every neutral — `ink`, `ink-muted`, `ink-faint`, `ink-ghost`, `paper`, `rule`, `rule-soft`, `viz0` |
+| `accent` | `#C2410C` | `accent` (as given), `accent-wash` |
+| `record` | `#8A6516` | `record` (as given), `record-wash`, `record-rule` |
+| `viz` | `#A4866B` | `viz1`…`viz4` |
+
+`surface` (white), `danger` and `scrim` (`ink` at 42%) are the same in every
+theme.
+
+- **A seed sets hue and chroma; the role sets lightness.** Each generated role
+  sits at its own fixed L* — the L* it was picked at — on its seed's hue, with
+  the seed's chroma scaled by a per-role factor. Contrast depends on lightness,
+  so the text floors hold whatever the seed.
+- **`accent` and `record` are used as given**, so their own floors (`record`
+  ≥ 4.5:1 on `paper`, a different hue from `accent`) are the seed's to meet.
+- **Out-of-gamut steps lose chroma**, keeping lightness and hue.
+- **Light only.** The lightness ladder is a light ground; a dark theme would be
+  a second ladder, not different seeds.
+
+The shipped seeds reproduce the 2026-09-27 palette within ΔE*ab 3 (a
+just-noticeable difference side by side is ~2.3): 13 of 19 roles exactly.
+`paper`, `rule`, `rule-soft` and `accent-wash` moved by ΔE ≤ 1, because the
+picked grounds sat at hue 90–94 against the ground seed's 81. `record-wash` and
+`record-rule` moved most, by ≤ 3: they were picked at hue 90 against `record`'s
+81.
+
+Gated by `apps/mobile/app/__tests__/ui-theme.test.ts`: `uiRoles` equals the
+shipped seeds generated, every role stays within ΔE*ab 3 of the picked palette,
+and for three seed sets no theme ships (a slate, a forest, a plum) the rules
+above still hold — distinct values, the neutrals in a fixed lightness order on
+the ground's hue, `ink` and `ink-muted` ≥ 4.5:1 on both grounds, `ink` legible
+on the ramp, even ramp steps, and each wash tinted from its own role.
 
 ### Data visualisation
 
