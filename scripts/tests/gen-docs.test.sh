@@ -41,6 +41,22 @@ grep -q "gen-docs-plan-ref-probe.txt:1: references plan file" <<<"${out}" \
   || fail "plan-reference failure must name the file and line: ${out}"
 rm -f "${PROBE}"
 
+# Merge-conflict markers fail the check wherever they are; a lone `=======`
+# (Markdown setext underline) passes. Markers are built at runtime so this
+# test file itself holds none.
+LT="$(printf '<%.0s' 1 2 3 4 5 6 7)"; GT="$(printf '>%.0s' 1 2 3 4 5 6 7)"
+printf 'Title\n=======\n' > "${PROBE}"
+"${GD}" check >/dev/null 2>&1 || fail "a lone ======= line must pass"
+printf 'a\n%s HEAD\nours\n=======\ntheirs\n%s branch\n' "${LT}" "${GT}" > "${PROBE}"
+if out="$("${GD}" check 2>&1)"; then
+  fail "a committed conflict marker must fail the check"
+fi
+grep -q "gen-docs-plan-ref-probe.txt:2: merge-conflict marker" <<<"${out}" \
+  || fail "conflict-marker failure must name the file and opening line: ${out}"
+grep -q "gen-docs-plan-ref-probe.txt:6: merge-conflict marker" <<<"${out}" \
+  || fail "conflict-marker failure must name the closing line: ${out}"
+rm -f "${PROBE}"
+
 # gen must introduce no STRUCTURAL change on a current tree (lanes, gates, CI
 # flags) — only the median column may refresh, and that is ignored. Guard: only
 # run this half when the generated file is clean in git, so a developer's

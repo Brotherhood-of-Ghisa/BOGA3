@@ -20,6 +20,8 @@
 #      - every numbered spec carries the Owns/Not here/Load when header,
 #      - no file outside docs/plans/** and docs/brainstorms/** references a
 #        plan file (plans are ephemeral; AGENTS.md "Planning").
+#      - no tracked or new text file holds a merge-conflict marker line
+#        (`<<<<<<< `, `||||||| `, `>>>>>>> `).
 
 set -euo pipefail
 
@@ -221,16 +223,25 @@ try:
         capture_output=True, check=True).stdout.decode().split("\0")
 except (OSError, subprocess.CalledProcessError) as exc:
     listed = []
-    problems.append(f"plan-reference check needs a git work tree ({exc})")
+    problems.append(f"plan-reference and conflict-marker checks need a git work tree ({exc})")
+# 5. no merge-conflict markers in any tracked or new text file, plans
+#    included. `=======` alone is not flagged: it is also a valid Markdown
+#    setext underline, and a real conflict always carries the open/close pair.
+CONFLICT = re.compile(r"^(?:<{7}|\|{7}|>{7})(?: |$)", re.M)
 for rel in listed:
-    if not rel or rel.startswith(("docs/plans/", "docs/brainstorms/")):
+    if not rel:
         continue
     path = os.path.join(root, rel)
-    if os.path.islink(path) or not os.path.isfile(path) or os.path.getsize(path) > 2_000_000:
+    if os.path.islink(path) or not os.path.isfile(path):
         continue
     try:
         text = open(path, encoding="utf-8").read()
     except (UnicodeDecodeError, OSError):
+        continue
+    for m in CONFLICT.finditer(text):
+        ln = text.count("\n", 0, m.start()) + 1
+        problems.append(f"{rel}:{ln}: merge-conflict marker '{m.group(0).strip()}' — resolve the conflict")
+    if rel.startswith(("docs/plans/", "docs/brainstorms/")) or os.path.getsize(path) > 2_000_000:
         continue
     if "plans/" not in text:
         continue
