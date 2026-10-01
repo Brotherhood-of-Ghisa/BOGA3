@@ -48,7 +48,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/ui/tokens.ts`
 - Purpose:
   - the app's one styling vocabulary: `uiRoles` (colour roles, including the
-    `viz0`…`viz4` data-visualisation ramp), `uiFonts` (the three embedded
+    `viz0`…`viz4` data-visualisation ramp, generated from four seeds by
+    `generateRoles` in `components/ui/theme.ts`), `uiFonts` (the three embedded
     typefaces and their shipped weights), `uiGeometry` (card / sheet / control /
     pill radii, the 44pt tap target, the 38pt metric column, the sheet handle,
     the 50pt labelled-field height, micro-label tracking), `uiSpace` (6 spacing

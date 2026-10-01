@@ -424,7 +424,8 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
 (`ui/design-language.md`); every screen uses it:
 
 - **`uiRoles`** — the colour roles of `ui/design-language.md` §2, including the
-  data-visualisation ramp `viz0`…`viz4`.
+  data-visualisation ramp `viz0`…`viz4`, generated from four seed colours by
+  `generateRoles` (`components/ui/theme.ts`; §2 "Derivation").
 - **`uiFonts`** — the three embedded typefaces of `ui/design-language.md` §3
   and the weights of each that ship.
 - **`uiGeometry`** — the radii (`card 6 · sheet 16 · control 4 · pill 999`),

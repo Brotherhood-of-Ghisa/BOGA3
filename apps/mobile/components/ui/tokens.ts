@@ -1,53 +1,10 @@
+import { defaultThemeSeeds, generateRoles } from '@/components/ui/theme';
+
 // The colour roles (`docs/specs/ui/design-language.md` §2). A screen names the
-// role, never the hex. One value per role: two roles that cannot be told apart
-// are one role, and the neutrals share one warm hue (rationalised 2026-09-27;
-// gated by `ui-design-tokens.test.ts`).
-export const uiRoles = {
-  // Text and realised values. A warm near-black, on the neutrals' hue.
-  ink: '#1B1712',
-  inkMuted: '#6B6358',
-  // Mini legends, tertiary labels, and not-yet-realised values.
-  inkFaint: '#9B948A',
-  // The faintest ink: legends of not-yet-realised values (the values
-  // themselves use `inkFaint`, `design-language.md` §6), absent values,
-  // placeholders and disabled controls.
-  inkGhost: '#BAB2A7',
-  // Grounds. `paper` is the page, and also a pressed control and an action
-  // strip inside a `surface` card.
-  paper: '#F6F4EF',
-  surface: '#FFFFFF',
-  // Hairlines. Depth is a rule plus a ground change — never a shadow. `rule`
-  // borders cards and controls and draws the sheet handle; `ruleSoft` divides
-  // rows inside a card or panel.
-  rule: '#E2DCD0',
-  ruleSoft: '#EFEAE0',
-  // The one primary action on a screen, and the row or field being edited.
-  accent: '#C2410C',
-  // `accent`'s hue at L* 97: a tint of the accent, not a neutral.
-  accentWash: '#FFF4EF',
-  // An all-time best, and the band that announces one. Brass, deliberately a
-  // different hue from `accent` (41° vs 17°) so "your best ever" and "the
-  // button that commits" do not read as the same mark. Decided 2026-09-22.
-  record: '#8A6516',
-  recordWash: '#FBF3E2',
-  recordRule: '#EEDFBE',
-  // Destructive actions only.
-  danger: '#A4262C',
-  // Data visualisation: one sequential ramp, one meaning ("more"). `viz0` is
-  // empty / rest; `viz1`…`viz4` darken in even lightness steps (L* 94, 87, 78,
-  // 68, 58) in a bronze taupe that is neither `accent` nor `record`. Text on a
-  // `viz` ground is `ink`: `ink-muted` and `ink-faint` fail from `viz2` up.
-  // Picked on device 2026-09-25 (DLM-T08, "B2"); gated by
-  // `ui-design-tokens.test.ts`.
-  viz0: '#F0ECE7',
-  viz1: '#E7D7CA',
-  viz2: '#D3BDAB',
-  viz3: '#BCA18A',
-  viz4: '#A4866B',
-  // The dimmed backdrop behind a sheet: `ink` at 42%, so the page behind reads
-  // as the same warm ground gone dark rather than as a neutral grey.
-  scrim: 'rgba(27, 23, 18, 0.42)',
-} as const;
+// role, never the hex. They are generated from four seed colours
+// (`components/ui/theme.ts`, §2 "Derivation"); what each role is for is on
+// `UiRoles`.
+export const uiRoles = generateRoles(defaultThemeSeeds);
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
 // widths and label tracking the accepted target is drawn with. Decided
