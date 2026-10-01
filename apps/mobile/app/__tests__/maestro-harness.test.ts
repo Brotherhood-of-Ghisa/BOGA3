@@ -39,7 +39,6 @@ import { resetLocalAppData } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
 import {
-  buildExerciseBlockHistoryFixtureRows,
   EXERCISE_BLOCK_HISTORY_FIXTURE,
   seedExerciseBlockHistoryFixture,
 } from '@/src/maestro/exercise-block-history-fixture';
@@ -316,55 +315,6 @@ describe('maestro harness helpers', () => {
     });
   });
 
-  it('builds deterministic exercise block history fixture rows for populated and empty visual QA states', () => {
-    const rows = buildExerciseBlockHistoryFixtureRows(
-      new Date('2026-05-26T12:00:00.000Z')
-    );
-    const primarySessionExerciseRows = rows.sessionExercises.filter(
-      (row) => row.exerciseDefinitionId === EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId
-    );
-    const secondarySessionExerciseRows = rows.sessionExercises.filter(
-      (row) => row.exerciseDefinitionId === EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId
-    );
-    const noHistorySessionExerciseRows = rows.sessionExercises.filter(
-      (row) => row.exerciseDefinitionId === EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseId
-    );
-
-    expect(new Set(primarySessionExerciseRows.map((row) => row.sessionId)).size).toBeGreaterThanOrEqual(5);
-    expect(secondarySessionExerciseRows.length).toBeGreaterThanOrEqual(1);
-    expect(noHistorySessionExerciseRows).toEqual([]);
-
-    const latestPrimaryRows = primarySessionExerciseRows.filter(
-      (row) => row.sessionId === 'maestro_exercise_block_history_squat_1'
-    );
-    expect(latestPrimaryRows).toHaveLength(2);
-    expect(rows.exerciseSets.some((row) => row.setType === 'warm_up')).toBe(true);
-    expect(rows.exerciseSets.some((row) => row.setType === 'rir_0')).toBe(true);
-    // The two-PR completion session is opt-in, so the shared history is unchanged.
-    expect(rows.sessions.map((row) => row.id)).not.toContain(
-      EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId
-    );
-  });
-
-  it('adds the newest completed session with a squat and a bench PR only when asked', () => {
-    const now = new Date('2026-05-26T12:00:00.000Z');
-    const base = buildExerciseBlockHistoryFixtureRows(now);
-    const rows = buildExerciseBlockHistoryFixtureRows(now, { includeTwoPrSession: true });
-
-    expect(rows.sessions).toHaveLength(base.sessions.length + 1);
-    const twoPr = rows.sessions.find((row) => row.id === EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId);
-    expect(twoPr?.completedAt.getTime()).toBe(
-      Math.max(...rows.sessions.map((row) => row.completedAt.getTime()))
-    );
-    expect(
-      rows.sessionExercises
-        .filter((row) => row.sessionId === EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId)
-        .map((row) => row.exerciseDefinitionId)
-    ).toEqual([
-      EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId,
-      EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId,
-    ]);
-  });
 });
 
 

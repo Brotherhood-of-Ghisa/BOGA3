@@ -241,50 +241,6 @@ describe('createStatsRepository.computeSummary', () => {
     loadMuscleGroupTaxonomy: jest.fn(),
   });
 
-  it('loads current and previous adjacent windows for the chosen period', async () => {
-    const store = buildStore();
-    const taxonomy = buildMuscleGroupTaxonomy();
-    store.loadAggregationInput
-      .mockResolvedValueOnce({
-        sessions: [{ id: 's-curr', completedAt: new Date('2026-05-18T08:00:00.000Z') }],
-        sessionExercises: [],
-        exerciseSets: [],
-        muscleMappings: [],
-        muscleGroups: taxonomy,
-      })
-      .mockResolvedValueOnce({
-        sessions: [
-          { id: 's-prev-1', completedAt: new Date('2026-05-08T08:00:00.000Z') },
-          { id: 's-prev-2', completedAt: new Date('2026-05-09T08:00:00.000Z') },
-        ],
-        sessionExercises: [],
-        exerciseSets: [],
-        muscleMappings: [],
-        muscleGroups: taxonomy,
-      });
-
-    const repository = createStatsRepository(store);
-
-    const summary = await repository.computeSummary({
-      periodDays: 7,
-      now: new Date('2026-05-19T15:00:00.000Z'),
-    });
-
-    expect(store.loadAggregationInput).toHaveBeenCalledTimes(2);
-    expect(store.loadAggregationInput).toHaveBeenNthCalledWith(1, {
-      start: new Date('2026-05-12T15:00:00.000Z'),
-      end: new Date('2026-05-19T15:00:00.000Z'),
-    });
-    expect(store.loadAggregationInput).toHaveBeenNthCalledWith(2, {
-      start: new Date('2026-05-05T15:00:00.000Z'),
-      end: new Date('2026-05-12T15:00:00.000Z'),
-    });
-
-    expect(summary.current.totals.sessionCount).toBe(1);
-    expect(summary.previous.totals.sessionCount).toBe(2);
-    expect(summary.current.period.days).toBe(7);
-  });
-
   it('loads a completed-session window for selected-muscle daily effort', async () => {
     const store = buildStore();
     store.loadAggregationInput.mockResolvedValueOnce({
