@@ -78,7 +78,7 @@
     "@types/jest": "29.5.14",
     "@types/pg": "^8.20.0",
     "@types/react": "~19.2.4",
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "12.3.0",
     "drizzle-kit": "^0.31.5",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",
