@@ -1,10 +1,20 @@
 /* eslint-disable import/first */
 
+/**
+ * The root layout's boot wiring: on mount it boots the local data layer, the
+ * auth state and the exercise catalog, starts the sync scheduler and its gate
+ * bridge, registers the background task, then nudges sync once boot settles.
+ *
+ * The data half runs for real: the local data layer and the catalog cache boot
+ * over the migrated in-memory SQLite fixture (helpers/local-data.ts). The rest
+ * is native or server wiring this suite only observes being called, so it is
+ * replaced: auth, the sync scheduler, the gate bridge, the background task,
+ * route access, the gesture root, the status bar and the navigator.
+ */
+
 import type { ReactNode } from 'react';
 
-const mockBootstrapLocalDataLayer = jest.fn();
 const mockBootstrapAuthState = jest.fn();
-const mockEnsureExerciseCatalogLoaded = jest.fn();
 const mockStartSyncScheduler = jest.fn();
 const mockStopSyncScheduler = jest.fn();
 const mockRequestSync = jest.fn();
@@ -14,9 +24,10 @@ const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => P
 const mockStackScreen = jest.fn();
 const mockStack = jest.fn();
 
-jest.mock('@/src/data', () => ({
-  bootstrapLocalDataLayer: (...args: unknown[]) => mockBootstrapLocalDataLayer(...args),
-}));
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 jest.mock('@/src/sync/scheduler', () => ({
   startSyncScheduler: (...args: unknown[]) => mockStartSyncScheduler(...args),
@@ -59,10 +70,6 @@ jest.mock('@/components/navigation/auth-route-guard', () => ({
   AuthRouteGuard: ({ children }: { children: ReactNode }) => children,
 }));
 
-jest.mock('@/src/exercise-catalog/cache', () => ({
-  ensureExerciseCatalogLoaded: (...args: unknown[]) => mockEnsureExerciseCatalogLoaded(...args),
-}));
-
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }));
@@ -103,16 +110,25 @@ jest.mock('expo-router', () => {
   };
 });
 
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 import RootLayout from '../_layout';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
+import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
 
 describe('RootLayout auth bootstrap wiring', () => {
+  afterEach(async () => {
+    // Let a boot still in flight settle before its database closes.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    closeLocalData();
+  });
+
   beforeEach(() => {
-    mockBootstrapLocalDataLayer.mockReset();
+    resetLocalData();
     mockBootstrapAuthState.mockReset();
-    mockEnsureExerciseCatalogLoaded.mockReset();
     mockStartSyncScheduler.mockReset();
     mockStopSyncScheduler.mockReset();
     mockRequestSync.mockReset();
@@ -121,19 +137,20 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockRegisterBackgroundSyncTask.mockReset();
     mockStackScreen.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
-    mockBootstrapLocalDataLayer.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
-    mockEnsureExerciseCatalogLoaded.mockResolvedValue(undefined);
   });
 
-  it('starts local data bootstrap and auth bootstrap on mount', async () => {
+  it('boots the local data layer, the exercise catalog and auth on mount', async () => {
     render(<RootLayout />);
 
+    // The data layer boots (the starter catalog seeded) and the catalog loads from it.
     await waitFor(() => {
-      expect(mockBootstrapLocalDataLayer).toHaveBeenCalledTimes(1);
+      expect(getExerciseCatalogSnapshot().status).toBe('ready');
     });
+    const seeded = localDataClient().prepare('SELECT COUNT(*) AS n FROM exercise_definitions').get() as { n: number };
+    expect(getExerciseCatalogSnapshot().exercises).toHaveLength(seeded.n);
+    expect(seeded.n).toBeGreaterThan(0);
     expect(mockBootstrapAuthState).toHaveBeenCalledTimes(1);
-    expect(mockEnsureExerciseCatalogLoaded).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('gesture-handler-root')).toBeTruthy();
     expect(screen.getByTestId('root-stack')).toBeTruthy();
     // Tab roots (incl. settings) live in the `(tabs)` group registered as a single screen
