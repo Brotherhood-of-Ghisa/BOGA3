@@ -6,6 +6,7 @@ import { isMetricStreamEvent, type CurrentGroupStreamItem as StreamItem, type Gr
 
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
+import { formatClockTime, formatLocalDateTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { computeGroupSessionMetrics } from './session-metrics';
 import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
@@ -96,25 +97,13 @@ export const formatMembershipSentence = (event: GroupMembershipEvent, username: 
   }
 };
 
-const pad2 = (value: number): string => `${value}`.padStart(2, '0');
+export { formatClockTime };
 
-/** Local wall-clock `HH:MM` (the offline marker's "last updated"). */
-export const formatClockTime = (epochMs: number): string => {
-  const date = new Date(epochMs);
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-};
-
-/** Local `M/D HH:MM`, the session list's start-time shape (stream cards). */
-export const formatStreamStartedAt = (epochMs: number): string => {
-  const date = new Date(epochMs);
-  return `${date.getMonth() + 1}/${date.getDate()} ${formatClockTime(epochMs)}`;
-};
+/** The session list's local `M/D HH:MM` start stamp, on stream cards. */
+export const formatStreamStartedAt = formatMonthDayTime;
 
 /** Local `YYYY-MM-DD HH:MM`, the View Session header shape (friend's session view). */
-export const formatGroupDateTime = (epochMs: number): string => {
-  const date = new Date(epochMs);
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${formatClockTime(epochMs)}`;
-};
+export const formatGroupDateTime = formatLocalDateTime;
 
 /** Contract §7 offline marker: "Offline · last updated HH:MM" ("Offline" with nothing cached). */
 export const formatOfflineMarker = (lastUpdatedAtMs: number | null): string =>

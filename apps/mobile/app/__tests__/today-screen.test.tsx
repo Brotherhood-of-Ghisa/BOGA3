@@ -114,12 +114,12 @@ const readyPlan = (materialize: () => Promise<{ sessionId: string }> = jest.fn(p
   materialize,
 });
 
-// A completed 1-hour session at Iron House, 09:00–10:00Z on `day`: two
-// exercises, six sets. UTC instants: the list label prints the stored ISO
-// clock time (`formatDateTimeStamp`), so this keeps it the same in every zone.
+// A completed 1-hour session at Iron House, 09:00–10:00 local time on `day`:
+// two exercises, six sets. Local instants: the list labels read the device
+// clock, so the expected stamps hold in every zone the suite runs in.
 const logSession = async (id: string, day: number) => {
-  const startedAt = new Date(Date.UTC(2026, 8, day, 9, 0));
-  const completedAt = new Date(Date.UTC(2026, 8, day, 10, 0));
+  const startedAt = new Date(2026, 8, day, 9, 0);
+  const completedAt = new Date(2026, 8, day, 10, 0);
   const sets = (exercise: string, count: number) =>
     Array.from({ length: count }, (_, index) => ({
       id: `${id}_${exercise}_${index + 1}`,
@@ -224,6 +224,7 @@ describe('Today: training over real data', () => {
       'Completed session on 9/16 10:00, 1h, 6 sets, 2 exercises, at Iron House',
     );
     expect(screen.getByTestId('today-recent-session-session-4').props.accessibilityLabel).not.toContain('session-4');
+    expect(screen.getByTestId('today-recent-session-summary-session-4-start')).toHaveTextContent('9/16 09:00');
 
     fireEvent.press(screen.getByTestId('today-recent-session-session-4'));
     fireEvent.press(screen.getByTestId('today-view-progress-button'));

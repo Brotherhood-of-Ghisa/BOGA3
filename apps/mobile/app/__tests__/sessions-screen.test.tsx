@@ -13,7 +13,7 @@
  * after unmount), driven through an injected client.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -39,7 +39,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import { completeSessionDraft, loadSessionSnapshotById } from '@/src/data/session-drafts';
+import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
@@ -228,6 +228,38 @@ describe('Sessions over real data', () => {
 
     fireEvent.press(screen.getByTestId('completed-session-menu-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('completed-session-edit-menu-action-button')).toBeNull();
+  });
+
+  it('stamps a row and its menu with the local start time, not the stored UTC clock', async () => {
+    // 23:45 local on 7/24: the stored ISO instant falls on another hour (and,
+    // west of UTC, another day) in every zone but UTC.
+    const lateId = 'sessions_local_time_late';
+    const startedAt = new Date(2026, 6, 24, 23, 45);
+    const completedAt = new Date(2026, 6, 25, 0, 45);
+    await openSessions(async () => {
+      await persistSessionDraftSnapshot(
+        {
+          sessionId: lateId,
+          gymId: null,
+          startedAt,
+          exercises: [
+            {
+              id: `${lateId}_bench`,
+              exerciseDefinitionId: 'seed_barbell_bench_press',
+              name: 'Barbell Bench Press',
+              sets: [{ id: `${lateId}_bench_1`, weightValue: '100', repsValue: '5', setType: 'rir_2', performanceStatus: null }],
+            },
+          ],
+        },
+        { now: completedAt }
+      );
+      await completeSessionDraft(lateId, { completedAt, now: completedAt });
+    });
+
+    expect(screen.getByTestId(`session-summary-${lateId}-start`)).toHaveTextContent('7/24 23:45');
+
+    fireEvent.press(screen.getByTestId(`completed-session-menu-button-${lateId}`));
+    expect(within(screen.getByTestId('completed-session-menu')).getByText('7/24 23:45')).toBeTruthy();
   });
 });
 
