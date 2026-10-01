@@ -154,6 +154,9 @@ Define the canonical repository structure, path ownership, and placement convent
   - canonical dev-mode guard for the mobile app.
   - returns `true` for Metro dev bundles (`__DEV__`) **and** for the `com.phano.boga3.dev` EAS build (TestFlight dev), so developer-only UI / escape hatches (e.g. the local-data reset on the Settings screen, the Maestro harness route) stay available on internal builds.
   - **Never use `__DEV__` directly** outside this file — production-bundled TestFlight builds set it to `false`, and a `no-restricted-syntax` ESLint rule will reject it. Import `isDevMode` from `@/src/utils/isDevMode` instead.
+- `apps/mobile/src/utils/local-time.ts`
+  - canonical wall-clock labels (`HH:MM`, `M/D HH:MM`, `YYYY-MM-DD HH:MM`) read in the device's time zone from a stored instant.
+  - stored timestamps (ISO strings, epoch ms) are UTC; never slice the clock out of an ISO string for display. Tests that assert a label build the instant from local fields (`new Date(y, m, d, h, min)`) so they hold in every `TZ`.
 - `e2e/` (reserved)
   - reserved for cross-stack orchestration/tests that span mobile + backend.
   - strategy may be documented before implementation exists.

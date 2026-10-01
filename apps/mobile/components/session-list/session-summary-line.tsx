@@ -1,15 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatCompactDuration, type SessionListItem } from './types';
 
+/** The session's local `M/D HH:MM` start stamp, from a stored ISO instant. */
 export function formatDateTimeStamp(isoTimestamp: string): string {
-  const [datePart, timePartWithZone = '00:00:00'] = isoTimestamp.split('T');
-  const [, month, day] = datePart.split('-');
-  const timePart = timePartWithZone.slice(0, 5);
-
-  return `${Number(month)}/${Number(day)} ${timePart}`;
+  return formatMonthDayTime(Date.parse(isoTimestamp));
 }
 
 export function formatSetCount(setCount: number): string {
