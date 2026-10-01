@@ -13,7 +13,12 @@ import {
   formatVolume,
   formatWeight,
 } from '@/src/session-recorder/exercise-page-model';
-import { formatDaysAgo, type RecordSet } from '@/src/session-recorder/exercise-records';
+import {
+  formatDaysAgo,
+  type ExerciseRecords,
+  type LastSession,
+  type RecordSet,
+} from '@/src/session-recorder/exercise-records';
 import type { ExerciseRecordsState } from '@/src/session-recorder/use-exercise-records';
 
 import { pageText } from './text-styles';
@@ -90,106 +95,121 @@ export function RecordsPanel({
   );
 }
 
+type CollapsedStatValues = { oneRepMax: string; maxWeight: string; volume: string; coverageNote?: string };
+
+const NO_STATS: CollapsedStatValues = { oneRepMax: DASH, maxWeight: DASH, volume: DASH };
+
+const orDash = <T,>(value: T | null | undefined, format: (value: T) => string): string =>
+  value === null || value === undefined ? DASH : format(value);
+
+/** "2026-09-12 · Iron Den · 130.0 × 3": the date, the gym when known, then the detail. */
+const datedDetail = (completedAt: Date, gymName: string | null | undefined, detail: string, dateFormat: ExerciseDateFormat) =>
+  [formatShortDate(completedAt, dateFormat), gymName, detail].filter(Boolean).join(' · ');
+
+const collapsedRecordStats = ({ oneRepMax, maxWeight, volume }: ExerciseRecords): CollapsedStatValues => ({
+  oneRepMax: orDash(oneRepMax?.value, formatOneRepMax),
+  maxWeight: orDash(maxWeight?.weight, formatWeight),
+  volume: orDash(volume?.value, formatVolume),
+});
+
+/** The previous session's best 1RM, heaviest set and volume, noting volume it could not total. */
+const collapsedLastStats = (last: LastSession | null): CollapsedStatValues => {
+  if (!last) return NO_STATS;
+  const weights = last.sets.map(set => set.weight);
+  return {
+    oneRepMax: orDash(last.oneRepMax, formatOneRepMax),
+    maxWeight: weights.length ? formatWeight(Math.max(...weights)) : DASH,
+    volume: orDash(last.volume, formatVolume),
+    coverageNote: last.volume === null ? formatVolumeWithCoverage(last.volume, last.knownVolume) : undefined,
+  };
+};
+
+type RecordLineContent = { label: string; value: string; detail: string; divider?: boolean; testID: string };
+
+const recordDetail = <R extends { completedAt: Date; gymName?: string | null }>(
+  record: R | null,
+  dateFormat: ExerciseDateFormat,
+  describe: (record: R) => string,
+): string => (record ? datedDetail(record.completedAt, record.gymName, describe(record), dateFormat) : '');
+
+const recordLines = ({ oneRepMax, maxWeight, volume }: ExerciseRecords, dateFormat: ExerciseDateFormat): RecordLineContent[] => [
+  {
+    label: '1RM',
+    testID: 'exercise-record-1rm',
+    value: orDash(oneRepMax?.value, formatOneRepMax),
+    detail: recordDetail(oneRepMax, dateFormat, record => `${formatWeight(record.weight)} × ${record.reps}`),
+  },
+  {
+    label: 'Max',
+    testID: 'exercise-record-max',
+    divider: true,
+    value: orDash(maxWeight?.weight, formatWeight),
+    detail: recordDetail(maxWeight, dateFormat, record => `${record.reps} reps`),
+  },
+  {
+    label: 'Vol',
+    testID: 'exercise-record-vol',
+    divider: true,
+    value: orDash(volume?.value, formatVolume),
+    detail: recordDetail(volume, dateFormat, record => `${record.setCount} sets`),
+  },
+];
+
+// Collapsed, the body sums up the selected view; expanded, it lists the
+// all-time records or the previous session's sets.
 function PanelBody({
   state,
   view,
   expanded,
   dateFormat,
-  isFilteredByGym = false,
+  isFilteredByGym,
   now,
 }: Pick<RecordsPanelProps, 'state' | 'view' | 'expanded' | 'dateFormat' | 'now' | 'isFilteredByGym'>) {
   if (state.status !== 'ready') {
-    if (!expanded && state.status === 'loading') {
-      return <CollapsedStats oneRepMax={DASH} maxWeight={DASH} volume={DASH} />;
-    }
-    return (
-      <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-message">
-        {state.status === 'loading' ? 'Loading records…' : 'Records unavailable.'}
-      </Text>
-    );
+    return <StatusMessage expanded={expanded} status={state.status} />;
   }
 
   const { records, last } = state.summary;
-  const date = (value: Date) => formatShortDate(value, dateFormat);
-
-  // Collapsed, the row sums up the selected view: the all-time records, or the
-  // previous session's best 1RM, heaviest weight and volume.
   if (!expanded) {
-    if (view === 'last') {
-      const weights = last?.sets.map(set => set.weight) ?? [];
-      const heaviest = weights.length ? Math.max(...weights) : null;
-      return (
-        <CollapsedStats
-          oneRepMax={last?.oneRepMax != null ? formatOneRepMax(last.oneRepMax) : DASH}
-          maxWeight={heaviest !== null ? formatWeight(heaviest) : DASH}
-          volume={last?.volume != null ? formatVolume(last.volume) : DASH}
-          coverageNote={last?.volume === null ? formatVolumeWithCoverage(last.volume, last.knownVolume) : undefined}
-        />
-      );
-    }
-    return (
-      <CollapsedStats
-        oneRepMax={records.oneRepMax ? formatOneRepMax(records.oneRepMax.value) : DASH}
-        maxWeight={records.maxWeight ? formatWeight(records.maxWeight.weight) : DASH}
-        volume={records.volume ? formatVolume(records.volume.value) : DASH}
-      />
-    );
+    return <CollapsedStats {...(view === 'last' ? collapsedLastStats(last) : collapsedRecordStats(records))} />;
   }
-
   if (view === 'records') {
-    if (!records.oneRepMax && !records.maxWeight && !records.volume) {
-      return <Empty isFilteredByGym={isFilteredByGym} />;
-    }
-    return (
-      <View testID="exercise-records-list">
-        <RecordLine
-          detail={
-            records.oneRepMax
-              ? `${date(records.oneRepMax.completedAt)}${records.oneRepMax.gymName ? ` · ${records.oneRepMax.gymName}` : ''} · ${formatWeight(records.oneRepMax.weight)} × ${records.oneRepMax.reps}`
-              : ''
-          }
-          label="1RM"
-          testID="exercise-record-1rm"
-          value={records.oneRepMax ? formatOneRepMax(records.oneRepMax.value) : DASH}
-        />
-        <RecordLine
-          detail={
-            records.maxWeight
-              ? `${date(records.maxWeight.completedAt)}${records.maxWeight.gymName ? ` · ${records.maxWeight.gymName}` : ''} · ${records.maxWeight.reps} reps`
-              : ''
-          }
-          divider
-          label="Max"
-          testID="exercise-record-max"
-          value={records.maxWeight ? formatWeight(records.maxWeight.weight) : DASH}
-        />
-        <RecordLine
-          detail={
-            records.volume
-              ? `${date(records.volume.completedAt)}${records.volume.gymName ? ` · ${records.volume.gymName}` : ''} · ${records.volume.setCount} sets`
-              : ''
-          }
-          divider
-          label="Vol"
-          testID="exercise-record-vol"
-          value={records.volume ? formatVolume(records.volume.value) : DASH}
-        />
-      </View>
-    );
+    const hasRecords = Boolean(records.oneRepMax || records.maxWeight || records.volume);
+    return hasRecords ? <RecordList lines={recordLines(records, dateFormat)} /> : <Empty isFilteredByGym={isFilteredByGym} />;
   }
+  return last ? <LastSessionDetail dateFormat={dateFormat} last={last} now={now} /> : <Empty isFilteredByGym={isFilteredByGym} />;
+}
 
-  if (!last) {
-    return <Empty isFilteredByGym={isFilteredByGym} />;
+function StatusMessage({ status, expanded }: { status: 'loading' | 'error'; expanded: boolean }) {
+  if (!expanded && status === 'loading') {
+    return <CollapsedStats {...NO_STATS} />;
   }
+  return (
+    <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-message">
+      {status === 'loading' ? 'Loading records…' : 'Records unavailable.'}
+    </Text>
+  );
+}
 
+function RecordList({ lines }: { lines: RecordLineContent[] }) {
+  return (
+    <View testID="exercise-records-list">
+      {lines.map(line => (
+        <RecordLine key={line.testID} {...line} />
+      ))}
+    </View>
+  );
+}
+
+function LastSessionDetail({ last, dateFormat, now }: { last: LastSession; dateFormat: ExerciseDateFormat; now?: Date }) {
   return (
     <View style={styles.last} testID="exercise-records-last">
       <View style={styles.lastSummary}>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
-          {`${date(last.completedAt)}${last.gymName ? ` · ${last.gymName}` : ''} · ${formatDaysAgo(last.completedAt, now)}`}
+          {datedDetail(last.completedAt, last.gymName, formatDaysAgo(last.completedAt, now), dateFormat)}
         </Text>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
-          {`1RM ${last.oneRepMax !== null ? formatOneRepMax(last.oneRepMax) : DASH} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
+          {`1RM ${orDash(last.oneRepMax, formatOneRepMax)} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
         </Text>
       </View>
       {last.sets.map((set, index) => (
