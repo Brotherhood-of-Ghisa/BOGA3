@@ -125,6 +125,89 @@ describe('buildHeatmapData', () => {
     expect(data.daily.every((d) => d.level === 0 && d.value === 0)).toBe(true);
     expect(data.weekly.every((w) => w.level === 0 && w.value === 0 && w.sessions === 0)).toBe(true);
   });
+
+  it('defaults to the local today and the 52-week window when no options are passed', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 5, 5, 12, 0));
+    try {
+      const data = buildHeatmapData([], 'totalVolume');
+      expect(data.todayDateKey).toBe(TODAY);
+      expect(data.weekly).toHaveLength(52);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('with weeks: "all" and no data, falls back to the default 52-week window', () => {
+    const data = buildHeatmapData([], 'totalVolume', { todayDateKey: TODAY, weeks: 'all' });
+    expect(data.weekly).toHaveLength(52);
+    expect(data.daily).toHaveLength(362);
+  });
+
+  it('honours an explicit window length in weeks', () => {
+    const data = buildHeatmapData(daily, 'totalVolume', { todayDateKey: TODAY, weeks: 2 });
+    expect(data.weekly.map((w) => w.weekStartDateKey)).toEqual(['2026-05-25', '2026-06-01']);
+    expect(data.daily[0].dateKey).toBe('2026-05-25');
+    expect(data.daily).toHaveLength(12);
+  });
+
+  it('marks each day with its Monday-based row and week, and only today as today', () => {
+    const data = buildHeatmapData(daily, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.daily.map((d) => [d.dateKey, d.dow, d.weekStartDateKey, d.isToday, d.hasTraining])).toEqual([
+      ['2026-06-01', 0, '2026-06-01', false, false],
+      ['2026-06-02', 1, '2026-06-01', false, false],
+      ['2026-06-03', 2, '2026-06-01', false, true],
+      ['2026-06-04', 3, '2026-06-01', false, true],
+      ['2026-06-05', 4, '2026-06-01', true, false],
+    ]);
+  });
+
+  it('buckets weeks across the observed weekly range, earlier weeks included', () => {
+    const twoWeeks: DailyEffortMetrics[] = [
+      { dateKey: '2026-05-26', totalVolume: 500, workingSetCount: 5, estimatedRM1: 70, highestWeight: 70 },
+      { dateKey: '2026-06-02', totalVolume: 100, workingSetCount: 1, estimatedRM1: 50, highestWeight: 50 },
+    ];
+    const data = buildHeatmapData(twoWeeks, 'totalVolume', { todayDateKey: TODAY, weeks: 2 });
+    expect(data.weekly.map((w) => [w.weekStartDateKey, w.value, w.level, w.isCurrentWeek])).toEqual([
+      ['2026-05-25', 500, 4, false],
+      ['2026-06-01', 100, 1, true],
+    ]);
+  });
+
+  it('keeps the best known value for best-of metrics in the weekly cell', () => {
+    const data = buildHeatmapData(daily, 'estimatedRM1', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.weekly[0]).toMatchObject({ value: 55, knownValue: 55, unavailable: false, hasTraining: true, sessions: 2 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ knownValue: 50, unavailable: false });
+  });
+
+  it('marks a best-of week unavailable when every training day lacks the metric', () => {
+    const noLoad: DailyEffortMetrics[] = [
+      { dateKey: '2026-06-03', totalVolume: 0, workingSetCount: 1, estimatedRM1: null, highestWeight: null },
+    ];
+    const data = buildHeatmapData(noLoad, 'highestWeight', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 0, unavailable: true, knownValue: 0 });
+    expect(data.weekly[0]).toMatchObject({ value: 0, level: 0, unavailable: true, hasTraining: true, sessions: 1 });
+  });
+
+  it('keeps known volume beside an unavailable volume day, and treats a missing known volume as zero', () => {
+    const partial: DailyEffortMetrics[] = [
+      { dateKey: '2026-06-02', totalVolume: 200, workingSetCount: 2, estimatedRM1: 60, highestWeight: 60 },
+      { dateKey: '2026-06-03', totalVolume: null, knownVolume: 80, workingSetCount: 2, estimatedRM1: 60, highestWeight: 60 },
+      { dateKey: '2026-06-04', totalVolume: null, workingSetCount: 1, estimatedRM1: 60, highestWeight: 60 },
+    ];
+    const data = buildHeatmapData(partial, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 0, unavailable: true, knownValue: 80 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-04')).toMatchObject({ value: 0, unavailable: true, knownValue: undefined });
+    expect(data.weekly[0]).toMatchObject({ value: 0, level: 0, unavailable: true, knownValue: 280, sessions: 3 });
+  });
+
+  it('marks a volume week unavailable when the weekly sum overflows', () => {
+    const huge: DailyEffortMetrics[] = [
+      { dateKey: '2026-06-02', totalVolume: Number.MAX_VALUE, workingSetCount: 1, estimatedRM1: null, highestWeight: null },
+      { dateKey: '2026-06-03', totalVolume: Number.MAX_VALUE, workingSetCount: 1, estimatedRM1: null, highestWeight: null },
+    ];
+    const data = buildHeatmapData(huge, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
+    expect(data.weekly[0]).toMatchObject({ value: 0, unavailable: true, knownValue: null });
+  });
 });
 
 

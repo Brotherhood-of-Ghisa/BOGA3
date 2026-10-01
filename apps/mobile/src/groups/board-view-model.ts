@@ -11,6 +11,7 @@ import type {
   BoardHolder,
   BoardRow,
   GroupBoardHistoryItem,
+  GroupBoardHistoryRelated,
   GroupBoardMetric,
   GroupBoardPodiumsResult,
   GroupMemberRef,
@@ -281,66 +282,98 @@ const linkExerciseNames = (item: GroupBoardHistoryItem): string => {
 const tookFirst = (leader: BoardHolder, myUserId: string | null): string =>
   `${holderName(leader, myUserId)} took #1 · ${formatBoardKg(leader.value_kg)}`;
 
-/** The lead-change sentence per reason (E1.3). An unknown reason or missing `related` reads "L took #1 · v". */
-export const describeHistorySentence = (item: GroupBoardHistoryItem, myUserId: string | null): string => {
-  const { leader, previous, reason, related } = item;
+/** "L now #1 · v", "You're now #1 · v". */
+const nowFirst = (leader: BoardHolder, myUserId: string | null): string =>
+  isMe(leader.member_user_id, myUserId)
+    ? `You're now #1 · ${formatBoardKg(leader.value_kg)}`
+    : `${holderName(leader, myUserId)} now #1 · ${formatBoardKg(leader.value_kg)}`;
 
-  if (reason === 'void') {
-    const cause = related?.kind === 'record_voided' ? ` — set ${related.reason}` : '';
-    const removed = previous
-      ? `${holderPossessive(previous, myUserId)} ${formatBoardKg(previous.value_kg)} removed${cause}`
-      : `a record removed${cause}`;
-    if (!leader) {
-      return `No one holds #1 (${removed})`;
-    }
-    const now = isMe(leader.member_user_id, myUserId)
-      ? `You're now #1 · ${formatBoardKg(leader.value_kg)}`
-      : `${holderName(leader, myUserId)} now #1 · ${formatBoardKg(leader.value_kg)}`;
-    return `${now} (${removed})`;
+/** "Dave's 142.5 kg", "your 150 kg". */
+const holderValue = (holder: BoardHolder, myUserId: string | null): string =>
+  `${holderPossessive(holder, myUserId)} ${formatBoardKg(holder.value_kg)}`;
+
+type CertificationEvent = Extract<GroupBoardHistoryRelated, { kind: 'certification' }>['event'];
+
+const ENDED_CERTIFICATION_EVENTS: ReadonlySet<CertificationEvent> = new Set(['withdrawn', 'cancelled', 'voided']);
+
+const certificationEvent = (related: GroupBoardHistoryItem['related']): CertificationEvent | null =>
+  related?.kind === 'certification' ? related.event : null;
+
+/** A void removes the record that held #1; the board may be left empty. */
+const voidSentence = ({ leader, previous, related }: GroupBoardHistoryItem, myUserId: string | null): string => {
+  const cause = related?.kind === 'record_voided' ? ` — set ${related.reason}` : '';
+  const removed = previous ? `${holderValue(previous, myUserId)} removed${cause}` : `a record removed${cause}`;
+  return leader ? `${nowFirst(leader, myUserId)} (${removed})` : `No one holds #1 (${removed})`;
+};
+
+/** Any other reason with no leader left; only an ended certification says whose #1 went. */
+const emptyBoardSentence = ({ reason, previous, related }: GroupBoardHistoryItem, myUserId: string | null): string => {
+  const event = certificationEvent(related);
+  if (reason === 'certification' && event !== null && event !== 'certified' && previous) {
+    return `No one holds #1 (${holderValue(previous, myUserId)} certification ${event})`;
   }
+  return 'No one holds #1';
+};
 
-  if (!leader) {
-    if (reason === 'certification' && related?.kind === 'certification' && related.event !== 'certified' && previous) {
-      return `No one holds #1 (${holderPossessive(previous, myUserId)} ${formatBoardKg(previous.value_kg)} certification ${related.event})`;
-    }
-    return 'No one holds #1';
+const recordSentence = (leader: BoardHolder, previous: BoardHolder | null, myUserId: string | null): string =>
+  previous
+    ? `${tookFirst(leader, myUserId)} (from ${holderNameInline(previous, myUserId)}, ${formatBoardKg(previous.value_kg)})`
+    : `${holderName(leader, myUserId)} set the first record · ${formatBoardKg(leader.value_kg)}`;
+
+const linkSentence = (item: GroupBoardHistoryItem, leader: BoardHolder, myUserId: string | null): string => {
+  const { previous, related } = item;
+  if (related?.kind !== 'link') {
+    return tookFirst(leader, myUserId);
   }
-
-  if (reason === 'record') {
-    if (!previous) {
-      return `${holderName(leader, myUserId)} set the first record · ${formatBoardKg(leader.value_kg)}`;
-    }
-    return `${tookFirst(leader, myUserId)} (from ${holderNameInline(previous, myUserId)}, ${formatBoardKg(previous.value_kg)})`;
-  }
-
-  if (reason === 'link' && related?.kind === 'link') {
-    const names = linkExerciseNames(item);
-    if (related.event === 'unlink') {
-      const who = previous ? `${holderNameInline(previous, myUserId)} unlinked` : 'unlinked';
-      return `${tookFirst(leader, myUserId)} (${who} ${names})`;
-    }
+  const names = linkExerciseNames(item);
+  if (related.event !== 'unlink') {
     return `${tookFirst(leader, myUserId)} (linked ${names})`;
   }
+  const who = previous ? `${holderNameInline(previous, myUserId)} unlinked` : 'unlinked';
+  return `${tookFirst(leader, myUserId)} (${who} ${names})`;
+};
 
-  if (reason === 'certification') {
-    const event = related?.kind === 'certification' ? related.event : null;
-    if (event === 'withdrawn' || event === 'cancelled' || event === 'voided') {
-      const lost = previous
-        ? `${holderPossessive(previous, myUserId)} ${formatBoardKg(previous.value_kg)} certification ${event}`
-        : `a certification ${event}`;
-      const now = isMe(leader.member_user_id, myUserId)
-        ? `You're now #1 · ${formatBoardKg(leader.value_kg)}`
-        : `${holderName(leader, myUserId)} now #1 · ${formatBoardKg(leader.value_kg)}`;
-      return `${now} (${lost})`;
-    }
-    const certifier =
-      related?.kind === 'certification' && related.certified_by
-        ? ` by ${related.certified_by.user_id === myUserId ? 'you' : formatMemberName(related.certified_by.username)}`
-        : '';
-    return `${tookFirst(leader, myUserId)} (certified${certifier})`;
+/** " by Kim", " by you", or nothing when the certifier is unknown. */
+const certifierSuffix = (related: GroupBoardHistoryItem['related'], myUserId: string | null): string => {
+  if (related?.kind !== 'certification' || !related.certified_by) {
+    return '';
   }
+  const { user_id, username } = related.certified_by;
+  return ` by ${isMe(user_id, myUserId) ? 'you' : formatMemberName(username)}`;
+};
 
-  return tookFirst(leader, myUserId);
+const certificationSentence = (
+  { previous, related }: GroupBoardHistoryItem,
+  leader: BoardHolder,
+  myUserId: string | null,
+): string => {
+  const event = certificationEvent(related);
+  if (event === null || !ENDED_CERTIFICATION_EVENTS.has(event)) {
+    return `${tookFirst(leader, myUserId)} (certified${certifierSuffix(related, myUserId)})`;
+  }
+  const lost = previous ? `${holderValue(previous, myUserId)} certification ${event}` : `a certification ${event}`;
+  return `${nowFirst(leader, myUserId)} (${lost})`;
+};
+
+/** The lead-change sentence per reason (E1.3). An unknown reason or missing `related` reads "L took #1 · v". */
+export const describeHistorySentence = (item: GroupBoardHistoryItem, myUserId: string | null): string => {
+  if (item.reason === 'void') {
+    return voidSentence(item, myUserId);
+  }
+  const { leader } = item;
+  if (!leader) {
+    return emptyBoardSentence(item, myUserId);
+  }
+  switch (item.reason) {
+    case 'record':
+      return recordSentence(leader, item.previous, myUserId);
+    case 'link':
+      return linkSentence(item, leader, myUserId);
+    case 'certification':
+      return certificationSentence(item, leader, myUserId);
+    default:
+      return tookFirst(leader, myUserId);
+  }
 };
 
 export const buildHistoryItem = (
