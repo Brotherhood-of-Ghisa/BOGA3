@@ -14,21 +14,22 @@ don't restate it here.
 ```bash
 ./boga test fast       # mobile quality + docs/meta + consent/MCP unit + backend fast smoke
 ./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
-./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + session view + bodyweight + auth-profile + sync e2e + two-user groups e2e
-./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, UI regression, exercise page, session view, bodyweight)
+./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + session view + auth-profile + sync e2e + two-user groups e2e
+./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, UI regression, exercise page, session view)
 ./boga sweep [--ref <ref>]  # every gate lane on origin/main (or <ref>) in a dedicated worktree — required before a release build
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
 ./boga doctor          # verify THIS machine can run every lane
 ```
 
-The accepted `ios-bodyweight` rewrite proves ordinary logging first, private
-opt-in, kg reading management, preserved contribution across off/on cycles,
-silent historical recalculation and numeric-zero rendering without a session
-prompt. Pure/backend coverage owns policy variants, exact date selection,
-migration, strict group omission, non-disclosure and certification invalidation.
-Until the implementation task rewrites and measures the lane, the generated
-matrix below continues to report historical runs of the current flow.
+Bodyweight has no Maestro lane: none of its UI claims needs a device (spec 06,
+"Maestro scope policy"). Jest over real data proves the exercise-page logger,
+the session-view row, the body weight log, the Settings rows and the editor's
+contribution field (`bodyweight-logging-ui.test.tsx`, `bodyweight-screen.test.tsx`,
+`exercise-catalog-screen.test.tsx`); `ios-sync-e2e` enters a reading through
+the real weight sheet on device. Pure/backend coverage owns policy variants,
+exact date selection, migration, strict group omission, non-disclosure and
+certification invalidation.
 
 Lanes are defined in `scripts/lanes.tsv` (the lane registry — names there are
 the canonical lane names everywhere: this doc, the timing records, `boga`).
@@ -96,40 +97,39 @@ get from `./boga timings` or a run.
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
 | lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.9s |
-| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.4s |
-| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~10s |
+| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~3.8s |
+| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~8.9s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
-| docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.2s |
-| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~19s |
-| agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~3.7s |
-| mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~4.5s |
+| docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.1s |
+| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~8.8s |
+| agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~2.7s |
+| mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |
 | handles | `./boga test handles` | — (run by name) | ✅ | ~1.1m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
-| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~32s |
-| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~5.5s |
-| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~19s |
-| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~53s |
-| agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.4s |
+| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~43s |
+| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.5s |
+| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~22s |
+| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~51s |
+| agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.7s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.3s |
-| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~6.8s |
-| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~6.0s |
-| dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~5.0s |
+| sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.6s |
+| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~5.3s |
+| dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~4.3s |
 | sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~28s |
-| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~1.7m |
-| sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~15s |
-| mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~8.8s |
+| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~2.0m |
+| sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~9.3s |
+| mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~10s |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
-| ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~58s |
-| ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~1.3m |
+| ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~50s |
+| ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~1.2m |
 | ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` + `frontend-ui` | ❌ | ~7.9m |
-| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~2.4m |
-| ios-session-view | `./boga test ios-session-view` | `boga test frontend` + `frontend-ui` | ❌ | ~2.2m |
-| ios-bodyweight | `./boga test ios-bodyweight` | `boga test frontend` + `frontend-ui` | ❌ | ~5.7m |
+| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~2.3m |
+| ios-session-view | `./boga test ios-session-view` | `boga test frontend` + `frontend-ui` | ❌ | ~2.0m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.7m |
-| ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.2m |
-| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~5.4m |
+| ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.1m |
+| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~5.3m |
 
 † All-machine median of the recorded green runs in the generating machine's timing store (`~/.config/boga/timings/records/`); `N/A` = no measured data yet, **not** "instant" — run the lane to record it. Per-machine numbers: `./boga timings`.
 <!-- /boga:gen:lane-matrix -->

@@ -13,7 +13,8 @@ else is Jest, screens over real data (spec 06, "Jest test shapes").
 | #414 | "Jest test shapes" rule (spec 06, `app/__tests__/README.md`); this plan. |
 | #415 | Session completion on real data: `completed-session-local-data.test.tsx` (23 tests, every claim of the session-completion flow that Jest can reach) replaces 27 mocked tests; `completed-session-detail-screen.test.tsx` keeps 14 for states real data cannot produce. `bootLocalApp()` in the helper. |
 | #416 | Exercise catalogue on real data: `exercise-catalog-screen.test.tsx` converted in place (18 tests, failures forced with `jest.spyOn` on the real modules), covering the catalogue flow's browser-fixture claims; booted-database snapshot in the helper (~160 ms a test); 4 tests retired that real data now covers (`maestro-harness` fixture rows ×2, `stats-repository` window wiring after a Stats delta assertion, `session-list-repository` delete write). |
-| this PR | Exercise page on real data: `exercise-page-screen.test.tsx` converted in place (22 tests on the `exercise-page` fixture, persistence read back from the DB), including the missing/deleted-session states; `exercise-page-persistence.test.ts` 7 → 2 (only the repository guards no screen reaches). |
+| #417 | Exercise page on real data: `exercise-page-screen.test.tsx` converted in place (22 tests on the `exercise-page` fixture, persistence read back from the DB), including the missing/deleted-session states; `exercise-page-persistence.test.ts` 7 → 2 (only the repository guards no screen reaches). |
+| this PR | Bodyweight on real data; `ios-bodyweight` lane deleted (row 9). `bodyweight-logging-ui.test.tsx` (exercise page + session view on the `bodyweight-rm-volume` fixture) and `bodyweight-screen.test.tsx` converted in place; `bodyweight-calculation-preference.test.tsx` folded into the latter; editor contribution field in `exercise-catalog-screen.test.tsx`; 2 pure tests retired. |
 
 ## Queue
 
@@ -28,7 +29,7 @@ include one run of the named lane on the Mac (green, and its new time from
 | 6 | mac | **Remove the 16 optional `Open`/`Continue`/`Close` taps** (appendix, "Rule-4 violations"). Check each against a real run first: `data-runtime-smoke`'s header says a fresh install can show the onboarding sheet. | The four affected lanes green, times recorded. |
 | 7 | mac | **Fold `session-view-abandon` into `session-view`** (its one claim is Jest-covered at `session-view-screen.test.tsx:322`) or drop it. | `ios-session-view` green. |
 | 8 | mac | **Merge `groups-link-exercise` into `groups-two-user-stream`** (step 4b already links on device). | `ios-groups-e2e` green. |
-| 9 | ask | **Bodyweight.** Spec 02 says the lane is due for a rewrite; all 6 claims are P/C. Decide with the operator: fold into that rewrite, or port to Jest and keep one device claim. Check `./boga timings ios-bodyweight` first (appendix, "Timing anomaly"). | Operator decision recorded here. |
+| 9 | done | **Bodyweight.** Operator decision (2026-10-01): no claim needs a device, so delete the lane and drop its captures (no standing visual-review consumer). All 6 claims ported to Jest over real data; the weight sheet's keyboard entry stays on device in `ios-sync-e2e`. Timing anomaly: the 2 recorded runs were 19.5m/20.0m, a fresh run on 2026-10-01 took 1.2m (flow 39s). | Done (this PR). |
 | 10 | mac | **Sync e2e B4** (second logged workout) looks redundant with B3; confirm its intent with the operator before cutting. | Decision, then `ios-sync-e2e` green. |
 | 11 | any | **Headers** for every remaining flow (appendix, "Headers that do not state what the flow proves"); can ride along with 1, 5–8. | Every flow has the three-part header. |
 

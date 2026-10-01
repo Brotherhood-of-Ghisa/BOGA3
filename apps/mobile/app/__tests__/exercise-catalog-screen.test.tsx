@@ -38,6 +38,10 @@ jest.mock('expo-router', () => ({
 
 import ExerciseCatalogScreen from '../(tabs)/exercise-catalog';
 import { uiRoles } from '@/components/ui';
+import {
+  __resetBodyweightCalculationPreferenceForTests,
+  setBodyweightCalculationsEnabled,
+} from '@/src/bodyweight/calculation-preference';
 import * as catalogRepository from '@/src/data/exercise-catalog';
 import * as catalogStats from '@/src/data/exercise-catalog-stats';
 import { exerciseDefinitions, exerciseMuscleMappings } from '@/src/data/schema';
@@ -132,6 +136,7 @@ describe('ExerciseCatalogScreen', () => {
     mockReplace.mockReset();
     mockSearchParams = {};
     __resetExerciseListPreferencesForTests();
+    __resetBodyweightCalculationPreferenceForTests();
   });
 
   afterEach(() => {
@@ -205,6 +210,40 @@ describe('ExerciseCatalogScreen', () => {
     expect(screen.getByDisplayValue('Bench Press')).toBeTruthy();
     expect(screen.queryByLabelText('Remove secondary muscle Triceps')).toBeNull();
     expect(screen.getByLabelText('Remove secondary muscle Front Delts')).toBeTruthy();
+  });
+
+  it('shows the bodyweight contribution only while calculations are on, keeping it while hidden', async () => {
+    const openEditor = async (name: string) => {
+      fireEvent.press(await screen.findByLabelText(`Edit exercise definition ${name}`));
+      await screen.findByText('Edit Exercise');
+    };
+    const percentage = () => screen.queryByTestId('exercise-editor-bodyweight-percentage');
+    await openCatalog();
+    await expandFamily('Back');
+
+    // Off: no contribution field, and saving keeps the stored 100%.
+    await openEditor('Pull-Up');
+    expect(percentage()).toBeNull();
+    fireEvent.changeText(screen.getByLabelText('Exercise definition name'), 'Strict Pull-Up');
+    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    expect(await screen.findByText('Exercise updated.')).toBeTruthy();
+    expect(definitionNamed('Strict Pull-Up')).toMatchObject({ id: 'seed_pull_up', bodyweightContribution: 1 });
+
+    // On: the field appears with the stored share; an invalid share writes nothing.
+    await act(async () => {
+      await setBodyweightCalculationsEnabled(true);
+    });
+    await openEditor('Strict Pull-Up');
+    expect(percentage()).toHaveProp('value', '100');
+    fireEvent.changeText(percentage()!, '101');
+    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    expect(screen.getByTestId('exercise-editor-bodyweight-error')).toBeTruthy();
+    expect(definitionNamed('Strict Pull-Up')).toMatchObject({ bodyweightContribution: 1 });
+
+    fireEvent.changeText(percentage()!, '70');
+    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+    expect(await screen.findByText('Exercise updated.')).toBeTruthy();
+    expect(definitionNamed('Strict Pull-Up')).toMatchObject({ bodyweightContribution: 0.7 });
   });
 
   it('blocks save when no primary muscle is selected', async () => {

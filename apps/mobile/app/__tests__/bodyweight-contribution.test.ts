@@ -4,7 +4,6 @@ import type { LocalDatabase } from '@/src/data/bootstrap';
 import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { exerciseDefinitions } from '@/src/data/schema';
-import { calculateAnalyticsSetMetrics, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
   BODYWEIGHT_SEED_CONTRIBUTIONS,
   validateBodyweightContribution,
@@ -56,18 +55,4 @@ it('preserves an existing contribution when an edit omits it and validates expli
     .toMatchObject({ bodyweightContribution: 1 });
   expect(await saveExerciseCatalogExercise({ ...input, bodyweightContribution: 0.9 }))
     .toMatchObject({ bodyweightContribution: 0.9 });
-});
-
-it('changes derived math without rewriting the raw Weight value', () => {
-  const set = { weightValue: '20', repsValue: '8', setType: null, performanceStatus: null };
-  const raw = { ...set };
-  const result = calculateAnalyticsSetMetrics({
-    ...set,
-    ...personalLoadContext(true, { bodyweightContribution: 1, loadInputMode: 'total_load' },
-      { bodyWeightKg: 80, bodyWeightSource: 'reading', bodyWeightMeasurementId: 'reading',
-        bodyWeightMeasuredAt: new Date('2026-09-01T00:00:00Z') }),
-  });
-  expect(result.volumeKgReps).toBe(800);
-  expect(result.estimatedOneRepMaxKg).toBeCloseTo(47.671419, 6);
-  expect(set).toEqual(raw);
 });
