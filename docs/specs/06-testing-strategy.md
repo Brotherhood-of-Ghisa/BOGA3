@@ -278,6 +278,26 @@ screenshots are the visual evidence.
   (measured medians + 3× ceilings from the records the gates write). Do not
   invent durations.
 
+## Jest test shapes
+
+Two shapes by default; pick by what is under test, not by habit.
+
+- **Pure functions** — calculations, formatting, sorting, decision rules. Plain
+  unit tests, no database and no render: this is where edge cases are enumerated.
+- **Screens over real data** — a screen's behaviour renders the production
+  route over the in-memory SQLite fixture through
+  `apps/mobile/app/__tests__/helpers/local-data.ts` (see *In-memory SQLite unit
+  tests*), seeded with a Maestro harness fixture where one fits. Queries,
+  caches, hooks and the screen are production code, so a broken query or a
+  stale cache fails here and not only on the simulator.
+
+Faking the data layer (`jest.mock('@/src/data')` or a repository) in a screen
+test is the exception, for states real data cannot produce: loading, a failed
+read, a race. Name the state in the test. Existing screen tests that fake data
+move to the helper when the screen is next changed; new screen tests start on
+it. Query-only tests against real SQL stay where a query has many edge cases of
+its own (sync, tombstones); otherwise the screen tests cover the query.
+
 ## Local data two-lane policy
 
 - **Lane 1 (CI-safe):** fast `apps/mobile` checks (`lint`, `typecheck`, `test`)
