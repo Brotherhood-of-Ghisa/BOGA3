@@ -1,12 +1,19 @@
 /* eslint-disable import/first */
 
+/**
+ * Settings and Profile navigation, preferences and account flows. The data
+ * these screens own is not local: the profile (`@/src/auth/profile`) and the
+ * auth session are server reads and writes, faked here at that boundary as
+ * the groups suites fake theirs. The local database is the in-memory SQLite
+ * fixture (helpers/local-data.ts), and preferences use their real store.
+ */
+
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 const mockUseAuth = jest.fn();
 const mockLoadUserProfile = jest.fn();
 const mockSaveUsername = jest.fn();
-const mockResetLocalDataAndReseed = jest.fn();
 const mockAlert = jest.fn();
 
 // Reading entry/navigation is covered by bodyweight-screen.test.tsx.
@@ -25,7 +32,7 @@ jest.mock('@/src/auth', () => ({
 }));
 
 // The sync-status panel has its own spec; stub it here so the Settings render
-// stays focused on navigation and the dev reset surface.
+// stays focused on navigation and the account surface.
 jest.mock('@/components/sync-status/sync-status-panel', () => ({
   SyncStatusPanel: () => null,
 }));
@@ -35,9 +42,12 @@ jest.mock('@/src/auth/profile', () => ({
   saveUsername: (...args: unknown[]) => mockSaveUsername(...args),
 }));
 
-jest.mock('@/src/data', () => ({
-  resetLocalDataAndReseed: (...args: unknown[]) => mockResetLocalDataAndReseed(...args),
-}));
+// The local database is the in-memory SQLite fixture; the dev reset that
+// writes to it is covered over real data in settings-dev-wipe.test.tsx.
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
@@ -48,6 +58,7 @@ import {
   getExerciseListPreferencesSnapshot,
 } from '@/src/exercise-catalog/list-preferences';
 import ProfileRoute from '../profile';
+import { closeLocalData, resetLocalData } from './helpers/local-data';
 import SettingsRoute from '../(tabs)/settings';
 
 type MockUseAuthValue = {
@@ -99,7 +110,13 @@ const createProfileRecord = (overrides: Partial<{ createdAt: string; id: string;
 });
 
 describe('settings and profile routes', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    closeLocalData();
+  });
+
   beforeEach(() => {
+    resetLocalData();
     mockPush.mockReset();
     mockReplace.mockReset();
     mockSearchParams = {};
@@ -108,13 +125,14 @@ describe('settings and profile routes', () => {
     mockUseAuth.mockReset().mockReturnValue(createAuthValue());
     mockLoadUserProfile.mockReset();
     mockSaveUsername.mockReset();
-    mockResetLocalDataAndReseed.mockReset();
     mockAlert.mockReset();
     __resetExerciseListPreferencesForTests();
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
   });
 
-  it('opens the profile route from settings', () => {
+  it('opens the profile route from settings', async () => {
+    // The preferences card reads its store on mount; load it first so the read lands in the test.
+    await ensureExerciseListPreferencesLoaded();
     render(<SettingsRoute />);
 
     fireEvent.press(screen.getByTestId('settings-profile-row'));
@@ -122,8 +140,10 @@ describe('settings and profile routes', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile');
   });
 
-  it('returns explicitly to More when settings was launched from the hub', () => {
+  it('returns explicitly to More when settings was launched from the hub', async () => {
     mockSearchParams = { source: 'more' };
+    // The preferences card reads its store on mount; load it first so the read lands in the test.
+    await ensureExerciseListPreferencesLoaded();
     render(<SettingsRoute />);
 
     fireEvent.press(screen.getByTestId('back-to-more-button'));
@@ -131,12 +151,14 @@ describe('settings and profile routes', () => {
     expect(mockReplace).toHaveBeenCalledWith('/more');
   });
 
-  it('opens Connected agents for a signed-in user', () => {
+  it('opens Connected agents for a signed-in user', async () => {
     mockUseAuth.mockReturnValue(
       createAuthValue({
         user: { email: 'member@example.test', id: 'user-1' },
       }),
     );
+    // The preferences card reads its store on mount; load it first so the read lands in the test.
+    await ensureExerciseListPreferencesLoaded();
     render(<SettingsRoute />);
 
     fireEvent.press(screen.getByTestId('settings-connected-agents-row'));
@@ -176,51 +198,6 @@ describe('settings and profile routes', () => {
     });
 
     expect(getExerciseListPreferencesSnapshot().pastRecordsGymScope).toBe('all');
-  });
-
-  it('exposes the dev reset surface in development builds and invokes the reset helper after confirmation', async () => {
-    mockResetLocalDataAndReseed.mockResolvedValue({
-      database: { name: 'fake-db' },
-      resetAt: new Date('2026-05-14T12:00:00.000Z'),
-    });
-
-    render(<SettingsRoute />);
-
-    expect(screen.getByTestId('settings-dev-tools-card')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('settings-dev-reset-button'));
-
-    expect(mockAlert).toHaveBeenCalledTimes(1);
-    const [, , buttons] = mockAlert.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]];
-    const resetButton = buttons.find((button) => button.text === 'Reset');
-    expect(resetButton).toBeDefined();
-
-    await act(async () => {
-      resetButton?.onPress?.();
-    });
-
-    await waitFor(() => {
-      expect(mockResetLocalDataAndReseed).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId('settings-dev-reset-feedback')).toBeTruthy();
-    });
-    expect(screen.getByText('Local data wiped and the exercise catalog re-seeded.')).toBeTruthy();
-  });
-
-  it('surfaces dev reset failures inline without crashing the screen', async () => {
-    mockResetLocalDataAndReseed.mockRejectedValue(new Error('Cannot wipe local data right now.'));
-
-    render(<SettingsRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-dev-reset-button'));
-    const [, , buttons] = mockAlert.mock.calls[0] as [string, string, { text: string; onPress?: () => void }[]];
-    await act(async () => {
-      buttons.find((button) => button.text === 'Reset')?.onPress?.();
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Cannot wipe local data right now.')).toBeTruthy();
-    });
   });
 
   it('renders logged-out profile state and submits email/password sign in', async () => {

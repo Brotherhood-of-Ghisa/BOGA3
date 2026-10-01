@@ -1,5 +1,14 @@
 /* eslint-disable import/first */
 
+/**
+ * The Settings onboarding surface: section order, release metadata, the
+ * external setup link and the signed-out state. Nothing here reads or writes
+ * app data; the screen runs over the in-memory SQLite fixture
+ * (helpers/local-data.ts) with its real preferences store. Replaced: the
+ * router, the system browser, the auth hook, dev mode, build metadata and the
+ * sync-status panel (its own spec).
+ */
+
 const mockOpenUrl = jest.fn();
 const mockPush = jest.fn();
 const mockUseAuth = jest.fn();
@@ -24,18 +33,10 @@ jest.mock('@/components/sync-status/sync-status-panel', () => ({
   SyncStatusPanel: () => null,
 }));
 
-jest.mock('@/src/data', () => ({
-  resetLocalDataAndReseed: jest.fn(),
-}));
-
-jest.mock('@/src/sync/dev-affordances', () => ({
-  wipeLocalAndReBootstrap: jest.fn(),
-  wipeRemoteForCurrentUser: jest.fn(),
-}));
-
-jest.mock('@/src/exercise-catalog/list-preferences', () => ({
-  useExerciseListPreferences: () => [{ dateFormat: 'DD-MM-YYYY' }, jest.fn()],
-}));
+jest.mock('@/src/data/bootstrap', () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
+  require('./helpers/local-data').localDataBootstrapModule()
+);
 
 jest.mock('@/src/utils/agent-connect', () => ({
   getAgentConnectUrl: () => 'https://setup.example.test/connect',
@@ -58,9 +59,27 @@ jest.mock('@/src/utils/runtime-metadata', () => ({
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import SettingsRoute from '../(tabs)/settings';
+import {
+  __resetExerciseListPreferencesForTests,
+  ensureExerciseListPreferencesLoaded,
+} from '@/src/exercise-catalog/list-preferences';
+import { closeLocalData, resetLocalData } from './helpers/local-data';
+
+// The preferences card reads its store on mount; load it first so the read
+// lands in the test.
+const renderSettings = async () => {
+  await ensureExerciseListPreferencesLoaded();
+  return render(<SettingsRoute />);
+};
 
 describe('settings onboarding surface', () => {
+  afterEach(() => {
+    closeLocalData();
+  });
+
   beforeEach(() => {
+    resetLocalData();
+    __resetExerciseListPreferencesForTests();
     mockOpenUrl.mockReset().mockResolvedValue(true);
     mockPush.mockReset();
     mockUseAuth.mockReset().mockReturnValue({
@@ -68,8 +87,8 @@ describe('settings onboarding surface', () => {
     });
   });
 
-  it('renders the visible title and agreed signed-in section order with release metadata', () => {
-    const result = render(<SettingsRoute />);
+  it('renders the visible title and agreed signed-in section order with release metadata', async () => {
+    const result = await renderSettings();
     const tree = JSON.stringify(result.toJSON());
     const orderedSectionIds = [
       'settings-section-account',
@@ -96,7 +115,7 @@ describe('settings onboarding surface', () => {
   });
 
   it('opens the public setup page as an external link', async () => {
-    render(<SettingsRoute />);
+    await renderSettings();
 
     const connectRow = screen.getByTestId('settings-connect-agent-row');
     expect(connectRow.props.accessibilityRole).toBe('link');
@@ -111,7 +130,7 @@ describe('settings onboarding surface', () => {
 
   it('keeps a failed browser launch inline and retryable', async () => {
     mockOpenUrl.mockRejectedValueOnce(new Error('No browser'));
-    render(<SettingsRoute />);
+    await renderSettings();
 
     fireEvent.press(screen.getByTestId('settings-connect-agent-row'));
     expect(await screen.findByText('Couldn’t open the setup page. Try again.')).toBeTruthy();
@@ -125,9 +144,9 @@ describe('settings onboarding surface', () => {
     });
   });
 
-  it('keeps signed-in-only management hidden while leaving setup and sync guidance useful', () => {
+  it('keeps signed-in-only management hidden while leaving setup and sync guidance useful', async () => {
     mockUseAuth.mockReturnValue({ user: null });
-    render(<SettingsRoute />);
+    await renderSettings();
 
     expect(screen.getByText('Sign in and manage your account.')).toBeTruthy();
     expect(screen.getByTestId('settings-connect-agent-row')).toBeTruthy();
