@@ -5,6 +5,16 @@
 > in `docs/specs/06-testing-strategy.md`; gates in
 > `docs/specs/02-quality-and-test-gates.md`.
 
+## Test shapes (read before adding a test)
+
+- Calculations, formatting and decision rules: pure unit tests, no database,
+  no render.
+- Screens: render the production route over real data with
+  `helpers/local-data.ts` (reference: `stats-screen-local-data.test.tsx`), not
+  with `jest.mock('@/src/data')`. Fake the data layer only for states real data
+  cannot produce (loading, a failed read, a race), and name that state.
+- Rule and rationale: `docs/specs/06-testing-strategy.md`, "Jest test shapes".
+
 ## GPS gym-location coverage policy
 
 - Applies to foreground location service and gym-coordinate matching work.
