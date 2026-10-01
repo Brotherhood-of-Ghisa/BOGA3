@@ -1577,9 +1577,8 @@ E0.1–E0.3).
   `exercise-picker.test.tsx` (`picker: group exercises (E0.1)`, `pick sheet (E0.2)`, `signed out`),
   `exercise-catalog-link-menu.test.tsx`, `exercise-group-links-add-as-new.test.ts`,
   and the exercise page's ⋮ Link item in `exercise-page-screen.test.tsx`;
-  Maestro `groups-two-user-stream.yaml` (§8, step 4b), which opens the Link
-  screen from a catalogue row's ⋮ and reads back the link made on the group
-  page.
+  the client calls against the live server in lane `groups-api-live`. (The
+  Link screen left `groups-two-user-stream.yaml` with the thin flow, §8.)
 
 **As-built (M25-T08, group page).** Product D10, D14, and E0.4; M25 design
 §1 and §7.
@@ -1662,7 +1661,8 @@ E0.1–E0.3).
 - **Evidence.** Jest: `groups-exercise-screens.test.tsx`,
   `groups-exercise-view-model.test.ts`, `groups-cache.test.ts`, and the
   member cases moved to the Members route in `groups-write-screens.test.tsx`.
-  Maestro: step 4b of `groups-two-user-stream.yaml` (§8).
+  Maestro: step 4 of `groups-two-user-stream.yaml` (one custom exercise
+  through the form, §8); the catalogue calls run live in `groups-api-live`.
 
 **As-built (M25-T09): leaderboards.** Product P6–P9, D11, D12, E1.1–E1.3; M25
 design §7.
@@ -1710,8 +1710,9 @@ design §7.
   nothing.
 - **Evidence.** Jest: `groups-board-api.test.ts`,
   `groups-board-view-model.test.ts`, `groups-online-pages.test.tsx`,
-  `groups-leaderboards-screens.test.tsx`, `groups-cache.test.ts`. Maestro:
-  steps 7b and 8b of `groups-two-user-stream.yaml` (§8).
+  `groups-leaderboards-screens.test.tsx`, `groups-cache.test.ts`; the board
+  calls run live in `groups-api-live`. Maestro: step 6 of
+  `groups-two-user-stream.yaml` (§8) opens one board row.
   Rows became pressable in M25-T10 (below).
 
 **As-built (M25-T10): stream record items, row detail, certify.** Product
@@ -1790,9 +1791,9 @@ P10–P18, D3–D5, D15, D16, E2, E3; M25 design §4, §6.
 - **Evidence.** Jest: `groups-certification-api.test.ts`,
   `groups-record-set-view-model.test.ts`, `groups-record-set-sheet.test.tsx`,
   `groups-stream-view-model.test.ts`, `groups-api.test.ts`,
-  `groups-leaderboards-screens.test.tsx`. Maestro: steps 7b, 7c (M25-T11:
-  record card, certify, Certified boards), and 8b of
-  `groups-two-user-stream.yaml` (§8).
+  `groups-leaderboards-screens.test.tsx`; certify, withdraw and cancel run
+  live in `groups-api-live`. Maestro: step 6 of `groups-two-user-stream.yaml`
+  (§8) certifies once from a board row's sheet.
 
 **As-built (groups UI iteration, post-M25).** Supersedes the Groups tab,
 group screen, and Today details above where they differ. No server change.
@@ -2104,6 +2105,23 @@ group screen, and Today details above where they differ. No server change.
     the certification's server `certified_at` (so it includes the device's
     steps up to the script, and any host/VM clock skew). Observed on the
     M25-T11 PR; data, not a promise (§7).
+- **As-built (thin flow, post-M28).** Supersedes the step lists above. The
+  flow keeps only what needs a device: cold boot and sign-in, the username
+  gate, create, the invite code read off screen, the join and two members
+  after a focus refresh, one custom exercise through the form, the `Training
+  now` card, the completed friend view without owner actions and with the
+  native back on repeat visits, certifying the counterparty's linked set from
+  its Leaderboards board row (sheet, then backdrop), and removing the
+  counterparty through the native alert. The standard copy, rename, Link your
+  exercise, the Link screen, archive, the edited card, History, the record
+  card and Today, multi-metric and Certified reads, unlink, bodyweight, the
+  former member, and the removed member's `NOT_FOUND` left Maestro: the server
+  rules are `groups-contract` / `groups-leaderboards`, the screens are Jest,
+  and every groups client call runs against the live server in lane
+  `groups-api-live` (`apps/mobile/app/__tests__/groups-api-live.test.ts`). The
+  counterparty keeps `sign-in`, `join`, `push-active`, `push-complete-edit`,
+  `latency`, and `link-board` (now to the custom `Sled Push`, which is no
+  longer renamed).
 - **Offline behaviour (AC12, AC13)** is proven in jest. Simulator network
   cannot be toggled reliably from Maestro.
 
