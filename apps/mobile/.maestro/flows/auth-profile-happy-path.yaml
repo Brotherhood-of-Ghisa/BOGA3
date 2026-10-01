@@ -5,8 +5,8 @@ appId: com.dinoderek.mobile
 # Proves:
 #   1. a wiped, signed-out launch lands on the sign-in gate (login-on-start);
 #   2. the fixture user signs in through real GoTrue;
-#   3. More → Settings → Connected agents loads the real grant list (empty for
-#      this user), and the native back returns;
+#   3. Settings → Connected agents loads the real grant list (empty for this
+#      user), and the native back returns;
 #   4. Profile loads the user's real row, and a username update is written to
 #      Supabase (`Profile updated.`);
 #   5. sign-out drops the session, and the route guard returns to the gate.
@@ -94,41 +94,12 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 60000
-# Now signed in: open More -> Settings -> Profile and exercise the account affordances.
-# Use extendedWaitUntil (poll) rather than a bare assertVisible after each
-# navigating tap: the tab/screen transition can lag a beat on the cold-JIT first
-# render (an immediate assert raced it and flaked once), and polling rides that
-  # out without padding the run. The harness teleport can leave the tab scene
-  # sliding for a beat even after its content is visible, so settle it before
-  # resolving and tapping a tab element.
-- extendedWaitUntil:
-    visible:
-      id: "main-bottom-tabs"
-    timeout: 15000
-- waitForAnimationToEnd:
-    timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "top-level-tab-more"
-      - extendedWaitUntil:
-          visible:
-            id: "more-screen"
-          timeout: 15000
-# Settings is the last row of the last section on More, so it sits below the
-# fold on a 402x874 device (row 766-854; the scroll viewport ends at 752).
-# Scroll it into view rather than tapping blind: before the type scale grew the
-# row heights, the row's centre sat 5pt inside the viewport and a bare tapOn
-# happened to land, which made this step one padding change away from failing.
-- scrollUntilVisible:
-    element:
-      id: "more-settings-row"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- tapOn:
-    id: "more-settings-row"
+# Now signed in: open Settings by deep link (More -> Settings is
+# settings-dev-wipe-local's claim, and its last-row scroll costs ~9s) and
+# exercise the account affordances. Use extendedWaitUntil (poll) rather than a
+# bare assertVisible after each navigation: the screen transition can lag a beat
+# on the cold-JIT first render (an immediate assert raced it and flaked once).
+- openLink: "boga3://settings"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
@@ -162,12 +133,13 @@ appId: com.dinoderek.mobile
     visible:
       id: "settings-screen"
     timeout: 15000
+# No centerElement: the Profile row starts Settings, so it never moves (spec 06
+# rule 3).
 - scrollUntilVisible:
     element:
       id: "settings-profile-row"
     direction: UP
     visibilityPercentage: 100
-    centerElement: true
 - tapOn:
     id: "settings-profile-row"
 - extendedWaitUntil:

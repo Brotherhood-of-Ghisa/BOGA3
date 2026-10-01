@@ -580,10 +580,10 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: "groups-07b-3-board-all-1rm"
+# No centerElement: it starts the board, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-board-metric-weight" }
     direction: UP
-    centerElement: true
     timeout: 15000
 - tapOn: { id: "group-board-metric-weight" }
 - scrollUntilVisible:
@@ -599,10 +599,10 @@ appId: com.dinoderek.mobile
     visible: { id: "group-metric-record-raw" }
     timeout: 15000
 - assertVisible: "As logged: Weight 102\\.5 kg × 5"
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
-    centerElement: true
     timeout: 15000
 - assertVisible: "Uncertified"
 - waitForAnimationToEnd
@@ -611,10 +611,10 @@ appId: com.dinoderek.mobile
 # from the modal accessibility tree, so tap the exposed region directly.
 - tapOn: { point: "50%,8%" }
 - assertNotVisible: { id: "group-metric-record-sheet" }
+# No centerElement: it starts the board, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-board-history-button" }
     direction: UP
-    centerElement: true
     timeout: 15000
 - tapOn: { id: "group-board-history-button" }
 - scrollUntilVisible:
@@ -661,10 +661,10 @@ appId: com.dinoderek.mobile
     visible: { id: "group-metric-record-metric-e1rm" }
     timeout: 15000
 - tapOn: { id: "group-metric-record-metric-e1rm" }
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
-    centerElement: true
     timeout: 15000
 - tapOn: { id: "group-metric-record-certify" }
 - extendedWaitUntil:
@@ -679,10 +679,10 @@ appId: com.dinoderek.mobile
     centerElement: true
     timeout: 15000
 - tapOn: { id: "group-metric-record-metric-weight" }
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
-    centerElement: true
     timeout: 15000
 - tapOn: { id: "group-metric-record-certify" }
 - extendedWaitUntil:
@@ -721,10 +721,10 @@ appId: com.dinoderek.mobile
 - assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 110\\.0 kg, Weight 110 kg × 5, .*, rules revision 1"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-07c-4-board-certified-weight"
+# No centerElement: it starts the board, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-board-history-button" }
     direction: UP
-    centerElement: true
     timeout: 15000
 - tapOn: { id: "group-board-history-button" }
 - scrollUntilVisible:
@@ -742,10 +742,10 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible: "1st, ${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}, Weight, 110\\.0 kg, Weight 110 kg × 5, .*, certified, rules revision 1"
 - tapOn: { id: "group-board-row-1" }
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-withdraw" }
     direction: DOWN
-    centerElement: true
     timeout: 15000
 - assertNotVisible: { id: "group-metric-record-certify" }
 - waitForAnimationToEnd
@@ -945,10 +945,10 @@ appId: com.dinoderek.mobile
 - assertNotVisible: "Absolute strength"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-bodyweight-03-normal-record"
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
-    centerElement: true
 - tapOn: { id: "group-metric-record-certify" }
 - extendedWaitUntil:
     visible: { id: "group-metric-record-status", text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
@@ -977,10 +977,10 @@ appId: com.dinoderek.mobile
     direction: DOWN
     centerElement: false
 - tapOn: { id: "group-exercise-form-submit" }
+# No centerElement: the form ends just below it, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-rules-preview" }
     direction: DOWN
-    centerElement: true
 - assertVisible: "Apply rules revision 2: 100% → 70% bodyweight contribution, total Weight.*"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-bodyweight-05-rule-change-preview"
@@ -1006,10 +1006,10 @@ appId: com.dinoderek.mobile
     visible: { id: "group-board-row-1", text: ".*1RM, .*rules revision 2" }
     timeout: 15000
 - tapOn: { id: "group-board-row-1" }
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
-    centerElement: true
 - tapOn: { id: "group-metric-record-certify" }
 - extendedWaitUntil:
     visible: { id: "group-metric-record-status", text: "Certified by ${MAESTRO_GROUPS_DEVICE_USERNAME} · .*" }
@@ -1036,10 +1036,10 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - tapOn: { id: "group-board-row-1" }
 - assertVisible: { id: "group-metric-record-raw", text: "As logged: Weight 20 kg × 5" }
+# No centerElement: it ends the record sheet, so it never moves (spec 06 rule 3).
 - scrollUntilVisible:
     element: { id: "group-metric-record-certify" }
     direction: DOWN
-    centerElement: true
 - assertVisible: "Uncertified"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-bodyweight-08-corrected-input-review"
