@@ -64,6 +64,22 @@ export const applyAllMigrations = (client: Database.Database): void => {
   }
 };
 
+// One migrated database per test file (Jest gives each file its own module
+// registry), serialized once and cloned for every fixture: cloning the snapshot
+// costs well under a millisecond, re-running every migration costs tens. Tests
+// about migrations themselves call `applyAllMigrations` on their own client.
+let migratedSnapshot: Buffer | null = null;
+
+const getMigratedSnapshot = (): Buffer => {
+  if (!migratedSnapshot) {
+    const client = new Database(':memory:');
+    applyAllMigrations(client);
+    migratedSnapshot = client.serialize();
+    client.close();
+  }
+  return migratedSnapshot;
+};
+
 /**
  * Creates a fresh in-memory database with the full migrated schema applied.
  *
@@ -83,8 +99,7 @@ export const applyAllMigrations = (client: Database.Database): void => {
 export const createInMemoryDatabase = (
   options: { foreignKeys?: boolean } = {},
 ): InMemoryDatabaseFixture => {
-  const client = new Database(':memory:');
-  applyAllMigrations(client);
+  const client = new Database(getMigratedSnapshot());
   if (options.foreignKeys !== false) {
     client.pragma('foreign_keys = ON');
   }

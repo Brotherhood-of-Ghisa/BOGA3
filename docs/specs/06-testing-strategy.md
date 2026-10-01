@@ -296,16 +296,40 @@ screenshots are the visual evidence.
 - Unit tests that need a real local SQLite engine (rather than a mocked client)
   must use the shared fixture at
   `apps/mobile/app/__tests__/helpers/in-memory-db.ts`.
-- The helper spins up an in-memory `better-sqlite3` database, applies **all**
+- The helper spins up an in-memory `better-sqlite3` database with **all**
   migrations from the generated bundle (`apps/mobile/drizzle/migrations.generated.ts`)
-  in journal order, and returns the drizzle handle, the raw client, and a
-  `close()` teardown.
+  applied in journal order, turns foreign-key enforcement on (as the app does at
+  boot), and returns the drizzle handle, the raw client, and a `close()`
+  teardown. It migrates once per test file and gives every call a copy of that
+  migrated snapshot, so a fixture per test costs well under a millisecond.
 - Rules:
   - do not hand-roll DB setup or copy DDL into individual tests; drive the schema
     from the generated bundle so every test tracks the real shipped schema when a
     new migration lands.
   - call `createInMemoryDatabase()` in `beforeEach` and `close()` in `afterEach`.
-    Pass `{ foreignKeys: true }` when the test depends on FK enforcement.
+    Pass `{ foreignKeys: false }` only to plant a deliberate orphan, with the
+    reason at the call site.
+  - tests about migrations themselves (upgrade paths, bundle integrity) build
+    their own client and call `applyAllMigrations`; the snapshot does not
+    exercise the production migrator (`drizzle-orm/expo-sqlite/migrator`, which
+    tracks applied migrations), so upgrade-path coverage stays with those tests,
+    and the native migrator on a fresh install with the `ios-data-smoke` lane.
+- **Device alignment.** Jest's SQLite must share major.minor with the SQLite
+  the app ships: `better-sqlite3`'s bundled build vs `expo-sqlite`'s vendored
+  copy (`node_modules/expo-sqlite/vendor/sqlite3/`, or `sqlcipher/` when the
+  app enables SQLCipher). `better-sqlite3` is pinned to an exact version for
+  this, and `sqlite-device-parity.test.ts` fails when an Expo SDK or
+  `better-sqlite3` upgrade breaks the match. Fix it by re-pinning
+  `better-sqlite3` to a release whose bundled SQLite (`deps/download.sh`)
+  matches; prefer a patch at or below the device's, so Jest is never the more
+  permissive engine.
+- **Screens over real data.** `apps/mobile/app/__tests__/helpers/local-data.ts`
+  renders production screens, repositories and caches over this fixture,
+  replacing only the native database open in `src/data/bootstrap.ts` (its
+  stand-in replays the boot steps screens depend on: infra-free starter catalog,
+  foreign-key integrity check, catalog-cache invalidation on reset) and seeding
+  through the Maestro harness fixtures (`loadMaestroFixture`). Reference use:
+  `stats-screen-local-data.test.tsx`.
 - Exception: tests that intentionally create a deliberately partial schema to
   assert negative-space behavior (for example `clock.test.ts`, which builds only
   `sync_runtime_state` so a stray write to another table surfaces as a
