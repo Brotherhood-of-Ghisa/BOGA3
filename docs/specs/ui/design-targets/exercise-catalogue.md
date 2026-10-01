@@ -55,7 +55,7 @@ Device: iPhone simulator at 390pt width, light.
 | `picker-options` (`ios-session-view`) | visible sort and never-done controls |
 | `picker-preselection` (`ios-session-view`) | a picked exercise with a plan from history |
 | `03-session-view-exercise-added` (`ios-session-view`) | the session view after `Add empty set` |
-| `exercise-swap-sheet` (`ios-exercise-page`) | ⋮ → Swap exercise: the shared list in the swap sheet |
+| `exercise-swap-sheet` (ad hoc) | ⋮ → Swap exercise: the shared list in the swap sheet |
 | `groups-link-03-picker-search` (`ios-groups-e2e`) | a search with `From your groups` |
 
 Additional browser comparison states: Favourite and A–Z, never-done on/off,

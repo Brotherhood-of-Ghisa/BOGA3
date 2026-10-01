@@ -96,9 +96,8 @@ case "$lane" in
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
     ;;
 
-  # The exercise page (exercise/session redesign step 4): its own fixture,
-  # seeded and reset in-flow through the maestro-harness deep link. Infra-free; its own lane so the new screen's
-  # evidence (the V5-* captures) is one run. No Supabase.
+  # The exercise page: its own fixture, seeded and reset in-flow through the
+  # maestro-harness deep link. Infra-free, no Supabase.
   exercise-page)
     run_flow data "Exercise page" exercise-page.yaml
     ;;

@@ -1,110 +1,48 @@
 appId: com.dinoderek.mobile
 ---
-# The exercise page (`docs/specs/ui/ux-rules.md` §14a), on its
-# own `exercise-page` fixture:
-# an active session whose Barbell Bench Press has two performed sets and three
-# planned ones, plus two completed Bench Press sessions for the records panel.
+# The exercise page (`docs/specs/ui/ux-rules.md` §14a) on its `exercise-page`
+# fixture: an active session whose Barbell Bench Press has two performed sets
+# and three planned ones, plus two completed Bench Press sessions for the
+# records panel (ios-exercise-page lane, infra-free).
 #
-# Proves on device:
-#   1. the page renders the accepted target's states (V5-Quiet, V5-Records,
-#      V5-Last, V5-Effort, V5-Menu) — each captured for the design comparison;
-#   2. the logger logs the current set with a changed effort and reps, and moves
-#      on; `+ Add set` copies the last set;
-#   3. Complete warns that the pending planned sets will be discarded (Cancel
-#      keeps the page), then goes back;
-#   4. re-opening the page shows those planned sets as not performed — kept,
-#      not deleted — and the logged sets as performed.
-#
-# Hermetic: starts from `reset=data` and ends with `reset=data`. Infra-free
-# (no sign-in).
+# Proves:
+#   1. the records panel's `History` pushes Exercise history, which lists the
+#      newer fixture session, and the native back returns to the page;
+#   2. the logger takes reps on the keyboard, commits set 3 as `82.5 × 5`, and
+#      marks it performed.
+# Why device:
+#   1. a stack push and the native back button;
+#   2. the keyboard.
+# Jest counterpart: app/__tests__/exercise-page-screen.test.tsx (the page over
+#   the same fixture: records, Last, effort cycle and sheet, menu, swap,
+#   `+ Add set`, Complete's warning, discarded planned sets read back from the
+#   database), app/__tests__/exercise-page-model.test.ts (effort inheritance),
+#   app/__tests__/exercise-history-screen.test.tsx (periods, bests, cards).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-page&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
-# The dev-client "Open in <App>?" URL-scheme trust dialog and expo-dev-client's
-# developer-menu onboarding sheet can appear on top of the freshly-loaded app;
-# dismiss them. Each tap is an optional no-op when its target is absent.
-- tapOn:
-    text: "Open"
-    optional: true
-- tapOn:
-    text: "Continue"
-    optional: true
-- tapOn:
-    text: "Close"
-    optional: true
 - extendedWaitUntil:
     visible:
       id: "exercise-page"
     timeout: 30000
-- assertVisible:
-    id: "exercise-page-title"
-    text: "Barbell Bench Press"
+# The records load in above the logger; wait for them before tapping
+# (spec 06 rule 4).
 - extendedWaitUntil:
     visible:
       id: "exercise-records-1rm"
       text: "1RM 102.1"
     timeout: 15000
-- assertVisible:
-    id: "exercise-set-logger"
-- assertVisible:
-    id: "exercise-set-2-toggle"
-    text: "Mark set 2 not performed"
-- assertVisible:
-    id: "exercise-set-4-toggle"
-    text: "Mark set 4 performed"
 - takeScreenshot: "exercise-page-v5-quiet"
 
-# V5-Records, then V5-Last. Wait for initial route presentation before tapping.
+# --- 1. Records → History → back ---
 - waitForAnimationToEnd:
     timeout: 4000
-- tapOn:
-    id: "exercise-records-toggle"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-record-vol"
-    timeout: 5000
-- takeScreenshot: "exercise-page-v5-records"
-- tapOn:
-    id: "exercise-records-view-last"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-records-last"
-    timeout: 5000
-- takeScreenshot: "exercise-page-v5-last"
-- tapOn:
-    id: "exercise-records-toggle"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-records-collapsed"
-    timeout: 5000
-
-# Exercise history (`ux-rules` §13), opened by the records panel's `History`:
-# the default period (last 30 days) holds the newer fixture session; All time
-# adds the older one. Both carry a warm-up. Then back to the page.
 - tapOn:
     id: "exercise-records-history"
 - extendedWaitUntil:
     visible:
-      id: "exercise-history-screen"
-    timeout: 10000
-- extendedWaitUntil:
-    visible:
       id: "exercise-history-session-card-maestro_exercise_page_history_2_bench"
     timeout: 10000
-- assertVisible:
-    id: "exercise-history-best-card"
-- assertNotVisible:
-    id: "exercise-history-session-card-maestro_exercise_page_history_1_bench"
-- assertVisible:
-    id: "exercise-history-set-row-maestro_exercise_page_history_2_bench_set_1-values"
-    text: "60.0 × 10"
 - takeScreenshot: "exercise-history-default"
-- tapOn:
-    id: "exercise-history-period-chip-all"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-history-session-card-maestro_exercise_page_history_1_bench"
-    timeout: 10000
-- takeScreenshot: "exercise-history-all-time"
 # The native back item is arrow-only; it reads the previous route's title.
 - tapOn: "Exercise"
 - extendedWaitUntil:
@@ -114,59 +52,7 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 
-# Effort cycles from prescribed RIR 1, through warm-up and blank, then RIR 3 downward.
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently RIR 0"
-- takeScreenshot: "effort-cycle-0"
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently W-Up"
-- takeScreenshot: "effort-cycle-1"
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently none"
-- takeScreenshot: "effort-cycle-2"
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently RIR 3"
-- takeScreenshot: "effort-cycle-3"
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently RIR 2"
-- takeScreenshot: "effort-cycle-4"
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible:
-    id: "exercise-set-logger-effort"
-    text: "Change effort, currently RIR 1"
-- takeScreenshot: "effort-cycle-5"
-- longPressOn:
-    id: "exercise-set-logger-effort"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-effort-sheet"
-    timeout: 5000
-- takeScreenshot: "exercise-page-v5-effort"
-- tapOn:
-    id: "exercise-effort-option-rir_0"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-logger-effort"
-      text: "Change effort, currently RIR 0"
-    timeout: 5000
-
-# Log set 3 as 82.5 × 5; the logger moves to set 4.
+# --- 2. Log set 3 on the keyboard: 82.5 × 5 ---
 - tapOn:
     id: "exercise-set-logger-reps"
 - eraseText: 3
@@ -183,197 +69,3 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "exercise-set-3-values"
     text: "82.5 × 5"
-
-# V5-Menu, dismissed by the backdrop. The sheet is modal to VoiceOver, which
-# hides the backdrop from the accessibility tree Maestro reads, so tap a point
-# above the sheet instead of its id.
-- tapOn:
-    id: "exercise-page-options"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-options-sheet"
-    timeout: 5000
-- assertVisible: "Remove from session"
-- takeScreenshot: "exercise-page-v5-menu"
-- tapOn:
-    point: "50%,10%"
-- extendedWaitUntil:
-    notVisible:
-      id: "exercise-options-sheet"
-    timeout: 5000
-
-# ⋮ → Swap exercise: the shared exercise list in the swap sheet, dismissed by
-# the backdrop (tapped by point, as above) without swapping.
-- tapOn:
-    id: "exercise-page-options"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-options-swap"
-    timeout: 5000
-- tapOn:
-    id: "exercise-options-swap"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-swap-list"
-    timeout: 10000
-- takeScreenshot: "exercise-swap-sheet"
-# The shared browser is taller. Tap the exposed backdrop below the safe area;
-# 7% lands inside the top inset on the 402×874pt phone.
-- tapOn:
-    point: "50%,8%"
-- extendedWaitUntil:
-    notVisible:
-      id: "exercise-swap-list"
-    timeout: 5000
-- assertVisible:
-    id: "exercise-page-title"
-    text: "Barbell Bench Press"
-
-# `+ Add set` copies set 5 (85 × 5) into a new set 6; log it.
-- tapOn:
-    id: "exercise-add-set"
-- hideKeyboard:
-    optional: true
-- tapOn:
-    id: "exercise-set-logger-commit"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-6-toggle"
-      text: "Mark set 6 not performed"
-    timeout: 5000
-- takeScreenshot: "exercise-page-logged"
-
-# Complete: the two planned sets still waiting are named; Cancel keeps the page.
-- tapOn:
-    id: "exercise-complete"
-- extendedWaitUntil:
-    visible: "2 planned sets will be discarded."
-    timeout: 5000
-- takeScreenshot: "exercise-page-complete-warning"
-- tapOn: "Cancel"
-- assertVisible:
-    id: "exercise-page"
-- tapOn:
-    id: "exercise-complete"
-- extendedWaitUntil:
-    visible: "2 planned sets will be discarded."
-    timeout: 5000
-- tapOn: "Complete"
-- extendedWaitUntil:
-    notVisible:
-      id: "exercise-page"
-    timeout: 10000
-
-# Re-open: the discarded planned sets are still there, not performed.
-- openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
-- tapOn:
-    text: "Open"
-    optional: true
-- extendedWaitUntil:
-    visible:
-      id: "exercise-page"
-    timeout: 30000
-- assertVisible:
-    id: "exercise-set-3-toggle"
-    text: "Mark set 3 not performed"
-- assertVisible:
-    id: "exercise-set-5-toggle"
-    text: "Mark set 5 performed"
-- assertVisible:
-    id: "exercise-set-6-toggle"
-    text: "Mark set 6 not performed"
-- assertVisible:
-    id: "exercise-set-logger"
-- takeScreenshot: "exercise-page-after-complete"
-
-# Use the session's short squat list for default inheritance. A neutral records
-# statistic dismisses the decimal keyboard; center Add above the fixed footer.
-- openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_squat"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-page-title"
-      text: "Barbell Back Squat"
-    timeout: 15000
-- waitForAnimationToEnd:
-    timeout: 4000
-- scrollUntilVisible:
-    element: { id: "exercise-add-set" }
-    direction: DOWN
-    centerElement: true
-- tapOn:
-    id: "exercise-add-set"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-logger"
-    timeout: 10000
-- scrollUntilVisible:
-    element: { id: "exercise-records-1rm" }
-    direction: UP
-    centerElement: true
-- tapOn: { id: "exercise-records-1rm" }
-- waitForAnimationToEnd:
-    timeout: 4000
-- scrollUntilVisible:
-    element: { id: "exercise-set-logger-effort" }
-    direction: DOWN
-    centerElement: true
-- longPressOn:
-    id: "exercise-set-logger-effort"
-- tapOn:
-    id: "exercise-effort-option-warm_up"
-- extendedWaitUntil:
-    notVisible:
-      id: "exercise-effort-sheet"
-    timeout: 5000
-- waitForAnimationToEnd:
-    timeout: 4000
-- scrollUntilVisible:
-    element: { id: "exercise-add-set" }
-    direction: DOWN
-    centerElement: true
-- tapOn:
-    id: "exercise-add-set"
-- scrollUntilVisible:
-    element: { id: "exercise-records-1rm" }
-    direction: UP
-    centerElement: true
-- tapOn: { id: "exercise-records-1rm" }
-- waitForAnimationToEnd:
-    timeout: 4000
-- scrollUntilVisible:
-    element: { id: "exercise-set-logger-effort" }
-    direction: DOWN
-    centerElement: true
-- assertVisible: "Change effort, currently none"
-- takeScreenshot: "effort-after-warmup-blank"
-- tapOn:
-    id: "exercise-set-logger-effort"
-- assertVisible: "Change effort, currently RIR 3"
-- scrollUntilVisible:
-    element: { id: "exercise-add-set" }
-    direction: DOWN
-    centerElement: true
-- tapOn:
-    id: "exercise-add-set"
-- scrollUntilVisible:
-    element: { id: "exercise-records-1rm" }
-    direction: UP
-    centerElement: true
-- tapOn: { id: "exercise-records-1rm" }
-- waitForAnimationToEnd:
-    timeout: 4000
-- scrollUntilVisible:
-    element: { id: "exercise-set-logger-effort" }
-    direction: DOWN
-    centerElement: true
-- assertVisible: "Change effort, currently RIR 3"
-- takeScreenshot: "effort-inherited-rir3"
-
-# Leave the simulator as found: data wiped.
-- openLink: "boga3://maestro-harness?reset=data"
-- tapOn:
-    text: "Open"
-    optional: true
-- extendedWaitUntil:
-    visible: "Maestro data reset complete."
-    timeout: 30000
