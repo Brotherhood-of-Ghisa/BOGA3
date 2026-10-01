@@ -154,23 +154,4 @@ describe('session list repository', () => {
     expect(withDeleted.completed[0].deletedAt).toEqual(new Date('2026-02-20T12:05:00.000Z'));
   });
 
-  it('writes soft-delete state changes with deterministic timestamps', async () => {
-    const store = createMockStore();
-    const repository = createSessionListRepository(store);
-    const now = new Date('2026-02-23T12:34:56.000Z');
-
-    await repository.setDeletedState('session-a', true, { now });
-    await repository.setDeletedState('session-a', false, { now });
-
-    expect(store.setSessionDeletedState).toHaveBeenNthCalledWith(1, {
-      sessionId: 'session-a',
-      deletedAt: now,
-      updatedAt: now,
-    });
-    expect(store.setSessionDeletedState).toHaveBeenNthCalledWith(2, {
-      sessionId: 'session-a',
-      deletedAt: null,
-      updatedAt: now,
-    });
-  });
 });

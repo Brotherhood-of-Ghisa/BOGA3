@@ -97,9 +97,11 @@ const getMigratedSnapshot = (): Buffer => {
  *   site.
  */
 export const createInMemoryDatabase = (
-  options: { foreignKeys?: boolean } = {},
+  options: { foreignKeys?: boolean; snapshot?: Buffer } = {},
 ): InMemoryDatabaseFixture => {
-  const client = new Database(getMigratedSnapshot());
+  // `snapshot`: start from a serialized database instead of the bare migrated
+  // schema (helpers/local-data.ts reuses a booted one).
+  const client = new Database(options.snapshot ?? getMigratedSnapshot());
   if (options.foreignKeys !== false) {
     client.pragma('foreign_keys = ON');
   }

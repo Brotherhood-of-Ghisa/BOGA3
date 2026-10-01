@@ -36,11 +36,19 @@ type ForeignKeyCheckRow = { table?: string; rowid?: number; parent?: string };
 
 let current: InMemoryDatabaseFixture | null = null;
 let booted = false;
+// Raw access before the first boot means the database is not a clean boot.
+let touchedBeforeBoot = false;
+// The first clean boot in a test file, serialized: later databases start from
+// it instead of re-seeding the starter catalog (~160 ms a test).
+let bootedSnapshot: Buffer | null = null;
 
 const currentFixture = (): InMemoryDatabaseFixture => {
   if (!current) {
-    current = createInMemoryDatabase();
-    booted = false;
+    current = bootedSnapshot
+      ? createInMemoryDatabase({ snapshot: bootedSnapshot })
+      : createInMemoryDatabase();
+    booted = bootedSnapshot !== null;
+    touchedBeforeBoot = false;
   }
   return current;
 };
@@ -73,6 +81,9 @@ const bootOnce = (fixture: InMemoryDatabaseFixture): LocalDatabase => {
   }
 
   booted = true;
+  if (!bootedSnapshot && !touchedBeforeBoot) {
+    bootedSnapshot = fixture.client.serialize();
+  }
   return database;
 };
 
@@ -128,14 +139,19 @@ export const bootLocalApp = async (): Promise<void> => {
     ensureExerciseCatalogLoaded,
     getExerciseCatalogSnapshot,
   } = require('@/src/exercise-catalog/cache');
+  const { getExerciseCatalogStatsSnapshot } = require('@/src/exercise-catalog/stats-cache');
   await act(async () => {
     await bootstrapLocalDataLayer();
-    // A seed that invalidated the catalog leaves a reload in flight; wait
-    // until it lands so it cannot re-render the screen after the test ends.
+    // A seed invalidates the catalog (and the history cache that listens to
+    // it), leaving reloads in flight; wait until they land so they cannot
+    // re-render the screen after the test ends.
     do {
       await ensureExerciseCatalogLoaded();
       await new Promise((resolve) => setTimeout(resolve, 0));
-    } while (getExerciseCatalogSnapshot().status !== 'ready');
+    } while (
+      getExerciseCatalogSnapshot().status !== 'ready' ||
+      getExerciseCatalogStatsSnapshot().status === 'loading'
+    );
   });
 };
 
@@ -155,4 +171,10 @@ export const loadMaestroFixture = async (name: MaestroHarnessFixtureName): Promi
 export const localDatabase = (): LocalDatabase => bootOnce(currentFixture());
 
 /** The raw better-sqlite3 client, for SQL assertions. */
-export const localDataClient = () => currentFixture().client;
+export const localDataClient = () => {
+  const fixture = currentFixture();
+  if (!booted) {
+    touchedBeforeBoot = true;
+  }
+  return fixture.client;
+};

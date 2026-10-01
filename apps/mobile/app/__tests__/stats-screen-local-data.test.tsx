@@ -65,6 +65,9 @@ describe('Stats over real data', () => {
 
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
     expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/Sets \(W\/Sets\)\s*10 \(8\)/);
+    // Against the adjacent previous 7 days of the same fixture.
+    expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*6\s*\+3/);
+    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/\+7 \(\+7\)/);
     expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toBeTruthy();
   });
 
