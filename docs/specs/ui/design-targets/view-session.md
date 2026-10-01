@@ -77,7 +77,7 @@ live view it follows the logging cards and Add exercise, preserving their
 hierarchy. Historical View Session consolidates the review sections as specified below.
 Share remains exercise-only.
 Verification states: `session-summary-muscle`, `session-summary-exercise` (ad hoc),
-`session-live-muscle-comparison`, plus the completion/share captures above.
+`session-live-muscle-comparison` (ad hoc), plus the completion/share captures above.
 
 ## Historical Summary / Sets (2026-09-25)
 
