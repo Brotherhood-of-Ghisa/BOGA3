@@ -1,8 +1,8 @@
 /**
- * The exercise page's persistence against the real repository and a real
- * migrated in-memory SQLite: the lane fixture seeds through the session's own
- * write path, a save replaces only the page's exercise, a removal leaves the
- * others, and the records panel reads what History reads.
+ * The exercise page repository's guards, which no screen path reaches: a
+ * completed session is never written back as a draft, and a save never
+ * recreates an exercise or a session that is gone. Everything the page itself
+ * does over real data is asserted in `exercise-page-screen.test.tsx`.
  */
 /* eslint-disable import/first */
 
@@ -22,15 +22,10 @@ jest.mock('@/src/data/bootstrap', () => ({
 }));
 
 import { __resetClockForTests } from '@/src/data/clock';
-import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
 import { exerciseDefinitions } from '@/src/data/schema';
-import { completeSessionDraft, loadSessionSnapshotById } from '@/src/data/session-drafts';
-import { setSessionDeletedState } from '@/src/data/session-list';
+import { completeSessionDraft } from '@/src/data/session-drafts';
 import { EXERCISE_PAGE_FIXTURE, seedExercisePageFixture } from '@/src/maestro/exercise-page-fixture';
-import { commitSet, planCompleteExercise } from '@/src/session-recorder/exercise-page-model';
-import { deriveExerciseRecords } from '@/src/session-recorder/exercise-records';
 import {
-  loadSessionExerciseDraft,
   saveSessionExerciseDraft,
   SessionExerciseDraftError,
 } from '@/src/session-recorder/session-exercise-draft';
@@ -69,61 +64,7 @@ describe('exercise page persistence', () => {
     mockActiveDatabase = null;
   });
 
-  it('loads one exercise of the active session, and refuses what is not there', async () => {
-    const loaded = await loadSessionExerciseDraft(activeSessionId, benchSessionExerciseId);
-    expect(loaded.status).toBe('ready');
-    if (loaded.status !== 'ready') return;
-    expect(loaded.exercise.sets.map((set) => set.performanceStatus ?? null)).toEqual([
-      null,
-      null,
-      'planned',
-      'planned',
-      'planned',
-    ]);
-
-    expect(await loadSessionExerciseDraft(activeSessionId, 'nope')).toEqual({
-      status: 'missing-exercise',
-    });
-    expect(await loadSessionExerciseDraft('nope', benchSessionExerciseId)).toEqual({
-      status: 'missing-session',
-    });
-    await setSessionDeletedState(HISTORY_SESSION_ID, true);
-    expect(await loadSessionExerciseDraft(HISTORY_SESSION_ID, HISTORY_BENCH_ID)).toEqual({
-      status: 'not-editable',
-    });
-  });
-
-  it('edits an exercise of a completed session in place: still completed, same times, every row kept', async () => {
-    const before = await loadSessionSnapshotById(HISTORY_SESSION_ID);
-    const loaded = await loadSessionExerciseDraft(HISTORY_SESSION_ID, HISTORY_BENCH_ID);
-    expect(loaded).toMatchObject({ status: 'ready', sessionStatus: 'completed' });
-    if (loaded.status !== 'ready') return;
-
-    // Untick the last set: autosave keeps it, unconfirmed, until the session view's Done.
-    const sets = loaded.exercise.sets.map((set, index) =>
-      index === 3 ? { ...set, weightValue: '85', performanceStatus: 'unperformed' as const } : set
-    );
-    await saveSessionExerciseDraft(HISTORY_SESSION_ID, {
-      sessionExerciseId: HISTORY_BENCH_ID,
-      exercise: { ...loaded.exercise, sets },
-      sessionStatus: 'completed',
-    });
-
-    const after = await loadSessionSnapshotById(HISTORY_SESSION_ID);
-    expect(after).toMatchObject({
-      status: 'completed',
-      startedAt: before?.startedAt,
-      completedAt: before?.completedAt,
-      durationSec: before?.durationSec,
-    });
-    expect(after?.exercises[0]?.sets.map((set) => [set.weightValue, set.performanceStatus ?? null])).toEqual([
-      ['60', null],
-      ['80', null],
-      ['80', null],
-      ['85', 'unperformed'],
-    ]);
-
-    // A completed session is not written back as a draft.
+  it('refuses to write a completed session back as a draft', async () => {
     await expect(
       saveSessionExerciseDraft(HISTORY_SESSION_ID, {
         sessionExerciseId: HISTORY_BENCH_ID,
@@ -131,72 +72,6 @@ describe('exercise page persistence', () => {
         sessionStatus: 'active',
       })
     ).rejects.toEqual(new SessionExerciseDraftError('not-editable'));
-  });
-
-  it('saves only its own exercise and keeps the rest of the session as persisted', async () => {
-    const loaded = await loadSessionExerciseDraft(activeSessionId, benchSessionExerciseId);
-    if (loaded.status !== 'ready') throw new Error('not loaded');
-    const [, , third] = loaded.exercise.sets;
-    const sets = commitSet(loaded.exercise.sets, third!.id, {
-      weightValue: '82.5',
-      repsValue: '5',
-      setType: 'rir_4',
-    });
-
-    await saveSessionExerciseDraft(activeSessionId, {
-      sessionExerciseId: benchSessionExerciseId,
-      exercise: { ...loaded.exercise, sets },
-      sessionStatus: 'active',
-    });
-
-    const session = await loadSessionSnapshotById(activeSessionId);
-    expect(session?.status).toBe('active');
-    expect(session?.exercises.map((exercise) => exercise.id)).toEqual([
-      benchSessionExerciseId,
-      squatSessionExerciseId,
-    ]);
-    expect(session?.exercises[0]?.sets[2]).toMatchObject({
-      weightValue: '82.5',
-      repsValue: '5',
-      setType: 'rir_4',
-      performanceStatus: null,
-      plannedRepsValue: '6',
-    });
-    expect(session?.exercises[1]?.sets).toHaveLength(1);
-  });
-
-  it('persists Complete as unperformed planned rows, never deleting them', async () => {
-    const loaded = await loadSessionExerciseDraft(activeSessionId, benchSessionExerciseId);
-    if (loaded.status !== 'ready') throw new Error('not loaded');
-    const plan = planCompleteExercise(loaded.exercise.sets);
-
-    await saveSessionExerciseDraft(activeSessionId, {
-      sessionExerciseId: benchSessionExerciseId,
-      exercise: { ...loaded.exercise, sets: plan.nextSets },
-      sessionStatus: 'active',
-    });
-
-    const reloaded = await loadSessionExerciseDraft(activeSessionId, benchSessionExerciseId);
-    if (reloaded.status !== 'ready') throw new Error('not reloaded');
-    expect(
-      reloaded.exercise.sets.map((set) => [set.performanceStatus ?? null, set.plannedRepsValue ?? null])
-    ).toEqual([
-      [null, null],
-      [null, null],
-      ['unperformed', '6'],
-      ['unperformed', '6'],
-      ['unperformed', '5'],
-    ]);
-  });
-
-  it('removes the exercise and leaves the others', async () => {
-    await saveSessionExerciseDraft(activeSessionId, {
-      sessionExerciseId: benchSessionExerciseId,
-      exercise: null,
-      sessionStatus: 'active',
-    });
-    const session = await loadSessionSnapshotById(activeSessionId);
-    expect(session?.exercises.map((exercise) => exercise.id)).toEqual([squatSessionExerciseId]);
   });
 
   it('will not recreate an exercise or a session that is gone', async () => {
@@ -221,26 +96,5 @@ describe('exercise page persistence', () => {
         sessionStatus: 'active',
       })
     ).rejects.toEqual(new SessionExerciseDraftError('not-editable'));
-  });
-
-  it('derives the records panel from completed history, the active session excluded', async () => {
-    const history = await loadExercisePerformanceHistory({
-      exerciseDefinitionId: EXERCISE_PAGE_FIXTURE.benchExerciseId,
-      period: 'all',
-      now: NOW,
-    });
-    const { records, last } = deriveExerciseRecords(history?.sessions ?? []);
-
-    expect(records.oneRepMax?.value).toBeCloseTo(102.14, 2);
-    expect(records.oneRepMax).toMatchObject({ weight: 80, reps: 8 });
-    expect(records.maxWeight).toMatchObject({ weight: 82.5, reps: 6 });
-    expect(records.volume).toMatchObject({ value: 2560, setCount: 5 });
-    expect(last?.volume).toBe(2375);
-    expect(last?.sets.map((set) => [set.setType, set.weight, set.reps])).toEqual([
-      ['warm_up', 60, 10],
-      ['rir_2', 80, 8],
-      ['rir_1', 80, 8],
-      ['rir_0', 82.5, 6],
-    ]);
   });
 });
