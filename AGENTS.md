@@ -56,6 +56,21 @@ place each under `docs/specs/**`, routed from here.
      Adding a Maestro flow or scenario needs a justification (why Jest cannot
      prove it) and the operator's approval first; every flow states what it
      proves (spec `06`, "Maestro scope policy").
+   - **Quality targets — run once before the PR.** Not in CI and not in
+     `boga test fast`, so nothing runs them for you: on the finished change run
+     `./boga test jest-coverage` and `./boga test complexity`, get both green,
+     and list both in the PR's Tests table.
+     - Coverage floor (whole suite, `app`/`components`/`src`): **80% branches,
+       80% lines**. Branches is the tight one (82% when the floor landed).
+     - Per function: cyclomatic complexity **≤ 20**, cognitive complexity
+       **≤ 25**, **≤ 200** lines, nesting depth **≤ 4**, **≤ 5** params.
+       Functions already over a limit are grandfathered in
+       `apps/mobile/eslint-complexity-suppressions.json`; that list only
+       shrinks (`npm run lint:complexity -- --prune-suppressions` after you
+       split one).
+     - Meet a target by adding tests or splitting the function. Lowering a
+       threshold or adding a suppression needs the operator's agreement.
+       Details: spec `02`, "Quality targets".
    - **The full sweep** (`./boga sweep --ref <ref>`, every lane in its own
      worktree) is required only before a release build. Otherwise suggest it to
      the operator when `boga test for` flags it; they decide.

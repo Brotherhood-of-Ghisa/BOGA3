@@ -16,6 +16,8 @@ Link CI runs / artifacts / prior threads — do not paste them.
 | Lane / gate | Result | Evidence |
 | --- | --- | --- |
 | `./boga test fast` | | |
+| `./boga test jest-coverage` | | |
+| `./boga test complexity` | | |
 
 Agreed with operator: <!-- yes, plus anything lowered or raised and why -->
 

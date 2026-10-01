@@ -43,4 +43,10 @@ module.exports = {
   // text-summary: console totals; json-summary: machine-readable totals;
   // lcov: per-file HTML report (coverage/lcov-report/index.html) + lcov.info.
   coverageReporters: ['text-summary', 'json-summary', 'lcov'],
+  // Floor for the whole-suite coverage run (AGENTS.md, spec 02 "Quality
+  // targets"). Global, so it only means something on a full run: a scoped
+  // `--coverage <path>` run counts every other file as 0% and fails it.
+  coverageThreshold: {
+    global: { branches: 80, lines: 80 },
+  },
 };
