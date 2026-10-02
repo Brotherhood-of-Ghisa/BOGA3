@@ -145,7 +145,7 @@ commit boundaries.
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
 per-feature coverage policies live next to the tests they govern (e.g.
-`apps/mobile/app/__tests__/sync/README.md`), not in the specs.
+`apps/mobile/__tests__/sync/README.md`), not in the specs.
 
 Product and domain details are maintained in the specs above — do not duplicate
 them here.

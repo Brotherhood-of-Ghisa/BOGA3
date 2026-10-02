@@ -2,7 +2,7 @@ import { defaultThemeSeeds, type ThemeSeeds } from '@/components/ui/theme';
 
 // The themes a user can choose (`docs/specs/ui/design-language.md` §2,
 // "Presets"). A preset is four seeds, fixed here and gated in
-// `app/__tests__/ui-theme.test.ts`: there is no free colour picker, so no seed
+// `__tests__/ui-theme.test.ts`: there is no free colour picker, so no seed
 // ever needs correcting at runtime. Picked 2026-10-01 from a mock of six: one
 // per hue family.
 export type ThemePreset = {

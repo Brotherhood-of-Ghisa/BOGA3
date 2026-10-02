@@ -11,7 +11,7 @@
 # trigger registry; the human tables live in AGENTS.md / spec 02). Per path,
 # the requirement is the UNION of every matching row minus any `-name`
 # removals those rows carry (so a narrower row can drop what a broader one
-# added, e.g. jest suites under app/__tests__ drop the simulator lanes). The
+# added, e.g. group screens drop frontend-ui for the groups e2e lane). The
 # change's default is the union over its paths, and each lane is printed with
 # the rule that selected it. `frontend` subsumes `frontend-ui`.
 #
@@ -154,8 +154,7 @@ if not ordered:
 # touches shared UI chrome or many screens is where the selective UI tier is
 # most likely to miss a cross-screen break the e2e lanes would catch.
 SHARED_UI = re.compile(r"^apps/mobile/(components/(ui|navigation)/|app/\(tabs\)/_layout\.tsx$)")
-ui_paths = [p for p in paths if re.match(r"^apps/mobile/(app|components)/", p)
-            and not p.startswith("apps/mobile/app/__tests__/")]
+ui_paths = [p for p in paths if re.match(r"^apps/mobile/(app|components)/", p)]
 shared = [p for p in ui_paths if SHARED_UI.match(p)]
 if shared or len(ui_paths) >= 15:
     why = (f"touches shared UI chrome ({shared[0]}{' …' if len(shared) > 1 else ''})" if shared

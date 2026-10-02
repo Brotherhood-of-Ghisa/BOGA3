@@ -146,7 +146,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
 make_tree() {
-  mkdir -p "$1/.maestro/flows" "$1/components" "$1/app/__tests__"
+  mkdir -p "$1/.maestro/flows" "$1/components" "$1/components/__tests__"
   cat >"$1/components/row.tsx" <<'EOF'
 export const Row = ({ testID, n }) => <View testID={`${testID}-row`}><Text testID={`set-${n}-toggle`} /></View>;
 export const Screen = () => <Row testID="stats-list" n={1} />;
@@ -176,7 +176,7 @@ printf -- '- tapOn:\n    id: "gone-screen-row"\n' >>"${TMP}/unknown-prefix/.maes
 expect_check fail "a leading-slot template whose prefix no source produces" "${TMP}/unknown-prefix"
 
 make_tree "${TMP}/test-only"
-printf 'const x = "only-in-a-jest-suite";\n' >"${TMP}/test-only/app/__tests__/x.test.tsx"
+printf 'const x = "only-in-a-jest-suite";\n' >"${TMP}/test-only/components/__tests__/x.test.tsx"
 printf -- '- tapOn:\n    id: "only-in-a-jest-suite"\n' >>"${TMP}/test-only/.maestro/flows/a.yaml"
 expect_check fail "an id that exists only in a jest suite" "${TMP}/test-only"
 

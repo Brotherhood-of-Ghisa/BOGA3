@@ -82,8 +82,8 @@ codebase areas/changes should trigger it — by path/area). Infrastructure value
 | `npm run lint:deps` | dependency-cruiser with `dependency-cruiser.config.cjs` over `app/**`, `components/**`, `src/**` (tests excluded, type-only imports included): no cycles, `src/**` never imports UI, and the `src/data` / `src/exercise-calculations` layer rules (spec 09, "Import direction"). Violations that predate the rules are grandfathered in `dependency-cruiser-known-violations.json`; anything else fails. `npm run lint:deps:prune` shrinks the baseline after a fix. | none | Once on the finished change, before the PR (spec 02, "Quality targets"). Not in CI and **not** in any gate aggregate — run by name (`./boga test dependencies`). |
 | `npm run typecheck` | Regenerates router types (`router:types`) then `tsc --noEmit`. | none | Any `apps/mobile/**` TS change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm test` | Full Jest unit/integration suite. Bare `jest` — deliberately **no `--forceExit`** (see *Unit-test hang safety*). Excludes infra-dependent sync tests (they live behind `test:sync:infra`). | none | Any `apps/mobile/**` change. Part of the fast gate (`./boga test fast`) and CI. |
-| `npm run test:sync` | `jest app/__tests__/sync` — the sync-focused subset (still infra-free; the infra-dependent files in that dir fail fast without an endpoint and are normally run via `test:sync:infra`). | none | Targeted feedback while editing mobile sync code under `apps/mobile/app/__tests__/sync/**` or the sync runtime it covers. |
-| `npm run test:sync:infra` | Runs the four **infra-dependent** sync tests by path: `drift-check.test.ts` (shells out to `check:sync-drift --strict`), `cycle-round-trip.test.ts` (real push→server-LWW→pull→local-LWW round trip, incl. a wiped-client reinstall re-pull), `cycle-multidevice-lww.test.ts` (two local DBs sharing one server: end-to-end LWW collisions, multi-device convergence, future-clock-clamp reconciliation), and `auth-required-envelope.test.ts` (unauthenticated cycle is a clean no-op). | local Supabase + Docker. Reads `SYNC_TEST_SUPABASE_URL` / `SYNC_TEST_SUPABASE_ANON_KEY` — these normally point at **this worktree's own local stack** (`API_URL`/`ANON_KEY` from `supabase status -o env`); it is **runnable locally, not a deferred/remote lane**. | Changes to the mobile sync cycle, client Drizzle schemas, the migration bundle, or the wire contract under `apps/mobile/src/**` sync code and `apps/mobile/app/__tests__/sync/**`. |
+| `npm run test:sync` | `jest __tests__/sync` — the sync-focused subset (still infra-free; the infra-dependent files in that dir fail fast without an endpoint and are normally run via `test:sync:infra`). | none | Targeted feedback while editing mobile sync code under `apps/mobile/__tests__/sync/**` or the sync runtime it covers. |
+| `npm run test:sync:infra` | Runs the four **infra-dependent** sync tests by path: `drift-check.test.ts` (shells out to `check:sync-drift --strict`), `cycle-round-trip.test.ts` (real push→server-LWW→pull→local-LWW round trip, incl. a wiped-client reinstall re-pull), `cycle-multidevice-lww.test.ts` (two local DBs sharing one server: end-to-end LWW collisions, multi-device convergence, future-clock-clamp reconciliation), and `auth-required-envelope.test.ts` (unauthenticated cycle is a clean no-op). | local Supabase + Docker. Reads `SYNC_TEST_SUPABASE_URL` / `SYNC_TEST_SUPABASE_ANON_KEY` — these normally point at **this worktree's own local stack** (`API_URL`/`ANON_KEY` from `supabase status -o env`); it is **runnable locally, not a deferred/remote lane**. | Changes to the mobile sync cycle, client Drizzle schemas, the migration bundle, or the wire contract under `apps/mobile/src/**` sync code and `apps/mobile/__tests__/sync/**`. |
 | `npm run test:handles` | Open-handle guard: `jest --detectOpenHandles --silent`, serial. Surfaces any leaked handle (unclosed connection, lingering timer, real Supabase transport) with a stack after tests pass. Can be scoped (e.g. `-- sync-cycle`). | none | Any change that touches timers, connections, async teardown, or test fixtures. Part of CI; **not** in any gate aggregate — run `./boga test handles` before opening a PR. |
 | `npm run test:coverage` | `jest --coverage --silent`: the `npm test` suite instrumented with Babel/istanbul. Counts every `app/**`, `components/**` and `src/**` source file (`collectCoverageFrom` in `jest.config.js`), so an untested file reports 0% rather than dropping out. Prints totals; writes `coverage/coverage-summary.json` and the per-file HTML report `coverage/lcov-report/index.html`. Fails below the global floor of 80% branches / 80% lines (`coverageThreshold`; spec 02, "Quality targets"). | none | Once on the finished change, before the PR (spec 02, "Quality targets"); also whenever you want to see which lines/branches a change leaves untested. Not in CI and **not** in any gate aggregate — run by name (`./boga test jest-coverage`). |
 | `npm run db:generate` | `drizzle-kit generate` + `tsx scripts/bundle-migrations.ts`: regenerates `drizzle/*.sql` AND the committed runtime bundle `drizzle/migrations.generated.ts`. Idempotent. | none | Any schema change under `apps/mobile/src/data/**` / `apps/mobile/drizzle/**`. Run it and commit the regenerated artifacts. |
@@ -138,7 +138,7 @@ lanes keep their own wrapper scripts (`test-sync-v2-e2e.sh`,
 | `auth-authz` | `tests/auth-authz-contract.sh` | Real auth context + RLS behavior: owner success, cross-user denial, validation/unauthorized paths (incl. `auth.users`-keyed profile tables and `public.app_logs` insert/read-deny). | local Supabase + Docker | `supabase/migrations/**` (RLS/policies/functions), auth config. Part of `boga test backend`. |
 | `groups-contract` | `tests/groups-contract.sh` | The M22 group domain (`docs/specs/tech/groups-contract.md` §8). Record half: the share rule across join/leave/rejoin and offline-late sessions, `group_stream` (All dedupe, per-group scope, membership items) and `group_session_detail` (every live set as raw synced text, no GPS), edit/tombstone/undelete flow-through, and share-trigger failure isolation (`sync_push` stays `ok`). Membership half: catalog ground rules (RLS on, no policies or direct grants, no `owner_user_id`, no Sync v2 FK), every RPC success path and error token, the owner/admin/member role matrix, leave/rejoin periods, removal, transfer, invite normalization/regeneration, non-member ≡ nonexistent `NOT_FOUND`, `AUTH_REQUIRED` (anon) and `AGENT_FORBIDDEN` (`client_id` token) on every RPC, and direct PostgREST denial on every group table. Hermetic: provisions and deletes its own per-run users. | local Supabase + Docker | Any group-domain migration/RPC change under `supabase/**`. Part of `boga test backend`. |
 | `groups-leaderboards` | `tests/groups-leaderboards.sh`, `tests/groups-boards.sh`, `tests/groups-certification.sh`, `tests/groups-bodyweight.sh`, then `tests/groups-week-summary.sh` | Legacy evaluator/board/certification coverage remains. After the accepted cutover is implemented, `groups-bodyweight.sh` must own independent group preference/contribution, off/on persistence, ordinary and strict policies, kg total/per-side scoring, raw-Weight/source-1RM/target-conversion mode-mismatch vectors, off/zero no-reading-access vectors, positive-missing reading invalidation, reading changes across session boundaries, missing-reading score omission with raw activity retained, private-field non-disclosure, certification invalidation, coherent publication, archive/rejoin, claim fences and failure isolation. Direct-drain mode makes Edge assertions deterministic; anonymous/OAuth/outsider and direct-table denial remain mandatory. Hermetic per-run fixtures restore runtime settings. `groups-week-summary.sh` owns the week summary read (groups contract §4.7): working sets from the facts' `working` flag, group records, ranks and ties, window edges, training now and staleness, the latest completed session on both record pipelines, and removed-member exclusion. | local Supabase + Docker (Edge Runtime, pg_net, pg_cron) | Evaluator migrations, `supabase/functions/group-eval/**`, or the TS it loads (`src/groups/set-facts.ts`, `src/exercise-calculations/**`, `src/data/set-types.ts`, `src/config/training.ts`). Part of `boga test backend`. |
-| `groups-api-live` | `tests/groups-api-live.sh` → `apps/mobile/app/__tests__/groups-api-live.test.ts` | The app's groups client (`src/groups/api.ts`) against the live server: two run users (owner, member) and every client call, so a drifted RPC name, parameter or response shape fails here instead of on a device. Each test builds its own group; the lane deletes the run's users and groups. Server rules stay in `groups-contract` / `groups-leaderboards`. |
+| `groups-api-live` | `tests/groups-api-live.sh` → `apps/mobile/__tests__/groups-api-live.test.ts` | The app's groups client (`src/groups/api.ts`) against the live server: two run users (owner, member) and every client call, so a drifted RPC name, parameter or response shape fails here instead of on a device. Each test builds its own group; the lane deletes the run's users and groups. Server rules stay in `groups-contract` / `groups-leaderboards`. |
 | `agent-api` | `tests/agent-api-contract.sh` | Real Supabase OAuth dynamic registration + authorization code/PKCE + consent and dedicated API proof: owner-only reads, cross-owner/nonexistent 404 equivalence, profile privacy, canonical calculations, limits/cursors, invalid/expired/revoked 401, direct RLS/write and `sync_push` denial, and metadata-only audit. | local Supabase + Docker | Agent auth/RLS migration, OAuth config, or `supabase/functions/agent-api/**`. Part of `boga test backend`. |
 | `sync-v2-schema` | `tests/sync-v2-schema-smoke.sh` | Sync-v2 clean-room schema shape (the columns/indexes/triggers/RLS the migration ships). | local Supabase + Docker | `supabase/migrations/**` sync-v2 schema changes. Part of `boga test backend`. |
 | `sync-push-contract` | `tests/sync-push-contract.sh` | `sync_push` RPC contract: LWW, clamp, undelete, envelope, batch caps, FK closure, auth/RLS. | local Supabase + Docker | `sync_push` RPC / sync push contract changes under `supabase/**`. Part of `boga test backend`. |
@@ -287,7 +287,7 @@ Two shapes by default; pick by what is under test, not by habit.
   unit tests, no database and no render: this is where edge cases are enumerated.
 - **Screens over real data** — a screen's behaviour renders the production
   route over the in-memory SQLite fixture through
-  `apps/mobile/app/__tests__/helpers/local-data.ts` (see *In-memory SQLite unit
+  `apps/mobile/__tests__/helpers/local-data.ts` (see *In-memory SQLite unit
   tests*), seeded with a Maestro harness fixture where one fits. Queries,
   caches, hooks and the screen are production code, so a broken query or a
   stale cache fails here and not only on the simulator.
@@ -316,7 +316,7 @@ its own (sync, tombstones); otherwise the screen tests cover the query.
 
 - Unit tests that need a real local SQLite engine (rather than a mocked client)
   must use the shared fixture at
-  `apps/mobile/app/__tests__/helpers/in-memory-db.ts`.
+  `apps/mobile/__tests__/helpers/in-memory-db.ts`.
 - The helper spins up an in-memory `better-sqlite3` database with **all**
   migrations from the generated bundle (`apps/mobile/drizzle/migrations.generated.ts`)
   applied in journal order, turns foreign-key enforcement on (as the app does at
@@ -344,7 +344,7 @@ its own (sync, tombstones); otherwise the screen tests cover the query.
   `better-sqlite3` to a release whose bundled SQLite (`deps/download.sh`)
   matches; prefer a patch at or below the device's, so Jest is never the more
   permissive engine.
-- **Screens over real data.** `apps/mobile/app/__tests__/helpers/local-data.ts`
+- **Screens over real data.** `apps/mobile/__tests__/helpers/local-data.ts`
   renders production screens, repositories and caches over this fixture,
   replacing only the native database open in `src/data/bootstrap.ts` (its
   stand-in replays the boot steps screens depend on: infra-free starter catalog,
@@ -394,10 +394,10 @@ its own (sync, tombstones); otherwise the screen tests cover the query.
 Per-feature coverage policies live in the README of the test directory they
 govern — read them when editing tests there (rule in `AGENTS.md`):
 
-- `apps/mobile/app/__tests__/sync/README.md` — sync integration coverage policy
+- `apps/mobile/__tests__/sync/README.md` — sync integration coverage policy
   (cycle, cursors, dirty bits, quarantine, AUTH_REQUIRED, reinstall re-pull, and
   the UI↔server e2e requirement).
-- `apps/mobile/app/__tests__/README.md` — GPS gym-location, exercise-tag, auth
+- `apps/mobile/__tests__/README.md` — GPS gym-location, exercise-tag, auth
   bootstrap, and profile-management coverage policies.
 
 This document keeps only the cross-cutting policies below.
@@ -685,7 +685,7 @@ journeys and what Jest cannot reach; everything else belongs in Jest.
   `supabase/tests/` — backend-local smoke/integration test entrypoints (until a
   dedicated helper workspace is introduced).
 - Do not couple backend work to a mobile test-directory refactor (e.g. moving
-  `apps/mobile/app/__tests__`) unless a dedicated change scopes it.
+  `apps/mobile/__tests__`) unless a dedicated change scopes it.
 
 ---
 

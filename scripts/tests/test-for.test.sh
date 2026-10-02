@@ -41,12 +41,12 @@ not_requires frontend      apps/mobile/components/Button.tsx
 not_requires backend       apps/mobile/components/Button.tsx
 not_requires ios-sync-e2e  apps/mobile/components/Button.tsx
 
-# jest suites under app/__tests__ → fast only (no simulator)
-requires fast              apps/mobile/app/__tests__/ui-icon.test.tsx
-not_requires frontend-ui   apps/mobile/app/__tests__/ui-icon.test.tsx
-not_requires frontend      apps/mobile/app/__tests__/ui-icon.test.tsx
-requires backend           apps/mobile/app/__tests__/sync/pull.test.ts
-not_requires frontend-ui   apps/mobile/app/__tests__/sync/pull.test.ts
+# jest suites under apps/mobile/__tests__ → fast only (no simulator)
+requires fast              apps/mobile/__tests__/ui-icon.test.tsx
+not_requires frontend-ui   apps/mobile/__tests__/ui-icon.test.tsx
+not_requires frontend      apps/mobile/__tests__/ui-icon.test.tsx
+requires backend           apps/mobile/__tests__/sync/pull.test.ts
+not_requires frontend-ui   apps/mobile/__tests__/sync/pull.test.ts
 
 # root layout / harness → the full frontend gate (frontend-ui folded into it)
 requires frontend          apps/mobile/app/_layout.tsx

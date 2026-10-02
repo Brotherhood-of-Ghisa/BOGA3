@@ -27,7 +27,7 @@ function resolveAndroidPackage(): string {
 // Android XML family below is registered under the same string, so
 // `{ fontFamily, fontWeight }` resolves identically on both. `uiFonts` in
 // components/ui/tokens.ts is the app-side vocabulary for these faces;
-// app/__tests__/ui-fonts-embedded.test.ts holds the three in step.
+// __tests__/ui-fonts-embedded.test.ts holds the three in step.
 const EMBEDDED_FONT_FACES = [
     { family: "Archivo", weight: 600, file: "archivo/600SemiBold/Archivo_600SemiBold.ttf" },
     { family: "Archivo", weight: 700, file: "archivo/700Bold/Archivo_700Bold.ttf" },

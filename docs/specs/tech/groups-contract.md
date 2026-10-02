@@ -1338,7 +1338,7 @@ into the group (§2.5), so the viewer cannot compute it from shared data.
 **As-built (post-M22).** `session-metrics.ts` exports `toGroupPerformedSet`,
 `selectGroupPerformedExercises`, and `computeGroupSessionMetrics`; the stream
 view model and `FriendSessionContent` use them. Jest:
-`apps/mobile/app/__tests__/groups-session-metrics.test.ts`.
+`apps/mobile/__tests__/groups-session-metrics.test.ts`.
 
 ## 6. Mobile client architecture
 
@@ -2197,7 +2197,7 @@ group screen, and Today details above where they differ. No server change.
   former member, and the removed member's `NOT_FOUND` left Maestro: the server
   rules are `groups-contract` / `groups-leaderboards`, the screens are Jest,
   and every groups client call runs against the live server in lane
-  `groups-api-live` (`apps/mobile/app/__tests__/groups-api-live.test.ts`). The
+  `groups-api-live` (`apps/mobile/__tests__/groups-api-live.test.ts`). The
   counterparty keeps `sign-in`, `join`, `push-active`, `push-complete-edit`,
   `latency`, and `link-board` (now to the custom `Sled Push`, which is no
   longer renamed).

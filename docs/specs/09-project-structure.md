@@ -20,8 +20,8 @@ Define the canonical repository structure, path ownership, and placement convent
   apps/
     agent-auth-web/              # Static Supabase OAuth consent application
     mobile/                      # Expo React Native app (current primary codebase)
-      app/                       # Expo Router routes/screens
-      app/__tests__/             # Current app-side test location (legacy/needs rationalization)
+      app/                       # Expo Router routes/screens only (no tests: every file is a route)
+      __tests__/                 # Jest suites (+ sync/, helpers/, colocated READMEs)
       components/                # UI components
         ui/                      # Canonical UI tokens + primitives foundation (M8+)
       src/                       # Non-route app code (domain/data/helpers)
@@ -183,8 +183,10 @@ Define the canonical repository structure, path ownership, and placement convent
   - must not be committed.
 - `apps/mobile/scripts/`
   - keep Maestro runtime/toolkit wrappers here (`maestro-env.sh`, `maestro-ios-*.sh`) rather than introducing a separate top-level test-runtime folder.
-- Mobile test-directory refactor
-  - moving tests out of `apps/mobile/app/__tests__/` is a valid follow-up improvement, but it must be done in a dedicated task (not mixed into unrelated backend work).
+- `apps/mobile/__tests__/`
+  - canonical location for mobile Jest suites, shared test helpers (`helpers/`), and per-area coverage policies (`README.md`, `sync/README.md`).
+  - never put a test file under `apps/mobile/app/`: Expo Router's typed-routes generator (`expo start` and `scripts/generate-router-types.js`) declares every `.ts`/`.tsx` file there as a route, and enough extra routes make `tsc` fail with TS2590. `__tests__/router-types-generator.test.ts` fails on any test file under `app/`.
+  - a small colocated `__tests__/` under `src/**` (e.g. `src/navigation/__tests__/`) is allowed; tests import routes as `@/app/...` or by relative path.
 
 ## Placement guidance
 
@@ -221,5 +223,4 @@ Imports that broke a rule when it landed are grandfathered in
 
 ## Known cleanup opportunities (tracked)
 
-- Rationalize mobile test placement currently under `apps/mobile/app/__tests__/` into a dedicated mobile test directory (deferred to a dedicated follow-up task).
 - Optional follow-up: add a repo-root command alias surface (for example root `package.json` script aliases) if ergonomics justify it; current canonical wrappers are `./scripts/quality-fast.sh` and `./scripts/quality-slow.sh`.

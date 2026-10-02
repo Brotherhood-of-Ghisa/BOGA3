@@ -27,7 +27,7 @@
 # a release build, otherwise suggested to the operator) runs everything.
 apps/mobile/app/**	fast,frontend-ui	UI screens / routes
 apps/mobile/components/**	fast,frontend-ui	UI components
-apps/mobile/app/__tests__/**	-frontend-ui	jest suites (fast gate; no simulator)
+apps/mobile/__tests__/**	fast	jest suites (fast gate; no simulator)
 apps/mobile/app/_layout.tsx	frontend	root layout: boot effects (every lane boots through it)
 apps/mobile/components/navigation/root-stack.tsx	frontend	root stack: route access groups (every lane boots through it)
 apps/mobile/components/navigation/auth-route-guard.tsx	frontend	boot restore guard (every lane boots through it)
@@ -42,7 +42,7 @@ apps/mobile/app/group-session/**	-frontend-ui,ios-smoke,ios-groups-e2e	group ses
 apps/mobile/app/(tabs)/groups.tsx	-frontend-ui,ios-smoke,ios-groups-e2e	Groups tab (groups e2e + launch smoke)
 apps/mobile/app/exercise-link.tsx	-frontend-ui,ios-smoke,ios-groups-e2e	group exercise link screen (groups e2e + launch smoke)
 apps/mobile/components/groups/**	-frontend-ui,ios-smoke,ios-groups-e2e	group components (groups e2e + launch smoke)
-apps/mobile/app/__tests__/sync/**	fast,backend	sync tests (sync-infra lane covers them)
+apps/mobile/__tests__/sync/**	fast,backend	sync tests (sync-infra lane covers them)
 apps/mobile/src/sync/**	fast,backend,ios-sync-e2e	sync runtime
 apps/mobile/src/auth/**	fast,backend,ios-sync-e2e	auth / session wiring
 apps/mobile/src/data/**	fast,backend	data layer / client schema
@@ -81,8 +81,8 @@ supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies
 supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-api-live	shared group lane fixtures
 supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
-apps/mobile/app/__tests__/groups-api-live.test.ts	groups-api-live	the groups client live suite
-apps/mobile/app/__tests__/helpers/groups-live-endpoint.ts	groups-api-live	the groups client live suite's endpoint helper
+apps/mobile/__tests__/groups-api-live.test.ts	groups-api-live	the groups client live suite
+apps/mobile/__tests__/helpers/groups-live-endpoint.ts	groups-api-live	the groups client live suite's endpoint helper
 supabase/scripts/**	backend	backend wrappers / runtime scripts
 supabase/scripts/local-runtime-*.sh	meta-tests	edge function server start/stop (functions-serve-stop meta-test)
 supabase/scripts/_common.sh	meta-tests	edge function server start/stop (functions-serve-stop meta-test)

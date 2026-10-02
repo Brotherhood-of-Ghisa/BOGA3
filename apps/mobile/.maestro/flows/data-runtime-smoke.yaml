@@ -18,12 +18,12 @@ appId: com.dinoderek.mobile
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
 #   4. the root-stack replace after Finish.
-# Jest counterpart: app/__tests__/exercise-picker.test.tsx,
-#   app/__tests__/exercise-page-screen.test.tsx (logger),
-#   app/__tests__/set-effort-defaults.test.ts (first-set warm-up),
-#   app/__tests__/session-view-model.test.ts (Finish prompts),
-#   app/__tests__/completed-session-local-data.test.tsx (Done → Stats),
-#   app/__tests__/stats-screen-local-data.test.tsx, app/__tests__/sessions-screen.test.tsx.
+# Jest counterpart: __tests__/exercise-picker.test.tsx,
+#   __tests__/exercise-page-screen.test.tsx (logger),
+#   __tests__/set-effort-defaults.test.ts (first-set warm-up),
+#   __tests__/session-view-model.test.ts (Finish prompts),
+#   __tests__/completed-session-local-data.test.tsx (Done → Stats),
+#   __tests__/stats-screen-local-data.test.tsx, __tests__/sessions-screen.test.tsx.
 #
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
