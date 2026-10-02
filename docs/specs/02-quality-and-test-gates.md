@@ -269,8 +269,13 @@ opening the PR**, and lists both in the PR's Tests table. Both must be green.
 | Lane | Target | Where it lives |
 | --- | --- | --- |
 | `jest-coverage` | Whole-suite floor: **80% branches, 80% lines** (`app/**`, `components/**`, `src/**`, tests excluded). Branches is the tight one (82.2% when the floor landed; lines 92.6%). | `coverageThreshold` in `apps/mobile/jest.config.js` |
-| `complexity` | Per function in the same source: cyclomatic complexity **≤ 20**, cognitive complexity (`sonarjs`) **≤ 25**, **≤ 200** lines (blank lines and comments excluded), nesting depth **≤ 4**, **≤ 5** parameters. | `apps/mobile/eslint.complexity.config.js` |
+| `complexity` | Per function in the same source: cognitive complexity (`sonarjs`) **≤ 25**, **≤ 200** lines (blank lines and comments excluded), nesting depth **≤ 4**, **≤ 5** parameters. | `apps/mobile/eslint.complexity.config.js` |
 
+- **Cognitive, not cyclomatic.** ESLint's cyclomatic `complexity` counts every
+  `?.`, `??` and `&&` as a path, so it flagged flat, readable guards and prop
+  defaults and pushed splits that did not aid reading; branch coverage
+  (`jest-coverage`) already measures how much of each function is tested.
+  Cognitive complexity scores what is hard to read: nested control flow.
 - **Grandfathered offenders.** The functions already over a complexity limit
   when it landed are listed, as counts per file and rule, in
   `apps/mobile/eslint-complexity-suppressions.json` (ESLint bulk

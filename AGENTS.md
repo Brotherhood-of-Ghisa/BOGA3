@@ -62,8 +62,8 @@ place each under `docs/specs/**`, routed from here.
      and list both in the PR's Tests table.
      - Coverage floor (whole suite, `app`/`components`/`src`): **80% branches,
        80% lines**. Branches is the tight one (82% when the floor landed).
-     - Per function: cyclomatic complexity **≤ 20**, cognitive complexity
-       **≤ 25**, **≤ 200** lines, nesting depth **≤ 4**, **≤ 5** params.
+     - Per function: cognitive complexity **≤ 25**, **≤ 200** lines,
+       nesting depth **≤ 4**, **≤ 5** params.
        Functions already over a limit are grandfathered in
        `apps/mobile/eslint-complexity-suppressions.json`; that list only
        shrinks (`npm run lint:complexity -- --prune-suppressions` after you
