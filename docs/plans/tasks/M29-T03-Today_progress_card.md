@@ -1,7 +1,7 @@
-# M29-T02-Today_progress_card — Rebuild Today around the Progress card
+# M29-T03-Today_progress_card — Rebuild Today around the Progress card
 
 - Status: `planned`
-- Depends on: `M29-T01-Progress_summary_data`
+- Depends on: `M29-T02-Progress_summary_data`
 - Milestone: `docs/plans/milestones/M29-today-landing-page.md`
 - Areas: frontend; UI impact: yes
 
@@ -11,14 +11,14 @@ Today loses its title, its next-workout / active-workout card and its separate
 recent-sessions list, and opens on the Progress card of `today-landing.md`:
 the week figures with last-week bars, the month working-sets line against the
 previous month, and the latest session with `All sessions`. The current Group
-activity section stays as it is until T04.
+activity section stays as it is until T05.
 
 ## Scope
 
 - In: `app/(tabs)/today.tsx`; a Progress card component and a small cumulative
   line chart (`react-native-svg`, already a dependency); the empty state; Jest;
   Maestro changes this forces; the Today docs.
-- Out: the group card (T04); Train; the Progress and Sessions screens.
+- Out: the group card (T05); Train; the Progress and Sessions screens.
 
 ## Decided
 
@@ -44,7 +44,7 @@ activity section stays as it is until T04.
 
 ## Deliverables and acceptance
 
-1. Today renders the Progress card exactly per the brief, from T01's read.
+1. Today renders the Progress card exactly per the brief, from T02's read.
 2. Empty history shows the `Your week starts here` panel with `Open Train`.
 3. Loading and error keep the existing `StatePanel` recipes.
 4. The removed next-workout/plan card and recents list leave no dead code,
