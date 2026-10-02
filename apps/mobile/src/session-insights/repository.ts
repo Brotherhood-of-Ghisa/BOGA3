@@ -5,6 +5,7 @@ import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
+import { loadEarlierBestE1rmByDefinition } from "@/src/data/exercise-session-facts";
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
@@ -52,6 +53,11 @@ export type SessionInsightsStore = {
   loadExerciseSets(
     sessionExerciseIds: string[],
   ): Promise<SessionInsightSetRow[]>;
+  /** Each definition's best 1RM before the target, from the exercise session facts. */
+  loadEarlierBestEstimatedOneRepMax(input: {
+    target: { sessionId: string; completedAt: Date };
+    exerciseDefinitionIds: string[];
+  }): Promise<ReadonlyMap<string, number>>;
   loadMuscleCatalog?(): Promise<{
     definitions: {
       id: string;
@@ -206,6 +212,9 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       }));
   },
 
+  loadEarlierBestEstimatedOneRepMax: ({ target, exerciseDefinitionIds }) =>
+    loadEarlierBestE1rmByDefinition(target, exerciseDefinitionIds),
+
   async loadExerciseSets(sessionExerciseIds) {
     if (sessionExerciseIds.length === 0) return [];
     const database = await bootstrapLocalDataLayer();
@@ -306,8 +315,14 @@ export const createCompletedSessionInsightsRepository = (
     );
     if (!targetGraph) return null;
     const catalog = await store.loadMuscleCatalog?.();
+    const historicalBestByDefinitionId = await store.loadEarlierBestEstimatedOneRepMax({
+      target: { sessionId: target.sessionId, completedAt: target.completedAt },
+      exerciseDefinitionIds: [...new Set(targetGraph.exercises.flatMap((exercise) =>
+        exercise.exerciseDefinitionId === null ? [] : [exercise.exerciseDefinitionId]))],
+    });
 
     return deriveCompletedSessionInsights({
+      historicalBestByDefinitionId,
       targetSession: targetGraph,
       historicalSessions: graphs.filter(
         (session) => session.sessionId !== target.sessionId,

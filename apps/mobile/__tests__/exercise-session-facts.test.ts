@@ -2,7 +2,8 @@
  * Exercise session facts over a real, fully migrated database (spec 05,
  * "Exercise session facts"): the triggers queue every write path, a read
  * drains the queue first, and the incremental result always equals a full
- * rebuild from the raw rows (the oracle). The 1RM flags must equal
+ * rebuild from the raw rows (the oracle). The 1RM flags, and the
+ * completed-session PR list read from the facts, must equal the replay
  * `deriveSessionPersonalRecords` on every session.
  *
  * Metric and flag rules themselves are pure and live in
@@ -33,6 +34,7 @@ import { __resetClockForTests, type Transaction } from '@/src/data/clock';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import {
   drainExerciseSessionFacts,
+  loadEarlierBestE1rmByDefinition,
   loadExerciseSessionFacts,
   loadFlaggedExerciseSessionFacts,
   rebuildAllExerciseSessionFacts,
@@ -58,7 +60,7 @@ import {
 } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { writeBodyweightCalculationsEnabled } from '@/src/data/user-settings';
-import { loadCompletedSessionInsights } from '@/src/session-insights';
+import { deriveSessionPersonalRecords, loadCompletedSessionInsights, loadSessionInsightHistory } from '@/src/session-insights';
 import { applyPullPage, entityToWire } from '@/src/sync/cycle';
 
 const BENCH = 'def-bench';
@@ -205,6 +207,28 @@ describe('exercise session facts — rows and reads', () => {
       .toEqual([['a-session', false], ['B-session', true]]);
     expect((await loadFlaggedExerciseSessionFacts({ from: day(0), to: day(9) })).map((row) => row.sessionId))
       .toEqual(['B-session']);
+  });
+
+  it('reads each definition\'s best 1RM strictly before a session, same-instant ties in derivation order', async () => {
+    // localeCompare: 'a-early' < 'B-target' < 'c-same'; 'c-same' shares the target's instant but comes after it.
+    insertSession('a-early', 1, [{ definitionId: BENCH, sets: [['100', '5'], ['120', '1']] }]);
+    insertSession('B-target', 1, [{ definitionId: BENCH, sets: [['110', '5']] }, { definitionId: SQUAT, sets: [['140', '5']] }]);
+    insertSession('c-same', 1, [{ definitionId: BENCH, sets: [['200', '5']] }]);
+    insertSession('later', 2, [{ definitionId: BENCH, sets: [['300', '5']] }]);
+    insertSession('gone', 0, [{ definitionId: SQUAT, sets: [['300', '5']] }], { deletedAt: day(5) });
+    insertSession('zero', 0, [{ definitionId: SQUAT, sets: [['0', '5']] }]); // a 0 kg 1RM is still a bar
+
+    const best = await loadEarlierBestE1rmByDefinition({ sessionId: 'B-target', completedAt: day(1) }, [BENCH, SQUAT, DIP]);
+
+    expect(new Map(best)).toEqual(new Map([[BENCH, factFor('a-early', BENCH)!.bestE1rmKg], [SQUAT, 0]]));
+    // A row with eligible sets but no 1RM (an unavailable load) sets no bar.
+    db().insert(exerciseSessionFacts).values({
+      sessionId: 'a-early', exerciseDefinitionId: DIP, achievedAt: day(1), bestE1rmKg: null,
+      volumeComplete: false, workingSets: 1, prE1rm: false, prWeight: false, prVolume: false,
+    }).run();
+    expect(await loadEarlierBestE1rmByDefinition({ sessionId: 'B-target', completedAt: day(1) }, [DIP])).toEqual(new Map());
+    expect(await loadEarlierBestE1rmByDefinition({ sessionId: 'a-early', completedAt: day(1) }, [BENCH])).toEqual(new Map());
+    expect(await loadEarlierBestE1rmByDefinition({ sessionId: 'B-target', completedAt: day(1) }, [])).toEqual(new Map());
   });
 
   it('never serves a row whose session is gone, even before the drain catches up', async () => {
@@ -394,7 +418,7 @@ describe('exercise session facts — incremental maintenance equals a full rebui
   });
 });
 
-describe('exercise session facts — 1RM flags equal deriveSessionPersonalRecords', () => {
+describe('exercise session facts — 1RM flags and completed-session PRs equal deriveSessionPersonalRecords', () => {
   // Deterministic generator (mulberry32) for a varied history.
   const random = (() => {
     let state = 0x5eed;
@@ -444,12 +468,20 @@ describe('exercise session facts — 1RM flags equal deriveSessionPersonalRecord
     const flagged = allFacts().filter((row) => row.prE1rm);
     expect(flagged.length).toBeGreaterThan(3);
 
+    // Every completed graph once; the replay itself skips sessions not before its target.
+    const graphs = await loadSessionInsightHistory({ completedAt: day(365), targetSessionId: '' });
     for (const sessionId of sessionIds) {
+      const replayed = deriveSessionPersonalRecords({
+        targetSession: graphs.find((graph) => graph.sessionId === sessionId)!,
+        historicalSessions: graphs,
+      });
       const insights = await loadCompletedSessionInsights(sessionId);
-      const expected = insights!.personalRecords.map((record) => `${record.exerciseDefinitionId}:${record.setId}`).sort();
-      const actual = flagged.filter((row) => row.sessionId === sessionId)
+      // The facts-backed list is the replay's list: same sets, order and values.
+      expect({ sessionId, records: insights!.personalRecords }).toEqual({ sessionId, records: replayed });
+      const flags = flagged.filter((row) => row.sessionId === sessionId)
         .map((row) => `${row.exerciseDefinitionId}:${row.bestE1rmSetId}`).sort();
-      expect({ sessionId, records: actual }).toEqual({ sessionId, records: expected });
+      const replayedSets = replayed.map((record) => `${record.exerciseDefinitionId}:${record.setId}`).sort();
+      expect({ sessionId, records: flags }).toEqual({ sessionId, records: replayedSets });
     }
   });
 });

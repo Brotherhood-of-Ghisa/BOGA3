@@ -1,5 +1,6 @@
 import { type LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import { addFiniteVolume, ordinaryLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import { eligibleSetsByBlockInSessionOrder, pickBestEstimatedOneRepMaxSet } from '@/src/exercise-calculations/best-set';
 import { isWorkingSessionSetType } from "@/src/data/set-types";
 import {
   collectMuscleSetContributions,
@@ -120,6 +121,11 @@ export type PersonalRecordSessionInput = {
 export type SessionPersonalRecordsInput = {
   targetSession: PersonalRecordSessionInput;
   historicalSessions: PersonalRecordSessionInput[];
+};
+
+export type SessionPersonalRecordsFromBestsInput = {
+  targetSession: PersonalRecordSessionInput;
+  historicalBestByDefinitionId: ReadonlyMap<string, number>;
 };
 
 export type ExerciseVolumeComparisonState =
@@ -398,40 +404,22 @@ const findBestPersonalRecordCandidate = (
   const groupOrderIndex = orderedExercises[0]?.orderIndex;
   if (groupOrderIndex === undefined) return null;
 
-  const candidates = orderedExercises
-    .flatMap((exercise) => exercise.sets.map((set) => ({ exercise, set })))
-    .filter(({ set }) => isEligiblePerformedSet(set))
-    // Session order (block, then set): the first tied set keeps the record.
-    .sort((left, right) =>
-      compareExerciseOrder(left.exercise, right.exercise) ||
-      compareSetOrder(left.set, right.set));
+  const best = pickBestEstimatedOneRepMaxSet(eligibleSetsByBlockInSessionOrder(
+    orderedExercises.map((exercise) => ({ ...exercise, loadContext: exercise.loadContext ?? ordinaryLoadContext() })),
+  ).flat());
+  if (!best) return null;
 
-  let best: PersonalRecordCandidate | null = null;
-  for (const { exercise, set } of candidates) {
-    const weight = parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue));
-    const reps = parseSetReps(set.repsValue);
-    if (weight === null || reps === null) continue;
-
-    const metric = calculateAnalyticsSetMetrics({ ...set, ...(exercise.loadContext ?? ordinaryLoadContext()) });
-    const estimatedOneRepMax = metric.estimatedOneRepMaxKg;
-    if (estimatedOneRepMax === null) continue;
-    if (best !== null && estimatedOneRepMax <= best.estimatedOneRepMax)
-      continue;
-
-    best = {
-      exerciseDefinitionId,
-      exerciseName: exercise.exerciseName,
-      sessionExerciseId: exercise.id,
-      sessionExerciseOrderIndex: groupOrderIndex,
-      setId: set.id,
-      setOrderIndex: set.orderIndex,
-      weight: metric.eligible && metric.load.status === 'known' ? metric.load.enteredWeightKg : weight,
-      reps,
-      estimatedOneRepMax,
-    };
-  }
-
-  return best;
+  return {
+    exerciseDefinitionId,
+    exerciseName: best.block.exerciseName,
+    sessionExerciseId: best.block.id,
+    sessionExerciseOrderIndex: groupOrderIndex,
+    setId: best.set.id,
+    setOrderIndex: best.set.orderIndex,
+    weight: best.enteredWeightKg,
+    reps: best.metric.reps,
+    estimatedOneRepMax: best.estimatedOneRepMaxKg,
+  };
 };
 
 export const deriveExercisePersonalRecord = (
@@ -509,23 +497,29 @@ const collectHistoricalBestByExerciseDefinition = (
   return bestByDefinition;
 };
 
-export const deriveSessionPersonalRecords = (
-  input: SessionPersonalRecordsInput,
-): ExercisePersonalRecord[] => {
-  const target = input.targetSession;
+const isLiveCompletedTarget = (target: PersonalRecordSessionInput): boolean => {
   if (
     target.status !== "completed" ||
     target.completedAt === null ||
     (target.deletedAt ?? null) !== null
   ) {
-    return [];
+    return false;
   }
   ensureValidDate(target.completedAt, "target completedAt");
+  return true;
+};
 
-  const historicalBestByDefinition = collectHistoricalBestByExerciseDefinition(
-    target,
-    input.historicalSessions,
-  );
+/**
+ * The target's 1RM PRs against each definition's best from earlier completed
+ * sessions, in first-exercise order. A definition absent from the map has no
+ * earlier 1RM and so no PR.
+ */
+export const deriveSessionPersonalRecordsFromBests = (
+  input: SessionPersonalRecordsFromBestsInput,
+): ExercisePersonalRecord[] => {
+  const target = input.targetSession;
+  if (!isLiveCompletedTarget(target)) return [];
+
   const orderedTargetExercises = target.exercises
     .filter((exercise) => (exercise.deletedAt ?? null) === null)
     .sort(compareExerciseOrder);
@@ -543,12 +537,30 @@ export const deriveSessionPersonalRecords = (
       exerciseDefinitionId,
       exercises: orderedTargetExercises,
       historicalBestEstimatedOneRepMax:
-        historicalBestByDefinition.get(exerciseDefinitionId) ?? null,
+        input.historicalBestByDefinitionId.get(exerciseDefinitionId) ?? null,
     });
     if (record) records.push(record);
   }
 
   return records;
+};
+
+/**
+ * The replay reference for the 1RM PR rule: earlier bests recomputed from
+ * every earlier session's sets. Runtime reads take the earlier bests from the
+ * exercise session facts instead; Jest holds the two equal.
+ */
+export const deriveSessionPersonalRecords = (
+  input: SessionPersonalRecordsInput,
+): ExercisePersonalRecord[] => {
+  if (!isLiveCompletedTarget(input.targetSession)) return [];
+  return deriveSessionPersonalRecordsFromBests({
+    targetSession: input.targetSession,
+    historicalBestByDefinitionId: collectHistoricalBestByExerciseDefinition(
+      input.targetSession,
+      input.historicalSessions,
+    ),
+  });
 };
 
 type ExerciseVolumeObservation = {
@@ -839,10 +851,14 @@ export const deriveSessionMuscleVolumeComparisons = (
   });
 };
 
+export type CompletedSessionInsightsInput = SessionMuscleVolumeComparisonsInput &
+  Pick<SessionPersonalRecordsFromBestsInput, "historicalBestByDefinitionId">;
+
+/** PRs read the supplied earlier bests; the comparisons read the earlier session graphs. */
 export const deriveCompletedSessionInsights = (
-  input: SessionMuscleVolumeComparisonsInput,
+  input: CompletedSessionInsightsInput,
 ): CompletedSessionInsights => ({
-  personalRecords: deriveSessionPersonalRecords(input),
+  personalRecords: deriveSessionPersonalRecordsFromBests(input),
   exerciseVolumeComparisons: deriveSessionExerciseVolumeComparisons(input),
   muscleVolumeComparisons: deriveSessionMuscleVolumeComparisons(input),
 });

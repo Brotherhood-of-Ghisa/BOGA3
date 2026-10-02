@@ -943,6 +943,7 @@ describe("createCompletedSessionInsightsRepository", () => {
     loadEarlierCompletedSessions: jest.fn().mockResolvedValue([]),
     loadSessionExercises: jest.fn().mockResolvedValue([]),
     loadExerciseSets: jest.fn().mockResolvedValue([]),
+    loadEarlierBestEstimatedOneRepMax: jest.fn().mockResolvedValue(new Map()),
     ...overrides,
   });
 
@@ -955,7 +956,7 @@ describe("createCompletedSessionInsightsRepository", () => {
     expect(store.loadSessionExercises).not.toHaveBeenCalled();
   });
 
-  it("assembles target and historical graphs before applying the shared PR calculation", async () => {
+  it("assembles the target and historical graphs, and takes PRs against the earlier bests the facts supply", async () => {
     const target = completedSession({ sessionId: "target" });
     const history = completedSession({
       sessionId: "history",
@@ -992,6 +993,7 @@ describe("createCompletedSessionInsightsRepository", () => {
           sessionExerciseId: "history-row",
         },
       ]),
+      loadEarlierBestEstimatedOneRepMax: jest.fn().mockResolvedValue(new Map([["bench", 100]])),
     });
     const repository = createCompletedSessionInsightsRepository(store);
 
@@ -1001,12 +1003,17 @@ describe("createCompletedSessionInsightsRepository", () => {
       completedAt: AT,
       targetSessionId: "target",
     });
+    expect(store.loadEarlierBestEstimatedOneRepMax).toHaveBeenCalledWith({
+      target: { sessionId: "target", completedAt: AT },
+      exerciseDefinitionIds: ["bench"],
+    });
     expect(insights).toEqual({
       muscleVolumeComparisons: [],
       personalRecords: [
         expect.objectContaining({
           exerciseDefinitionId: "bench",
           setId: "target-set",
+          historicalBestEstimatedOneRepMax: 100,
         }),
       ],
       exerciseVolumeComparisons: [

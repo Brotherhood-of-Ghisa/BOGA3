@@ -2,12 +2,13 @@
 // facts"): one exercise definition's completed history in, one row per session
 // out, each with the session's bests and its personal-record flags.
 
+import { addFiniteVolume, enteredWeightKg } from '@/src/exercise-calculations/analytics';
 import {
-  addFiniteVolume,
-  calculateAnalyticsSetMetrics,
-  enteredWeightKg,
-} from '@/src/exercise-calculations/analytics';
-import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
+  eligibleSetsByBlockInSessionOrder,
+  pickBestEstimatedOneRepMaxSet,
+  type EligibleSessionSet,
+} from '@/src/exercise-calculations/best-set';
+import { summarizeVolume, type LoadContext } from '@/src/exercise-calculations/load-metrics';
 import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseSessionFact } from './schema';
@@ -46,12 +47,6 @@ export type ExerciseSessionFactRow = ExerciseSessionFact;
 
 type SessionBests = Omit<ExerciseSessionFactRow, 'prE1rm' | 'prWeight' | 'prVolume'>;
 
-type Ordered = { orderIndex: number; id: string };
-
-/** Session order: block, then set; ids break position ties. */
-const compareOrder = (left: Ordered, right: Ordered): number =>
-  left.orderIndex - right.orderIndex || left.id.localeCompare(right.id);
-
 /** The order PR history uses: `completed_at`, then session id. */
 export const compareFactSessionOrder = (
   left: { completedAt: Date; sessionId: string },
@@ -60,24 +55,9 @@ export const compareFactSessionOrder = (
   left.completedAt.getTime() - right.completedAt.getTime() ||
   left.sessionId.localeCompare(right.sessionId);
 
-type EligibleSet = { set: FactsSetInput; metric: Extract<SetMetrics, { eligible: true }> };
-
-const eligibleSetsInSessionOrder = (blocks: FactsBlockInput[]): EligibleSet[][] =>
-  [...blocks].sort(compareOrder).map((block) =>
-    [...block.sets].sort(compareOrder).flatMap((set) => {
-      const metric = calculateAnalyticsSetMetrics({ ...set, ...block.loadContext });
-      return metric.eligible ? [{ set, metric }] : [];
-    }),
-  );
+type EligibleSet = EligibleSessionSet<FactsBlockInput, FactsSetInput>;
 
 type Best = { value: number; setId: string; reps: number };
-
-/** Strictly greater wins, so the first set in session order keeps a tie. */
-const pickBestE1rm = (best: Best | null, { set, metric }: EligibleSet): Best | null => {
-  const value = metric.estimatedOneRepMaxKg;
-  if (value === null || (best !== null && value <= best.value)) return best;
-  return { value, setId: set.id, reps: metric.reps };
-};
 
 /** Raw entered kg; equal weight goes to more reps, then to session order. */
 const pickTopWeight = (best: Best | null, { set, metric }: EligibleSet): Best | null => {
@@ -94,10 +74,11 @@ export const summarizeFactSession = (
   exerciseDefinitionId: string,
   session: FactsSessionInput,
 ): SessionBests | null => {
-  const blocks = eligibleSetsInSessionOrder(session.blocks).filter((sets) => sets.length > 0);
+  const blocks = eligibleSetsByBlockInSessionOrder<FactsSetInput, FactsBlockInput>(session.blocks)
+    .filter((sets) => sets.length > 0);
   if (blocks.length === 0) return null;
 
-  let bestE1rm: Best | null = null;
+  const bestE1rm = pickBestEstimatedOneRepMaxSet(blocks.flat());
   let topWeight: Best | null = null;
   let knownVolume: number | null = 0;
   let totalVolume: number | null = 0;
@@ -107,7 +88,6 @@ export const summarizeFactSession = (
     knownVolume = addFiniteVolume(knownVolume, coverage.knownVolumeKgReps);
     totalVolume = addFiniteVolume(totalVolume, coverage.totalVolumeKgReps);
     for (const eligible of sets) {
-      bestE1rm = pickBestE1rm(bestE1rm, eligible);
       topWeight = pickTopWeight(topWeight, eligible);
       if (isWorkingSessionSetType(eligible.set.setType)) workingSets += 1;
     }
@@ -117,8 +97,8 @@ export const summarizeFactSession = (
     sessionId: session.sessionId,
     exerciseDefinitionId,
     achievedAt: session.completedAt,
-    bestE1rmKg: bestE1rm?.value ?? null,
-    bestE1rmSetId: bestE1rm?.setId ?? null,
+    bestE1rmKg: bestE1rm?.estimatedOneRepMaxKg ?? null,
+    bestE1rmSetId: bestE1rm?.set.id ?? null,
     topWeightKg: topWeight?.value ?? null,
     topWeightSetId: topWeight?.setId ?? null,
     volumeKg: totalVolume ?? knownVolume,

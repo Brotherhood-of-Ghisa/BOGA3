@@ -3,7 +3,7 @@
 // raw-data or policy write touches; every read drains that queue first, so a
 // read never returns facts built from older rows or older rules.
 
-import { and, eq, gte, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, or } from 'drizzle-orm';
 
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
@@ -291,4 +291,43 @@ export const loadFlaggedExerciseSessionFacts = async (
       ),
     ))
     .all());
+};
+
+/**
+ * Each listed definition's best estimated 1RM over the sessions before
+ * `target` in PR-history order: the bar the target's 1RM PR flag is set
+ * against. A definition without an earlier 1RM is absent.
+ */
+export const loadEarlierBestE1rmByDefinition = async (
+  target: { sessionId: string; completedAt: Date },
+  exerciseDefinitionIds: readonly string[],
+): Promise<Map<string, number>> => {
+  const best = new Map<string, number>();
+  if (exerciseDefinitionIds.length === 0) return best;
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  for (const ids of chunks(exerciseDefinitionIds)) {
+    const rows = database
+      .select({
+        sessionId: exerciseSessionFacts.sessionId,
+        exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId,
+        achievedAt: exerciseSessionFacts.achievedAt,
+        bestE1rmKg: exerciseSessionFacts.bestE1rmKg,
+      })
+      .from(exerciseSessionFacts)
+      .innerJoin(sessions, liveSessionJoin)
+      .where(and(
+        inArray(exerciseSessionFacts.exerciseDefinitionId, ids),
+        lte(exerciseSessionFacts.achievedAt, target.completedAt),
+        isNotNull(exerciseSessionFacts.bestE1rmKg),
+      ))
+      .all();
+    for (const row of rows) {
+      // Same-instant sessions fall to the derivation's session-id order, not SQLite's.
+      if (compareFactSessionOrder({ completedAt: row.achievedAt, sessionId: row.sessionId }, target) >= 0) continue;
+      const value = row.bestE1rmKg as number;
+      if (value > (best.get(row.exerciseDefinitionId) ?? -Infinity)) best.set(row.exerciseDefinitionId, value);
+    }
+  }
+  return best;
 };
