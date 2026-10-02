@@ -59,7 +59,10 @@ last day when the previous month is shorter).
 - **Group activity card:** `PRs` are **group records only**. These are the
   evaluator's `record` events on the group's linked exercises
   (`groups-contract.md` §2.10–§2.11), already server-side. Personal PRs never
-  appear on the group card.
+  appear on the group card. Settled in T04 (`groups-contract.md` §4.7): a
+  non-voided record where the member took #1 on a board, one per event, from
+  completed sessions only; the board's working sets also count completed
+  sessions only.
 - The two counts follow different rules and are not expected to agree. For
   example, a member's first lift on a group exercise is a group record but not
   a personal PR.
@@ -127,7 +130,7 @@ server's own group records, so nothing server-side needs personal PR flags.
 | `M29-T01-Exercise_session_facts` | Local derived per-exercise-per-session facts with 1RM / weight / volume PR flags | none | completed |
 | `M29-T02-Progress_summary_data` | Local week / month / PR / latest-session data for Today | T01 | planned |
 | `M29-T03-Today_progress_card` | Rebuild Today with the Progress card; keep the current group snapshot | T02 | planned |
-| `M29-T04-Group_week_summary_RPC` | Server RPC + client for the group card's data | none | planned |
+| `M29-T04-Group_week_summary_RPC` | Server RPC + client for the group card's data | none | completed |
 | `M29-T05-Today_group_card_and_closeout` | The Group activity card, gallery acceptance, milestone closeout | T03, T04 | planned |
 | `M29-T06-Completion_PRs_on_facts` | Completed-session and completion-screen PRs read the facts table | T01 | planned |
 | `M29-T07-Session_view_PRs_on_facts` | The session view's live PR bar reads earlier bests from the facts table | T01 | planned |

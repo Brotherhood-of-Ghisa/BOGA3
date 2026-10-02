@@ -45,6 +45,7 @@ import {
   type GroupSessionDetailResult,
   type GroupStreamResult,
   type GroupUpdateResult,
+  type GroupWeekSummaryResult,
   type StreamCursor,
   type StreamItem,
 } from './types';
@@ -131,6 +132,7 @@ export type GroupRpcName =
   | 'group_certify'
   | 'group_certification_withdraw'
   | 'group_certification_cancel'
+  | 'group_week_summary'
   | 'group_stream_v2'
   | 'group_exercise_list_v2'
   | 'group_exercise_create_v2'
@@ -239,6 +241,32 @@ export const getGroupSessionDetail = async (memberUserId: string, sessionId: str
     'group_session_detail',
     await callGroupRpc('group_session_detail', { p_member_user_id: memberUserId, p_session_id: sessionId }),
     (r) => isRecord(r.session),
+  );
+
+export type GroupWeekSummaryRequest = {
+  groupId: string;
+  /** The window's local start and end (Monday 00:00 to the next), epoch ms; the device owns the time zone. */
+  windowStartMs: number;
+  windowEndMs: number;
+};
+
+/** One group's week (contract §4.7): its board, who is training now and the latest completed session. */
+export const getGroupWeekSummary = async ({
+  groupId,
+  windowStartMs,
+  windowEndMs,
+}: GroupWeekSummaryRequest): Promise<GroupWeekSummaryResult> =>
+  expectShape(
+    'group_week_summary',
+    await callGroupRpc('group_week_summary', {
+      p_group_id: groupId,
+      p_window_start_ms: windowStartMs,
+      p_window_end_ms: windowEndMs,
+    }),
+    (r) =>
+      Array.isArray(r.members) &&
+      Array.isArray(r.training_now) &&
+      (r.latest_completed === null || isRecord(r.latest_completed)),
   );
 
 export const previewGroupInvite = async (code: string): Promise<GroupInvitePreviewResult> =>

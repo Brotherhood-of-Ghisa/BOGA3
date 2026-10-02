@@ -4,6 +4,7 @@
  * card rule (`toGroupPerformedSet`), which delegates to the same core.
  */
 
+import { isWorkingSessionSetType } from '@/src/data/set-types';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import {
   GROUP_EVAL_RULES_VERSION,
@@ -23,6 +24,7 @@ const row = (setId: string, weight: string, reps: string, overrides: Partial<Gro
   weight_value: weight,
   reps_value: reps,
   performance_status: null,
+  set_type: 'rir_2',
   live: true,
   fingerprint: `fp-${setId}`,
   ...overrides,
@@ -83,11 +85,24 @@ describe('group evaluator set facts', () => {
       weight_kg: 102.5,
       reps: 5,
       e1rm_kg: estimateOneRepMax(102.5, 5),
+      working: true,
       achieved_at_ms: STARTED_AT_MS,
       fingerprint: 'fp-s1',
       rules_version: GROUP_EVAL_RULES_VERSION,
     });
-    expect(GROUP_EVAL_RULES_VERSION).toBe(3);
+    expect(GROUP_EVAL_RULES_VERSION).toBe(4);
+  });
+
+  it("stores the app's working-set rule: every set but a warm-up", () => {
+    const workingOf = (setType: string | null) => factOf(row('s1', '100', '5', { set_type: setType })).working;
+    const setTypes = ['rir_0', 'rir_3', 'rir_12', null, 'working', 'RIR_1', 'warm_up'];
+    expect(setTypes.map(workingOf)).toEqual(setTypes.map(isWorkingSessionSetType));
+    expect(setTypes.map(workingOf)).toEqual([true, true, true, true, true, true, false]);
+    // Independent of performed: the summary filters on both.
+    expect(factOf(row('s1', '100', '5', { set_type: 'rir_1', performance_status: 'planned' }))).toMatchObject({
+      performed: false,
+      working: true,
+    });
   });
 
   it('keeps the entered value of a per-side set (conversion happens later, in SQL)', () => {

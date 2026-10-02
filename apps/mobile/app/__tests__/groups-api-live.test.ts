@@ -56,6 +56,7 @@ import {
   getGroupMetricStream,
   getGroupSessionDetail,
   getGroupStream,
+  getGroupWeekSummary,
   joinGroup,
   leaveGroup,
   listGroupComparisons,
@@ -73,6 +74,7 @@ import {
   withdrawGroupCertification,
 } from '@/src/groups/api';
 import type { GroupMetricBoardWire } from '@/src/groups/metric-wire';
+import type { GroupWeekSummaryResult } from '@/src/groups/types';
 
 const env = readGroupsLiveEnv();
 let owner: LiveClient;
@@ -114,7 +116,7 @@ const entity = (type: string, id: string, cuam: number, fields: Record<string, u
   fields,
 });
 
-type SetSpec = { weight: string; reps: string };
+type SetSpec = { weight: string; reps: string; setType?: string };
 
 /** A completed (or active) one-exercise session of the member's, plus its exercise definition. */
 const pushMemberSession = async ({
@@ -158,7 +160,7 @@ const pushMemberSession = async ({
     ...sets.map((set, index) =>
       entity('exercise_sets', `${sessionId}-set-${index + 1}`, cuam, {
         session_exercise_id: exerciseId, order_index: index, weight_value: set.weight, reps_value: set.reps,
-        set_type: 'working', planned_weight_value: null, planned_reps_value: null, planned_set_type: null,
+        set_type: set.setType ?? 'working', planned_weight_value: null, planned_reps_value: null, planned_set_type: null,
         performance_status: null, created_at: cuam, updated_at: cuam, deleted_at: null,
       }),
     ),
@@ -288,6 +290,40 @@ describe('groups client against the live server', () => {
     const detail = await as(owner, () => getGroupSessionDetail(member.userId, sessionId));
     expect(JSON.stringify(detail.session)).toContain(firstSetId);
   });
+
+  it("reads the group's week: the member's working sets, then their active session training now", async () => {
+    const { groupId, joinedAtMs } = await groupWithMember('Live week');
+    const startedAt = Math.max(Date.now(), joinedAtMs + 1000);
+    const window = { groupId, windowStartMs: startedAt - 60_000, windowEndMs: startedAt + 7 * 86_400_000 };
+    // Every set but the warm-up is a working set.
+    await pushMemberSession({
+      startedAt, completed: true,
+      sets: [{ weight: '100', reps: '5', setType: 'rir_1' }, { weight: '100', reps: '5', setType: 'rir_2' },
+        { weight: '60', reps: '10', setType: 'warm_up' }],
+    });
+    const memberRow = (summary: GroupWeekSummaryResult) =>
+      summary.members.find((row) => row.member.user_id === member.userId);
+    const counted = await poll(
+      'week summary working sets',
+      () => as(owner, () => getGroupWeekSummary(window)),
+      (summary) => (memberRow(summary)?.working_sets ?? 0) > 0,
+    );
+    expect(memberRow(counted)).toMatchObject({ rank: 1, working_sets: 2, group_records: 0 });
+    expect(counted.members.find((row) => row.member.user_id === owner.userId)).toMatchObject({ rank: 2, working_sets: 0 });
+    expect(counted.latest_completed).toMatchObject({ member: { user_id: member.userId }, working_sets: 2, exercise_count: 1 });
+
+    const { sessionId } = await pushMemberSession({
+      startedAt: startedAt + 120_000, completed: false, sets: [{ weight: '80', reps: '5', setType: 'rir_0' }],
+    });
+    const training = await poll(
+      'week summary training now',
+      () => as(member, () => getGroupWeekSummary(window)),
+      (summary) => summary.training_now.some((row) => row.session_id === sessionId && row.working_sets === 1),
+    );
+    expect(training.training_now).toEqual([
+      expect.objectContaining({ session_id: sessionId, member: expect.objectContaining({ user_id: member.userId }), exercise_count: 1 }),
+    ]);
+  }, 120_000);
 
   it('ranks a linked record on a comparison board, then certifies, withdraws and cancels per metric', async () => {
     const { groupId, joinedAtMs } = await groupWithMember('Live metric boards');

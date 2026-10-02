@@ -1,4 +1,6 @@
-import { EFFORT_LOGGING_POLICY } from '../config/training';
+// The group-eval Edge Function loads this file (via src/groups/set-facts.ts), so
+// its imports name their .ts files.
+import { EFFORT_LOGGING_POLICY } from '../config/training.ts';
 
 export type RirSessionSetType = `rir_${number}`;
 export type SessionSetType = 'warm_up' | RirSessionSetType;
@@ -27,7 +29,8 @@ export const normalizeSessionSetType = (value: unknown): SessionSetTypeValue =>
 /**
  * The single working-set rule: every set that is not a warm-up. Untagged, any
  * RIR and unrecognised stored values all count. Callers decide set validity
- * (performed, parseable) before asking.
+ * (performed, parseable) before asking. The group evaluator stores it on every
+ * set fact: changing it needs a `GROUP_EVAL_RULES_VERSION` bump.
  */
 export const isWorkingSessionSetType = (value: unknown): boolean => value !== 'warm_up';
 

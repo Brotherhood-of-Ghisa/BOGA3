@@ -392,6 +392,7 @@ invisible.
 | `performed` | The session screens' rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
 | `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (M25-T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
+| `working` | The app's working-set rule (`isWorkingSessionSetType` over the synced `set_type`: every set but a warm-up), independent of `performed`. Null on a fact from before rules version 4. Read only by the week summary (§4.7). |
 | `achieved_at_ms` | `sessions.started_at` |
 | `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (M25-T06) can compare a live row without the evaluator. |
 | `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
@@ -517,10 +518,19 @@ Archive and leave queue nothing: the board freezes.
   `authenticated` execute none. Everything else is owner-only: the triggers,
   enqueue, kick, sweep, config, targets, apply, and fingerprint.
 
+**Rules version 4** adds the facts' `working`, so the evaluator stores the
+app's working-set rule without a SQL copy of it; a change to
+`isWorkingSessionSetType` needs a version bump. Its migration queues every
+session with older facts, so the sweep re-normalizes them within its next
+rounds; until then a session's facts read `working` null and its sets count no
+working sets in §4.7.
+
 **One implementation of the set rules.** `set-facts.ts` holds
 `parseGroupPerformedSet`. The device's `toGroupPerformedSet` (§5) delegates
-to it, so card metrics and facts cannot diverge. The file imports nothing
-through `@/`, and its imports name their `.ts` files. The mobile tsconfig
+to it, so card metrics and facts cannot diverge. It and the files it loads
+(`src/exercise-calculations/**`, `src/data/set-types.ts`,
+`src/config/training.ts`) import nothing through `@/`, and their imports name
+their `.ts` files. The mobile tsconfig
 sets `allowImportingTsExtensions` so Deno loads it by relative path, as
 `agent-api` loads `exercise-calculations`.
 
@@ -1224,6 +1234,75 @@ takes the board advisory lock.
   on certify). `CONFLICT` maps from its token. `isGroupNotFound`,
   `isRecordSetNotFound`, `isCertificationNotFound`, and `isGroupMemberNotFound`
   match the messages above, so only `group not found` evicts.
+
+### 4.7 Week summary
+
+One read for a group's week: its board, who is training now, and the latest
+completed session.
+
+```jsonc
+// group_week_summary(p_group_id, p_window_start_ms, p_window_end_ms)
+{ "members": [{ "rank": 1, "member": { "user_id", "username" },
+                "working_sets": 12, "group_records": 1 }],
+  "training_now": [{ "member", "session_id", "started_at_ms", "gym_name",
+                     "working_sets", "exercise_count" }],
+  "latest_completed": { "member", "session_id", "started_at_ms", "completed_at_ms",
+                        "duration_sec", "gym_name", "working_sets", "exercise_count",
+                        "group_records": [{ "key", "group_exercise": { "group_exercise_id", "name" },
+                                            "set_id", "boards": [{ "metric", "value", "unit": "kg" }] }] } | null }
+```
+
+- **The window comes from the client.** `[p_window_start_ms,
+  p_window_end_ms)` is the device's local week (Monday 00:00 to the next), so
+  the server never guesses a time zone.
+- **Sessions that count.** For `members`: completed, untombstoned sessions
+  **shared to this group** (§2.5) by a current member, whose live `started_at`
+  is in the window. Active sessions add nothing to the board.
+- **Working sets.** Facts (§2.9) that are `performed` and `live`, whose Sync v2
+  set and session-exercise rows still exist untombstoned (so a delete counts
+  at once, before the evaluator re-drains), and `working` (every set but a
+  warm-up), on any exercise, linked or not. `exercise_count` counts the
+  session exercises with at least one such performed fact, warm-ups included
+  (§5). The counts trail a push by the evaluator's lag.
+- **Group records.** Non-voided `record` events (§2.11, either contract) in
+  this group whose payload lists at least one board with `group_record = true`
+  (the member took #1), one per event. They come from the same sessions as
+  the working sets, so provisional records (an active session) and own bests
+  that took no #1 never count. The record's set row must still exist
+  untombstoned, which also drops a record no apply will void any more (one
+  from an earlier contract-2 rules revision). Unlinking keeps a record; a void
+  removes it.
+- **Board.** Every current member, removed and former members excluded, with
+  zeros when they have nothing. `rank` is competition ranking over
+  `(working_sets desc, group_records desc)`: equal rows share a rank and the
+  next rank skips. Order: rank, then `lower(username)` with nulls last, then
+  `user_id`. The client trims to its top three and finds the caller.
+- **Training now.** A current member's active, untombstoned session shared to
+  this group whose latest accepted write is under **2 hours** old by server
+  time. The write is the greatest `server_received_at` over the session row,
+  its exercises, and its sets. Not windowed. Newest `started_at` first, then
+  member and session id. The counts are the session's facts as above.
+- **Latest completed.** A current member's completed, untombstoned session
+  shared to this group with the greatest `completed_at` (nulls last, then
+  `started_at` desc, member, id), at any time. It is not windowed, so it can
+  be older than the week. `group_records` lists its group records in event
+  order, each with only the boards it took #1 on: contract-1 `value_kg` and
+  contract-2 `value` both read as `value`, in `unit` `kg`. It opens with
+  `group_session_detail`.
+- **Check order.** The preamble, then membership (`NOT_FOUND: group not
+  found`; a removed member, a non-member, and a nonexistent group read the
+  same), then `VALIDATION`: a null or negative start, an end not after the
+  start, or a window over 8 days.
+- **Posture.** As §3: `security definer`, a pinned `search_path`, execute
+  granted to `anon`, `authenticated`, and `service_role`. Its helpers
+  (`group_week_session_counts`, `group_week_session_records`,
+  `group_week_gym_name`) have no client grant and are not `security
+  definer`. `stable`, no locks.
+- **Mobile.** `getGroupWeekSummary({ groupId, windowStartMs, windowEndMs })`
+  in `src/groups/api.ts` sends every `p_*` arg; the shape check is `members` and `training_now` arrays and `latest_completed` an
+  object or null.
+- **Proven** by `groups-week-summary.sh` (lane `groups-leaderboards`) and a
+  `groups-api-live` case.
 
 ## 5. Stream-card metrics (computed on the viewing device)
 
