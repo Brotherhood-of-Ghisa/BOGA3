@@ -128,8 +128,9 @@ describe('domain schema and runtime migrations', () => {
     // migrations append after it. The first follow-up is the local sync
     // quarantine table; planned set targets append after that; the local
     // group cache is m0004, m0005 empties it for the raw-set payload shape,
-    // exercise_group_links is m0006, and the kg-only cutover is m0010.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(11);
+    // exercise_group_links is m0006, the kg-only cutover is m0010, and the
+    // derived exercise session facts are m0011 (tables) and m0012 (triggers).
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(13);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -170,7 +171,50 @@ describe('domain schema and runtime migrations', () => {
       'm0008',
       'm0009',
       'm0010',
+      'm0011',
+      'm0012',
     ]);
+  });
+
+  it('creates the local-only, FK-free exercise session facts tables in m0011', () => {
+    const factsMigration = localRuntimeMigrations.migrations.m0011;
+    expect(factsMigration).toContain('CREATE TABLE `exercise_session_facts`');
+    expect(factsMigration).toContain('PRIMARY KEY(`exercise_definition_id`, `session_id`)');
+    expect(factsMigration).toContain(
+      'CREATE INDEX `exercise_session_facts_definition_achieved_at_idx` ON `exercise_session_facts` (`exercise_definition_id`,`achieved_at`)'
+    );
+    expect(factsMigration).toContain('CREATE TABLE `exercise_session_facts_stale`');
+    expect(factsMigration).toContain('CREATE TABLE `exercise_session_facts_state`');
+    // Derived and out of sync scope: no FKs, no sync bookkeeping columns.
+    expect(factsMigration).not.toContain('FOREIGN KEY');
+    expect(factsMigration).not.toContain('local_dirty');
+  });
+
+  it('queues stale definitions from triggers on every raw and policy table in m0012', () => {
+    const triggerMigration = localRuntimeMigrations.migrations.m0012;
+    const triggered = Array.from(
+      triggerMigration.matchAll(/AFTER (INSERT|UPDATE|DELETE)(?: OF [^]*?)? ON `(\w+)`/g),
+      ([, event, table]) => `${table}:${event}`,
+    ).sort();
+    expect(triggered).toEqual([
+      'body_weight_measurements:DELETE',
+      'body_weight_measurements:INSERT',
+      'body_weight_measurements:UPDATE',
+      'exercise_definitions:UPDATE',
+      'exercise_sets:DELETE',
+      'exercise_sets:INSERT',
+      'exercise_sets:UPDATE',
+      'session_exercises:DELETE',
+      'session_exercises:INSERT',
+      'session_exercises:UPDATE',
+      'sessions:INSERT',
+      'sessions:UPDATE',
+      'user_settings:DELETE',
+      'user_settings:INSERT',
+      'user_settings:UPDATE',
+    ]);
+    // Data-only side effect: triggers write the queue and nothing else.
+    expect(triggerMigration).not.toMatch(/CREATE TABLE|ALTER|DROP|INSERT OR IGNORE INTO `(?!exercise_session_facts_stale)/);
   });
 
   it('creates the exercise_group_links synced entity in the m0006 follow-up migration', () => {

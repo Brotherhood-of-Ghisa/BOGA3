@@ -35,6 +35,21 @@ Pure TypeScript over the local database, covered by Jest.
   `countMuscleAnalyticsWorkingSets`. The facts table's `working_sets` excludes
   unlinked legacy exercises, so it is not the source for Today's totals.
 
+## From T01 (as built)
+
+- Read API in `src/data/exercise-session-facts.ts`:
+  `loadFlaggedExerciseSessionFacts({ from, to })` returns rows with any PR
+  flag, `from <= achieved_at < to`, in history order (filter `prE1rm` for
+  Today); `loadExerciseSessionFacts(definitionId)` returns one definition's
+  rows. `achieved_at` is the session's `completed_at`.
+- Each read drains the stale queue first, synchronously. There are no warm-up
+  hooks: decide here whether Today needs one. Measured on an M4 Max in Node
+  (better-sqlite3, median of 7), so a device will be slower: a full rebuild
+  takes 51 ms on the dev rich history (221 sessions, 2,910 sets) and 582 ms at
+  10× (2,210 sessions, 29,100 sets). An incremental drain after one completed
+  session takes 2.5 ms and 21 ms; a warm read takes under 1 ms. A full rebuild
+  runs on the first read after install, a wipe or a rules bump.
+
 ## Open — resolve with the user at session start
 
 1. **Module shape.** One `loadTodayProgress(now)` returning a view model, or

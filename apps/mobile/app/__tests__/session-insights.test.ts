@@ -850,6 +850,45 @@ describe("deriveSessionPersonalRecords", () => {
     );
   });
 
+  it("gives a tie across repeated blocks to the first set in session order (block, then set)", () => {
+    // Block A set 2 and block B set 1 tie on 1RM; block A comes first in the session.
+    const target = completedSession({
+      sessionId: "target",
+      exercises: [
+        insightExercise({
+          id: "bench-row-b",
+          exerciseDefinitionId: "bench",
+          orderIndex: 1,
+          sets: [insightSet("bench-b-1", { weightValue: "120" })],
+        }),
+        insightExercise({
+          id: "bench-row-a",
+          exerciseDefinitionId: "bench",
+          orderIndex: 0,
+          sets: [
+            insightSet("bench-a-1", { weightValue: "80" }),
+            insightSet("bench-a-2", { orderIndex: 1, weightValue: "120" }),
+          ],
+        }),
+      ],
+    });
+    const history = completedSession({
+      sessionId: "history",
+      completedAt: new Date("2026-09-01T10:00:00.000Z"),
+      exercises: [
+        insightExercise({
+          id: "history-bench",
+          exerciseDefinitionId: "bench",
+          sets: [insightSet("history-bench-set", { weightValue: "100" })],
+        }),
+      ],
+    });
+
+    const [record] = deriveSessionPersonalRecords({ targetSession: target, historicalSessions: [history] });
+
+    expect(record).toEqual(expect.objectContaining({ sessionExerciseId: "bench-row-a", setId: "bench-a-2" }));
+  });
+
   it("omits no-baseline exercises and deleted target work", () => {
     const target = completedSession({
       sessionId: "target",

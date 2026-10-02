@@ -404,11 +404,10 @@ const findBestPersonalRecordCandidate = (
   const candidates = orderedExercises
     .flatMap((exercise) => exercise.sets.map((set) => ({ exercise, set })))
     .filter(({ set }) => isEligiblePerformedSet(set))
-    .sort((left, right) => {
-      const setDifference = compareSetOrder(left.set, right.set);
-      if (setDifference !== 0) return setDifference;
-      return compareExerciseOrder(left.exercise, right.exercise);
-    });
+    // Session order (block, then set): the first tied set keeps the record.
+    .sort((left, right) =>
+      compareExerciseOrder(left.exercise, right.exercise) ||
+      compareSetOrder(left.set, right.set));
 
   let best: PersonalRecordCandidate | null = null;
   for (const { exercise, set } of candidates) {

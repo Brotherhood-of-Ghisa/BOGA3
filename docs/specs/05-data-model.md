@@ -56,7 +56,9 @@ The kg-only wire uses `x-boga-sync-protocol: 3`; missing, malformed or
 unsupported versions receive `UPDATE_REQUIRED` before row access. It includes
 `user_settings`, carries readings as kg and carries exercise contributions.
 Group projections and calculated metrics remain outside the mirror; no derived
-Volume/1RM columns are stored.
+Volume/1RM columns are stored. The derived exercise session facts (see *Local
+schema inventory*) are a device-only table that each device rebuilds from its
+own synced raw rows; they never cross the wire.
 
 ## Local schema inventory
 
@@ -102,12 +104,74 @@ Volume/1RM columns are stored.
   `sync_quarantine`. Guardrails: FK-free (local integrity rule 2), cleared by
   the sign-out / account-switch wipe, and evicted per group on `NOT_FOUND`
   (`docs/specs/tech/groups-contract.md` §6.2).
+- `exercise_session_facts`, `exercise_session_facts_stale`,
+  `exercise_session_facts_state` — local-only, derived, rebuildable personal
+  history facts (`apps/mobile/src/data/schema/exercise-session-facts.ts`,
+  migrations `0011`–`0012`; rules in *Exercise session facts* below). Sync
+  impact decision: `out of sync scope` — no dirty columns, no FKs, no server
+  counterpart, outside the drift checker. Guardrails: FK-free (local integrity
+  rule 2) with reads inner-joining the live session rows; cleared by the
+  sign-out / account-switch wipe; each device derives its own rows from synced
+  raw data, so devices on different rules versions never mix values; a read
+  never returns stale rows (below).
+
+### Exercise session facts (local-only, derived)
+
+One row per completed, non-deleted session and linked exercise definition with
+at least one eligible performed set: `session_id`, `exercise_definition_id`,
+`achieved_at` (the session's `completed_at`), `best_e1rm_kg` +
+`best_e1rm_set_id`, `top_weight_kg` + `top_weight_set_id`, `volume_kg` +
+`volume_complete`, `working_sets`, and the flags `pr_e1rm`, `pr_weight`,
+`pr_volume`. Primary key `(exercise_definition_id, session_id)`; indexes
+`(exercise_definition_id, achieved_at)` and `(achieved_at)`. Code:
+`apps/mobile/src/data/exercise-session-facts.ts` (rebuild, drain, reads) and
+`exercise-session-facts-derive.ts` (pure rules).
+
+- **Grain.** Repeated blocks of one definition in a session fold into one row.
+  Unlinked legacy session exercises, active sessions and deleted sessions have
+  no rows.
+- **Metrics** use the existing rules unchanged. Eligible sets are valid
+  confirmed performed sets, warm-ups included. 1RM uses the personal
+  calculation policy (`tech/bodyweight-load-contract.md`). Top weight is the
+  raw entered kg; an equal weight goes to the set with more reps. Volume is
+  calculated load × reps, summed as the completed-session volume comparison
+  does; `volume_kg` is the known subtotal when `volume_complete` is false.
+  Working sets follow `isWorkingSessionSetType` (*Sync v2 data-model
+  contract* #5).
+- **Ties inside a session** go to the first set in session order (block, then
+  set). The completed-session PR badge uses the same order.
+- **PR flags.** History is ordered by `completed_at`, then `session_id`. A
+  metric is flagged when the session's value strictly beats the best of every
+  earlier session for that definition; at most one set per metric per session
+  carries it. The first session with a value is the baseline, never a PR, and
+  a session with no value neither counts as the baseline nor raises the bar.
+  An incomplete volume is never a volume PR and never raises the volume bar.
+  The 1RM flag equals `deriveSessionPersonalRecords` on every session.
+- **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
+  `exercise_sets`, `exercise_definitions` (load mode, contribution),
+  `user_settings` (the bodyweight toggle) and `body_weight_measurements` queue
+  the affected definition ids in `exercise_session_facts_stale`, whatever path
+  wrote the row (recorder, completed-edit, session list, sync pull-apply,
+  imports, dev reset). Writes inside active sessions queue nothing; completing
+  a session queues its definitions. Every facts read first drains the queue in
+  one transaction, rebuilding each queued definition's whole history (cost
+  bounded by that definition's history). `exercise_session_facts_state` holds
+  the rules version the table was fully built under; a missing row (fresh
+  install, wipe) or another version rebuilds every definition before the read.
+  Changing a rule, including one in the shared calculation kernel or the
+  working-set policy, bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`; a Jest
+  fixture pins the values the current version derives and fails when a rule
+  changes under it. Reads return rows in the derivation's order, not SQLite
+  collation order.
+- **Oracle.** A full rebuild from the raw rows defines the truth; Jest asserts
+  the incremental drain equals it after each kind of write.
 
 ### Sign-out / account-switch wipe
 
 `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`) deletes, in one
-transaction, the twelve user-owned entity tables (child before parent) and
-`group_cache`, then resets `bootstrap_completed_at`, `pull_cursor`, and
+transaction, the twelve user-owned entity tables (child before parent),
+`group_cache`, and the three exercise-session-facts tables (last, after the raw
+deletes have fired the facts triggers), then resets `bootstrap_completed_at`, `pull_cursor`, and
 `applied_seed_migration_app_version` on the `sync_runtime_state` row. It keeps
 `last_emitted_ms` and issues no server delete.
 
@@ -475,8 +539,9 @@ also asserts the hardcoded topological table order in
 or FK without updating that list also fails the gate.
 
 This rule does NOT apply to: `smoke_records`, `sync_runtime_state`,
-`sync_quarantine`, or `group_cache` (test/runtime scaffolding, local sync
-bookkeeping, and the disposable group cache) — these
+`sync_quarantine`, `group_cache`, or the `exercise_session_facts*` tables
+(test/runtime scaffolding, local sync bookkeeping, the disposable group cache,
+and derived local facts) — these
 have no server counterpart and are out of the checker's scope, which introspects
 only the twelve `app_public.<entity>` mirror tables. Nor does it apply to the two
 local-only sync-bookkeeping columns (`local_dirty`, `local_updated_at_ms`) on

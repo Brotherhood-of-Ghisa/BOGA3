@@ -27,7 +27,7 @@ tombstones and dirty/LWW bookkeeping apply.
 | `exercise_sets` | Actual/planned Weight text is kg | In Sync v2 scope; raw Weight remains the source value |
 | `groups` | `bodyweight_calculations_enabled`, default false | Server-authoritative and outside Sync v2 |
 | `group_exercises` | `bodyweight_contribution`, fraction in `[0,1]`, default 0 | Server-authoritative and outside Sync v2 |
-| Calculated metrics | Read-time/device or server projections | Never Sync v2 entities or persisted personal achievements |
+| Calculated metrics | Read-time/device or server projections; the device-local exercise session facts are a rebuildable cache of them (`05-data-model.md`) | Never Sync v2 entities or persisted personal achievements |
 
 The private and group preferences are independent. The private preference
 controls personal UI, analytics and connected-coach output. The group preference

@@ -31,7 +31,10 @@ function main() {
     require.resolve('@expo/router-server/build/typed-routes/generate', { paths: [expoCliDir] }),
   );
 
-  const ctx = requireContextPonyfill(appRoot, true, EXPO_ROUTER_CTX_IGNORE);
+  // Jest files under `app/__tests__` are not routes. Left in, each one widens the
+  // `Href` union until `tsc` fails with TS2590 ("union type too complex").
+  const routeFiles = new RegExp(`^(?!\\./__tests__/)${EXPO_ROUTER_CTX_IGNORE.source.slice(1)}`, EXPO_ROUTER_CTX_IGNORE.flags);
+  const ctx = requireContextPonyfill(appRoot, true, routeFiles);
   const declaration = getTypedRoutesDeclarationFile(ctx, {});
 
   fs.mkdirSync(outputDir, { recursive: true });

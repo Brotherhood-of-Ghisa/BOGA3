@@ -74,6 +74,9 @@ import {
   exerciseMuscleMappings,
   exerciseSets,
   exerciseTagDefinitions,
+  exerciseSessionFacts,
+  exerciseSessionFactsStale,
+  exerciseSessionFactsState,
   groupCache,
   gyms,
   muscleGroups,
@@ -242,6 +245,22 @@ describe('sign-out / account-switch local wipe', () => {
     await wipeLocalForAccountSwitch();
 
     expect(db().select().from(groupCache).all()).toHaveLength(0);
+  });
+
+  it('clears the derived exercise session facts, their stale queue and the built marker', async () => {
+    db().insert(exerciseSessionFactsState).values({ id: 'facts', rulesVersion: 1 }).run();
+    db().insert(exerciseSessionFacts).values({
+      sessionId: 'session-a', exerciseDefinitionId: 'definition-a', achievedAt: new Date(1),
+      volumeComplete: true, workingSets: 1, prE1rm: false, prWeight: false, prVolume: false,
+    }).run();
+    db().insert(exerciseSessionFactsStale).values({ exerciseDefinitionId: 'definition-a' }).run();
+
+    await wipeLocalForAccountSwitch();
+
+    expect(db().select().from(exerciseSessionFacts).all()).toHaveLength(0);
+    // The raw deletes fire the facts triggers; the queue is still empty afterwards.
+    expect(db().select().from(exerciseSessionFactsStale).all()).toHaveLength(0);
+    expect(db().select().from(exerciseSessionFactsState).all()).toHaveLength(0);
   });
 
   it('issues no server call (and therefore no server delete)', async () => {
