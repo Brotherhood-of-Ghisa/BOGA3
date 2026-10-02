@@ -93,8 +93,9 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "exercise-set-logger-reps"
 - inputText: "8"
-- hideKeyboard:
-    optional: true
+# The logger's commit sits above the keyboard and the page scroll has
+# keyboardShouldPersistTaps="handled", so the tap lands with the keyboard up
+# (a hideKeyboard here cost ~4.3s).
 - tapOn:
     id: "exercise-set-logger-commit"
 - extendedWaitUntil:
