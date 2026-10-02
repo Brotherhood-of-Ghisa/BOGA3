@@ -950,6 +950,7 @@ npm run test
 npm run test:handles   # serial --detectOpenHandles guard; fails (with a stack) on any leaked handle
 npm run test:coverage  # instrumented run; fails under 80% branches/lines; report in coverage/lcov-report/index.html
 npm run lint:complexity  # per-function complexity limits; pre-existing offenders grandfathered
+npm run lint:deps        # import-direction rules (dependency-cruiser); pre-existing violations grandfathered
 npm run db:generate:canary
 ```
 

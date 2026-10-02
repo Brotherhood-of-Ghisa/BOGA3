@@ -185,6 +185,30 @@ Define the canonical repository structure, path ownership, and placement convent
 - Prefer one canonical location per test/tool type and document exceptions in `docs/specs/06-testing-strategy.md`.
 - If a new folder becomes canonical for a subsystem or test type, update this doc and any impacted templates/playbook references in the same task.
 
+## Import direction (mobile)
+
+Enforced over `apps/mobile/{app,components,src}/**` (tests excluded, type-only
+imports included) by `apps/mobile/dependency-cruiser.config.cjs`, lane
+`dependencies` (spec 02, "Quality targets"):
+
+- No import cycles. Move the part both modules need into a module both import.
+- `src/**` is the non-UI layer: it never imports `app/**` or `components/**`.
+- `src/data` is persistence. Besides itself it imports only:
+  - import-free rules: `src/exercise-calculations`, `src/exercise-core`, and
+    `src/bodyweight/as-of.ts` and `weight-entry.ts`;
+  - the write and invalidation signals: `src/sync/write-nudge.ts`,
+    `src/exercise-catalog/invalidation.ts`, `src/bodyweight/invalidation.ts`;
+  - its startup dependencies: `src/auth/supabase.ts`, `src/logging`,
+    `src/utils`, `src/config`.
+
+  Feature logic, hooks and view models import `src/data`, never the reverse.
+  Read models in `src/data` may call the calculation kernel on what they read.
+- `src/exercise-calculations` imports only itself and
+  `src/bodyweight/as-of.ts` (see its ownership entry above).
+
+Imports that broke a rule when it landed are grandfathered in
+`apps/mobile/dependency-cruiser-known-violations.json`; that list only shrinks.
+
 ## Known cleanup opportunities (tracked)
 
 - Rationalize mobile test placement currently under `apps/mobile/app/__tests__/` into a dedicated mobile test directory (deferred to a dedicated follow-up task).

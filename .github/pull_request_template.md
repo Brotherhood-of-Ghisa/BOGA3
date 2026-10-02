@@ -18,6 +18,7 @@ Link CI runs / artifacts / prior threads — do not paste them.
 | `./boga test fast` | | |
 | `./boga test jest-coverage` | | |
 | `./boga test complexity` | | |
+| `./boga test dependencies` | | |
 
 Agreed with operator: <!-- yes, plus anything lowered or raised and why -->
 
