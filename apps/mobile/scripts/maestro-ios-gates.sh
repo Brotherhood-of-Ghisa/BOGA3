@@ -18,11 +18,13 @@
 #     provision and is safe to run right after Smoke in the same session.
 #
 # The individual lanes (maestro-run-lane.sh smoke / data-smoke) are left
-# unchanged; this is an additive, faster path for running both together.
+# unchanged; this is an additive, faster path for running the two launch and
+# data flows together. It runs data-runtime-smoke only, not the ios-data-smoke
+# lane's two screen flows (completion share, exercise catalogue).
 #
 # The shared-session execution model itself lives in maestro-ios-run-flows.sh
-# (it is shared with the ios-ui-regression lane); this script is only the flow
-# list and the reset strategy for the two infra-free gates.
+# (it is shared with the ios-data-smoke lane); this script is only the flow
+# list and the reset strategy.
 
 set -euo pipefail
 

@@ -63,10 +63,8 @@ apps/mobile/scripts/ios-sim-boot.sh	frontend,meta-tests	simulator boot-wait (+ i
 apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
 apps/mobile/.maestro/flows/smoke-launch.yaml	-frontend,ios-smoke	single flow → the lane that runs it
 apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
-apps/mobile/.maestro/flows/stats-screen-ux.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
-apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
-apps/mobile/.maestro/flows/settings-dev-wipe-local.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
-apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-ui-regression	single flow → the lane that runs it
+apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
+apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
 apps/mobile/.maestro/flows/auth-profile-happy-path.yaml	-frontend,ios-auth-profile	single flow → the lane that runs it

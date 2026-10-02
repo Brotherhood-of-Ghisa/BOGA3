@@ -311,8 +311,8 @@ appId: com.dinoderek.mobile
     timeout: 30000
 
 # === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
-# Settings by deep link: More -> Settings is settings-dev-wipe-local's claim, and
-# its last-row scroll costs ~9s. Poll for Settings rather than asserting it
+# Settings by deep link: More -> Settings is Jest's more-settings-route.test.tsx,
+# and More's last-row scroll costs seconds. Poll for Settings rather than asserting it
 # immediately: a cold-JIT first render can lag a beat.
 - openLink: "boga3://settings"
 - extendedWaitUntil:

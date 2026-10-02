@@ -97,14 +97,14 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `00-stats-empty-state` (ad hoc) | no history: the empty table |
-| `01-exercise-view-default` (`ios-ui-regression`) | By Exercise, 7 days, sorted by Sets |
+| `01-exercise-view-default` (ad hoc) | By Exercise, 7 days, sorted by Sets |
 | `01a-exercise-table-working-sets`, `01b-exercise-table-most-recent`, `01c-exercise-table-volume-ascending` (ad hoc) | the sort header states |
 | `02-exercise-view-30-days` (ad hoc) | 30 days |
 | `03-muscle-breakdown-7-days` (ad hoc) | By Muscle: the family cards and failure shades |
 | `04-back-to-exercise-view` (ad hoc) | back to By Exercise |
 | `05-exercise-heatmap-daily` (ad hoc) | exercise history sheet, Daily, today selected |
 | `05a-heatmap-today-and-selected` (ad hoc) | Daily with yesterday selected: today's ring beside the selected border |
-| `05b-exercise-heatmap-weekly` (`ios-ui-regression`) | exercise history sheet as it opens: Weekly, Volume |
+| `05b-exercise-heatmap-weekly` (ad hoc) | exercise history sheet as it opens: Weekly, Volume |
 | `05c-exercise-heatmap-1rm` (ad hoc) | Weekly, 1RM |
 | `06-muscle-heatmap-weekly`, `06b-muscle-heatmap-daily` (ad hoc) | a single muscle's history (Chest), Weekly then Daily |
 | `06c-muscle-family-history` (ad hoc) | a multi-muscle family's history (Legs, `Muscle Group History`) |

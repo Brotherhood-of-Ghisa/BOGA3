@@ -108,8 +108,8 @@ panels, and the `Groups`-only list.
 | `editor-create-empty` (ad hoc) | `+`: the editor, empty |
 | `editor-validation-errors` (ad hoc) | Save with no name or primary muscle |
 | `editor-muscle-selector` (ad hoc) | the primary-muscle list in the same sheet |
-| `editor-filled` (`ios-ui-regression`) | a name, `Per side`, a primary and a secondary |
-| `catalogue-created-notice` (`ios-ui-regression`) | saved: the notice and the new row |
+| `editor-filled` (`ios-data-smoke`) | a name, `Per side`, a primary and a secondary |
+| `catalogue-created-notice` (`ios-data-smoke`) | saved: the notice |
 | `groups-link-01-link-screen` (`ios-groups-e2e`) | reached through a row's ⋮ `Link to group exercise…`, showing an existing link |
 
 `(ad hoc)` states are no longer captured by a lane: their flow keeps only
@@ -118,8 +118,7 @@ proves the rest. When the screen changes, capture them with a one-off flow
 run (`apps/mobile/scripts/maestro-ios-run-flow.sh --flow …`); git history
 holds the flow steps that reached them.
 
-`browser-swap-search-keyboard` (`ios-ui-regression`) is the swap sheet's
-search with the keyboard up. The other `browser-*` states (search, no
+The `browser-*` states (the swap sheet's search with the keyboard up, search, no
 matches, prior-year/old history, shared preferences, old plan suggestions
 and history loading/error/Retry) are ad hoc; Jest proves them over the
 browser fixture (`app/__tests__/exercise-catalog-screen.test.tsx`) and
