@@ -85,3 +85,94 @@ describe('group comparison rule editor', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });
+
+describe('group comparison rule editor: creating and edge inputs', () => {
+  const createProps = { bodyweightCalculationsEnabled: true, submitLabel: 'Create comparison', pendingLabel: 'Creating…', pending: false, errorMessage: null };
+
+  it('creates from blank rules: no revision, no review step, and the group setting for bodyweight', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...createProps} onSubmit={onSubmit} />);
+    expect(screen.queryByTestId('group-rules-revision')).toBeNull();
+    expect(screen.getByTestId('group-exercise-form-name-input')).toHaveProp('value', '');
+    expect(screen.getByTestId('group-exercise-form-bodyweight-percentage')).toHaveProp('value', '0');
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Dips');
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '90');
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Create comparison');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith({
+      name: 'Dips', loadInputMode: 'total_load', bodyweightCalculationsEnabled: true,
+      bodyweightContribution: 0.9, defaultMetric: 'e1rm',
+    }, null);
+  });
+
+  it('starts from prefilled rules and follows a new prefill until edited', () => {
+    const initialRules = { name: 'Bench', loadInputMode: 'total_load' as const, bodyweightCalculationsEnabled: false,
+      bodyweightContribution: 0, defaultMetric: 'weight' as const };
+    const { rerender } = render(<GroupComparisonForm {...createProps} initialRules={initialRules} onSubmit={jest.fn()} />);
+    expect(screen.getByTestId('group-exercise-form-name-input')).toHaveProp('value', 'Bench');
+    rerender(<GroupComparisonForm {...createProps} initialRules={{ ...initialRules, name: 'Incline bench' }} onSubmit={jest.fn()} />);
+    expect(screen.getByTestId('group-exercise-form-name-input')).toHaveProp('value', 'Incline bench');
+    expect(screen.queryByTestId('group-rules-revision')).toBeNull();
+  });
+
+  it('shows the note and the current revision', () => {
+    render(<GroupComparisonForm {...props} note="Linked from your exercise." onSubmit={jest.fn()} />);
+    expect(screen.getByTestId('group-exercise-form-note')).toHaveTextContent('Linked from your exercise.');
+    expect(screen.getByTestId('group-rules-revision')).toHaveTextContent('Rules revision 2');
+  });
+
+  it('names a missing name inline, without the contribution error', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), '   ');
+    expect(screen.queryByTestId('group-exercise-form-name-error')).toBeNull();
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(screen.getByTestId('group-exercise-form-name-error')).toBeOnTheScreen();
+    expect(screen.queryByTestId('group-exercise-form-bodyweight-error')).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty contribution', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), ' ');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(screen.getByTestId('group-exercise-form-bodyweight-error')).toBeOnTheScreen();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts a decimal comma in the contribution', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '62,5');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: 0.625 }), 2);
+  });
+
+  it('hides the contribution field when the group has bodyweight calculations off', () => {
+    render(<GroupComparisonForm {...createProps} bodyweightCalculationsEnabled={false} onSubmit={jest.fn()} />);
+    expect(screen.queryByTestId('group-exercise-form-bodyweight-percentage')).toBeNull();
+  });
+
+  it('reviews a load-mode change with per-side wording, and labels each step', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
+    fireEvent.press(screen.getByTestId('group-exercise-form-load-mode-per_side_load'));
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Review rule changes');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(screen.getByTestId('group-rules-preview')).toHaveTextContent(
+      'Apply rules revision 3: 100% → 100% bodyweight contribution, per-side Weight. The whole board will rebuild together. ' +
+        'Previous scores stay in their original rules history; this is not a new performed record.',
+    );
+    expect(screen.getByText(/Attestations of unchanged performance inputs stay valid/)).toBeOnTheScreen();
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Apply group rules');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ loadInputMode: 'per_side_load' }), 2);
+  });
+
+  it('shows the pending label while saving', () => {
+    render(<GroupComparisonForm {...props} pending onSubmit={jest.fn()} />);
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Saving…');
+  });
+});

@@ -52,17 +52,6 @@
       "count": 1
     }
   },
-  "app/profile.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "app/session/[sessionId]/index.tsx": {
     "max-lines-per-function": {
       "count": 1
@@ -73,30 +62,11 @@
       "count": 1
     }
   },
-  "components/exercise-catalog/exercise-editor-modal.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/exercise-page/exercise-page-screen.tsx": {
     "complexity": {
       "count": 1
     },
     "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/groups/group-comparison-form.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
@@ -122,22 +92,6 @@
     }
   },
   "components/groups/group-metric-history.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/groups/group-metric-record-sheet.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/groups/group-metric-stream-card.tsx": {
     "complexity": {
       "count": 1
     },
@@ -229,7 +183,7 @@
   },
   "src/groups/metric-wire-guards.ts": {
     "complexity": {
-      "count": 3
+      "count": 2
     }
   }
 }
