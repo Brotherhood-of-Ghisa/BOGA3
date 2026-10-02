@@ -1,6 +1,10 @@
 import { type LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { addFiniteVolume, ordinaryLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
-import { eligibleSetsByBlockInSessionOrder, pickBestEstimatedOneRepMaxSet } from '@/src/exercise-calculations/best-set';
+import {
+  compareSessionPosition,
+  eligibleSetsByBlockInSessionOrder,
+  pickBestEstimatedOneRepMaxSet,
+} from '@/src/exercise-calculations/best-set';
 import { isWorkingSessionSetType } from "@/src/data/set-types";
 import {
   collectMuscleSetContributions,
@@ -175,24 +179,6 @@ const ensureValidDate = (value: Date, label: string): void => {
   }
 };
 
-const compareExerciseOrder = (
-  left: SessionInsightExerciseInput,
-  right: SessionInsightExerciseInput,
-): number => {
-  if (left.orderIndex !== right.orderIndex)
-    return left.orderIndex - right.orderIndex;
-  return left.id.localeCompare(right.id);
-};
-
-const compareSetOrder = (
-  left: SessionInsightSetInput,
-  right: SessionInsightSetInput,
-): number => {
-  if (left.orderIndex !== right.orderIndex)
-    return left.orderIndex - right.orderIndex;
-  return left.id.localeCompare(right.id);
-};
-
 const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
   (set.deletedAt ?? null) === null &&
   isConfirmedPerformedSet({
@@ -234,7 +220,7 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
 
   const exercises = [...input.exercises]
     .filter((exercise) => (exercise.deletedAt ?? null) === null)
-    .sort(compareExerciseOrder);
+    .sort(compareSessionPosition);
 
   return {
     bodyweightCalculationsEnabled: exercises.some(exercise => exercise.loadContext?.policy === 'personal'),
@@ -249,7 +235,7 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
     exerciseSets: exercises.flatMap((exercise) =>
       [...exercise.sets]
         .filter((set) => (set.deletedAt ?? null) === null)
-        .sort(compareSetOrder)
+        .sort(compareSessionPosition)
         .map((set) => ({
           id: set.id,
           sessionExerciseId: exercise.id,
@@ -400,7 +386,7 @@ const findBestPersonalRecordCandidate = (
         (exercise.deletedAt ?? null) === null &&
         exercise.exerciseDefinitionId === exerciseDefinitionId,
     )
-    .sort(compareExerciseOrder);
+    .sort(compareSessionPosition);
   const groupOrderIndex = orderedExercises[0]?.orderIndex;
   if (groupOrderIndex === undefined) return null;
 
@@ -522,7 +508,7 @@ export const deriveSessionPersonalRecordsFromBests = (
 
   const orderedTargetExercises = target.exercises
     .filter((exercise) => (exercise.deletedAt ?? null) === null)
-    .sort(compareExerciseOrder);
+    .sort(compareSessionPosition);
   const exerciseDefinitionIds = Array.from(
     new Set(
       orderedTargetExercises
@@ -581,10 +567,10 @@ const collectExerciseVolumeObservations = (
 
   for (const exercise of [...exercises]
     .filter((candidate) => (candidate.deletedAt ?? null) === null)
-    .sort(compareExerciseOrder)) {
+    .sort(compareSessionPosition)) {
     const eligibleSets = [...exercise.sets]
       .filter(isEligiblePerformedSet)
-      .sort(compareSetOrder);
+      .sort(compareSessionPosition);
     if (eligibleSets.length === 0) continue;
 
     const identity = exercise.exerciseDefinitionId
