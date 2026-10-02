@@ -105,6 +105,7 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "gym-editor-name"
 - inputText: "Canal Street Gym"
+# The keyboard covers `Add gym` (gym-editor-save); hide it before the tap.
 - hideKeyboard:
     optional: true
 - tapOn:
