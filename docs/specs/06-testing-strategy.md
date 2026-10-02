@@ -493,6 +493,12 @@ journeys and what Jest cannot reach; everything else belongs in Jest.
   (M22; `docs/specs/tech/groups-contract.md` §8). This is a separate test layer
   from the single-user sync e2e lane: it is the only lane where two accounts
   interact. Lane `ios-groups-e2e`, part of `boga test frontend`.
+- Scope: a thin pass of what only a device shows (cold boot and sign-in, the
+  keyboard forms, the focus refresh, the friend view's native back, the record
+  sheet and its backdrop, the native remove alert). The server rules are
+  `groups-contract` / `groups-leaderboards`, and every call of the app's groups
+  client against the live server is `groups-api-live`; a new groups behaviour
+  goes there, or in Jest, unless it needs one of those device reasons.
 - Scripted counterparty pattern: the device drives the UI as one fixture user;
   the second user is driven over HTTP from Maestro `runScript`
   (`apps/mobile/.maestro/scripts/*.js`) with the same RPCs its app would call.
@@ -503,7 +509,8 @@ journeys and what Jest cannot reach; everything else belongs in Jest.
   before the run (`supabase/scripts/groups-fixture-reset.sh`: their groups,
   their Sync v2 rows, the device user's username), so repeated runs in one
   slot need no Supabase reset. It must pass twice in a row.
-- Timing: "after a refresh" is one pull-to-refresh; the counterparty script
+- Timing: "after a refresh" leaves the Groups screen for My groups and returns
+  (it re-reads on focus); the counterparty script
   logs the observed `sync_push` → card-visible time (`GROUPS_E2E_LATENCY` in
   `maestro-debug/**/maestro.log`). It is observed data, not a latency promise.
 - Out of scope: offline and airplane-mode behaviour (simulator networking
@@ -512,8 +519,8 @@ journeys and what Jest cannot reach; everything else belongs in Jest.
   or components, group migrations, or this lane's fixtures/scripts change
   (`scripts/triggers.tsv`; UI paths already require `frontend`, which includes
   it).
-- Evidence: command result + artifact root, screenshots `groups-01`…`groups-09`,
-  and the logged latency.
+- Evidence: command result + artifact root, the flow's screenshots
+  (`groups-01`…`groups-07`, `groups-members-removed`), and the logged latency.
 
 ## iOS lane configuration contract (infra-free vs Supabase-configured)
 
