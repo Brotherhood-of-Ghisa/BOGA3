@@ -19,13 +19,13 @@ appId: com.dinoderek.mobile
 #      cycle (nothing taps Refresh);
 #   3. clearState wipes BOTH the SQLite data and the SecureStore session (see
 #      src/auth/storage.ts), which only a reinstall reproduces.
-# Jest counterpart: app/__tests__/sync/cycle-round-trip.test.ts (live server:
+# Jest counterpart: __tests__/sync/cycle-round-trip.test.ts (live server:
 #   the gym → session → exercise → set chain and kg readings pushed, then
-#   restored on a wiped client), app/__tests__/sync-bootstrapper.test.ts (seed
-#   decision), app/__tests__/sync-status-panel.test.tsx (every status field,
-#   Refresh), app/__tests__/bodyweight-screen.test.tsx (the reading editor),
-#   app/__tests__/completed-session-local-data.test.tsx (a session shows no
-#   body-weight UI when a reading applies), app/__tests__/sync/** and the
+#   restored on a wiped client), __tests__/sync-bootstrapper.test.ts (seed
+#   decision), __tests__/sync-status-panel.test.tsx (every status field,
+#   Refresh), __tests__/bodyweight-screen.test.tsx (the reading editor),
+#   __tests__/completed-session-local-data.test.tsx (a session shows no
+#   body-weight UI when a reading applies), __tests__/sync/** and the
 #   sync-cycle-*.test.ts family (cycle, push/pull, drift).
 #
 # HERMETIC — the flow signs in as its DEDICATED fixture user (user_b, passed in

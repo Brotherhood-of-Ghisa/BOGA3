@@ -444,7 +444,7 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    since 8px body-adjacent text was poor for accessibility — so `9` now folds up
    into `10` rather than into `11`.
    No other rung moved when `xxs` was added; the design-language screens use it
-   for micro-labels, and `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
+   for micro-labels, and `apps/mobile/__tests__/ui-design-tokens.test.ts`
    holds all eight rungs and their line-heights. Reasoning:
    `ui/design-language.md` §3.
 2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
@@ -476,7 +476,7 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    `TextInput` sets `allowFontScaling={false}` after any spread props;
    `FormField` and `SearchField` enforce this for their callers.
    Existing fit-to-width behaviour is preserved. Native system dialogs remain
-   OS-controlled. `app/__tests__/ui-font-scaling.test.tsx` guards coverage and
+   OS-controlled. `__tests__/ui-font-scaling.test.tsx` guards coverage and
    prop precedence; the visual target is the existing default-size layout at
    both default and accessibility text sizes.
 
@@ -520,7 +520,7 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    in `Text`. Chevron `›` → `chevron-right`, kebab `⋮` → `more-vertical`,
    external `↗` → `arrow-up-right`, and so on. Characters that belong to the
    data stay text: `×` in `100 kg × 5`, the minus in `−12%`, `·` and `•`
-   separators. `app/__tests__/ui-icon.test.tsx` fails on a retired glyph anywhere
+   separators. `__tests__/ui-icon.test.tsx` fails on a retired glyph anywhere
    in `app/`, `components/` or `src/` outside comments; no file is exempt.
 2. An icon-only control carries an `accessibilityLabel` naming the action; the
    `Icon` inside it stays decorative. An icon never carries state alone: the

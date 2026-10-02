@@ -9,14 +9,14 @@ appId: com.dinoderek.mobile
 # Why device:
 #   1. a real sheet whose body swaps panels, the keyboard, and the on-device
 #      expo-sqlite write.
-# Jest counterpart: app/__tests__/exercise-catalog-screen.test.tsx (the
+# Jest counterpart: __tests__/exercise-catalog-screen.test.tsx (the
 #   catalogue over the browser fixture: the create read back from the database
 #   and listed, grouping, sort and never-done controls, Manage and row sheets,
 #   editor validation and muscle selection, search, no matches, history failure
-#   and Retry), app/__tests__/exercise-list-controls.test.tsx,
-#   app/__tests__/exercise-picker.test.tsx (shared preferences, preselection,
+#   and Retry), __tests__/exercise-list-controls.test.tsx,
+#   __tests__/exercise-picker.test.tsx (shared preferences, preselection,
 #   plan suggestions, swap, results tappable with the keyboard up),
-#   app/__tests__/exercise-page-screen.test.tsx (swap).
+#   __tests__/exercise-page-screen.test.tsx (swap).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-browser&teleport=exercise-catalog"
 # Wait for the fixture's catalogue, not the previous screen (spec 06 rule 4).

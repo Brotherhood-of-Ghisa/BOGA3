@@ -13,11 +13,11 @@ appId: com.dinoderek.mobile
 # Why device: 1. the cold boot and the root route guard; 2., 3. and 4. real
 #   round trips to local Supabase, with stack navigation and the keyboard;
 #   5. the real session teardown and route guard.
-# Jest counterpart: app/__tests__/root-stack-routing.test.tsx (gate, sign-out
-#   routing), app/__tests__/sign-in-screen.test.tsx,
-#   app/__tests__/settings-onboarding.test.tsx (Settings sections, About
-#   metadata), app/__tests__/connected-agents-screen.test.tsx,
-#   app/__tests__/settings-profile-navigation.test.tsx (profile edit).
+# Jest counterpart: __tests__/root-stack-routing.test.tsx (gate, sign-out
+#   routing), __tests__/sign-in-screen.test.tsx,
+#   __tests__/settings-onboarding.test.tsx (Settings sections, About
+#   metadata), __tests__/connected-agents-screen.test.tsx,
+#   __tests__/settings-profile-navigation.test.tsx (profile edit).
 #
 # Login-on-start is enforced in this auth-configured lane: a clean launch with no
 # session lands on the sign-in gate, so this flow signs in through the gate first
