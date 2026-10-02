@@ -22,6 +22,7 @@ import { eq } from 'drizzle-orm';
 import { resetBodyweightCalculationPreferenceForAccountSwitch } from '@/src/bodyweight/calculation-preference';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import { clearExerciseSessionFacts } from '@/src/data/exercise-session-facts';
 import {
   bodyWeightMeasurements,
   exerciseDefinitions,
@@ -53,7 +54,9 @@ import {
  * (`exercise_group_links` has a `no action` FK into `exercise_definitions`, so
  * it must be deleted first.)
  * Plus the local-only, FK-free `group_cache` (the previous account's cached
- * group RPC payloads; groups contract §6.2).
+ * group RPC payloads; groups contract §6.2), and, last, the derived exercise
+ * session facts with their stale queue and built marker (the raw deletes above
+ * fire the facts triggers, so the queue is cleared after them).
  *
  * What it resets on the singleton runtime-state row:
  *   - bootstrap_completed_at → null  (so the first-cycle bootstrapper re-runs
@@ -92,6 +95,7 @@ const wipeLocalTables = (database: LocalDatabase): void => {
     transaction.delete(userSettings).run();
     transaction.delete(bodyWeightMeasurements).run();
     transaction.delete(groupCache).run();
+    clearExerciseSessionFacts(transaction);
 
     transaction
       .update(syncRuntimeState)

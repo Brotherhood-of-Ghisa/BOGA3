@@ -17,7 +17,9 @@ accepted 2026-10-02).
 - In: a local, derived per-exercise-per-session facts table with PR flags
   (the base for this and later PR-history views); the Today route and its
   components; a local progress-summary data layer; a group weekly-summary RPC
-  and its client; the specs, Jest and Maestro coverage this changes.
+  and its client; moving the existing PR readers onto the facts table, one PR
+  per reader (T06–T08, added by T01's session); the specs, Jest and Maestro
+  coverage this changes.
 - Out:
   - Train (unchanged); the Progress and Groups tabs themselves.
   - The exercise-linking suggestion (dropped from Today on review).
@@ -26,7 +28,6 @@ accepted 2026-10-02).
     stores them for later views.
   - PR-history screens and a per-muscle PR timeline (later; the facts table
     supports them).
-  - Rewiring the existing PR readers to the facts table (later, one per PR).
 
 ## Agreed design direction
 
@@ -84,6 +85,8 @@ completed session come from one new group RPC, not from paging the stream
 - Facts before the progress read, data before UI, Progress before Group.
 - The two UI tasks run in sequence, because both rewrite `app/(tabs)/today.tsx`.
 - The group RPC (T04) needs nothing from T01–T03 and can run in parallel.
+- The reader rewires (T06–T08) need only T01 and can run beside T02–T05. T06
+  and T07 both touch `src/session-insights/`, so run them one after the other.
 
 ### D9. PRs are derived once and stored per exercise per session
 
@@ -100,14 +103,19 @@ definition:
 Properties:
 
 - **Not synced:** each device derives its own rows. Cleared on wipe.
-- **Never served stale:** a rules version and a stale-definition queue force a
-  rebuild before any read.
+- **Never served stale:** SQLite triggers on the raw and policy tables queue
+  stale definitions; every read drains the queue first (read path only, no
+  warm-up hooks yet). A one-row rules-version marker (not a per-row column)
+  forces a full rebuild on a fresh install, after a wipe and after a rule
+  change.
 - **Proven against a full rebuild:** the full rebuild is the oracle in Jest,
   and the 1RM flags must equal `deriveSessionPersonalRecords`.
 
 Volume is a per-exercise-per-session total, so the grain is the
 exercise-in-session, not the set; the best sets are referenced by id. Changing
-a calculation rule means one full rebuild on each device. Card: T01.
+a calculation rule means one full rebuild on each device. Shipped by T01; the
+durable rules are in spec 05, "Exercise session facts". Ties inside a session
+now go to session order (block, then set), for the existing PR badge too.
 
 D9's table stays device-only: the group card's PRs (D4) come from the
 server's own group records, so nothing server-side needs personal PR flags.
@@ -116,11 +124,14 @@ server's own group records, so nothing server-side needs personal PR flags.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| `M29-T01-Exercise_session_facts` | Local derived per-exercise-per-session facts with 1RM / weight / volume PR flags | none | planned |
+| `M29-T01-Exercise_session_facts` | Local derived per-exercise-per-session facts with 1RM / weight / volume PR flags | none | completed |
 | `M29-T02-Progress_summary_data` | Local week / month / PR / latest-session data for Today | T01 | planned |
 | `M29-T03-Today_progress_card` | Rebuild Today with the Progress card; keep the current group snapshot | T02 | planned |
 | `M29-T04-Group_week_summary_RPC` | Server RPC + client for the group card's data | none | planned |
 | `M29-T05-Today_group_card_and_closeout` | The Group activity card, gallery acceptance, milestone closeout | T03, T04 | planned |
+| `M29-T06-Completion_PRs_on_facts` | Completed-session and completion-screen PRs read the facts table | T01 | planned |
+| `M29-T07-Session_view_PRs_on_facts` | The session view's live PR bar reads earlier bests from the facts table | T01 | planned |
+| `M29-T08-Exercise_records_on_facts` | Exercise page and history records read the facts table | T01 | planned |
 
 ## Risks / dependencies
 

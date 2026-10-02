@@ -78,6 +78,20 @@
       "when": 1790712946963,
       "tag": "0010_square_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790960200689,
+      "tag": "0011_exercise_session_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790960204106,
+      "tag": "0012_exercise_session_facts_triggers",
+      "breakpoints": true
     }
   ]
 }

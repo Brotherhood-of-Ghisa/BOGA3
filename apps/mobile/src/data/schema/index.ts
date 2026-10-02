@@ -20,6 +20,13 @@ export {
   type NewExerciseGroupLink,
 } from './exercise-group-links';
 export { exerciseSets, type ExerciseSet, type NewExerciseSet } from './exercise-sets';
+export {
+  exerciseSessionFacts,
+  exerciseSessionFactsStale,
+  exerciseSessionFactsState,
+  type ExerciseSessionFact,
+  type NewExerciseSessionFact,
+} from './exercise-session-facts';
 export { groupCache, type GroupCacheRecord, type NewGroupCacheRecord } from './group-cache';
 export { gyms, type Gym, type NewGym } from './gyms';
 export { muscleGroups, type MuscleGroup, type NewMuscleGroup } from './muscle-groups';
