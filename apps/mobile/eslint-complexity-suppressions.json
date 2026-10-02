@@ -92,14 +92,6 @@
       "count": 1
     }
   },
-  "components/groups/group-comparison-form.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/groups/group-exercise-pick-sheet.tsx": {
     "complexity": {
       "count": 1
