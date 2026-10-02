@@ -154,6 +154,18 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-4-values')).toHaveTextContent('82.5 × 6');
   });
 
+  it('scrolls Complete exercise with the page, after the set list, instead of pinning it', async () => {
+    await openPage();
+
+    // Host testIDs inside the scroll, in render (document) order.
+    const scroll = screen.getByTestId('exercise-page-scroll');
+    const order = scroll
+      .findAll((node) => typeof node.type === 'string' && typeof node.props.testID === 'string')
+      .map((node) => node.props.testID as string);
+    expect(order).toContain('exercise-set-list');
+    expect(order.indexOf('exercise-complete')).toBeGreaterThan(order.indexOf('exercise-set-list'));
+  });
+
   it('highlights only records: today\'s top set stays plain, a record weight and 1RM take `record`', async () => {
     await openPage();
 
