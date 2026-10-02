@@ -58,8 +58,9 @@ place each under `docs/specs/**`, routed from here.
      proves (spec `06`, "Maestro scope policy").
    - **Quality targets — run once before the PR.** Not in CI and not in
      `boga test fast`, so nothing runs them for you: on the finished change run
-     `./boga test jest-coverage` and `./boga test complexity`, get both green,
-     and list both in the PR's Tests table.
+     `./boga test jest-coverage`, `./boga test complexity` and
+     `./boga test dependencies`, get all three green, and list them in the PR's
+     Tests table.
      - Coverage floor (whole suite, `app`/`components`/`src`): **80% branches,
        80% lines**. Branches is the tight one (82% when the floor landed).
      - Per function: cognitive complexity **≤ 25**, **≤ 200** lines,
@@ -68,8 +69,16 @@ place each under `docs/specs/**`, routed from here.
        `apps/mobile/eslint-complexity-suppressions.json`; that list only
        shrinks (`npm run lint:complexity -- --prune-suppressions` after you
        split one).
-     - Meet a target by adding tests or splitting the function. Lowering a
-       threshold or adding a suppression needs the operator's agreement.
+     - Import direction (dependency-cruiser): no import cycles (type-only
+       included); `src/**` never imports `app/**` or `components/**`;
+       `src/data` imports only lower layers; `src/exercise-calculations`
+       imports only itself and `src/bodyweight/as-of.ts`. Existing violations
+       are grandfathered in
+       `apps/mobile/dependency-cruiser-known-violations.json`; shrink it with
+       `npm run lint:deps:prune` after you fix one.
+     - Meet a target by adding tests, splitting the function or moving the
+       code to the layer a rule allows. Lowering a threshold or adding a
+       suppression or baseline entry needs the operator's agreement.
        Details: spec `02`, "Quality targets".
    - **The full sweep** (`./boga sweep --ref <ref>`, every lane in its own
      worktree) is required only before a release build. Otherwise suggest it to

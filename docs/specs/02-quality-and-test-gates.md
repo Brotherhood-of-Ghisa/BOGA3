@@ -108,6 +108,7 @@ get from `./boga timings` or a run.
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | N/A |
 | complexity | `./boga test complexity` | — (run by name) | ❌ | ~6.5s |
+| dependencies | `./boga test dependencies` | — (run by name) | ❌ | N/A |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
 | backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~44s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.5s |
@@ -261,14 +262,15 @@ iOS Maestro lanes and are exempt from the iOS dev-client rebuild and frontend ga
 
 ## Quality targets (run once before the PR)
 
-Two lanes hold the mobile app to numeric targets. They sit outside every gate
-and outside CI: the agent runs each **once, on the finished change, before
-opening the PR**, and lists both in the PR's Tests table. Both must be green.
+Three lanes hold the mobile app to its quality targets. They sit outside every
+gate and outside CI: the agent runs each **once, on the finished change, before
+opening the PR**, and lists all three in the PR's Tests table. All must be green.
 
 | Lane | Target | Where it lives |
 | --- | --- | --- |
 | `jest-coverage` | Whole-suite floor: **80% branches, 80% lines** (`app/**`, `components/**`, `src/**`, tests excluded). Branches is the tight one (82.2% when the floor landed; lines 92.6%). | `coverageThreshold` in `apps/mobile/jest.config.js` |
 | `complexity` | Per function in the same source: cognitive complexity (`sonarjs`) **≤ 25**, **≤ 200** lines (blank lines and comments excluded), nesting depth **≤ 4**, **≤ 5** parameters. | `apps/mobile/eslint.complexity.config.js` |
+| `dependencies` | Import direction in the same source (dependency-cruiser, type-only imports included): no cycles; `src/**` never imports `app/**` or `components/**`; `src/data` and `src/exercise-calculations` import only the layers spec 09 ("Import direction") allows. | `apps/mobile/dependency-cruiser.config.cjs` |
 
 - **Cognitive, not cyclomatic.** ESLint's cyclomatic `complexity` counts every
   `?.`, `??` and `&&` as a path, so it flagged flat, readable guards and prop
@@ -283,9 +285,16 @@ opening the PR**, and lists both in the PR's Tests table. Both must be green.
   suppression, which also fails the lane until you run
   `npm run lint:complexity -- --prune-suppressions` (from `apps/mobile/`) and
   commit the smaller file.
-- **The fix is the code, never the target.** Add tests or split the function.
-  Lowering a threshold, raising a limit, or adding a suppression needs the
-  operator's agreement, stated in the PR's Deviations section.
+- **Grandfathered imports.** The imports that already broke a dependency rule
+  when it landed are listed in
+  `apps/mobile/dependency-cruiser-known-violations.json`; any other violation
+  fails the lane. A fixed entry does not fail the lane by itself: run
+  `npm run lint:deps:prune` (from `apps/mobile/`, shrink-only) and commit the
+  smaller file.
+- **The fix is the code, never the target.** Add tests, split the function,
+  or move the code to the layer a rule allows. Lowering a threshold, raising a
+  limit, relaxing a dependency rule, or adding a suppression or baseline entry
+  needs the operator's agreement, stated in the PR's Deviations section.
 - **Coverage is global, so run the whole suite.** A scoped
   `npm run test:coverage -- <path>` counts every other file as 0% and always
   fails the floor; scope it only to read the per-file report

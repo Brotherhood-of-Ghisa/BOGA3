@@ -1,0 +1,337 @@
+[
+  {
+    "type": "cycle",
+    "from": "src/data/bootstrap.ts",
+    "to": "src/data/infra-free-catalog-bootstrap.ts",
+    "unresolvedTo": "./infra-free-catalog-bootstrap",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/data/infra-free-catalog-bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/data/bundle-migrations.ts",
+    "to": "src/data/bootstrap.ts",
+    "unresolvedTo": "./bootstrap",
+    "dependencyTypes": [
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/data/bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/infra-free-catalog-bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/bundle-migrations.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/data/bundle-migrations.ts",
+    "to": "src/data/exercise-catalog-seeds.ts",
+    "unresolvedTo": "./exercise-catalog-seeds",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/data/exercise-catalog-seeds.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/infra-free-catalog-bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/bundle-migrations.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/data/exercise-catalog-seeds.ts",
+    "to": "src/data/bootstrap.ts",
+    "unresolvedTo": "./bootstrap",
+    "dependencyTypes": [
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/data/bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/infra-free-catalog-bootstrap.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/data/exercise-catalog-seeds.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/sync/bootstrapper.ts",
+    "to": "src/sync/cycle.ts",
+    "unresolvedTo": "@/src/sync/cycle",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/sync/cycle.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/sync/bootstrapper.ts",
+        "dependencyTypes": [
+          "aliased",
+          "aliased-tsconfig",
+          "aliased-tsconfig-paths",
+          "local",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "dependency",
+    "from": "src/appearance/launch-theme-report.ts",
+    "to": "components/ui/theme-presets.ts",
+    "unresolvedTo": "@/components/ui/theme-presets",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/navigation/more-destinations.ts",
+    "to": "components/ui/icon-glyphs.ts",
+    "unresolvedTo": "@/components/ui/icon-glyphs",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/session-recorder/gym-options.ts",
+    "to": "components/session-recorder/types.ts",
+    "unresolvedTo": "@/components/session-recorder/types",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/session-recorder/session-lifecycle.ts",
+    "to": "components/session-recorder/types.ts",
+    "unresolvedTo": "@/components/session-recorder/types",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/session-recorder/session-model.ts",
+    "to": "components/session-recorder/types.ts",
+    "unresolvedTo": "@/components/session-recorder/types",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/session-recorder/session-view-model.ts",
+    "to": "components/session-recorder/types.ts",
+    "unresolvedTo": "@/components/session-recorder/types",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/session-recorder/use-session-view.ts",
+    "to": "components/session-recorder/types.ts",
+    "unresolvedTo": "@/components/session-recorder/types",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "type-only",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  },
+  {
+    "type": "dependency",
+    "from": "src/sync/SyncGate.tsx",
+    "to": "components/ui/index.ts",
+    "unresolvedTo": "@/components/ui",
+    "dependencyTypes": [
+      "aliased",
+      "aliased-tsconfig",
+      "aliased-tsconfig-paths",
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "src-not-to-ui"
+    }
+  }
+]
