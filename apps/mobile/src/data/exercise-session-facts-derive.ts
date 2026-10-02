@@ -17,7 +17,7 @@ import { isWorkingSessionSetType } from './set-types';
  * Bump when a rule below changes what a row holds. Every device then rebuilds
  * the whole table once before its next facts read.
  */
-export const EXERCISE_SESSION_FACTS_RULES_VERSION = 1;
+export const EXERCISE_SESSION_FACTS_RULES_VERSION = 2;
 
 export type FactsSetInput = {
   id: string;
