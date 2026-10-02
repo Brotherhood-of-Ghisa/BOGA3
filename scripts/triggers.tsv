@@ -76,6 +76,7 @@ apps/mobile/.maestro/scripts/groups-*	-frontend,ios-groups-e2e	groups flow helpe
 supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/migrations/*group*	groups-api-live,ios-groups-e2e	group schema / RPCs (the client's live wire check + two-user e2e lane)
 supabase/scripts/groups-fixture-reset.sh	ios-groups-e2e	groups e2e fixture reset
+supabase/scripts/sync-e2e-fixture-reset.sh	ios-sync-e2e	sync e2e fixture reset
 supabase/functions/**	backend	edge functions
 supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies

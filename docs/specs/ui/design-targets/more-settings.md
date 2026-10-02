@@ -44,7 +44,7 @@ Device: iPhone simulator at 390pt width, light.
 | `06-settings-sections-top` (`ios-auth-profile`) | Settings, signed in: Account and AI coaching |
 | `07-settings-about-metadata` (ad hoc) | Settings: About |
 | `settings-preferences` (ad hoc) | Settings: the date format |
-| `19-first-run-roundtrip-delta-synced` (`ios-sync-e2e`) | the sync-status panel after a sync |
+| `18-first-run-roundtrip-reading-synced` (`ios-sync-e2e`) | the sync-status panel after a sync |
 | `02-dev-wipe-local-settings`, `03-dev-wipe-local-feedback` (`ios-ui-regression`) | Developer tools, and a success `Notice` (information only) |
 | `dev-logs` (`ios-ui-regression`) | Logs (information only) |
 

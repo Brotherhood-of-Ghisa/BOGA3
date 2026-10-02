@@ -383,6 +383,13 @@ the runner. The rule is enforced by
 trigger registry runs on any `.maestro/**` or `maestro*` change): it fails if two
 sign-in flows resolve to the same fixture.
 
+A flow whose claims depend on its user's server state resets that user with the
+service role before the run, so repeated runs in one slot start alike:
+`supabase/scripts/sync-e2e-fixture-reset.sh` (`user_b`: its Sync v2 rows, then a
+check that every pull layer is empty, so the first sign-in always takes the
+bootstrapper's seed branch) and `supabase/scripts/groups-fixture-reset.sh`
+(`user_c`/`user_d`, below).
+
 **Scripted counterparties.** A flow that needs a second user drives it over
 HTTP from `runScript` (`.maestro/scripts/*.js`) instead of a second device
 (`groups-two-user-stream`: `user_d` joins, pushes sessions through `sync_push`,

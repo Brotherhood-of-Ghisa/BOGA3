@@ -4,82 +4,48 @@ appId: com.dinoderek.mobile
 # (ios-sync-e2e lane).
 #
 # Proves:
-#   A. a new user's first sign-in runs the real bootstrapper (seed → push →
-#      pull) and lifts the first-sync gate on its own;
-#   B. an 80 kg reading saved in the reading editor, a workout logged through
-#      Train → session view → exercise page → Finish → Done, and an 82 kg
-#      reading, all on the freshly bootstrapped local database;
-#   C. a sync forced from Settings drains Pending changes to 0 (the server
-#      accepted this run's rows);
-#   D. after a full wipe (clearState) and a fresh sign-in, the workout and both
-#      readings restore from the server, and the restored session shows no
-#      body-weight UI.
-# Why device: real GoTrue sign-in, the real sync cycle and NetInfo against a
-#   real server, the UI's gating and trigger wiring, the keyboard, and a
-#   clearState wipe of SQLite and SecureStore. sync-infra drives the same cycle
-#   without UI; it is not evidence for these.
-# Jest counterpart: app/__tests__/sync/** (cycle, push/pull, drift),
-#   app/__tests__/sync-cycle-push.test.ts (dirty-bit-only push),
-#   app/__tests__/sync-status-panel.test.tsx (status fields),
-#   app/__tests__/bodyweight-screen.test.tsx (reading editor).
+#   1. a new user's first sign-in, on an empty server, runs the real
+#      bootstrapper (seed → push → pull) and lifts the first-sync gate on its
+#      own;
+#   2. a reading entered on the device is pushed: Settings' Pending changes
+#      reaches 0;
+#   3. after a full wipe (clearState) and a fresh sign-in, the bootstrapper
+#      pulls instead of re-seeding, and the reading is back on the device.
+# Why device:
+#   1. real GoTrue sign-in, the auth → sync trigger, `expo/fetch` and the
+#      on-device expo-sqlite against a real server, and the root stack's
+#      access switch from the gate to the app;
+#   2. a write on the device reaching the server through the scheduler's own
+#      cycle (nothing taps Refresh);
+#   3. clearState wipes BOTH the SQLite data and the SecureStore session (see
+#      src/auth/storage.ts), which only a reinstall reproduces.
+# Jest counterpart: app/__tests__/sync/cycle-round-trip.test.ts (live server:
+#   the gym → session → exercise → set chain and kg readings pushed, then
+#   restored on a wiped client), app/__tests__/sync-bootstrapper.test.ts (seed
+#   decision), app/__tests__/sync-status-panel.test.tsx (every status field,
+#   Refresh), app/__tests__/bodyweight-screen.test.tsx (the reading editor),
+#   app/__tests__/completed-session-local-data.test.tsx (a session shows no
+#   body-weight UI when a reading applies), app/__tests__/sync/** and the
+#   sync-cycle-*.test.ts family (cycle, push/pull, drift).
 #
-# ISOLATION — this flow signs in as a DEDICATED fixture user (user_b, passed in
-# as MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner). Per the
-# one-user-per-flow rule (docs/specs/11), every Supabase-backed Maestro flow owns
-# its OWN fixture user so no flow ever depends on — or is corrupted by — another
-# flow's residual server state (auth-profile-happy-path owns user_a; this flow
-# owns user_b; enforced by scripts/tests/maestro-fixture-users.test.sh). A
-# dedicated, otherwise-untouched user also makes this flow's first sign-in
-# deterministic: it always finds an EMPTY server -> the bootstrapper's SEED branch
-# runs -> the FULL catalog is seeded locally, so the "Barbell Back Squat" pick in
-# phase B is guaranteed present. (A passing run pushes user_b's complete catalog
-# to dirty=0 in phase C, so even repeated lane runs that later hit user_b's pull
-# branch still get a complete catalog.)
-#
-# Phases (each maps to a step in the user-asked flow):
-#   A. New user signs in -> the REAL bootstrapper -> seed -> push -> pull cycle
-#      runs against the provisioned Supabase and lifts the first-sync gate on its
-#      own (NO `bootstrap=complete` harness stamp). Landing on the data screen
-#      proves: logged in + all bootstrap data seeded locally.
-#   B. Save 80 kg, log one exercise, save 82 kg. The session recorder stays
-#      free of body-weight management UI.
-#   C. Force a sync from the Settings sync-status surface and wait for "Pending
-#      changes" to reach 0. This is the run-SPECIFIC upload proof: the dirty rows
-#      were created THIS run in (B) on a freshly-bootstrapped local DB, so
-#      draining them to 0 means the logged exercise was accepted by the server.
-#   D. Fully wipe the device (clearState wipes BOTH the SQLite data AND the
-#      SecureStore session — see src/auth/storage.ts) and sign in again. The
-#      bootstrapper now PULLS from the (non-empty) server, so the logged workout
-#      and both private dated readings reappear without session-local weight UI.
-#      After a full local wipe the ONLY source of any
-#      session is the remote DB — so a restored session proves the data is in the
-#      remote database.
-#
-# Why no exact-count / unique-row assertion in (D): the lane reuses a running
-# local Supabase WITHOUT reset between runs (ensure-local-runtime-baseline.sh:
-# "reusing existing instance without reset"), so user_b's server rows accumulate
-# across runs. Run-specific upload proof therefore lives in (C) (dirty-count -> 0,
-# which cannot false-pass); (D) proves the remote->device restore direction. user_b
-# is exclusive to this flow and only this flow ever logs a workout for it, so the
-# "1 exercise" history row asserted here is this suite's own logged session.
-#
-# Why a Maestro flow cannot assert the strict "ONLY that exercise was in the push
-# payload": the push wire payload is not observable from the UI. That delta-only
-# assertion is covered at the wire level by the jest push suite
-# (app/__tests__/sync-cycle-push.test.ts, dirty-bit-only push). This flow proves
-# the observable end goal: the logged exercise is uploaded and round-trips
-# through the remote DB.
+# HERMETIC — the flow signs in as its DEDICATED fixture user (user_b, passed in
+# as MAESTRO_ROUNDTRIP_EMAIL/PASSWORD by the lane runner; one user per flow,
+# docs/specs/11, enforced by scripts/tests/maestro-fixture-users.test.sh), and
+# the lane runner first empties user_b's server data
+# (supabase/scripts/sync-e2e-fixture-reset.sh). So the first sign-in always
+# finds an empty server and takes the bootstrapper's SEED branch, and the only
+# reading on the server after the wipe is the one this run entered. The seeded
+# catalog alone cannot prove claim 3: a failed push would leave the server
+# empty and the second sign-in would re-seed the same catalog.
 
-# === Phase A: new user, first sign-in, real bootstrap + sync ===
-# Cold launch with no session: the route-layer guard lands on sign-in.
+# === 1. First sign-in on an empty server: seed, push, gate lifts ===
 # `clearState` relaunches the dev client with a wiped sandbox, dropping its Metro
 # connection, so re-open the dev-client deep link (carrying this worktree's Metro
 # port, exported by maestro-ios-launch.sh) to reload the app bundle into the
 # wiped sandbox. clearState reinstalled the app, so the expo-dev-client menu
 # reappears over the app and BLOCKS sign-in: wait for the onboarding intro and
 # dismiss it (Continue -> dev menu, Close -> app). The URL-scheme trust dialog is
-# pre-authorized in maestro-ios-launch.sh, so there is no "Open" tap (absent it
-# cost ~7s and FAILED on transient iOS-26 hierarchy errors). See
+# pre-authorized in maestro-ios-launch.sh, so there is no "Open" tap. See
 # auth-profile-happy-path for the failure screenshots that proved the dev menu is
 # load-bearing after clearState.
 - launchApp:
@@ -108,21 +74,18 @@ appId: com.dinoderek.mobile
     commands:
       - tapOn:
           text: "Close"
+# The route guard itself (no data screen before sign-in) is auth-profile's
+# claim and root-stack-routing's Jest.
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
     timeout: 60000
-- assertVisible:
-    id: "sign-in-card"
-# No data screen may render before sign-in.
-- assertNotVisible:
-    id: "today-screen"
 - takeScreenshot: "16-first-run-roundtrip-signed-out"
 
-# Sign in as the fixture user. The auth layer fires a real requestSync() on a
-# live session (src/auth/service.ts), so the first authenticated cycle starts
-# within ~1s. The first-sync gate stands in front of the data screen until the
-# REAL bootstrapper->seed->push->pull cycle drains and stamps the bootstrap flag.
+# The auth layer fires a real requestSync() on a live session
+# (src/auth/service.ts). The root stack's access levels are exclusive
+# (components/navigation/root-stack.tsx), so the data screen appearing means the
+# first-sync gate lifted — from real sync progress, with no harness stamp.
 - tapOn:
     id: "sign-in-email-input"
 - inputText: "${MAESTRO_ROUNDTRIP_EMAIL}"
@@ -131,20 +94,16 @@ appId: com.dinoderek.mobile
 - inputText: "${MAESTRO_ROUNDTRIP_PASSWORD}"
 - tapOn:
     id: "sign-in-submit-button"
-# Let the real first cycle complete on its own (no harness stamp). Reaching the
-# data screen with the gate block gone proves the gate lifted from real sync
-# progress. A generous window absorbs sim/Metro warm-up.
 - extendedWaitUntil:
     visible:
       id: "today-screen"
     timeout: 90000
-- assertNotVisible:
-    id: "sync-gate-block"
 - takeScreenshot: "17-first-run-roundtrip-bootstrapped"
 
-# Record a new weight through the real editor; leave its precise default date.
-# A later run's reading sorts after earlier fixture readings without deleting
-# any server data or bypassing the sync/bootstrap lifecycle.
+# === 2. A reading entered on the device reaches the server ===
+# Add opens the editor empty and focused (components/bodyweight/
+# body-weight-screen.tsx), so the value goes straight in; the precise default
+# date stays.
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:
     visible: { id: "body-weight-add" }
@@ -153,9 +112,6 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "weight-entry-value" }
     timeout: 15000
-- tapOn: { id: "weight-entry-value" }
-# The field holds a short reading; a bare eraseText deletes 50 characters.
-- eraseText: 10
 - inputText: "80"
 - scrollUntilVisible:
     element: { id: "weight-entry-save" }
@@ -165,248 +121,42 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
-- assertVisible: "Reading saved."
-- openLink: "boga3://train"
-- extendedWaitUntil:
-    visible: { id: "train-screen" }
-    timeout: 30000
-# A prior interrupted lane can leave this fixture user's uploaded session active.
-# Retire it through the real UI so the round trip is repeatable after a failed run.
-- runFlow:
-    when:
-      visible: { id: "train-resume-session-button" }
-    commands:
-      - tapOn: { id: "train-resume-session-button" }
-      - extendedWaitUntil:
-          visible: { id: "session-view-options-button" }
-          timeout: 30000
-      - tapOn: { id: "session-view-options-button" }
-      - extendedWaitUntil:
-          visible: { id: "session-view-abandon" }
-          timeout: 10000
-      - tapOn: { id: "session-view-abandon" }
-      - extendedWaitUntil:
-          visible: { text: "Abandon session?" }
-          timeout: 10000
-      - tapOn: { text: "Abandon" }
-- extendedWaitUntil:
-    visible: { id: "train-start-empty-button" }
-    timeout: 30000
 
-# === Phase Ba: log one exercise with a 80 kg applicable reading ===
-# Through the real session UI, WITHOUT a data reset — the just-bootstrapped local
-# DB (seeded catalog + bootstrap flag) must be preserved: Train's Start opens the
-# session view, `+ Add exercise` the picker, the card the exercise page, whose
-# logger confirms the set; back on the session view, Finish completes it.
-- waitForAnimationToEnd:
-    timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "top-level-tab-train"
-      - extendedWaitUntil:
-          visible:
-            id: "train-start-empty-button"
-          timeout: 15000
-- tapOn:
-    id: "train-start-empty-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-add-exercise"
-    timeout: 30000
-- assertNotVisible: "Body weight"
-- tapOn:
-    id: "session-view-add-exercise"
-- tapOn: "Exercise filter input"
-- inputText: "Barbell Back Squat"
-- pressKey: Enter
-# Selecting the seeded "Barbell Back Squat" here also implicitly proves the
-# catalog bootstrapped in Phase A: the row only exists if the seed landed. The
-# search expands matching families; collapse/search behavior is
-# covered by focused tests.
-- extendedWaitUntil:
-    visible:
-      text: "Select exercise Barbell Back Squat"
-    timeout: 15000
-- tapOn:
-    text: "Select exercise Barbell Back Squat"
-- tapOn:
-    id: "exercise-picker-add-empty-set-button"
-- extendedWaitUntil:
-    visible:
-      text: "Barbell Back Squat, 0 of 1 sets done"
-    timeout: 15000
-- tapOn:
-    text: "Barbell Back Squat, 0 of 1 sets done"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-logger"
-    timeout: 15000
-- tapOn:
-    id: "exercise-set-logger-weight"
-- inputText: "135"
-- tapOn:
-    id: "exercise-set-logger-reps"
-- inputText: "8"
-- hideKeyboard:
-    optional: true
-- tapOn:
-    id: "exercise-set-logger-commit"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-1-toggle"
-      text: "Mark set 1 not performed"
-    timeout: 10000
-- tapOn:
-    id: "exercise-page-back"
-- extendedWaitUntil:
-    visible:
-      text: "Barbell Back Squat, 1 of 1 sets done"
-    timeout: 15000
-# One explicitly confirmed set finishes straight through with no cleanup dialog.
-- tapOn:
-    id: "session-view-finish-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-completion-presentation"
-    timeout: 30000
-# M24 inserts a durable completion presentation before returning to Stats. Use
-# its explicit exit so the sync round-trip remains realistic after submission.
-- tapOn:
-    id: "session-completion-done"
-- extendedWaitUntil:
-    visible:
-      id: "stats-history-screen"
-    timeout: 30000
-- takeScreenshot: "18a-first-run-roundtrip-logged-80kg"
-
-# Record a new weight through the real editor; leave its precise default date.
-# A later run's reading sorts after earlier fixture readings without deleting
-# any server data or bypassing the sync/bootstrap lifecycle.
-- openLink: "boga3://body-weight"
-- extendedWaitUntil:
-    visible: { id: "body-weight-add" }
-    timeout: 30000
-- tapOn: { id: "body-weight-add" }
-- extendedWaitUntil:
-    visible: { id: "weight-entry-value" }
-    timeout: 15000
-- tapOn: { id: "weight-entry-value" }
-# The field holds a short reading; a bare eraseText deletes 50 characters.
-- eraseText: 10
-- inputText: "82"
-- scrollUntilVisible:
-    element: { id: "weight-entry-save" }
-    direction: DOWN
-    centerElement: true
-- tapOn: { id: "weight-entry-save" }
-- extendedWaitUntil:
-    notVisible: { id: "weight-entry-sheet" }
-    timeout: 15000
-- assertVisible: "Reading saved."
-- openLink: "boga3://train"
-- extendedWaitUntil:
-    visible: { id: "train-start-empty-button" }
-    timeout: 30000
-
-# === Phase C: force a sync, prove the logged delta uploaded (Pending -> 0) ===
-# Settings by deep link: More -> Settings is settings-dev-wipe-local's claim, and
-# its last-row scroll costs ~9s. Poll for Settings rather than asserting it
-# immediately: a cold-JIT first render can lag a beat.
+# The save nudges the scheduler (src/sync/write-nudge.ts), whose cycle pushes
+# the reading. Pending changes reaching 0 is the upload proof AND the barrier
+# for the wipe below: without it clearState can beat the push. The id+text
+# matcher targets the dirty-count field, so an unrelated "0" cannot satisfy it.
+# The card sits below the fold, out of the hierarchy until scrolled to.
 - openLink: "boga3://settings"
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
     timeout: 15000
-# The sync-status card sits below the Account / AI-coaching / Preferences
-# sections, far enough down the Settings scroll view that it is not in the
-# view hierarchy at all until scrolled to — so wait for it where it lives
-# rather than at the top of the screen.
-- scrollUntilVisible:
-    element:
-      id: "settings-sync-status-card"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-    timeout: 30000
-- extendedWaitUntil:
-    visible:
-      id: "settings-sync-status-card"
-    timeout: 30000
-# Every status field must render on-device for the signed-in user — the surface
-# check the standalone settings-sync-status flow used to own (its field-content
-# assertions live in jest sync-status-panel.test.tsx). dirty-count is asserted
-# below; refresh-button is exercised next.
-- scrollUntilVisible:
-    element:
-      id: "settings-sync-status-last-success"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible:
-    id: "settings-sync-status-last-success"
-- scrollUntilVisible:
-    element:
-      id: "settings-sync-status-network"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible:
-    id: "settings-sync-status-network"
-- scrollUntilVisible:
-    element:
-      id: "settings-sync-status-error"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- assertVisible:
-    id: "settings-sync-status-error"
-# Tap Refresh: fires a real full sync cycle (push the dirty delta + pull).
-- scrollUntilVisible:
-    element:
-      id: "settings-sync-status-refresh-button"
-    direction: DOWN
-    visibilityPercentage: 100
-    centerElement: true
-- tapOn:
-    id: "settings-sync-status-refresh-button"
-# Wait until "Pending changes" reads exactly 0 — the logged exercise's local
-# dirty rows have all been accepted by the server. The combined id+text matcher
-# targets the dirty-count field specifically so an unrelated "0" elsewhere cannot
-# satisfy it. If the push never completes, this times out (correct failure).
 - scrollUntilVisible:
     element:
       id: "settings-sync-status-dirty-count"
-    direction: UP
-    visibilityPercentage: 100
+    direction: DOWN
     centerElement: true
+    timeout: 30000
 - extendedWaitUntil:
     visible:
       id: "settings-sync-status-dirty-count"
       text: "0"
     timeout: 60000
-- takeScreenshot: "19-first-run-roundtrip-delta-synced"
+- takeScreenshot: "18-first-run-roundtrip-reading-synced"
 
-# === Phase D: full device wipe + re-sign-in -> data restored from remote ===
-# clearState wipes BOTH the local SQLite AND the SecureStore session, modelling a
-# fresh install / new device for the same account. Signing in again runs the real
-# bootstrapper, which finds the server non-empty (catalog + the logged session
-# from Phase C) and PULLS everything back — no re-seed.
-# Second clearState reinstall -> dev-client menu reappears and blocks sign-in;
-# dismiss it (Continue -> dev menu, Close -> app), same as Phase A. Trust dialog
-# pre-authorized away (no "Open" tap).
+# === 3. Full wipe + fresh sign-in: the reading comes back from the server ===
+# Same dev-menu dismissal as step 1.
 - launchApp:
     clearState: true
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
-- extendedWaitUntil:
-    visible:
-      text: "Continue"
-    timeout: 30000
-# Settle the sheet, then retry each dismissal tap so the transient iOS-26
-# `kAXErrorInvalidUIElement` (stale element ref during the post-clearState reload
-# churn) is re-attempted rather than failing the run. Each retry wraps one tap
-# and is idempotent: the element stays present until the tap succeeds.
+- retry:
+    maxRetries: 3
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: "Continue"
+          timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
 - retry:
@@ -431,49 +181,13 @@ appId: com.dinoderek.mobile
 - inputText: "${MAESTRO_ROUNDTRIP_PASSWORD}"
 - tapOn:
     id: "sign-in-submit-button"
-# Gate lifts off the real re-pull cycle and lands on the data screen.
 - extendedWaitUntil:
     visible:
       id: "today-screen"
     timeout: 90000
-- assertNotVisible:
-    id: "sync-gate-block"
-# Open the sessions history. After a full local wipe the only source of any
-# session is the remote DB, so a restored "1 exercise" session row proves the
-# logged workout is in the remote database.
-- waitForAnimationToEnd:
-    timeout: 4000
-- retry:
-    maxRetries: 3
-    commands:
-      - tapOn:
-          id: "top-level-tab-progress"
-      - extendedWaitUntil:
-          visible:
-            id: "stats-history-screen"
-          timeout: 30000
-- tapOn:
-    id: "stats-card-sessions"
-- assertVisible:
-    id: "completed-history-scroll"
-- extendedWaitUntil:
-    visible:
-      text: "1 exercise"
-    timeout: 30000
-- takeScreenshot: "20-first-run-roundtrip-restored-from-remote"
-
-# The newest completed row was logged above. Its completed-session screen
-# stays free of body-weight management UI after the full local wipe; the
-# private reading log below proves both dated readings restored independently.
-- tapOn: { id: "completed-session-open-button-.*", index: 0 }
-- extendedWaitUntil:
-    visible: { id: "completed-session-detail-screen" }
-    timeout: 30000
-- assertNotVisible: "Body weight"
-- takeScreenshot: "21-roundtrip-newer-session-without-weight-ui"
+# After the wipe the server is the only place this reading exists.
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:
-    visible: { id: "body-weight-reading-.*", text: "Edit 82 kilograms, .*" }
+    visible: { id: "body-weight-reading-.*", text: "Edit 80 kilograms, .*" }
     timeout: 30000
-- assertVisible: { id: "body-weight-reading-.*", text: "Edit 80 kilograms, .*" }
-- takeScreenshot: "23-roundtrip-private-readings-restored"
+- takeScreenshot: "19-first-run-roundtrip-reading-restored"

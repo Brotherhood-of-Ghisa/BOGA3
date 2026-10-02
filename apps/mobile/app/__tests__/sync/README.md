@@ -51,15 +51,16 @@
     by `sync-v2-push-roundtrip.sh` and `sync-v2-pull-drain.sh` inside the e2e
     wrapper.
 - **The device-level proof is its own requirement and is NOT satisfied by the
-  above:** `npm run test:e2e:ios:sync` (real session view / exercise page UI + real cycle + real
+  above:** `npm run test:e2e:ios:sync` (real sign-in + real cycle + real
   local Supabase) is mandatory for changes to the sync cycle, scheduler, sync
   triggers, auth session handoff, or the first-sync gate. `test:sync:infra` is
   the breadth lane (LWW, multi-device, drift) — it bypasses the UI, NetInfo, and
   the scheduler wiring, so a green run there is not evidence for those layers.
-  The device flow also saves two weight readings and two completed sessions,
-  syncs, wipes local state and signs in again: both restored sessions must resolve
-  their applicable 80/82 kg readings and provenance. It checks the private
-  reading history through the real screen after bootstrap.
+  On an empty server (the lane resets its `user_b` fixture first) the device
+  signs in (seed → push), saves one kg reading, waits for Pending changes to
+  reach 0, wipes local state and signs in again: the bootstrapper must pull
+  rather than re-seed, and the reading must be back. Per-entity restore (the
+  session chain, readings) is `cycle-round-trip`'s, against the live server.
 - Current frontend baseline suites for this policy (Sync v2) include the
   `apps/mobile/app/__tests__/sync-cycle-*.test.ts` family
   (`-convergence`, `-pull`, `-push`, `-race`, `-wire`),
