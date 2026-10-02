@@ -48,7 +48,7 @@ apps/mobile/src/auth/**	fast,backend,ios-sync-e2e	auth / session wiring
 apps/mobile/src/data/**	fast,backend	data layer / client schema
 apps/mobile/drizzle/**	fast,backend	migration artifacts
 apps/mobile/scripts/check-sync-schema-drift*	fast,backend	sync drift checker
-apps/mobile/src/groups/**	fast,ios-groups-e2e	group client (two-user e2e lane)
+apps/mobile/src/groups/**	fast,groups-api-live,ios-groups-e2e	group client (its live wire check + the two-user e2e lane)
 apps/mobile/src/groups/set-facts.ts	groups-leaderboards	group set rules the group-eval function loads
 apps/mobile/src/exercise-calculations/**	groups-leaderboards	calculations the group-eval function loads
 apps/mobile/src/session-recorder/set-semantics.ts	groups-leaderboards	set semantics the group-eval function loads
@@ -74,12 +74,15 @@ apps/mobile/.maestro/flows/sync-first-run-log-and-roundtrip.yaml	-frontend,ios-s
 apps/mobile/.maestro/flows/groups-two-user-stream.yaml	-frontend,ios-groups-e2e	single flow → the lane that runs it
 apps/mobile/.maestro/scripts/groups-*	-frontend,ios-groups-e2e	groups flow helper scripts → the groups lane
 supabase/migrations/**	backend	server schema / RLS / RPCs
-supabase/migrations/*group*	ios-groups-e2e	group schema / RPCs (two-user e2e lane)
+supabase/migrations/*group*	groups-api-live,ios-groups-e2e	group schema / RPCs (the client's live wire check + two-user e2e lane)
 supabase/scripts/groups-fixture-reset.sh	ios-groups-e2e	groups e2e fixture reset
 supabase/functions/**	backend	edge functions
 supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies
-supabase/tests/lib/**	groups-contract,groups-leaderboards	shared group lane fixtures
+supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-api-live	shared group lane fixtures
+supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
+apps/mobile/app/__tests__/groups-api-live.test.ts	groups-api-live	the groups client live suite
+apps/mobile/app/__tests__/helpers/groups-live-endpoint.ts	groups-api-live	the groups client live suite's endpoint helper
 supabase/scripts/**	backend	backend wrappers / runtime scripts
 supabase/scripts/local-runtime-*.sh	meta-tests	edge function server start/stop (functions-serve-stop meta-test)
 supabase/scripts/_common.sh	meta-tests	edge function server start/stop (functions-serve-stop meta-test)

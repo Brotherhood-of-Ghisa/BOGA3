@@ -40,7 +40,7 @@ place each under `docs/specs/**`, routed from here.
    | Root layout / root stack / route access (`app/_layout.tsx`, `components/navigation/root-stack.tsx`) / Maestro harness or runtime scripts | `boga test fast` + `boga test frontend` |
    | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
-   | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test ios-groups-e2e` (two-user e2e) |
+   | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test groups-api-live` (client ↔ live server) + `boga test ios-groups-e2e` (two-user e2e) |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
