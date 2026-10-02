@@ -52,17 +52,6 @@
       "count": 1
     }
   },
-  "app/profile.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "app/session/[sessionId]/index.tsx": {
     "max-lines-per-function": {
       "count": 1
