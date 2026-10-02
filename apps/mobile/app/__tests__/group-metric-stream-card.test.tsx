@@ -291,6 +291,11 @@ describe('compact event rows', () => {
       ],
     ],
     ['a lead change', leadChange, ['Leaderboard changed · Pull-up · Rules 2']],
+    [
+      'an event of a kind this build does not know',
+      { ...ENVELOPE, kind: 'future_event' } as unknown as GroupMetricStreamItemWire,
+      ['Leaderboard changed · Pull-up · Rules 2'],
+    ],
   ])('shows %s and opens the revision history', (_label, item, lines) => {
     const { card, label, texts } = renderCard(item);
     expect(texts).toEqual([...lines, '10 Sep · View rules history']);
