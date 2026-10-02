@@ -43,8 +43,9 @@ appId: com.dinoderek.mobile
       id: "exercise-history-session-card-maestro_exercise_page_history_2_bench"
     timeout: 10000
 - takeScreenshot: "exercise-history-default"
-# The native back item is arrow-only; it reads the previous route's title.
-- tapOn: "Exercise"
+# The screen draws its own back arrow (the native item can stop dispatching).
+- tapOn:
+    id: "exercise-history-back"
 - extendedWaitUntil:
     visible:
       id: "exercise-page"

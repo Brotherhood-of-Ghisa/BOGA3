@@ -11,6 +11,7 @@ import {
   Card,
   ChipGroup,
   Icon,
+  IconButton,
   ListRow,
   Notice,
   Screen,
@@ -464,7 +465,25 @@ export default function ExerciseHistoryRoute() {
 
   return (
     <>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen
+        options={{
+          title,
+          headerBackVisible: false,
+          // The native back item can stop dispatching on iOS 26.4 after
+          // reaching this screen from an active session (as on Body weight).
+          // Draw the shared arrow and pop explicitly.
+          headerLeft: () => (
+            <IconButton
+              name="chevron-left"
+              accessibilityLabel="Back"
+              onPress={() =>
+                router.canGoBack() ? router.back() : router.replace(mainTabHref('progress'))
+              }
+              testID="exercise-history-back"
+            />
+          ),
+        }}
+      />
       <ExerciseHistoryScreenShell
         summary={summary}
         period={period}

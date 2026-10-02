@@ -280,9 +280,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - missing/invalid `exerciseDefinitionId` shows the in-screen error state and does not crash
   - the bests rows and each session card push `/completed-session/<sessionId>`
     (transition 23); the period and tag controls push nothing (DLM-T10)
-  - opened from the exercise page, its arrow-only native back reads the exercise
-    page's stack title, `Exercise`, to assistive tech (Maestro taps it by that
-    text)
+  - it draws its own back arrow (`exercise-history-back`, label `Back`) in place
+    of the native back item, which can stop dispatching on iOS 26.4 when the
+    screen is reached from an active session; Back pops the stack, or replaces
+    with `/progress` when nothing is below it
 
 12. `/groups` (M22)
 - File: `apps/mobile/app/(tabs)/groups.tsx`
