@@ -43,6 +43,9 @@ session's graph). Read the earlier best from the facts table instead.
    session-view tests pass unchanged.
 2. Jest covers active and completed-edit sessions, and an exercise with no
    earlier facts (no marker).
+3. If T06 left the duplicated 1RM best-set rule in place (T06 Deliverable
+   4), finish it here: after this task no PR reader replays history, so one
+   copy must remain.
 
 ## Specs to update
 

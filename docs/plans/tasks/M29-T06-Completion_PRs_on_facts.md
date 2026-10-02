@@ -34,8 +34,9 @@ replaying every earlier session in `deriveSessionPersonalRecords`.
 1. The exercise volume comparison could read `volume_kg` / `volume_complete`
    from the facts too; the muscle comparison cannot. Move the exercise
    comparison in this PR, or keep loading the history graph for both?
-2. Keep `deriveSessionPersonalRecords` as the pure rule (tests and the
-   oracle), or retire it once nothing reads it?
+2. Where the single 1RM best-set rule lives (Deliverable 4): moved into
+   `src/exercise-calculations` and imported by both sides, or kept only in
+   `src/data/exercise-session-facts-derive.ts` with the replay copy deleted?
 
 ## Deliverables and acceptance
 
@@ -45,6 +46,13 @@ replaying every earlier session in `deriveSessionPersonalRecords`.
    generated history (reuse the T01 generator).
 3. Measure `loadCompletedSessionInsights` before and after on the 10× dev
    rich history (T01's harness); record it in the PR body.
+4. One implementation of the 1RM best-set rule (eligibility, strictly
+   greater, ties in session order). Today it exists twice:
+   `pickBestE1rm` in `src/data/exercise-session-facts-derive.ts` and
+   `findBestPersonalRecordCandidate` in `src/session-insights/calculations.ts`,
+   kept equal only by the differential test in
+   `exercise-session-facts.test.ts`. Delete or replace the replay copy here,
+   or leave a stated reason and hand it to T07, which then must finish it.
 
 ## Specs to update
 
