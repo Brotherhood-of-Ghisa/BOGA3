@@ -5,6 +5,10 @@ migration. Chosen by the user on 2026-09-24 (plan decision G1 (a)): a brief plus
 the gallery states the user accepts. **Pending acceptance** in the DLM-T03
 gallery.
 
+**Today is being replaced** by `today-landing.md` (accepted 2026-10-02). This
+record governs Today's current screen until that build ships, then keeps only
+Train.
+
 ## Target
 
 - Vocabulary: `../design-language.md` and the app frame (`app-frame.md`).
