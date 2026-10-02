@@ -161,35 +161,89 @@ const isRecordContext = (value: unknown, event: Record<string, unknown>): boolea
   });
 };
 
+type WireRecord = Record<string, unknown>;
+
+const hasStreamEnvelope = (value: unknown): value is WireRecord =>
+  isMetricRecord(value) && typeof value.key === 'string' && integer(value.sort_at_ms);
+const hasGroupRef = (value: WireRecord) =>
+  isMetricRecord(value.group) && typeof value.group.group_id === 'string' && typeof value.group.name === 'string';
+const hasGroupExerciseRef = (value: WireRecord) =>
+  isMetricRecord(value.group_exercise) && typeof value.group_exercise.group_exercise_id === 'string';
+const isStringArray = (value: unknown) => Array.isArray(value) && value.every(item => typeof item === 'string');
+
+const isSessionItem = (value: WireRecord) =>
+  member(value.member) && typeof value.session_id === 'string' && Array.isArray(value.groups) && Array.isArray(value.exercises);
+const isMembershipItem = (value: WireRecord) =>
+  member(value.member) && ['joined','left','removed'].includes(String(value.event));
+
+/** Original kg-only items: only their kind, revision and (for records) positive kg boards are checked. */
+const isLegacyBoard = (board: unknown) =>
+  isMetricRecord(board) && ['weight','e1rm'].includes(String(board.metric)) && finite(board.value_kg) && board.value_kg > 0;
+const isLegacyItem = (value: WireRecord) =>
+  integer(value.rules_revision) && ['record','record_voided','link'].includes(String(value.kind)) &&
+  (value.kind !== 'record' || (Array.isArray(value.boards) && value.boards.every(isLegacyBoard)));
+
+type MetricEventRecord = WireRecord & { rules_revision: number };
+
+/** A metric event carries its exercise's current rules at the event's revision. */
+const hasMetricEventEnvelope = (value: WireRecord): value is MetricEventRecord =>
+  value.metric_event === true && isEventBase(value) && isGroupMetricRulesWire(value.group_exercise) &&
+  value.group_exercise.rules_revision === value.rules_revision &&
+  value.group_exercise.group_exercise_id === value.group_exercise_id;
+
+/** The performance snapshot is the event's own set in the event's own session. */
+const hasOwnPerformance = (value: WireRecord) =>
+  isGroupPerformanceWire(value.performance) &&
+  value.performance.set_id === value.set_id && value.performance.session_id === value.session_id;
+const isRecordBoard = (board: unknown) =>
+  metricValueRecord(board) && nullableFinite(board.previous_value) &&
+  typeof board.group_record === 'boolean' && typeof board.fingerprint === 'string';
+const isRecordEvent = (value: MetricEventRecord) =>
+  member(value.member) && isRecordContext(value.record_context, value) &&
+  typeof value.session_id === 'string' && typeof value.set_id === 'string' &&
+  typeof value.provisional === 'boolean' && typeof value.voided === 'boolean' && hasOwnPerformance(value) &&
+  Array.isArray(value.boards) && value.boards.length > 0 && value.boards.every(isRecordBoard);
+
+const isLeaderEntry = (entry: unknown, revision: unknown) =>
+  isMetricRecord(entry) && isGroupMetric(entry.metric) && isHolder(entry.leader, entry.metric, revision);
+const isRecordVoidedEvent = (value: MetricEventRecord) =>
+  typeof value.related_event_id === 'string' && ['deleted','edited'].includes(String(value.reason)) &&
+  isGroupPerformanceWire(value.performance) &&
+  Array.isArray(value.leaders) && value.leaders.every(entry => isLeaderEntry(entry, value.rules_revision));
+
+/** A board rank before or after a link change; null when the member had none. */
+const isRankAt = (rank: unknown, metric: unknown, revision: unknown) =>
+  rank === null || (metricValueRecord(rank) && rank.metric === metric && rank.rules_revision === revision &&
+    integer(rank.rank) && rank.rank > 0);
+const isLinkEffect = (effect: unknown, revision: unknown) =>
+  isMetricRecord(effect) && isGroupMetric(effect.metric) &&
+  isRankAt(effect.before, effect.metric, revision) && isRankAt(effect.after, effect.metric, revision);
+const isLinkEvent = (value: MetricEventRecord) =>
+  ['link','unlink'].includes(String(value.event)) && isStringArray(value.exercise_definition_ids) &&
+  Array.isArray(value.effects) && value.effects.every(effect => isLinkEffect(effect, value.rules_revision));
+
+const isRulesChangeEvent = (value: MetricEventRecord) =>
+  integer(value.previous_revision) && value.previous_revision < value.rules_revision &&
+  isGroupMetricRulesWire(value.rules) && value.rules.rules_revision === value.rules_revision;
+
+/** A Map, so an inherited name such as `toString` is never a kind. */
+const METRIC_EVENT_GUARDS = new Map<string, (value: MetricEventRecord) => boolean>([
+  ['record', isRecordEvent],
+  ['record_voided', isRecordVoidedEvent],
+  ['link', isLinkEvent],
+  ['rules_change', isRulesChangeEvent],
+]);
+
+/** Checks are layered: envelope, then group, then group exercise, then the legacy or metric-event payload. */
 export function isGroupMetricStreamItem(value: unknown): boolean {
-  if (!isMetricRecord(value) || typeof value.key !== 'string' || !integer(value.sort_at_ms)) return false;
-  if (value.kind === 'session') return member(value.member) && typeof value.session_id === 'string' &&
-    Array.isArray(value.groups) && Array.isArray(value.exercises);
-  if (!isMetricRecord(value.group) || typeof value.group.group_id !== 'string' || typeof value.group.name !== 'string') return false;
-  if (value.kind === 'membership') return member(value.member) && ['joined','left','removed'].includes(String(value.event));
-  if (!isMetricRecord(value.group_exercise) || typeof value.group_exercise.group_exercise_id !== 'string') return false;
-  if (value.legacy === true) return integer(value.rules_revision) && ['record','record_voided','link'].includes(String(value.kind)) &&
-    (value.kind !== 'record' || (Array.isArray(value.boards) && value.boards.every(board =>
-      isMetricRecord(board) && ['weight','e1rm'].includes(String(board.metric)) && finite(board.value_kg) && board.value_kg > 0)));
-  if (value.metric_event !== true || !isEventBase(value) || !isGroupMetricRulesWire(value.group_exercise) ||
-    value.group_exercise.rules_revision !== value.rules_revision ||
-    value.group_exercise.group_exercise_id !== value.group_exercise_id) return false;
-  switch (value.kind) {
-    case 'record': return member(value.member) && isRecordContext(value.record_context, value) && typeof value.session_id === 'string' && typeof value.set_id === 'string' &&
-      typeof value.provisional === 'boolean' && typeof value.voided === 'boolean' && isGroupPerformanceWire(value.performance) &&
-      value.performance.set_id === value.set_id && value.performance.session_id === value.session_id &&
-      Array.isArray(value.boards) && value.boards.length > 0 && value.boards.every(board => metricValueRecord(board) &&
-        nullableFinite(board.previous_value) && typeof board.group_record === 'boolean' && typeof board.fingerprint === 'string');
-    case 'record_voided': return typeof value.related_event_id === 'string' && ['deleted','edited'].includes(String(value.reason)) &&
-      isGroupPerformanceWire(value.performance) && Array.isArray(value.leaders) && value.leaders.every(entry =>
-        isMetricRecord(entry) && isGroupMetric(entry.metric) && isHolder(entry.leader,entry.metric,value.rules_revision));
-    case 'link': return ['link','unlink'].includes(String(value.event)) && Array.isArray(value.exercise_definition_ids) &&
-      value.exercise_definition_ids.every(id => typeof id === 'string') && Array.isArray(value.effects) && value.effects.every(effect =>
-        isMetricRecord(effect) && isGroupMetric(effect.metric) && [effect.before,effect.after].every(rank => rank === null ||
-          (metricValueRecord(rank) && rank.metric === effect.metric && rank.rules_revision === value.rules_revision && integer(rank.rank) && rank.rank > 0)));
-    case 'rules_change': return integer(value.previous_revision) && value.previous_revision < value.rules_revision &&
-      isGroupMetricRulesWire(value.rules) && value.rules.rules_revision === value.rules_revision;
-    default: return false;
-  }
+  if (!hasStreamEnvelope(value)) return false;
+  if (value.kind === 'session') return isSessionItem(value);
+  if (!hasGroupRef(value)) return false;
+  if (value.kind === 'membership') return isMembershipItem(value);
+  if (!hasGroupExerciseRef(value)) return false;
+  if (value.legacy === true) return isLegacyItem(value);
+  if (!hasMetricEventEnvelope(value)) return false;
+  const guard = typeof value.kind === 'string' ? METRIC_EVENT_GUARDS.get(value.kind) : undefined;
+  return guard !== undefined && guard(value);
 }
 export const isRenderedGroupMetricStreamKind = (kind: unknown) => streamKinds.includes(String(kind));
