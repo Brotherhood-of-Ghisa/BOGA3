@@ -4,7 +4,6 @@
  * drain are covered over a real database in `exercise-session-facts.test.ts`.
  */
 
-import { WORKING_SET_POLICY } from '@/src/config/training';
 import {
   deriveExerciseSessionFacts,
   EXERCISE_SESSION_FACTS_RULES_VERSION,
@@ -213,11 +212,10 @@ describe('exercise session facts — PR flags', () => {
 describe('exercise session facts — rules version', () => {
   // Stored facts are rebuilt only when EXERCISE_SESSION_FACTS_RULES_VERSION
   // changes. These literals pin what today's rules derive, including the shared
-  // kernel (1RM formula, set eligibility, working-set policy). If this test
+  // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(1);
-    expect(WORKING_SET_POLICY.maxRir).toBe(3);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(2);
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s1', 1, [block('a1', 0, [['100', '5', 'rir_3'], ['60', '10', 'warm_up'], ['90', '8', 'rir_4']])]),
       session('s2', 2, [block('b1', 0, [['', '12', 'rir_0'], ['102.5', '5', null], ['110', '1', 'rir_1', 'planned']])]),
@@ -230,12 +228,12 @@ describe('exercise session facts — rules version', () => {
     }))).toEqual([
       {
         sessionId: 's1', exerciseDefinitionId: DEFINITION, bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
-        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1820, volumeComplete: true, workingSets: 1,
+        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1820, volumeComplete: true, workingSets: 2,
         prE1rm: false, prWeight: false, prVolume: false,
       },
       {
         sessionId: 's2', exerciseDefinitionId: DEFINITION, bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
-        topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, volumeComplete: true, workingSets: 1,
+        topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, volumeComplete: true, workingSets: 2,
         prE1rm: true, prWeight: true, prVolume: false,
       },
     ]);

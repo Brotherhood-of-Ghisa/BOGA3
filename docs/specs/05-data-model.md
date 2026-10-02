@@ -159,7 +159,7 @@ at least one eligible performed set: `session_id`, `exercise_definition_id`,
   the rules version the table was fully built under; a missing row (fresh
   install, wipe) or another version rebuilds every definition before the read.
   Changing a rule, including one in the shared calculation kernel or the
-  working-set policy, bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`; a Jest
+  working-set rule (`isWorkingSessionSetType`), bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`; a Jest
   fixture pins the values the current version derives and fails when a rule
   changes under it. Reads return rows in the derivation's order, not SQLite
   collation order.
