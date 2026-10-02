@@ -90,6 +90,9 @@ completed session come from one new group RPC, not from paging the stream
 - The group RPC (T04) needs nothing from T01–T03 and can run in parallel.
 - The reader rewires (T06–T08) need only T01 and can run beside T02–T05. T06
   and T07 both touch `src/session-insights/`, so run them one after the other.
+- T08 also waits for `M30-T01` (warm-ups leave every record). T06 and T07 do
+  not, but must not run at the same time as `M30-T01`, which edits the same
+  PR paths.
 
 ### D9. PRs are derived once and stored per exercise per session
 
@@ -134,7 +137,7 @@ server's own group records, so nothing server-side needs personal PR flags.
 | `M29-T05-Today_group_card_and_closeout` | The Group activity card, gallery acceptance, milestone closeout | T03, T04 | planned |
 | `M29-T06-Completion_PRs_on_facts` | Completed-session and completion-screen PRs read the facts table | T01 | planned |
 | `M29-T07-Session_view_PRs_on_facts` | The session view's live PR bar reads earlier bests from the facts table | T01 | planned |
-| `M29-T08-Exercise_records_on_facts` | Exercise page and history records read the facts table | T01 | planned |
+| `M29-T08-Exercise_records_on_facts` | Exercise page and history records read the facts table | T01, `M30-T01` | planned |
 
 ## Risks / dependencies
 
