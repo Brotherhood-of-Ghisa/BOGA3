@@ -152,6 +152,8 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 1');
     expect(screen.getByTestId('exercise-set-logger-preview')).toHaveTextContent('1RM 99.3 · VOL 495');
     expect(screen.getByTestId('exercise-set-4-values')).toHaveTextContent('82.5 × 6');
+    // Only the logger carries the unit label; the other set rows stay quiet.
+    expect(screen.getAllByText('Weight · kg')).toHaveLength(1);
   });
 
   it('highlights only records: today\'s top set stays plain, a record weight and 1RM take `record`', async () => {
