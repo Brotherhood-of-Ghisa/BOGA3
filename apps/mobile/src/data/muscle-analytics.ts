@@ -111,9 +111,6 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
   return 0;
 };
 
-export const isMuscleAnalyticsWorkingSet = (setType: string | null): boolean =>
-  isWorkingSessionSetType(setType);
-
 const isMuscleAnalyticsPerformedSet = (
   set: MuscleAnalyticsInput['exerciseSets'][number]
 ): boolean =>
@@ -154,7 +151,7 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
     (set) =>
       includedExerciseIds.has(set.sessionExerciseId) &&
       isMuscleAnalyticsPerformedSet(set) &&
-      isMuscleAnalyticsWorkingSet(set.setType)
+      isWorkingSessionSetType(set.setType)
   ).length;
 };
 

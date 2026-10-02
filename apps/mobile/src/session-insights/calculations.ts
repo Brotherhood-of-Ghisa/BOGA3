@@ -5,7 +5,6 @@ import {
   collectMuscleSetContributions,
   countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
-  isMuscleAnalyticsWorkingSet,
   type MuscleAnalyticsInput,
   type MuscleContributionRole,
 } from "@/src/data/muscle-analytics";
@@ -198,8 +197,6 @@ const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
   parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)) !== null &&
   parseSetReps(set.repsValue) !== null;
 
-const isWorkingSetType = isWorkingSessionSetType;
-
 export const calculateLinearPercentile = (
   sortedValues: number[],
   percentile: number,
@@ -287,7 +284,7 @@ export const summarizeCurrentSessionMuscleLoad = (
       addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
     );
 
-    if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+    if (isWorkingSessionSetType(contribution.setType)) {
       const workingSetIdentities =
         workingSetIdentitiesByMuscle.get(contribution.muscleGroupId) ??
         new Set<string>();
@@ -596,7 +593,7 @@ const collectExerciseVolumeObservations = (
     current.sessionExerciseIds.push(exercise.id);
     current.setCount += eligibleSets.length;
     current.workingSetCount += eligibleSets.filter((set) =>
-      isWorkingSetType(set.setType),
+      isWorkingSessionSetType(set.setType),
     ).length;
     const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
     current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
@@ -765,7 +762,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
       observation.setIds.add(contribution.setIdentity);
-      if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+      if (isWorkingSessionSetType(contribution.setType)) {
         observation.workingSetIds.add(contribution.setIdentity);
       }
       byMuscle.set(contribution.muscleGroupId, observation);

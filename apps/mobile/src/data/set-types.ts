@@ -1,4 +1,4 @@
-import { EFFORT_LOGGING_POLICY, WORKING_SET_POLICY } from '../config/training';
+import { EFFORT_LOGGING_POLICY } from '../config/training';
 
 export type RirSessionSetType = `rir_${number}`;
 export type SessionSetType = 'warm_up' | RirSessionSetType;
@@ -10,7 +10,6 @@ const rirTypesThrough = (maxRir: number): RirSessionSetType[] =>
 /** Current selectable efforts; persisted values are validated independently. */
 export const RIR_SESSION_SET_TYPES = rirTypesThrough(EFFORT_LOGGING_POLICY.maxSelectableRir);
 export const SESSION_SET_TYPES: readonly SessionSetType[] = ['warm_up', ...RIR_SESSION_SET_TYPES];
-export const WORKING_SESSION_SET_TYPES = rirTypesThrough(WORKING_SET_POLICY.maxRir);
 
 /** Canonical stored RIR, including values outside today's selectable range. */
 export const getSessionSetRir = (value: unknown): number | null => {
@@ -25,10 +24,12 @@ export const isSessionSetType = (value: unknown): value is SessionSetType =>
 export const normalizeSessionSetType = (value: unknown): SessionSetTypeValue =>
   isSessionSetType(value) ? value : null;
 
-export const isWorkingSessionSetType = (value: unknown): boolean => {
-  const rir = getSessionSetRir(value);
-  return rir !== null && rir <= WORKING_SET_POLICY.maxRir;
-};
+/**
+ * The single working-set rule: every set that is not a warm-up. Untagged, any
+ * RIR and unrecognised stored values all count. Callers decide set validity
+ * (performed, parseable) before asking.
+ */
+export const isWorkingSessionSetType = (value: unknown): boolean => value !== 'warm_up';
 
 /** Shared by current controls, history, completed sessions and group views. */
 export const formatSessionSetType = (value: unknown, style: 'full' | 'compact' = 'full'): string | null => {

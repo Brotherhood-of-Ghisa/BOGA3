@@ -47,7 +47,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
           familyName: 'Chest',
           sortOrder: 10,
           setCount: 12,
-          nearFailureCount: 3,
+          workingSetCount: 3,
           totalVolume: 1800,
           muscles: [
             {
@@ -56,7 +56,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Chest',
               sortOrder: 10,
               setCount: 12,
-              nearFailureCount: 3,
+              workingSetCount: 3,
               totalVolume: 1800,
             },
           ],
@@ -65,7 +65,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
           familyName: 'Shoulders',
           sortOrder: 20,
           setCount: 10,
-          nearFailureCount: 4,
+          workingSetCount: 4,
           totalVolume: 900,
           muscles: [
             {
@@ -74,7 +74,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Shoulders',
               sortOrder: 20,
               setCount: 8,
-              nearFailureCount: 4,
+              workingSetCount: 4,
               totalVolume: 600,
             },
             {
@@ -83,7 +83,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Shoulders',
               sortOrder: 21,
               setCount: 2,
-              nearFailureCount: 0,
+              workingSetCount: 0,
               totalVolume: 300,
             },
           ],
@@ -92,7 +92,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
           familyName: 'Legs',
           sortOrder: 40,
           setCount: 0,
-          nearFailureCount: 0,
+          workingSetCount: 0,
           totalVolume: 0,
           muscles: [
             {
@@ -101,7 +101,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Legs',
               sortOrder: 40,
               setCount: 0,
-              nearFailureCount: 0,
+              workingSetCount: 0,
               totalVolume: 0,
             },
           ],
@@ -124,7 +124,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
           familyName: 'Chest',
           sortOrder: 10,
           setCount: 8,
-          nearFailureCount: 2,
+          workingSetCount: 2,
           totalVolume: 1500,
           muscles: [
             {
@@ -133,7 +133,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Chest',
               sortOrder: 10,
               setCount: 8,
-              nearFailureCount: 2,
+              workingSetCount: 2,
               totalVolume: 1500,
             },
           ],
@@ -142,7 +142,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
           familyName: 'Shoulders',
           sortOrder: 20,
           setCount: 8,
-          nearFailureCount: 3,
+          workingSetCount: 3,
           totalVolume: 600,
           muscles: [
             {
@@ -151,7 +151,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Shoulders',
               sortOrder: 20,
               setCount: 6,
-              nearFailureCount: 3,
+              workingSetCount: 3,
               totalVolume: 400,
             },
             {
@@ -160,7 +160,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Shoulders',
               sortOrder: 21,
               setCount: 2,
-              nearFailureCount: 0,
+              workingSetCount: 0,
               totalVolume: 200,
             },
           ],
@@ -169,7 +169,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
           familyName: 'Legs',
           sortOrder: 40,
           setCount: 0,
-          nearFailureCount: 0,
+          workingSetCount: 0,
           totalVolume: 0,
           muscles: [
             {
@@ -178,7 +178,7 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               familyName: 'Legs',
               sortOrder: 40,
               setCount: 0,
-              nearFailureCount: 0,
+              workingSetCount: 0,
               totalVolume: 0,
             },
           ],
@@ -341,7 +341,7 @@ describe('sortExerciseListItems', () => {
     id,
     name: id,
     setCount: 0,
-    nearFailureCount: 0,
+    workingSetCount: 0,
     totalVolume: 0,
     estimatedOneRepMax: null,
     lastCompletedAt: null,
@@ -403,9 +403,9 @@ describe('sortExerciseListItems', () => {
 
   it('sorts all-set, working-set, and volume values in both directions', () => {
     const items = [
-      item('alpha', { name: 'Alpha', setCount: 8, nearFailureCount: 1, totalVolume: 300 }),
-      item('beta', { name: 'Beta', setCount: 4, nearFailureCount: 3, totalVolume: 100 }),
-      item('gamma', { name: 'Gamma', setCount: 6, nearFailureCount: 2, totalVolume: 200 }),
+      item('alpha', { name: 'Alpha', setCount: 8, workingSetCount: 1, totalVolume: 300 }),
+      item('beta', { name: 'Beta', setCount: 4, workingSetCount: 3, totalVolume: 100 }),
+      item('gamma', { name: 'Gamma', setCount: 6, workingSetCount: 2, totalVolume: 200 }),
     ];
 
     expect(sortExerciseListItems(items, 'sets-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
@@ -510,7 +510,7 @@ describe('StatsScreenShell', () => {
               id: 'bench',
               name: 'Bench Press',
               setCount: 8,
-              nearFailureCount: 4,
+              workingSetCount: 4,
               totalVolume: 1000,
               estimatedOneRepMax: 100,
               lastCompletedAt: null,
@@ -528,13 +528,13 @@ describe('StatsScreenShell', () => {
     renderStatsScreenShell();
 
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      '10 sets, 4 near-failure sets. up 2 sets and up 1 near-failure sets'
+      '10 sets, 4 working sets. up 2 sets and up 1 working sets'
     );
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      'strongest shade at 8 near-failure sets for the selected 7-day period'
+      'strongest shade at 8 working sets for the selected 7-day period'
     );
     expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
-      '8 sets, 4 near-failure sets'
+      '8 sets, 4 working sets'
     );
   });
 
@@ -873,7 +873,7 @@ describe('StatsScreenShell — view mode toggle', () => {
     id,
     name,
     setCount: 5,
-    nearFailureCount: 2,
+    workingSetCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
     lastCompletedAt: null,
@@ -1026,21 +1026,21 @@ describe('StatsScreenShell — view mode toggle', () => {
       exerciseListItems: [
         buildExerciseListItem('alpha', 'Alpha', {
           setCount: 10,
-          nearFailureCount: 1,
+          workingSetCount: 1,
           totalVolume: 100,
           estimatedOneRepMax: null,
           lastCompletedAt: new Date('2026-01-01T00:00:00Z'),
         }),
         buildExerciseListItem('beta', 'Beta', {
           setCount: 5,
-          nearFailureCount: 3,
+          workingSetCount: 3,
           totalVolume: 300,
           estimatedOneRepMax: 90,
           lastCompletedAt: new Date('2026-03-01T00:00:00Z'),
         }),
         buildExerciseListItem('gamma', 'Gamma', {
           setCount: 7,
-          nearFailureCount: 2,
+          workingSetCount: 2,
           totalVolume: 200,
           estimatedOneRepMax: 120,
           lastCompletedAt: new Date('2026-02-01T00:00:00Z'),
@@ -1188,7 +1188,7 @@ describe('StatsScreenShell — search & filtering', () => {
     id,
     name,
     setCount: 5,
-    nearFailureCount: 2,
+    workingSetCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
     lastCompletedAt: null,
@@ -1316,7 +1316,7 @@ describe('StatsScreenShell — search & filtering', () => {
 
 it('keeps partial volume readable and uses ordinary strength copy for bodyweight arithmetic', () => {
   render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseListItems: [{
-    id: 'bw', name: 'Pull-up', setCount: 2, nearFailureCount: 2,
+    id: 'bw', name: 'Pull-up', setCount: 2, workingSetCount: 2,
     totalVolume: null, knownVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
   }] })} />);
   expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');

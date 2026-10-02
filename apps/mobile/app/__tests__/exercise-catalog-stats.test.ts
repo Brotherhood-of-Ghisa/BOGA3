@@ -62,10 +62,11 @@ describe('aggregateExerciseCatalogStats', () => {
     // Best Wathan estimate of 100x5 vs 100x4 — 5 reps is higher
     expect(bench?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5)!, 5);
     expect(bench?.setCount).toBe(3);
-    expect(bench?.nearFailureCount).toBe(1);
+    // Unclassified and RIR sets are working sets; the warm-up is not.
+    expect(bench?.workingSetCount).toBe(2);
   });
 
-  it('counts valid performed sets and the RIR 0-2 near-failure subset', () => {
+  it('counts valid performed sets and the non-warm-up working subset', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -96,7 +97,7 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.aggregatesById.get('ex-counts')).toEqual(
       expect.objectContaining({
         setCount: 5,
-        nearFailureCount: 3,
+        workingSetCount: 4,
       })
     );
   });
@@ -144,7 +145,7 @@ describe('aggregateExerciseCatalogStats', () => {
       expect.objectContaining({
         sessionCount: 1,
         setCount: 1,
-        nearFailureCount: 0,
+        workingSetCount: 0,
         totalVolume: 400,
       })
     );

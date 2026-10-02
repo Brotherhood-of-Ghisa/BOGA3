@@ -280,7 +280,7 @@ describe('completion presentation over real data', () => {
     expect(screen.getByTestId(`session-completion-exercise-${ONE_PR_SQUAT}`)).toBeTruthy();
   });
 
-  it('shows the two-PR session side by side, with exercise volume and an unmapped muscle breakdown', async () => {
+  it('shows the two-PR session side by side, with exercise volume and its untagged sets as working sets', async () => {
     await openSession({ sessionId: TWO_PRS, presentation: 'completion' }, 'completion-two-prs');
 
     expect(await screen.findByTestId(SQUAT_PR)).toBeTruthy();
@@ -291,11 +291,9 @@ describe('completion presentation over real data', () => {
     expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat')).toHaveTextContent(
       /\d+% (above|below) median|At median/
     );
-    expect(
-      within(screen.getByTestId('session-completion-muscle-breakdown')).getByText(
-        'No mapped working sets for this session.'
-      )
-    ).toBeTruthy();
+    // Neither set has an effort; untagged sets are working sets.
+    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 working set');
+    expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
 
@@ -563,12 +561,13 @@ describe('a session written through the app', () => {
     expect(label('session-completion-duration')).toBe('Duration 58m');
     expect(label('session-completion-exercises')).toBe('Exercises 2');
     expect(label('session-completion-sets')).toBe('Sets 5');
-    expect(label('session-completion-working-sets')).toBe('Working 3');
+    expect(label('session-completion-working-sets')).toBe('Working 4');
     expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
     expect(label('session-completion-muscle-chest')).toBe('Chest, 3 working sets');
     expect(screen.getByText('4 sets · 3 working')).toBeTruthy();
-    expect(screen.getByText('1 set · 0 working')).toBeTruthy();
+    // The untagged pulldown set is a working set.
+    expect(screen.getByText('1 set · 1 working')).toBeTruthy();
     expect(screen.queryByText('Numbers in brackets are working sets.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
