@@ -1,3 +1,7 @@
+// One time zone for every run, here and in CI: local-calendar rules (weeks,
+// months, DST changes) are tested in Europe/London, which observes DST.
+process.env.TZ = 'Europe/London';
+
 module.exports = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],

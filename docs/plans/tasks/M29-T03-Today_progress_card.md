@@ -28,6 +28,37 @@ activity section stays as it is until T05.
 - D2, D3, D5, D6 (milestone).
 - No in-progress card on Today; Train owns resuming.
 
+## From T02 (as built)
+
+- One read: `loadTodayProgress(now)` from `@/src/progress-summary` returns
+  `{ status: 'empty' }` (no completed session) or `{ status: 'ready', week,
+  month, latest }`; types in `src/progress-summary/calculations.ts`.
+  - `week`: `window` (the full Mon–Sun range for the label), `current`
+    (Monday through today) and `previous` (the whole previous calendar week),
+    each `{ sessions, workingSets, prs }`; the bars are `current` over
+    `previous`.
+  - `month`: `window`, `dayOfMonth`, `daysInMonth`, `cumulativeWorkingSets`
+    (index 0 = the 1st, last = today), `toDate`, `projectedWorkingSets`
+    (linear: so far ÷ `dayOfMonth` × `daysInMonth`, today counted), and
+    `previous` with `daysInMonth`, its whole-month `cumulativeWorkingSets`,
+    `toSameDay` (D3; its last day when shorter) and `total`. The headline
+    difference is `toDate.workingSets − previous.toSameDay.workingSets`; the
+    summary line's "vs" figures are `previous.total.workingSets` and
+    `previous.toSameDay` sessions / PRs (or `total`, if the design wants the
+    whole month — both are there).
+  - `latest`: `id`, `startedAt`, `completedAt`, `durationSec`, `gymName`,
+    `workingSets`, `exerciseCount`, `exerciseNames` (all, session order; the
+    card ellipsises), `prs`.
+- Every figure places a session by `completed_at` (a Sunday-night session that
+  ends after midnight is Monday's). Calendar windows: `src/utils/local-calendar.ts`.
+- The read is pure local SQLite, no network. There is no facts warm-up hook:
+  the first read after install, a wipe or a rules bump rebuilds the facts
+  table synchronously inside this read (T01's numbers: 51 ms on the dev rich
+  history in Node, 582 ms at 10×; a device is slower). Show the loading state,
+  and add a warm-up hook only if a device measurement says it's needed.
+- Jest runs in `Europe/London` (pinned in `jest.config.js`); build test
+  instants from local fields.
+
 ## Open — resolve with the user at session start
 
 1. **Group tags on the latest session.** The device does not know which groups
