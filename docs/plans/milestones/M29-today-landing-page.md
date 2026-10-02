@@ -14,12 +14,19 @@ accepted 2026-10-02).
 
 ## Scope
 
-- In: the Today route and its components; a local progress-summary data layer;
-  a group weekly-summary RPC and its client; the specs, Jest and Maestro
-  coverage this changes.
-- Out: Train (unchanged); the Progress and Groups tabs themselves; the
-  exercise-linking suggestion (dropped from Today on review); an in-progress
-  workout card on Today (Train owns it); top-weight PRs (1RM only, as today).
+- In: a local, derived per-exercise-per-session facts table with PR flags
+  (the base for this and later PR-history views); the Today route and its
+  components; a local progress-summary data layer; a group weekly-summary RPC
+  and its client; the specs, Jest and Maestro coverage this changes.
+- Out:
+  - Train (unchanged); the Progress and Groups tabs themselves.
+  - The exercise-linking suggestion (dropped from Today on review).
+  - An in-progress workout card on Today (Train owns it).
+  - Top-weight and volume PRs on Today (1RM only, as today). The facts table
+    stores them for later views.
+  - PR-history screens and a per-muscle PR timeline (later; the facts table
+    supports them).
+  - Rewiring the existing PR readers to the facts table (later, one per PR).
 
 ## Agreed design direction
 
@@ -41,14 +48,20 @@ are not reused for this. Last week is the whole previous calendar week; the
 month comparison is the previous month **up to the same day of month** (the
 last day when the previous month is shorter).
 
-### D4. A PR is the existing personal-record rule
+### D4. `PRs` means a personal record on Progress and a group record on Group
 
-A PR is a set whose estimated 1RM beats the lifter's best from all earlier
-completed sessions on that exercise definition — the rule
-`deriveSessionPersonalRecords` already applies (at most one per exercise per
-session, none without earlier history). Today counts them per window. Group
-records (linked group exercises) are a different thing and are not Today's
-`PRs`.
+- **Progress card:** a PR is a set whose estimated 1RM beats the lifter's best
+  from all earlier completed sessions on that exercise definition. This is the
+  rule `deriveSessionPersonalRecords` already applies: at most one per exercise
+  per session, none without earlier history. Today counts them per window, read
+  from the facts table (D9).
+- **Group activity card:** `PRs` are **group records only**. These are the
+  evaluator's `record` events on the group's linked exercises
+  (`groups-contract.md` §2.10–§2.11), already server-side. Personal PRs never
+  appear on the group card.
+- The two counts follow different rules and are not expected to agree. For
+  example, a member's first lift on a group exercise is a group record but not
+  a personal PR.
 
 ### D5. Absolute differences, no percentages
 
@@ -68,27 +81,61 @@ completed session come from one new group RPC, not from paging the stream
 
 ### D8. Build order
 
-Data before UI, Progress before Group, and the two UI tasks in sequence
-because both rewrite `app/(tabs)/today.tsx`. T01 and T03 can run in parallel.
+- Facts before the progress read, data before UI, Progress before Group.
+- The two UI tasks run in sequence, because both rewrite `app/(tabs)/today.tsx`.
+- The group RPC (T04) needs nothing from T01–T03 and can run in parallel.
+
+### D9. PRs are derived once and stored per exercise per session
+
+Answering "is this a PR?" today replays every earlier completed session and
+every set, for every exercise (O(all sets ever logged)). M29 adds a local-only
+derived table instead, with one row per completed session × linked exercise
+definition:
+
+- **Bests:** best 1RM, top weight, volume, and working sets.
+- **Flags:** a PR flag for each of the three metrics. At most one per exercise
+  per session; the first session of an exercise carries none.
+- **Index:** `(exercise_definition_id, completed_at)`.
+
+Properties:
+
+- **Not synced:** each device derives its own rows. Cleared on wipe.
+- **Never served stale:** a rules version and a stale-definition queue force a
+  rebuild before any read.
+- **Proven against a full rebuild:** the full rebuild is the oracle in Jest,
+  and the 1RM flags must equal `deriveSessionPersonalRecords`.
+
+Volume is a per-exercise-per-session total, so the grain is the
+exercise-in-session, not the set; the best sets are referenced by id. Changing
+a calculation rule means one full rebuild on each device. Card: T01.
+
+D9's table stays device-only: the group card's PRs (D4) come from the
+server's own group records, so nothing server-side needs personal PR flags.
 
 ## Task breakdown
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| `M29-T01-Progress_summary_data` | Local week / month / PR / latest-session data for Today | none | planned |
-| `M29-T02-Today_progress_card` | Rebuild Today with the Progress card; keep the current group snapshot | T01 | planned |
-| `M29-T03-Group_week_summary_RPC` | Server RPC + client for the group card's data | none | planned |
-| `M29-T04-Today_group_card_and_closeout` | The Group activity card, gallery acceptance, milestone closeout | T02, T03 | planned |
+| `M29-T01-Exercise_session_facts` | Local derived per-exercise-per-session facts with 1RM / weight / volume PR flags | none | planned |
+| `M29-T02-Progress_summary_data` | Local week / month / PR / latest-session data for Today | T01 | planned |
+| `M29-T03-Today_progress_card` | Rebuild Today with the Progress card; keep the current group snapshot | T02 | planned |
+| `M29-T04-Group_week_summary_RPC` | Server RPC + client for the group card's data | none | planned |
+| `M29-T05-Today_group_card_and_closeout` | The Group activity card, gallery acceptance, milestone closeout | T03, T04 | planned |
 
 ## Risks / dependencies
 
-- **PR counting is O(history).** Counting PRs in a window replays every earlier
-  completed session. T01 must measure it on a realistic history and memoise or
-  cache if it shows.
+- **Facts drifting from raw rows.** Many paths write sets and sessions: the
+  recorder, completed-edit, the session list, sync pull-apply, imports, and
+  policy edits. A missed path serves wrong PRs. T01 covers every path through
+  triggers (recommended) and proves incremental maintenance equals a full
+  rebuild.
+- **Rebuild cost.** A full rebuild runs once per device on first launch and on
+  each rules bump. T01 measures it, and the incremental update, on a large
+  fixture history; no estimates.
 - **Shared-to-group tags on the latest session** are not known locally (the
-  share trigger is server-side). T02 decides whether to take them from the
+  share trigger is server-side). T03 decides whether to take them from the
   group stream or drop them.
 - **Stale active sessions.** An abandoned draft stays `active` forever on the
-  server; "training now" needs a staleness rule (T03).
+  server; "training now" needs a staleness rule (T04).
 - **Maestro.** `session-view.yaml` asserts Today's recents section and
-  captures `today-recents`; T02 must move or replace that claim.
+  captures `today-recents`; T03 must move or replace that claim.

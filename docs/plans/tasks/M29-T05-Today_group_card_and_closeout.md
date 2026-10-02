@@ -1,7 +1,7 @@
-# M29-T04-Today_group_card_and_closeout — The Group activity card
+# M29-T05-Today_group_card_and_closeout — The Group activity card
 
 - Status: `planned`
-- Depends on: `M29-T02-Today_progress_card`, `M29-T03-Group_week_summary_RPC`
+- Depends on: `M29-T03-Today_progress_card`, `M29-T04-Group_week_summary_RPC`
 - Milestone: `docs/plans/milestones/M29-today-landing-page.md`
 - Areas: frontend; UI impact: yes
 
@@ -9,14 +9,15 @@
 
 Replace Today's group stream snapshot with the Group activity card of
 `today-landing.md`: the switcher (only with more than one group), this week's
-top three by working sets with PRs and the `You · <rank>` line, and the latest
+top three by working sets with group records as `PRs` (D4) and the
+`You · <rank>` line, and the latest
 activity row (one training now, several training now, or the latest completed
 session). Then capture every accepted state, get gallery acceptance, and close
 the milestone.
 
 ## Scope
 
-- In: the group card component(s) on `app/(tabs)/today.tsx`, T03's client,
+- In: the group card component(s) on `app/(tabs)/today.tsx`, T04's client,
   the group list for the switcher, empty/signed-out/offline/error states, Jest,
   the Maestro capture of the group states, docs, milestone closeout.
 - Out: the Groups tab; the stream cards' own design.
@@ -61,12 +62,13 @@ the milestone.
 ## Specs to update
 
 - `docs/specs/ui/screen-map.md`, `navigation-contract.md`, `ux-rules.md`
-  (Today group card), `design-targets/today-landing.md` (states, lanes),
+  (Today group card), `design-targets/today-landing.md` (states, lanes, and
+  the brief stating the group card's `PRs` are group records, D4),
   `design-targets/today-train.md`, `design-targets/groups.md` (the retired
   `groups-07c-0-today-record` state).
 
 ## Gates
 
 Expected from `./boga test for`: `fast` + `frontend-ui` + `ios-groups-e2e`
-(+ `groups-api-live` if T03's client changes); agree with the operator. Before
+(+ `groups-api-live` if T04's client changes); agree with the operator. Before
 the PR: `jest-coverage`, `complexity`; suggest `./boga sweep` (shared UI).
