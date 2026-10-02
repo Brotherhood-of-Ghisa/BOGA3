@@ -10,8 +10,9 @@
 #
 # What it owns:
 #   1. The lane-matrix table in docs/specs/02-quality-and-test-gates.md,
-#      generated from scripts/lanes.tsv + measured medians from this
-#      machine's timing store (scripts/lane-timing.sh) between these markers:
+#      generated from scripts/lanes.tsv + recent-run medians from this
+#      machine's timing store (scripts/lane-timing.sh; the rule is in
+#      load_medians below) between these markers:
 #        <!-- boga:gen:lane-matrix ... -->  ...  <!-- /boga:gen:lane-matrix -->
 #   2. check-only validations:
 #      - every `boga test <name>` citation in the always-load docs + PR
@@ -60,7 +61,17 @@ GATE_ALIASES = {"fast", "backend", "frontend", "frontend-ui", "slow", "all",
                 "fast-frontend", "fast-backend", "fast-repo",
                 "for"}  # `boga test for` — the trigger-matcher subcommand
 
-# ---------- measured medians (all machines, green runs) ----------
+# ---------- measured medians (all machines, recent green runs) ----------
+# A lane's median is taken over its RECENT_RUNS newest green runs (by
+# recorded_at), so a lane that got faster or slower shows it after a few runs
+# instead of being outvoted by its whole history. Records are not ranked by
+# commit: most runs are of uncommitted work (`dirty`) and PR commits are
+# squash-merged, so a record's commit does not say which code it measured.
+RECENT_RUNS = 5
+# `gen` keeps a committed median unless the new one moved more than this
+# fraction from it, so run-to-run noise does not churn the table.
+CHURN_TOLERANCE = 0.20
+
 def load_medians():
     rec_dir = os.environ["RECORDS_DIR"]
     by_lane = {}
@@ -80,8 +91,12 @@ def load_medians():
             continue
         for r in recs:
             if r.get("exit_code") == 0:
-                by_lane.setdefault(r["lane"], []).append(r["wall_ms"])
-    return {lane: statistics.median(ms) for lane, ms in by_lane.items()}
+                by_lane.setdefault(r["lane"], []).append((str(r.get("recorded_at", "")), r["wall_ms"]))
+    medians = {}
+    for lane, runs in by_lane.items():
+        runs.sort(reverse=True)  # recorded_at is YYYYMMDDTHHMMSSZ: newest first
+        medians[lane] = statistics.median(ms for _, ms in runs[:RECENT_RUNS])
+    return medians
 
 def fmt(ms):
     if ms >= 60000:
@@ -89,6 +104,30 @@ def fmt(ms):
     if ms >= 9500:
         return f"~{ms/1000:.0f}s"
     return f"~{ms/1000:.1f}s"
+
+def parse_fmt(cell):
+    """Inverse of fmt(): '~2.1m' -> 126000.0; None for N/A or anything else."""
+    m = re.fullmatch(r"~(\d+(?:\.\d+)?)([sm])", cell.strip())
+    if not m:
+        return None
+    return float(m.group(1)) * (60000 if m.group(2) == "m" else 1000)
+
+def committed_cells(text):
+    """lane -> median cell as currently written in the spec's lane matrix."""
+    cells = {}
+    for line in text.splitlines():
+        m = re.match(r"\|[^|]*\| `\./boga test ([^`]+)` \|.*\|([^|]*)\|\s*$", line)
+        if m:
+            cells[m.group(1)] = m.group(2).strip()
+    return cells
+
+def median_cell(name):
+    if name not in medians:
+        return "N/A"
+    old = parse_fmt(committed.get(name, ""))
+    if old and abs(medians[name] - old) <= CHURN_TOLERANCE * old:
+        return committed[name]
+    return fmt(medians[name])
 
 medians = load_medians()
 
@@ -123,7 +162,7 @@ def matrix_lines():
         elif header:
             out.append(f"| {header} | | | | |")
         for name, gate, infra, ci, cwd, cmd in rows:
-            med = fmt(medians[name]) if name in medians else "N/A"
+            med = median_cell(name)
             ci_mark = "✅" if ci == "yes" else "❌"
             suffix = " *(+ local Supabase)*" if infra == "ios+supabase" else ""
             gate_cell = GATE_DISPLAY.get(gate, gate)
@@ -131,9 +170,11 @@ def matrix_lines():
                 gate_cell += " + `frontend-ui`"
             out.append(f"| {name}{suffix} | `./boga test {name}` | {gate_cell} | {ci_mark} | {med} |")
     out.append("")
-    out.append("† All-machine median of the recorded green runs "
-               "in the generating machine's timing store (`~/.config/boga/timings/records/`); `N/A` = no measured data yet, **not** \"instant\" — "
-               "run the lane to record it. Per-machine numbers: `./boga timings`.")
+    out.append(f"† Median of each lane's {RECENT_RUNS} newest green runs (all machines, by `recorded_at`) "
+               "in the generating machine's timing store (`~/.config/boga/timings/records/`); "
+               f"`./boga docs gen` keeps a committed figure until that median moves more than {CHURN_TOLERANCE:.0%} from it. "
+               "`N/A` = no measured data yet, **not** \"instant\" — run the lane to record it. "
+               "Per-machine numbers over a time window: `./boga timings`.")
     return out
 
 MARK_OPEN = re.compile(r"<!-- boga:gen:lane-matrix[^>]*-->")
@@ -145,6 +186,7 @@ if not m or MARK_CLOSE not in src:
     problems.append("02-quality-and-test-gates.md: lane-matrix markers missing")
 else:
     head, rest = src[:m.end()], src[src.index(MARK_CLOSE):]
+    committed = committed_cells(src[m.end():src.index(MARK_CLOSE)])
     generated = "\n" + "\n".join(matrix_lines()) + "\n"
     new = head + generated + rest
     if mode == "gen":
