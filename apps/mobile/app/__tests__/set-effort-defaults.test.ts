@@ -1,5 +1,6 @@
 import { appendSuggestedPlan, createExercise } from '@/src/session-recorder/session-model';
 import { isWorkingSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
+import { countMuscleAnalyticsPerformedSets, countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
 
 // The session view's set factories. Copying the previous set's effort when a
 // set is added is the exercise page's `addSet` (exercise-page-model.test.ts).
@@ -26,57 +27,49 @@ describe('new session set effort defaults', () => {
 
   it('recognizes RIR 3 while preserving blank and rejecting unknown effort', () => {
     expect(normalizeSessionSetType('rir_3')).toBe('rir_3');
-    expect(isWorkingSessionSetType('rir_3')).toBe(true);
     expect(normalizeSessionSetType(null)).toBeNull();
     expect(normalizeSessionSetType('rir_4')).toBe('rir_4');
     expect(normalizeSessionSetType('rir_-1')).toBeNull();
-    expect(isWorkingSessionSetType('warm_up')).toBe(false);
-    expect(isWorkingSessionSetType(null)).toBe(false);
   });
 });
 
-describe('file-configured working-set effort threshold', () => {
-  afterEach(() => {
-    jest.dontMock('@/src/config/training');
+describe('working-set rule', () => {
+  it.each([null, undefined, 'rir_0', 'rir_3', 'rir_4', 'rir_12', 'drop_set', 'rir_-1'])(
+    'counts %p as a working set', (value) => {
+      expect(isWorkingSessionSetType(value)).toBe(true);
+    }
+  );
+
+  it('excludes only warm-ups', () => {
+    expect(isWorkingSessionSetType('warm_up')).toBe(false);
   });
 
-  it.each([
-    [0, ['rir_0']],
-    [1, ['rir_0', 'rir_1']],
-    [2, ['rir_0', 'rir_1', 'rir_2']],
-    [3, ['rir_0', 'rir_1', 'rir_2', 'rir_3']],
-  ] as const)('counts RIR %i or harder without changing logging', (maxRir, workingEfforts) => {
-    jest.doMock('@/src/config/training', () => ({ ...jest.requireActual('@/src/config/training'), WORKING_SET_POLICY: { maxRir } }));
-    jest.isolateModules(() => {
-      const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
-      expect(types.WORKING_SESSION_SET_TYPES).toEqual(workingEfforts);
-      expect(types.SESSION_SET_TYPES.filter(types.isWorkingSessionSetType)).toEqual(workingEfforts);
-      expect([null, undefined, 'rir_4', 'warm_up'].some(types.isWorkingSessionSetType)).toBe(false);
-
-      expect(types.SESSION_SET_TYPE_CYCLE).toEqual(['warm_up', null, 'rir_3', 'rir_2', 'rir_1', 'rir_0']);
-      expect(types.nextSessionSetType(null)).toBe('rir_3');
-      expect(types.nextSessionSetType('rir_0')).toBe('warm_up');
-      expect(types.RIR_SESSION_SET_TYPES.map(types.defaultSessionSetType)).toEqual(types.RIR_SESSION_SET_TYPES);
-      expect(types.defaultSessionSetType('warm_up')).toBeNull();
-    });
+  it('counts every valid performed non-warm-up set in analytics', () => {
+    const input = {
+      sessions: [{ id: 'session', completedAt: new Date('2026-09-23T12:00:00Z') }],
+      sessionExercises: [{ id: 'exercise', sessionId: 'session', exerciseDefinitionId: null }],
+      exerciseSets: ['rir_0', 'rir_1', 'rir_2', 'rir_3', 'rir_5', 'warm_up', null].map((setType) => ({
+        sessionExerciseId: 'exercise', setType, weightValue: '80', repsValue: '8',
+      })),
+      muscleMappings: [],
+      muscleGroups: [],
+    };
+    expect(countMuscleAnalyticsWorkingSets(input)).toBe(6);
+    expect(countMuscleAnalyticsPerformedSets(input)).toBe(7);
   });
 
-  it('applies a stricter threshold to analytics without excluding performed sets', () => {
-    jest.doMock('@/src/config/training', () => ({ ...jest.requireActual('@/src/config/training'), WORKING_SET_POLICY: { maxRir: 1 } }));
-    jest.isolateModules(() => {
-      const analytics = jest.requireActual<typeof import('@/src/data/muscle-analytics')>('@/src/data/muscle-analytics');
-      const input = {
-        sessions: [{ id: 'session', completedAt: new Date('2026-09-23T12:00:00Z') }],
-        sessionExercises: [{ id: 'exercise', sessionId: 'session', exerciseDefinitionId: null }],
-        exerciseSets: ['rir_0', 'rir_1', 'rir_2', 'rir_3', 'warm_up', null].map((setType) => ({
-          sessionExerciseId: 'exercise', setType, weightValue: '80', repsValue: '8',
-        })),
-        muscleMappings: [],
-        muscleGroups: [],
-      };
-      expect(analytics.countMuscleAnalyticsWorkingSets(input)).toBe(2);
-      expect(analytics.countMuscleAnalyticsPerformedSets(input)).toBe(6);
-    });
+  it('does not count invalid performed sets', () => {
+    const input = {
+      sessions: [{ id: 'session', completedAt: new Date('2026-09-23T12:00:00Z') }],
+      sessionExercises: [{ id: 'exercise', sessionId: 'session', exerciseDefinitionId: null }],
+      exerciseSets: [
+        { sessionExerciseId: 'exercise', setType: null, weightValue: '80', repsValue: '' },
+        { sessionExerciseId: 'exercise', setType: 'rir_2', weightValue: '80', repsValue: '8', performanceStatus: 'unperformed' as const },
+      ],
+      muscleMappings: [],
+      muscleGroups: [],
+    };
+    expect(countMuscleAnalyticsWorkingSets(input)).toBe(0);
   });
 });
 
@@ -109,10 +102,9 @@ describe('file-configured selectable RIR range', () => {
     });
   });
 
-  it('preserves stored effort and independent working-set policy after reducing the picker range', () => {
+  it('preserves stored effort and working-set status after reducing the picker range', () => {
     jest.doMock('@/src/config/training', () => ({
       EFFORT_LOGGING_POLICY: { maxSelectableRir: 2 },
-      WORKING_SET_POLICY: { maxRir: 4 },
     }));
     jest.isolateModules(() => {
       const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
@@ -122,7 +114,6 @@ describe('file-configured selectable RIR range', () => {
       expect(types.formatSessionSetType('rir_4', 'compact')).toBe('R4');
       expect(types.defaultSessionSetType('rir_4')).toBe('rir_4');
       expect(types.isWorkingSessionSetType('rir_4')).toBe(true);
-      expect(types.isWorkingSessionSetType('rir_5')).toBe(false);
       expect(types.nextSessionSetType('rir_4')).toBe('warm_up');
     });
   });
@@ -130,7 +121,6 @@ describe('file-configured selectable RIR range', () => {
   it.each(['rir_-1', 'rir_1.5', 'rir_01', 'rir_NaN', 'rir_9007199254740992', 'rir_3\n', 'rir_ 3', 'drop_set'])(
     'rejects malformed or unsafe stored effort %s', (value) => {
       expect(normalizeSessionSetType(value)).toBeNull();
-      expect(isWorkingSessionSetType(value)).toBe(false);
     }
   );
 });

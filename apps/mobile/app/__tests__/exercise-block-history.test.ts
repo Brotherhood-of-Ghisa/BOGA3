@@ -88,7 +88,7 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(recent.daysAgo).toBe(2);
   });
 
-  it('includes warm-ups in metrics but not <=2 RIR counts', () => {
+  it('includes warm-ups in metrics but not in working-set counts', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
       sessions: [
@@ -108,7 +108,8 @@ describe('aggregateExerciseBlockHistory', () => {
     const block = summary.blocks[0];
     expect(block.totalVolume).toBe(500 * 5 + 100 * 5 + 90 * 4);
     expect(block.highestWeight).toBe(500);
-    expect(block.workingSetCount).toBe(1);
+    // rir-good and the untagged set; the warm-up and the invalid row are excluded.
+    expect(block.workingSetCount).toBe(2);
     expect(block.estimatedOneRepMax).not.toBeNull();
   });
 

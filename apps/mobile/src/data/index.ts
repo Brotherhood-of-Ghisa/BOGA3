@@ -88,7 +88,6 @@ export {
   computeMuscleSetVolume,
   countMuscleAnalyticsWorkingSets,
   getMuscleContributionRoleWeight,
-  isMuscleAnalyticsWorkingSet,
   type AggregateSelectedMuscleDailyEffortOptions,
   type CalendarHeatmapMetric,
   type DailyEffortMetrics,

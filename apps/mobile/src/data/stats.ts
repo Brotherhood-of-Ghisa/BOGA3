@@ -10,7 +10,6 @@ import {
   collectMuscleSetContributions,
   countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
-  isMuscleAnalyticsWorkingSet,
   type AggregateSelectedMuscleDailyEffortOptions,
   type DailyEffortMetrics,
   type MuscleAnalyticsInput,
@@ -26,6 +25,7 @@ import {
   sessions,
   userSettings,
 } from './schema';
+import { isWorkingSessionSetType } from './set-types';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
@@ -42,7 +42,7 @@ export type StatsMusclePerformance = {
   familyName: string;
   sortOrder: number;
   setCount: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   totalVolume: number | null;
   knownVolume?: number | null;
 };
@@ -51,7 +51,7 @@ export type StatsMuscleFamilyPerformance = {
   familyName: string;
   sortOrder: number;
   setCount: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   totalVolume: number | null;
   knownVolume?: number | null;
   muscles: StatsMusclePerformance[];
@@ -117,7 +117,7 @@ const computePreviousPeriodBounds = (current: StatsPeriodBounds): StatsPeriodBou
 export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   type MuscleAccumulator = {
     setIdentities: Set<string>;
-    nearFailureSetIdentities: Set<string>;
+    workingSetIdentities: Set<string>;
     totalVolume: number | null;
   knownVolume?: number | null;
   };
@@ -126,13 +126,13 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   for (const contribution of collectMuscleSetContributions(input)) {
     const accumulator = accumulatorsByMuscleId.get(contribution.muscleGroupId) ?? {
       setIdentities: new Set<string>(),
-      nearFailureSetIdentities: new Set<string>(),
+      workingSetIdentities: new Set<string>(),
       totalVolume: 0,
       knownVolume: 0,
     };
     accumulator.setIdentities.add(contribution.setIdentity);
-    if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
-      accumulator.nearFailureSetIdentities.add(contribution.setIdentity);
+    if (isWorkingSessionSetType(contribution.setType)) {
+      accumulator.workingSetIdentities.add(contribution.setIdentity);
     }
     accumulator.knownVolume = addFiniteVolume(accumulator.knownVolume, contribution.weightedVolume ?? 0);
     accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume);
@@ -148,7 +148,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       familyName: group.familyName,
       sortOrder: group.sortOrder,
       setCount: accumulator?.setIdentities.size ?? 0,
-      nearFailureCount: accumulator?.nearFailureSetIdentities.size ?? 0,
+      workingSetCount: accumulator?.workingSetIdentities.size ?? 0,
       totalVolume: accumulator ? accumulator.totalVolume : 0,
       knownVolume: accumulator ? accumulator.knownVolume : 0,
     };
@@ -160,7 +160,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   const muscleFamilies: StatsMuscleFamilyPerformance[] = Array.from(musclesByFamily.entries())
     .map(([familyName, muscles]) => {
       const familySetIdentities = new Set<string>();
-      const familyNearFailureSetIdentities = new Set<string>();
+      const familyWorkingSetIdentities = new Set<string>();
       let familyTotalVolume: number | null = 0;
       let familyKnownVolume: number | null = 0;
       let familySortOrder = Number.POSITIVE_INFINITY;
@@ -173,8 +173,8 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
           for (const identity of accumulator.setIdentities) {
             familySetIdentities.add(identity);
           }
-          for (const identity of accumulator.nearFailureSetIdentities) {
-            familyNearFailureSetIdentities.add(identity);
+          for (const identity of accumulator.workingSetIdentities) {
+            familyWorkingSetIdentities.add(identity);
           }
         }
       }
@@ -186,7 +186,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
         familyName,
         sortOrder: Number.isFinite(familySortOrder) ? familySortOrder : 0,
         setCount: familySetIdentities.size,
-        nearFailureCount: familyNearFailureSetIdentities.size,
+        workingSetCount: familyWorkingSetIdentities.size,
         totalVolume: familyTotalVolume, knownVolume: familyKnownVolume,
         muscles: sortedMuscles,
       };

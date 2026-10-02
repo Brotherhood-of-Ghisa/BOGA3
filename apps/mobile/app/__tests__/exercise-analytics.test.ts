@@ -56,13 +56,13 @@ describe('aggregateExerciseWeeklyEffort', () => {
     expect(result[0].highestWeight).toBe(100);
   });
 
-  it('excludes null setType sets from workingSetCount but includes in volume', () => {
+  it('counts null setType sets as working sets and in volume', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [{ setType: null, weight: 80, reps: 8 }]),
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result[0].totalVolume).toBe(640);
-    expect(result[0].workingSetCount).toBe(0);
+    expect(result[0].workingSetCount).toBe(1);
   });
 
   it('merges two sessions in the same week', () => {
@@ -189,19 +189,20 @@ describe('aggregateExerciseWeeklyEffort', () => {
     }
   });
 
-  it('counts all RIR efforts, including RIR 3, as working sets', () => {
+  it('counts every non-warm-up set as a working set', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
         { setType: 'rir_0', weight: 100, reps: 5 },
         { setType: 'rir_1', weight: 100, reps: 5 },
         { setType: 'rir_2', weight: 100, reps: 5 },
         { setType: 'rir_3', weight: 100, reps: 5 },
+        { setType: 'rir_5', weight: 100, reps: 5 },
         { setType: null, weight: 100, reps: 5 },
         { setType: 'warm_up', weight: 60, reps: 10 },
       ]),
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
-    expect(result[0].workingSetCount).toBe(4);
+    expect(result[0].workingSetCount).toBe(6);
   });
 
   it('excludes unconfirmed sets from weekly and daily effort', () => {
@@ -241,7 +242,7 @@ describe('aggregateExerciseDailyEffort', () => {
     ];
     const [day] = aggregateExerciseDailyEffort(sessions, TZ);
     expect(day.totalVolume).toBe(60 * 10 + 100 * 5 + 120 * 3);
-    expect(day.workingSetCount).toBe(1);
+    expect(day.workingSetCount).toBe(2);
     expect(day.highestWeight).toBe(120);
     expect(day.estimatedRM1).not.toBeNull();
   });

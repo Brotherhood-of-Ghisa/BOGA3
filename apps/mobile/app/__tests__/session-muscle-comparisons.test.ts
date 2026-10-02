@@ -26,7 +26,7 @@ const session = (sessionId: string, day: string, sets: SessionInsightSetInput[])
 });
 
 describe('muscle volume comparisons', () => {
-  it('counts warm-up and unspecified performed sets independently of working sets', () => {
+  it('counts unspecified but not warm-up performed sets as working sets', () => {
     const rows = deriveSessionMuscleVolumeComparisons({
       ...catalog,
       targetSession: session('target', '25', [
@@ -39,8 +39,8 @@ describe('muscle volume comparisons', () => {
       historicalSessions: [],
     });
     expect(rows).toEqual([
-      expect.objectContaining({ exerciseDefinitionId: 'chest', setCount: 3, workingSetCount: 1, currentVolume: 850 }),
-      expect.objectContaining({ exerciseDefinitionId: 'triceps', setCount: 3, workingSetCount: 1, currentVolume: 425 }),
+      expect.objectContaining({ exerciseDefinitionId: 'chest', setCount: 3, workingSetCount: 2, currentVolume: 850 }),
+      expect.objectContaining({ exerciseDefinitionId: 'triceps', setCount: 3, workingSetCount: 2, currentVolume: 425 }),
     ]);
   });
 

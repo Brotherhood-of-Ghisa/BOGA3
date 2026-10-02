@@ -83,7 +83,7 @@ describe('exercise browser model', () => {
 });
 
 describe('browser last-performed date', () => {
-  const aggregate = { exerciseDefinitionId: 'e', sessionCount: 18, setCount: 40, nearFailureCount: 0, totalVolume: 300, estimatedOneRepMax: 50 };
+  const aggregate = { exerciseDefinitionId: 'e', sessionCount: 18, setCount: 40, workingSetCount: 0, totalVolume: 300, estimatedOneRepMax: 50 };
   afterEach(() => jest.useRealTimers());
   it('uses local dates and refreshes the year at display time across local New Year', () => {
     jest.useFakeTimers();

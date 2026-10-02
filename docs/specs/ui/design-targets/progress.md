@@ -41,7 +41,7 @@ rule that comes with it: text on a `viz` ground is `ink`.
   right-aligned Plex Mono columns.
 - Each muscle family is a `Card`: the family row, then its nested muscles
   indented one step, each a `ListRow` with two stacked `Stat`s (`Sets`,
-  `Volume`) and their deltas. A row with near-failure sets takes one uniform
+  `Volume`) and their deltas. A row with working sets takes one uniform
   failure shade, `viz1`–`viz4`, the same ramp for families and muscles
   (T08-D3); on it every text is `ink`.
 - Loading, error and empty states are `StatePanel`s inside a `Card`; the copy

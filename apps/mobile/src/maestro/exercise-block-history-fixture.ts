@@ -335,8 +335,8 @@ const sessionInputs: FixtureSessionInput[] = [
 ];
 
 // The newest completed session: a squat and a bench set that both beat their
-// history, so its completion screen shows two PRs. Neither set has an effort,
-// so no set is a working set and the muscle breakdown has nothing mapped.
+// history, so its completion screen shows two PRs. Neither set has an effort;
+// untagged sets still count as working sets.
 const twoPrSessionInputs: FixtureSessionInput[] = [
   {
     id: EXERCISE_BLOCK_HISTORY_FIXTURE.twoPrCompletionSessionId,
