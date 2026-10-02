@@ -16,6 +16,7 @@ export {
   getGroupInviteCode,
   getGroupSessionDetail,
   getGroupStream,
+  getGroupWeekSummary,
   groupExerciseCore,
   isGroupApiError,
   isCertificationNotFound,
@@ -48,6 +49,7 @@ export {
   type GroupUpdateInput,
   type GroupRpcName,
   type GroupStreamRequest,
+  type GroupWeekSummaryRequest,
 } from './api';
 export {
   deleteGroupCacheEntry,

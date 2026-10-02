@@ -50,6 +50,8 @@ apps/mobile/drizzle/**	fast,backend	migration artifacts
 apps/mobile/scripts/check-sync-schema-drift*	fast,backend	sync drift checker
 apps/mobile/src/groups/**	fast,groups-api-live,ios-groups-e2e	group client (its live wire check + the two-user e2e lane)
 apps/mobile/src/groups/set-facts.ts	groups-leaderboards	group set rules the group-eval function loads
+apps/mobile/src/data/set-types.ts	groups-leaderboards	set-type rules the group-eval function loads (via set-facts.ts)
+apps/mobile/src/config/training.ts	groups-leaderboards	training policy the group-eval function loads (via set-types.ts)
 apps/mobile/src/exercise-calculations/**	groups-leaderboards	calculations the group-eval function loads
 apps/mobile/src/**	fast	mobile TS/JS logic
 apps/mobile/*.json	fast	mobile config (native iOS dep change ⇒ also rebuild dev client + frontend, see spec 02)

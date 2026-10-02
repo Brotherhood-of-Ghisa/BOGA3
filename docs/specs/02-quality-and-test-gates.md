@@ -211,7 +211,7 @@ Machine-readable form: `scripts/triggers.tsv`, queried with
 | Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `./boga test fast` **+** `./boga test backend` **+** `./boga test ios-sync-e2e` (the UI↔server e2e lane) |
 | Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./boga test backend` |
 | Groups (`apps/mobile/src/groups/**`, group migrations `supabase/migrations/*group*`, `groups-fixture-reset.sh`) | the rows above **+** `./boga test groups-api-live` (the app's groups client against the live server) **+** `./boga test ios-groups-e2e` (the two-user UI↔server e2e lane) |
-| Group evaluator (`supabase/functions/group-eval/**`, the TS it loads: `src/groups/set-facts.ts`, `src/exercise-calculations/**`) | the rows above **+** `./boga test groups-leaderboards` (already inside `boga test backend`) |
+| Group evaluator (`supabase/functions/group-eval/**`, the TS it loads: `src/groups/set-facts.ts`, `src/exercise-calculations/**`, `src/data/set-types.ts`, `src/config/training.ts`) | the rows above **+** `./boga test groups-leaderboards` (already inside `boga test backend`) |
 | Agent consent web (`apps/agent-auth-web/**`) | `./boga test fast` |
 | MCP server (`services/boga-mcp/**`) | `./boga test fast` **+** `./boga test mcp-smoke` |
 | Added/removed/upgraded a **native iOS** dependency (iOS pod, native Expo module, or an iOS-affecting native field / config plugin in `apps/mobile/app.config.ts`) | **First** `./boga ios build-client --force`, then `./boga test frontend` |

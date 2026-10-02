@@ -29,6 +29,12 @@ the milestone.
 - Several training now collapses into one row that opens the Groups tab; one
   training now or the latest completed session opens the group session.
 - The exercise-linking suggestion is not on Today.
+- Data (T04): `getGroupWeekSummary({ groupId, windowStartMs, windowEndMs })`,
+  `groups-contract.md` §4.7. The window is the local week (D3); the client
+  trims `members` to three and finds `You` by user id (ranks may tie).
+  `training_now` drives the live row (empty, one, or several);
+  `latest_completed` (any time, with its `group_records`) drives the
+  completed row and opens through `group_session_detail`.
 
 ## Open — resolve with the user at session start
 

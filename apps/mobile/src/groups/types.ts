@@ -402,6 +402,58 @@ export type GroupCertifyResult = { certification: GroupCertification; created: b
 /** `group_certification_withdraw` / `_cancel`: an already-ended certification is returned unchanged. */
 export type GroupCertificationEndResult = { certification: GroupCertification };
 
+// ---- Week summary (contract §4.7) ---------------------------------------------
+
+/** One current member's week: working sets and group records from completed shared sessions in the window. */
+export type GroupWeekBoardRow = {
+  /** Competition rank: equal (working sets, group records) share a rank. */
+  rank: number;
+  member: GroupMemberRef;
+  working_sets: number;
+  group_records: number;
+};
+
+/** An active shared session whose latest write is under 2 hours old. Not windowed. */
+export type GroupWeekTrainingSession = {
+  member: GroupMemberRef;
+  session_id: string;
+  started_at_ms: number;
+  gym_name: string | null;
+  working_sets: number;
+  exercise_count: number;
+};
+
+/** A board the member took #1 on with the record set; `value` is in `unit`. */
+export type GroupWeekRecordBoard = { metric: GroupBoardMetric; value: number; unit: 'kg' };
+
+/** A non-voided group record (the member took #1 on at least one board), from either record pipeline. */
+export type GroupWeekRecord = {
+  key: string;
+  group_exercise: { group_exercise_id: string; name: string };
+  set_id: string;
+  boards: GroupWeekRecordBoard[];
+};
+
+/** The group's latest completed shared session, at any time; opens with `group_session_detail`. */
+export type GroupWeekLatestSession = {
+  member: GroupMemberRef;
+  session_id: string;
+  started_at_ms: number;
+  completed_at_ms: number | null;
+  duration_sec: number | null;
+  gym_name: string | null;
+  working_sets: number;
+  exercise_count: number;
+  group_records: GroupWeekRecord[];
+};
+
+/** `group_week_summary`: every current member ranked, newest training first, and the latest completed session. */
+export type GroupWeekSummaryResult = {
+  members: GroupWeekBoardRow[];
+  training_now: GroupWeekTrainingSession[];
+  latest_completed: GroupWeekLatestSession | null;
+};
+
 // ---- Errors -----------------------------------------------------------------
 
 /** Tokens the server raises as `'<TOKEN>: <message>'` (contract §4). */
