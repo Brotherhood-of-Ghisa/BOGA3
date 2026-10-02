@@ -26,7 +26,7 @@ import {
   sessions,
   userSettings,
 } from './schema';
-import { normalizeSessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
 

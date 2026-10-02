@@ -34,7 +34,7 @@ import { loadHistoricalBestsExcluding } from '@/src/session-recorder/historical-
 import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 import {
   deriveSessionExerciseVolumeComparisons,
   loadCompletedSessionInsights,

@@ -3,7 +3,7 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 
-import { canonicalizeWeightForReps } from './set-semantics';
+import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 

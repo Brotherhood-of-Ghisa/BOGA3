@@ -14,7 +14,7 @@ import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
@@ -161,7 +161,7 @@ export type AppendCompletedSessionExerciseAsPlannedResult = {
   sessionId: string;
 };
 
-export type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+export type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type SessionPersistenceRecord = ResolvedSessionWeight & {
   id: string;

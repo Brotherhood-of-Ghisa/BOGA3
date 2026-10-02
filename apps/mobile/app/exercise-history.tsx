@@ -1,5 +1,5 @@
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
-import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
+import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';

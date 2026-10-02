@@ -1,4 +1,4 @@
-import { formatCurrentDateTime, parseSessionDateTime } from './session-model';
+import { formatCurrentDateTime, parseSessionDateTime } from '@/src/utils/local-time';
 
 /**
  * A completed session's editable Start and End, as the recorder's completed

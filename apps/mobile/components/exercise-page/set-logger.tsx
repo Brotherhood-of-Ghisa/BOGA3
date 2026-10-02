@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
+import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { Icon } from '@/components/ui/icon';
 import {
   uiBorder,

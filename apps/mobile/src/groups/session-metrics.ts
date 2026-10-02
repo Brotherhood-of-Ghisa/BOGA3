@@ -7,7 +7,7 @@ import {
   type LoadContext, type SetMetrics, type VolumeCoverage,
 } from '@/src/exercise-calculations/load-metrics';
 import { ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
-import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
+import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import type { GroupSessionExercise, GroupSessionSet } from './types';
 
 export type GroupPerformedSet = {

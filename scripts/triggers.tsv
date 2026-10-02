@@ -51,7 +51,6 @@ apps/mobile/scripts/check-sync-schema-drift*	fast,backend	sync drift checker
 apps/mobile/src/groups/**	fast,groups-api-live,ios-groups-e2e	group client (its live wire check + the two-user e2e lane)
 apps/mobile/src/groups/set-facts.ts	groups-leaderboards	group set rules the group-eval function loads
 apps/mobile/src/exercise-calculations/**	groups-leaderboards	calculations the group-eval function loads
-apps/mobile/src/session-recorder/set-semantics.ts	groups-leaderboards	set semantics the group-eval function loads
 apps/mobile/src/**	fast	mobile TS/JS logic
 apps/mobile/*.json	fast	mobile config (native iOS dep change ⇒ also rebuild dev client + frontend, see spec 02)
 apps/mobile/*.ts	fast	mobile config (iOS native field change ⇒ rebuild dev client + frontend; Android-only fields exempt, see spec 02)

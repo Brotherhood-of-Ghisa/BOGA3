@@ -16,7 +16,7 @@ import {
 import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
-} from "@/src/session-recorder/set-semantics";
+} from "@/src/exercise-calculations/set-semantics";
 
 export type SessionInsightSetInput = {
   id: string;

@@ -6,7 +6,7 @@ import { ActionButton, Card, Icon, ListRow, Notice, ScreenScroll, StatePanel, St
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
-import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
+import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
 

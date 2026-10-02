@@ -7,7 +7,7 @@ import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord } from '@/src/session-insights';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
-import { canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
+import { canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from '@/src/exercise-calculations/set-semantics';
 
 /**
  * The read-only session view's presentation model (`ux-rules` §14b): one

@@ -4,7 +4,7 @@ import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 
-import { canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from './set-semantics';
+import { canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from '@/src/exercise-calculations/set-semantics';
 
 /**
  * Pure rules of the exercise page (`docs/specs/ui/ux-rules.md` §14a). The

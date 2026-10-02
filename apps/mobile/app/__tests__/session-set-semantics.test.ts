@@ -7,7 +7,7 @@ import {
   isConfirmedPerformedSet,
   isPerformedSet,
   normalizeSessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 
 describe('session set semantics', () => {
   it.each(['1', '5', '0012'])('accepts positive integer reps: %s', (reps) => {

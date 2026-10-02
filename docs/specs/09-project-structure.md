@@ -80,6 +80,9 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
   - its editor fields (`ExerciseCoreFields`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form (M25-T08).
+- `apps/mobile/src/exercise-calculations/`
+  - owns the load calculation kernel (`load-metrics.ts`, `analytics.ts`) and the set rules every reader shares (`set-semantics.ts`: which sets count as performed, the canonical weight for the reps). Persistence (`src/data`), the session recorder, session insights and groups import them; this directory never imports `src/data`, hooks or UI.
+  - the `agent-api` and `group-eval` Edge Functions load it by relative path, so its whole import graph uses relative `.ts` specifiers (never `@/`).
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-insights/`
