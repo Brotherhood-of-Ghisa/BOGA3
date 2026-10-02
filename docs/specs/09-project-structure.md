@@ -91,6 +91,13 @@ Define the canonical repository structure, path ownership, and placement convent
     share payload/action used by the completion presentation.
   - remains derived-only: it owns no schema, durable achievement/share state,
     backend API, or sync envelope.
+- `apps/mobile/src/progress-summary/`
+  - owns Today's progress read (`loadTodayProgress`): this and last calendar
+    week, this month against the previous month by day, and the latest
+    completed session. Sessions and working sets come from the stats
+    aggregation (`src/data/stats.ts`), 1RM PRs from the exercise session facts;
+    every figure places a session by its `completed_at`.
+  - derived-only, like `session-insights`: no schema, no sync, no history replay.
 - `apps/mobile/.maestro/`
   - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.
@@ -160,6 +167,9 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/utils/local-time.ts`
   - canonical wall-clock labels (`HH:MM`, `M/D HH:MM`, `YYYY-MM-DD HH:MM`) read in the device's time zone from a stored instant.
   - stored timestamps (ISO strings, epoch ms) are UTC; never slice the clock out of an ISO string for display. Tests that assert a label build the instant from local fields (`new Date(y, m, d, h, min)`) so they hold in every `TZ`.
+- `apps/mobile/src/utils/local-calendar.ts`
+  - canonical local calendar windows: Monday-start weeks and calendar months in the device's time zone, half-open `[start, end)` with both edges on local midnight, so a DST change resizes a window instead of shifting it.
+  - Jest runs in `Europe/London` (pinned in `apps/mobile/jest.config.js`, locally and in CI), so calendar tests cover both DST changes.
 - `e2e/` (reserved)
   - reserved for cross-stack orchestration/tests that span mobile + backend.
   - strategy may be documented before implementation exists.

@@ -358,6 +358,14 @@ its own (sync, tombstones); otherwise the screen tests cover the query.
   would erase that guard. Bespoke fixtures still close their connections in
   `afterEach` (see *Unit-test hang safety*).
 
+## Unit-test time zone
+
+- `apps/mobile/jest.config.js` pins `TZ=Europe/London` for every Jest run,
+  locally and in CI, whatever the shell's zone. The zone observes DST, so
+  local-calendar tests (weeks, months, the clock changes) mean the same
+  everywhere. Assert local times from local fields (`new Date(y, m, d, h)`),
+  not from UTC literals, unless the test is about the UTC instant itself.
+
 ## Unit-test hang safety
 
 - `npm test` is bare `jest` with **no `--forceExit`** — by design. `--forceExit`
