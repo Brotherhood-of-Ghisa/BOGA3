@@ -12,7 +12,7 @@ import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';

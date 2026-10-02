@@ -33,7 +33,7 @@ import { __resetBodyweightCalculationPreferenceForTests } from '@/src/bodyweight
 import * as bodyweightRepository from '@/src/data/bodyweight';
 import { bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import * as userSettingsRepository from '@/src/data/user-settings';
-import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
+import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
 // A reading or preference write invalidates the exercise catalog, whose reload

@@ -1,8 +1,8 @@
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
-import type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
-export type { SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+export type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type SessionSet = {
   id: string;

@@ -1,4 +1,4 @@
-import { canonicalizeWeightForReps } from '@/src/session-recorder/set-semantics';
+import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
@@ -35,7 +35,7 @@ import {
   type PickerGroupRow,
 } from '@/src/groups/link-view-model';
 import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
+import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
 // The picker is a tall sheet, so opening a preselection does not

@@ -8,7 +8,7 @@ import {
   formatSetRow,
   type SessionViewSetRow,
 } from './session-view-model';
-import { canonicalizeWeightForReps, isConfirmedPerformedSet, type SessionSetPerformanceStatus } from './set-semantics';
+import { canonicalizeWeightForReps, isConfirmedPerformedSet, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 /**
  * View Session's presentation model: what a finished session did, set by set.

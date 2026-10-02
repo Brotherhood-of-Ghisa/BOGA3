@@ -1,5 +1,5 @@
 import { parseSetWeight } from '@/src/exercise-calculations';
-import { formatCurrentDateTime, parseSessionDateTime } from '@/src/session-recorder/session-model';
+import { formatCurrentDateTime, parseSessionDateTime } from '@/src/utils/local-time';
 
 export { isValidSessionWeight } from './as-of';
 

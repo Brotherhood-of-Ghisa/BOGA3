@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Alert, Keyboard, ScrollView, Text } from 'react-native';
 import { ActionButton, FormField, Notice, Sheet } from '@/components/ui';
 import { resolveMeasurementDate, validateBodyWeight, type WeightEntry } from '@/src/bodyweight/weight-entry';
-import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
+import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { weightStyles as styles } from './styles';
 
 // Keep the native Modal mounted through its visible=false dismissal, matching

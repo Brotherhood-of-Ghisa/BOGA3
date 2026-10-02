@@ -10,7 +10,7 @@ import {
 import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 import { isWorkingSessionSetType } from './set-types';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;

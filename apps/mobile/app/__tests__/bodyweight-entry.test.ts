@@ -6,7 +6,7 @@ import { deleteBodyWeightReading, listBodyWeightReadings,
   readCurrentBodyWeight, saveBodyWeightReading } from '@/src/data/bodyweight';
 import { isValidSessionWeight, resolveMeasurementDate, validateBodyWeight } from '@/src/bodyweight/weight-entry';
 import { loadActiveSessionGraph, setSessionGym, completeActiveSession } from '@/src/session-recorder/session-lifecycle';
-import { formatCurrentDateTime } from '@/src/session-recorder/session-model';
+import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
