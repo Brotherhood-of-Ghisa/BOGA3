@@ -7,12 +7,11 @@ not stored as user preferences or exposed through Settings.
   Set it to `4` for Warm-up → blank → RIR-4 → RIR-3 → RIR-2 → RIR-1 → RIR-0;
   set it to `2` to start at RIR-2 instead. The next tap after RIR-0 is Warm-up.
   Labels and optional import enrichment use this same range automatically.
-- `WORKING_SET_POLICY.maxRir` independently controls working-set classification.
-  `3` means valid confirmed RIR-0 through RIR-3 count. Warm-up, blank, invalid,
-  and unconfirmed rows never count as working sets. Changing this threshold
-  reinterprets derived analytics for existing records; it does not edit them.
 
-Both values accept non-negative safe integers. The default is `3` for each.
+The value accepts a non-negative safe integer; the default is `3`.
+
+Working-set classification is not configurable: every valid performed set that
+is not a warm-up counts (`isWorkingSessionSetType` in `src/data/set-types.ts`).
 
 Persisted/imported effort accepts canonical `rir_<n>` values independently of the
 current picker range. Reducing the range preserves older values and their labels;

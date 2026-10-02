@@ -8,8 +8,8 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  View,
   type TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -399,8 +399,8 @@ export function ExercisePageScreen({
               {`Not saved: ${draft.saveError}`}
             </Text>
           ) : null}
-        </ScreenScroll>
-        <View style={styles.footer}>
+          {/* In the scroll, after the set list — not a pinned footer, which
+              cost a row of screen above the keyboard on every set. */}
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ busy: isCompleting }}
@@ -410,7 +410,7 @@ export function ExercisePageScreen({
             testID="exercise-complete">
             <Text allowFontScaling={false} style={pageText.controlLabel}>Complete exercise</Text>
           </Pressable>
-        </View>
+        </ScreenScroll>
       </KeyboardAvoidingView>
 
       <EffortSheet
@@ -520,11 +520,6 @@ const styles = StyleSheet.create({
     letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
     color: uiRoles.record,
-  },
-  footer: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.sm,
-    paddingBottom: uiSpace.md,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).

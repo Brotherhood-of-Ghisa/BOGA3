@@ -18,20 +18,14 @@
 //   output.groupsCounterpartyUserId  user_d's id (member row testIDs)
 //   output.groupsGroupId             the group user_d joined
 //   output.groupsCardKey             "<user_d>:<session>" (stream card testIDs)
-//   output.groupsHistoryCardKey      the pre-join session's would-be card key
 //   output.groupsFirstSetId          first set of the live session (friend view)
 //   output.groupsBoardExerciseId     the active custom group exercise user_d links to
-//   output.groupsRecordKey           the record item's key (record card testIDs)
-//   output.groupsRecordSessionCardKey "<user_d>:<record session>" (its session card)
-//   output.groupsRecordSetId         the record set
 //
 // Any unexpected response throws, which fails the Maestro step.
 
 /* global STEP, SUPABASE_URL, SUPABASE_ANON_KEY, EMAIL, PASSWORD, CODE, LABEL, http, json, output */
 
 var TAG = '[groups-counterparty]';
-var MINUTE_MS = 60 * 1000;
-var DAY_MS = 24 * 60 * MINUTE_MS;
 var DURATION_SEC = 45 * 60;
 
 function fail(message) {
@@ -164,81 +158,6 @@ function benchSet1(weight, cuam) {
   return setEntity(liveSet(1), output.groupsSessionId + '-bench', 0, weight, '5', cuam);
 }
 
-// Unlink acceptance uses the device's OWN mappings. The counterparty certifies
-// its completed set; all assertions read the public RPCs and owner-scoped rows.
-function unlinkBoard(certified) {
-  return rpcOk(output.groupsToken, 'group_board', {
-    p_group_id: output.groupsGroupId, p_group_exercise_id: output.unlinkGroupExerciseId,
-    p_metric: 'weight', p_certified: certified, p_after: null, p_limit: 10,
-  });
-}
-
-function awaitUnlinkBoard(linked) {
-  var deadline = Date.now() + POLL_DEADLINE_MS;
-  for (;;) {
-    var all = unlinkBoard(false).rows || [];
-    var certified = unlinkBoard(true).rows || [];
-    var ready = linked
-      ? all.length === 1 && all[0].set_id === output.unlinkSetId && certified.length === 1 &&
-        certified[0].set_id === output.unlinkSetId && certified[0].certification.certification_id === output.unlinkCertificationId
-      : all.length === 0 && certified.length === 0;
-    if (ready) return;
-    if (Date.now() > deadline) fail('unlink boards did not converge; linked=' + linked + ' all=' + JSON.stringify(all) + ' certified=' + JSON.stringify(certified));
-    pause(POLL_INTERVAL_MS);
-  }
-}
-
-function assertUnlinkPreserved(linked) {
-  awaitUnlinkBoard(linked);
-  var stream = rpcOk(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 50 });
-  var record = (stream.items || []).filter(function (item) { return item.key === output.unlinkRecordKey; })[0];
-  if (!record || record.voided !== null || record.provisional !== false || !record.certified ||
-      !record.certification || record.certification.certification_id !== output.unlinkCertificationId) {
-    fail('completed record / original active certification changed: ' + JSON.stringify(record));
-  }
-  var detail = rpcOk(output.groupsToken, 'group_session_detail', {
-    p_member_user_id: output.unlinkDeviceUserId, p_session_id: output.unlinkSessionId,
-  });
-  if (!detail.session || detail.session.status !== 'completed') fail('shared completed session disappeared');
-  var response = http.get(output.groupsSupabaseUrl + '/rest/v1/exercise_group_links?group_id=eq.' + output.groupsGroupId + '&select=exercise_definition_id,group_exercise_id,deleted_at', {
-    headers: { apikey: output.groupsAnonKey, Authorization: 'Bearer ' + output.unlinkDeviceToken, 'Accept-Profile': 'app_public' },
-  });
-  var links = parse(response);
-  if (response.status !== 200 || !Array.isArray(links)) fail('could not read own link rows');
-  var primary = links.filter(function (link) { return link.exercise_definition_id === output.unlinkPrimaryId; })[0];
-  var secondary = links.filter(function (link) { return link.exercise_definition_id === output.unlinkSecondaryId; })[0];
-  if (!primary || (primary.deleted_at === null) !== linked || !secondary || secondary.deleted_at !== null ||
-      secondary.group_exercise_id !== output.unlinkGroupExerciseId) fail('the selected mapping or untouched second mapping is wrong: ' + JSON.stringify(links));
-  console.log(TAG + ' UNLINK_PRESERVATION linked=' + linked + ' record=' + output.unlinkRecordKey + ' certification=' + output.unlinkCertificationId + ' second-link=preserved');
-}
-
-// Public RPC polling verifies the same published revision the device reads.
-function bodyweightBoard(metric, certified) {
-  return rpcOk(output.groupsToken, 'group_metric_board', {
-    p_group_id: output.groupsGroupId, p_group_exercise_id: output.bodyweightExerciseId,
-    p_metric: metric, p_certified: certified, p_after: null, p_limit: 10,
-  });
-}
-function awaitBodyweightBoard(metric, certified, matches) {
-  var deadline = Date.now() + POLL_DEADLINE_MS;
-  for (;;) {
-    var board = bodyweightBoard(metric, certified);
-    if (board.state === 'ready' && matches(board)) return board;
-    if (Date.now() > deadline) fail('bodyweight board did not converge: ' + JSON.stringify(board));
-    pause(POLL_INTERVAL_MS);
-  }
-}
-function bodyweightSession(id, stamp, missing) {
-  var at = output.bodyweightStartedAt - (missing ? 1 : 0);
-  return sessionEntity(id, at, stamp, at + 60000);
-}
-function bodyweightReading(id, kg, stamp) {
-  return entity('body_weight_measurements', id + '-reading', stamp, {
-    weight_kg: kg,
-    measured_at: output.bodyweightStartedAt, created_at: stamp, updated_at: stamp, deleted_at: null,
-  });
-}
-
 var steps = {
   'sign-in': function () {
     output.groupsSupabaseUrl = SUPABASE_URL;
@@ -276,14 +195,12 @@ var steps = {
     console.log(TAG + ' joined group ' + joined.group_id + ' with code ' + code);
   },
 
-  // One push: a completed pre-join history session (never shared: the flow
-  // asserts it has no card, §2.5) and the live, active session.
+  // One push: the live, active session. (That a pre-join session is never
+  // shared, §2.5, is groups-contract's.)
   'push-active': function () {
     var cuam = nextClientUpdatedAt();
     var startedAt = Math.max(Date.now(), output.groupsJoinedAtMs + 1000);
     var sessionId = 'maestro-groups-' + startedAt;
-    var historyId = sessionId + '-history';
-    var historyStart = output.groupsJoinedAtMs - DAY_MS;
     var definitionId = sessionId + '-def-bench';
     output.groupsSessionId = sessionId;
     output.groupsSessionStartedAt = startedAt;
@@ -302,9 +219,6 @@ var steps = {
         name: 'Barbell Row', load_input_mode: 'total_load', bodyweight_contribution: 0,
         created_at: cuam, updated_at: cuam, deleted_at: null,
       }),
-      sessionEntity(historyId, historyStart, cuam, historyStart + DURATION_SEC * 1000),
-      sessionExerciseEntity(historyId + '-bench', historyId, definitionId, 0, 'Bench Press', cuam),
-      setEntity(historyId + '-set-1', historyId + '-bench', 0, '100', '5', cuam),
       sessionEntity(sessionId, startedAt, cuam, null),
       sessionExerciseEntity(sessionId + '-bench', sessionId, definitionId, 0, 'Bench Press', cuam),
       sessionExerciseEntity(sessionId + '-row', sessionId, sessionId + '-def-row', 1, 'Barbell Row', cuam),
@@ -313,7 +227,6 @@ var steps = {
       setEntity(liveSet(3), sessionId + '-row', 0, '50', '10', cuam),
     ]);
     output.groupsCardKey = output.groupsCounterpartyUserId + ':' + sessionId;
-    output.groupsHistoryCardKey = output.groupsCounterpartyUserId + ':' + historyId;
     output.groupsFirstSetId = liveSet(1);
     console.log(TAG + ' pushed active session ' + sessionId + ' (3 sets, 1500 kg, 2 exercises)');
   },
@@ -336,31 +249,8 @@ var steps = {
     console.log(TAG + ' GROUPS_E2E_LATENCY ' + LABEL + ' sync_push->card visible: ' + elapsed + ' ms');
   },
 
-  // A member reads the exercises the owner added on the device — the
-  // renamed custom one (active, per side, no source) first, then the archived
-  // standard copy (it keeps its seed id).
-  'assert-exercises': function () {
-    var list = rpcOk(output.groupsToken, 'group_exercise_list_v2', { p_group_id: output.groupsGroupId });
-    var got = (list.exercises || []).map(function (exercise) {
-      return {
-        name: exercise.name,
-        load_input_mode: exercise.load_input_mode,
-        source_exercise_id: exercise.source_exercise_id,
-        archived: exercise.archived_at_ms !== null,
-      };
-    });
-    var want = [
-      { name: 'Prowler Push', load_input_mode: 'per_side_load', source_exercise_id: null, archived: false },
-      { name: 'Barbell Bench Press', load_input_mode: 'total_load', source_exercise_id: 'seed_barbell_bench_press', archived: true },
-    ];
-    if (JSON.stringify(got) !== JSON.stringify(want)) {
-      fail('expected group exercises ' + JSON.stringify(want) + ', got ' + JSON.stringify(got));
-    }
-    console.log(TAG + ' member reads the group exercises: ' + JSON.stringify(got));
-  },
-
   // user_d links its pushed Bench Press (total load) to the device's
-  // active custom group exercise, Prowler Push (per side), with a sync_push like
+  // active custom group exercise, Sled Push (per side), with a sync_push like
   // its own app would. Its completed sets from before the link then count as a
   // link effect (contract §2.11). Waits until the evaluator has written the
   // board, so the device's reads are deterministic: raw Weight 102.5 kg × 5,
@@ -368,10 +258,10 @@ var steps = {
   'link-board': function () {
     var list = rpcOk(output.groupsToken, 'group_exercise_list_v2', { p_group_id: output.groupsGroupId });
     var targets = (list.exercises || []).filter(function (exercise) {
-      return exercise.name === 'Prowler Push' && exercise.archived_at_ms === null;
+      return exercise.name === 'Sled Push' && exercise.archived_at_ms === null;
     });
     if (targets.length !== 1) {
-      fail('expected one active Prowler Push, got ' + JSON.stringify(list.exercises));
+      fail('expected one active Sled Push, got ' + JSON.stringify(list.exercises));
     }
     var groupExerciseId = targets[0].group_exercise_id;
     output.groupsBoardExerciseId = groupExerciseId;
@@ -425,282 +315,6 @@ var steps = {
     console.log(
       TAG + ' GROUPS_E2E_LATENCY board sync_push->board row: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',
     );
-  },
-
-  // A new completed session on the already-linked Bench Press, one set
-  // of 110 kg × 5 total. Its sets are created after the link, so the evaluator
-  // attributes a record, not a link effect (contract §2.11 step 5): raw
-  // Weight 110 kg × 5, beating 102.5 kg on Weight and 1RM.
-  // Waits until the stream returns the final (non-provisional) record item.
-  'push-record': function () {
-    var cuam = nextClientUpdatedAt();
-    var startedAt = Math.max(Date.now(), output.groupsJoinedAtMs + 1000);
-    var sessionId = output.groupsSessionId + '-record';
-    var exerciseId = sessionId + '-bench';
-    var setId = sessionId + '-set-1';
-    push([
-      sessionEntity(sessionId, startedAt, cuam, startedAt + DURATION_SEC * 1000),
-      sessionExerciseEntity(exerciseId, sessionId, output.groupsSessionId + '-def-bench', 0, 'Bench Press', cuam),
-      setEntity(setId, exerciseId, 0, '110', '5', cuam),
-    ]);
-    output.groupsRecordSetId = setId;
-    output.groupsRecordSessionCardKey = output.groupsCounterpartyUserId + ':' + sessionId;
-
-    var deadline = Date.now() + POLL_DEADLINE_MS;
-    var polls = 0;
-    var record = null;
-    var items = [];
-    for (;;) {
-      polls += 1;
-      var stream = rpcOk(output.groupsToken, 'group_stream_v2', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 50 });
-      items = stream.items || [];
-      var found = items.filter(function (item) {
-        return item.kind === 'record' && item.set_id === setId && item.provisional === false;
-      });
-      if (found.length > 0) {
-        record = found[0];
-        break;
-      }
-      if (Date.now() > deadline) {
-        fail('no final record item for ' + setId + ' after the push (' + polls + ' polls); stream: ' + JSON.stringify(items));
-      }
-      pause(POLL_INTERVAL_MS);
-    }
-    var boards = (record.boards || [])
-      .map(function (board) {
-        return board.metric + ':' + board.group_record;
-      })
-      .sort()
-      .join(',');
-    if (
-      Number(record.boards.filter(function (b) { return b.metric === 'weight'; })[0].value) !== 110 ||
-      Number(record.performance.reps) !== 5 ||
-      Number(record.performance.weight_value) !== 110 || record.performance.source_load_input_mode !== 'total_load' ||
-      boards !== 'e1rm:true,weight:true' ||
-      record.voided !== false ||
-      !record.record_context || record.record_context.metrics.some(function (m) { return m.certification !== null; })
-    ) {
-      fail('unexpected record item: ' + JSON.stringify(record));
-    }
-    output.groupsRecordKey = record.key;
-    console.log(
-      TAG + ' GROUPS_E2E_LATENCY record sync_push->record item: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',
-    );
-  },
-
-  // After the device certified the record set, wait until the
-  // evaluator has written the Certified · 1RM entry (certify -> pg_net kick ->
-  // apply), so the device's board reads are deterministic. The script cannot
-  // see the tap, so the latency is from this step's start (it includes the
-  // Maestro steps between the tap and this script).
-  'await-certified': function () {
-    var startedAt = Date.now();
-    var deadline = startedAt + POLL_DEADLINE_MS;
-    var polls = 0;
-    var board;
-    for (;;) {
-      polls += 1;
-      board = rpcOk(output.groupsToken, 'group_metric_board', {
-        p_group_id: output.groupsGroupId,
-        p_group_exercise_id: output.groupsBoardExerciseId,
-        p_metric: 'e1rm',
-        p_certified: true,
-        p_after: null,
-        p_limit: 10,
-      });
-      var rows = board.entries || [];
-      if (rows.length > 0 && rows[0].set_id === output.groupsRecordSetId) break;
-      if (Date.now() > deadline) {
-        fail('no Certified · 1RM row for ' + output.groupsRecordSetId + ' (' + polls + ' polls); rows: ' + JSON.stringify(rows));
-      }
-      pause(POLL_INTERVAL_MS);
-    }
-    var row = board.entries[0];
-    var certification = rpcOk(output.groupsToken, 'group_metric_certification_get', { p_group_id: output.groupsGroupId, p_certification_id: row.certification_id }).certification;
-    var by = certification && certification.certified_by;
-    if (
-      board.entries.length !== 1 ||
-      row.member.user_id !== output.groupsCounterpartyUserId ||
-      row.metric !== 'e1rm' || !Number.isFinite(Number(row.value)) || Number(row.value) <= 0 ||
-      Number(row.performance.weight_value) !== 110 ||
-      row.certified !== true ||
-      !by ||
-      by.user_id === output.groupsCounterpartyUserId
-    ) {
-      fail('unexpected Certified · 1RM board: ' + JSON.stringify(board.entries));
-    }
-    // Measured from the certification's server certified_at_ms (the local
-    // stack's clock; host/VM skew applies), so it includes the device steps
-    // between the tap and this script.
-    console.log(
-      TAG +
-        ' GROUPS_E2E_LATENCY certify->certified board: ' +
-        (Date.now() - Number(certification.certified_at_ms)) +
-        ' ms since certified_at (this step: ' +
-        (Date.now() - startedAt) +
-        ' ms, ' +
-        polls +
-        ' polls)',
-    );
-  },
-
-  'prepare-device-unlink': function () {
-    var device = signIn(); // EMAIL/PASSWORD are the device fixture for this step only.
-    output.unlinkDeviceToken = device.token;
-    output.unlinkDeviceUserId = device.userId;
-    var created = rpcOk(device.token, 'group_exercise_create', {
-      p_group_id: output.groupsGroupId, p_name: 'Unlink Bench', p_load_input_mode: 'total_load', p_source_exercise_id: null,
-    });
-    output.unlinkGroupExerciseId = created.exercise.group_exercise_id;
-    output.unlinkPrimaryId = 'maestro-unlink-bench-a';
-    output.unlinkSecondaryId = 'maestro-unlink-bench-b';
-    var stamp = nextClientUpdatedAt();
-    var definitions = [output.unlinkPrimaryId, output.unlinkSecondaryId];
-    var names = ['Bench (competition)', 'Bench (training)'];
-    var entities = [];
-    for (var i = 0; i < definitions.length; i++) {
-      entities.push(entity('exercise_definitions', definitions[i], stamp, {
-        name: names[i], load_input_mode: 'total_load', bodyweight_contribution: 0,
-        created_at: stamp, updated_at: stamp, deleted_at: null,
-      }));
-      entities.push(entity('exercise_group_links', output.groupsGroupId + ':' + definitions[i], stamp, {
-        exercise_definition_id: definitions[i], group_id: output.groupsGroupId, group_exercise_id: output.unlinkGroupExerciseId,
-        created_at: stamp, updated_at: stamp, deleted_at: null,
-      }));
-    }
-    if (!rpcOk(device.token, 'sync_push', { entities: entities }).ok) fail('could not seed device links');
-    // Later created_at than the link: this is a logged record, not retroactive linking.
-    stamp = nextClientUpdatedAt();
-    output.unlinkSessionId = 'maestro-unlink-session';
-    output.unlinkSetId = 'maestro-unlink-set';
-    if (!rpcOk(device.token, 'sync_push', { entities: [
-      sessionEntity(output.unlinkSessionId, stamp, stamp, stamp + 60000),
-      sessionExerciseEntity('maestro-unlink-session-exercise', output.unlinkSessionId, output.unlinkPrimaryId, 0, names[0], stamp),
-      setEntity(output.unlinkSetId, 'maestro-unlink-session-exercise', 0, '80', '5', stamp),
-    ] }).ok) fail('could not seed the completed set');
-    var deadline = Date.now() + POLL_DEADLINE_MS;
-    for (;;) {
-      var stream = rpcOk(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 50 });
-      var record = (stream.items || []).filter(function (item) {
-        return item.kind === 'record' && item.set_id === output.unlinkSetId && item.provisional === false;
-      })[0];
-      if (record) { output.unlinkRecordKey = record.key; break; }
-      if (Date.now() > deadline) fail('device set did not create a completed record');
-      pause(POLL_INTERVAL_MS);
-    }
-    var certified = rpcOk(output.groupsToken, 'group_certify', {
-      p_group_id: output.groupsGroupId, p_group_exercise_id: output.unlinkGroupExerciseId,
-      p_member_user_id: device.userId, p_set_id: output.unlinkSetId,
-    });
-    output.unlinkCertificationId = certified.certification.certification_id;
-    assertUnlinkPreserved(true);
-  },
-  'assert-unlink-cancelled': function () { assertUnlinkPreserved(true); },
-  'assert-device-unlinked': function () { assertUnlinkPreserved(false); },
-  'assert-device-relinked': function () { assertUnlinkPreserved(true); },
-
-  'prepare-bodyweight': function () {
-    rpcOk(output.unlinkDeviceToken, 'group_update', {
-      p_group_id: output.groupsGroupId, p_name: 'Maestro Groups E2E', p_description: null,
-      p_bodyweight_calculations_enabled: true,
-    });
-    var created = rpcOk(output.unlinkDeviceToken, 'group_exercise_create_v2', {
-      p_group_id: output.groupsGroupId, p_name: 'Pull-up', p_load_input_mode: 'total_load',
-      p_source_exercise_id: null, p_bodyweight_contribution: 1, p_default_metric: 'e1rm',
-    });
-    output.bodyweightExerciseId = created.exercise.group_exercise_id;
-    output.bodyweightStartedAt = nextClientUpdatedAt();
-    output.bodyweightCounterpartySessionId = 'maestro-bodyweight-heavy';
-    var people = [
-      { token: output.unlinkDeviceToken, id: 'maestro-bodyweight-light', kg: 60, contribution: 0.1 },
-      { token: output.groupsToken, id: output.bodyweightCounterpartySessionId, kg: 90, contribution: 0.7 },
-    ];
-    for (var i = 0; i < people.length; i++) {
-      var person = people[i];
-      var stamp = nextClientUpdatedAt();
-      var def = person.id + '-def';
-      var set = setEntity(person.id + '-set', person.id + '-se', 0, '20', '5', stamp);
-      var entities = [
-        entity('exercise_definitions', def, stamp, {
-          name: 'Personal Pull-up', load_input_mode: 'total_load', bodyweight_contribution: person.contribution,
-          created_at: stamp, updated_at: stamp, deleted_at: null,
-        }),
-        entity('exercise_group_links', output.groupsGroupId + ':' + def, stamp, {
-          exercise_definition_id: def, group_id: output.groupsGroupId, group_exercise_id: output.bodyweightExerciseId,
-          created_at: stamp, updated_at: stamp, deleted_at: null,
-        }),
-        bodyweightSession(person.id, stamp, false),
-        bodyweightReading(person.id, person.kg, stamp),
-        sessionExerciseEntity(person.id + '-se', person.id, def, 0, 'Personal Pull-up', stamp), set,
-      ];
-      // A session preceding the timeline keeps its raw Weight but has no group 1RM.
-      if (i === 1) {
-        var missing = person.id + '-missing';
-        var reps = setEntity(missing + '-set', missing + '-se', 0, '10', '15', stamp);
-        entities.push(bodyweightSession(missing, stamp, true));
-        entities.push(sessionExerciseEntity(missing + '-se', missing, def, 0, 'Personal Pull-up', stamp));
-        entities.push(reps);
-      }
-      if (!rpcOk(person.token, 'sync_push', { entities: entities }).ok) fail('could not seed bodyweight performance');
-    }
-    awaitBodyweightBoard('e1rm', false, function (b) {
-      return b.entries.length === 2 && b.entries[0].member.user_id === output.groupsCounterpartyUserId;
-    });
-    awaitBodyweightBoard('weight', false, function (b) {
-      return b.entries.length === 2 && b.entries.every(function (row) {
-        return row.value === 20 && row.metric === 'weight';
-      });
-    });
-    console.log(TAG + ' normal Weight and bodyweight-aware 1RM group calculations verified');
-  },
-  'await-bodyweight-certified': function () {
-    var board = awaitBodyweightBoard('e1rm', true, function (b) {
-      return b.entries.length === 1 && b.entries[0].member.user_id === output.groupsCounterpartyUserId;
-    });
-    output.bodyweightCertificationId = board.entries[0].certification_id;
-    var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
-      p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
-    }).certification;
-    if (cert.certified_by.user_id !== output.unlinkDeviceUserId) fail('performance was not attested');
-    if (/body_weight|measurement/i.test(JSON.stringify(cert))) fail('certification leaked private weight context');
-  },
-  'assert-bodyweight-rules': function () {
-    var board = awaitBodyweightBoard('e1rm', false, function (b) {
-      return b.rules_revision === 2 && b.entries.length === 2 && b.entries.every(function (row) { return row.rules_revision === 2; });
-    });
-    if (board.entries.some(function (row) { return row.metric !== 'e1rm' || row.unit !== 'kg'; })) {
-      fail('group board did not use the normal 1RM presentation: ' + JSON.stringify(board));
-    }
-    awaitBodyweightBoard('e1rm', true, function (b) {
-      return b.rules_revision === 2 && b.entries.length === 0;
-    });
-    var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
-      p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
-    }).certification;
-    if (cert.ended_at_ms === null) fail('rule contribution change retained the prior certification');
-  },
-  'correct-bodyweight': function () {
-    var stamp = nextClientUpdatedAt();
-    push([bodyweightReading(output.bodyweightCounterpartySessionId, 95, stamp)]);
-    awaitBodyweightBoard('e1rm', false, function (b) {
-      return b.rules_revision === 2 && b.entries.length === 2 && !b.entries[0].certified;
-    });
-    awaitBodyweightBoard('e1rm', true, function (b) { return b.entries.length === 0; });
-    var cert = rpcOk(output.groupsToken, 'group_metric_certification_get', {
-      p_group_id: output.groupsGroupId, p_certification_id: output.bodyweightCertificationId,
-    }).certification;
-    if (cert.ended_at_ms === null) fail('bodyweight correction retained an active strength certification');
-    console.log(TAG + ' dated-reading correction invalidated the 1RM attestation');
-  },
-
-  // AC11: once removed, the counterparty's next read of the group is NOT_FOUND.
-  'assert-removed': function () {
-    var result = rpc(output.groupsToken, 'group_stream', { p_group_id: output.groupsGroupId, p_before: null, p_limit: 20 });
-    var message = result.body && result.body.message ? String(result.body.message) : '';
-    if (result.status === 200 || message.indexOf('NOT_FOUND:') !== 0) {
-      fail('expected NOT_FOUND after removal, got HTTP ' + result.status + ' ' + result.raw);
-    }
-    console.log(TAG + ' removed counterparty group_stream -> HTTP ' + result.status + ' ' + message);
   },
 };
 

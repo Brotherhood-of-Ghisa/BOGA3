@@ -3,7 +3,7 @@ import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { addFiniteVolume, ordinaryLoadContext, personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/session-recorder/set-semantics';
+import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';

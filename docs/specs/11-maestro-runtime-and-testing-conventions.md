@@ -215,7 +215,7 @@ Responsibility split:
 - `maestro-ios-teardown.sh`
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-run-lane.sh`
-  - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `ui-regression` /
+  - the high-level per-lane entrypoint (`smoke` / `data-smoke` /
     `exercise-page` / `session-view` / `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
     reset strategy, Supabase config, fixture users, pre-run fixture reset) and
     calls the shared toolkit via `maestro-ios-run-flow.sh` (one flow per
@@ -359,7 +359,7 @@ Every lane runs the same dev-client build; whether it behaves as a local-only
 from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile`,
 `sync-e2e`, and `groups-e2e` lanes (`test:e2e:ios:auth-profile`,
 `test:e2e:ios:sync`, `test:e2e:ios:groups`) are the Supabase-backed iOS lanes — they provision a local Supabase baseline and export
-those vars; `smoke`, `data-runtime-smoke`, `ui-regression`, and the combined
+those vars; `smoke`, `data-smoke`, `exercise-page`, `session-view`, and the combined
 `gates` lane are deliberately **infra-free** (they export none, so the inlined
 values are empty).
 (Which lanes take which shape, and why, is testing policy — see
@@ -382,6 +382,13 @@ the runner. The rule is enforced by
 `scripts/tests/maestro-fixture-users.test.sh` (the `meta-tests` lane, which the
 trigger registry runs on any `.maestro/**` or `maestro*` change): it fails if two
 sign-in flows resolve to the same fixture.
+
+A flow whose claims depend on its user's server state resets that user with the
+service role before the run, so repeated runs in one slot start alike:
+`supabase/scripts/sync-e2e-fixture-reset.sh` (`user_b`: its Sync v2 rows, then a
+check that every pull layer is empty, so the first sign-in always takes the
+bootstrapper's seed branch) and `supabase/scripts/groups-fixture-reset.sh`
+(`user_c`/`user_d`, below).
 
 **Scripted counterparties.** A flow that needs a second user drives it over
 HTTP from `runScript` (`.maestro/scripts/*.js`) instead of a second device

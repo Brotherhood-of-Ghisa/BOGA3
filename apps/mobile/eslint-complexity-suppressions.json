@@ -1,14 +1,6 @@
 {
   "app/(tabs)/exercise-catalog.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "app/(tabs)/groups.tsx": {
-    "complexity": {
       "count": 1
     }
   },
@@ -18,9 +10,6 @@
     }
   },
   "app/(tabs)/stats-history.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 2
     },
@@ -29,17 +18,11 @@
     }
   },
   "app/completed-session/[sessionId].tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     }
   },
   "app/exercise-link.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     },
@@ -48,17 +31,6 @@
     }
   },
   "app/group/join.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "app/profile.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
@@ -73,37 +45,12 @@
       "count": 1
     }
   },
-  "components/exercise-catalog/exercise-editor-modal.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/exercise-page/exercise-page-screen.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/groups/group-comparison-form.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
   "components/groups/group-exercise-pick-sheet.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
@@ -114,59 +61,21 @@
     }
   },
   "components/groups/group-metric-board.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
   "components/groups/group-metric-history.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/groups/group-metric-record-sheet.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/groups/group-metric-stream-card.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
   "components/groups/group-metric-stream-record-sheet.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
-  "components/groups/record-set-sheet.tsx": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "components/groups/stream-record-card.tsx": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "components/gyms/gym-editor.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     },
@@ -175,9 +84,6 @@
     }
   },
   "components/session-complete/exercise-volume-card.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
@@ -188,9 +94,6 @@
     }
   },
   "components/session-recorder/exercise-picker.tsx": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 1
     },
@@ -198,38 +101,19 @@
       "count": 1
     }
   },
-  "components/ui/list-row.tsx": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/data/exercise-catalog-stats.ts": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
   "src/data/muscle-analytics.ts": {
-    "complexity": {
-      "count": 1
-    },
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
   },
   "src/data/session-drafts.ts": {
-    "complexity": {
-      "count": 1
-    },
     "max-lines-per-function": {
       "count": 2
-    }
-  },
-  "src/groups/metric-wire-guards.ts": {
-    "complexity": {
-      "count": 3
     }
   }
 }

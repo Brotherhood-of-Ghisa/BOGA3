@@ -12,7 +12,7 @@ import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
@@ -176,8 +176,7 @@ const computeDaysAgo = (completedAt: Date, now: Date): number => {
 const countWorkingSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
   let count = 0;
   for (const row of setRows) {
-    const setType = normalizeSessionSetType(row.setType);
-    if (!isWorkingSessionSetType(setType)) continue;
+    if (!isWorkingSessionSetType(row.setType)) continue;
     if (parseCalculationSet({ ...row, weightValue: canonicalizeWeightForReps(row.weightValue, row.repsValue) }) === null) continue;
     count += 1;
   }

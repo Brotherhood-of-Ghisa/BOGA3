@@ -85,7 +85,7 @@ determinism seam for tests.
 - **Today and selected differ** (DLM-T09-D3): today (the current week) is a 1px
   `ink` ring, the selected cell a 2px `ink` border with the selected
   accessibility state; the selected week also gets a filled `ink` caret.
-  `app/__tests__/heatmap-marks.test.tsx` holds this.
+  `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history sheet keeps both views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
   a one-year chart rebuild on every toggle while preserving view-local selection

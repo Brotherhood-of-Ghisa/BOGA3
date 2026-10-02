@@ -1,91 +1,24 @@
 appId: com.dinoderek.mobile
 ---
-# Completed-session edit and share (ios-ui-regression lane, infra-free).
+# Completed-session share (ios-data-smoke lane, infra-free).
 #
 # Proves:
-#   1. a completed session's `Edit` opens the session view on it; a card opens
-#      the exercise page, where a set is changed on the keyboard; back returns
-#      to the session view, and `Done` returns to the completed session, which
-#      reads the edit back from the device's SQLite;
-#   2. the completion screen's share preview opens the native share sheet,
+#   1. the completion screen's share preview opens the native share sheet,
 #      which dismisses without a destination, and the preview's backdrop
 #      closes it.
 # Why device:
-#   1. stack transitions across three screens, the keyboard, and the
-#      on-device expo-sqlite write and read;
-#   2. the native share sheet and a real sheet backdrop.
-# Jest counterpart: app/__tests__/completed-session-local-data.test.tsx
+#   1. the native share sheet (the preview captured to an image and handed to
+#      expo-sharing in the installed binary) and a real sheet backdrop.
+# Jest counterpart: __tests__/completed-session-local-data.test.tsx
 #   (every completion and detail state over the fixtures: records, grouping,
 #   no-history and unmapped copy, missing sessions, delete/undelete, append,
-#   share preview, edit read-back), app/__tests__/completed-session-detail-screen.test.tsx
-#   (loading, error and share-failure states real data cannot produce),
-#   app/__tests__/session-view-screen.test.tsx ("editing a completed session":
-#   Start/End validation, autosave pause, Done).
+#   share preview, edit read-back), __tests__/completed-session-detail-screen.test.tsx
+#   (the capture and share calls, share failure and retry, backdrop dismissal),
+#   __tests__/session-view-screen.test.tsx ("editing a completed session":
+#   Start/End validation, autosave pause, an exercise-page edit saved by Done).
 
-# --- 1. Edit a completed session ---
-- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=completed-session&sessionId=maestro_m24_completion_one_pr"
-- extendedWaitUntil:
-    visible:
-      id: "completed-session-detail-screen"
-    timeout: 30000
-- tapOn:
-    id: "view-session-section-sets"
-- tapOn:
-    id: "completed-session-detail-edit-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-done-button"
-    timeout: 30000
-- takeScreenshot: "completed-edit-session-view"
-
-# Change the set on the exercise page: 275 × 5 becomes 275 × 6.
-- tapOn:
-    id: "session-view-exercise-maestro_m24_completion_one_pr_squat"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-page"
-    timeout: 15000
-- tapOn:
-    id: "exercise-set-1-open"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-logger"
-    timeout: 5000
-- tapOn:
-    id: "exercise-set-logger-reps"
-- eraseText: 3
-- inputText: "6"
-- hideKeyboard:
-    optional: true
-- tapOn:
-    id: "exercise-set-logger-commit"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-set-1-values"
-      text: "275.0 × 6"
-    timeout: 5000
-- takeScreenshot: "completed-edit-exercise-page"
-- tapOn:
-    id: "exercise-page-back"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-done-button"
-    timeout: 15000
-- tapOn:
-    id: "session-view-done-button"
-- extendedWaitUntil:
-    visible:
-      id: "completed-session-detail-screen"
-    timeout: 30000
-# The squat's first row reads the edit back: 275.0 × 6, not the fixture's × 5.
-- assertVisible:
-    id: "completed-session-detail-exercise-maestro_m24_completion_one_pr_squat-set-1-values"
-    text: "275.0 × 6"
-- takeScreenshot: "completed-edit-read-back"
-
-# --- 2. Share: the native share sheet ---
 # The completion-two-prs fixture's newest session beats both histories.
-- openLink: "boga3://maestro-harness?fixture=completion-two-prs&teleport=completed-session&sessionId=maestro_m24_completion_two_prs&presentation=completion"
+- openLink: "boga3://maestro-harness?reset=data&fixture=completion-two-prs&teleport=completed-session&sessionId=maestro_m24_completion_two_prs&presentation=completion"
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"

@@ -121,7 +121,6 @@ export function SetRow({ row, divider, onOpen, onToggle, onConfirm, onDrop }: Se
             ? DASH
             : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`}
         </Text>
-        <Text allowFontScaling={false} style={pageText.microLabel}>{meaning}</Text>
       </Pressable>
     </ListRow>
   );

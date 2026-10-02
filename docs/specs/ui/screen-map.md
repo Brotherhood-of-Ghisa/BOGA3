@@ -177,8 +177,8 @@ Brief entrypoint map of the current mobile screens.
     (`Recent` plus arrow for Exercise, arrow only for Sets/Vol). Accessibility
     wording retains the complete sort mode and next action. Mounted sort choice
     survives time-range, search, and Breakdown changes.
-  - per-muscle family and nested rows show the same set/near-failure count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
-  - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight near-failure sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
+  - per-muscle family and nested rows show the same set/working-set count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
+  - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight working sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - in By Muscle, a nested muscle row and a collapsed single-muscle family header open that muscle's history; a multi-muscle family header opens the whole family's (`Muscle Group History`)
   - in By Exercise, a table row opens the exercise's history
   - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `W/sets`, plus `1RM` / `Top weight` for an exercise) and `View` (`Weekly` / `Daily`) `SegmentedControl`s, the week banner in Weekly, and the 365-day daily or weekly heatmap; loading, error and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so switching is immediate and keeps each view's selection and scroll
@@ -652,7 +652,7 @@ Brief entrypoint map of the current mobile screens.
 21. `/session/[sessionId]/exercise/[sessionExerciseId]`
 - File: `apps/mobile/app/session/[sessionId]/exercise/[sessionExerciseId].tsx` (composition in `apps/mobile/components/exercise-page/`)
 - Purpose:
-  - one page per exercise of the active session, or of a completed session being edited from the session view, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise`
+  - one page per exercise of the active session, or of a completed session being edited from the session view, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise` — the last item in the scroll, after the set list, never a pinned footer
   - reached only from the session view; its domain lives in `src/session-recorder/**`
   - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel leaves that session out
 - Key states (high level):

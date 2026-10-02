@@ -13,11 +13,11 @@ appId: com.dinoderek.mobile
 # Why device:
 #   1. a stack push and the native back button;
 #   2. the keyboard.
-# Jest counterpart: app/__tests__/exercise-page-screen.test.tsx (the page over
+# Jest counterpart: __tests__/exercise-page-screen.test.tsx (the page over
 #   the same fixture: records, Last, effort cycle and sheet, menu, swap,
 #   `+ Add set`, Complete's warning, discarded planned sets read back from the
-#   database), app/__tests__/exercise-page-model.test.ts (effort inheritance),
-#   app/__tests__/exercise-history-screen.test.tsx (periods, bests, cards).
+#   database), __tests__/exercise-page-model.test.ts (effort inheritance),
+#   __tests__/exercise-history-screen.test.tsx (periods, bests, cards).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-page&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
 - extendedWaitUntil:
@@ -43,8 +43,9 @@ appId: com.dinoderek.mobile
       id: "exercise-history-session-card-maestro_exercise_page_history_2_bench"
     timeout: 10000
 - takeScreenshot: "exercise-history-default"
-# The native back item is arrow-only; it reads the previous route's title.
-- tapOn: "Exercise"
+# The screen draws its own back arrow (the native item can stop dispatching).
+- tapOn:
+    id: "exercise-history-back"
 - extendedWaitUntil:
     visible:
       id: "exercise-page"
@@ -57,8 +58,9 @@ appId: com.dinoderek.mobile
     id: "exercise-set-logger-reps"
 - eraseText: 3
 - inputText: "5"
-- hideKeyboard:
-    optional: true
+# The logger's commit sits above the keyboard and the page scroll has
+# keyboardShouldPersistTaps="handled", so the tap lands with the keyboard up
+# (a hideKeyboard here cost ~4.3s).
 - tapOn:
     id: "exercise-set-logger-commit"
 - extendedWaitUntil:

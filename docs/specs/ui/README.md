@@ -38,6 +38,10 @@ drifted from the code and predated several UI milestones. Git history has them.)
 - `design-targets/`
   - accepted design target records per `ai-design-policy.md`, one file per
     accepted target
+- `design-targets/today-landing.md`
+  - accepted Claude Design target for the Today landing page (Progress and
+    Group activity cards); integrated rendering and gallery acceptance remain
+    required
 - `design-targets/bodyweight.md`
   - accepted repo-native replacement target for optional private/group
     bodyweight calculations; integrated rendering and human acceptance remain

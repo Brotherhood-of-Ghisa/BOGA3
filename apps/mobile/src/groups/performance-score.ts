@@ -4,7 +4,7 @@ import { isValidSessionWeight, type ResolvedSessionWeight } from '../bodyweight/
 import { groupLoadContext } from '../exercise-calculations/analytics.ts';
 import { parseSetWeight } from '../exercise-calculations/index.ts';
 import { calculateSetMetrics, type SetMetricInput } from '../exercise-calculations/load-metrics.ts';
-import { canonicalizeWeightForReps } from '../session-recorder/set-semantics.ts';
+import { canonicalizeWeightForReps } from '../exercise-calculations/set-semantics.ts';
 import { checkGroupLinkCompatibility, type GroupExerciseRules, type GroupLinkSource, type GroupMetricValue } from './metric-contract.ts';
 
 export type GroupPerformanceInput = ResolvedSessionWeight & {

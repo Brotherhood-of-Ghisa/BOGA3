@@ -950,6 +950,7 @@ npm run test
 npm run test:handles   # serial --detectOpenHandles guard; fails (with a stack) on any leaked handle
 npm run test:coverage  # instrumented run; fails under 80% branches/lines; report in coverage/lcov-report/index.html
 npm run lint:complexity  # per-function complexity limits; pre-existing offenders grandfathered
+npm run lint:deps        # import-direction rules (dependency-cruiser); pre-existing violations grandfathered
 npm run db:generate:canary
 ```
 
@@ -962,7 +963,7 @@ TASK_ID=ad-hoc npm run test:e2e:ios:data-smoke
 TASK_ID=ad-hoc npm run test:e2e:ios:gates        # smoke + data-smoke sharing one sim + Metro (~28% faster than running both separately)
 TASK_ID=ad-hoc npm run test:e2e:ios:auth-profile
 TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/session-completion-states-fixture.yaml --scenario session-completion-states-fixture
-# (this flow is also gated: it runs in `./boga test ios-ui-regression`)
+# (this flow is also gated: it runs in `./boga test ios-data-smoke`)
 ```
 
 ### Backend (Supabase)

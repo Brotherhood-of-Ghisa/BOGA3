@@ -9,7 +9,7 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh smoke|data-smoke|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
 # `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
@@ -21,7 +21,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|ui-regression|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 run_flow() {
@@ -70,29 +70,20 @@ case "$lane" in
     run_flow full "Smoke" smoke-launch.yaml
     ;;
 
-  # Infra-free real expo-sqlite migration + smoke write/read; the backend-less
-  # build seeds its own starter catalog at boot. No Supabase.
+  # Infra-free, no Supabase. data-runtime-smoke: real expo-sqlite migration +
+  # smoke write/read, and the backend-less build seeds its own starter catalog
+  # at boot. Then the two screen flows whose device claims need no backend:
+  # the completion screen's native share sheet, and an exercise created through
+  # the catalogue's editor sheet. They share ONE provisioned simulator + Metro
+  # (maestro-ios-run-flows.sh), because a lane of their own would pay the
+  # provision/launch/teardown overhead again; each resets its own data in-flow
+  # through the maestro-harness deep link, so a `data` reset is enough.
   data-smoke)
-    run_flow data "Data runtime smoke" data-runtime-smoke.yaml
-    ;;
-
-  # The infra-free UI regression lane: the screen-level flows that need no
-  # backend and reset their own data in-flow through the maestro-harness deep
-  # link. They share ONE provisioned simulator + Metro (maestro-ios-run-flows.sh)
-  # because standalone runs would each pay the ~55-60s provision/launch/teardown
-  # overhead. `data` reset is enough — none of these flows tests
-  # cold-install, permission, or onboarding behaviour.
-  #
-  # Every flow here is asserted UI, not screenshot evidence: a flow that only
-  # captured screenshots would go green while the screens underneath it broke,
-  # which is what happened to the unwired flows this lane replaced.
-  ui-regression)
     MAESTRO_RESET_STRATEGY=data \
     "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
-      --session "iOS UI regression" \
-      --scenario "Stats screen" --flow "$APP_DIR/.maestro/flows/stats-screen-ux.yaml" \
-      --scenario "Session completion states" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
-      --scenario "Settings dev wipe-local" --flow "$APP_DIR/.maestro/flows/settings-dev-wipe-local.yaml" \
+      --session "Data runtime smoke" \
+      --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
+      --scenario "Session completion share" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
     ;;
 
@@ -112,8 +103,8 @@ case "$lane" in
   # fixture-backed sign-in / profile / username-update / sign-out happy path (the
   # happy-path flow also asserts the route guard at both ends). The first-sync
   # gate's in-progress + dismissal surfaces are covered by the jest
-  # sync-gate-screen suite; the real-cycle gate lift and the settings sync-status
-  # surface are proven on-device by the sync-e2e round-trip. Signs in as user_a —
+  # sync-gate-screen suite; the real-cycle gate lift is proven on-device by the
+  # sync-e2e round-trip. Signs in as user_a —
   # its own dedicated fixture, per the one-user-per-flow rule (see docs/specs/11,
   # enforced by scripts/tests/maestro-fixture-users.test.sh).
   auth-profile)
@@ -124,19 +115,19 @@ case "$lane" in
     run_flow full "Auth profile happy path" auth-profile-happy-path.yaml
     ;;
 
-  # The UI <-> server sync e2e lane: real session UI + real sync cycle + real
-  # local Supabase. Proves (A) new-user bootstrap lifts the gate, (B) a workout
-  # logged through the session view and exercise page, (C) forced sync drains
-  # Pending changes to 0 and the settings sync-status surface renders, (D) full
-  # device wipe + re-sign-in restores the workout from the remote DB.
+  # The UI <-> server sync e2e lane: real sign-in + real sync cycle + real
+  # local Supabase. Proves (A) a new user's first sign-in seeds, pushes and
+  # lifts the first-sync gate, and (B) a reading entered on the device comes
+  # back from the server after a full device wipe and a fresh sign-in.
   #
   # Signs in as user_b — its own dedicated fixture, per the one-user-per-flow rule
-  # (docs/specs/11): every Supabase-backed Maestro flow owns a distinct fixture so
-  # no flow depends on another's residual server state. A pristine user also makes
-  # first sign-in deterministic (empty server -> bootstrapper SEED branch). See the
-  # flow file's ISOLATION note; enforced by scripts/tests/maestro-fixture-users.test.sh.
+  # (docs/specs/11), enforced by scripts/tests/maestro-fixture-users.test.sh.
+  # sync-e2e-fixture-reset.sh first empties user_b's server data, so every run's
+  # first sign-in takes the bootstrapper's SEED branch and the wipe restores only
+  # this run's data.
   sync-e2e)
     export_local_supabase_env
+    "$REPO_ROOT/supabase/scripts/sync-e2e-fixture-reset.sh"
     MAESTRO_ROUNDTRIP_EMAIL="$USER_B_EMAIL" \
     MAESTRO_ROUNDTRIP_PASSWORD="$USER_B_PASSWORD" \
     run_flow full "First-run log and remote round-trip" sync-first-run-log-and-roundtrip.yaml

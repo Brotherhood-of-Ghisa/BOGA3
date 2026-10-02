@@ -115,7 +115,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     Replaced the session view's `OutlineButton` and the Gyms screen's
     `GymButton` (View Session was its third consumer). DLM-T10 added `checked`
     for a text button that toggles a view (Sessions' `Show deleted`)
-  - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
+  - covered by `apps/mobile/__tests__/ui-design-primitives.test.tsx`
 
 3. Design-language primitives, second set (DLM-T01, 2026-09-24)
 - Files: `apps/mobile/components/ui/icon-button.tsx`, `state-panel.tsx`,
@@ -194,7 +194,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     and a `description` (a wrapping `ink-muted` second line) and
     `accessibilityRole="link"` for a row that opens the browser (DLM-T04: the
     More and Settings destinations)
-  - covered by `apps/mobile/app/__tests__/ui-design-primitives.test.tsx`
+  - covered by `apps/mobile/__tests__/ui-design-primitives.test.tsx`
 
 4. `Icon`
 - Files: `apps/mobile/components/ui/icon.tsx`, `icon-glyphs.ts` (geometry),
@@ -225,7 +225,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     trailing slot on the set row. Add icons from the same Lucide
     release, named by role
   - replaced the improvised Unicode glyphs on every screen;
-    `app/__tests__/ui-icon.test.tsx` fails if a retired glyph comes back
+    `__tests__/ui-icon.test.tsx` fails if a retired glyph comes back
     anywhere in `app/`, `components/` or `src/` (no file is exempt)
 
 5. `ui` barrel exports
@@ -277,7 +277,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - shared exercise list row/header rendering and shared Favourite/Name A–Z and Show never-done controls for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
   - in the design language (DLM-T06): hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are a Sort `SegmentedControl` (Favourite/Name A–Z) and a checked Show never-done `ChipGroup`. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
-  - covered by `apps/mobile/app/__tests__/exercise-list-controls.test.tsx`
+  - covered by `apps/mobile/__tests__/exercise-list-controls.test.tsx`
   - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so all three surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
 
 6. Session completion (the completion presentation of `/completed-session/<id>`)
@@ -314,8 +314,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     inline retryable failure and temporary-file cleanup; no Close or Cancel.
     The card (`paper`, `ink` mark, record band, mono figures) includes all PRs
     and exercise comparisons, never gym or location data
-  - covered by `apps/mobile/app/__tests__/completed-session-local-data.test.tsx`,
-    `completed-session-detail-screen.test.tsx`, and the `ios-ui-regression` lane
+  - covered by `apps/mobile/__tests__/completed-session-local-data.test.tsx`,
+    `completed-session-detail-screen.test.tsx`, and the `ios-data-smoke` lane
     (`session-completion-states-fixture`: the native share sheet)
 
 7. `SessionSummaryLine`
@@ -430,7 +430,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`; effort includes all configured cycle choices with `None` for blank and scrolls for longer ranges; the options sheet shows `Link to group exercise…` only when its host passes `onLink` (signed in)
   - `ExerciseSwapSheet` — `Sheet` over the shared `ExerciseListContent` / `buildExerciseListModel` and list preferences
   - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
-  - covered by `app/__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
+  - covered by `__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
 
 14. Exercise picker
 - File: `apps/mobile/components/session-recorder/exercise-picker.tsx`
@@ -447,7 +447,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `ExerciseSwapSheet`). It owns its own state and reports a choice
     (`onSelectExercise` / `onAppendPlan` / `onOpenManage`); the host bumps
     `openRequestId` for a fresh open and applies the choice
-  - covered by `apps/mobile/app/__tests__/exercise-picker.test.tsx`
+  - covered by `apps/mobile/__tests__/exercise-picker.test.tsx`
 
 15. Session view components
 - Folder: `apps/mobile/components/session-view/`
@@ -475,7 +475,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     and the gyms with the current one checked, and a `Manage gyms` footer row.
     testIDs `session-view-gym-sheet`, `-suggestion`, `-option-<id>` /
     `-option-none`, `-manage`
-  - covered by `apps/mobile/app/__tests__/session-view-screen.test.tsx`
+  - covered by `apps/mobile/__tests__/session-view-screen.test.tsx`
 
 16. Session detail (shared by the session view, View Session and the group session view)
 - Folder: `apps/mobile/components/session-detail/`; the row and card models in
@@ -523,7 +523,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `ViewSessionExerciseSheet` — `Sheet` titled with the exercise:
     `Append to current session`
     (`completed-session-detail-append-exercise-button-<id>`)
-  - covered by `apps/mobile/app/__tests__/completed-session-local-data.test.tsx`
+  - covered by `apps/mobile/__tests__/completed-session-local-data.test.tsx`
     and `completed-session-detail-screen.test.tsx`
 
 18. Gyms
@@ -543,7 +543,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `gym-editor`, `-name`, `-location-status`, `-location-save` / `-replace` /
     `-clear` / `-confirm` / `-cancel`, `-feedback`, `-archive` / `-unarchive`,
     `-cancel`, `-save`
-  - covered by `apps/mobile/app/__tests__/gyms-screen.test.tsx`,
+  - covered by `apps/mobile/__tests__/gyms-screen.test.tsx`,
     `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
     `ios-session-view` lane
 

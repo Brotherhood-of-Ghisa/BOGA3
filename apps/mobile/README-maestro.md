@@ -14,9 +14,9 @@ Run commands from `apps/mobile`.
 - Runtime scripts fail fast if `.maestro/maestro.env.local` is missing.
 - The iOS development-client build is host-local and **shared across every worktree**: a single cache at `$HOME/.cache/boga/maestro/ios-dev-client/` (NOT keyed by worktree slot). A freshly set-up worktree reuses an already-built client instead of rebuilding from scratch. The cache is trusted on existence and rebuilt only via `--force` (see the native-dependency warning below).
 - `npm run test:e2e:ios:smoke` and `npm run test:e2e:ios:data-smoke` use the port and simulator configured for this workspace, provision/install the dev client, launch Metro, run Maestro, then tear down.
-- `npm run test:e2e:ios:ui-regression` runs its infra-free screen flows (Stats, session completion, the Settings wipe-local and the exercise catalogue) against ONE provisioned simulator and ONE Metro instance (`scripts/maestro-ios-run-flows.sh`), for the same reason the combined `gates` lane does: the provision/launch/teardown overhead is paid once, not once per flow.
+- `npm run test:e2e:ios:data-smoke` runs the data-runtime smoke, the completion share sheet and the exercise catalogue's create against ONE provisioned simulator and ONE Metro instance (`scripts/maestro-ios-run-flows.sh`), for the same reason the combined `gates` lane does: the provision/launch/teardown overhead is paid once, not once per flow.
 - `npm run test:e2e:ios:gates` runs BOTH the smoke and data-runtime-smoke flows against one provisioned simulator and one Metro instance, so the ~55-60s fixed overhead (sim boot + dev-client warm-up + Metro start + teardown) is paid once instead of per gate (measured ~196s separate -> ~140s combined). The standalone gates above are unchanged; this is an additive convenience path for running both together.
-- The accepted `./boga test ios-sync-e2e` extension will prove the private preference, kg readings and contributions survive a real sync/wipe/bootstrap round trip without changing raw workout rows. Exact as-of selection, kg conversion and LWW/tombstone cases remain in pure/backend lanes.
+- `./boga test ios-sync-e2e` proves a kg reading entered on the device survives a real sync → wipe → bootstrap round trip. The private preference, contributions, exact as-of selection, kg conversion and LWW/tombstone cases stay in Jest (`sync-infra`'s `cycle-round-trip` against the live server) and the pure/backend lanes.
 - Run artifacts are written to `artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`. The combined runner namespaces each flow's JUnit/output/debug under a per-flow subdirectory of that root.
 
 ## First-time setup
@@ -134,17 +134,11 @@ Cold-start smoke lane:
 TASK_ID=T-20260301-05 npm run test:e2e:ios:smoke
 ```
 
-Data-runtime smoke lane:
+Data-runtime smoke lane (data-runtime smoke, completion share sheet,
+exercise catalogue create — three flows sharing one sim + Metro):
 
 ```bash
 TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
-```
-
-Infra-free UI regression lane (Stats screen, session-completion states,
-Settings dev wipe-local — three flows sharing one sim + Metro):
-
-```bash
-TASK_ID=ad-hoc npm run test:e2e:ios:ui-regression
 ```
 
 Session view lane (infra-free; two flows sharing one sim +
@@ -177,7 +171,7 @@ cd ../..
 
 - `smoke` uses `full reset` and navigates through the real tabs (Train's Start opens the session view).
 - `data-smoke` uses harness `data reset` plus `teleport` to Stats, then logs a workout through Train, the session view and the exercise page.
-- `ui-regression` provisions with `data reset`; each of its flows resets what it
+- `data-smoke` provisions with `data reset`; each of its flows resets what it
   needs in-flow through `boga3://maestro-harness?reset=data`, which is what makes
   them safe to share one app install.
 - `session-view` works the same way; its flows also end with a data reset.
@@ -193,7 +187,9 @@ sharing: `auth-profile-happy-path` → `user_a`, `sync-first-run-log-and-roundtr
 counterparty scripted over HTTP from `.maestro/scripts/groups-counterparty.js`,
 bound through `MAESTRO_GROUPS_COUNTERPARTY_EMAIL`).
 The lanes reuse one local Supabase without reset between runs, so a
-shared user would leak state between flows and flake them. Adding a sign-in flow
+shared user would leak state between flows and flake them (a lane whose claims
+need a clean server resets its own users first, e.g.
+`supabase/scripts/sync-e2e-fixture-reset.sh`). Adding a sign-in flow
 means adding a fixture user in `supabase/scripts/auth-fixture-constants.sh` and
 wiring it in `scripts/maestro-run-lane.sh`. Enforced by
 `scripts/tests/maestro-fixture-users.test.sh` (meta-tests lane); full contract in

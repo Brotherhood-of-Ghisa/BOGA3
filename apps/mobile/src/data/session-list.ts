@@ -6,7 +6,7 @@ import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
 import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 type SessionLifecycleStatus = 'active' | 'completed';

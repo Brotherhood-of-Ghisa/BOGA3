@@ -41,7 +41,7 @@ rule that comes with it: text on a `viz` ground is `ink`.
   right-aligned Plex Mono columns.
 - Each muscle family is a `Card`: the family row, then its nested muscles
   indented one step, each a `ListRow` with two stacked `Stat`s (`Sets`,
-  `Volume`) and their deltas. A row with near-failure sets takes one uniform
+  `Volume`) and their deltas. A row with working sets takes one uniform
   failure shade, `viz1`–`viz4`, the same ramp for families and muscles
   (T08-D3); on it every text is `ink`.
 - Loading, error and empty states are `StatePanel`s inside a `Card`; the copy
@@ -97,14 +97,14 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `00-stats-empty-state` (ad hoc) | no history: the empty table |
-| `01-exercise-view-default` (`ios-ui-regression`) | By Exercise, 7 days, sorted by Sets |
+| `01-exercise-view-default` (ad hoc) | By Exercise, 7 days, sorted by Sets |
 | `01a-exercise-table-working-sets`, `01b-exercise-table-most-recent`, `01c-exercise-table-volume-ascending` (ad hoc) | the sort header states |
 | `02-exercise-view-30-days` (ad hoc) | 30 days |
 | `03-muscle-breakdown-7-days` (ad hoc) | By Muscle: the family cards and failure shades |
 | `04-back-to-exercise-view` (ad hoc) | back to By Exercise |
 | `05-exercise-heatmap-daily` (ad hoc) | exercise history sheet, Daily, today selected |
 | `05a-heatmap-today-and-selected` (ad hoc) | Daily with yesterday selected: today's ring beside the selected border |
-| `05b-exercise-heatmap-weekly` (`ios-ui-regression`) | exercise history sheet as it opens: Weekly, Volume |
+| `05b-exercise-heatmap-weekly` (ad hoc) | exercise history sheet as it opens: Weekly, Volume |
 | `05c-exercise-heatmap-1rm` (ad hoc) | Weekly, 1RM |
 | `06-muscle-heatmap-weekly`, `06b-muscle-heatmap-daily` (ad hoc) | a single muscle's history (Chest), Weekly then Daily |
 | `06c-muscle-family-history` (ad hoc) | a multi-muscle family's history (Legs, `Muscle Group History`) |
@@ -115,7 +115,7 @@ Device: iPhone simulator at 390pt width, light.
 | `exercise-history-all-time` (ad hoc) | All time: both fixture sessions |
 | `04-data-runtime-smoke-success` (ad hoc) | Sessions after a workout is logged: one completed row |
 | `sessions-row-menu` (ad hoc) | a completed row's ⋮ sheet: Edit / Append / Delete |
-| `20-first-run-roundtrip-restored-from-remote` (`ios-sync-e2e`) | Sessions after a restore from the server |
+| `20-first-run-roundtrip-restored-from-remote` (ad hoc) | Sessions after a restore from the server |
 
 `(ad hoc)` states are no longer captured by a lane: their flow keeps only
 the claims that need a device (spec 06, "Maestro scope policy") and Jest
@@ -125,12 +125,12 @@ holds the flow steps that reached them.
 
 Jest only (no flow reaches them): the loading and error states (the screen's
 and the history sheets'), a filtered list with no match, the shade and delta
-colours (`app/__tests__/stats-screen.test.tsx`), and the today and selected
-marks on every cell kind (`app/__tests__/heatmap-marks.test.tsx`). For
+colours (`__tests__/stats-screen.test.tsx`), and the today and selected
+marks on every cell kind (`__tests__/heatmap-marks.test.tsx`). For
 DLM-T10: the bests in `record`, the tag chips, the deleted-exercise notice and
-exercise history's states (`app/__tests__/exercise-history-screen.test.tsx`);
+exercise history's states (`__tests__/exercise-history-screen.test.tsx`);
 the active session, the `Deleted` tag, the discard confirm and the `Retry`
-(`app/__tests__/sessions-screen.test.tsx`).
+(`__tests__/sessions-screen.test.tsx`).
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

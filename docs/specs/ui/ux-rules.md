@@ -204,7 +204,7 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
     - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
     - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
-    - `W-Up` marks a set as warm-up effort; warm-up sets still count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume statistics, but are not working sets. A working set is a valid confirmed RIR set meeting the file-based `WORKING_SET_POLICY.maxRir` threshold (`src/config/training.ts`, default RIR-3 or harder); the threshold has no Settings control and does not restrict the effort cycle or RIR inheritance. Use `Working set(s)` where space permits and `W/set` / `W/sets` in compact UI.
+    - `W-Up` marks a set as warm-up effort; warm-up sets still count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume statistics, but are not working sets. A working set is any valid confirmed set that is not `W-Up`: blank effort and every RIR count. The rule lives in one predicate, `isWorkingSessionSetType` (`src/data/set-types.ts`). Use `Working set(s)` where space permits and `W/set` / `W/sets` in compact UI.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
@@ -444,7 +444,7 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    since 8px body-adjacent text was poor for accessibility — so `9` now folds up
    into `10` rather than into `11`.
    No other rung moved when `xxs` was added; the design-language screens use it
-   for micro-labels, and `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
+   for micro-labels, and `apps/mobile/__tests__/ui-design-tokens.test.ts`
    holds all eight rungs and their line-heights. Reasoning:
    `ui/design-language.md` §3.
 2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
@@ -476,7 +476,7 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    `TextInput` sets `allowFontScaling={false}` after any spread props;
    `FormField` and `SearchField` enforce this for their callers.
    Existing fit-to-width behaviour is preserved. Native system dialogs remain
-   OS-controlled. `app/__tests__/ui-font-scaling.test.tsx` guards coverage and
+   OS-controlled. `__tests__/ui-font-scaling.test.tsx` guards coverage and
    prop precedence; the visual target is the existing default-size layout at
    both default and accessibility text sizes.
 
@@ -520,7 +520,7 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    in `Text`. Chevron `›` → `chevron-right`, kebab `⋮` → `more-vertical`,
    external `↗` → `arrow-up-right`, and so on. Characters that belong to the
    data stay text: `×` in `100 kg × 5`, the minus in `−12%`, `·` and `•`
-   separators. `app/__tests__/ui-icon.test.tsx` fails on a retired glyph anywhere
+   separators. `__tests__/ui-icon.test.tsx` fails on a retired glyph anywhere
    in `app/`, `components/` or `src/` outside comments; no file is exempt.
 2. An icon-only control carries an `accessibilityLabel` naming the action; the
    `Icon` inside it stays decorative. An icon never carries state alone: the
@@ -626,9 +626,9 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    estimated 1RM; unavailable 1RM values render as `—`. Exercise names receive
    the remaining flexible width and wrap to their full value rather than being
    capped at an assumed line count.
-   A working set is the valid confirmed RIR subset meeting the configured effort threshold (§5.11);
-   warm-up, null, and unknown-quality rows remain in the leading set count but
-   not the parenthesized count. Whole data rows remain the only controls that
+   A working set is every valid confirmed set except warm-ups (§5.11);
+   warm-up rows remain in the leading set count but not the parenthesized
+   count. Whole data rows remain the only controls that
    open exercise history; repeated per-row metric labels are omitted visually
    but all values and their meanings remain in each row's accessibility label.
 4. `Exercise`, `Sets`, and `Vol` are the only exercise-sort controls; `1RM` is
@@ -665,9 +665,9 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
 10. Exercise analytics uses calculated load × reps under the current private policy, with invalid/overflow coverage and no muscle-role weighting. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
-11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<near-failure count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
+11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<working-set count>)` form plus `Volume`. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(nearFailureCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no near-failure sets keep the default surface. The background is decorative and supplements the readable near-failure count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact near-failure count and selected-period threshold.
+13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(workingSetCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no working sets keep the default surface. The background is decorative and supplements the readable working-set count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact working-set count and selected-period threshold.
 14. The `/exercise-history` route (opened from the exercise page's `History`)
     is one `ScreenScroll` on `paper` over the `MainTabs` strip (Progress
     selected), in the design language (DLM-T10): a `Last 7 days` / `Last 30

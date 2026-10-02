@@ -5,7 +5,7 @@ import {
   canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
-} from '../session-recorder/set-semantics.ts';
+} from './set-semantics.ts';
 
 export type CalculationPolicy = 'ordinary' | 'personal' | 'group';
 export type LoadInputMode = 'total_load' | 'per_side_load';

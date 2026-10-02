@@ -12,19 +12,18 @@ appId: com.dinoderek.mobile
 #   4. Finish (one confirmed set, no prompt) opens the completion screen, and
 #      Done replaces it with Stats;
 #   5. Stats' exercise list reads back the session just written: the only
-#      on-device check of the session-write → stats read path
-#      (stats-screen-ux.yaml reads fixture rows inserted straight into SQLite,
-#      which bypass the session screens).
+#      on-device check of the Stats queries (their values over the harness
+#      fixtures are stats-screen-local-data.test.tsx).
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
 #   4. the root-stack replace after Finish.
-# Jest counterpart: app/__tests__/exercise-picker.test.tsx,
-#   app/__tests__/exercise-page-screen.test.tsx (logger),
-#   app/__tests__/set-effort-defaults.test.ts (first-set warm-up),
-#   app/__tests__/session-view-model.test.ts (Finish prompts),
-#   app/__tests__/completed-session-local-data.test.tsx (Done → Stats),
-#   app/__tests__/stats-screen-local-data.test.tsx, app/__tests__/sessions-screen.test.tsx.
+# Jest counterpart: __tests__/exercise-picker.test.tsx,
+#   __tests__/exercise-page-screen.test.tsx (logger),
+#   __tests__/set-effort-defaults.test.ts (first-set warm-up),
+#   __tests__/session-view-model.test.ts (Finish prompts),
+#   __tests__/completed-session-local-data.test.tsx (Done → Stats),
+#   __tests__/stats-screen-local-data.test.tsx, __tests__/sessions-screen.test.tsx.
 #
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
@@ -94,8 +93,9 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "exercise-set-logger-reps"
 - inputText: "8"
-- hideKeyboard:
-    optional: true
+# The logger's commit sits above the keyboard and the page scroll has
+# keyboardShouldPersistTaps="handled", so the tap lands with the keyboard up
+# (a hideKeyboard here cost ~4.3s).
 - tapOn:
     id: "exercise-set-logger-commit"
 - extendedWaitUntil:

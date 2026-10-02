@@ -81,7 +81,7 @@ export type ExerciseListItem = {
   id: string;
   name: string;
   setCount: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   totalVolume: number | null;
   knownVolume?: number | null;
   estimatedOneRepMax: number | null;
@@ -153,20 +153,20 @@ export const formatCountDelta = (current: number, previous: number): DeltaDispla
   };
 };
 
-export const formatSetCountPair = (setCount: number, nearFailureCount: number): string =>
-  `${formatNumber(setCount)} (${formatNumber(nearFailureCount)})`;
+export const formatSetCountPair = (setCount: number, workingSetCount: number): string =>
+  `${formatNumber(setCount)} (${formatNumber(workingSetCount)})`;
 
 export const formatSetCountPairDelta = (
   currentSetCount: number,
-  currentNearFailureCount: number,
+  currentWorkingSetCount: number,
   previousSetCount: number,
-  previousNearFailureCount: number
+  previousWorkingSetCount: number
 ): DeltaDisplay => {
   const setDifference = currentSetCount - previousSetCount;
-  const nearFailureDifference = currentNearFailureCount - previousNearFailureCount;
-  const toneDifference = setDifference === 0 ? nearFailureDifference : setDifference;
+  const workingSetDifference = currentWorkingSetCount - previousWorkingSetCount;
+  const toneDifference = setDifference === 0 ? workingSetDifference : setDifference;
   return {
-    text: `${formatSignedCount(setDifference)} (${formatSignedCount(nearFailureDifference)})`,
+    text: `${formatSignedCount(setDifference)} (${formatSignedCount(workingSetDifference)})`,
     tone:
       toneDifference > 0 ? 'positive' : toneDifference < 0 ? 'negative' : 'neutral',
   };
@@ -196,14 +196,14 @@ export const fullScaleFailureCount = (periodDays: StatsPeriodDays): number =>
   (8 * periodDays) / 7;
 
 export const computeFailureIntensityProgress = (
-  nearFailureCount: number,
+  workingSetCount: number,
   periodDays: StatsPeriodDays
 ): number => {
   const fullScale = fullScaleFailureCount(periodDays);
-  if (!Number.isFinite(nearFailureCount) || nearFailureCount <= 0 || !Number.isFinite(fullScale)) {
+  if (!Number.isFinite(workingSetCount) || workingSetCount <= 0 || !Number.isFinite(fullScale)) {
     return 0;
   }
-  return Math.min(1, nearFailureCount / fullScale);
+  return Math.min(1, workingSetCount / fullScale);
 };
 
 const describeCountDifference = (difference: number, label: string): string => {
@@ -224,33 +224,33 @@ const describeVolumeDifference = (delta: DeltaDisplay): string => {
 const buildMuscleRowAccessibilityLabel = ({
   actionLabel,
   setCount,
-  nearFailureCount,
+  workingSetCount,
   previousSetCount,
-  previousNearFailureCount,
+  previousWorkingSetCount,
   volume,
   volumeDelta,
   periodDays,
 }: {
   actionLabel: string;
   setCount: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   previousSetCount: number;
-  previousNearFailureCount: number;
+  previousWorkingSetCount: number;
   volume: number | null;
   volumeDelta: DeltaDisplay;
   periodDays: StatsPeriodDays;
 }): string =>
   [
     actionLabel,
-    `${formatNumber(setCount)} sets, ${formatNumber(nearFailureCount)} near-failure sets`,
+    `${formatNumber(setCount)} sets, ${formatNumber(workingSetCount)} working sets`,
     `${describeCountDifference(setCount - previousSetCount, 'sets')} and ${describeCountDifference(
-      nearFailureCount - previousNearFailureCount,
-      'near-failure sets'
+      workingSetCount - previousWorkingSetCount,
+      'working sets'
     )}`,
     `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
     `failure background reaches its strongest shade at ${formatNumber(
       fullScaleFailureCount(periodDays)
-    )} near-failure sets for the selected ${periodDays}-day period`,
+    )} working sets for the selected ${periodDays}-day period`,
   ].join('. ');
 
 export const nextExerciseSortMode = (
@@ -334,10 +334,10 @@ export const sortExerciseListItems = (
         comparison = compareNumbers(left.setCount, right.setCount, false);
         break;
       case 'working-sets-desc':
-        comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, true);
+        comparison = compareNumbers(left.workingSetCount, right.workingSetCount, true);
         break;
       case 'working-sets-asc':
-        comparison = compareNumbers(left.nearFailureCount, right.nearFailureCount, false);
+        comparison = compareNumbers(left.workingSetCount, right.workingSetCount, false);
         break;
       case 'volume-desc':
         comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, true);
@@ -851,9 +851,9 @@ function MuscleFamilyCard({
         accessibilityLabel={buildMuscleRowAccessibilityLabel({
           actionLabel: `Open ${family.familyName} history`,
           setCount: family.setCount,
-          nearFailureCount: family.nearFailureCount,
+          workingSetCount: family.workingSetCount,
           previousSetCount: previousFamily?.setCount ?? 0,
-          previousNearFailureCount: previousFamily?.nearFailureCount ?? 0,
+          previousWorkingSetCount: previousFamily?.workingSetCount ?? 0,
           volume: family.totalVolume,
           volumeDelta,
           periodDays,
@@ -867,15 +867,15 @@ function MuscleFamilyCard({
             collapsedMuscle ? toMuscleHistoryTarget(collapsedMuscle) : toFamilyHistoryTarget(family)
           )
         }
-        sets={formatSetCountPair(family.setCount, family.nearFailureCount)}
+        sets={formatSetCountPair(family.setCount, family.workingSetCount)}
         setsDelta={formatSetCountPairDelta(
           family.setCount,
-          family.nearFailureCount,
+          family.workingSetCount,
           previousFamily?.setCount ?? 0,
-          previousFamily?.nearFailureCount ?? 0
+          previousFamily?.workingSetCount ?? 0
         )}
         setsTestID={`stats-family-sets-${testIdSlug}`}
-        shade={selectFailureShade(computeFailureIntensityProgress(family.nearFailureCount, periodDays))}
+        shade={selectFailureShade(computeFailureIntensityProgress(family.workingSetCount, periodDays))}
         testID={
           collapsedMuscle
             ? `stats-family-header-button-${collapsedMuscle.muscleGroupId}`
@@ -900,9 +900,9 @@ function MuscleFamilyCard({
                 accessibilityLabel={buildMuscleRowAccessibilityLabel({
                   actionLabel: `Open ${muscle.displayName} history`,
                   setCount: muscle.setCount,
-                  nearFailureCount: muscle.nearFailureCount,
+                  workingSetCount: muscle.workingSetCount,
                   previousSetCount: previousMuscle?.setCount ?? 0,
-                  previousNearFailureCount: previousMuscle?.nearFailureCount ?? 0,
+                  previousWorkingSetCount: previousMuscle?.workingSetCount ?? 0,
                   volume: muscle.totalVolume,
                   volumeDelta: muscleVolumeDelta,
                   periodDays,
@@ -912,16 +912,16 @@ function MuscleFamilyCard({
                 level="muscle"
                 name={muscle.displayName}
                 onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
-                sets={formatSetCountPair(muscle.setCount, muscle.nearFailureCount)}
+                sets={formatSetCountPair(muscle.setCount, muscle.workingSetCount)}
                 setsDelta={formatSetCountPairDelta(
                   muscle.setCount,
-                  muscle.nearFailureCount,
+                  muscle.workingSetCount,
                   previousMuscle?.setCount ?? 0,
-                  previousMuscle?.nearFailureCount ?? 0
+                  previousMuscle?.workingSetCount ?? 0
                 )}
                 setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
                 shade={selectFailureShade(
-                  computeFailureIntensityProgress(muscle.nearFailureCount, periodDays)
+                  computeFailureIntensityProgress(muscle.workingSetCount, periodDays)
                 )}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}
                 untrained={muscle.setCount === 0 && muscle.totalVolume === 0}
@@ -1015,7 +1015,7 @@ function ExerciseListView({
           key={item.id}
           accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
             item.setCount
-          )} sets, ${formatNumber(item.nearFailureCount)} working sets. Volume ${formatVolumeWithCoverage(
+          )} sets, ${formatNumber(item.workingSetCount)} working sets. Volume ${formatVolumeWithCoverage(
             item.totalVolume, item.knownVolume
           )}${
             item.estimatedOneRepMax === null
@@ -1029,7 +1029,7 @@ function ExerciseListView({
                 allowFontScaling={false}
                 style={[styles.tableFigure, styles.setsColumn]}
                 testID={`stats-exercise-sets-${item.id}`}>
-                {formatSetCountPair(item.setCount, item.nearFailureCount)}
+                {formatSetCountPair(item.setCount, item.workingSetCount)}
               </Text>
               <Text
                 allowFontScaling={false}
@@ -1355,7 +1355,7 @@ export default function StatsRoute() {
           id: ex.id,
           name: ex.name,
           setCount: agg?.setCount ?? 0,
-          nearFailureCount: agg?.nearFailureCount ?? 0,
+          workingSetCount: agg?.workingSetCount ?? 0,
           totalVolume: agg ? agg.totalVolume : 0,
           knownVolume: agg ? agg.knownVolume : 0,
           estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,

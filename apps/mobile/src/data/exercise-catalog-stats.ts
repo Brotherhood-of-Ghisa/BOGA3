@@ -9,7 +9,7 @@ import {
   isConfirmedPerformedSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
-} from '@/src/session-recorder/set-semantics';
+} from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
@@ -22,7 +22,7 @@ export type ExerciseAggregate = {
   exerciseDefinitionId: string;
   sessionCount: number;
   setCount: number;
-  nearFailureCount: number;
+  workingSetCount: number;
   totalVolume: number | null;
   knownVolume?: number | null;
   estimatedOneRepMax: number | null;
@@ -266,7 +266,7 @@ export const aggregateExerciseCatalogStats = (
         exerciseDefinitionId: defId,
         sessionCount: 0,
         setCount: 0,
-        nearFailureCount: 0,
+        workingSetCount: 0,
         totalVolume: 0,
         knownVolume: 0,
         estimatedOneRepMax: null,
@@ -286,7 +286,7 @@ export const aggregateExerciseCatalogStats = (
 
     aggregate.setCount += 1;
     if (isWorkingSessionSetType(set.setType)) {
-      aggregate.nearFailureCount += 1;
+      aggregate.workingSetCount += 1;
     }
 
     aggregate.knownVolume = addFiniteVolume(aggregate.knownVolume, metric.volumeKgReps ?? 0);

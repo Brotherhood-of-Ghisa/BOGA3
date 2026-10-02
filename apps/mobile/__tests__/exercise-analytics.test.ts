@@ -1,0 +1,264 @@
+import {
+  aggregateExerciseDailyEffort,
+  aggregateExerciseWeeklyEffort,
+  type ExerciseRawSession,
+} from '@/src/data/exercise-analytics';
+
+const makeSession = (
+  isoDate: string,
+  sets: {
+    setType: string | null;
+    weight: number;
+    reps: number;
+    performanceStatus?: 'planned' | 'skipped' | 'unperformed' | null;
+  }[]
+): ExerciseRawSession => ({
+  completedAt: new Date(isoDate),
+  sets: sets.map((s) => ({
+    setType: s.setType,
+    weightValue: String(s.weight),
+    repsValue: String(s.reps),
+    performanceStatus: s.performanceStatus,
+  })),
+});
+
+const TZ = 'UTC';
+
+describe('aggregateExerciseWeeklyEffort', () => {
+  it('returns empty array for empty input', () => {
+    expect(aggregateExerciseWeeklyEffort([], TZ)).toEqual([]);
+  });
+
+  it('aggregates a single working set correctly', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: 'rir_1', weight: 100, reps: 5 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result).toHaveLength(1);
+    const week = result[0];
+    expect(week.totalVolume).toBe(500);
+    expect(week.workingSetCount).toBe(1);
+    expect(week.highestWeight).toBe(100);
+    expect(week.estimatedRM1).not.toBeNull();
+  });
+
+  it('includes warm-up sets in all metrics except working sets', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: 'warm_up', weight: 60, reps: 10 },
+        { setType: 'rir_2', weight: 100, reps: 5 },
+      ]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result).toHaveLength(1);
+    expect(result[0].totalVolume).toBe(60 * 10 + 500);
+    expect(result[0].workingSetCount).toBe(1);
+    expect(result[0].highestWeight).toBe(100);
+  });
+
+  it('counts null setType sets as working sets and in volume', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: null, weight: 80, reps: 8 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result[0].totalVolume).toBe(640);
+    expect(result[0].workingSetCount).toBe(1);
+  });
+
+  it('merges two sessions in the same week', () => {
+    // 2026-05-18 (Mon) and 2026-05-20 (Wed) → same Mon-start week
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: 'rir_0', weight: 100, reps: 5 }]),
+      makeSession('2026-05-20T10:00:00Z', [{ setType: 'rir_1', weight: 110, reps: 3 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result).toHaveLength(1);
+    expect(result[0].totalVolume).toBe(500 + 330);
+    expect(result[0].workingSetCount).toBe(2);
+    expect(result[0].highestWeight).toBe(110);
+    expect(result[0].weekStartDateKey).toBe('2026-05-18');
+  });
+
+  it('produces two entries for sessions in different weeks', () => {
+    // 2026-05-18 (Mon, week 3 of May) and 2026-05-25 (Mon, week 4 of May)
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-05-25T10:00:00Z', [{ setType: null, weight: 120, reps: 4 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result).toHaveLength(2);
+    expect(result[0].weekStartDateKey).toBe('2026-05-18');
+    expect(result[1].weekStartDateKey).toBe('2026-05-25');
+  });
+
+  it('assigns correct weekOfMonth (1-based)', () => {
+    // May 2026: Mon-start weeks → 2026-05-04 (w1), 2026-05-11 (w2), 2026-05-18 (w3), 2026-05-25 (w4)
+    const sessions = [
+      makeSession('2026-05-04T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-05-11T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-05-18T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-05-25T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result.map((w) => w.weekOfMonth)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('keeps the 5th week of a month (no layout clipping)', () => {
+    // June 2026: weeks start 2026-06-01, 2026-06-08, 2026-06-15, 2026-06-22, 2026-06-29 → 5 Mon-start weeks.
+    // 2026-06-29's monthKey = '2026-06' → weekOfMonth = 5. It must still be returned so the
+    // weekly bar and the WeekSelectionBanner agree on that week.
+    const sessions = [
+      makeSession('2026-06-01T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-06-08T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-06-15T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-06-22T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-06-29T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    const juneWeeks = result.filter((w) => w.monthKey === '2026-06');
+    expect(juneWeeks).toHaveLength(5);
+    expect(juneWeeks.map((w) => w.weekOfMonth)).toEqual([1, 2, 3, 4, 5]);
+    expect(juneWeeks.map((w) => w.weekStartDateKey)).toContain('2026-06-29');
+  });
+
+  it('resets weekOfMonth counter across months', () => {
+    // weekOfMonth is a sequential counter per monthKey within the result set.
+    // A single session in May and a single session in June → each gets weekOfMonth = 1.
+    const sessions = [
+      makeSession('2026-05-25T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-06-01T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result[0].monthKey).toBe('2026-05');
+    expect(result[0].weekOfMonth).toBe(1);
+    expect(result[1].monthKey).toBe('2026-06');
+    expect(result[1].weekOfMonth).toBe(1);
+  });
+
+  it('handles Monday/Sunday boundary: Sunday is in the previous Mon-start week', () => {
+    // 2026-05-24 (Sunday) → Mon week starts 2026-05-18
+    // 2026-05-25 (Monday) → Mon week starts 2026-05-25
+    const sessions = [
+      makeSession('2026-05-24T23:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+      makeSession('2026-05-25T01:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result).toHaveLength(2);
+    expect(result[0].weekStartDateKey).toBe('2026-05-18');
+    expect(result[1].weekStartDateKey).toBe('2026-05-25');
+  });
+
+  it('tracks highestWeight as max across sets and sessions in the week', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: null, weight: 100, reps: 5 },
+        { setType: null, weight: 120, reps: 3 },
+      ]),
+      makeSession('2026-05-20T10:00:00Z', [
+        { setType: null, weight: 90, reps: 8 },
+      ]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result[0].highestWeight).toBe(120);
+  });
+
+  it('tracks estimatedRM1 as max across sets in the week', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: null, weight: 100, reps: 1 },
+        { setType: null, weight: 80, reps: 10 },
+      ]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    // estimatedRM1 should be the max of the two estimates
+    expect(result[0].estimatedRM1).toBeGreaterThan(0);
+  });
+
+  it('skips sets with invalid weight (zero/non-numeric)', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: null, weight: 0, reps: 5 },
+      ]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    // parseSetWeight('0') returns null (zero weight is invalid)
+    // If the only set is invalid, we might get an empty result or a result with zero volume
+    // The implementation skips sets where weight === null
+    if (result.length > 0) {
+      expect(result[0].totalVolume).toBe(0);
+    }
+  });
+
+  it('counts every non-warm-up set as a working set', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: 'rir_0', weight: 100, reps: 5 },
+        { setType: 'rir_1', weight: 100, reps: 5 },
+        { setType: 'rir_2', weight: 100, reps: 5 },
+        { setType: 'rir_3', weight: 100, reps: 5 },
+        { setType: 'rir_5', weight: 100, reps: 5 },
+        { setType: null, weight: 100, reps: 5 },
+        { setType: 'warm_up', weight: 60, reps: 10 },
+      ]),
+    ];
+    const result = aggregateExerciseWeeklyEffort(sessions, TZ);
+    expect(result[0].workingSetCount).toBe(6);
+  });
+
+  it('excludes unconfirmed sets from weekly and daily effort', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: 'rir_1', weight: 100, reps: 5, performanceStatus: null },
+        { setType: 'rir_0', weight: 500, reps: 10, performanceStatus: 'unperformed' },
+      ]),
+    ];
+
+    expect(aggregateExerciseWeeklyEffort(sessions, TZ)[0]).toEqual(
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100, workingSetCount: 1 })
+    );
+    expect(aggregateExerciseDailyEffort(sessions, TZ)[0]).toEqual(
+      expect.objectContaining({ totalVolume: 500, highestWeight: 100, workingSetCount: 1 })
+    );
+  });
+});
+
+describe('aggregateExerciseDailyEffort', () => {
+  it('returns one entry per training day, sorted by date', () => {
+    const sessions = [
+      makeSession('2026-05-20T10:00:00Z', [{ setType: 'rir_1', weight: 80, reps: 5 }]),
+      makeSession('2026-05-18T10:00:00Z', [{ setType: 'rir_1', weight: 100, reps: 5 }]),
+    ];
+    const result = aggregateExerciseDailyEffort(sessions, TZ);
+    expect(result.map((d) => d.dateKey)).toEqual(['2026-05-18', '2026-05-20']);
+  });
+
+  it('rolls the four metrics per day and includes warm-ups outside working sets', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [
+        { setType: 'warm_up', weight: 60, reps: 10 },
+        { setType: 'rir_1', weight: 100, reps: 5 },
+        { setType: null, weight: 120, reps: 3 },
+      ]),
+    ];
+    const [day] = aggregateExerciseDailyEffort(sessions, TZ);
+    expect(day.totalVolume).toBe(60 * 10 + 100 * 5 + 120 * 3);
+    expect(day.workingSetCount).toBe(2);
+    expect(day.highestWeight).toBe(120);
+    expect(day.estimatedRM1).not.toBeNull();
+  });
+
+  it('feeds the weekly aggregator (weekly volume = sum of daily volume)', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: 'rir_1', weight: 100, reps: 5 }]),
+      makeSession('2026-05-20T10:00:00Z', [{ setType: 'rir_1', weight: 80, reps: 5 }]),
+    ];
+    const daily = aggregateExerciseDailyEffort(sessions, TZ);
+    const weekly = aggregateExerciseWeeklyEffort(sessions, TZ);
+    const dailySum = daily.reduce((sum, d) => {
+      if (d.totalVolume === null) throw new Error('Expected complete conventional volume');
+      return sum + d.totalVolume;
+    }, 0);
+    expect(weekly).toHaveLength(1);
+    expect(weekly[0].totalVolume).toBe(dailySum);
+  });
+});

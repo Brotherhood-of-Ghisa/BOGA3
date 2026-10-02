@@ -20,8 +20,8 @@ Define the canonical repository structure, path ownership, and placement convent
   apps/
     agent-auth-web/              # Static Supabase OAuth consent application
     mobile/                      # Expo React Native app (current primary codebase)
-      app/                       # Expo Router routes/screens
-      app/__tests__/             # Current app-side test location (legacy/needs rationalization)
+      app/                       # Expo Router routes/screens only (no tests: every file is a route)
+      __tests__/                 # Jest suites (+ sync/, helpers/, colocated READMEs)
       components/                # UI components
         ui/                      # Canonical UI tokens + primitives foundation (M8+)
       src/                       # Non-route app code (domain/data/helpers)
@@ -80,6 +80,9 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
   - its editor fields (`ExerciseCoreFields`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form (M25-T08).
+- `apps/mobile/src/exercise-calculations/`
+  - owns the load calculation kernel (`load-metrics.ts`, `analytics.ts`) and the set rules every reader shares (`set-semantics.ts`: which sets count as performed, the canonical weight for the reps). Persistence (`src/data`), the session recorder, session insights and groups import them; this directory never imports `src/data`, hooks or UI.
+  - the `agent-api` and `group-eval` Edge Functions load it by relative path, so its whole import graph uses relative `.ts` specifiers (never `@/`).
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-insights/`
@@ -88,6 +91,13 @@ Define the canonical repository structure, path ownership, and placement convent
     share payload/action used by the completion presentation.
   - remains derived-only: it owns no schema, durable achievement/share state,
     backend API, or sync envelope.
+- `apps/mobile/src/progress-summary/`
+  - owns Today's progress read (`loadTodayProgress`): this and last calendar
+    week, this month against the previous month by day, and the latest
+    completed session. Sessions and working sets come from the stats
+    aggregation (`src/data/stats.ts`), 1RM PRs from the exercise session facts;
+    every figure places a session by its `completed_at`.
+  - derived-only, like `session-insights`: no schema, no sync, no history replay.
 - `apps/mobile/.maestro/`
   - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.
@@ -157,6 +167,9 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/utils/local-time.ts`
   - canonical wall-clock labels (`HH:MM`, `M/D HH:MM`, `YYYY-MM-DD HH:MM`) read in the device's time zone from a stored instant.
   - stored timestamps (ISO strings, epoch ms) are UTC; never slice the clock out of an ISO string for display. Tests that assert a label build the instant from local fields (`new Date(y, m, d, h, min)`) so they hold in every `TZ`.
+- `apps/mobile/src/utils/local-calendar.ts`
+  - canonical local calendar windows: Monday-start weeks and calendar months in the device's time zone, half-open `[start, end)` with both edges on local midnight, so a DST change resizes a window instead of shifting it.
+  - Jest runs in `Europe/London` (pinned in `apps/mobile/jest.config.js`, locally and in CI), so calendar tests cover both DST changes.
 - `e2e/` (reserved)
   - reserved for cross-stack orchestration/tests that span mobile + backend.
   - strategy may be documented before implementation exists.
@@ -170,8 +183,10 @@ Define the canonical repository structure, path ownership, and placement convent
   - must not be committed.
 - `apps/mobile/scripts/`
   - keep Maestro runtime/toolkit wrappers here (`maestro-env.sh`, `maestro-ios-*.sh`) rather than introducing a separate top-level test-runtime folder.
-- Mobile test-directory refactor
-  - moving tests out of `apps/mobile/app/__tests__/` is a valid follow-up improvement, but it must be done in a dedicated task (not mixed into unrelated backend work).
+- `apps/mobile/__tests__/`
+  - canonical location for mobile Jest suites, shared test helpers (`helpers/`), and per-area coverage policies (`README.md`, `sync/README.md`).
+  - never put a test file under `apps/mobile/app/`: Expo Router's typed-routes generator (`expo start` and `scripts/generate-router-types.js`) declares every `.ts`/`.tsx` file there as a route, and enough extra routes make `tsc` fail with TS2590. `__tests__/router-types-generator.test.ts` fails on any test file under `app/`.
+  - a small colocated `__tests__/` under `src/**` (e.g. `src/navigation/__tests__/`) is allowed; tests import routes as `@/app/...` or by relative path.
 
 ## Placement guidance
 
@@ -182,7 +197,30 @@ Define the canonical repository structure, path ownership, and placement convent
 - Prefer one canonical location per test/tool type and document exceptions in `docs/specs/06-testing-strategy.md`.
 - If a new folder becomes canonical for a subsystem or test type, update this doc and any impacted templates/playbook references in the same task.
 
+## Import direction (mobile)
+
+Enforced over `apps/mobile/{app,components,src}/**` (tests excluded, type-only
+imports included) by `apps/mobile/dependency-cruiser.config.cjs`, lane
+`dependencies` (spec 02, "Quality targets"):
+
+- No import cycles. Move the part both modules need into a module both import.
+- `src/**` is the non-UI layer: it never imports `app/**` or `components/**`.
+- `src/data` is persistence. Besides itself it imports only:
+  - import-free rules: `src/exercise-calculations`, `src/exercise-core`, and
+    `src/bodyweight/as-of.ts` and `weight-entry.ts`;
+  - the write and invalidation signals: `src/sync/write-nudge.ts`,
+    `src/exercise-catalog/invalidation.ts`, `src/bodyweight/invalidation.ts`;
+  - its startup dependencies: `src/auth/supabase.ts`, `src/logging`,
+    `src/utils`, `src/config`.
+
+  Feature logic, hooks and view models import `src/data`, never the reverse.
+  Read models in `src/data` may call the calculation kernel on what they read.
+- `src/exercise-calculations` imports only itself and
+  `src/bodyweight/as-of.ts` (see its ownership entry above).
+
+Imports that broke a rule when it landed are grandfathered in
+`apps/mobile/dependency-cruiser-known-violations.json`; that list only shrinks.
+
 ## Known cleanup opportunities (tracked)
 
-- Rationalize mobile test placement currently under `apps/mobile/app/__tests__/` into a dedicated mobile test directory (deferred to a dedicated follow-up task).
 - Optional follow-up: add a repo-root command alias surface (for example root `package.json` script aliases) if ergonomics justify it; current canonical wrappers are `./scripts/quality-fast.sh` and `./scripts/quality-slow.sh`.

@@ -22,10 +22,11 @@ module.exports = [
     files: ['app/**/*.{ts,tsx}', 'components/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
     plugins: { sonarjs },
     rules: {
-      // Cyclomatic complexity: independent paths through a function.
-      complexity: ['error', { max: 20 }],
       // Cognitive complexity: how hard the control flow is to read (nesting
-      // costs more than a flat sequence of branches).
+      // costs more than a flat sequence of branches). The only complexity
+      // score: ESLint's cyclomatic `complexity` counts every `?.`, `??` and
+      // `&&` as a path, so it pushed splits of readable guards and props, and
+      // branch coverage (lane `jest-coverage`) measures testability directly.
       'sonarjs/cognitive-complexity': ['error', 25],
       'max-lines-per-function': ['error', { max: 200, skipBlankLines: true, skipComments: true }],
       'max-depth': ['error', 4],

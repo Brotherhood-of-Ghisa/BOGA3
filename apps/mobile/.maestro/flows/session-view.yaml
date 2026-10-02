@@ -23,12 +23,12 @@ appId: com.dinoderek.mobile
 #   4. a real sheet and the keyboard;
 #   5. the stack replace after Finish, a native alert, and the tab's re-read
 #      of the device's SQLite on focus.
-# Jest counterpart: app/__tests__/session-view-screen.test.tsx (summary and
+# Jest counterpart: __tests__/session-view-screen.test.tsx (summary and
 #   cards, record band, live comparison, ⋮ sheet, gym picking and
 #   suggestions, the Gyms round trip, the picker add, cleanup prompts, abandon
-#   confirmation), app/__tests__/session-view-model.test.ts,
-#   app/__tests__/exercise-picker.test.tsx, app/__tests__/gyms-screen.test.tsx,
-#   app/__tests__/train-screen.test.tsx, app/__tests__/today-screen.test.tsx.
+#   confirmation), __tests__/session-view-model.test.ts,
+#   __tests__/exercise-picker.test.tsx, __tests__/gyms-screen.test.tsx,
+#   __tests__/train-screen.test.tsx, __tests__/today-screen.test.tsx.
 #
 # Hermetic: starts from `reset=data` and ends with a data reset. Infra-free
 # (no sign-in).
@@ -105,6 +105,7 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "gym-editor-name"
 - inputText: "Canal Street Gym"
+# The keyboard covers `Add gym` (gym-editor-save); hide it before the tap.
 - hideKeyboard:
     optional: true
 - tapOn:

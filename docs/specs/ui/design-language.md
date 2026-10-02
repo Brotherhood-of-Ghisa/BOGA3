@@ -60,7 +60,7 @@ is built from. It clears WCAG AA as text on both grounds it lands on —
 just a band. `record-wash` / `record-rule` moved with it, keeping the same hue
 relationship to `record` that the orange pair had to `accent`.
 
-The floor is a gate, not a note: `apps/mobile/app/__tests__/ui-design-tokens.test.ts`
+The floor is a gate, not a note: `apps/mobile/__tests__/ui-design-tokens.test.ts`
 fails if `record` ever equals `accent` again or drops below 4.5:1.
 
 **Rationalised 2026-09-27.** The roles were picked by eye and had drifted into
@@ -120,7 +120,7 @@ picked grounds sat at hue 90–94 against the ground seed's 81. `record-wash` an
 `record-rule` moved most, by ≤ 3: they were picked at hue 90 against `record`'s
 81.
 
-Gated by `apps/mobile/app/__tests__/ui-theme.test.ts`: `uiRoles` equals the
+Gated by `apps/mobile/__tests__/ui-theme.test.ts`: `uiRoles` equals the
 shipped seeds generated, every role stays within ΔE*ab 3 of the picked palette,
 and for every shipped preset ("Presets" below) and three seed sets no preset
 ships (a teal, an indigo, a rose) the rules above still hold — distinct values,
@@ -320,6 +320,6 @@ additionally render faded (§6).
   the faintest ink for the values themselves read too faint to use).
 - **Warm-ups are presented exactly like working sets**, including a real 1RM.
   They count toward 1RM and records, but not toward working sets (kept as
-  shipped, decided 2026-09-23): `isWorkingSetType`
-  (`src/session-insights/calculations.ts`) feeds only the working-set count.
+  shipped, decided 2026-09-23): `isWorkingSessionSetType`
+  (`src/data/set-types.ts`) feeds only the working-set count.
   The full rule is `ux-rules.md` §5.11.

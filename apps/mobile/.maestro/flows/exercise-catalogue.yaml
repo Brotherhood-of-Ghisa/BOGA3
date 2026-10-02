@@ -1,27 +1,22 @@
 appId: com.dinoderek.mobile
 ---
-# Exercise catalogue: create, and keyboard-safe selection (ios-ui-regression
-# lane, infra-free).
+# Exercise catalogue: create an exercise (ios-data-smoke lane, infra-free).
 #
 # Proves:
 #   1. `+` opens the exercise editor sheet; a name typed on the keyboard and a
 #      primary muscle picked in the sheet's muscle list save to the device's
-#      SQLite, and the catalogue shows `Exercise created.` and lists the new
-#      exercise;
-#   2. in the exercise page's swap sheet, a search result tapped while the
-#      keyboard is still up swaps the exercise (the tap reaches the row instead
-#      of only dismissing the keyboard).
+#      SQLite, and the catalogue shows `Exercise created.`.
 # Why device:
 #   1. a real sheet whose body swaps panels, the keyboard, and the on-device
-#      expo-sqlite write and read;
-#   2. the keyboard and a real sheet; Jest cannot tell whether a tap with the
-#      keyboard up reaches the row.
-# Jest counterpart: app/__tests__/exercise-catalog-screen.test.tsx (the
-#   catalogue over the browser fixture: grouping, sort and never-done controls,
-#   Manage and row sheets, editor validation and muscle selection, search, no
-#   matches, history failure and Retry), app/__tests__/exercise-list-controls.test.tsx,
-#   app/__tests__/exercise-picker.test.tsx (shared preferences, preselection,
-#   plan suggestions, swap), app/__tests__/exercise-page-screen.test.tsx (swap).
+#      expo-sqlite write.
+# Jest counterpart: __tests__/exercise-catalog-screen.test.tsx (the
+#   catalogue over the browser fixture: the create read back from the database
+#   and listed, grouping, sort and never-done controls, Manage and row sheets,
+#   editor validation and muscle selection, search, no matches, history failure
+#   and Retry), __tests__/exercise-list-controls.test.tsx,
+#   __tests__/exercise-picker.test.tsx (shared preferences, preselection,
+#   plan suggestions, swap, results tappable with the keyboard up),
+#   __tests__/exercise-page-screen.test.tsx (swap).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-browser&teleport=exercise-catalog"
 # Wait for the fixture's catalogue, not the previous screen (spec 06 rule 4).
@@ -31,7 +26,6 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 
-# --- 1. Create an exercise ---------------------------------------------------
 - tapOn:
     id: "create-new-exercise-button"
 - extendedWaitUntil:
@@ -62,41 +56,4 @@ appId: com.dinoderek.mobile
     visible:
       text: "Exercise created."
     timeout: 10000
-- tapOn: "Exercise filter input"
-- inputText: "Maestro Catalogue"
-- pressKey: Enter
-- extendedWaitUntil:
-    visible:
-      text: "Exercise actions Maestro Catalogue Press"
-    timeout: 10000
 - takeScreenshot: "catalogue-created-notice"
-
-# --- 2. Swap: select with the keyboard up ------------------------------------
-# The browser fixture's active session; its bench is swapped for an exercise
-# found by search. The target must be the FIRST result: a row the keyboard
-# covers still counts as visible to Maestro, and the tap lands on a key.
-- openLink: "boga3://maestro-harness?teleport=exercise-page&sessionId=maestro_session_view_active&sessionExerciseId=maestro_session_view_bench"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-page-options"
-    timeout: 15000
-- tapOn:
-    id: "exercise-page-options"
-- tapOn:
-    id: "exercise-options-swap"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-swap-list"
-    timeout: 10000
-- tapOn: "Search exercises"
-- inputText: "Close-Grip Incline"
-- extendedWaitUntil:
-    visible: "Select exercise Close-Grip Incline Dumbbell Bench Press"
-    timeout: 10000
-- takeScreenshot: "browser-swap-search-keyboard"
-- tapOn: "Select exercise Close-Grip Incline Dumbbell Bench Press"
-- extendedWaitUntil:
-    visible:
-      id: "exercise-page-title"
-      text: "Close-Grip Incline Dumbbell Bench Press"
-    timeout: 10000

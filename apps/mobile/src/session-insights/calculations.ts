@@ -5,7 +5,6 @@ import {
   collectMuscleSetContributions,
   countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
-  isMuscleAnalyticsWorkingSet,
   type MuscleAnalyticsInput,
   type MuscleContributionRole,
 } from "@/src/data/muscle-analytics";
@@ -16,7 +15,7 @@ import {
 import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
-} from "@/src/session-recorder/set-semantics";
+} from "@/src/exercise-calculations/set-semantics";
 
 export type SessionInsightSetInput = {
   id: string;
@@ -198,8 +197,6 @@ const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
   parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)) !== null &&
   parseSetReps(set.repsValue) !== null;
 
-const isWorkingSetType = isWorkingSessionSetType;
-
 export const calculateLinearPercentile = (
   sortedValues: number[],
   percentile: number,
@@ -287,7 +284,7 @@ export const summarizeCurrentSessionMuscleLoad = (
       addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
     );
 
-    if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+    if (isWorkingSessionSetType(contribution.setType)) {
       const workingSetIdentities =
         workingSetIdentitiesByMuscle.get(contribution.muscleGroupId) ??
         new Set<string>();
@@ -404,11 +401,10 @@ const findBestPersonalRecordCandidate = (
   const candidates = orderedExercises
     .flatMap((exercise) => exercise.sets.map((set) => ({ exercise, set })))
     .filter(({ set }) => isEligiblePerformedSet(set))
-    .sort((left, right) => {
-      const setDifference = compareSetOrder(left.set, right.set);
-      if (setDifference !== 0) return setDifference;
-      return compareExerciseOrder(left.exercise, right.exercise);
-    });
+    // Session order (block, then set): the first tied set keeps the record.
+    .sort((left, right) =>
+      compareExerciseOrder(left.exercise, right.exercise) ||
+      compareSetOrder(left.set, right.set));
 
   let best: PersonalRecordCandidate | null = null;
   for (const { exercise, set } of candidates) {
@@ -596,7 +592,7 @@ const collectExerciseVolumeObservations = (
     current.sessionExerciseIds.push(exercise.id);
     current.setCount += eligibleSets.length;
     current.workingSetCount += eligibleSets.filter((set) =>
-      isWorkingSetType(set.setType),
+      isWorkingSessionSetType(set.setType),
     ).length;
     const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
     current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
@@ -765,7 +761,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
       observation.setIds.add(contribution.setIdentity);
-      if (isMuscleAnalyticsWorkingSet(contribution.setType)) {
+      if (isWorkingSessionSetType(contribution.setType)) {
         observation.workingSetIds.add(contribution.setIdentity);
       }
       byMuscle.set(contribution.muscleGroupId, observation);

@@ -7,7 +7,7 @@ import type { VolumeCoverage } from '../../../apps/mobile/src/exercise-calculati
 import { parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import {
   canonicalizeWeightForReps, type SessionSetPerformanceStatus,
-} from '../../../apps/mobile/src/session-recorder/set-semantics.ts';
+} from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import {
   isValidSessionWeight, type ResolvedSessionWeight,
 } from '../../../apps/mobile/src/bodyweight/as-of.ts';

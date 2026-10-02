@@ -1,6 +1,6 @@
 import { sessionBodyWeightForCalculation, type SessionWeightContext } from '../bodyweight/as-of.ts';
 import { parseSetWeight } from './index.ts';
-import { canonicalizeWeightForReps } from '../session-recorder/set-semantics.ts';
+import { canonicalizeWeightForReps } from './set-semantics.ts';
 import {
   calculateSetMetrics, summarizeVolume,
   type LoadContext, type LoadInputMode, type SetMetricInput, type VolumeCoverage,

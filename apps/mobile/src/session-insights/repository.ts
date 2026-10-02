@@ -14,7 +14,7 @@ import {
   muscleGroups,
   userSettings,
 } from "@/src/data/schema";
-import { normalizeSessionSetPerformanceStatus } from "@/src/session-recorder/set-semantics";
+import { normalizeSessionSetPerformanceStatus } from "@/src/exercise-calculations/set-semantics";
 
 import {
   deriveCompletedSessionInsights,
