@@ -70,6 +70,11 @@ jest.mock('expo-sharing', () => ({
 }));
 
 import CompletedSessionDetailRoute from '../completed-session/[sessionId]';
+import {
+  __resetBodyweightCalculationPreferenceForTests,
+  setBodyweightCalculationsEnabled,
+} from '@/src/bodyweight/calculation-preference';
+import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { exerciseDefinitions, exerciseSets, sessions } from '@/src/data/schema';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -247,6 +252,7 @@ const label = (testID: string) => screen.getByTestId(testID).props.accessibility
 
 beforeEach(() => {
   resetLocalData();
+  __resetBodyweightCalculationPreferenceForTests();
   mockParams = {};
   mockCanGoBack = true;
   mockStackScreen.mockReset();
@@ -497,6 +503,29 @@ describe('a session written through the app', () => {
     expect(screen.queryByText('Append')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
   });
+
+  // A session restored from the server has no stored weight; the private
+  // reading that applies to it stays off the screen in either preference.
+  it.each([false, true])(
+    'shows no body-weight UI when a reading applies (calculations %s)',
+    async (calculations) => {
+      await seedDesignSession();
+      await act(async () => {
+        await setBodyweightCalculationsEnabled(calculations);
+        await saveBodyWeightReading({ weightValue: '82', measuredAt: new Date(Date.now() - 3 * 60 * 60 * 1000) });
+      });
+      await bootLocalApp();
+      mockParams = { sessionId: DESIGN.sessionId };
+      render(<CompletedSessionDetailRoute />);
+      await screen.findByTestId('completed-session-detail-summary');
+      await settle();
+      expect(screen.queryByText(/Body weight|BW \+|82(\.0)? ?kg/i)).toBeNull();
+
+      fireEvent.press(screen.getByTestId('view-session-section-sets'));
+      await screen.findByTestId(`completed-session-detail-exercise-${DESIGN.bench}`);
+      expect(screen.queryByText(/Body weight|BW \+|82(\.0)? ?kg/i)).toBeNull();
+    }
+  );
 
   it('shows confirmed sets, blank weight as zero, and leaves out exercises with none', async () => {
     await openDesignSession(
