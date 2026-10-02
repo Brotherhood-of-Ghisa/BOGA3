@@ -215,7 +215,7 @@ Responsibility split:
 - `maestro-ios-teardown.sh`
   - performs cleanup using the emitted runtime state, including Expo process shutdown, app termination, simulator shutdown by default, and restoring the developer's `.env.local`.
 - `maestro-run-lane.sh`
-  - the high-level per-lane entrypoint (`smoke` / `data-smoke` / `ui-regression` /
+  - the high-level per-lane entrypoint (`smoke` / `data-smoke` /
     `exercise-page` / `session-view` / `auth-profile` / `sync-e2e` / `groups-e2e`); holds each lane's data (flows,
     reset strategy, Supabase config, fixture users, pre-run fixture reset) and
     calls the shared toolkit via `maestro-ios-run-flow.sh` (one flow per
@@ -359,7 +359,7 @@ Every lane runs the same dev-client build; whether it behaves as a local-only
 from `apps/mobile/.env.local` at bundle time. Concretely: the `auth-profile`,
 `sync-e2e`, and `groups-e2e` lanes (`test:e2e:ios:auth-profile`,
 `test:e2e:ios:sync`, `test:e2e:ios:groups`) are the Supabase-backed iOS lanes — they provision a local Supabase baseline and export
-those vars; `smoke`, `data-runtime-smoke`, `ui-regression`, and the combined
+those vars; `smoke`, `data-smoke`, `exercise-page`, `session-view`, and the combined
 `gates` lane are deliberately **infra-free** (they export none, so the inlined
 values are empty).
 (Which lanes take which shape, and why, is testing policy — see

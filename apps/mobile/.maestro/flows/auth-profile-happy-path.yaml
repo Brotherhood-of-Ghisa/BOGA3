@@ -94,8 +94,8 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 60000
-# Now signed in: open Settings by deep link (More -> Settings is
-# settings-dev-wipe-local's claim, and its last-row scroll costs ~9s) and
+# Now signed in: open Settings by deep link (More -> Settings is Jest's
+# more-settings-route.test.tsx, and More's last-row scroll costs seconds) and
 # exercise the account affordances. Use extendedWaitUntil (poll) rather than a
 # bare assertVisible after each navigation: the screen transition can lag a beat
 # on the cold-JIT first render (an immediate assert raced it and flaked once).

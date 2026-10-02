@@ -3,8 +3,9 @@
 /**
  * The Stats screen over real data: the production route, repositories and
  * catalog caches over the migrated in-memory SQLite database, seeded through
- * the Maestro harness with the same fixture the `ios-ui-regression` stats flow
- * loads (`exercise-block-history`). Only the native database open and the
+ * the Maestro harness with the `exercise-block-history` fixture. No Maestro
+ * flow covers Stats beyond `ios-data-smoke`'s exercise-list read-back: this
+ * suite owns the rest. Only the native database open and the
  * router are replaced (helpers/local-data.ts); the two overlay read failures
  * are forced with `jest.spyOn` on the real module, the only states real data
  * cannot produce.

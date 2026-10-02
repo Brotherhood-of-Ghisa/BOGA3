@@ -14,8 +14,8 @@ don't restate it here.
 ```bash
 ./boga test fast       # mobile quality + docs/meta + consent/MCP unit + backend fast smoke
 ./boga test backend    # local Supabase auth/agent/sync contracts + real MCP smoke
-./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + UI regression + exercise page + session view + auth-profile + sync e2e + two-user groups e2e
-./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, UI regression, exercise page, session view)
+./boga test frontend   # boots the iOS simulator, runs Maestro smoke + data-smoke + exercise page + session view + auth-profile + sync e2e + two-user groups e2e
+./boga test frontend-ui  # the frontend lanes that need no backend (smoke, data-smoke, exercise page, session view)
 ./boga sweep [--ref <ref>]  # every gate lane on origin/main (or <ref>) in a dedicated worktree — required before a release build
 ./boga test --list     # every lane: name, gate, infra, CI?, command
 ./boga test <lane>     # one lane by name (e.g. ./boga test sync-push-contract)
@@ -97,42 +97,41 @@ get from `./boga timings` or a run.
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
 | lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.9s |
-| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~3.8s |
-| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~8.9s |
+| typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.1s |
+| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~9.1s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
-| docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.1s |
-| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~8.8s |
+| docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~0.2s |
+| meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~20s |
 | agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~2.7s |
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |
 | handles | `./boga test handles` | — (run by name) | ✅ | ~1.1m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
 | jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | N/A |
-| complexity | `./boga test complexity` | — (run by name) | ❌ | N/A |
+| complexity | `./boga test complexity` | — (run by name) | ❌ | ~6.5s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
-| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~43s |
+| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~44s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~4.5s |
 | groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~22s |
-| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~51s |
-| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~9.8s |
+| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~52s |
+| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~10s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~7.7s |
-| sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.3s |
+| sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.4s |
 | sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~4.6s |
-| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~5.3s |
+| sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~5.4s |
 | dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~4.3s |
-| sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~28s |
+| sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~29s |
 | sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~2.0m |
-| sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~9.3s |
+| sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~10s |
 | mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~10s |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
 | ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~50s |
 | ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~1.2m |
-| ios-ui-regression | `./boga test ios-ui-regression` | `boga test frontend` + `frontend-ui` | ❌ | ~7.9m |
 | ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~2.3m |
 | ios-session-view | `./boga test ios-session-view` | `boga test frontend` + `frontend-ui` | ❌ | ~2.0m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.7m |
-| ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.1m |
-| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~1.9m |
+| ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~2.2m |
+| ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~5.1m |
 
 † All-machine median of the recorded green runs in the generating machine's timing store (`~/.config/boga/timings/records/`); `N/A` = no measured data yet, **not** "instant" — run the lane to record it. Per-machine numbers: `./boga timings`.
 <!-- /boga:gen:lane-matrix -->
@@ -269,8 +268,13 @@ opening the PR**, and lists both in the PR's Tests table. Both must be green.
 | Lane | Target | Where it lives |
 | --- | --- | --- |
 | `jest-coverage` | Whole-suite floor: **80% branches, 80% lines** (`app/**`, `components/**`, `src/**`, tests excluded). Branches is the tight one (82.2% when the floor landed; lines 92.6%). | `coverageThreshold` in `apps/mobile/jest.config.js` |
-| `complexity` | Per function in the same source: cyclomatic complexity **≤ 20**, cognitive complexity (`sonarjs`) **≤ 25**, **≤ 200** lines (blank lines and comments excluded), nesting depth **≤ 4**, **≤ 5** parameters. | `apps/mobile/eslint.complexity.config.js` |
+| `complexity` | Per function in the same source: cognitive complexity (`sonarjs`) **≤ 25**, **≤ 200** lines (blank lines and comments excluded), nesting depth **≤ 4**, **≤ 5** parameters. | `apps/mobile/eslint.complexity.config.js` |
 
+- **Cognitive, not cyclomatic.** ESLint's cyclomatic `complexity` counts every
+  `?.`, `??` and `&&` as a path, so it flagged flat, readable guards and prop
+  defaults and pushed splits that did not aid reading; branch coverage
+  (`jest-coverage`) already measures how much of each function is tested.
+  Cognitive complexity scores what is hard to read: nested control flow.
 - **Grandfathered offenders.** The functions already over a complexity limit
   when it landed are listed, as counts per file and rule, in
   `apps/mobile/eslint-complexity-suppressions.json` (ESLint bulk

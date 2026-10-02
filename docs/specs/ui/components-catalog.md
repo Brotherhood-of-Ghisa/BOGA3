@@ -315,7 +315,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     The card (`paper`, `ink` mark, record band, mono figures) includes all PRs
     and exercise comparisons, never gym or location data
   - covered by `apps/mobile/app/__tests__/completed-session-local-data.test.tsx`,
-    `completed-session-detail-screen.test.tsx`, and the `ios-ui-regression` lane
+    `completed-session-detail-screen.test.tsx`, and the `ios-data-smoke` lane
     (`session-completion-states-fixture`: the native share sheet)
 
 7. `SessionSummaryLine`

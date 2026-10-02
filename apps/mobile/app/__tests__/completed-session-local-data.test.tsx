@@ -4,9 +4,9 @@
  * The completed-session screen over real data: the production route and its
  * default data client (session snapshot, insights, historical bests, append,
  * delete) over the migrated in-memory SQLite database, seeded through the
- * Maestro harness with the fixtures the `ios-ui-regression`
- * session-completion flow loads (`exercise-block-history`,
- * `completion-two-prs`). Only the native database open, the router, and the
+ * Maestro harness with the fixtures `exercise-block-history` and
+ * `completion-two-prs` (the latter is also what the `ios-data-smoke` share
+ * flow loads). Only the native database open, the router, and the
  * native capture/share modules are replaced.
  *
  * `completed-session-detail-screen.test.tsx` keeps the states real data cannot

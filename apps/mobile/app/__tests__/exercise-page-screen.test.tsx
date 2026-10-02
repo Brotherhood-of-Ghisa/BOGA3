@@ -462,6 +462,10 @@ describe('ExercisePageScreen', () => {
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     fireEvent.press(await screen.findByTestId('exercise-options-swap'));
     const swap = await screen.findByTestId('exercise-swap-sheet');
+    // The search keeps focus while a result is tapped: with the default
+    // `never`, iOS spends that first tap dismissing the keyboard and the row
+    // never fires (fireEvent cannot see the keyboard, so pin the prop).
+    expect(within(swap).getByTestId('exercise-swap-list')).toHaveProp('keyboardShouldPersistTaps', 'handled');
     fireEvent.changeText(within(swap).getByLabelText('Search exercises'), 'Incline Barbell');
     fireEvent.press(await within(swap).findByText('Incline Barbell Bench Press'));
 
