@@ -33,8 +33,9 @@ activity section stays as it is until T05.
 - One read: `loadTodayProgress(now)` from `@/src/progress-summary` returns
   `{ status: 'empty' }` (no completed session) or `{ status: 'ready', week,
   month, latest }`; types in `src/progress-summary/calculations.ts`.
-  - `week`: `window`, `current` and `previous` (the whole previous calendar
-    week), each `{ sessions, workingSets, prs }`; the bars are `current` over
+  - `week`: `window` (the full Mon–Sun range for the label), `current`
+    (Monday through today) and `previous` (the whole previous calendar week),
+    each `{ sessions, workingSets, prs }`; the bars are `current` over
     `previous`.
   - `month`: `window`, `dayOfMonth`, `daysInMonth`, `cumulativeWorkingSets`
     (index 0 = the 1st, last = today), `toDate`, `projectedWorkingSets`

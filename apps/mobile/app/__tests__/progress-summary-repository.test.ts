@@ -28,7 +28,13 @@ jest.mock('@/src/data/bootstrap', () => ({
 import { __resetClockForTests } from '@/src/data/clock';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions } from '@/src/data/schema';
 import { aggregateStats, createDrizzleStatsStore } from '@/src/data/stats';
-import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
+import {
+  createDrizzleProgressSummaryStore,
+  createTodayProgressRepository,
+  loadTodayProgress,
+  type ProgressSummaryStore,
+  type TodayProgress,
+} from '@/src/progress-summary';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
 const BENCH = 'def-bench';
@@ -208,5 +214,27 @@ describe('loadTodayProgress', () => {
     expect(progress.latest).toMatchObject({ id: 'may-8', workingSets: 4, exerciseCount: 1, prs: 1, gymName: null, durationSec: null });
     expect(progress.week.current).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
     expect(progress.month.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+  });
+
+  it('reads the latest session alone only when it is older than the loaded range', async () => {
+    const store = createDrizzleProgressSummaryStore();
+    const counted: ProgressSummaryStore = {
+      ...store,
+      loadAggregationInput: jest.fn(store.loadAggregationInput),
+      loadPrE1rmFacts: jest.fn(store.loadPrE1rmFacts),
+    };
+    const { loadTodayProgress: load } = createTodayProgressRepository(counted);
+
+    insertSession('may-8', { completedAt: local(2026, 5, 8, 18) }, [bench('100')]);
+    await load(NOW);
+    expect(counted.loadAggregationInput).toHaveBeenCalledTimes(2);
+    expect(counted.loadPrE1rmFacts).toHaveBeenCalledTimes(2);
+
+    jest.mocked(counted.loadAggregationInput).mockClear();
+    jest.mocked(counted.loadPrE1rmFacts).mockClear();
+    insertSession('oct-13', { completedAt: local(2026, 10, 13, 18) }, [bench('110', 2)]);
+    expect(ready(await load(NOW)).latest).toMatchObject({ id: 'oct-13', workingSets: 2, prs: 1 });
+    expect(counted.loadAggregationInput).toHaveBeenCalledTimes(1);
+    expect(counted.loadPrE1rmFacts).toHaveBeenCalledTimes(1);
   });
 });

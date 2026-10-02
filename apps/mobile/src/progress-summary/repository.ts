@@ -8,7 +8,7 @@ import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 import { loadFlaggedExerciseSessionFacts } from '@/src/data/exercise-session-facts';
 import { gyms, sessionExercises, sessions } from '@/src/data/schema';
 import { createDrizzleStatsStore, type StatsStore } from '@/src/data/stats';
-import type { LocalWindow } from '@/src/utils/local-calendar';
+import { isInWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
 import {
   deriveTodayProgress,
@@ -90,23 +90,27 @@ export const createTodayProgressRepository = (
     if (latest === null) return deriveTodayProgress({ now, sessions: [], prAchievedAt: [], latest: null });
 
     const range = todayProgressLoadWindow(now);
-    const latestWindow = instantWindow(latest.completedAt);
-    const [aggregation, prFacts, latestAggregation, latestPrFacts] = await Promise.all([
+    const [aggregation, prFacts] = await Promise.all([
       store.loadAggregationInput(range),
       store.loadPrE1rmFacts(range),
-      store.loadAggregationInput(latestWindow),
-      store.loadPrE1rmFacts(latestWindow),
     ]);
+    const sessionsInRange = workingSetsBySession(aggregation);
+    // The latest session is nearly always inside the range; read it alone only when older.
+    const [latestSessions, latestPrFacts] = isInWindow(latest.completedAt, range)
+      ? [sessionsInRange, prFacts]
+      : await Promise.all([
+          store.loadAggregationInput(instantWindow(latest.completedAt)).then(workingSetsBySession),
+          store.loadPrE1rmFacts(instantWindow(latest.completedAt)),
+        ]);
     const { exerciseNames, ...latestSession } = latest;
 
     return deriveTodayProgress({
       now,
-      sessions: workingSetsBySession(aggregation),
+      sessions: sessionsInRange,
       prAchievedAt: prFacts.map((fact) => fact.achievedAt),
       latest: {
         ...latestSession,
-        workingSets: workingSetsBySession(latestAggregation)
-          .find((session) => session.id === latest.id)?.workingSets ?? 0,
+        workingSets: latestSessions.find((session) => session.id === latest.id)?.workingSets ?? 0,
         exerciseCount: exerciseNames.length,
         exerciseNames,
         prs: latestPrFacts.filter((fact) => fact.sessionId === latest.id).length,
@@ -115,4 +119,6 @@ export const createTodayProgressRepository = (
   },
 });
 
-export const { loadTodayProgress } = createTodayProgressRepository();
+const defaultTodayProgressRepository = createTodayProgressRepository();
+
+export const loadTodayProgress = defaultTodayProgressRepository.loadTodayProgress;

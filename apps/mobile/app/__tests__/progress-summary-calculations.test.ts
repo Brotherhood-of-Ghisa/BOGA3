@@ -43,7 +43,7 @@ describe('deriveTodayProgress', () => {
       .toEqual({ status: 'empty' });
   });
 
-  it('counts this week and the whole previous calendar week, PRs on the boundary included once', () => {
+  it('counts this week through today and the whole previous calendar week, PRs on the boundary included once', () => {
     const now = local(2026, 3, 18, 12); // Wednesday; this week starts Monday 16 March
     const monday = local(2026, 3, 16);
     const { week } = ready(deriveTodayProgress({
@@ -54,8 +54,9 @@ describe('deriveTodayProgress', () => {
         session('this-mon', monday, 5),
         session('this-wed', local(2026, 3, 18, 9), 6),
         session('older', justBefore(local(2026, 3, 9)), 99),
+        session('after-today', local(2026, 3, 19), 40), // later this week, e.g. another device's clock
       ],
-      prAchievedAt: [justBefore(monday), monday, monday, local(2026, 3, 9)],
+      prAchievedAt: [justBefore(monday), monday, monday, local(2026, 3, 9), local(2026, 3, 19)],
       latest: LATEST,
     }));
 

@@ -20,6 +20,7 @@ export type ProgressSession = { id: string; completedAt: Date; workingSets: numb
 
 export type TodayProgressWeek = {
   window: LocalWindow;
+  /** Monday through the end of today, like the month's `toDate`. */
   current: ProgressCounts;
   /** The whole previous calendar week. */
   previous: ProgressCounts;
@@ -167,7 +168,7 @@ export const deriveTodayProgress = (input: TodayProgressInput): TodayProgress =>
     status: 'ready',
     week: {
       window: week,
-      current: countIn(input, week),
+      current: countIn(input, { start: week.start, end: startOfLocalDay(input.now, 1) }),
       previous: countIn(input, localWeekWindow(input.now, -1)),
     },
     month: deriveMonth(input),
