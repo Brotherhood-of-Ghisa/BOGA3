@@ -2,8 +2,8 @@
 
 /**
  * The developer-only data affordances on the Settings screen, over real data:
- * the dev-mode visibility gate, the catalog reset ("Reset local data"), the
- * local wipe, and the two-step "wipe remote then wipe local" flow that keeps
+ * the dev-mode visibility gate, the log viewer link, the catalog reset ("Reset
+ * local data"), the local wipe, and the two-step "wipe remote then wipe local" flow that keeps
  * the just-deleted server rows from being re-pushed by the next sync cycle.
  *
  * The local database is the migrated in-memory SQLite fixture
@@ -107,6 +107,14 @@ describe('settings developer data affordances', () => {
     expect(screen.queryByTestId('settings-dev-reset-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-local-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
+  });
+
+  it('opens the in-app log viewer from Developer tools', async () => {
+    await openSettings();
+
+    fireEvent.press(screen.getByTestId('settings-dev-logs-button'));
+
+    expect(mockPush).toHaveBeenCalledWith('/dev-logs');
   });
 
   it('resets local data after confirmation: history and custom exercises gone, the catalog re-seeded', async () => {

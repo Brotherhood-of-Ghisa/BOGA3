@@ -581,6 +581,15 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(screen.getByLabelText('Exercise filter input')).toHaveProp('value', '');
   });
 
+  // The filter input keeps focus while a result is tapped: with the default
+  // `never`, iOS spends that first tap dismissing the keyboard and the row never
+  // fires (fireEvent cannot see the keyboard, so pin the prop).
+  it('lets a result tap through while the search keyboard is up', async () => {
+    await openInteractions();
+
+    expect(await screen.findByTestId('exercise-picker-list')).toHaveProp('keyboardShouldPersistTaps', 'handled');
+  });
+
   it('filters exercise picker by all query words across names and primary muscles only', async () => {
     await openInteractions();
 

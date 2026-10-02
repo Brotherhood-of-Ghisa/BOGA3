@@ -12,9 +12,8 @@ appId: com.dinoderek.mobile
 #   4. Finish (one confirmed set, no prompt) opens the completion screen, and
 #      Done replaces it with Stats;
 #   5. Stats' exercise list reads back the session just written: the only
-#      on-device check of the session-write → stats read path
-#      (stats-screen-ux.yaml reads fixture rows inserted straight into SQLite,
-#      which bypass the session screens).
+#      on-device check of the Stats queries (their values over the harness
+#      fixtures are stats-screen-local-data.test.tsx).
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;

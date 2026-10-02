@@ -75,6 +75,7 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
 }));
 
 import { SessionViewScreen } from '../session/[sessionId]/index';
+import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
 import { gyms, sessions } from '@/src/data/schema';
 import * as sessionDrafts from '@/src/data/session-drafts';
@@ -793,6 +794,61 @@ describe('Session view: editing a completed session', () => {
     await pressDone();
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
     expect(buttons).toEqual(['Discard unconfirmed sets and save changes']);
+  });
+
+  // The stack keeps the session view mounted under the exercise page, so both
+  // screens are rendered side by side: the page's logger edits a set after the
+  // view has loaded the session, and Done must save that edit, not its own copy.
+  it('saves on Done a set changed on the exercise page after the view opened, keeping the session completed', async () => {
+    const titles = answerAlerts(() => 'unexpected');
+    await seed(async () => {
+      await sessionDrafts.persistSessionDraftSnapshot(
+        {
+          sessionId: DONE,
+          gymId: null,
+          startedAt: STARTED_AT,
+          exercises: [benchWith([performed('c1', '160', '8', 'rir_1')])] as never,
+        },
+        { now: COMPLETED_AT }
+      );
+      await sessionDrafts.completeSessionDraft(DONE, { completedAt: COMPLETED_AT, now: COMPLETED_AT });
+    });
+    render(
+      <>
+        <SessionViewScreen sessionId={DONE} />
+        <ExercisePageScreen sessionExerciseId="done_bench" sessionId={DONE} />
+      </>
+    );
+    await screen.findByTestId('session-view-done-button');
+    await screen.findByTestId('exercise-page');
+
+    fireEvent.press(screen.getByTestId('exercise-set-1-open'));
+    fireEvent.changeText(await screen.findByTestId('exercise-set-logger-reps'), '9');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    });
+    await waitFor(async () =>
+      expect((await readSession(DONE))!.exercises[0].sets[0]).toMatchObject({ id: 'c1', repsValue: '9' })
+    );
+    // The logger writes the completed session in place.
+    expect(sessionRow(DONE)).toMatchObject({ status: 'completed', completedAt: COMPLETED_AT });
+
+    await pressDone();
+
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(titles).toEqual([]);
+    expect(await readSession(DONE)).toMatchObject({
+      status: 'completed',
+      startedAt: STARTED_AT,
+      completedAt: COMPLETED_AT,
+      exercises: [
+        expect.objectContaining({
+          id: 'done_bench',
+          sets: [expect.objectContaining({ id: 'c1', weightValue: '160', repsValue: '9', setType: 'rir_1' })],
+        }),
+      ],
+    });
+    await expectActiveFixtureUntouched();
   });
 
   it('goes to the completed session when there is nothing to go back to', async () => {

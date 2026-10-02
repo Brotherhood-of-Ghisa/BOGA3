@@ -31,13 +31,13 @@ This directory contains two kinds of files:
   - used by: `npm run start:ios:dev-client`.
   - status: used and needed.
 - `maestro-run-lane.sh`
-  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `ui-regression` / `exercise-page` / `auth-profile` / `sync-e2e` / `groups-e2e`). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-ios-run-flow.sh` (one flow, own sim + Metro) or `maestro-ios-run-flows.sh` (several flows sharing one). Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` etc.).
+  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `exercise-page` / `session-view` / `auth-profile` / `sync-e2e` / `groups-e2e`). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-ios-run-flow.sh` (one flow, own sim + Metro) or `maestro-ios-run-flows.sh` (several flows sharing one). Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` etc.).
   - used by: all `npm run test:e2e:ios:*` scripts except `gates`.
   - status: used and needed. Replaced the one-wrapper-per-lane scripts (`maestro-ios-smoke.sh`, `-data-smoke.sh`, `-auth-profile.sh`, `-sync-e2e.sh`).
 - `maestro-ios-gates.sh`
   - purpose: the smoke + data-runtime-smoke flow list and a `full` reset, handed to `maestro-ios-run-flows.sh` so both run against ONE provisioned simulator and ONE Metro instance.
   - used by: `npm run test:e2e:ios:gates`.
-  - status: used and needed. Additive convenience path; the standalone `maestro-run-lane.sh smoke` / `data-smoke` lanes are unchanged. Provision runs a `full` reset (the smoke precondition); the data-runtime-smoke flow self-resets data in-flow via its `?reset=data` harness deep links, so both flows are safe to run back-to-back in one session. The shared-session execution model itself now lives in `maestro-ios-run-flows.sh`, shared with the `ios-ui-regression` lane.
+  - status: used and needed. Additive convenience path; the standalone `maestro-run-lane.sh smoke` / `data-smoke` lanes are unchanged. Provision runs a `full` reset (the smoke precondition); the data-runtime-smoke flow self-resets data in-flow via its `?reset=data` harness deep links, so both flows are safe to run back-to-back in one session. The shared-session execution model itself now lives in `maestro-ios-run-flows.sh`, shared with the `ios-data-smoke` lane.
 
 ### Internal Maestro helpers
 
@@ -59,7 +59,7 @@ This directory contains two kinds of files:
   - status: used and needed.
 - `maestro-ios-run-flows.sh`
   - purpose: the same lifecycle for SEVERAL flows sharing one provisioned simulator + Metro, so the ~55-60s provision/launch/teardown overhead is paid once instead of per flow. Per-flow JUnit/output/debug are namespaced; every flow runs even after one fails, and any failure fails the run. The caller owns `MAESTRO_RESET_STRATEGY`.
-  - used by: `maestro-ios-gates.sh`, and `maestro-run-lane.sh ui-regression`.
+  - used by: `maestro-ios-gates.sh`, and `maestro-run-lane.sh data-smoke`.
   - status: used and needed. Only for flows that reset their own state in-flow (`?reset=data`); a flow testing cold install / permissions wants its own `full`-reset run through the singular runner.
 - `maestro-ios-provision.sh`
   - purpose: ensures the shared dev client exists, boots the configured simulator, and installs the app.

@@ -29,7 +29,7 @@ completion's states join this record when they are accepted.
 ## States
 
 Device: iPhone simulator at 390pt width, light. Captured by the
-`ios-ui-regression` lane (`session-completion-states-fixture.yaml`) unless
+`ios-data-smoke` lane (`session-completion-states-fixture.yaml`) unless
 marked ad hoc:
 
 | Screenshot | State |
@@ -39,7 +39,7 @@ marked ad hoc:
 | `view-session-options` (ad hoc) | the session ⋮ sheet (`Delete session`) |
 | `view-session-deleted` (ad hoc) | the deleted band, no `Edit` |
 | `view-session-not-found` (ad hoc) | not found, with the top bar's back |
-| `completed-edit-read-back` | the detail after the session view's `Done` |
+| `completed-edit-read-back` (ad hoc) | the detail after the session view's `Done` |
 
 Completion (PR B, pending acceptance), same lane and flow:
 
@@ -97,9 +97,8 @@ The existing cards, tokens and chart styling remain the visual authority.
 - Loading/failed comparisons stay explicit while facts, Sets and actions work.
   No-history/baseline, unmapped, empty/missing and deleted controls are retained.
 
-Runtime comparison states: `completed-edit-session-view` and
-`completed-edit-read-back` (`ios-ui-regression`,
-`session-completion-states-fixture`); ad hoc: `view-session-summary-top`,
+Runtime comparison states (ad hoc): `completed-edit-session-view`,
+`completed-edit-read-back`, `view-session-summary-top`,
 `session-summary-exercise`, `session-summary-muscle`, `view-session-sets`,
 `view-session-summary-after-edit`, `view-session-insights-loading`,
 `view-session-insights-error`, `view-session-no-history`, `view-session-unmapped`,

@@ -962,7 +962,7 @@ TASK_ID=ad-hoc npm run test:e2e:ios:data-smoke
 TASK_ID=ad-hoc npm run test:e2e:ios:gates        # smoke + data-smoke sharing one sim + Metro (~28% faster than running both separately)
 TASK_ID=ad-hoc npm run test:e2e:ios:auth-profile
 TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/session-completion-states-fixture.yaml --scenario session-completion-states-fixture
-# (this flow is also gated: it runs in `./boga test ios-ui-regression`)
+# (this flow is also gated: it runs in `./boga test ios-data-smoke`)
 ```
 
 ### Backend (Supabase)
