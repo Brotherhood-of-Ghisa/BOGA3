@@ -121,7 +121,7 @@ holds the flow steps that reached them.
 The `browser-*` states (the swap sheet's search with the keyboard up, search, no
 matches, prior-year/old history, shared preferences, old plan suggestions
 and history loading/error/Retry) are ad hoc; Jest proves them over the
-browser fixture (`app/__tests__/exercise-catalog-screen.test.tsx`) and
+browser fixture (`__tests__/exercise-catalog-screen.test.tsx`) and
 additionally covers deleted actions, save failure and `Back to exercise`.
 
 No target screenshots are committed; runtime captures stay in the gitignored

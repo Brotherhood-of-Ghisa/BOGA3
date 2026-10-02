@@ -9,12 +9,12 @@ appId: com.dinoderek.mobile
 # Why device:
 #   1. the native share sheet (the preview captured to an image and handed to
 #      expo-sharing in the installed binary) and a real sheet backdrop.
-# Jest counterpart: app/__tests__/completed-session-local-data.test.tsx
+# Jest counterpart: __tests__/completed-session-local-data.test.tsx
 #   (every completion and detail state over the fixtures: records, grouping,
 #   no-history and unmapped copy, missing sessions, delete/undelete, append,
-#   share preview, edit read-back), app/__tests__/completed-session-detail-screen.test.tsx
+#   share preview, edit read-back), __tests__/completed-session-detail-screen.test.tsx
 #   (the capture and share calls, share failure and retry, backdrop dismissal),
-#   app/__tests__/session-view-screen.test.tsx ("editing a completed session":
+#   __tests__/session-view-screen.test.tsx ("editing a completed session":
 #   Start/End validation, autosave pause, an exercise-page edit saved by Done).
 
 # The completion-two-prs fixture's newest session beats both histories.

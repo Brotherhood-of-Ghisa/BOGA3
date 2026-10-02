@@ -13,11 +13,11 @@ appId: com.dinoderek.mobile
 # Why device:
 #   1. a stack push and the native back button;
 #   2. the keyboard.
-# Jest counterpart: app/__tests__/exercise-page-screen.test.tsx (the page over
+# Jest counterpart: __tests__/exercise-page-screen.test.tsx (the page over
 #   the same fixture: records, Last, effort cycle and sheet, menu, swap,
 #   `+ Add set`, Complete's warning, discarded planned sets read back from the
-#   database), app/__tests__/exercise-page-model.test.ts (effort inheritance),
-#   app/__tests__/exercise-history-screen.test.tsx (periods, bests, cards).
+#   database), __tests__/exercise-page-model.test.ts (effort inheritance),
+#   __tests__/exercise-history-screen.test.tsx (periods, bests, cards).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-page&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
 - extendedWaitUntil:

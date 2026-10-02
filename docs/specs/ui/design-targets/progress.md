@@ -125,12 +125,12 @@ holds the flow steps that reached them.
 
 Jest only (no flow reaches them): the loading and error states (the screen's
 and the history sheets'), a filtered list with no match, the shade and delta
-colours (`app/__tests__/stats-screen.test.tsx`), and the today and selected
-marks on every cell kind (`app/__tests__/heatmap-marks.test.tsx`). For
+colours (`__tests__/stats-screen.test.tsx`), and the today and selected
+marks on every cell kind (`__tests__/heatmap-marks.test.tsx`). For
 DLM-T10: the bests in `record`, the tag chips, the deleted-exercise notice and
-exercise history's states (`app/__tests__/exercise-history-screen.test.tsx`);
+exercise history's states (`__tests__/exercise-history-screen.test.tsx`);
 the active session, the `Deleted` tag, the discard confirm and the `Retry`
-(`app/__tests__/sessions-screen.test.tsx`).
+(`__tests__/sessions-screen.test.tsx`).
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

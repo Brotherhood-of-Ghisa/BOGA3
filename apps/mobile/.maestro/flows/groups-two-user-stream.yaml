@@ -32,7 +32,7 @@ appId: com.dinoderek.mobile
 #   boot, real sign-in and keyboard; 3 the focus refresh; 4 the keyboard;
 #   5 react-native-screens' native back (it went dead from the second visit on
 #   iOS 26); 6 the sheet and its backdrop; 7 the native alert.
-# Jest counterpart: app/__tests__/groups-api-live.test.ts (lane groups-api-live:
+# Jest counterpart: __tests__/groups-api-live.test.ts (lane groups-api-live:
 #   every groups client call against the live server),
 #   groups-write-screens.test.tsx (username gate, create, invite, remove),
 #   groups-exercise-screens.test.tsx, groups-exercise-link-screen.test.tsx,

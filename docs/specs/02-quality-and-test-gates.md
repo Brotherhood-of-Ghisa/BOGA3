@@ -206,7 +206,7 @@ Machine-readable form: `scripts/triggers.tsv`, queried with
 | …sign-in, profile, or connected-agents screens | the UI row **+** `./boga test ios-auth-profile` |
 | …the sync-status surface (`components/sync-status/**`) | the UI row **+** `./boga test ios-sync-e2e` |
 | …only group screens (`app/group/**`, `app/group-session/**`, `app/(tabs)/groups.tsx`, `app/exercise-link.tsx`, `components/groups/**`) | `./boga test fast` **+** `./boga test ios-smoke` **+** `./boga test ios-groups-e2e` |
-| Only jest suites (`apps/mobile/app/__tests__/**`) | `./boga test fast` (no simulator; `__tests__/sync/**` also `backend`) |
+| Only jest suites (`apps/mobile/__tests__/**`) | `./boga test fast` (no simulator; `__tests__/sync/**` also `backend`) |
 | One Maestro flow (`apps/mobile/.maestro/flows/<flow>.yaml`) | the lane that runs that flow **+** `meta-tests` (runner / config changes: `./boga test frontend`) |
 | Sync / boot / auth (`apps/mobile/src/sync/**`, `src/auth/**`, scheduler, data bootstrap/migrations, `drizzle/**`, sync RPCs) | `./boga test fast` **+** `./boga test backend` **+** `./boga test ios-sync-e2e` (the UI↔server e2e lane) |
 | Backend (`supabase/migrations/**`, `functions/**`, RLS/policies, sync RPCs) | `./boga test backend` |

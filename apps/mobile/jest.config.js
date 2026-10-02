@@ -15,14 +15,14 @@ module.exports = {
   //   this ignore list (and the two endpoint suites fail hard when the endpoint
   //   env is missing).
   testPathIgnorePatterns: [
-    '<rootDir>/app/__tests__/sync/cycle-round-trip.test.ts',
-    '<rootDir>/app/__tests__/sync/cycle-multidevice-lww.test.ts',
-    '<rootDir>/app/__tests__/sync/auth-required-envelope.test.ts',
-    '<rootDir>/app/__tests__/sync/drift-check.test.ts',
-    '<rootDir>/app/__tests__/sync/update-softdelete-roundtrip.test.ts',
-    '<rootDir>/app/__tests__/sync/future-clock-clamp.test.ts',
+    '<rootDir>/__tests__/sync/cycle-round-trip.test.ts',
+    '<rootDir>/__tests__/sync/cycle-multidevice-lww.test.ts',
+    '<rootDir>/__tests__/sync/auth-required-envelope.test.ts',
+    '<rootDir>/__tests__/sync/drift-check.test.ts',
+    '<rootDir>/__tests__/sync/update-softdelete-roundtrip.test.ts',
+    '<rootDir>/__tests__/sync/future-clock-clamp.test.ts',
     // The groups client against a live endpoint: lane groups-api-live.
-    '<rootDir>/app/__tests__/groups-api-live.test.ts',
+    '<rootDir>/__tests__/groups-api-live.test.ts',
   ],
   // Explicit per-test/hook ceiling: a hung test or hook (unresolved await,
   // infinite loop) now fails loudly here instead of stalling the run. This is
