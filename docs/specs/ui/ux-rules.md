@@ -751,13 +751,27 @@ unchanged. What differs is presentation:
    (the autosave text debounce); the tick — the screen's one `accent` primary,
    disabled until the values are a valid set — performs it and moves the logger
    on. Tapping effort cycles W-Up → blank → RIR 3 → RIR 2 → RIR 1 → RIR 0 → W-Up; long press opens the configured options in a scrolling sheet. The highest selectable RIR comes from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`). Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
+   The in-progress row also answers swipes (2026-10-01): right confirms it
+   exactly like the tick and moves on — confirming the last set then adds one,
+   the fresh row open in the logger with the copied values; left drops the
+   entry, the typed weight and reps clearing while the row keeps its place and
+   the cursor stays (a planned row reads as its plan again, effort included; an
+   ad-hoc row keeps its effort). Swipes never navigate — they cannot go to the
+   previous set or screen — and the row's accessibility actions
+   (`Confirm set` / `Drop set`) are the non-gesture path for the same two moves.
 4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
    volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
    like any set. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests, matching the session view
    (§14b.4; aligned 2026-09-23). The one highlight is a performed weight or 1RM
-   beating the all-time best before today, shown in `record` (brass); volume is
-   never one, since its record is a whole session's. The records panel uses
+   beating the all-time best before today, shown in `record` (brass) — and only
+   on the session's best such set: the highest beating 1RM, else the heaviest
+   beating weight, a tie keeping the set that reached the value first (2026-10-01,
+   one superlative per exercise; `design-language.md` §5); volume is never one,
+   since its record is a whole session's. That best set earns the set list the
+   `record` band, in the session view's card words: `New 1RM record · <1RM>`, or
+   `New top weight · <weight>` when only the weight beat the baseline. The
+   records panel uses
    History's rules (warm-ups count). `Records` | `Last` chooses what the
    panel shows and never expands or collapses it; only the chevron does.
    Collapsed, its `1RM` / `Max` / `Vol` row sums up the chosen view: the
@@ -769,8 +783,9 @@ unchanged. What differs is presentation:
    the alert names both counts. `Remove from session` (⋮, danger) confirms, then
    removes the exercise; `Swap exercise` keeps the sets and replaces the
    exercise definition. Signed in, the ⋮ also offers `Link to group
-   exercise…`, which opens the Link screen for the exercise (product E0.3) and
-   leaves the session untouched; signed out it is absent.
+   exercise…`, which opens the Link screen for the exercise (product E0.3) after
+   the page's pending edits are written, so linking mid-session leaves the
+   session exactly as it reads; signed out it is absent.
 6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
    VoiceOver escape dismiss; no Cancel.
 

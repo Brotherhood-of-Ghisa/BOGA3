@@ -178,6 +178,75 @@ describe('ExercisePageScreen', () => {
     });
     expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: uiRoles.record });
     expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
+
+    // The best record of the session earns the set list its band.
+    expect(screen.getByTestId('exercise-record-band')).toHaveTextContent('New 1RM record · 108.3');
+  });
+
+  it('confirms the in-progress set from the swipe action, advancing like the tick', async () => {
+    await openPage();
+
+    // The logger is the open cursor row; its accessibility actions are the
+    // non-gesture path of the swipes (`ux-rules.md` §14a.3).
+    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+
+    await waitFor(async () =>
+      expect((await benchSets())[2]).toMatchObject({ weightValue: '82.5', repsValue: '6', performanceStatus: null })
+    );
+    // The cursor moved on: the swipe shell now sits on set 4, not 3.
+    await waitFor(() => expect(screen.queryByTestId('exercise-set-swipe-3')).toBeNull());
+    expect(screen.getByTestId('exercise-set-swipe-4')).toBeTruthy();
+  });
+
+  it('confirming the last set from the swipe action adds the next one, ready in the logger', async () => {
+    await openPage();
+
+    // Confirm sets 3 and 4 through the logger's action; the logger follows the
+    // cursor, leaving set 5 the in-progress one.
+    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    await waitFor(async () => expect((await benchSets())[2]?.performanceStatus).toBeNull());
+    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    await waitFor(async () => expect((await benchSets())[3]?.performanceStatus).toBeNull());
+
+    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+
+    // The deterministic continuation of confirming the last set is Add set:
+    // a fresh unperformed row with the copied values, open in the logger.
+    await waitFor(async () => expect(await benchSets()).toHaveLength(6));
+    expect((await benchSets())[5]).toMatchObject({
+      weightValue: '85',
+      repsValue: '5',
+      performanceStatus: 'unperformed',
+    });
+    expect(screen.getByTestId('exercise-set-swipe-6')).toBeTruthy();
+  });
+
+  it('drops the in-progress entry from the swipe action and navigates nowhere', async () => {
+    await openPage();
+
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'discard' },
+    });
+
+    // The typed entry is gone from the draft; the logger reads the set's plan
+    // again, the shell stays on the same set, and nothing navigated — dropping
+    // never goes to the previous set or screen.
+    await waitFor(async () => expect((await benchSets())[2]?.weightValue).toBe(''));
+    await waitFor(() =>
+      expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('82.5')
+    );
+    expect(screen.getByTestId('exercise-set-swipe-3')).toBeTruthy();
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
   it('edits an exercise of a completed session, writing it back as completed with its times', async () => {
@@ -452,8 +521,28 @@ describe('ExercisePageScreen', () => {
     const sheet = await screen.findByTestId('exercise-options-sheet');
     fireEvent.press(within(sheet).getByText('Link to group exercise…'));
 
-    expect(mockRouter.push).toHaveBeenCalledWith(`/exercise-link?exerciseDefinitionId=${BENCH_DEF}`);
+    // The Link screen opens after the page's pending edits are written
+    // (`ux-rules.md` §14a.5), so the push resolves through the flush.
+    await waitFor(() =>
+      expect(mockRouter.push).toHaveBeenCalledWith(`/exercise-link?exerciseDefinitionId=${BENCH_DEF}`)
+    );
     expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
+  });
+
+  it('writes pending edits before opening the Link screen, leaving the session as it reads', async () => {
+    mockLinkingUserId = 'user-1';
+    await openPage();
+
+    // Typed values ride the autosave debounce; linking must not leave them
+    // behind (`ux-rules.md` §14a.5: the Link screen leaves the session untouched).
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    fireEvent.press(await screen.findByTestId('exercise-options-link-group'));
+
+    await waitFor(() =>
+      expect(mockRouter.push).toHaveBeenCalledWith(`/exercise-link?exerciseDefinitionId=${BENCH_DEF}`)
+    );
+    expect((await benchSets())[2]).toMatchObject({ weightValue: '90' });
   });
 
   it('swaps the exercise and keeps its sets', async () => {

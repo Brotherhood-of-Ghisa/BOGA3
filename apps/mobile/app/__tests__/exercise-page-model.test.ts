@@ -6,10 +6,12 @@ import {
   canCommitLogger,
   commitSet,
   describeCompleteExercisePlan,
+  discardSetEntry,
   displayedValues,
   findCursorIndex,
   formatWeight,
   planCompleteExercise,
+  recordBandFor,
   toggleSetPerformed,
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
@@ -122,6 +124,53 @@ describe('exercise page model', () => {
     });
   });
 
+  it('highlights only the best record set of the session, not every qualifying one', () => {
+    // Both sets beat the baseline; the best 1RM wins (Epley: 90×8 ≈ 114, 100×6 ≈ 120).
+    const rows = rowsFor(
+      [
+        performedSet('a', '90', '8', 'rir_1'),
+        performedSet('b', '100', '6', 'rir_0'),
+      ],
+      { oneRepMax: 100, weight: 85 }
+    );
+    expect(rows[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+    expect(rows[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: true });
+    expect(recordBandFor(rows)).toMatchObject({ kind: 'oneRepMax' });
+
+    // A tie on the best 1RM keeps the set that reached it first.
+    const tied = rowsFor(
+      [
+        performedSet('a', '100', '3', 'rir_0'),
+        performedSet('b', '100', '3', 'rir_0'),
+      ],
+      { oneRepMax: 90, weight: 90 }
+    );
+    expect(tied[0]).toMatchObject({ oneRepMaxRecord: true });
+    expect(tied[1]).toMatchObject({ oneRepMaxRecord: false });
+
+    // No 1RM beats the baseline: the heaviest qualifying weight wins, and its
+    // band is the top-weight one.
+    const heavy = rowsFor(
+      [
+        performedSet('a', '90', '3', 'rir_0'),
+        performedSet('b', '95', '1', 'rir_0'),
+      ],
+      { oneRepMax: 120, weight: 85 }
+    );
+    expect(heavy[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+    expect(heavy[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
+    expect(recordBandFor(heavy)).toEqual({ kind: 'weight', label: 'New top weight · 95.0' });
+  });
+
+  it('announces the best record with a band, or none at all', () => {
+    expect(recordBandFor(rowsFor(quietSets()))).toBeNull();
+
+    const oneRepMax = rowsFor([performedSet('a', '100', '3', 'rir_0')], { oneRepMax: 100, weight: 200 });
+    expect(recordBandFor(oneRepMax)).toEqual({ kind: 'oneRepMax', label: 'New 1RM record · 109.0' });
+
+    expect(recordBandFor([])).toBeNull();
+  });
+
   it('shows entered values over the plan once the lifter starts typing', () => {
     const [set] = updateLoggerValues([plannedSet('p', '82.5', '6', 'rir_1')], 'p', { weightValue: '80' });
     expect(set).toMatchObject({
@@ -194,6 +243,47 @@ describe('exercise page model', () => {
 
   it('returns null for a row with nothing valid to perform, so the page opens it', () => {
     expect(toggleSetPerformed([plannedSet('p', '', '', null)], 'p')).toBeNull();
+  });
+
+  it('drops the in-progress entry by clearing typed values, keeping the row in place', () => {
+    const sets = quietSets();
+    const typed = updateLoggerValues(sets, 's3', { weightValue: '90', repsValue: '4' });
+
+    const dropped = discardSetEntry(typed, 's3');
+    // The planned row is pristine again: values blank, actual effort blank —
+    // it reads as its plan (prescribed 82.5 × 6, RIR 1) through the fallback.
+    expect(dropped[2]).toMatchObject({
+      weightValue: '',
+      repsValue: '',
+      setType: null,
+      performanceStatus: 'planned',
+      plannedWeightValue: '82.5',
+      plannedRepsValue: '6',
+    });
+    expect(displayedValues(dropped[2])).toEqual({ weightValue: '82.5', repsValue: '6', setType: 'rir_1' });
+    expect(findCursorIndex(dropped)).toBe(2);
+
+    // An ad-hoc entry keeps its effort: it has no plan to revert to.
+    const adHoc = [
+      { ...performedSet('x', '60', '8', 'rir_2'), performanceStatus: 'unperformed' as const },
+    ];
+    expect(discardSetEntry(adHoc, 'x')[0]).toMatchObject({
+      weightValue: '',
+      repsValue: '',
+      setType: 'rir_2',
+      performanceStatus: 'unperformed',
+    });
+  });
+
+  it('treats drop as a no-op on an untouched row, and never touches a performed row', () => {
+    const sets = quietSets();
+    // An untouched planned row already reads as its plan.
+    expect(discardSetEntry(sets, 's3')).toBe(sets);
+    // A planned row whose only entry is a chosen effort returns to blank.
+    const cycled = updateLoggerValues(sets, 's3', { setType: 'rir_0' });
+    expect(discardSetEntry(cycled, 's3')[2]).toMatchObject({ setType: null });
+    // Performed rows are the glyph's business, not the swipe's.
+    expect(discardSetEntry(sets, 's1')).toBe(sets);
   });
 
   it('adds a set copying the last row, not performed', () => {
