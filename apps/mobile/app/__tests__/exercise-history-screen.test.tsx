@@ -22,11 +22,25 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockReplace = jest.fn();
+let mockCanGoBack = true;
+let mockScreenOptions: { headerLeft?: () => mockReact.ReactElement } = {};
 let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  Stack: { Screen: () => null },
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  Stack: {
+    Screen: ({ options }: { options: typeof mockScreenOptions }) => {
+      mockScreenOptions = options;
+      return null;
+    },
+  },
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
   useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
@@ -148,6 +162,9 @@ beforeEach(() => {
   resetLocalData();
   __resetExerciseListPreferencesForTests();
   mockPush.mockClear();
+  mockBack.mockClear();
+  mockReplace.mockClear();
+  mockCanGoBack = true;
   mockSearchParams = {};
 });
 
@@ -264,6 +281,27 @@ describe('ExerciseHistoryRoute over real data', () => {
     fireEvent.press(screen.getByTestId('top-level-tab-more'));
 
     expect(mockPush).toHaveBeenCalledWith('/more');
+  });
+
+  it('draws its own back arrow that pops the stack', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    render(mockScreenOptions.headerLeft!());
+    fireEvent.press(screen.getByTestId('exercise-history-back'));
+
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('back falls to Progress when nothing is below it on the stack', async () => {
+    mockCanGoBack = false;
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    render(mockScreenOptions.headerLeft!());
+    fireEvent.press(screen.getByTestId('exercise-history-back'));
+
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/progress');
   });
 
   it('says the exercise was not found for an unknown id', async () => {
