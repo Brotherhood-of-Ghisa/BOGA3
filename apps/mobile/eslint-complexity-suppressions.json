@@ -129,14 +129,6 @@
       "count": 1
     }
   },
-  "components/groups/group-metric-record-sheet.tsx": {
-    "complexity": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/groups/group-metric-stream-record-sheet.tsx": {
     "complexity": {
       "count": 1
