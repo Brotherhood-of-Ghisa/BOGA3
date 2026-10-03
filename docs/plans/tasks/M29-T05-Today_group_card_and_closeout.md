@@ -36,6 +36,30 @@ the milestone.
   `latest_completed` (any time, with its `group_records`) drives the
   completed row and opens through `group_session_detail`.
 
+## From T03 (as built)
+
+- `app/(tabs)/today.tsx` now renders the Progress section, then the old
+  `TodaySocialSnapshot` (the stream snapshot) under `Group activity`: replace
+  that function and its `TodaySocialState`; the stream read (`useGroupStream`)
+  in the route goes with it.
+- Today's card parts live in `components/today/` (not `components/ui/`):
+  `ShareBar` (6pt, `viz0` track, `viz3` fill, `viz4` once reached) and the
+  `todayText` type roles are there to reuse for the board's bars; the board
+  bars are 12pt in the canvas.
+- No group tags on the latest-session row (decided with the user: the device
+  does not know shares). `today-landing.md` has a "Build decisions" list;
+  add the group card's there.
+- Maestro: Jest owns Today (user's call); no committed flow asserts Today
+  beyond `today-screen` in `smoke-launch.yaml`. `session-view.yaml` no longer
+  visits Today. Gallery captures came from a one-off flow
+  (`scripts/maestro-ios-run-flow.sh --flow <scratch yaml>`) over the
+  committed `fixture=today-progress` + `teleport=today` harness params (spec
+  11 §9). The slot simulator is an iPhone 17 Pro (402pt); the user accepted
+  the T03 gallery at that width.
+- `today-train.md` is already reduced to Train (its Today states removed);
+  `groups-07c-0-today-record` was dropped from it — `groups.md` may still
+  name it.
+
 ## Open — resolve with the user at session start
 
 1. **Default group** when there are several: last selected, most active this
@@ -54,7 +78,7 @@ the milestone.
 3. Gallery of every state at 390pt, accepted by the user;
    `today-landing.md` updated to name the lanes and screenshots and marked
    built.
-4. `today-train.md` reduced to Train; the M29 milestone deleted (last card).
+4. The M29 milestone deleted (last card).
 
 ## UX contract (UI tasks only)
 
@@ -70,7 +94,7 @@ the milestone.
 - `docs/specs/ui/screen-map.md`, `navigation-contract.md`, `ux-rules.md`
   (Today group card), `design-targets/today-landing.md` (states, lanes, and
   the brief stating the group card's `PRs` are group records, D4),
-  `design-targets/today-train.md`, `design-targets/groups.md` (the retired
+  `design-targets/groups.md` (the retired
   `groups-07c-0-today-record` state).
 
 ## Gates

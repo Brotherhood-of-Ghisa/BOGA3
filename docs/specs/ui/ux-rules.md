@@ -94,18 +94,34 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      `SegmentedControl` (`tablist` / `tab` + `selected`): the date format.
      There is no screen choice: every active-session entry opens the session
      view (`/session/<id>`).
-7. Today is a bounded overview, not a second full feed or history screen.
-   - An active draft replaces the planned-session action and exposes Resume.
+7. Today is a bounded landing page, not a second full feed or history screen.
+   It starts and resumes nothing: Train owns both.
+   - Progress counts working sets (§5.11), never volume, and places every
+     session, working set and PR by the session's `completed_at`. A week is
+     Monday 00:00 to Sunday 24:00 local; a month is the local calendar month.
+   - The week shows this week's sessions, working sets and PRs so far, each
+     with a bar against last week's whole total (full once reached), never a
+     signed delta.
+   - The month compares its working sets so far with the previous month up to
+     the same day of month (its last day when shorter), as a signed absolute
+     count (`+4`, `−3`, `±0`; §13.2). The projection is linear: so far per
+     elapsed day, today included, times the month's days. The summary line
+     sets the projection against the previous month's total, and sessions and
+     PRs so far against the previous month's to the same day.
+   - A PR is a set whose estimated 1RM beats every earlier completed session
+     on that exercise, at most one per exercise per session (the completed
+     session's PR rule).
+   - The latest completed session is one row; full history is the Sessions
+     list (`All sessions`). The row carries no group tags: which groups a
+     session was shared to is decided on the server, and the device does not
+     know it.
+   - With no completed session, the card is `Your week starts here` with
+     `Open Train`.
    - Joined-group activity reuses the group stream session cards, record cards,
      membership rows, and offline/error patterns and is limited to the three
      newest session, record, or membership items. Records show whether or not
      they are certified, read-only (no `Certify`); a record or membership row
      opens the Groups screen on its group.
-   - Recent personal activity is limited to the three newest non-deleted
-     completed sessions; full history remains owned by Progress.
-   - When the separate planning dependency is absent, Today uses the approved
-     `Watch this space 👀` placeholder and offers Train; it never invents a
-     scheduled session or metric.
 8. Train is the personal-training entry hub, while the session view remains
    focused on performing one workout.
    - Active-session detection must succeed before Train exposes any new-session
@@ -113,9 +129,9 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      exists.
    - An active draft replaces empty and planned start actions with one Resume
      action.
-   - Today and Train use the same session-entry coordinator. It rechecks the
-     active draft at press time and serializes competing requests so an empty
-     or planned action cannot create a second concurrent session.
+   - Every session entry goes through one session-entry coordinator. It
+     rechecks the active draft at press time and serializes competing requests
+     so an empty or planned action cannot create a second concurrent session.
    - Empty start persists one blank active draft through the session
      repository (`src/session-recorder/`) before opening it in the session
      view. A failed write stays inline and retryable.
