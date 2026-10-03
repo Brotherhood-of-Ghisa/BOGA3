@@ -38,7 +38,7 @@ import {
 // asserted on their own; the screens that adopt them have their own tests.
 
 const flatStyle = (node: { props: { style?: unknown } }): ViewStyle & TextStyle =>
-  StyleSheet.flatten(node.props.style as StyleProp<ViewStyle & TextStyle>) ?? {};
+  (StyleSheet.flatten(node.props.style as any) ?? {}) as ViewStyle & TextStyle;
 
 describe('Card', () => {
   it('is a surface on a rule hairline at the card radius, with no shadow', () => {

@@ -48,7 +48,7 @@ const renderList = (props: Partial<Parameters<typeof ExerciseListContent>[0]> = 
 };
 
 const colorOf = (node: { props: { style?: unknown } }) =>
-  (StyleSheet.flatten(node.props.style as StyleProp<TextStyle>) ?? {}).color;
+  (StyleSheet.flatten(node.props.style as any) ?? {}).color;
 
 describe('ExerciseListContent rows', () => {
   it('makes each row one target labelled for the pick, with the stats line in Plex Mono', () => {
