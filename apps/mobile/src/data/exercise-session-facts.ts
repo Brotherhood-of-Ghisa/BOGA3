@@ -3,11 +3,12 @@
 // raw-data or policy write touches; every read drains that queue first, so a
 // read never returns facts built from older rows or older rules.
 
-import { and, eq, gte, inArray, isNotNull, isNull, lt, max, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, or, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
+import { createRecordBook, type RecordEntry, type WeightRecordValue } from '@/src/exercise-calculations/records';
 import {
   canonicalizeWeightForReps,
   normalizeSessionSetPerformanceStatus,
@@ -299,50 +300,6 @@ export const loadFlaggedExerciseSessionFacts = async (
     .all());
 };
 
-/**
- * Each listed definition's best estimated 1RM over the sessions before
- * `target` in PR-history order: the bar the target's 1RM PR flag is set
- * against. A definition without an earlier 1RM is absent.
- */
-export const loadEarlierBestE1rmByDefinition = async (
-  target: { sessionId: string; completedAt: Date },
-  exerciseDefinitionIds: readonly string[],
-): Promise<Map<string, number>> => {
-  const best = new Map<string, number>();
-  if (exerciseDefinitionIds.length === 0) return best;
-  const database = await bootstrapLocalDataLayer();
-  drainExerciseSessionFacts(database);
-  const raise = (definitionId: string, value: number) => {
-    if (value > (best.get(definitionId) ?? -Infinity)) best.set(definitionId, value);
-  };
-  for (const ids of chunks(exerciseDefinitionIds)) {
-    const scope = and(inArray(exerciseSessionFacts.exerciseDefinitionId, ids), isNotNull(exerciseSessionFacts.bestE1rmKg));
-    const earlier = database
-      .select({ exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId, best: max(exerciseSessionFacts.bestE1rmKg) })
-      .from(exerciseSessionFacts)
-      .innerJoin(sessions, liveSessionJoin)
-      .where(and(scope, lt(exerciseSessionFacts.achievedAt, target.completedAt)))
-      .groupBy(exerciseSessionFacts.exerciseDefinitionId)
-      .all();
-    for (const row of earlier) raise(row.exerciseDefinitionId, row.best as number);
-    const sameInstant = database
-      .select({
-        sessionId: exerciseSessionFacts.sessionId,
-        exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId,
-        bestE1rmKg: exerciseSessionFacts.bestE1rmKg,
-      })
-      .from(exerciseSessionFacts)
-      .innerJoin(sessions, liveSessionJoin)
-      .where(and(scope, eq(exerciseSessionFacts.achievedAt, target.completedAt)))
-      .all();
-    // Same-instant sessions fall to the derivation's session-id order, not SQLite's.
-    for (const row of sameInstant) {
-      if (row.sessionId.localeCompare(target.sessionId) < 0) raise(row.exerciseDefinitionId, row.bestE1rmKg as number);
-    }
-  }
-  return best;
-};
-
 /** Which sessions count toward one exercise's all-time bests. */
 export type ExerciseBestsScope = {
   exerciseDefinitionId: string;
@@ -387,6 +344,7 @@ const bestsColumns = {
 };
 
 type BestsRow = {
+  exerciseDefinitionId: string;
   sessionId: string;
   completedAt: Date;
   gymId: string | null;
@@ -430,36 +388,42 @@ const rowsBefore = (database: LocalDatabase, rows: BestsRow[], beforeSessionId: 
   return rows.filter((row) => compareFactSessionOrder(row, { completedAt, sessionId: beforeSessionId }) < 0);
 };
 
-/**
- * Folds rows in PR-history order. A value must strictly beat the best so far,
- * so a tie keeps the earliest session; an equal top weight goes to more reps.
- */
+/** Folds rows in PR-history order through the record book (`records.ts`). */
 const pickBests = (rows: BestsRow[]): ExerciseBests => {
-  const bests: ExerciseBests = { oneRepMax: null, topWeight: null, volume: null, latest: null };
+  const book = createRecordBook<RecordEntry & {
+    oneRepMax: ExerciseBests['oneRepMax'];
+    weight: (WeightRecordValue & ExerciseBestSession) | null;
+    volume: ExerciseBests['volume'];
+  }>();
+  let latest: ExerciseBestSession | null = null;
   for (const row of rows) {
     const session = { sessionId: row.sessionId, completedAt: row.completedAt, gymId: row.gymId, gymName: row.gymName };
-    if (row.bestE1rmKg !== null && (bests.oneRepMax === null || row.bestE1rmKg > bests.oneRepMax.value)) {
-      bests.oneRepMax = {
+    book.add({
+      oneRepMax: row.bestE1rmKg === null ? null : {
         ...session,
         value: row.bestE1rmKg,
         weight: bestSetWeight(row.e1rmWeightValue, row.e1rmRepsValue),
         reps: bestSetReps(row.e1rmRepsValue),
-      };
-    }
-    if (row.topWeightKg !== null) {
-      const top = bests.topWeight;
-      const reps = bestSetReps(row.topWeightRepsValue);
-      if (top === null || row.topWeightKg > top.weight || (row.topWeightKg === top.weight && reps > top.reps)) {
-        bests.topWeight = { ...session, weight: row.topWeightKg, reps };
-      }
-    }
-    if (row.volumeComplete && row.volumeKg !== null && (bests.volume === null || row.volumeKg > bests.volume.value)) {
-      bests.volume = { ...session, value: row.volumeKg, workingSets: row.workingSets };
-    }
-    bests.latest = session;
+      },
+      weight: row.topWeightKg === null ? null : { ...session, weight: row.topWeightKg, reps: bestSetReps(row.topWeightRepsValue) },
+      volume: row.volumeComplete && row.volumeKg !== null ? { ...session, value: row.volumeKg, workingSets: row.workingSets } : null,
+    });
+    latest = session;
   }
-  return bests;
+  const { oneRepMax, weight, volume } = book.holders;
+  return { oneRepMax, topWeight: weight, volume, latest };
 };
+
+const selectBestsRows = (database: LocalDatabase, where: SQL | undefined) =>
+  database.select({ ...bestsColumns, exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId })
+    .from(exerciseSessionFacts)
+    .innerJoin(sessions, liveSessionJoin)
+    .leftJoin(gyms, eq(gyms.id, sessions.gymId))
+    .leftJoin(bestE1rmSet, eq(bestE1rmSet.id, exerciseSessionFacts.bestE1rmSetId))
+    .leftJoin(topWeightSet, eq(topWeightSet.id, exerciseSessionFacts.topWeightSetId))
+    .where(where)
+    .all()
+    .sort(compareFactSessionOrder);
 
 /**
  * One exercise's all-time 1RM, top weight and best complete volume, each with
@@ -469,16 +433,52 @@ const pickBests = (rows: BestsRow[]): ExerciseBests => {
 export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<ExerciseBests> => {
   const database = await bootstrapLocalDataLayer();
   drainExerciseSessionFacts(database);
-  const rows = database.select(bestsColumns).from(exerciseSessionFacts)
-    .innerJoin(sessions, liveSessionJoin)
-    .leftJoin(gyms, eq(gyms.id, sessions.gymId))
-    .leftJoin(bestE1rmSet, eq(bestE1rmSet.id, exerciseSessionFacts.bestE1rmSetId))
-    .leftJoin(topWeightSet, eq(topWeightSet.id, exerciseSessionFacts.topWeightSetId))
-    .where(and(
-      eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
-      gymScope(scope.gymId),
-    ))
-    .all()
-    .sort(compareFactSessionOrder);
+  const rows = selectBestsRows(database, and(
+    eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
+    gymScope(scope.gymId),
+  ));
   return pickBests(rowsBefore(database, rows, scope.beforeSessionId));
+};
+
+/**
+ * Each listed definition's records over every gym's sessions before `target`
+ * in PR-history order: the records the target's sets are compared with. The
+ * same fold as `loadExerciseBests`; a definition with no earlier fact row is
+ * absent.
+ */
+export const loadEarlierBestsByDefinition = async (
+  target: { sessionId: string; completedAt: Date },
+  exerciseDefinitionIds: readonly string[],
+): Promise<Map<string, ExerciseBests>> => {
+  const bests = new Map<string, ExerciseBests>();
+  if (exerciseDefinitionIds.length === 0) return bests;
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  const before = (row: BestsRow) => compareFactSessionOrder(row, target) < 0;
+  for (const ids of chunks(exerciseDefinitionIds)) {
+    const rows = selectBestsRows(database, and(
+      inArray(exerciseSessionFacts.exerciseDefinitionId, ids),
+      lte(exerciseSessionFacts.achievedAt, target.completedAt),
+    )).filter(before);
+    const rowsByDefinition = new Map<string, BestsRow[]>();
+    for (const row of rows) {
+      const group = rowsByDefinition.get(row.exerciseDefinitionId) ?? [];
+      group.push(row);
+      rowsByDefinition.set(row.exerciseDefinitionId, group);
+    }
+    for (const [definitionId, group] of rowsByDefinition) bests.set(definitionId, pickBests(group));
+  }
+  return bests;
+};
+
+/** Each listed definition's 1RM record before `target` (`loadEarlierBestsByDefinition`). */
+export const loadEarlierBestE1rmByDefinition = async (
+  target: { sessionId: string; completedAt: Date },
+  exerciseDefinitionIds: readonly string[],
+): Promise<Map<string, number>> => {
+  const best = new Map<string, number>();
+  for (const [definitionId, bests] of await loadEarlierBestsByDefinition(target, exerciseDefinitionIds)) {
+    if (bests.oneRepMax) best.set(definitionId, bests.oneRepMax.value);
+  }
+  return best;
 };

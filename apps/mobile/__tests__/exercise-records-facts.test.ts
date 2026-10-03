@@ -114,7 +114,7 @@ describe('exercise records from the facts', () => {
     expect(records.oneRepMax?.value).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
     expect(records.maxWeight).toMatchObject({ weight: 100, reps: 5, completedAt: day(1) });
     expect(records.volume).toMatchObject({ value: 100 * 5 + 90 * 8, setCount: 2, completedAt: day(1) });
-    expect(recordBaselineOf(records)).toEqual({ oneRepMax: records.oneRepMax!.value, weight: 100 });
+    expect(recordBaselineOf(records)).toEqual({ oneRepMax: records.oneRepMax!.value, weight: { weight: 100, reps: 5 } });
   });
 
   it('gives a tie across sessions to the earliest session; an equal top weight goes to more reps', async () => {

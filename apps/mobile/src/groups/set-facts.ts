@@ -6,8 +6,8 @@ import { estimateOneRepMax, parseCalculationSet } from '../exercise-calculations
 import {
   canonicalizeWeightForReps,
   isConfirmedPerformedSet,
+  isWorkingSetType,
 } from '../exercise-calculations/set-semantics.ts';
-import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
 export const GROUP_EVAL_RULES_VERSION = 4;

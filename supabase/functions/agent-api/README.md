@@ -233,7 +233,13 @@ This section lists the fields that rule governs.
   stat footprint: it is absent from `recent_performances` and `volume_series`,
   sets no `last_performed_at`, and is not an excluded-volume session.
 
-`metric_revision: "working_sets_v1"` marks this meaning. The previous
+`personal_records` follow the app's record rules
+([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
+§3): `top_weight` is the heaviest Weight and, at that weight, the most reps; a
+tie keeps the earliest session; a zero result is never a record.
+
+`metric_revision: "working_sets_v2"` marks this meaning. `"working_sets_v1"`
+let a zero 1RM, Weight or Volume stand as a record; the earlier
 `"bodyweight_optional_v1"` counted warm-ups in every figure.
 
 ## Optional bodyweight calculation response
@@ -241,7 +247,7 @@ This section lists the fields that rule governs.
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v1"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v2"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

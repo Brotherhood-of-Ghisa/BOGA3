@@ -1,6 +1,8 @@
 # Fix plan: one definition each for counted sets, counted sessions, records and calculations
 
 > Status: **decisions agreed** (2026-10-03; D4 changed by Dino, rest as recommended). Owner: Dino.
+> Progress: PR 2 merged (#487); PR 1 in its own session; PR 3 split into 3 (the
+> definition) and 3b (D5's Weight-record display, a UI change needing a design target).
 > Source: the metrics-definitions audit run in this worktree on 2026-10-03.
 > The decisions below need sign-off before PR 2 starts; PR 1 can start now.
 > Working note: each PR moves the rules it ships into the owning spec, and
@@ -134,7 +136,7 @@ the plan fixes, with the anchors as of `06d49059`.
 | D8 | Display precision | One `format.ts`: Weight 1 dp (trailing `.0` trimmed), 1RM 1 dp, Volume whole kg, everywhere including Stats and groups. The history sheet keeps whole numbers only if you want that (ux-rules:631 asks for it today) | This is the user-visible part of "consistent calculations". Exceptions should be deliberate, and listed in the contract |
 | D9 | The agent-api revision string | Bump `metric_revision` to `working_sets_v2` in the PR that changes zero and tie handling (D3/D4) | API clients need to see that the meaning changed |
 
-## Delivery: 4 PRs
+## Delivery: 5 PRs
 
 PR 1 is independent. PRs 2 → 3 → 4 run in order. Each PR ships its section of
 the contract and replaces the restatements it touches with links.
@@ -233,6 +235,17 @@ session counts), and the quality targets.
 
 Proposed lanes: `fast`, `backend` (the agent-api contract), `frontend-ui` (the
 exercise page and session view record highlight), and the quality targets.
+
+### PR 3b: Weight records on the session view and completion (D5 display)
+
+PR 3 makes the record set one definition (`pickSessionRecordSet`) and gives the
+session view and completion the full baseline (`loadEarlierBestsByDefinition`),
+but they still show 1RM records only. 3b shows the Weight fallback there, as
+the exercise page does: `weightRecord` on `SessionViewSetRow` and
+`set-summary-row.tsx`, a kind on `ExercisePersonalRecord`, the card band and
+`PersonalRecordCard` / share-sheet copy, and the contract §3 screen table.
+It needs a pinned design target and screenshots (`ai-design-policy.md`).
+Lanes: `fast`, `frontend-ui`.
 
 ### PR 4: calculations and display (K1–K3, D8, the remaining doc sweep)
 

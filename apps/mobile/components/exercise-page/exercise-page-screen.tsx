@@ -30,6 +30,7 @@ import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
   addSet,
   buildSetRows,
+  sessionRecordBlocks,
   commitSet,
   describeCompleteExercisePlan,
   discardSetEntry,
@@ -146,7 +147,9 @@ export function ExercisePageScreen({
   );
   const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
-  const rows = buildSetRows(sets, baseline, loadContext);
+  const recordSession = exercise && draft.state.status === 'ready'
+    ? sessionRecordBlocks(exercise, draft.state.sessionBlocks) : null;
+  const rows = buildSetRows(sets, baseline, loadContext, recordSession);
   const recordBand = recordBandFor(rows);
   const cursorIndex = findCursorIndex(sets);
   const openSet =

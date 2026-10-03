@@ -5,6 +5,7 @@ import {
   eligibleSetsByBlockInSessionOrder,
   pickBestEstimatedOneRepMaxSet,
 } from '@/src/exercise-calculations/best-set';
+import { beatsRecord, compareRecordOrder, createRecordBook } from '@/src/exercise-calculations/records';
 import {
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
@@ -398,13 +399,12 @@ export const deriveExercisePersonalRecord = (
   input: ExercisePersonalRecordInput,
 ): ExercisePersonalRecord | null => {
   const historicalBest = input.historicalBestEstimatedOneRepMax;
-  if (historicalBest === null || !Number.isFinite(historicalBest)) return null;
-
   const best = findBestPersonalRecordCandidate(
     input.exerciseDefinitionId,
     input.exercises,
   );
-  if (!best || best.estimatedOneRepMax <= historicalBest) return null;
+  // The 1RM record rule (`records.ts`): strictly above a positive record.
+  if (!best || historicalBest === null || !beatsRecord(best.estimatedOneRepMax, historicalBest)) return null;
 
   return {
     ...best,
@@ -412,35 +412,34 @@ export const deriveExercisePersonalRecord = (
   };
 };
 
-const compareSessionOrder = (
-  left: Pick<PersonalRecordSessionInput, "sessionId" | "completedAt">,
-  right: Pick<PersonalRecordSessionInput, "sessionId" | "completedAt">,
-): number => {
-  if (left.completedAt === null || right.completedAt === null) return 0;
-  const completedAtDifference =
-    left.completedAt.getTime() - right.completedAt.getTime();
-  return completedAtDifference !== 0
-    ? completedAtDifference
-    : left.sessionId.localeCompare(right.sessionId);
-};
+/** Both sessions completed, and `session` first in record order (`compareRecordOrder`). */
+const isBeforeInRecordOrder = (
+  session: Pick<PersonalRecordSessionInput, "sessionId" | "completedAt">,
+  target: Pick<PersonalRecordSessionInput, "sessionId" | "completedAt">,
+): boolean =>
+  session.completedAt !== null && target.completedAt !== null &&
+  compareRecordOrder(
+    { sessionId: session.sessionId, completedAt: session.completedAt },
+    { sessionId: target.sessionId, completedAt: target.completedAt },
+  ) < 0;
 
+/** The replay reference's earlier 1RM records, folded by the record book from raw sets. */
 const collectHistoricalBestByExerciseDefinition = (
   targetSession: PersonalRecordSessionInput,
   historicalSessions: PersonalRecordSessionInput[],
 ): Map<string, number> => {
-  const bestByDefinition = new Map<string, number>();
+  const books = new Map<string, ReturnType<typeof createRecordBook>>();
+  const earlier = historicalSessions
+    .filter((session) =>
+      session.status === "completed" && session.completedAt !== null && (session.deletedAt ?? null) === null)
+    .map((session) => {
+      ensureValidDate(session.completedAt as Date, "historical completedAt");
+      return { ...session, completedAt: session.completedAt as Date };
+    })
+    .filter((session) => isBeforeInRecordOrder(session, targetSession))
+    .sort(compareRecordOrder);
 
-  for (const session of historicalSessions) {
-    if (
-      session.status !== "completed" ||
-      session.completedAt === null ||
-      (session.deletedAt ?? null) !== null
-    ) {
-      continue;
-    }
-    ensureValidDate(session.completedAt, "historical completedAt");
-    if (compareSessionOrder(session, targetSession) >= 0) continue;
-
+  for (const session of earlier) {
     const exerciseDefinitionIds = new Set(
       session.exercises
         .filter((exercise) => (exercise.deletedAt ?? null) === null)
@@ -448,24 +447,18 @@ const collectHistoricalBestByExerciseDefinition = (
         .filter((id): id is string => id !== null),
     );
     for (const exerciseDefinitionId of exerciseDefinitionIds) {
-      const candidate = findBestPersonalRecordCandidate(
-        exerciseDefinitionId,
-        session.exercises,
-      );
+      const candidate = findBestPersonalRecordCandidate(exerciseDefinitionId, session.exercises);
       if (!candidate) continue;
-      const currentBest = bestByDefinition.get(exerciseDefinitionId);
-      if (
-        currentBest === undefined ||
-        candidate.estimatedOneRepMax > currentBest
-      ) {
-        bestByDefinition.set(
-          exerciseDefinitionId,
-          candidate.estimatedOneRepMax,
-        );
-      }
+      const book = books.get(exerciseDefinitionId) ?? createRecordBook();
+      books.set(exerciseDefinitionId, book);
+      book.add({ oneRepMax: { value: candidate.estimatedOneRepMax }, weight: null, volume: null });
     }
   }
 
+  const bestByDefinition = new Map<string, number>();
+  for (const [exerciseDefinitionId, book] of books) {
+    if (book.holders.oneRepMax) bestByDefinition.set(exerciseDefinitionId, book.holders.oneRepMax.value);
+  }
   return bestByDefinition;
 };
 
@@ -619,7 +612,7 @@ export const deriveSessionExerciseVolumeComparisons = (
       continue;
     }
     ensureValidDate(session.completedAt, "historical completedAt");
-    if (compareSessionOrder(session, target) >= 0) continue;
+    if (!isBeforeInRecordOrder(session, target)) continue;
 
     for (const observation of collectExerciseVolumeObservations(
       session.exercises,
@@ -764,7 +757,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       session.status !== "completed" ||
       session.completedAt === null ||
       (session.deletedAt ?? null) !== null ||
-      compareSessionOrder(session, target) >= 0
+      !isBeforeInRecordOrder(session, target)
     )
       continue;
     for (const muscle of observe(session)) {

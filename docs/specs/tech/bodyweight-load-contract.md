@@ -102,8 +102,9 @@ for policy purposes.
 
 A valid zero calculated load produces numeric Volume `0` and 1RM `0`. Reps,
 performed-set counts, working-set classification and effort remain usable. A
-zero Weight/1RM/Volume result never creates a personal or group record, ranking
-or achievement. Invalid input never becomes zero implicitly.
+zero result is never a record, ranking or achievement
+(`training-metrics-contract.md` §3). Invalid input never becomes zero
+implicitly.
 
 Top weight is always the highest raw entered Weight in kg. It never includes
 bodyweight contribution and never changes after a preference, contribution or
