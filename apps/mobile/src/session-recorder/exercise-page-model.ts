@@ -131,10 +131,8 @@ const beats = (value: number | null, record: number | null): boolean =>
  * set that reached the value first.
  */
 export const bestRecordSetId = (
-  candidates: { id: string; oneRepMaxRecord: boolean; oneRepMax: number | null; weightRecord: boolean; weight: number | null }[],
-  baseline: ExerciseRecordBaseline | null
+  candidates: { id: string; oneRepMaxRecord: boolean; oneRepMax: number | null; weightRecord: boolean; weight: number | null }[]
 ): string | null => {
-  if (!baseline) return null;
   let best: { id: string; oneRepMax: number | null; weight: number | null } | null = null;
   for (const candidate of candidates) {
     const oneRepMax = candidate.oneRepMaxRecord ? candidate.oneRepMax : null;
@@ -179,7 +177,7 @@ export const buildSetRows = (
       oneRepMaxRecord: performed && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
     };
   });
-  const winnerId = bestRecordSetId(evaluated, baseline);
+  const winnerId = bestRecordSetId(evaluated);
   return evaluated.map((row) => ({
     ...row,
     weightRecord: winnerId !== null && row.id === winnerId && row.weightRecord,

@@ -201,8 +201,11 @@ describe('ExercisePageScreen', () => {
     await openPage();
 
     // The logger is the open cursor row; its accessibility actions are the
-    // non-gesture path of the swipes (`ux-rules.md` §14a.3).
-    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+    // non-gesture path of the swipes (`ux-rules.md` §14a.3), exposed on its
+    // accessible header.
+    const header = screen.getByTestId('exercise-set-logger-header');
+    expect(header).toHaveProp('accessible', true);
+    fireEvent(header, 'accessibilityAction', {
       nativeEvent: { actionName: 'confirm' },
     });
 
@@ -219,16 +222,16 @@ describe('ExercisePageScreen', () => {
 
     // Confirm sets 3 and 4 through the logger's action; the logger follows the
     // cursor, leaving set 5 the in-progress one.
-    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'confirm' },
     });
     await waitFor(async () => expect((await benchSets())[2]?.performanceStatus).toBeNull());
-    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'confirm' },
     });
     await waitFor(async () => expect((await benchSets())[3]?.performanceStatus).toBeNull());
 
-    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'confirm' },
     });
 
@@ -247,7 +250,7 @@ describe('ExercisePageScreen', () => {
     await openPage();
 
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
-    fireEvent(screen.getByTestId('exercise-set-logger'), 'accessibilityAction', {
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'discard' },
     });
 
@@ -261,6 +264,50 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-swipe-3')).toBeTruthy();
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  it('binds swipe and accessibility actions to the row being targeted when cursor and open rows differ', async () => {
+    await openPage();
+
+    // Set 3 is cursor (unperformed); tapping Add set opens Set 6 in the logger.
+    fireEvent.press(screen.getByTestId('exercise-add-set'));
+    await waitFor(() => expect(screen.getByTestId('exercise-set-logger-header')).toBeTruthy());
+    expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 6')).toBeTruthy();
+
+    // Type into Set 6's logger.
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '95');
+
+    // Both Set 3 (cursor) and Set 6 (open) have swipe shells.
+    expect(screen.getByTestId('exercise-set-swipe-3')).toBeTruthy();
+    expect(screen.getByTestId('exercise-set-swipe-6')).toBeTruthy();
+
+    // Discarding on Set 3's collapsed row drops Set 3, leaving Set 6's entry intact in the logger.
+    fireEvent(screen.getByTestId('exercise-set-3-open'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'discard' },
+    });
+    expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('95');
+
+    // Confirming Set 3 commits Set 3, leaving Set 6 open in the logger without prematurely adding Set 7.
+    fireEvent(screen.getByTestId('exercise-set-3-open'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    await waitFor(async () =>
+      expect((await benchSets())[2]).toMatchObject({ performanceStatus: null })
+    );
+    expect(await benchSets()).toHaveLength(6);
+    expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 6')).toBeTruthy();
+    expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('95');
+
+    // Now confirming Set 6 (the last set) commits Set 6 and adds Set 7.
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    await waitFor(async () => expect(await benchSets()).toHaveLength(7));
+    expect((await benchSets())[5]).toMatchObject({
+      weightValue: '95',
+      performanceStatus: null,
+    });
+    expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 7')).toBeTruthy();
   });
 
   it('edits an exercise of a completed session, writing it back as completed with its times', async () => {

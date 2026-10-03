@@ -64,18 +64,21 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
   const effort = formatEffort(setType);
 
   return (
-    <View
-      accessibilityActions={[
-        { name: 'confirm', label: `Confirm set ${number}` },
-        ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}'s entry` }] : []),
-      ]}
-      onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === 'confirm') onConfirm();
-        if (event.nativeEvent.actionName === 'discard') onDrop?.();
-      }}
-      style={styles.logger}
-      testID="exercise-set-logger">
-      <View style={styles.header}>
+    <View style={styles.logger} testID="exercise-set-logger">
+      <View
+        accessibilityActions={[
+          { name: 'confirm', label: `Confirm set ${number}` },
+          ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}'s entry` }] : []),
+        ]}
+        accessibilityHint="Confirm or drop the set from the actions menu"
+        accessibilityLabel={`Set ${number}, in progress`}
+        accessible
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'confirm') onConfirm();
+          if (event.nativeEvent.actionName === 'discard') onDrop?.();
+        }}
+        style={styles.header}
+        testID="exercise-set-logger-header">
         <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
         <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
           {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}

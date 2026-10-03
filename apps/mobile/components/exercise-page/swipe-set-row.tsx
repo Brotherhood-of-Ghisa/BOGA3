@@ -17,9 +17,8 @@ const TRIGGER_VELOCITY = 500;
 
 type SwipeSetRowProps = {
   children: ReactNode;
-  enabled?: boolean;
-  onSwipeRight?: () => void;
-  onSwipeLeft?: () => void;
+  onSwipeRight: () => void;
+  onSwipeLeft: () => void;
   testID?: string;
 };
 
@@ -32,11 +31,10 @@ type SwipeSetRowProps = {
  * glyph, the logger's tick) keep working, and the accessibility actions are
  * the non-gesture path.
  */
-export function SwipeSetRow({ children, enabled = true, onSwipeRight, onSwipeLeft, testID }: SwipeSetRowProps) {
+export function SwipeSetRow({ children, onSwipeRight, onSwipeLeft, testID }: SwipeSetRowProps) {
   const drag = useSharedValue(0);
 
   const pan = Gesture.Pan()
-    .enabled(enabled && (onSwipeRight !== undefined || onSwipeLeft !== undefined))
     .activeOffsetX([-ACTIVATION_DISTANCE, ACTIVATION_DISTANCE])
     .failOffsetY([-FAIL_VERTICAL, FAIL_VERTICAL])
     .onUpdate((event) => {
@@ -49,8 +47,8 @@ export function SwipeSetRow({ children, enabled = true, onSwipeRight, onSwipeLef
       const right = translationX > 0 && (translationX > TRIGGER_DISTANCE || velocityX > TRIGGER_VELOCITY);
       const left = translationX < 0 && (-translationX > TRIGGER_DISTANCE || -velocityX > TRIGGER_VELOCITY);
       drag.value = withTiming(0, { duration: 120 });
-      if (right && onSwipeRight) runOnJS(onSwipeRight)();
-      else if (left && onSwipeLeft) runOnJS(onSwipeLeft)();
+      if (right) runOnJS(onSwipeRight)();
+      else if (left) runOnJS(onSwipeLeft)();
     });
 
   const contentStyle = useAnimatedStyle(() => ({

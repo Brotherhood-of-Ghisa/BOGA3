@@ -205,14 +205,22 @@ export function ExercisePageScreen({
    * continuation is Add set: the fresh row opens in the logger with the
    * copied values and the weight focused. Invalid values change nothing.
    */
-  const onSwipeRight = () => {
-    if (!openSet || !loggerValues) return;
+  const onSwipeRight = (setId: string) => {
     Keyboard.dismiss();
-    const committed = commitSet(sets, openSet.id, loggerValues);
+    const isTargetOpen = openSet?.id === setId;
+    const values =
+      isTargetOpen && loggerValues
+        ? loggerValues
+        : (() => {
+            const target = sets.find((s) => s.id === setId);
+            return target ? loggerValuesFor(target) : null;
+          })();
+    if (!values) return;
+    const committed = commitSet(sets, setId, values);
     if (committed === sets) return;
-    if (sets[sets.length - 1]?.id !== openSet.id) {
+    if (sets[sets.length - 1]?.id !== setId) {
       updateSets(() => committed, 'structural');
-      setOpenSetId(null);
+      if (isTargetOpen) setOpenSetId(null);
       return;
     }
     const next = addSet(committed);
@@ -222,9 +230,8 @@ export function ExercisePageScreen({
   };
 
   /** Swipe left: drop the in-progress entry; the row keeps its place (`discardSetEntry`). */
-  const onSwipeLeft = () => {
-    if (!openSet) return;
-    updateSets((current) => discardSetEntry(current, openSet.id), 'structural');
+  const onSwipeLeft = (setId: string) => {
+    updateSets((current) => discardSetEntry(current, setId), 'structural');
   };
 
   const finishComplete = async (nextSets: typeof sets) => {
@@ -337,9 +344,9 @@ export function ExercisePageScreen({
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
                     onCommit={onCommit}
-                    onConfirm={onSwipeRight}
+                    onConfirm={() => onSwipeRight(row.id)}
                     onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType))}
-                    onDrop={onSwipeLeft}
+                    onDrop={() => onSwipeLeft(row.id)}
                     onOpenEffort={() => setOpenSheet('effort')}
                     ref={weightInputRef}
                     repsValue={loggerValues.repsValue}
@@ -350,8 +357,8 @@ export function ExercisePageScreen({
                   <SetRow
                     divider={index > 0 && !followsLogger}
                     key={row.id}
-                    onConfirm={onSwipeRight}
-                    onDrop={onSwipeLeft}
+                    onConfirm={() => onSwipeRight(row.id)}
+                    onDrop={() => onSwipeLeft(row.id)}
                     onOpen={setOpenSetId}
                     onToggle={onToggle}
                     row={row}
@@ -360,8 +367,8 @@ export function ExercisePageScreen({
                 return (
                   <SwipeSetRow
                     key={row.id}
-                    onSwipeLeft={onSwipeLeft}
-                    onSwipeRight={onSwipeRight}
+                    onSwipeLeft={() => onSwipeLeft(row.id)}
+                    onSwipeRight={() => onSwipeRight(row.id)}
                     testID={`exercise-set-swipe-${row.number}`}>
                     {rowContent}
                   </SwipeSetRow>
