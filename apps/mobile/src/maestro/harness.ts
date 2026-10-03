@@ -18,6 +18,7 @@ import { seedBodyweightRmVolumeFixture } from './bodyweight-load-fixture';
 import { seedExercisePageFixture } from './exercise-page-fixture';
 import { seedExerciseBrowserFixture } from './exercise-browser-fixture';
 import { seedSessionViewFixture } from './session-view-fixture';
+import { seedTodayProgressFixture } from './today-progress-fixture';
 import { setBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 
 export type MaestroHarnessResetMode = 'none' | 'data';
@@ -29,7 +30,9 @@ export type MaestroHarnessFixtureName =
   | 'bodyweight-rm-volume'
   | 'exercise-page'
   | 'session-view'
-  | 'exercise-browser';
+  | 'exercise-browser'
+  // A completed history dated relative to now: Today's Progress card, populated.
+  | 'today-progress';
 /**
  * Drives the first-sync gate deterministically in tests without a live cycle:
  * 'reset' clears the bootstrap flag so the gate's full-screen block shows;
@@ -56,7 +59,8 @@ export type MaestroHarnessTeleportTarget =
   // The session view; needs `sessionId`: the active draft,
   // or a completed session to edit it (e.g. `maestro_m24_completion_one_pr`
   // from the `exercise-block-history` fixture).
-  | 'session-view';
+  | 'session-view'
+  | 'today';
 
 export const coerceMaestroHarnessQueryParam = (value: string | string[] | undefined): string | null => {
   if (Array.isArray(value)) {
@@ -86,7 +90,8 @@ export const resolveMaestroHarnessFixtureName = (
   value === 'bodyweight-rm-volume' ||
   value === 'exercise-page' ||
   value === 'session-view' ||
-  value === 'exercise-browser'
+  value === 'exercise-browser' ||
+  value === 'today-progress'
     ? value
     : 'none';
 
@@ -109,6 +114,7 @@ export const resolveMaestroHarnessTeleportTarget = (
     case 'completed-session':
     case 'exercise-page':
     case 'session-view':
+    case 'today':
       return value;
     default:
       return null;
@@ -173,6 +179,8 @@ export const resolveMaestroHarnessTeleportHref = ({
         : null;
     case 'session-view':
       return sessionId ? sessionViewHref(sessionId) : null;
+    case 'today':
+      return '/today' as Href;
     default:
       return null;
   }
@@ -201,6 +209,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   if (fixtureName === 'session-view') {
     await seedSessionViewFixture();
   }
+  if (fixtureName === 'today-progress') await seedTodayProgressFixture();
 };
 
 export const runMaestroHarnessBodyweightPreference = (value: string | null | undefined) => {

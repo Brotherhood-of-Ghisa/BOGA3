@@ -98,6 +98,7 @@ Define the canonical repository structure, path ownership, and placement convent
     aggregation (`src/data/stats.ts`), 1RM PRs from the exercise session facts;
     every figure places a session by its `completed_at`.
   - derived-only, like `session-insights`: no schema, no sync, no history replay.
+  - drawn by Today's Progress card, `apps/mobile/components/today/`.
 - `apps/mobile/.maestro/`
   - owns committed Maestro flow definitions (`flows/`), their `runScript` helpers (`scripts/`, e.g. the scripted counterparty of the two-user groups flow), and the checked-in sample config file (`maestro.env.sample`).
   - the per-worktree file `apps/mobile/.maestro/maestro.env.local` is canonical but remains untracked/local-only.

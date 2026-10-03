@@ -1,0 +1,158 @@
+// The Progress card's words and chart geometry (pure). The figures come from
+// `src/progress-summary`; this file only says them (`ux-rules.md` §7, §13).
+
+import type { LatestSessionSummary, TodayProgressMonth } from '@/src/progress-summary';
+import type { LocalWindow } from '@/src/utils/local-calendar';
+import { formatCompactDuration } from '@/src/data/session-list';
+import { formatMonthDayTime } from '@/src/utils/local-time';
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+export const monthName = (date: Date): string => MONTHS[date.getMonth()];
+export const shortMonthName = (date: Date): string => monthName(date).slice(0, 3);
+
+const dayLabel = (date: Date, withMonth: boolean): string =>
+  `${WEEKDAYS[date.getDay()]} ${date.getDate()}${withMonth ? ` ${shortMonthName(date)}` : ''}`;
+
+/** `Mon 13 – Sun 19`; a week across two months names both (`Mon 29 Sep – Sun 5 Oct`). */
+export const formatWeekRange = (window: LocalWindow): string => {
+  const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
+  const acrossMonths = sunday.getMonth() !== window.start.getMonth();
+  return `${dayLabel(window.start, acrossMonths)} – ${dayLabel(sunday, acrossMonths)}`;
+};
+
+/** A count's signed absolute difference (`ux-rules.md` §13.2): `+4`, `−3`, `±0`. */
+export const formatSignedCount = (difference: number): string => {
+  if (difference > 0) return `+${difference}`;
+  if (difference < 0) return `−${Math.abs(difference)}`;
+  return '±0';
+};
+
+export const paceDifference = (month: TodayProgressMonth): number =>
+  month.toDate.workingSets - month.previous.toSameDay.workingSets;
+
+/** `ahead of Sep's pace` / `behind Sep's pace` / `level with Sep's pace`. */
+export const formatPacePhrase = (month: TodayProgressMonth): string => {
+  const difference = paceDifference(month);
+  const relation = difference > 0 ? 'ahead of' : difference < 0 ? 'behind' : 'level with';
+  return `${relation} ${shortMonthName(month.previous.window.start)}'s pace`;
+};
+
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/** A share bar: this week as a share of last week's total, full once reached. */
+export const weekShare = (counts: { current: number; previous: number }): { fraction: number; reached: boolean } => {
+  if (counts.current === 0) return { fraction: 0, reached: false };
+  if (counts.current >= counts.previous) return { fraction: 1, reached: true };
+  return { fraction: counts.current / counts.previous, reached: false };
+};
+
+const ordinal = (day: number): string => {
+  const teen = day % 100 >= 11 && day % 100 <= 13;
+  const suffix = teen ? 'th' : (['th', 'st', 'nd', 'rd'][day % 10] ?? 'th');
+  return `${day}${suffix}`;
+};
+
+/** The month chart's spoken summary; the chart itself is one image. */
+export const monthChartAccessibilityLabel = (month: TodayProgressMonth): string => {
+  const sameDay = Math.min(month.dayOfMonth, month.previous.daysInMonth);
+  return [
+    `Cumulative working sets: ${monthName(month.window.start)} ${month.toDate.workingSets} by the ${ordinal(month.dayOfMonth)}`,
+    `against ${monthName(month.previous.window.start)} ${month.previous.toSameDay.workingSets} by the ${ordinal(sameDay)};`,
+    `${monthName(month.previous.window.start)} finished at ${month.previous.total.workingSets}.`,
+    `On course for ${month.projectedWorkingSets}.`,
+  ].join(' ');
+};
+
+export const formatSessionCount = (count: number): string => plural(count, 'session', 'sessions');
+export const formatPrCount = (count: number): string => plural(count, 'PR', 'PRs');
+
+/** `12 W/sets · 4 exercises`. */
+export const formatLatestFigures = (latest: LatestSessionSummary): string =>
+  `${latest.workingSets} W/sets · ${plural(latest.exerciseCount, 'exercise', 'exercises')}`;
+
+export const formatLatestDuration = (latest: LatestSessionSummary): string =>
+  formatCompactDuration(latest.durationSec);
+
+export const latestSessionAccessibilityLabel = (latest: LatestSessionSummary): string => {
+  const gym = latest.gymName?.trim();
+  return [
+    `Completed session on ${formatMonthDayTime(latest.startedAt.getTime())}`,
+    formatLatestDuration(latest),
+    plural(latest.workingSets, 'working set', 'working sets'),
+    plural(latest.exerciseCount, 'exercise', 'exercises'),
+    gym ? `at ${gym}` : null,
+    latest.prs > 0 ? formatPrCount(latest.prs) : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(', ');
+};
+
+export const weekFigureAccessibilityLabel = (label: string, counts: { current: number; previous: number }): string =>
+  `${label} ${counts.current}, of ${counts.previous} last week`;
+
+// --- The month chart's geometry -------------------------------------------
+
+export type ChartPoint = { x: number; y: number };
+
+export type MonthChartGeometry = {
+  plot: { width: number; top: number; bottom: number };
+  current: ChartPoint[];
+  previous: ChartPoint[];
+  projection: { from: ChartPoint; to: ChartPoint };
+  today: { current: ChartPoint; previous: ChartPoint };
+  monthEndX: number;
+};
+
+// Room on the right for the previous month's name at the end of its line.
+export const CHART_RIGHT_GUTTER = 34;
+export const CHART_HEIGHT = 104;
+const PLOT_TOP = 6;
+const PLOT_BOTTOM = 86;
+
+/**
+ * Day of month on x (the 1st at 0; the longer of the two months spans the
+ * plot) and cumulative working sets on y, scaled to the highest of the
+ * projection, the previous month's total and today's figure.
+ */
+export const monthChartGeometry = (month: TodayProgressMonth, width: number): MonthChartGeometry => {
+  const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
+  const days = Math.max(month.daysInMonth, month.previous.daysInMonth);
+  const yMax = Math.max(1, month.projectedWorkingSets, month.previous.total.workingSets, month.toDate.workingSets);
+  const x = (dayIndex: number) => (days > 1 ? (dayIndex / (days - 1)) * plotWidth : 0);
+  const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (PLOT_BOTTOM - PLOT_TOP);
+  const toPoints = (values: number[]) => values.map((value, index) => ({ x: x(index), y: y(value) }));
+
+  const current = toPoints(month.cumulativeWorkingSets);
+  const previous = toPoints(month.previous.cumulativeWorkingSets);
+  const todayIndex = month.dayOfMonth - 1;
+  const todayCurrent = current[todayIndex] ?? { x: x(todayIndex), y: y(month.toDate.workingSets) };
+  const sameDayIndex = Math.min(month.dayOfMonth, month.previous.daysInMonth) - 1;
+  const todayPrevious = previous[sameDayIndex] ?? { x: x(sameDayIndex), y: y(month.previous.toSameDay.workingSets) };
+
+  return {
+    plot: { width: plotWidth, top: PLOT_TOP, bottom: PLOT_BOTTOM },
+    current,
+    previous,
+    projection: { from: todayCurrent, to: { x: x(month.daysInMonth - 1), y: y(month.projectedWorkingSets) } },
+    today: { current: todayCurrent, previous: todayPrevious },
+    monthEndX: x(month.daysInMonth - 1),
+  };
+};
+
+export const toPolyline = (points: ChartPoint[]): string =>
+  points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');

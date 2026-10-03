@@ -71,6 +71,26 @@ before the build closes.
   auth-unavailable, offline, loading and error keep today's `StatePanel` /
   `Notice` recipes and copy where they still apply.
 
+## Build decisions
+
+Where the build departs from the canvas or settles what the brief left open:
+
+- **No group tags on the latest session.** The canvas draws a `Tag` per group
+  the session was shared to. Sharing is decided on the server (from membership
+  history), so the device does not know it; the row shows none.
+- **Exercise names ellipsise.** The row joins every exercise name on one line
+  and truncates it, with no `+<n>` count.
+- **Bars fill once reached.** A week bar is full, in the darker `viz` step,
+  once this week matches last week's total (not only when it passes it). With
+  nothing last week, any figure fills it; a zero is empty.
+- **PR figures.** A PR figure is `record` with its up arrow only when it is
+  above zero; `0` is plain `ink`.
+- **The chart.** The longer of the two months spans the width. The chart is
+  one image for VoiceOver, labelled with its summary sentence (not shown on
+  screen); the visible summary line under it stays.
+- **Group activity** keeps the current stream snapshot until the group card
+  is built.
+
 ## States
 
 Device: iPhone simulator at 390pt width, light. Lanes and screenshot names are
