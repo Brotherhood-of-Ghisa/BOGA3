@@ -558,7 +558,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     const accentNodes = screen.UNSAFE_root.findAll(
       (node: Node) =>
         typeof node.type === 'string' &&
-        (StyleSheet.flatten(node.props.style as ViewStyle) ?? {}).backgroundColor === uiRoles.accent,
+        (StyleSheet.flatten(node.props.style as any) ?? {}).backgroundColor === uiRoles.accent,
     );
     expect(accentNodes.map((node: Node) => node.props.testID)).toEqual(['exercise-picker-append-plan-button']);
     fireEvent.press(appendButton);
