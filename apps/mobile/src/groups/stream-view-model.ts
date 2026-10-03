@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { isMetricStreamEvent, type CurrentGroupStreamItem as StreamItem, type GroupMetricStreamItemWire } from './metric-wire';
 // Pure presentation for the group stream (`docs/specs/tech/groups-contract.md`
 // §6.1): card status, card metrics (computed on the device, §5) and their kg
@@ -5,7 +6,6 @@ import { isMetricStreamEvent, type CurrentGroupStreamItem as StreamItem, type Gr
 // sentences (M25-T10), and filter chips. No React, no I/O.
 
 import { formatCompactDuration } from '@/src/data/session-list';
-import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
 import { formatClockTime, formatLocalDateTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { computeGroupSessionMetrics } from './session-metrics';
@@ -61,18 +61,11 @@ export const formatSessionStatusLabel = (
   return durationSec === null ? 'Completed' : `Completed · ${formatCompactDuration(durationSec)}`;
 };
 
-/** A kg number: integers as-is, otherwise at most 2 decimals; no thousands separators (design-language §6). */
-export const formatKg = (value: number): string => {
-  if (!Number.isFinite(value)) {
-    return '-';
-  }
-  const rounded = Number(value.toFixed(2));
-  const [integerPart, fractionPart] = Math.abs(rounded).toString().split('.');
-  const sign = rounded < 0 ? '-' : '';
-  return fractionPart ? `${sign}${integerPart}.${fractionPart}` : `${sign}${integerPart}`;
-};
+/** A Weight or 1RM figure in its one format (`exercise-calculations/format.ts`). */
+export const formatMetricFigure = (metric: 'weight' | 'e1rm', kg: number): string =>
+  metric === 'e1rm' ? formatOneRepMax(kg) : formatWeight(kg);
 
-export const formatVolumeKg = (totalVolumeKg: number): string => `${formatKg(totalVolumeKg)} kg`;
+export const formatVolumeKg = (totalVolumeKg: number): string => `${formatVolume(totalVolumeKg)} kg`;
 
 const pluralize = (count: number, singular: string, plural: string): string =>
   `${count} ${count === 1 ? singular : plural}`;
@@ -253,10 +246,10 @@ const formatPossessive = (member: GroupMemberRef, myUserId: string | null): stri
   isMyUser(member.user_id, myUserId) ? 'Your' : `${formatMemberName(member.username)}'s`;
 
 /** "140 kg × 1", for sentences (prose keeps its unit). */
-export const formatSetValue = (weightKg: number, reps: number): string => `${formatKg(weightKg)} kg × ${reps}`;
+export const formatSetValue = (weightKg: number, reps: number): string => `${formatWeight(weightKg)} kg × ${reps}`;
 
 /** "140.0 × 1", for a figure slot: the app's weight figure, no unit (design-language §6). */
-export const formatSetFigure = (weightKg: number, reps: number): string => `${formatWeightFigure(weightKg)} × ${reps}`;
+export const formatSetFigure = (weightKg: number, reps: number): string => `${formatWeight(weightKg)} × ${reps}`;
 
 /** "Certified by sam" / "Certified by you" / "Certified" (the certifier's account is gone). */
 export const formatCertifiedBy = (certifiedBy: GroupMemberRef | null, myUserId: string | null): string => {
@@ -286,7 +279,7 @@ const buildRecordCard = (item: StreamRecordItem, myUserId: string | null): Strea
   const setFigure = formatSetFigure(item.weight_kg, item.reps);
   const valueLabel =
     item.e1rm_kg !== null && item.boards.some((board) => board.metric === 'e1rm')
-      ? `${setFigure} · 1RM ${formatOneRepMaxFigure(item.e1rm_kg)}`
+      ? `${setFigure} · 1RM ${formatOneRepMax(item.e1rm_kg)}`
       : setFigure;
   const voided = item.voided !== null;
   let statusLabel = RECORD_UNCERTIFIED_LABEL;
@@ -335,7 +328,7 @@ export const formatRecordVoidedSentence = (item: StreamRecordVoidedItem, myUserI
     .sort((a, b) => metricRank(a.metric) - metricRank(b.metric))
     .map(({ metric, leader }) =>
       leader
-        ? `Now #1 on ${metricName(metric)}: ${formatStreamPersonName(leader.member, myUserId)} ${formatKg(leader.value_kg)} kg`
+        ? `Now #1 on ${metricName(metric)}: ${formatStreamPersonName(leader.member, myUserId)} ${formatMetricFigure(metric, leader.value_kg)} kg`
         : `No one holds #1 on ${metricName(metric)}`,
     );
   return [head, ...leaders].join(' · ');

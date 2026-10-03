@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
@@ -6,9 +7,6 @@ import { Stat } from '@/components/ui/stat';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   formatEffort,
-  formatOneRepMax,
-  formatVolume,
-  formatWeight,
   type SetRowView,
 } from '@/src/session-recorder/exercise-page-model';
 

@@ -134,7 +134,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent(/^7$/);
     // Sets and Volume read the 7 working sets; the warm-up adds to neither.
     expect(screen.getByTestId(`stats-exercise-volume-${SQUAT}`)).toHaveTextContent('7100');
-    expect(screen.getByTestId(`stats-exercise-1rm-${SQUAT}`)).toHaveTextContent('321');
+    expect(screen.getByTestId(`stats-exercise-1rm-${SQUAT}`)).toHaveTextContent('320.6');
     expect(screen.queryByTestId(`stats-exercise-sessions-${SQUAT}`)).toBeNull();
     expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel).toContain('7 sets. Volume');
   });

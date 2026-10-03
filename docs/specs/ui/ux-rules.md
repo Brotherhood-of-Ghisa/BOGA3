@@ -629,7 +629,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    details`, or the selected week's range (Source Sans `ink-muted`) and
    `<metric>: <value>` with the value in Plex Mono `ink`. `Daily` has no band;
    its day detail is inside the chart (§11.6).
-6. Values follow `design-language.md` §6: full integers, never `2.5k`; a missing
+6. Values follow the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`; a missing
    1RM or top weight is `—`.
 7. Muscle volume is the per-side, role-weighted aggregate across the selected
    muscle IDs; 1RM and top weight are exercise-level and not offered for muscles.
@@ -695,8 +695,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    literals. Summary deltas keep their sign (`+`, `−`, `±0`) in Plex Mono
    `ink-muted`, with `new` in `ink`; they carry no green or red (G3). The
    Sessions and Sets cards name what their delta is against: the adjacent
-   earlier period of the selected range (`−3 vs prev 7 days`). Volumes
-   and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
+   earlier period of the selected range (`−3 vs prev 7 days`). Figures take
+   the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`.
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
 10. Exercise analytics uses calculated load × reps of working sets (§5.11) under the current private policy, with invalid/overflow coverage and no muscle-role weighting. A day or week with only warm-ups makes no heatmap cell, for exercises and muscles alike. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets`, its working sets, plus `Volume`, the working sets' volume. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
@@ -724,8 +724,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
     stacked `Stat`s (`1RM`, `Top set`, `Vol`, `Sets`); then one `SetSummaryRow` per set,
     `type · weight × reps · 1RM · VOL`. Warm-ups are shown like working sets,
     named by their type column (`W-Up`); there is no set-number column. Figures
-    use the session view's formatters: weights with one decimal, 1RM with one,
-    volume a whole number, no unit suffix.
+    use the one display format (`tech/training-metrics-contract.md` §4), no unit
+    suffix.
 
 ### 14. Group screens: freshness, pull-to-refresh, and the offline marker (M22)
 

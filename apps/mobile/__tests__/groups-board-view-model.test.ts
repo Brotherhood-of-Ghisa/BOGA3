@@ -256,7 +256,7 @@ describe('history sentences (E1.3)', () => {
 
   it.each<[string, Partial<GroupBoardHistoryItem>, string]>([
     ['the first record', { reason: 'record' }, 'Dave set the first record · 142.5 kg'],
-    ['a record taking #1', { reason: 'record', previous: SAM }, 'Dave took #1 · 142.5 kg (from Sam, 138 kg)'],
+    ['a record taking #1', { reason: 'record', previous: SAM }, 'Dave took #1 · 142.5 kg (from Sam, 138.0 kg)'],
     [
       'a link',
       {
@@ -282,7 +282,7 @@ describe('history sentences (E1.3)', () => {
         previous: DAVE,
         related: { kind: 'link', key: 'l2', event: 'unlink', exercises: [{ exercise_definition_id: 'd1', name: 'Bench' }] },
       },
-      'Sam took #1 · 138 kg (Dave unlinked Bench)',
+      'Sam took #1 · 138.0 kg (Dave unlinked Bench)',
     ],
     [
       'a void (edited)',
@@ -292,7 +292,7 @@ describe('history sentences (E1.3)', () => {
         previous: DAVE,
         related: { kind: 'record_voided', key: 'v1', reason: 'edited', record: { weight_kg: 140, reps: 1, e1rm_kg: 140 } },
       },
-      "Sam now #1 · 138 kg (Dave's 142.5 kg removed — set edited)",
+      "Sam now #1 · 138.0 kg (Dave's 142.5 kg removed — set edited)",
     ],
     [
       'a void that empties the board',
@@ -313,7 +313,7 @@ describe('history sentences (E1.3)', () => {
     [
       'a certification withdrawn',
       { reason: 'certification', leader: SAM, previous: DAVE, related: certification('withdrawn', 'Kim') },
-      "Sam now #1 · 138 kg (Dave's 142.5 kg certification withdrawn)",
+      "Sam now #1 · 138.0 kg (Dave's 142.5 kg certification withdrawn)",
     ],
     [
       'a voided certification that empties the Certified board',
@@ -323,7 +323,7 @@ describe('history sentences (E1.3)', () => {
     ['an unknown reason', { reason: 'dispute', previous: SAM }, 'Dave took #1 · 142.5 kg'],
     ['a link with no related event', { reason: 'link', related: null }, 'Dave took #1 · 142.5 kg'],
   ])('%s', (_label, overrides, expected) => {
-    expect(describeHistorySentence(item(overrides), ME)).toBe(expected);
+    expect(describeHistorySentence(item(overrides), ME, 'e1rm')).toBe(expected);
   });
 
   it.each<[string, Partial<GroupBoardHistoryItem>, string]>([
@@ -335,9 +335,9 @@ describe('history sentences (E1.3)', () => {
         previous: null,
         related: { kind: 'record_voided', key: 'v3', reason: 'deleted', record: { weight_kg: 1, reps: 1, e1rm_kg: 1 } },
       },
-      'Sam now #1 · 138 kg (a record removed — set deleted)',
+      'Sam now #1 · 138.0 kg (a record removed — set deleted)',
     ],
-    ['a void with no related event', { reason: 'void', leader: SAM, previous: null, related: null }, 'Sam now #1 · 138 kg (a record removed)'],
+    ['a void with no related event', { reason: 'void', leader: SAM, previous: null, related: null }, 'Sam now #1 · 138.0 kg (a record removed)'],
     ['a record that empties the board', { reason: 'record', leader: null, previous: DAVE }, 'No one holds #1'],
     [
       'a certification given that leaves no leader',
@@ -357,7 +357,7 @@ describe('history sentences (E1.3)', () => {
         previous: null,
         related: { kind: 'link', key: 'l3', event: 'unlink', exercises: [{ exercise_definition_id: 'd1', name: 'Bench' }] },
       },
-      'Sam took #1 · 138 kg (unlinked Bench)',
+      'Sam took #1 · 138.0 kg (unlinked Bench)',
     ],
     [
       'a link with no exercises',
@@ -367,7 +367,7 @@ describe('history sentences (E1.3)', () => {
     [
       'a certification cancelled with no previous holder',
       { reason: 'certification', leader: SAM, previous: null, related: certification('cancelled', null) },
-      'Sam now #1 · 138 kg (a certification cancelled)',
+      'Sam now #1 · 138.0 kg (a certification cancelled)',
     ],
     [
       'a certification given with no certifier',
@@ -375,7 +375,7 @@ describe('history sentences (E1.3)', () => {
       'Dave took #1 · 142.5 kg (certified)',
     ],
   ])('edge wording: %s', (_label, overrides, expected) => {
-    expect(describeHistorySentence(item(overrides), ME)).toBe(expected);
+    expect(describeHistorySentence(item(overrides), ME, 'e1rm')).toBe(expected);
   });
 
   it('speaks to me after a certification loss and as the certifier', () => {
@@ -384,8 +384,9 @@ describe('history sentences (E1.3)', () => {
       describeHistorySentence(
         item({ reason: 'certification', leader: mine, previous: DAVE, related: certification('voided', 'Kim') }),
         ME,
+        'e1rm',
       ),
-    ).toBe("You're now #1 · 150 kg (Dave's 142.5 kg certification voided)");
+    ).toBe("You're now #1 · 150.0 kg (Dave's 142.5 kg certification voided)");
     const certifiedByMe: GroupBoardHistoryItem['related'] = {
       kind: 'certification',
       key: 'c2',
@@ -397,18 +398,18 @@ describe('history sentences (E1.3)', () => {
       reps: 1,
       e1rm_kg: 142.5,
     };
-    expect(describeHistorySentence(item({ reason: 'certification', previous: SAM, related: certifiedByMe }), ME)).toBe(
+    expect(describeHistorySentence(item({ reason: 'certification', previous: SAM, related: certifiedByMe }), ME, 'e1rm')).toBe(
       'Dave took #1 · 142.5 kg (certified by you)',
     );
   });
 
   it('speaks to me: "You", "you", "your"', () => {
     const mine = holder(ME, 'dino', 150);
-    expect(describeHistorySentence(item({ reason: 'record', leader: mine, previous: DAVE }), ME)).toBe(
-      'You took #1 · 150 kg (from Dave, 142.5 kg)',
+    expect(describeHistorySentence(item({ reason: 'record', leader: mine, previous: DAVE }), ME, 'e1rm')).toBe(
+      'You took #1 · 150.0 kg (from Dave, 142.5 kg)',
     );
-    expect(describeHistorySentence(item({ reason: 'record', leader: DAVE, previous: mine }), ME)).toBe(
-      'Dave took #1 · 142.5 kg (from you, 150 kg)',
+    expect(describeHistorySentence(item({ reason: 'record', leader: DAVE, previous: mine }), ME, 'e1rm')).toBe(
+      'Dave took #1 · 142.5 kg (from you, 150.0 kg)',
     );
     expect(
       describeHistorySentence(
@@ -419,10 +420,11 @@ describe('history sentences (E1.3)', () => {
           related: { kind: 'record_voided', key: 'v', reason: 'edited', record: { weight_kg: 1, reps: 1, e1rm_kg: 1 } },
         }),
         ME,
+        'e1rm',
       ),
-    ).toBe("You're now #1 · 150 kg (Dave's 142.5 kg removed — set edited)");
-    expect(describeHistorySentence(item({ reason: 'void', leader: DAVE, previous: mine, related: null }), ME)).toBe(
-      'Dave now #1 · 142.5 kg (your 150 kg removed)',
+    ).toBe("You're now #1 · 150.0 kg (Dave's 142.5 kg removed — set edited)");
+    expect(describeHistorySentence(item({ reason: 'void', leader: DAVE, previous: mine, related: null }), ME, 'e1rm')).toBe(
+      'Dave now #1 · 142.5 kg (your 150.0 kg removed)',
     );
   });
 });

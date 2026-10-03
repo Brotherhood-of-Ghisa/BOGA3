@@ -110,8 +110,8 @@ function GroupBoardHistoryContent({ userId, groupId, exerciseId, metric, scope }
   });
   const { pulling, onRefresh } = usePullToRefresh(history.refresh);
   const items = useMemo(
-    () => history.items.map((item) => ({ seq: item.seq, view: buildHistoryItem(item, userId) })),
-    [history.items, userId],
+    () => history.items.map((item) => ({ seq: item.seq, view: buildHistoryItem(item, userId, metric) })),
+    [history.items, userId, metric],
   );
 
   if (history.lostAccess) {

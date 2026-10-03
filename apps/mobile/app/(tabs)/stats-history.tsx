@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -318,9 +319,9 @@ const formatNumber = (value: number): string => {
   return value.toFixed(1).replace(/\.0$/, '');
 };
 
-// Full integers in Plex Mono, never `2.5k`: the numbers are the point
+// Full figures in Plex Mono, never `2.5k`: the numbers are the point
 // (`design-language.md` §6, DLM-T08-D2).
-const formatTotalWeight = (value: number | null): string => value === null ? '— · incomplete' : String(Math.round(value));
+const formatTotalWeight = (value: number | null): string => value === null ? '— · incomplete' : formatVolume(value);
 
 export type StatsScreenShellProps = {
   summary: StatsSummary | null;
@@ -972,7 +973,7 @@ function ExerciseListView({
           )}${
             item.estimatedOneRepMax === null
               ? '. Estimated one rep max unavailable'
-              : `. Estimated one rep max ${formatTotalWeight(item.estimatedOneRepMax)} kg`
+              : `. Estimated one rep max ${formatOneRepMax(item.estimatedOneRepMax)} kg`
           }`}
           density="list"
           meta={
@@ -993,7 +994,7 @@ function ExerciseListView({
                 allowFontScaling={false}
                 style={[styles.tableFigure, styles.oneRepMaxColumn]}
                 testID={`stats-exercise-1rm-${item.id}`}>
-                {item.estimatedOneRepMax === null ? '—' : formatTotalWeight(item.estimatedOneRepMax)}
+                {item.estimatedOneRepMax === null ? '—' : formatOneRepMax(item.estimatedOneRepMax)}
               </Text>
             </View>
           }

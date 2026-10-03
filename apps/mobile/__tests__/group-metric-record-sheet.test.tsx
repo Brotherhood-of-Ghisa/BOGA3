@@ -160,7 +160,7 @@ describe('what the sheet shows', () => {
     renderSheet();
     expect(text('23.3 kg')).toBeTruthy();
     expect(text('Dave · 10 Sep')).toBeTruthy();
-    expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20 kg × 5');
+    expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20.0 kg × 5');
     expect(text('Rules 2 · total Weight')).toBeTruthy();
     expect(text('Strength values are estimates. Scores use the group’s rules, independently of personal exercise settings.')).toBeTruthy();
     expect(status()).toHaveTextContent('Uncertified');

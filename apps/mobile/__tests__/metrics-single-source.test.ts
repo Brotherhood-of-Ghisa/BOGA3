@@ -9,6 +9,8 @@
  *   sets; every other caller uses `isWorkingSet`, which also checks the set
  *   was performed.
  * - The Wathan 1RM constants appear only in `exercise-calculations/index.ts`.
+ * - A figure's display precision lives in `format.ts`: `toFixed` outside it,
+ *   bar the listed non-figure uses, is a second format.
  *
  * It scans the app (`src`, `app`, `components`) and the TS that imports the
  * kernel on the server (`supabase/functions`, `services/boga-mcp/src`).
@@ -42,8 +44,12 @@ const files = SCAN_ROOTS.flatMap(listSourceFiles).map((file) => ({
   source: fs.readFileSync(file, 'utf8'),
 }));
 
-const offenders = (pattern: RegExp, allowed: readonly string[]) =>
-  files.filter((file) => pattern.test(file.source) && !allowed.includes(file.path)).map((file) => file.path);
+// Every allowed file must still match, so a stale exemption fails too.
+const offenders = (pattern: RegExp, allowed: readonly string[]) => [
+  ...files.filter((file) => pattern.test(file.source) && !allowed.includes(file.path)).map((file) => file.path),
+  ...allowed.filter((path) => !files.some((file) => file.path === path && pattern.test(file.source)))
+    .map((path) => `stale exemption: ${path}`),
+];
 
 describe('training-metric rules have one implementation', () => {
   it('scans the sources', () => {
@@ -67,8 +73,18 @@ describe('training-metric rules have one implementation', () => {
       'apps/mobile/src/groups/metric-evaluation.ts',
       // Performed sets only (`selectGroupPerformedExercises`).
       'apps/mobile/src/groups/session-metrics.ts',
-      // Aggregate helpers over parsed sets.
-      'apps/mobile/src/exercise-calculations/index.ts',
+    ])).toEqual([]);
+  });
+
+  it('formats training figures only in format.ts', () => {
+    expect(offenders(/\.toFixed\(/, [
+      'apps/mobile/src/exercise-calculations/format.ts',
+      // Not training figures: a percentage, a body weight, chart coordinates
+      // and set counts.
+      'apps/mobile/src/groups/link-view-model.ts',
+      'apps/mobile/components/bodyweight/body-weight-screen.tsx',
+      'apps/mobile/components/today/progress-format.ts',
+      'apps/mobile/app/(tabs)/stats-history.tsx',
     ])).toEqual([]);
   });
 

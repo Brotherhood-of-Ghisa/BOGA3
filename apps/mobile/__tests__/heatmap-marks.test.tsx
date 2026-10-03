@@ -90,7 +90,7 @@ describe('DailyHeatmap marks', () => {
 describe('WeeklyHeatmap marks', () => {
   const renderWeekly = (selectedWeekKey: string | null) =>
     render(
-      <WeeklyHeatmap data={data} onSelectWeek={jest.fn()} selectedWeekKey={selectedWeekKey} testIDPrefix={PREFIX} />
+      <WeeklyHeatmap data={data} onSelectWeek={jest.fn()} selectedWeekKey={selectedWeekKey} testIDPrefix={PREFIX} formatValue={String} />
     );
 
   it('rings the current week and puts no marker up while nothing is selected', () => {
@@ -137,9 +137,9 @@ describe('Bodyweight heatmap coverage', () => {
   ])('keeps the average inside the chart when training includes zero', (values, average) => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
-    render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} />);
+    render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
     const marker = screen.getByTestId(`${PREFIX}-heatmap-average`);
-    expect(marker).toHaveProp('accessibilityLabel', `12-week average ${average}`);
+    expect(marker).toHaveProp('accessibilityLabel', `12-week average ~${average}`);
     const top = StyleSheet.flatten(marker.props.style).top;
     expect(top).toBeGreaterThanOrEqual(0);
     expect(top).toBeLessThanOrEqual(78);

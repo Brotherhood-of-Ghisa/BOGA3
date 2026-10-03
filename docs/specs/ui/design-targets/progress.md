@@ -33,7 +33,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
   summary `Card`s with stacked `Stat`s, Sessions a link `Card` with a
   `chevron-right`; then a `SearchField`.
 - Deltas are Plex Mono `ink-muted` with their sign; `new` is `ink` (G3,
-  T08-D4). Figures are full integers in Plex Mono, never `2.5k` (T08-D2).
+  T08-D4). Figures take the one display format (`tech/training-metrics-contract.md`
+  §4) in Plex Mono, never `2.5k` (T08-D2).
 - The exercise table is a `Card`: a header row of micro-labels (the active sort
   in `ink` with an `arrow-up` / `arrow-down`, `Recent` for the Exercise sort,
   no wash; inactive indicators keep their width, transparent), then

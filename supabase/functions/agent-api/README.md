@@ -295,11 +295,10 @@ Performed sets use ordinary vocabulary and separate raw/derived values:
 }
 ```
 
-Blank Weight plus valid performed reps canonicalizes to zero. Valid zero returns
-numeric zero metrics and creates no record/ranking. Planned, skipped,
-unperformed, invalid and deleted rows do not contribute. Wathan applies to the
-calculated load and displayed 1RM follows the contract's per-side/contribution
-formula. The breakdown is an API interpretation aid, not a user-facing label.
+Parsing, the zero rule and the load, Volume and 1RM formulas are the app's
+([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
+§4); planned, skipped, unperformed, invalid and deleted rows do not
+contribute. The breakdown is an API interpretation aid, not a user-facing label.
 
 Volume coverage remains explicit for invalid/overflow/truncated input. Missing
 bodyweight under the personal policy is complete zero-fallback input, not

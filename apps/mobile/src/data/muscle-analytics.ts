@@ -2,12 +2,6 @@ import type { SessionWeightContext } from '@/src/bodyweight/as-of';
 import { type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
-  computeSetVolume,
-  estimateOneRepMax,
-  parseSetReps,
-  parseSetWeight,
-} from '@/src/exercise-calculations';
-import {
   countedSessionIds,
   isWorkingSet,
   type SessionSetPerformanceStatus,
@@ -61,8 +55,8 @@ export type MuscleSetContribution = {
   roleWeight: number;
   weightedVolume: number | null;
   setVolume: number | null;
-  metrics?: SetMetrics;
-  enteredWeightKg?: number | null;
+  metrics: SetMetrics;
+  enteredWeightKg: number | null;
   sessionId: string;
   sessionCompletedAt: Date;
   sessionExerciseId: string;
@@ -121,22 +115,6 @@ const isMuscleAnalyticsWorkingSet = (
     performanceStatus: set.performanceStatus,
     setType: set.setType,
   });
-
-export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
-  const weight = parseSetWeight(weightValue);
-  const reps = parseSetReps(repsValue);
-  if (weight === null || reps === null) return 0;
-  return computeSetVolume(weight, reps);
-};
-
-export const computePerSideMuscleSetVolume = (
-  weightValue: string,
-  repsValue: string,
-  loadInputMode: 'total_load' | 'per_side_load'
-): number => {
-  const enteredLoadVolume = computeMuscleSetVolume(weightValue, repsValue);
-  return loadInputMode === 'total_load' ? enteredLoadVolume / 2 : enteredLoadVolume;
-};
 
 const sessionIdByExerciseId = (input: MuscleAnalyticsInput): Map<string, string> => {
   const sessionIds = new Set(input.sessions.map((session) => session.id));
@@ -387,13 +365,9 @@ export const accumulateContributionMetrics = (
 
   acc.workingSetCount += 1;
 
-  const weight = contribution.enteredWeightKg === undefined
-    ? parseSetWeight(contribution.weightValue) : contribution.enteredWeightKg;
+  const weight = contribution.enteredWeightKg;
   if (weight !== null) acc.highestWeight = Math.max(acc.highestWeight ?? 0, weight);
-  const reps = parseSetReps(contribution.repsValue);
-  const rm1 = contribution.metrics === undefined
-    ? (weight !== null && reps !== null ? estimateOneRepMax(weight, reps) : null)
-    : contribution.metrics.estimatedOneRepMaxKg;
+  const rm1 = contribution.metrics.estimatedOneRepMaxKg;
   if (rm1 !== null) acc.bestRM1 = Math.max(acc.bestRM1 ?? 0, rm1);
 };
 

@@ -4,6 +4,8 @@ import { Text, FlatList, RefreshControl, View } from 'react-native';
 
 import { ChipGroup, SegmentedControl } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useGroupOnlinePages, type BoardRowViewModel, type GroupBoardScope } from '@/src/groups';
+import { formatBoardKg } from '@/src/groups/board-view-model';
+import { formatSetValue } from '@/src/groups/stream-view-model';
 import { getGroupMetricBoard, getGroupMetricHistory, getGroupMetricRevisions } from '@/src/groups/api';
 import { GROUP_METRICS, isGroupMetric, type GroupMetric } from '@/src/groups/metric-contract';
 import { buildGroupMetricRow, describeGroupMetricHistory, describeGroupRules, describeLegacyMetricHistory, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
@@ -89,8 +91,8 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
     .sort((a, b) => b.value_kg - a.value_kg || a.achieved_at_ms - b.achieved_at_ms || a.member_user_id.localeCompare(b.member_user_id))
     .map((row, index) => ({ key: row.member_user_id, rank: index + 1, rankLabel: String(index + 1),
       memberLabel: formatBoardMemberLabel(row.member, false, userId), isMe: row.member_user_id === userId, former: false,
-      valueLabel: `${row.value_kg.toFixed(1)} kg`, detailLabel: `${row.weight_kg} kg × ${row.reps}`, dateLabel: formatBoardDate(row.achieved_at_ms),
-      certification: null, accessibilityLabel: `${index + 1}, ${formatBoardMemberLabel(row.member, false, userId)}, ${row.value_kg} kg, original rules ${rules.rules_revision}` }));
+      valueLabel: formatBoardKg(row.metric, row.value_kg), detailLabel: formatSetValue(row.weight_kg, row.reps), dateLabel: formatBoardDate(row.achieved_at_ms),
+      certification: null, accessibilityLabel: `${index + 1}, ${formatBoardMemberLabel(row.member, false, userId)}, ${formatBoardKg(row.metric, row.value_kg)}, original rules ${rules.rules_revision}` }));
   const header = <View style={groupScreenStyles.header}>
     <Text allowFontScaling={false} style={textStyles.heading}>{exercise.name} · History</Text>
     <ChipGroup mode="single" accessibilityLabel="Rules revision" value={rules.rules_revision}

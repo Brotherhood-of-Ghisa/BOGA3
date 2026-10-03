@@ -237,7 +237,7 @@ var steps = {
     var startedAt = output.groupsSessionStartedAt;
     push([sessionEntity(output.groupsSessionId, startedAt, nextClientUpdatedAt(), startedAt + DURATION_SEC * 1000)]);
     push([benchSet1('102.5', nextClientUpdatedAt())]);
-    console.log(TAG + ' completed and edited session ' + output.groupsSessionId + ' (1512.5 kg)');
+    console.log(TAG + ' completed and edited session ' + output.groupsSessionId + ' (1513 kg)');
   },
 
   // AC4: the time from the last sync_push to the card showing on the device.

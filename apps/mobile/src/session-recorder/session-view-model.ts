@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
 import type { Session, SessionSet } from '@/components/session-recorder/types';
@@ -50,15 +51,6 @@ export type SessionViewModel = {
   volumeNote?: string;
 };
 
-// Weights keep what was entered, with one decimal on whole numbers so a column
-// of `60.0` / `82.5` reads alike; no unit suffix (design-language §6).
-export const formatWeightFigure = (weight: number): string =>
-  Number.isInteger(weight) ? weight.toFixed(1) : String(weight);
-
-export const formatOneRepMaxFigure = (value: number): string => value.toFixed(1);
-
-// No thousands separators (design-language §6).
-export const formatVolumeFigure = (value: number): string => String(Math.round(value));
 
 export type SetRowInput = {
   id: string;
@@ -85,14 +77,14 @@ export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord 
       repsValue: String(reps),
     });
     const estimate = metric.estimatedOneRepMaxKg;
-    oneRepMax = estimate === null ? EMPTY_FIGURE : formatOneRepMaxFigure(estimate);
-    volume = metric.volumeKgReps === null ? EMPTY_FIGURE : formatVolumeFigure(metric.volumeKgReps);
+    oneRepMax = estimate === null ? EMPTY_FIGURE : formatOneRepMax(estimate);
+    volume = metric.volumeKgReps === null ? EMPTY_FIGURE : formatVolume(metric.volumeKgReps);
   }
   return {
     id,
     typeLabel: formatSessionSetType(setType) ?? EMPTY_FIGURE,
     // Bodyweight changes derived metrics, never entered-load copy or geometry.
-    weightReps: `${weight === null ? EMPTY_FIGURE : formatWeightFigure(weight)} × ${reps === null ? EMPTY_FIGURE : reps}`,
+    weightReps: `${weight === null ? EMPTY_FIGURE : formatWeight(weight)} × ${reps === null ? EMPTY_FIGURE : reps}`,
     oneRepMax,
     volume,
     done,
@@ -182,7 +174,7 @@ export const buildSessionViewModel = (
       doneCount: figures.filter((row) => row.done).length,
       totalCount: figures.length,
       rows,
-      recordOneRepMax: record && recordSetId ? formatOneRepMaxFigure(record.estimatedOneRepMax) : null,
+      recordOneRepMax: record && recordSetId ? formatOneRepMax(record.estimatedOneRepMax) : null,
     };
   });
 

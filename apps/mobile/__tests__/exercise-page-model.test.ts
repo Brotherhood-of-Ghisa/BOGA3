@@ -1,3 +1,4 @@
+import { formatWeight } from '@/src/exercise-calculations/format';
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 import {
@@ -10,7 +11,6 @@ import {
   discardSetEntry,
   displayedValues,
   findCursorIndex,
-  formatWeight,
   planCompleteExercise,
   recordBandFor,
   toggleSetPerformed,

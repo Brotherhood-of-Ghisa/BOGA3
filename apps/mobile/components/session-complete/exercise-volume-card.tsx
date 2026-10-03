@@ -1,3 +1,4 @@
+import { formatVolume } from '@/src/exercise-calculations/format';
 import { compactVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -12,11 +13,9 @@ type ExerciseVolumeCardProps = {
   testID?: string;
 };
 
-// No thousands separators and no unit on a figure (`design-language.md` §6).
-export const formatVolumeFigure = (value: number): string => String(Math.abs(value) > Number.MAX_VALUE / 10 ? value : Math.round(value * 10) / 10);
 
 // The spoken form keeps the unit: a screen reader has no legend to lean on.
-const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable or incomplete' : `${formatVolumeFigure(value)} kg reps`;
+const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable or incomplete' : `${formatVolume(value)} kg reps`;
 
 export const formatExerciseSetCount = (workingSetCount: number): string =>
   `${workingSetCount} ${workingSetCount === 1 ? 'set' : 'sets'}`;
@@ -28,7 +27,7 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
   const delta = comparison.currentVolume - comparison.medianVolume;
   if (delta === 0) return 'At median';
   if (comparison.medianVolume === 0) {
-    return `${delta > 0 ? '+' : '−'}${formatVolumeFigure(Math.abs(delta))} vs median`;
+    return `${delta > 0 ? '+' : '−'}${formatVolume(Math.abs(delta))} vs median`;
   }
 
   const percentage = Math.round((Math.abs(delta) / comparison.medianVolume) * 100);
@@ -106,7 +105,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
         <View style={styles.valueRow}>
           <View style={styles.legend}>
             <Text allowFontScaling={false} style={styles.microLabel}>{comparison.currentVolume === null && (comparison.knownVolume ?? 0) > 0 ? 'Known vol' : 'Vol'}</Text>
-            <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? compactVolumeFigure(null, comparison.knownVolume) : formatVolumeFigure(comparison.currentVolume)}</Text>
+            <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? compactVolumeFigure(null, comparison.knownVolume) : formatVolume(comparison.currentVolume)}</Text>
           </View>
           <Text allowFontScaling={false} style={comparison.medianVolume === null ? styles.deltaMuted : styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
@@ -116,9 +115,9 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
         {hasDistribution ? (
           <View testID={testID ? `${testID}-distribution` : undefined}>
             <View style={styles.rangeLabels}>
-              <Legend label="P5" value={formatVolumeFigure(comparison.percentile5Volume as number)} />
-              <Legend label="Median" value={formatVolumeFigure(comparison.medianVolume as number)} />
-              <Legend label="P95" value={formatVolumeFigure(comparison.percentile95Volume as number)} />
+              <Legend label="P5" value={formatVolume(comparison.percentile5Volume as number)} />
+              <Legend label="Median" value={formatVolume(comparison.medianVolume as number)} />
+              <Legend label="P95" value={formatVolume(comparison.percentile95Volume as number)} />
             </View>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackWrap}>
               <View style={styles.track} />
@@ -147,7 +146,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
                 comparison.state === 'single-baseline'
                   ? '1 prior session'
                   : `${comparison.historicalSessionCount} equal prior sessions`
-              } · baseline ${formatVolumeFigure(comparison.medianVolume as number)}`}
+              } · baseline ${formatVolume(comparison.medianVolume as number)}`}
             </Text>
           </View>
         ) : (

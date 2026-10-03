@@ -73,8 +73,8 @@ own synced raw rows; they never cross the wire.
 - `sessions` (recorded start/end/status and ordinary sync fields; bodyweight is a private read projection)
 - `session_exercises`
 - `exercise_sets` (actual entered `weight_value` / `reps_value` / `set_type`, plus optional planned target fields `planned_weight_value` / `planned_reps_value` / `planned_set_type` and `performance_status` for explicit planned/unperformed execution state; legacy `skipped` values remain readable)
-- `exercise_sets` stores actual/planned Weight text in kg. Blank performed
-  Weight canonicalizes to zero while malformed values remain invalid.
+- `exercise_sets` stores actual/planned Weight text in kg, parsed as
+  `tech/training-metrics-contract.md` §4 says.
 - `exercise_definitions` stores `bodyweight_contribution` (fraction in `[0,1]`,
   default 0). The private preference decides whether it participates.
   - `load_input_mode` is required metadata with values `total_load` and
@@ -432,27 +432,20 @@ section states only the data-model-level invariants.
    migration or wire-envelope change.
 8. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
 9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
-10. Muscle volume reads working sets only (a warm-up adds none) and is
-   recomputed per side from current exercise metadata and
-   the applicable private calculation policy via
-   `tech/bodyweight-load-contract.md` §2. Ordinary mode ignores contribution
-   and readings: total input contributes `E / 2` per side and per-side input
-   contributes `E`, while its displayed Volume remains `E × reps`. Enabled
-   positive-contribution mode resolves total `c × B + F × E`, halves it for
-   muscle allocation, then applies the mapping role factor: `1` for primary and
-   `0.5` for secondary. Persisted
+10. Muscle volume, like every figure, is computed at read time from current
+   exercise metadata and the applicable private policy; the calculation is
+   `tech/training-metrics-contract.md` §4. Persisted
    `exercise_muscle_mappings.weight` does not alter this calculation; null-role
    and stabilizer mappings do not contribute. One-arm/one-leg rows imply both
    sides were performed in v1. Exercise history and records use the same
-   current policy for Volume/1RM, with no muscle-role factor on 1RM. Top weight
-   is always raw entered kg and never substitutes calculated load. Live and
+   current policy for Volume/1RM, with no muscle-role factor on 1RM. Live and
    completion personal-record
    presentation resolves its exercise name from the current linked
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row.
    Completed-session exercise-volume comparisons remain a read-time projection,
-   not persisted data. They sum calculated load × reps across working sets
-   (valid confirmed sets that are not warm-ups), combine repeated blocks by
+   not persisted data. They sum the working sets' Volume (contract §1, §4),
+   combine repeated blocks by
    linked exercise definition, and compare only complete totals from earlier
    completed, nondeleted sessions for that definition. A definition with only
    warm-ups in a session is neither compared nor a baseline. Missing/invalid load preserves

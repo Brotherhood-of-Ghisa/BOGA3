@@ -9,7 +9,7 @@ shows and link here for what they mean; they do not restate these rules.
 | 1 | Counted set (a *working set*) | `isWorkingSet`, `apps/mobile/src/exercise-calculations/set-semantics.ts` |
 | 2 | Counted session | `isCountedSession` / `countedSessionIds`, same file |
 | 3 | Records (Volume, 1RM, Weight) | `apps/mobile/src/exercise-calculations/records.ts`; session bests in `best-set.ts` |
-| 4 | Calculations (load, volume, 1RM, top weight) | Owned for now by `tech/bodyweight-load-contract.md` |
+| 4 | Calculations and display (parse, load, Volume, 1RM, top weight, precision) | `parse.ts`, `load-metrics.ts`, `index.ts` (`estimateOneRepMax`), `format.ts` in `apps/mobile/src/exercise-calculations/` |
 
 `apps/mobile/__tests__/metrics-single-source.test.ts` fails when the rules
 below are re-implemented. It checks for a `'warm_up'` comparison outside
@@ -167,3 +167,94 @@ API's `metric_revision`.
 
 Group boards keep their own contract (`tech/groups-contract.md`), but follow
 the same zero rule.
+
+## 4. Calculations
+
+**Parsing** (`parse.ts`). Weight is digits with an optional decimal point, and
+must be non-negative. Reps is a positive integer. A performed set with blank
+Weight and valid reps has Weight `0` (`canonicalizeWeightForReps`). Invalid
+input never becomes zero. The parser is the only one: field validation, the
+performed check (§1) and every figure call it.
+
+**Load** (`load-metrics.ts`). The definitions:
+
+- `E` is the entered Weight in kg;
+- `B` is the applicable bodyweight in kg;
+- `c` is the applicable contribution fraction;
+- `F = 1` for `total_load` and `F = 2` for `per_side_load`.
+
+The bodyweight policy (`tech/bodyweight-load-contract.md`) decides `c` and `B`.
+
+Ordinary policy, a disabled preference, or `c = 0`:
+
+```text
+calculated load = E
+Volume          = E × reps
+displayed 1RM   = estimateOneRepMax(E, reps)
+```
+
+`loadInputMode` does not rescale ordinary Volume or 1RM.
+
+The enabled preference with `c > 0`:
+
+```text
+calculated load = c × B + F × E
+Volume          = calculated load × reps
+total 1RM       = estimateOneRepMax(calculated load, reps)
+displayed 1RM   = (total 1RM - c × B) / F
+```
+
+Bodyweight is counted once. Per-side entry doubles only the external Weight in
+the positive-contribution branch. Screens show Weight, 1RM and Volume, never
+the calculated-load breakdown.
+
+**1RM** (`estimateOneRepMax`, `index.ts`) is Wathan:
+
+```text
+1RM = 100 × load / (48.8 + 53.8 × exp(-0.075 × reps))
+```
+
+- Only positive integer reps are eligible.
+- Negative or non-finite Weight is rejected, as are a contribution outside
+  `[0, 1]`, an invalid distribution and non-finite or overflowing results.
+  The contribution range and the load-mode check also guard the exercise
+  editor in `src/exercise-core`. That layer stays import-free for Deno, so it
+  keeps its own one-line copy on purpose (agreed 2026-10-03).
+- A zero load gives Volume `0` and 1RM `0`. Both are valid figures, but never
+  records (§3).
+
+**Top weight** is the highest raw entered Weight in kg, and at that weight the
+most reps (§3). It never includes the bodyweight contribution and never changes
+after a preference, contribution or reading edit.
+
+**Totals.**
+
+- A session's or exercise's Volume is the sum over its working sets (§1)
+  (`summarizeVolume`).
+- When a set's load is unknown, the total is a known subtotal, with coverage
+  shown as `Known subtotal from X of Y working sets`.
+
+**Muscle volume.**
+
+- It is per side.
+- Ordinary total input contributes `E / 2` per side, and per-side input
+  contributes `E`.
+- With a positive contribution, it first resolves the total `c × B + F × E`,
+  then halves it.
+- The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
+
+No derived figure is written back to a set or session.
+
+**Display** (`format.ts`). Every figure has one format on every screen, the
+groups' included. Figures have no unit and no thousands separators; a sentence
+adds ` kg` itself.
+
+| Figure | Format | Example |
+| --- | --- | --- |
+| Weight (entered, top, group Weight) | as entered, one decimal on whole kg | `60.0`, `82.5`, `2.25` |
+| 1RM (personal and group) | one decimal | `104.7` |
+| Volume | whole kg·reps | `2560` |
+
+The agent API, the group evaluator and the SQL group functions call this
+kernel rather than copying it; the SQL load factor matches
+`metric-contract.ts` (`groups-bodyweight.sh` vector).
