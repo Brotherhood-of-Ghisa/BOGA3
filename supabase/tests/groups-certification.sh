@@ -728,16 +728,16 @@ expect_csince "link:weight@R,link:e1rm@R" "relink moves #1 with reason link"
 def "${RIVAL_TOKEN}" "${DR}" per_side_load
 drain "load mode"
 [[ "$(active_certs r3)" == "1" ]] || fail "a load-mode change voids nothing"
-expect_centry R weight "194@r3" "a load-mode change rescales the certified value (D6)"
+expect_centry R weight "97@r3" "a load-mode change leaves the certified Weight raw (D6 converts 1RM only)"
 
 # Delete R's Certified entries: a non-silent apply would now see the board
 # move to R and write lead changes; the silent recompute must not.
 run_psql "delete from app_public.group_board_entries
            where group_exercise_id = '${GX}' and member_user_id = '${RIVAL_UID}' and certified;" >/dev/null
 mark
-expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(5, 1000) >= 1;" "t"
+expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(6, 1000) >= 1;" "t"
 drain "rules"
-expect_centry R weight "194@r3" "the rules recompute restores Certified entries"
+expect_centry R weight "97@r3" "the rules recompute restores Certified entries"
 [[ "$(active_certs r3)" == "1" ]] || fail "a rules recompute voids nothing that still matches"
 expect_sql "the rules recompute writes no event" \
   "select count(*) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" "0"
@@ -761,7 +761,7 @@ podiums "${ATHLETE_TOKEN}"
 check_args "the podium count ignores it" --arg x "${GX}" \
   '[.exercises[] | select(.exercise.group_exercise_id == $x)][0].entry_count == 0'
 drain "after cancel (frozen: no apply)"
-expect_centry R weight "194@r3" "the frozen stored entry stays until a catch-up"
+expect_centry R weight "97@r3" "the frozen stored entry stays until a catch-up"
 pass "frozen: certify rejected, cancel immediate on the reads"
 
 # =============================================================================

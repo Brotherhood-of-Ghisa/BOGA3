@@ -138,7 +138,7 @@ drain() {
 drain_ok() {
   drain
   expect_ok "group-eval drain: $1"
-  check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 4'
+  check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 5'
 }
 
 # mine: the athlete's jobs in the last drain, keyed by session id or group exercise id.
@@ -396,7 +396,8 @@ expect_fact() {
   [[ "${actual}" == "$2" ]] || fail "fact $1: expected '$2', got '${actual}'"
 }
 expect_fact b1 "true:true:102.5:5:$(e1rm 102.5 5)"
-expect_fact b2 "true:true:0:8:$(e1rm 0 8)"
+# A 0 kg set is performed but has no e1RM: a zero 1RM is never a result.
+expect_fact b2 "true:true:0:8:-"
 expect_fact b3 "false:true:-:-:-"
 expect_fact b4 "false:true:-:-:-"
 expect_fact b5 "false:true:-:-:-"
@@ -411,7 +412,7 @@ expect_fact bb "true:true:100:10000000000:$(e1rm 100 10000000000)"
 expect_fact d1 "true:true:30:10:$(e1rm 30 10)"
 expect_fact g1 "true:false:50:5:$(e1rm 50 5)"
 expect_sql "every S1 fact: position, session start, rules version, SQL fingerprint of the raw row" \
-  "select count(*) || ':' || bool_and(f.achieved_at_ms = ${START} and f.rules_version = 4
+  "select count(*) || ':' || bool_and(f.achieved_at_ms = ${START} and f.rules_version = 5
             and f.session_id = '${S1}' and f.session_exercise_id = es.session_exercise_id
             and f.set_order_index = es.order_index
             and f.fingerprint = app_public.group_set_fingerprint(es.weight_value, es.reps_value,
@@ -605,7 +606,7 @@ pass "lease expiry"
 
 # Two statements: one statement's snapshot cannot see what its own volatile
 # function inserted.
-expect_sql "a future rules version requeues evaluated sessions" "select app_public.group_eval_requeue_rules(5, 1000) >= 1;" "t"
+expect_sql "a future rules version requeues evaluated sessions" "select app_public.group_eval_requeue_rules(6, 1000) >= 1;" "t"
 [[ "$(queue_of)" == "session:${S1}:rules" ]] || fail "a rules bump must requeue S1 with cause rules: got '$(queue_of)'"
 drain_ok "rules"
 expect_mine "a rules requeue re-normalizes silently" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"rules\"], targets: [\"${GXA}\"]}]"

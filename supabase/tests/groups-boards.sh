@@ -587,7 +587,7 @@ check_args "R6 Certified podiums are empty, with the All count for the empty sta
 pass "R6: uncertified sets make no Certified entries; Certified podiums empty"
 
 # =============================================================================
-echo "[${LANE_LABEL}] R7 — load_input_mode changed (D6 conversion)"
+echo "[${LANE_LABEL}] R7 — load_input_mode changed (D6 converts 1RM; Weight stays raw)"
 # =============================================================================
 
 GX7="$(gx "R7 curl (per side)" per_side_load)"
@@ -602,27 +602,158 @@ sess "${ATHLETE_TOKEN}" "${T}-s7" completed "${DA7}" "r7a1:100:5"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-s7b" completed "${DA7B}" "r7b1:40:8"
 drain "R7 setup"
-expect_entry "${GX7}" A weight "50@r7a1" "D6 total → per side ÷2"
+expect_entry "${GX7}" A weight "100@r7a1" "D6 total → per side: Weight is the raw entered kg"
 expect_entry "${GX7}" A e1rm "$(e1rm 100 5 0.5)@r7a1" "D6 e1RM ÷2"
-expect_entry "${GX7B}" A weight "80@r7b1" "D6 per side → total ×2"
+expect_entry "${GX7B}" A weight "40@r7b1" "D6 per side → total: Weight is the raw entered kg"
 expect_entry "${GX7B}" A e1rm "$(e1rm 40 8 2)@r7b1" "D6 e1RM ×2"
-expect_sql "D6 the entered value and factor are kept" \
-  "select string_agg(entered_weight_kg || 'x' || load_factor, ',' order by group_exercise_id = '${GX7}' desc)
+expect_sql "D6 the entered value and factor are kept; the Weight entry's weight_kg is raw" \
+  "select string_agg(entered_weight_kg || 'x' || load_factor || '=' || weight_kg, ',' order by group_exercise_id = '${GX7}' desc)
      from app_public.group_board_entries
     where group_exercise_id in ('${GX7}', '${GX7B}') and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" \
-  "100x0.5,40x2"
+  "100x0.5=100,40x2=40"
+expect_sql "D6 the 1RM entry carries the raw Weight beside the converted 1RM" \
+  "select weight_kg || '/' || e1rm_kg from app_public.group_board_entries
+    where group_exercise_id = '${GX7B}' and member_user_id = '${ATHLETE_UID}' and metric = 'e1rm' and not certified;" \
+  "40/$(e1rm 40 8 2)"
 
 mark
 def "${ATHLETE_TOKEN}" "${DA7}" per_side_load
 drain "R7 mode up"
-expect_since "${GX7}" "record_voided:edited@A,record@A" "R7 rescale up: void + record"
-expect_entry "${GX7}" A weight "100@r7a1" "R7 rescale up"
+expect_since "${GX7}" "record_voided:edited@A,record@A" "R7 rescale up: the 1RM moves (void + record)"
+expect_entry "${GX7}" A weight "100@r7a1" "R7 rescale up leaves Weight raw"
+expect_entry "${GX7}" A e1rm "$(e1rm 100 5)@r7a1" "R7 rescale up"
 mark
 def "${ATHLETE_TOKEN}" "${DA7}" total_load
 drain "R7 mode down"
-expect_since "${GX7}" "record_voided:edited@A" "R7 rescale down: void"
-expect_entry "${GX7}" A weight "50@r7a1" "R7 rescale down"
-pass "R7: load mode rescales like an edit; D6 in both directions"
+expect_entry "${GX7}" A weight "100@r7a1" "R7 rescale down leaves Weight raw"
+expect_entry "${GX7}" A e1rm "$(e1rm 100 5 0.5)@r7a1" "R7 rescale down"
+expect_sql "R7 rescale down voids the 1RM record; the replacement keeps only the Weight board" \
+  "select string_agg(kind || coalesce(':' || reason, ''), ',' order by seq) || '|' ||
+          (select string_agg(b ->> 'metric', ',') from jsonb_array_elements(
+             (select payload -> 'boards' from app_public.group_events where group_exercise_id = '${GX7}'
+                and kind = 'record' order by seq desc limit 1)) b)
+     from app_public.group_events where group_exercise_id = '${GX7}' and seq > ${MARK};" \
+  "record_voided:edited,record|weight"
+pass "R7: a load-mode change moves 1RM like an edit and never Weight; D6 in both directions"
+
+# =============================================================================
+echo "[${LANE_LABEL}] raw Weight — a Weight best stored converted falls silently (forward only)"
+# =============================================================================
+
+# Before Weight was raw, a per-side member's Weight on a total-load board was
+# stored ×2. Reproduce that stored state, then apply: the entry falls to the
+# raw value with no event, the stored record stands, and only a set that
+# beats the raw value is a record.
+GXV="$(gx "V press (total)" total_load)"
+DAV="${T}-dAV"; DRV="${T}-dRV"
+def "${ATHLETE_TOKEN}" "${DAV}" per_side_load
+link "${ATHLETE_TOKEN}" "${DAV}" "${GID}" "${GXV}"
+def "${RIVAL_TOKEN}" "${DRV}" total_load
+link "${RIVAL_TOKEN}" "${DRV}" "${GID}" "${GXV}"
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-sv-r" completed "${DRV}" "v-r1:60:5"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sv-a" completed "${DAV}" "v-a1:40:8"
+drain "V setup"
+expect_entry "${GXV}" A weight "40@v-a1" "V a per-side Weight is raw"
+expect_entry "${GXV}" R weight "60@v-r1" "V the rival leads Weight"
+# Certify both sets so the Certified boards hold the same two entries.
+for pair in "${RIVAL_TOKEN}:${ATHLETE_UID}:v-a1" "${ATHLETE_TOKEN}:${RIVAL_UID}:v-r1"; do
+  IFS=: read -r token lifter suffix <<<"${pair}"
+  rpc "${token}" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GXV}" --arg m "${lifter}" --arg s "${T}-${suffix}" \
+      '{p_group_id: $g, p_group_exercise_id: $x, p_member_user_id: $m, p_set_id: $s}')"
+  expect_ok "V certify ${suffix}"
+done
+drain "V certifications"
+V_RECORD="$(run_psql "select id from app_public.group_events where kind = 'record' and set_id = '${T}-v-a1';")"
+[[ -n "${V_RECORD}" ]] || fail "V the athlete's record exists"
+run_psql "update app_public.group_board_entries set value_kg = 80, weight_kg = 80
+           where group_exercise_id = '${GXV}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';
+          update app_public.group_events
+             set payload = payload || jsonb_build_object('weight_kg', 80, 'boards', (
+                   select jsonb_agg(case when b ->> 'metric' = 'weight' then b || '{\"value_kg\": 80}'::jsonb else b end)
+                     from jsonb_array_elements(payload -> 'boards') b))
+           where id = '${V_RECORD}';" >/dev/null
+board "${OWNER_TOKEN}" "${GXV}" weight false
+check_args "V the stored converted Weight leads" --arg a "${ATHLETE_UID}" '.rows[0].member.user_id == $a and .rows[0].value_kg == 80'
+
+mark
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sv-a2" completed "${DAV}" "v-a2:35:8"
+drain "V re-evaluation"
+expect_since "${GXV}" "" "V the converted best falls silently: no lead change (All or Certified), void or record"
+expect_entry "${GXV}" A weight "40@v-a1" "V the entry falls to the raw value"
+expect_sql "V the certified Weight falls to the raw value too" \
+  "select value_kg from app_public.group_board_entries
+    where group_exercise_id = '${GXV}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight' and certified;" "40"
+board "${OWNER_TOKEN}" "${GXV}" weight false
+check_args "V the rival leads again" --arg r "${RIVAL_UID}" '.rows[0].member.user_id == $r and .rows[0].value_kg == 60'
+expect_sql "V the stored record stands (forward only)" \
+  "select count(*) from app_public.group_events where kind = 'record_voided' and related_event_id = '${V_RECORD}';" "0"
+
+mark
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sv-a3" completed "${DAV}" "v-a3:45:8"
+drain "V a raw Weight PR"
+expect_since "${GXV}" "record@A" "V a set beating the raw value is a record"
+[[ "$(boards_of "${GXV}")" == "e1rm:$(e1rm 40 8 2):true,weight:40:false" ]] ||
+  fail "V record boards (raw Weight baseline): $(boards_of "${GXV}")"
+expect_entry "${GXV}" A weight "45@v-a3" "V the raw PR"
+# stored_converted <gx> <set-suffix>: rewrite the athlete's Weight entries and
+# the set's record as the old rule stored them for a factor-2 link.
+stored_converted() {
+  local rec
+  rec="$(run_psql "select id from app_public.group_events where kind = 'record' and set_id = '${T}-$2';")"
+  [[ -n "${rec}" ]] || fail "stored_converted: no record for $2"
+  run_psql "update app_public.group_board_entries set value_kg = value_kg * 2, weight_kg = weight_kg * 2
+             where group_exercise_id = '$1' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';
+            update app_public.group_events
+               set payload = payload || jsonb_build_object('weight_kg', (payload ->> 'weight_kg')::numeric * 2, 'boards', (
+                     select jsonb_agg(case when b ->> 'metric' = 'weight'
+                                           then b || jsonb_build_object('value_kg', (b ->> 'value_kg')::numeric * 2)
+                                           else b end)
+                       from jsonb_array_elements(payload -> 'boards') b))
+             where id = '${rec}';" >/dev/null
+}
+
+# The first apply after the rule meets a set that beats the raw value but not
+# the stored converted one: a record against the raw baseline, not a rules move.
+GXV2="$(gx "V2 press (total)" total_load)"
+DAV2="${T}-dAV2"
+def "${ATHLETE_TOKEN}" "${DAV2}" per_side_load
+link "${ATHLETE_TOKEN}" "${DAV2}" "${GID}" "${GXV2}"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sv2-a" completed "${DAV2}" "v2-a1:40:8"
+drain "V2 setup"
+stored_converted "${GXV2}" v2-a1
+expect_entry "${GXV2}" A weight "80@v2-a1" "V2 the stored converted Weight"
+mark
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sv2-a2" completed "${DAV2}" "v2-a2:45:8"
+drain "V2 raw PR on the first apply"
+expect_since "${GXV2}" "record@A" "V2 beating the raw value (not the converted one) is a record"
+[[ "$(boards_of "${GXV2}")" == "e1rm:$(e1rm 40 8 2):true,weight:40:true" ]] ||
+  fail "V2 record boards (raw Weight baseline): $(boards_of "${GXV2}")"
+expect_entry "${GXV2}" A weight "45@v2-a2" "V2 the raw PR"
+
+# A reps-only edit of a record stored converted keeps its Weight card: the
+# replacement lists Weight at the raw value with its original baseline.
+GXV3="$(gx "V3 press (total)" total_load)"
+DAV3="${T}-dAV3"
+def "${ATHLETE_TOKEN}" "${DAV3}" per_side_load
+link "${ATHLETE_TOKEN}" "${DAV3}" "${GID}" "${GXV3}"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sv3-a" completed "${DAV3}" "v3-a1:40:8"
+drain "V3 setup"
+stored_converted "${GXV3}" v3-a1
+mark
+set_edit "${ATHLETE_TOKEN}" "${T}-sv3-a" v3-a1 0 40 9
+drain "V3 reps edit"
+expect_since "${GXV3}" "record_voided:edited@A,record@A" "V3 a reps edit voids and replaces the record"
+[[ "$(boards_of "${GXV3}")" == "e1rm:$(e1rm 40 8 2):true,weight:null:true" ]] ||
+  fail "V3 the replacement keeps the Weight card: $(boards_of "${GXV3}")"
+expect_entry "${GXV3}" A weight "40@v3-a1" "V3 the entry is raw"
+pass "raw Weight: a stored converted best falls silently, its record stands, the raw value is the baseline"
 
 # =============================================================================
 echo "[${LANE_LABEL}] R9 — an archived board is frozen; unarchive catches up"
@@ -660,7 +791,7 @@ echo "[${LANE_LABEL}] R10 — a rules_version bump recomputes silently"
 run_psql "update app_public.group_board_entries set value_kg = 1
            where group_exercise_id = '${GX1}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" >/dev/null
 mark
-expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(5, 1000) >= 1;" "t"
+expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(6, 1000) >= 1;" "t"
 drain "R10 rules"
 expect_entry "${GX1}" A weight "105@r1c1" "R10 the recompute corrects entries"
 expect_sql "R10 the recompute writes no event in the group" \
@@ -750,6 +881,37 @@ drain "W warm-up record edited"
 expect_since "${GXW}" "record_voided:edited@M,lead_change:void:weight@M,lead_change:void:e1rm@M" \
   "W an edited warm-up record is voided with its lead changes"
 pass "working sets only: never ranks, records or certifies; a stored warm-up record stands, its board moves silently"
+
+# =============================================================================
+echo "[${LANE_LABEL}] zero kg — a 0 kg result never ranks, records or fails the apply"
+# =============================================================================
+
+# A member whose only counting sets on a linked exercise are 0 kg (typed 0,
+# or blank weight with reps) has no Weight and no 1RM: the fact stores no
+# e1RM at 0 kg and the boards read a zero 1RM as none, so the apply writes
+# no entry instead of failing group_board_entries' value_kg > 0 check.
+GXZ="$(gx "Z zero" per_side_load)"
+DAZ="${T}-dAZ"
+def "${ATHLETE_TOKEN}" "${DAZ}" total_load
+link "${ATHLETE_TOKEN}" "${DAZ}" "${GID}" "${GXZ}"
+mark
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sz" completed "${DAZ}" "z1:0:5" "z2::8"
+drain "Z only 0 kg sets"
+expect_sql "Z the facts store no e1RM at 0 kg" \
+  "select string_agg(replace(set_id, '${T}-', '') || '=' || weight_kg || '/' || coalesce(e1rm_kg::text, 'null'), ',' order by set_id)
+     from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-sz';" \
+  "z1=0/null,z2=0/null"
+expect_entry "${GXZ}" A weight "" "Z a 0 kg set has no Weight"
+expect_entry "${GXZ}" A e1rm "" "Z a 0 kg set has no 1RM"
+expect_since "${GXZ}" "" "Z a 0 kg set makes no record or lead change"
+mark
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sz2" completed "${DAZ}" "z3:20:5"
+drain "Z a loaded set"
+expect_since "${GXZ}" "record@A,lead_change:record:weight@A,lead_change:record:e1rm@A" "Z the first loaded set is the first record"
+expect_entry "${GXZ}" A weight "20@z3" "Z the loaded set ranks"
+pass "zero kg: no entry, no record, no failed apply"
 
 # =============================================================================
 echo "[${LANE_LABEL}] provisional records in an active session (T8)"

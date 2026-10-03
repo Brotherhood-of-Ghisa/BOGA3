@@ -10,7 +10,7 @@ import {
 import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
-export const GROUP_EVAL_RULES_VERSION = 4;
+export const GROUP_EVAL_RULES_VERSION = 5;
 
 export type GroupRawSetValues = {
   weight_value: string;
@@ -69,6 +69,7 @@ export type GroupSetFact = {
   live: boolean;
   weight_kg: number | null;
   reps: number | null;
+  /** Wathan e1RM; null unless performed, and null at 0 kg (a zero 1RM is never a result). */
   e1rm_kg: number | null;
   /** The effort half of the counted-set rule (`isWorkingSetType`); a working set is a performed one with it. */
   working: boolean;
@@ -99,7 +100,7 @@ export const normalizeGroupSetFacts = (rows: GroupEvalSessionRows): GroupSetFact
       live: set.live,
       weight_kg: parsed?.weightKg ?? null,
       reps: parsed?.reps ?? null,
-      e1rm_kg: parsed === null ? null : estimateOneRepMax(parsed.weightKg, parsed.reps),
+      e1rm_kg: parsed === null || parsed.weightKg <= 0 ? null : estimateOneRepMax(parsed.weightKg, parsed.reps),
       working: isWorkingSetType(set.set_type),
       achieved_at_ms: startedAtMs,
       fingerprint: set.fingerprint,

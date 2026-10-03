@@ -1,0 +1,9 @@
+{
+  "_comment": "Shared D6 load-factor vectors: the factor from a member exercise's load_input_mode (source) to the group exercise's (target), applied to 1RM only; Weight stays the raw entered kg. jest (groups-metric-contract.test.ts) runs them against groupEnteredWeightFactor; supabase/tests/groups-bodyweight.sh runs them against app_public.group_board_load_factor.",
+  "cases": [
+    {"source": "total_load", "target": "total_load", "factor": 1},
+    {"source": "per_side_load", "target": "per_side_load", "factor": 1},
+    {"source": "per_side_load", "target": "total_load", "factor": 2},
+    {"source": "total_load", "target": "per_side_load", "factor": 0.5}
+  ]
+}
