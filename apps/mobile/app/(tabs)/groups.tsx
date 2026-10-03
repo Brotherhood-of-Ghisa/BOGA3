@@ -86,7 +86,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
   }, [selectedGroupId]);
 
   // No group selected (My groups loading or empty): read nothing.
-  const stream = useGroupStream({ userId: selectedGroupId ? userId : null, groupId: selectedGroupId });
+  const stream = useGroupStream({ userId, groupId: selectedGroupId });
   const boardsFetcher = useCallback(() => getGroupMetricPodiums(selectedGroupId ?? ''), [selectedGroupId]);
   // Cache-first, read only while the Leaderboards segment is open.
   const boards = useGroupResource<GroupMetricPodiumWire>({

@@ -898,6 +898,8 @@ members, then by username case-insensitively with nulls last (C3.6.1).
 - `p_group_id` null means every group where the caller is currently active
   (All). A value means that group only, and the caller must be an active
   member, else `NOT_FOUND`.
+- All stays a supported server read for agents and other clients. The mobile
+  app never uses it: it reads one group's stream at a time (§6.1–§6.3).
 - A removed member therefore gets nothing on their next refresh (C3.6.8, AC11).
 - `p_limit` accepts `1..50` and defaults to `20`.
 
@@ -1411,7 +1413,8 @@ RPC failure is caught in this module (C3.10.5, AC13).
     `createGroup`, `updateGroup`, `getGroupInviteCode`,
     `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
     `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
-  - `group_stream` always sends all three `p_*` args.
+  - `group_stream` always sends all three `p_*` args. `groupId` is required:
+    the app never reads the All stream.
   - **Stream kinds (M25-T05, M25-T10).** `getGroupStream` keeps `session`,
     `membership`, `record`, `record_voided`, and `link` items and drops any
     other kind before callers or the cache see it, keeping the server's
@@ -1467,7 +1470,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:all`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>`, `boards:v4:<groupId>` and `week:v4:<groupId>` (Today's week summary, stamped with its window start; a cached earlier week is never shown as the current one); full boards and history are never cached |
+| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>`, `boards:v4:<groupId>` and `week:v4:<groupId>` (Today's week summary, stamped with its window start; a cached earlier week is never shown as the current one); full boards and history are never cached |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1481,8 +1484,7 @@ migration via `npm run db:generate`.
 - **Access loss (C3.6.8).** A `NOT_FOUND` on a group evicts `group:<id>`,
   `stream:<id>`, `group-exercises:<id>` (M25-T07), `boards:<id>` (M25-T09), `week:<id>`, and every `session:*`
   entry. The member's `exercise_group_links` rows are synced data and are never
-  evicted. A successful All refresh replaces
-  `stream:all`, which no longer contains that group. The group screen shows
+  evicted. The group screen shows
   "You're no longer a member of this group."
 
 **As-built (M22-T03).**
@@ -1530,7 +1532,7 @@ migration via `npm run db:generate`.
 | `/group/[groupId]/leaderboards/[exerciseId]?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/index.tsx` | (M25-T09) Full board with the Weight / 1RM × Certified / All toggles |
 | `/group/[groupId]/leaderboards/[exerciseId]/history?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/history.tsx` | (M25-T09) The board's lead-change history |
 
-- **Groups tab.** It shows the stream with **All** and per-group chips, header
+- **Groups tab.** It shows one group's stream at a time, picked with per-group chips, header
   actions My groups / Create group / Join group, and the empty, signed-out, and
   offline states.
 - **Group screen.** Its header shows name, description, member count, and my
@@ -1583,7 +1585,8 @@ join, edit, and invite routes, and every action, are M22-T05.
   - The header holds `My groups`, and M22-T05 adds Create / Join beside it.
   - Chips show once My groups has loaded at least one group. A selected
     group that leaves My groups, or whose stream returns `NOT_FOUND`, falls
-    back to All.
+    back to the first group in My groups (`resolveSelectedGroupId`). With no
+    group selected, `useGroupStream` reads nothing.
   - `group_list_mine` returning no groups shows the empty state
     (`groups-empty-state`, children slot for the T05 buttons).
 - **Group screen.** Members render in server order. Membership items there

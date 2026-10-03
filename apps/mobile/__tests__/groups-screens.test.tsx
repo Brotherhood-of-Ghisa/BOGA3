@@ -260,6 +260,8 @@ describe('Groups tab', () => {
     expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
     expect(screen.getByText('No groups yet')).toBeTruthy();
     expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
+    // No group selected: the stream reads nothing (there is no all-groups stream).
+    expect(api.getGroupStream).not.toHaveBeenCalled();
   });
 
   it("renders the first group's cached stream at once, then newest-first cards", async () => {
@@ -293,7 +295,6 @@ describe('Groups tab', () => {
     expect(within(screen.getByTestId(cardID('friend-2:s-2'))).getByText('Training now')).toBeTruthy();
     expect(screen.getByText('Unnamed member joined')).toBeTruthy();
     expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: 'group-a' });
-    expect(api.getGroupStream).not.toHaveBeenCalledWith({ groupId: null });
 
     fireEvent.press(screen.getByTestId(cardID('friend-1:s-1')));
     expect(mockPush).toHaveBeenLastCalledWith('/group-session/friend-1/s-1');
