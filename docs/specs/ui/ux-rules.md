@@ -102,8 +102,11 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      a session with no working set is not one. A week is
      Monday 00:00 to Sunday 24:00 local; a month is the local calendar month.
    - The week shows this week's sessions, working sets and PRs so far, each
-     with a bar against last week's whole total (full once reached), never a
-     signed delta.
+     with a bar against last week's whole total, never a signed delta. The
+     bar fills in laps of last week's total, one `viz` step darker per lap:
+     `viz2` up to it, then `viz3` over a full `viz2` up to twice it, then
+     `viz4` over a full `viz3` up to three times, where it stops full. With
+     no last week, any figure is a full `viz3` bar.
    - The month compares its working sets so far with the previous month up to
      the same day of month (its last day when shorter), as a signed absolute
      count (`+4`, `−3`, `±0`; §13.2). The projection is linear: so far per

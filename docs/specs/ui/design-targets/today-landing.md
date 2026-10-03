@@ -29,8 +29,10 @@ runtime gallery of every state below on 2026-10-03.
   with the date range in `ink-faint`, then three stacked figures: `Sessions`,
   `Sets` (working sets, `ux-rules.md` §5.11) and `PRs` (the `record` figure
   with its up arrow). Under each figure a thin bar on the `viz` ramp shows this
-  week as a share of **last week's total** (full, in the darker step, once it
-  is passed) and a caption `vs <n> last wk` (was `of <n> last wk`; changed
+  week as a share of **last week's total**, in laps of it: `viz2` up to the
+  total, then `viz3` over it up to twice, then `viz4` up to three times, where
+  it stops full (was a `viz3` fill, full in `viz4` once passed; changed on
+  operator review, 2026-10-03) and a caption `vs <n> last wk` (was `of <n> last wk`; changed
   on operator review of the phone build, 2026-10-03). No signed deltas: a part week
   against a whole one says little.
 - **Progress card, middle: the month.** `<Month> so far` with the month's

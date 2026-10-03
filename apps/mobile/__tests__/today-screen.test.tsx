@@ -25,6 +25,8 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+import { ShareBar } from '@/components/today';
+import { uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -142,7 +144,7 @@ describe('Today: the Progress card over real data', () => {
     const sessions = figure('sessions');
     expect(sessions.value).toHaveTextContent('1');
     expect(sessions.previous).toHaveTextContent('vs 2 last wk');
-    expect(sessions.fill).toHaveStyle({ width: '50%' });
+    expect(sessions.fill).toHaveStyle({ width: '50%', backgroundColor: uiRoles.viz2 });
     expect(text('today-progress-week-sessions')).toHaveProp('accessibilityLabel', 'Sessions 1, vs 2 last week');
 
     const workingSets = figure('working-sets');
@@ -268,5 +270,33 @@ describe('Today: progress read states', () => {
 
     expect(loadProgress).not.toHaveBeenCalled();
     expect(text('today-progress-loading')).toBeTruthy();
+  });
+});
+
+describe('Today: the share bar', () => {
+  const bar = (current: number, previous: number) => {
+    render(<ShareBar current={current} previous={previous} testID="bar" />);
+    return { track: screen.getByTestId('bar'), fill: screen.getByTestId('bar-fill') };
+  };
+
+  it('fills the first lap over the empty track up to last week', () => {
+    const { track, fill } = bar(2, 3);
+
+    expect(track).toHaveStyle({ backgroundColor: uiRoles.viz0 });
+    expect(fill).toHaveStyle({ width: '67%', backgroundColor: uiRoles.viz2 });
+  });
+
+  it('fills the next step over a full first lap once past last week', () => {
+    const { track, fill } = bar(4, 3);
+
+    expect(track).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    expect(fill).toHaveStyle({ width: '33%', backgroundColor: uiRoles.viz3 });
+  });
+
+  it('stops full in the darkest step past three times last week', () => {
+    const { track, fill } = bar(12, 3);
+
+    expect(track).toHaveStyle({ backgroundColor: uiRoles.viz3 });
+    expect(fill).toHaveStyle({ width: '100%', backgroundColor: uiRoles.viz4 });
   });
 });

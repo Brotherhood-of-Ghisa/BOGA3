@@ -566,8 +566,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     `record` with its `arrow-up`), each over a `ShareBar` and `vs <n> last wk`.
     testIDs `today-progress-week` (`-range`), `today-progress-week-<sessions |
     working-sets | prs>` (`-value`, `-bar`, `-bar-fill`, `-previous`)
-  - `ShareBar` — a 6pt bar: a `viz0` track and a `viz3` fill for a share of a
-    total, full in `viz4` once the total is reached
+  - `ShareBar` — a 6pt bar filling in laps of a total (`weekShare`): a `viz2`
+    fill over the `viz0` track up to the total, then `viz3` over a full `viz2`
+    up to twice it, then `viz4` over a full `viz3` up to three times
   - `MonthPace` — `<Month> so far` and its working sets, the signed difference
     from the previous month at the same day with `ahead of / behind / level
     with <Mon>'s pace`, a `react-native-svg` cumulative chart (this month

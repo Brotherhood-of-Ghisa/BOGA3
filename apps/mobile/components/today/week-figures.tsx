@@ -9,14 +9,20 @@ import { todayText } from './text-styles';
 
 type ShareBarProps = { current: number; previous: number; testID?: string };
 
-// A thin bar on the `viz` ramp: `current` as a share of `previous`, full in the
-// darker step once reached (`viz0` is the track).
+// One `viz` step per lap of `previous` (`weekShare`): `viz2` up to it, `viz3`
+// up to twice it, `viz4` beyond. A lap fills over the one before, full; the
+// first over the `viz0` track.
+const LAP_FILLS = [uiRoles.viz2, uiRoles.viz3, uiRoles.viz4] as const;
+
+// A thin bar on the `viz` ramp: `current` as a share of `previous`, in laps.
 export function ShareBar({ current, previous, testID }: ShareBarProps) {
-  const { fraction, reached } = weekShare({ current, previous });
+  const { lap, fraction } = weekShare({ current, previous });
   return (
-    <View style={styles.track} testID={testID}>
+    <View
+      style={[styles.track, lap > 0 ? { backgroundColor: LAP_FILLS[lap - 1] } : null]}
+      testID={testID}>
       <View
-        style={[styles.fill, { width: `${Math.round(fraction * 100)}%` }, reached ? styles.fillReached : null]}
+        style={[styles.fill, { width: `${Math.round(fraction * 100)}%`, backgroundColor: LAP_FILLS[lap] }]}
         testID={testID ? `${testID}-fill` : undefined}
       />
     </View>
@@ -136,9 +142,5 @@ const styles = StyleSheet.create({
   fill: {
     height: BAR_HEIGHT,
     borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.viz3,
-  },
-  fillReached: {
-    backgroundColor: uiRoles.viz4,
   },
 });

@@ -54,11 +54,21 @@ export const formatPacePhrase = (month: TodayProgressMonth): string => {
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** A share bar: this week as a share of last week's total, full once reached. */
-export const weekShare = (counts: { current: number; previous: number }): { fraction: number; reached: boolean } => {
-  if (counts.current === 0) return { fraction: 0, reached: false };
-  if (counts.current >= counts.previous) return { fraction: 1, reached: true };
-  return { fraction: counts.current / counts.previous, reached: false };
+/** The laps a share bar draws: up to last week's total, up to twice it, up to three times. */
+export const WEEK_SHARE_LAPS = 3;
+
+/**
+ * A share bar: this week in laps of last week's total. `lap` 0 fills toward
+ * last week's total; past it, lap 1 fills toward twice it over a full lap 0;
+ * lap 2 toward three times, where the bar stops. With no last week, any figure
+ * has passed it: a full lap 1.
+ */
+export const weekShare = (counts: { current: number; previous: number }): { lap: number; fraction: number } => {
+  if (counts.current === 0) return { lap: 0, fraction: 0 };
+  if (counts.previous === 0) return { lap: 1, fraction: 1 };
+  const ratio = counts.current / counts.previous;
+  const lap = Math.min(Math.ceil(ratio) - 1, WEEK_SHARE_LAPS - 1);
+  return { lap, fraction: Math.min(ratio - lap, 1) };
 };
 
 const ordinal = (day: number): string => {
