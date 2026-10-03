@@ -64,12 +64,19 @@ Sync v2 path.
 - Supabase `app_public` tables with owner-scoped composite PK/FKs, checks,
   indexes, owner-immutability protection, timestamps, server receipt time, RLS,
   and explicit grants matching the contract.
-- Expand Sync v2 from ten to fourteen entity types and four to five layers:
+- Expand Sync v2 from twelve to sixteen entity types across five layers:
   push projection/upsert, pull union/projection, cursors, local wire mapping,
   topological selection, FK closure, quarantine classification, dirty counts,
   first-sync/restore, tombstone propagation, and account/dev wipe.
-- Keep `exercise_sets` in L4: its new source-set FK points to
-  `session_plan_sets` in L3, so the graph remains fourteen entities/five layers.
+- Position `exercise_sets` and `session_exercise_tags` in L4 alongside
+  `body_weight_measurements` (independent root); their parent `session_exercises`
+  is in L3 and `session_plan_sets` is in L3; `sessions` and
+  `session_plan_exercises` are in L2; `session_plans` is in L1; and
+  `training_programmes`, `user_settings`, `gyms`, `exercise_definitions`, and
+  `muscle_groups` are in L0.
+- Shifting `sessions` (L1->L2), `session_exercises` (L2->L3), and `exercise_sets`
+  (L3->L4) in `topo-order.ts` must be accompanied by the client `pull_cursor`
+  migration or protocol versioning strategy specified in T01.
 - Schema-drift declarations and fixtures for all new fields and edges.
 - Compatibility behavior for an older client receiving a server state that
   contains plan entities, exactly as decided in T01.
@@ -83,7 +90,7 @@ receipts, API routes, or MCP tools.
 
 1. A clean local database and a clean local Supabase stack expose the exact T01
    schema, constraints, indexes, RLS, grants, and owner-scoped FK graph.
-2. `sync-drift --strict` reports fourteen entities, five valid layers, and no
+2. `sync-drift --strict` reports sixteen entities, five valid layers, and no
    warning or error. No M22 group or M21 agent-control table enters sync scope.
 3. A normal app token can push and pull each planning entity; `anon`, OAuth
    client tokens, and a different owner cannot read or write the rows directly.
@@ -104,7 +111,8 @@ receipts, API routes, or MCP tools.
    rejected atomically by direct writes and sync.
 8. Unknown/new-entity compatibility behaves exactly as T01 decided and has a
    regression test or an explicit coordinated-rollout assertion.
-9. Existing ten-entity workout, exercise, stats, and group tests remain green.
+9. Existing twelve-entity workout, exercise, stats, bodyweight, and group tests
+   remain green.
 
 ## Docs touched (required)
 

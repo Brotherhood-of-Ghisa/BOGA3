@@ -24,9 +24,10 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/09-project-structure.md, 
 - Milestone: `docs/plans/milestones/M23-session-planning-and-programmes.md`
 - **Contract:** `docs/specs/tech/session-planning-contract.md`
 - Data: `docs/specs/05-data-model.md`
-- Current draft/recorder semantics:
+- Current draft/recorder semantics and kernel:
   `apps/mobile/src/data/session-drafts.ts`,
-  `apps/mobile/src/session-recorder/set-semantics.ts`
+  `apps/mobile/src/exercise-calculations/set-semantics.ts`,
+  `apps/mobile/src/utils/local-time.ts`
 - Project structure: `docs/specs/09-project-structure.md`
 - Testing: `docs/specs/02-quality-and-test-gates.md`,
   `docs/specs/06-testing-strategy.md`
@@ -91,7 +92,9 @@ to reorder manual and source-derived sets without changing their provenance.
 - `completePlanBlock(planExerciseId)` and `skipPlanBlock(planExerciseId)`:
   - completion requires the live sourced exercise block to contain at least one
     valid confirmed performed set whose `source_plan_set_id` belongs to that
-    source block, but never requires target equality; manual sets do not count;
+    source block, but never requires target equality; manual warm-ups do not count;
+    under M30 working-set semantics, materialized confirmed working sets contribute
+    to session facts/stats, while warm-up sets remain excluded from volume/PRs;
   - skip is valid only without performed work and never creates performed rows;
   - only these explicit operations resolve a block and advance derived
     programme progress; attachment alone leaves it pending.
@@ -169,6 +172,11 @@ change.
   graph that the recorder already understands.
 - The repository is the mutation boundary for mobile UI; screens do not issue
   ad-hoc multi-table writes.
+- Conforming to dependency-cruiser layering rules (PR #453): `apps/mobile/src/session-planner/`
+  must keep its pure domain logic/types independent of `src/session-recorder` and
+  prevent circular imports with `src/data` or `src/exercise-calculations`.
+- Tests live in `apps/mobile/__tests__/` or `src/session-planner/__tests__/`, outside
+  `app/` (PR #469).
 
 ## Evidence
 

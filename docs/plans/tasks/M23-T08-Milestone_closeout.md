@@ -51,7 +51,7 @@ all completed task cards.
    progress, and whole-plan/block materialization paths with as-built links.
 5. **Data, sync, and auth.** `05-data-model.md`,
    `tech/sync-v2-server-contract.md`, and `10-api-authn-authz-guidelines.md`
-   contain the fourteen-entity/five-layer model, all three performed source
+   contain the sixteen-entity/five-layer model, all three performed source
    links, independent performed/source set ordering, block progress, RLS,
    current-grant permission, receipt, service-role boundary, and direct-agent
    denials.

@@ -109,7 +109,7 @@ repository's bounded contract posture.
 5. Smoke verifies exact graph ownership/order/targets/provenance, zero new
    performed rows or performed source links, same-key replay, different-payload
    conflict, metadata-only audit, disable denial, and revoke denial.
-6. Sync integration proves a server-created graph pulls in fourteen-entity,
+6. Sync integration proves a server-created graph pulls in sixteen-entity,
    five-layer FK-safe order and survives first-sync restore without becoming
    locally dirty. Session/block/set source fields and performed set ordering
    round-trip independently.

@@ -42,11 +42,15 @@ freeform behavior.
 ### In scope
 
 - Add **Active**, **Upcoming**, **Unscheduled**, and **Completed** sections to
-  `/sessions`, with clear empty/loading/error/offline behavior.
+  `/sessions`, with clear empty/loading/error/offline behavior. Coordinate with
+  the Today landing page (M29), which surfaces the next scheduled plan or next
+  unresolved programme block, while `/sessions` owns full queue management.
 - Add `/session-plan/new` and `/session-plan/[planId]`, register their stack
   titles, params, back behavior, and transitions.
 - Compose the existing exercise and gym pickers, set rows/types, tokens,
   primitives, input validation, confirmations, and accessibility patterns.
+  Target load inputs and displays respect exercise `load_input_mode`
+  (`per_side_load` vs `total_load`) per M19.
 - Human create/edit/reschedule/duplicate/delete for eligible one-off plans and
   future unattached blocks.
 - Start-all action with active-session conflict/Resume behavior, plus per-block
@@ -219,11 +223,12 @@ recurrence, reminders, recommendations, and plan-versus-actual analytics.
 
 ## Testing and verification approach
 
-- Add focused component/route tests for card choice, handle-only drag initiation,
-  insertion feedback, cancellation/rollback, Move earlier/later VoiceOver and
-  keyboard semantics, reduced motion, boundary states, and both warm-up order
-  scenarios. Extend the relevant Maestro flow; T07 owns the final dedicated
-  server-to-mobile planning lane.
+- Add focused component/route tests (placed outside `app/` per PR #469, in
+  `apps/mobile/__tests__/` or `src/session-planner/__tests__/`) for card choice,
+  handle-only drag initiation, insertion feedback, cancellation/rollback,
+  Move earlier/later VoiceOver and keyboard semantics, reduced motion, boundary
+  states, and both warm-up order scenarios. Extend the relevant Maestro flow;
+  T07 owns the final dedicated server-to-mobile planning lane.
 - Before PR: `./boga test fast` and `./boga test frontend`.
 - Run `./boga test for --diff origin/main` and record artifacts from the gate
   runner. Use `./boga timings` for measured times only.
