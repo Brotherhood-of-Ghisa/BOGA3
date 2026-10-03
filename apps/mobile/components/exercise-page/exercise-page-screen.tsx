@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   type TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,7 +21,7 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -31,9 +32,11 @@ import {
   buildSetRows,
   commitSet,
   describeCompleteExercisePlan,
+  discardSetEntry,
   findCursorIndex,
   loggerValuesFor,
   planCompleteExercise,
+  recordBandFor,
   toggleSetPerformed,
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
@@ -48,6 +51,7 @@ import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { SetLogger } from './set-logger';
 import { SetRow } from './set-row';
+import { SwipeSetRow } from './swipe-set-row';
 import { pageText } from './text-styles';
 
 type ExercisePageScreenProps = {
@@ -143,6 +147,7 @@ export function ExercisePageScreen({
   const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
   const rows = buildSetRows(sets, baseline, loadContext);
+  const recordBand = recordBandFor(rows);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
     sets.find((set) => set.id === openSetId) ?? (cursorIndex !== null ? sets[cursorIndex] : undefined);
@@ -192,6 +197,35 @@ export function ExercisePageScreen({
     setOpenSetId(added?.id ?? null);
     // Ready to overwrite the copied weight (`ux-rules.md` §5.11).
     requestAnimationFrame(() => weightInputRef.current?.focus());
+  };
+
+  /**
+   * Swipe right on the in-progress set (`ux-rules.md` §14a.3): confirm it and
+   * move on — the same write as the tick. On the last set, the deterministic
+   * continuation is Add set: the fresh row opens in the logger with the
+   * copied values and the weight focused. Invalid values change nothing.
+   */
+  const onSwipeRight = (setId: string) => {
+    Keyboard.dismiss();
+    const isTargetOpen = openSet?.id === setId;
+    const target = sets.find((s) => s.id === setId);
+    if (!target) return;
+    const committed = commitSet(sets, setId, loggerValuesFor(target));
+    if (committed === sets) return;
+    if (sets[sets.length - 1]?.id !== setId) {
+      updateSets(() => committed, 'structural');
+      if (isTargetOpen) setOpenSetId(null);
+      return;
+    }
+    const next = addSet(committed);
+    updateSets(() => next, 'structural');
+    setOpenSetId(next[next.length - 1]?.id ?? null);
+    requestAnimationFrame(() => weightInputRef.current?.focus());
+  };
+
+  /** Swipe left: drop the in-progress entry; the row keeps its place (`discardSetEntry`). */
+  const onSwipeLeft = (setId: string) => {
+    updateSets((current) => discardSetEntry(current, setId), 'structural');
   };
 
   const finishComplete = async (nextSets: typeof sets) => {
@@ -285,25 +319,53 @@ export function ExercisePageScreen({
             view={recordsView}
           />
           <Card testID="exercise-set-list">
+            {recordBand ? (
+              <View style={styles.recordBand} testID="exercise-record-band">
+                <Icon color={uiRoles.record} name="arrow-up" size="xs" />
+                <Text allowFontScaling={false} style={styles.recordBandLabel}>{recordBand.label}</Text>
+              </View>
+            ) : null}
             {rows.map((row, index) => {
               const isOpen = row.id === openSet?.id;
               const followsLogger = index > 0 && rows[index - 1]?.id === openSet?.id;
-              if (isOpen && loggerValues) {
-                return (
+              if (isOpen || row.isCursor) {
+                // The in-progress row carries the swipes; the accessibility
+                // actions are the non-gesture path for the same two moves.
+                const rowContent = isOpen && loggerValues ? (
                   <SetLogger
-                    key={row.id}
                     loadContext={loadContext}
                     number={row.number}
                     onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
                     onCommit={onCommit}
+                    onConfirm={() => onSwipeRight(row.id)}
                     onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType))}
+                    onDrop={() => onSwipeLeft(row.id)}
                     onOpenEffort={() => setOpenSheet('effort')}
                     ref={weightInputRef}
                     repsValue={loggerValues.repsValue}
                     setType={loggerValues.setType}
                     weightValue={loggerValues.weightValue}
                   />
+                ) : (
+                  <SetRow
+                    divider={index > 0 && !followsLogger}
+                    key={row.id}
+                    onConfirm={() => onSwipeRight(row.id)}
+                    onDrop={() => onSwipeLeft(row.id)}
+                    onOpen={setOpenSetId}
+                    onToggle={onToggle}
+                    row={row}
+                  />
+                );
+                return (
+                  <SwipeSetRow
+                    key={row.id}
+                    onSwipeLeft={() => onSwipeLeft(row.id)}
+                    onSwipeRight={() => onSwipeRight(row.id)}
+                    testID={`exercise-set-swipe-${row.number}`}>
+                    {rowContent}
+                  </SwipeSetRow>
                 );
               }
               return (
@@ -366,7 +428,12 @@ export function ExercisePageScreen({
           groupLinkingUserId && exercise.exerciseDefinitionId
             ? () => {
                 setOpenSheet('none');
-                router.push(exerciseLinkHref(exercise.exerciseDefinitionId));
+                // Pending edits are written before the Link screen opens, so
+                // linking mid-session cannot race the autosave debounce and
+                // the session is left exactly as it reads (`ux-rules.md` §14a.5).
+                void draft.flush().then((saved) => {
+                  if (saved) router.push(exerciseLinkHref(exercise.exerciseDefinitionId));
+                });
               }
             : undefined
         }
@@ -433,6 +500,27 @@ const styles = StyleSheet.create({
   },
   saveError: {
     color: uiRoles.danger,
+  },
+  // The record band, the session view card's (`exercise-sets-card.tsx`), on
+  // the page's set list.
+  recordBand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.xs,
+    backgroundColor: uiRoles.recordWash,
+    borderBottomWidth: uiBorder.width,
+    borderBottomColor: uiRoles.recordRule,
+  },
+  recordBandLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.record,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).

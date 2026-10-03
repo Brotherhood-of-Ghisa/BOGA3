@@ -34,6 +34,12 @@ type SetLoggerProps = {
   onCycleEffort: () => void;
   onOpenEffort: () => void;
   onCommit: () => void;
+  // The swipe-right equivalent, as the logger's `confirm` accessibility
+  // action (`ux-rules.md` §14a.3): the tick confirms without the swipe's
+  // last-set add-set continuation.
+  onConfirm: () => void;
+  // The swipe-left equivalent, as the logger's `discard` accessibility action.
+  onDrop?: () => void;
 };
 
 // Up to 5 digits and a point; the logger rejects anything else as it is typed.
@@ -49,7 +55,7 @@ const DASH = '—';
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, loadContext },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext },
   weightInputRef
 ) {
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
@@ -59,7 +65,20 @@ export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogge
 
   return (
     <View style={styles.logger} testID="exercise-set-logger">
-      <View style={styles.header}>
+      <View
+        accessibilityActions={[
+          { name: 'confirm', label: `Confirm set ${number}` },
+          ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}'s entry` }] : []),
+        ]}
+        accessibilityHint="Confirm or drop the set from the actions menu"
+        accessibilityLabel={`Set ${number}, in progress`}
+        accessible
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'confirm') onConfirm();
+          if (event.nativeEvent.actionName === 'discard') onDrop?.();
+        }}
+        style={styles.header}
+        testID="exercise-set-logger-header">
         <Text allowFontScaling={false} style={[pageText.microLabel, styles.setLabel]}>{`Set ${number}`}</Text>
         <Text allowFontScaling={false} style={pageText.detailFigure} testID="exercise-set-logger-preview">
           {`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}

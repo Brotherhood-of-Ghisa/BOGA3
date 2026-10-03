@@ -122,12 +122,41 @@ export const previewMetrics = (weightValue: string, repsValue: string, context: 
   return { oneRepMax, volume };
 };
 
+const beats = (value: number | null, record: number | null): boolean =>
+  value !== null && record !== null && value > record;
+
+/**
+ * The one set of the session whose record is highlighted (`design-language.md`
+ * §5: one superlative). A performed set qualifies when its 1RM or its top
+ * weight beats the all-time best before today. The best qualifying 1RM wins;
+ * when no 1RM beats it, the heaviest qualifying weight does; a tie keeps the
+ * set that reached the value first.
+ */
+export const bestRecordSetId = (
+  candidates: { id: string; oneRepMaxRecord: boolean; oneRepMax: number | null; weightRecord: boolean; weight: number | null }[]
+): string | null => {
+  let best: { id: string; oneRepMax: number | null; weight: number | null } | null = null;
+  for (const candidate of candidates) {
+    const oneRepMax = candidate.oneRepMaxRecord ? candidate.oneRepMax : null;
+    const weight = candidate.weightRecord ? candidate.weight : null;
+    if (oneRepMax === null && weight === null) continue;
+    const takesOver =
+      best === null ||
+      (oneRepMax !== null
+        ? best.oneRepMax === null || oneRepMax > best.oneRepMax
+        : best.oneRepMax === null && weight !== null && (best.weight === null || weight > best.weight));
+    if (takesOver) best = { id: candidate.id, oneRepMax, weight };
+  }
+  return best?.id ?? null;
+};
+
 /**
  * Builds the rows. Every figure takes its row's colour and weight; the one
  * highlight is a performed working set's weight or 1RM that beats the lifter's
- * all-time best before today, shown as a `record`. A warm-up keeps its own
- * figures but is never a record. Volume is never one here: its record is a
- * whole session's, so no single set can beat it.
+ * all-time best before today, shown as a `record` — and only on the session's
+ * single best such set (`bestRecordSetId`), never on every qualifying row. A
+ * warm-up keeps its own figures but is never a record. Volume is never one here:
+ * its record is a whole session's, so no single set can beat it.
  */
 export const buildSetRows = (
   sets: ExercisePageSet[],
@@ -135,9 +164,7 @@ export const buildSetRows = (
   context: LoadContext
 ): SetRowView[] => {
   const cursorIndex = findCursorIndex(sets);
-  const beats = (value: number | null, record: number | null) =>
-    value !== null && record !== null && value > record;
-  return sets.map((set, index): SetRowView => {
+  const evaluated = sets.map((set, index): SetRowView => {
     const values = displayedValues(set);
     const metrics = metricsOf(values.weightValue, values.repsValue, context);
     const performed = isPerformed(set);
@@ -156,6 +183,34 @@ export const buildSetRows = (
       oneRepMaxRecord: working && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
     };
   });
+  const winnerId = bestRecordSetId(evaluated);
+  return evaluated.map((row) => ({
+    ...row,
+    weightRecord: winnerId !== null && row.id === winnerId && row.weightRecord,
+    oneRepMaxRecord: winnerId !== null && row.id === winnerId && row.oneRepMaxRecord,
+  }));
+};
+
+export type SetListRecordBand = {
+  kind: 'oneRepMax' | 'weight';
+  label: string;
+};
+
+/**
+ * The record band for the set list, from the built rows: the session's best
+ * record set announced with the same words as the session view's card band.
+ * `null` when no performed set beats the baseline.
+ */
+export const recordBandFor = (rows: SetRowView[]): SetListRecordBand | null => {
+  const winner = rows.find((row) => row.oneRepMaxRecord || row.weightRecord);
+  if (!winner) return null;
+  if (winner.oneRepMaxRecord && winner.oneRepMax !== null) {
+    return { kind: 'oneRepMax', label: `New 1RM record · ${formatOneRepMax(winner.oneRepMax)}` };
+  }
+  if (winner.weight !== null) {
+    return { kind: 'weight', label: `New top weight · ${formatWeight(winner.weight)}` };
+  }
+  return null;
 };
 
 /** The values the logger opens with: the row as displayed. */
@@ -235,6 +290,29 @@ export const toggleSetPerformed = (sets: ExercisePageSet[], setId: string): Exer
   const values = displayedValues(set);
   if (!canCommitLogger(values)) return null;
   return commitSet(sets, setId, values);
+};
+
+/**
+ * Swipe-left drop: the in-progress entry is discarded — typed weight and reps
+ * clear, and a planned row returns to its pristine state (its actual effort
+ * back to blank, so it reads as its plan again; the display falls back to the
+ * prescribed effort). The row keeps its place and its state otherwise: nothing
+ * navigates and the cursor stays on it. An ad-hoc row keeps its effort (it has
+ * no plan to revert to). Returns the same array when there is nothing to
+ * discard; a performed row is never touched here (the glyph un-performs it).
+ */
+export const discardSetEntry = (sets: ExercisePageSet[], setId: string): ExercisePageSet[] => {
+  const set = sets.find((candidate) => candidate.id === setId);
+  if (!set || isPerformed(set)) return sets;
+  const hasPlan = hasPlannedValues(set);
+  const untouched = !hasEnteredValues(set) && (!hasPlan || (set.setType ?? null) === null);
+  if (untouched) return sets;
+  return replaceSet(sets, setId, (current) => ({
+    ...current,
+    weightValue: '',
+    repsValue: '',
+    setType: hasPlan ? null : current.setType,
+  }));
 };
 
 export const createLocalSetId = () =>

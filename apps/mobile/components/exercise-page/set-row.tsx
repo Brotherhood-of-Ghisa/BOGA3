@@ -19,6 +19,10 @@ type SetRowProps = {
   divider: boolean;
   onOpen: (setId: string) => void;
   onToggle: (setId: string) => void;
+  // The in-progress row's swipe equivalents, as accessibility actions
+  // (`ux-rules.md` §14a.3): the non-gesture path for confirm / drop.
+  onConfirm?: () => void;
+  onDrop?: () => void;
 };
 
 const DASH = '—';
@@ -35,13 +39,17 @@ const describeValues = (row: SetRowView) =>
  * row's colour and weight; only a record weight or 1RM stands out, in `record`.
  * The row body opens the row in the logger; the glyph performs or un-performs it.
  */
-export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
+export function SetRow({ row, divider, onOpen, onToggle, onConfirm, onDrop }: SetRowProps) {
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
   const meaning = 'Weight · kg';
   const glyph = performed ? 'set-done' : row.isCursor ? 'set-current' : 'set-planned';
   const statState = performed ? 'realised' : 'planned';
+  const actions = [
+    ...(onConfirm ? [{ name: 'confirm', label: `Confirm set ${row.number}` }] : []),
+    ...(onDrop ? [{ name: 'discard', label: `Drop set ${row.number}'s entry` }] : []),
+  ];
 
   return (
     <ListRow
@@ -88,9 +96,16 @@ export function SetRow({ row, divider, onOpen, onToggle }: SetRowProps) {
         </Pressable>
       }>
       <Pressable
-        accessibilityHint="Opens the set for editing"
+        accessibilityActions={actions}
+        accessibilityHint={
+          actions.length > 0 ? 'Opens the set for editing. Confirm or drop the set from the actions menu.' : 'Opens the set for editing'
+        }
         accessibilityLabel={`Set ${row.number}, ${effort}, ${meaning}, ${values}, ${performed ? 'performed' : 'not performed'}`}
         accessibilityRole="button"
+        onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'confirm') onConfirm?.();
+          if (event.nativeEvent.actionName === 'discard') onDrop?.();
+        }}
         onPress={() => onOpen(row.id)}
         style={styles.body}
         testID={`exercise-set-${row.number}-open`}>
