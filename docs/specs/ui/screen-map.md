@@ -170,7 +170,7 @@ Brief entrypoint map of the current mobile screens.
     action. Only exercises with at least one working set in the selected
     7-/30-day window appear; `Vol` and `1RM` read working sets only.
   - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
-    Exercise cycles most/least recently completed across all-time valid history;
+    Exercise cycles most/least recently completed across all-time working-set history;
     Sets cycles all sets high/low then working sets high/low; and Vol cycles
     high/low. The 1RM header is static. Missing recency stays last, and ties use
     name then ID. Each sortable header reserves its inline indicator width so

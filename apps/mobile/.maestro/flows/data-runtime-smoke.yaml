@@ -7,8 +7,9 @@ appId: com.dinoderek.mobile
 #      expo-sqlite and the backend-less build seeds its starter catalogue;
 #   2. Train's Start opens an empty session; the picker sheet's keyboard search
 #      finds the seeded Barbell Back Squat and adds it with an empty set;
-#   3. the exercise page's logger takes weight and reps on the keyboard and
-#      commits `135.0 × 8`;
+#   3. the exercise page's logger takes weight and reps on the keyboard, one
+#      tap cycles the first set's default `W-Up` to no effort (a working set,
+#      so Stats counts it), and it commits `135.0 × 8`;
 #   4. Finish (one confirmed set, no prompt) opens the completion screen, and
 #      Done replaces it with Stats;
 #   5. Stats' exercise list reads back the session just written: the only
@@ -93,6 +94,12 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "exercise-set-logger-reps"
 - inputText: "8"
+# The first set defaults to W-Up; a warm-up-only exercise has no Stats
+# footprint, so one tap cycles it to no effort, a working set.
+- tapOn:
+    id: "exercise-set-logger-effort"
+- assertVisible:
+    text: "Change effort, currently none"
 # The logger's commit sits above the keyboard and the page scroll has
 # keyboardShouldPersistTaps="handled", so the tap lands with the keyboard up
 # (a hideKeyboard here cost ~4.3s).
