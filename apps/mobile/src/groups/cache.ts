@@ -16,7 +16,6 @@ export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof sche
 export const groupCacheKeys = {
   mine: 'groups:v4:mine',
   group: (groupId: string) => `group:v4:${groupId}`,
-  streamAll: 'stream:v4:all',
   stream: (groupId: string) => `stream:v4:${groupId}`,
   session: (memberUserId: string, sessionId: string) => `session:v4:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */

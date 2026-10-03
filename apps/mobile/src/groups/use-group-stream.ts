@@ -63,11 +63,12 @@ export type GroupStreamState = GroupResourceState<GroupStreamResult> & {
   loadMore: () => Promise<void>;
 };
 
+/** One group's stream. A null `userId` or `groupId` reads nothing. */
 export function useGroupStream({ userId, groupId }: { userId: string | null; groupId: string | null }): GroupStreamState {
-  const fetcher = useCallback(() => getGroupMetricStream({ groupId }), [groupId]);
+  const fetcher = useCallback(() => getGroupMetricStream({ groupId: groupId ?? '' }), [groupId]);
   const resource = useGroupResource<GroupStreamResult>({
     userId,
-    cacheKey: groupId ? groupCacheKeys.stream(groupId) : groupCacheKeys.streamAll,
+    cacheKey: groupId ? groupCacheKeys.stream(groupId) : null,
     fetcher,
     evictGroupIdOnNotFound: groupId,
   });
@@ -105,7 +106,7 @@ export function useGroupStream({ userId, groupId }: { userId: string | null; gro
   const offline = resource.offline;
 
   const loadMore = useCallback(async (): Promise<void> => {
-    if (!hasMore || loadingRef.current || offline || cursor === null) {
+    if (!hasMore || loadingRef.current || offline || cursor === null || groupId === null) {
       return;
     }
     const requestIdentity = identityRef.current;

@@ -43,12 +43,13 @@ describe('group cache', () => {
   it('builds the contract cache keys', () => {
     expect(groupCacheKeys.mine).toBe('groups:v4:mine');
     expect(groupCacheKeys.group('g1')).toBe('group:v4:g1');
-    expect(groupCacheKeys.streamAll).toBe('stream:v4:all');
     expect(groupCacheKeys.stream('g1')).toBe('stream:v4:g1');
     expect(groupCacheKeys.session('u2', 's1')).toBe('session:v4:u2:s1');
     expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:v4:g1');
     expect(groupCacheKeys.boards('g1')).toBe('boards:v4:g1');
     expect(groupCacheKeys.weekSummary('g1')).toBe('week:v4:g1');
+    // The app reads one group's stream at a time: there is no all-groups key.
+    expect(groupCacheKeys).not.toHaveProperty('streamAll');
   });
 
   it('round-trips a payload and its fetch time for the owning user', () => {
@@ -67,16 +68,16 @@ describe('group cache', () => {
   });
 
   it('returns nothing for a missing key', () => {
-    expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-1')).toBeNull();
+    expect(readGroupCache(db(), groupCacheKeys.stream('g1'), 'user-1')).toBeNull();
   });
 
   it('upserts: a later write replaces the payload, fetch time, and owner', () => {
-    put(groupCacheKeys.streamAll, 'user-1', { v: 1 }, 1_000);
-    put(groupCacheKeys.streamAll, 'user-2', { v: 2 }, 2_000);
+    put(groupCacheKeys.stream('g1'), 'user-1', { v: 1 }, 1_000);
+    put(groupCacheKeys.stream('g1'), 'user-2', { v: 2 }, 2_000);
 
-    expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-1')).toBeNull();
-    expect(readGroupCache(db(), groupCacheKeys.streamAll, 'user-2')).toEqual({ payload: { v: 2 }, fetchedAtMs: 2_000 });
-    expect(allKeys()).toEqual(['stream:v4:all']);
+    expect(readGroupCache(db(), groupCacheKeys.stream('g1'), 'user-1')).toBeNull();
+    expect(readGroupCache(db(), groupCacheKeys.stream('g1'), 'user-2')).toEqual({ payload: { v: 2 }, fetchedAtMs: 2_000 });
+    expect(allKeys()).toEqual(['stream:v4:g1']);
   });
 
   it('throws on a corrupt payload instead of reading it as a miss', () => {
@@ -87,7 +88,6 @@ describe('group cache', () => {
 
   it('evictGroup removes group:<id>, stream:<id>, group-exercises:<id>, boards:<id>, week:<id>, and every session:* entry, and nothing else', () => {
     put(groupCacheKeys.mine);
-    put(groupCacheKeys.streamAll);
     put(groupCacheKeys.group('g1'));
     put(groupCacheKeys.stream('g1'));
     put(groupCacheKeys.groupExercises('g1'));
@@ -103,7 +103,7 @@ describe('group cache', () => {
 
     evictGroup(db(), 'g1');
 
-    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:v4:g2', 'groups:v4:mine', 'stream:v4:all', 'stream:v4:g2', 'week:v4:g2']);
+    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:v4:g2', 'groups:v4:mine', 'stream:v4:g2', 'week:v4:g2']);
   });
 
   it('never reads a v1 payload under a v2 key and evicts both generations on access loss', () => {
@@ -129,7 +129,7 @@ describe('group cache', () => {
 
   it('wipeGroupCache clears every row for every user', () => {
     put(groupCacheKeys.mine, 'user-1');
-    put(groupCacheKeys.streamAll, 'user-2');
+    put(groupCacheKeys.stream('g1'), 'user-2');
 
     wipeGroupCache(db());
 

@@ -200,8 +200,8 @@ export const getGroup = async (groupId: string): Promise<GroupGetResult> =>
   );
 
 export type GroupStreamRequest = {
-  /** Null = every group the caller is currently active in (All). */
-  groupId: string | null;
+  /** One group; the app never reads the server's all-groups stream (`p_group_id` null). */
+  groupId: string;
   /** Null = first page. */
   before?: StreamCursor | null;
   /** `1..50`; defaults to 20. */

@@ -141,7 +141,7 @@ const cachedKeys = () =>
 
 const renderResource = (options: Partial<GroupResourceOptions<Payload>> & Pick<GroupResourceOptions<Payload>, 'fetcher'>) =>
   renderHook((props: GroupResourceOptions<Payload>) => useGroupResource(props), {
-    initialProps: { userId: USER, cacheKey: groupCacheKeys.streamAll, ...options },
+    initialProps: { userId: USER, cacheKey: groupCacheKeys.mine, ...options },
   });
 
 let setIntervalSpy: jest.SpyInstance;
@@ -186,7 +186,7 @@ describe('useGroupResource', () => {
   });
 
   it('renders the cached payload first, then the refreshed one, and re-caches it', async () => {
-    seedCache(groupCacheKeys.streamAll, { v: 'cached' });
+    seedCache(groupCacheKeys.mine, { v: 'cached' });
     const pending = deferred<Payload>();
     const fetcher = jest.fn(() => pending.promise);
 
@@ -208,14 +208,14 @@ describe('useGroupResource', () => {
     await flush();
 
     expect(result.current).toMatchObject({ data: { v: 'fresh' }, lastUpdatedAtMs: NOW_MS, refreshing: false });
-    expect(readGroupCache(fixture.database, groupCacheKeys.streamAll, USER)).toEqual({
+    expect(readGroupCache(fixture.database, groupCacheKeys.mine, USER)).toEqual({
       payload: { v: 'fresh' },
       fetchedAtMs: NOW_MS,
     });
   });
 
   it("never renders another user's cached payload", async () => {
-    seedCache(groupCacheKeys.streamAll, { v: 'someone else' }, 'user-2');
+    seedCache(groupCacheKeys.mine, { v: 'someone else' }, 'user-2');
     const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
 
     const { result } = renderResource({ fetcher });
@@ -278,7 +278,7 @@ describe('useGroupResource', () => {
   });
 
   it('marks offline from NetInfo, keeps the cache, and skips requests until back online', async () => {
-    seedCache(groupCacheKeys.streamAll, { v: 'cached' });
+    seedCache(groupCacheKeys.mine, { v: 'cached' });
     const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
 
     blurScreen();
@@ -302,7 +302,7 @@ describe('useGroupResource', () => {
   });
 
   it('marks offline when the last refresh failed with NETWORK and keeps lastUpdatedAtMs; a success clears it', async () => {
-    seedCache(groupCacheKeys.streamAll, { v: 'cached' });
+    seedCache(groupCacheKeys.mine, { v: 'cached' });
     const fetcher = jest.fn(
       (): Promise<Payload> => Promise.reject(new GroupApiError('NETWORK', 'Network request failed')),
     );
@@ -329,7 +329,7 @@ describe('useGroupResource', () => {
 
   it('on NOT_FOUND evicts the group entries and surfaces lostAccess', async () => {
     seedCache(groupCacheKeys.mine, { v: 'mine' });
-    seedCache(groupCacheKeys.streamAll, { v: 'all' });
+    seedCache(groupCacheKeys.stream('g2'), { v: 'other group' });
     seedCache(groupCacheKeys.group('g1'), { v: 'group' });
     seedCache(groupCacheKeys.stream('g1'), { v: 'stream' });
     seedCache(groupCacheKeys.session('u2', 's1'), { v: 'session' });
@@ -344,7 +344,7 @@ describe('useGroupResource', () => {
 
     expect(result.current).toMatchObject({ lostAccess: true, data: null, lastUpdatedAtMs: null, offline: false });
     expect(result.current.error?.code).toBe('NOT_FOUND');
-    expect(cachedKeys()).toEqual(['groups:v4:mine', 'stream:v4:all']);
+    expect(cachedKeys()).toEqual(['groups:v4:mine', 'stream:v4:g2']);
   });
 
   it('on NOT_FOUND without a group id evicts only its own entry', async () => {
@@ -362,7 +362,7 @@ describe('useGroupResource', () => {
   it('never throws into render: unexpected failures and a corrupt cache become INTERNAL error states', async () => {
     fixture.database
       .insert(groupCache)
-      .values({ cacheKey: groupCacheKeys.streamAll, userId: USER, payloadJson: '{corrupt', fetchedAtMs: 1 })
+      .values({ cacheKey: groupCacheKeys.mine, userId: USER, payloadJson: '{corrupt', fetchedAtMs: 1 })
       .run();
     const fetcher = jest.fn(() => {
       throw new Error('boom');
