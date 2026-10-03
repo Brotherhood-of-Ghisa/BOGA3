@@ -132,7 +132,8 @@ describe('Stats over real data', () => {
     // A row's own figures, from the same week.
     expect(screen.getByTestId(`stats-exercise-name-${SQUAT}`)).toHaveTextContent('Barbell Back Squat');
     expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent(/8 \(7\)/);
-    expect(screen.getByTestId(`stats-exercise-volume-${SQUAT}`)).toHaveTextContent('7550');
+    // Volume reads the 7 working sets; the warm-up counts toward Sets only.
+    expect(screen.getByTestId(`stats-exercise-volume-${SQUAT}`)).toHaveTextContent('7100');
     expect(screen.getByTestId(`stats-exercise-1rm-${SQUAT}`)).toHaveTextContent('321');
     expect(screen.queryByTestId(`stats-exercise-sessions-${SQUAT}`)).toBeNull();
     expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel).toContain('8 sets, 7 working sets');
@@ -247,9 +248,10 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-family-sets-legs')).toBeTruthy();
     expect(screen.getByTestId('stats-family-volume-legs')).toBeTruthy();
     expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
-    // Squat's 8 sets (7 working: all but the warm-up) land on each muscle it maps to.
+    // Squat's 8 sets (7 working: all but the warm-up) land on each muscle it
+    // maps to; only the working sets add volume.
     expect(screen.getByTestId('stats-muscle-sets-quads')).toHaveTextContent(/8 \(7\)/);
-    expect(screen.getByTestId('stats-muscle-row-quads').props.accessibilityLabel).toContain('volume 3775');
+    expect(screen.getByTestId('stats-muscle-row-quads').props.accessibilityLabel).toContain('volume 3550');
   });
 
   it("opens a seeded exercise's history with all four metrics and both views, and dismisses it", async () => {

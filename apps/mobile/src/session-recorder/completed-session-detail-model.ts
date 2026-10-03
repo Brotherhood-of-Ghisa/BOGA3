@@ -8,7 +8,9 @@ import {
   formatSetRow,
   type SessionViewSetRow,
 } from './session-view-model';
-import { canonicalizeWeightForReps, isConfirmedPerformedSet, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
+import {
+  canonicalizeWeightForReps, isConfirmedPerformedSet, isWorkingSetType, type SessionSetPerformanceStatus,
+} from '@/src/exercise-calculations/set-semantics';
 
 /**
  * View Session's presentation model: what a finished session did, set by set.
@@ -107,7 +109,8 @@ export const buildCompletedSessionDetailModel = (
     const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
 
     performedSetCount += performed.length;
-    for (const { set } of performed) {
+    // The summary Volume reads working sets only; every row keeps its own figures.
+    for (const { set } of performed.filter(({ set }) => isWorkingSetType(set.setType))) {
       metrics.push(calculateAnalyticsSetMetrics({
         ...(exercise.loadContext ?? ordinaryLoadContext()),
         weightValue: set.weight,

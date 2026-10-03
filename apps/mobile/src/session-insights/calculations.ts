@@ -1,5 +1,5 @@
 import { type LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { addFiniteVolume, ordinaryLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import { addFiniteVolume, ordinaryLoadContext, summarizeExerciseLoad, workingSetsOnly } from '@/src/exercise-calculations/analytics';
 import {
   compareSessionPosition,
   eligibleSetsByBlockInSessionOrder,
@@ -269,23 +269,22 @@ export const summarizeCurrentSessionMuscleLoad = (
   const weightedVolumeByMuscle = new Map<string, number | null>();
   const workingSetIdentitiesByMuscle = new Map<string, Set<string>>();
 
+  // Muscle load reads working sets only: a warm-up adds no volume or bar.
   for (const contribution of contributions) {
     if (!muscleGroupById.has(contribution.muscleGroupId)) continue;
+    if (!isWorkingSessionSetType(contribution.setType)) continue;
     weightedVolumeByMuscle.set(
       contribution.muscleGroupId,
       addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
     );
-
-    if (isWorkingSessionSetType(contribution.setType)) {
-      const workingSetIdentities =
-        workingSetIdentitiesByMuscle.get(contribution.muscleGroupId) ??
-        new Set<string>();
-      workingSetIdentities.add(contribution.setIdentity);
-      workingSetIdentitiesByMuscle.set(
-        contribution.muscleGroupId,
-        workingSetIdentities,
-      );
-    }
+    const workingSetIdentities =
+      workingSetIdentitiesByMuscle.get(contribution.muscleGroupId) ??
+      new Set<string>();
+    workingSetIdentities.add(contribution.setIdentity);
+    workingSetIdentitiesByMuscle.set(
+      contribution.muscleGroupId,
+      workingSetIdentities,
+    );
   }
 
   const positiveMuscles = Array.from(
@@ -572,6 +571,7 @@ const collectExerciseVolumeObservations = (
       .filter(isEligiblePerformedSet)
       .sort(compareSessionPosition);
     if (eligibleSets.length === 0) continue;
+    const workingSets = workingSetsOnly(eligibleSets);
 
     const identity = exercise.exerciseDefinitionId
       ? `definition:${exercise.exerciseDefinitionId}`
@@ -589,25 +589,26 @@ const collectExerciseVolumeObservations = (
 
     current.sessionExerciseIds.push(exercise.id);
     current.setCount += eligibleSets.length;
-    current.workingSetCount += eligibleSets.filter((set) =>
-      isWorkingSessionSetType(set.setType),
-    ).length;
-    const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
+    current.workingSetCount += workingSets.length;
+    const coverage = summarizeExerciseLoad(workingSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
     current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
     current.volume = addFiniteVolume(current.volume, coverage.totalVolumeKgReps);
     observationsByIdentity.set(identity, current);
   }
 
-  return Array.from(observationsByIdentity.values()).sort((left, right) => {
-    if (left.sessionExerciseOrderIndex !== right.sessionExerciseOrderIndex) {
-      return left.sessionExerciseOrderIndex - right.sessionExerciseOrderIndex;
-    }
-    return (
-      left.sessionExerciseIds[0]?.localeCompare(
-        right.sessionExerciseIds[0] ?? "",
-      ) ?? 0
-    );
-  });
+  // Volume reads working sets; an exercise with only warm-ups is no observation.
+  return Array.from(observationsByIdentity.values())
+    .filter((observation) => observation.workingSetCount > 0)
+    .sort((left, right) => {
+      if (left.sessionExerciseOrderIndex !== right.sessionExerciseOrderIndex) {
+        return left.sessionExerciseOrderIndex - right.sessionExerciseOrderIndex;
+      }
+      return (
+        left.sessionExerciseIds[0]?.localeCompare(
+          right.sessionExerciseIds[0] ?? "",
+        ) ?? 0
+      );
+    });
 };
 
 export const deriveSessionExerciseVolumeComparisons = (
@@ -727,9 +728,10 @@ export const deriveSessionMuscleVolumeComparisons = (
     return [];
 
   const groupById = new Map(muscleGroups.map((group) => [group.id, group]));
-  // Comparison observations include every valid mapped performed set, even
-  // when its volume is zero. The positive-only muscle-load bars are a separate
-  // presentation and cannot supply a distribution's observations or counts.
+  // A muscle is observed when it has a valid mapped working set, even when its
+  // volume is zero; its volume reads working sets only. The positive-only
+  // muscle-load bars are a separate presentation and cannot supply a
+  // distribution's observations or counts.
   const observe = (session: PersonalRecordSessionInput) => {
     const contributions = collectMuscleSetContributions(
       adaptCurrentSessionToMuscleAnalyticsInput({
@@ -756,13 +758,12 @@ export const deriveSessionMuscleVolumeComparisons = (
         setIds: new Set<string>(),
         workingSetIds: new Set<string>(),
       };
+      observation.setIds.add(contribution.setIdentity);
+      byMuscle.set(contribution.muscleGroupId, observation);
+      if (!isWorkingSessionSetType(contribution.setType)) continue;
       observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
-      observation.setIds.add(contribution.setIdentity);
-      if (isWorkingSessionSetType(contribution.setType)) {
-        observation.workingSetIds.add(contribution.setIdentity);
-      }
-      byMuscle.set(contribution.muscleGroupId, observation);
+      observation.workingSetIds.add(contribution.setIdentity);
     }
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,
@@ -770,7 +771,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       knownVolume: observation.knownVolume,
       setCount: observation.setIds.size,
       workingSetCount: observation.workingSetIds.size,
-    })).sort((left, right) =>
+    })).filter((muscle) => muscle.workingSetCount > 0).sort((left, right) =>
       (right.knownVolume ?? -1) - (left.knownVolume ?? -1) ||
       left.sortOrder - right.sortOrder ||
       left.displayName.localeCompare(right.displayName) ||

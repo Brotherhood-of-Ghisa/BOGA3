@@ -1,14 +1,15 @@
 import { loadAsOfWeightResolver } from './bodyweight';
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
-import { addFiniteVolume, ordinaryLoadContext, personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import {
+  addFiniteVolume, ordinaryLoadContext, personalLoadContext, summarizeExerciseLoad, workingSetsOnly,
+} from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
-import { isWorkingSessionSetType } from './set-types';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
 export type SelectedExerciseWeeklyEffort = SelectedMuscleWeeklyEffort;
@@ -93,13 +94,12 @@ export const aggregateExerciseDailyEffort = (
       bestRM1: null,
       highestWeight: null,
     };
-    const summary = summarizeExerciseLoad(session.sets, session.loadContext ?? ordinaryLoadContext());
+    // Every cell reads working sets: a warm-up-only day makes no cell.
+    const summary = summarizeExerciseLoad(workingSetsOnly(session.sets), session.loadContext ?? ordinaryLoadContext());
     if (summary.volumeCoverage.eligibleSetCount === 0) continue;
     day.knownVolume = addFiniteVolume(day.knownVolume, summary.volumeCoverage.knownVolumeKgReps);
     day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeCoverage.totalVolumeKgReps);
-    summary.metrics.forEach((metric, index) => {
-      if (metric.eligible && isWorkingSessionSetType(session.sets[index].setType)) day.workingSetCount++;
-    });
+    day.workingSetCount += summary.volumeCoverage.eligibleSetCount;
     if (summary.topWeightSet !== null) day.highestWeight = Math.max(day.highestWeight ?? 0, summary.topWeightSet.weight);
     if (summary.estimatedOneRepMax !== null) day.bestRM1 = Math.max(day.bestRM1 ?? 0, summary.estimatedOneRepMax);
     dayMap.set(dateKey, day);

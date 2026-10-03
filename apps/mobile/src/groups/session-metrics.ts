@@ -7,7 +7,7 @@ import {
   type LoadContext, type SetMetrics, type VolumeCoverage,
 } from '@/src/exercise-calculations/load-metrics';
 import { ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
-import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
+import { canonicalizeWeightForReps, isWorkingSetType } from '@/src/exercise-calculations/set-semantics';
 import type { GroupSessionExercise, GroupSessionSet } from './types';
 
 export type GroupPerformedSet = {
@@ -30,9 +30,10 @@ export type GroupPerformedExercise = {
 };
 export type GroupSessionMetrics = {
   performedSets: number;
-  /** Null only when a performed row is invalid. */
+  /** Working sets only; null only when a working row is invalid. */
   totalVolumeKg: number | null;
   exerciseCount: number;
+  /** Volume coverage over the working sets. */
   coverage: VolumeCoverage;
 };
 
@@ -75,7 +76,8 @@ export function computeGroupSessionMetrics(
   exercises: GroupSessionExercise[],
 ): GroupSessionMetrics {
   const performed = selectGroupPerformedExercises(exercises);
-  const coverage = summarizeVolume(performed.flatMap(exercise => exercise.sets.map(set => set.metrics)));
-  return { performedSets: coverage.eligibleSetCount, totalVolumeKg: coverage.totalVolumeKgReps,
+  const sets = performed.flatMap(exercise => exercise.sets);
+  const coverage = summarizeVolume(sets.flatMap(set => isWorkingSetType(set.setType) ? [set.metrics] : []));
+  return { performedSets: sets.length, totalVolumeKg: coverage.totalVolumeKgReps,
     exerciseCount: performed.length, coverage };
 }

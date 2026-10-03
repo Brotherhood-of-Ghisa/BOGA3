@@ -132,7 +132,9 @@ describe('per-side load semantics', () => {
       muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
     });
-    expect(entries[0]?.contributions[0]?.weightedVolume).toBe(250);
+    // Sunday's working 100 × 5 total load: 500 / 2 per side × 0.5 = 125.
+    expect(entries[0]?.contributions[0]?.setId).toBe('set-sunday-work');
+    expect(entries[0]?.contributions[0]?.weightedVolume).toBe(125);
     expect(entries[0]?.contributions[0]?.roleWeight).toBe(0.5);
   });
 
@@ -300,6 +302,30 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     ]);
   });
 
+  it('reads working sets only: a warm-up adds a set but no volume, session or contribution to a day', () => {
+    const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
+      muscleGroupIds: ['chest_sternal'],
+      timeZone: 'Europe/London',
+    });
+
+    const sunday = entries.find((entry) => entry.dateKey === '2026-03-29');
+    expect(sunday).toMatchObject({ sessionCount: 1, setCount: 2, totalWeight: 500 });
+    expect(sunday?.contributions.map((contribution) => contribution.setId)).toEqual(['set-sunday-work']);
+  });
+
+  it('makes no day or week from warm-up-only sets', () => {
+    const input = buildAnalyticsInput();
+    input.exerciseSets = input.exerciseSets.filter((set) => set.id !== 'set-sunday-work');
+    const daily = aggregateSelectedMuscleDailyEffort(input, {
+      muscleGroupIds: ['chest_sternal'],
+      timeZone: 'Europe/London',
+    });
+
+    expect(daily.map((entry) => entry.dateKey)).toEqual(['2026-03-30', '2026-05-01']);
+    expect(aggregateSelectedMuscleDailyEffortMetrics(daily).map((entry) => entry.dateKey)).toEqual(['2026-03-30', '2026-05-01']);
+    expect(aggregateSelectedMuscleWeeklyEffort(daily).map((week) => week.weekStartDateKey)).toEqual(['2026-03-30', '2026-04-27']);
+  });
+
   it('excludes invalid sets while aggregating multiple sessions on one local day', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
       muscleGroupIds: ['chest_sternal'],
@@ -361,7 +387,8 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     const sunday = entries.find((entry) => entry.dateKey === '2026-03-29');
     const monday = entries.find((entry) => entry.dateKey === '2026-03-30');
 
-    expect(sunday?.totalWeight).toBe(750);
+    // Sunday: the working 100 × 5 only (500 × 0.5); the warm-up adds nothing.
+    expect(sunday?.totalWeight).toBe(250);
     expect(monday?.totalWeight).toBe(300);
     expect(monday?.contributions[0]).toMatchObject({
       muscleGroupId: 'triceps',

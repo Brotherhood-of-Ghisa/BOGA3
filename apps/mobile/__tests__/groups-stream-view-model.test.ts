@@ -168,7 +168,7 @@ describe('group stream view model', () => {
         gymName: 'Iron Temple',
         groupNames: ['Crew', 'Gym pals'],
         setsLabel: '3 sets',
-        volumeLabel: '1752.5 kg',
+        volumeLabel: '1152.5 kg', // the 60 × 10 warm-up adds no volume
         volumeNote: null,
         exercisesLabel: '2 exercises',
         recordsLabel: null,

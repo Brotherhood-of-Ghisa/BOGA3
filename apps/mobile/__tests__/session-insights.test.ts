@@ -233,24 +233,26 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
       unmappedSetCount: 0,
       contributingMuscleCount: 3,
     });
+    // Load reads working sets only: the 100 × 10 bench warm-up adds nothing,
+    // so chest is the working 100 × 5 total load halved per side (250).
     expect(summary.muscles).toEqual([
+      expect.objectContaining({
+        id: "biceps",
+        workingSetCount: 1,
+        weightedVolume: 250,
+        relativeVolume: 1,
+      }),
       expect.objectContaining({
         id: "chest",
         workingSetCount: 1,
-        weightedVolume: 750,
+        weightedVolume: 250,
         relativeVolume: 1,
       }),
       expect.objectContaining({
         id: "triceps",
         workingSetCount: 1,
-        weightedVolume: 375,
+        weightedVolume: 125,
         relativeVolume: 0.5,
-      }),
-      expect.objectContaining({
-        id: "biceps",
-        workingSetCount: 1,
-        weightedVolume: 250,
-        relativeVolume: 1 / 3,
       }),
     ]);
     expect(summary.workingSetsByMuscle).toEqual([
@@ -422,7 +424,7 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
     expect(calculateLinearPercentile([100, 200], 0.95)).toBe(195);
   });
 
-  it("combines repeated target blocks, includes warm-ups, and excludes invalid work", () => {
+  it("combines repeated target blocks, leaves warm-ups out of volume, and excludes invalid work", () => {
     const target = completedSession({
       sessionId: "target",
       exercises: [
@@ -498,14 +500,61 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         sessionExerciseOrderIndex: 2,
         setCount: 2,
         workingSetCount: 1,
-        currentVolume: 1100,
-        knownVolume: 1100,
+        // The working 120 × 5 only; the 100 × 5 warm-up still counts as a set.
+        currentVolume: 600,
+        knownVolume: 600,
         historicalSessionCount: 3,
         medianVolume: 700,
         percentile5Volume: 520,
         percentile95Volume: 880,
         state: "distribution",
       },
+    ]);
+  });
+
+  it("compares no warm-up-only exercise and takes no baseline from one", () => {
+    const warmUp = (id: string) => insightSet(id, { weightValue: "200", repsValue: "10", setType: "warm_up" });
+    const target = completedSession({
+      sessionId: "target",
+      exercises: [
+        insightExercise({ id: "target-bench", exerciseDefinitionId: "bench", sets: [warmUp("target-bench-warm-up")] }),
+        insightExercise({
+          id: "target-squat",
+          orderIndex: 1,
+          exerciseDefinitionId: "squat",
+          sets: [warmUp("target-squat-warm-up"), insightSet("target-squat-working", { weightValue: "100", repsValue: "5" })],
+        }),
+      ],
+    });
+    const history = [
+      completedSession({
+        sessionId: "history-warm-up-only",
+        completedAt: new Date("2026-09-01T10:00:00.000Z"),
+        exercises: [insightExercise({ id: "history-squat-a", exerciseDefinitionId: "squat", sets: [warmUp("history-warm-up")] })],
+      }),
+      completedSession({
+        sessionId: "history-working",
+        completedAt: new Date("2026-09-02T10:00:00.000Z"),
+        exercises: [insightExercise({
+          id: "history-squat-b",
+          exerciseDefinitionId: "squat",
+          sets: [warmUp("history-mixed-warm-up"), insightSet("history-working", { weightValue: "80", repsValue: "5" })],
+        })],
+      }),
+    ];
+
+    expect(
+      deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: history }),
+    ).toEqual([
+      expect.objectContaining({
+        exerciseDefinitionId: "squat",
+        setCount: 2,
+        workingSetCount: 1,
+        currentVolume: 500,
+        historicalSessionCount: 1,
+        medianVolume: 400,
+        state: "single-baseline",
+      }),
     ]);
   });
 

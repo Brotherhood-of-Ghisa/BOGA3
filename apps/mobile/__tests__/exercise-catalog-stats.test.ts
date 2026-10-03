@@ -25,8 +25,9 @@ const buildRawHistory = (
     { id: 'se-orphan', sessionId: 'session-recent', exerciseDefinitionId: null },
   ],
   exerciseSets: [
-    // Recent bench: 3 valid confirmed sets, of which only RIR 2 is a working set.
-    { sessionExerciseId: 'se-recent-bench', weightValue: '60', repsValue: '10', setType: 'warm_up' },
+    // Recent bench: 3 valid confirmed sets; the unclassified and RIR 2 sets are
+    // working sets, the (heaviest) warm-up is not.
+    { sessionExerciseId: 'se-recent-bench', weightValue: '150', repsValue: '10', setType: 'warm_up' },
     { sessionExerciseId: 'se-recent-bench', weightValue: '100', repsValue: '5', setType: null },
     { sessionExerciseId: 'se-recent-bench', weightValue: '100', repsValue: '4', setType: 'rir_2' },
     // Recent curl: 1 valid confirmed, unclassified set.
@@ -53,12 +54,12 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.everDoneIds.size).toBe(0);
   });
 
-  it('includes warm-up sets in volume and 1RM', () => {
+  it('leaves warm-up sets out of volume and 1RM but still counts them as sets', () => {
     const result = aggregateExerciseCatalogStats(buildRawHistory(), 7, NOW);
     const bench = result.aggregatesById.get('ex-bench');
     expect(bench).toBeDefined();
-    // 60*10 + 100*5 + 100*4 = 1500
-    expect(bench?.totalVolume).toBe(1500);
+    // 100*5 + 100*4 = 900; the 150 x 10 warm-up adds nothing.
+    expect(bench?.totalVolume).toBe(900);
     // Best Wathan estimate of 100x5 vs 100x4 — 5 reps is higher
     expect(bench?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5)!, 5);
     expect(bench?.setCount).toBe(3);
@@ -128,7 +129,7 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.aggregatesById.has('ex-only-bad')).toBe(false);
   });
 
-  it('counts warm-up-only exercises as done', () => {
+  it('does not count a warm-up-only exercise as done, recent or aggregated', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -140,15 +141,40 @@ describe('aggregateExerciseCatalogStats', () => {
       30,
       NOW
     );
-    expect(result.everDoneIds.has('ex-warm-only')).toBe(true);
-    expect(result.aggregatesById.get('ex-warm-only')).toEqual(
-      expect.objectContaining({
-        sessionCount: 1,
-        setCount: 1,
-        workingSetCount: 0,
-        totalVolume: 400,
-      })
+    expect(result.everDoneIds.has('ex-warm-only')).toBe(false);
+    expect(result.lastCompletedAtById.has('ex-warm-only')).toBe(false);
+    expect(result.recencyScoresById.has('ex-warm-only')).toBe(false);
+    expect(result.aggregatesById.has('ex-warm-only')).toBe(false);
+  });
+
+  it('takes session count, Last and recency from the sessions with a working set', () => {
+    const result = aggregateExerciseCatalogStats(
+      {
+        sessions: [
+          { id: 'working', completedAt: daysBefore(NOW, 10) },
+          { id: 'warm-only', completedAt: daysBefore(NOW, 1) },
+        ],
+        sessionExercises: [
+          { id: 'se-working', sessionId: 'working', exerciseDefinitionId: 'ex-mixed' },
+          { id: 'se-warm-only', sessionId: 'warm-only', exerciseDefinitionId: 'ex-mixed' },
+        ],
+        exerciseSets: [
+          { sessionExerciseId: 'se-working', weightValue: '40', repsValue: '10', setType: 'warm_up' },
+          { sessionExerciseId: 'se-working', weightValue: '60', repsValue: '5', setType: 'rir_1' },
+          { sessionExerciseId: 'se-warm-only', weightValue: '200', repsValue: '10', setType: 'warm_up' },
+        ],
+      },
+      30,
+      NOW
     );
+    expect(result.aggregatesById.get('ex-mixed')).toEqual(expect.objectContaining({
+      sessionCount: 1, setCount: 3, workingSetCount: 1, totalVolume: 300,
+      estimatedOneRepMax: estimateOneRepMax(60, 5),
+    }));
+    expect(result.lastCompletedAtById.get('ex-mixed')).toEqual(daysBefore(NOW, 10));
+    expect(result.recencyScoresById.get('ex-mixed')).toEqual(expect.objectContaining({
+      completedSetCount: 1, lastCompletedAt: daysBefore(NOW, 10),
+    }));
   });
 
   it('does not mark an exercise done or aggregate volume from unconfirmed sets', () => {
@@ -237,7 +263,7 @@ describe('Favourite and all-time browser history', () => {
     const raw: ExerciseCatalogStatsRawHistory = {
       sessions: ages.map((age, i) => ({ id: `s${i}`, completedAt: daysBefore(NOW, age) })),
       sessionExercises: ages.map((_, i) => ({ id: `e${i}`, sessionId: `s${i}`, exerciseDefinitionId: `def${i}` })),
-      exerciseSets: ages.map((_, i) => ({ sessionExerciseId: `e${i}`, weightValue: '0', repsValue: '5', setType: 'warm_up' })),
+      exerciseSets: ages.map((_, i) => ({ sessionExerciseId: `e${i}`, weightValue: '0', repsValue: '5', setType: 'rir_3' })),
     };
     const all = aggregateExerciseCatalogStats(raw, 'all', NOW);
     const short = aggregateExerciseCatalogStats(raw, 7, NOW);
@@ -263,7 +289,7 @@ describe('Favourite and all-time browser history', () => {
         { id: 'orphan', sessionId: 'missing', exerciseDefinitionId: 'orphan' },
       ],
       exerciseSets: [
-        ...['block1', 'block1', 'block2', 'block3'].map((sessionExerciseId) => ({ sessionExerciseId, weightValue: '20', repsValue: '8', setType: 'warm_up' })),
+        ...['block1', 'block1', 'block2', 'block3'].map((sessionExerciseId) => ({ sessionExerciseId, weightValue: '20', repsValue: '8', setType: 'rir_2' })),
         { sessionExerciseId: 'invalid', weightValue: '-1', repsValue: '8', setType: null },
         { sessionExerciseId: 'invalid', weightValue: '1e3', repsValue: '8', setType: null },
         { sessionExerciseId: 'invalid', weightValue: '', repsValue: '', setType: null },

@@ -14,7 +14,7 @@ export const seedExerciseBrowserFixture = async (now = new Date()): Promise<void
       sessionId, gymId: null, startedAt: new Date(history.completedAt.getTime() - 3_600_000),
       exercises: [0, 1].map((i) => ({
         id: `${sessionId}_block_${i}`, exerciseDefinitionId: history.exerciseDefinitionId, name: history.name,
-        sets: [{ id: `${sessionId}_set_${i}`, weightValue: '30', repsValue: '8', setType: 'warm_up', performanceStatus: null }],
+        sets: [{ id: `${sessionId}_set_${i}`, weightValue: '30', repsValue: '8', setType: 'rir_2', performanceStatus: null }],
       })),
     }, { now: history.completedAt });
     await completeSessionDraft(sessionId, { completedAt: history.completedAt, now: history.completedAt });

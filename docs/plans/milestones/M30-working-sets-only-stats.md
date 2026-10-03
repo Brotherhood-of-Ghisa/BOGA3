@@ -123,7 +123,7 @@ follow D1/D2, and the 1RM flags still equal `deriveSessionPersonalRecords`.
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | `M30-T01-Working_set_rule_and_records` | Shared predicate; facts v3; every PR, record and best excludes warm-ups; rule specs | none | completed |
-| `M30-T02-Working_set_measures` | Volume, heatmaps, muscle analytics, comparisons, favourites and "done" exclude warm-ups | T01 | planned |
+| `M30-T02-Working_set_measures` | Volume, heatmaps, muscle analytics, comparisons, favourites and "done" exclude warm-ups | T01 | completed |
 | `M30-T03-Sets_mean_working_sets` | Every unqualified set count is working sets; the pairs collapse | T02 | planned |
 | `M30-T04-Agent_API_working_sets` | Agent API and MCP metrics and counts exclude warm-ups | T01 | completed |
 | `M30-T05-Group_results_working_sets` | Group boards, records, certifications and week summary exclude warm-ups, forward only | T01 | completed |
@@ -141,6 +141,19 @@ T04 decisions (2026-10-03): `agent-api` filters in its own adapter
 `working_sets_v1`. `exercises[].set_count` counts working sets, and
 `exercise_count` counts blocks with a working set. A warm-up-only session drops
 out of exercise context (D2).
+
+T02 decisions (2026-10-03): aggregators filter with `workingSetsOnly`
+(`src/exercise-calculations/analytics.ts`) or `isWorkingSessionSetType` on
+muscle contributions; contributions still carry warm-ups so the counts T03
+owns keep their values. Per-exercise and per-muscle session counts need a
+working set; Progress's top-line `Sessions` still counts every completed
+session (matching Today). A warm-up-only exercise gets no catalog aggregate,
+heatmap cell, muscle-load bar, comparison or baseline, but keeps its rows on
+exercise history (1RM and Top set `—`, Vol 0), the session view and View
+Session. The coverage note and the comparison empty states say "working sets".
+Left for T03: the catalog aggregate's `setCount`, the muscle `setCount`,
+the comparisons' `setCount`, `performedSetCount` and group `performedSets`
+still count warm-ups.
 
 T05 decisions (2026-10-03): no `GROUP_EVAL_RULES_VERSION` bump (facts already
 store `working`; nothing is re-normalized or requeued). A best that was a

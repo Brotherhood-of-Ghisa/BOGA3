@@ -317,15 +317,19 @@ export const aggregateSelectedMuscleDailyEffort = (
       sessionIds: new Set<string>(),
     };
 
-    entry.sessionIds.add(contribution.sessionId);
     entry.setCount += 1;
+    entriesByDate.set(dateKey, entry);
+    // Everything but the set count reads working sets only.
+    if (!isWorkingSessionSetType(contribution.setType)) continue;
+    entry.sessionIds.add(contribution.sessionId);
     entry.knownWeight = addFiniteVolume(entry.knownWeight, contribution.weightedVolume ?? 0);
     entry.totalWeight = addFiniteVolume(entry.totalWeight, contribution.weightedVolume);
     entry.contributions.push(contribution);
-    entriesByDate.set(dateKey, entry);
   }
 
+  // A warm-up-only day makes no heatmap cell.
   return Array.from(entriesByDate.values())
+    .filter((entry) => entry.sessionIds.size > 0)
     .map(({ sessionIds, ...entry }) => ({
       ...entry,
       sessionCount: sessionIds.size,

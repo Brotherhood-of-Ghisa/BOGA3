@@ -87,12 +87,19 @@ describe('group session metrics', () => {
       exercise('empty', []),
     ];
 
-    it('counts performed sets, sums kg × reps with warm-ups, and counts exercises with a performed set', () => {
+    it('counts performed sets, sums kg × reps of working sets, and counts exercises with a performed set', () => {
+      // 102.5 × 5 + 80 × 8; the 60 × 10 warm-up counts as a set, not as volume.
       expect(computeGroupSessionMetrics(exercises)).toMatchObject({
         performedSets: 3,
-        totalVolumeKg: 1752.5,
+        totalVolumeKg: 1152.5,
         exerciseCount: 2,
       });
+    });
+
+    it('adds no volume or coverage for a warm-up-only exercise', () => {
+      const metrics = computeGroupSessionMetrics([exercise('warm', [rawSet('w1', '60', '10', { set_type: 'warm_up' })])]);
+      expect(metrics).toMatchObject({ performedSets: 1, totalVolumeKg: 0, exerciseCount: 1 });
+      expect(metrics.coverage).toMatchObject({ eligibleSetCount: 0, complete: true });
     });
 
     it('is all zeros before anything is performed', () => {

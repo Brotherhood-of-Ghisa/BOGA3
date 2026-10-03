@@ -220,19 +220,15 @@ export const aggregateExerciseBlockHistory = (
       .sort(compareSetOrder);
     if (setRows.length === 0) continue;
 
-    const toCalculationSet = (row: ExerciseBlockHistorySetRow) => ({
-      weightValue: row.weightValue,
-      repsValue: row.repsValue,
-      setType: row.setType,
-    });
-    const loadContext = session.loadContext ?? ordinaryLoadContext();
-    const summary = summarizeExerciseLoad(setRows.map(toCalculationSet), loadContext);
-    // The 1RM and top weight are bests (the PR baseline): working sets only.
-    const bests = summarizeExerciseLoad(
-      setRows.filter((row) => isWorkingSet({
-        weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
-      })).map(toCalculationSet),
-      loadContext,
+    // Every aggregate reads working sets (the 1RM and top weight are the PR
+    // baseline); a warm-up-only block has none and is no block.
+    const workingRows = setRows.filter((row) => isWorkingSet({
+      weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
+    }));
+    if (workingRows.length === 0) continue;
+    const summary = summarizeExerciseLoad(
+      workingRows.map((row) => ({ weightValue: row.weightValue, repsValue: row.repsValue, setType: row.setType })),
+      session.loadContext ?? ordinaryLoadContext(),
     );
 
     blocks.push({
@@ -240,10 +236,10 @@ export const aggregateExerciseBlockHistory = (
       completedAt: session.completedAt,
       daysAgo: computeDaysAgo(session.completedAt, input.now),
       sessionExerciseIds: matchingSessionExercises.map((row) => row.sessionExerciseId),
-      estimatedOneRepMax: bests.estimatedOneRepMax,
+      estimatedOneRepMax: summary.estimatedOneRepMax,
       totalVolume: summary.volumeCoverage.totalVolumeKgReps,
       knownVolume: summary.volumeCoverage.knownVolumeKgReps,
-      highestWeight: bests.topWeightSet?.weight ?? null,
+      highestWeight: summary.topWeightSet?.weight ?? null,
       workingSetCount: countWorkingSets(setRows),
     });
   }

@@ -33,8 +33,17 @@ describe('buildCompletedSessionDetailModel', () => {
     expect(model.cards[0].rows.map((row) => row.id)).toEqual(['b1', 'b2', 'b-zero']);
     expect(model.cards[0].rows[2]).toMatchObject({ weightReps: '0.0 × 5', volume: '0', oneRepMax: '0.0' });
     expect(model.performedSetCount).toBe(4);
-    // 60×10 + 100×5 + 82.5×8, rounded, no separator.
-    expect(model.volume).toBe('1760');
+    // Working sets only: 100×5 + 0×5 + 82.5×8, rounded, no separator; the
+    // 60×10 warm-up keeps its row and adds no volume.
+    expect(model.volume).toBe('1160');
+  });
+
+  it('keeps a warm-up-only exercise card, with no volume', () => {
+    const warmUpOnly = { ...bench, sets: [{ id: 'w', weight: '60', reps: '10', setType: 'warm_up' }] };
+    const model = buildCompletedSessionDetailModel([warmUpOnly], new Map());
+    expect(model.cards[0]).toMatchObject({ setCount: 1, rows: [expect.objectContaining({ id: 'w', volume: '600' })] });
+    expect(model.performedSetCount).toBe(1);
+    expect(model.volume).toBe('0');
   });
 
   it("formats rows as the session view does", () => {

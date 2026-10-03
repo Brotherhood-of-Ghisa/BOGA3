@@ -1345,7 +1345,8 @@ TS the session screens use. Nothing is mirrored in SQL.
   (for example `1e3`) do not produce a performed row.
 - **Sets** — the count of performed sets.
 - **Volume** — the ordinary kg calculation uses raw entered Weight and the
-  source exercise's `load_input_mode`. Warm-ups are included. This shared
+  source exercise's `load_input_mode`, over working sets only (warm-ups add no
+  volume; the coverage note counts working sets). This shared
   session summary never reads a personal preference, contribution or weight
   reading; positive group contributions belong only to the server-authoritative
   ranked projection in §11.

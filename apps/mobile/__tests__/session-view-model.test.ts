@@ -112,10 +112,20 @@ describe('session view model', () => {
     expect(onlyWarmUpBeats.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
   });
 
-  it('totals done sets and their volume, warm-ups included', () => {
+  it('totals done sets, and the volume of the working ones', () => {
     const model = buildSessionViewModel(session([bench]), new Map());
     expect(model.performedSetCount).toBe(3);
-    expect(model.volume).toBe('3255');
+    // 160 × 8 + 162.5 × 6; the 100 × 10 warm-up adds no volume.
+    expect(model.volume).toBe('2255');
+  });
+
+  it('keeps a warm-up-only exercise card but adds nothing to the volume', () => {
+    const warmUpOnly = { ...bench, sets: [doneSet('w', '100', '10', 'warm_up')] };
+    const model = buildSessionViewModel(session([warmUpOnly]), new Map());
+    expect(model.cards[0].rows[0]).toMatchObject({ typeLabel: 'W-Up', volume: '1000' });
+    expect(model.performedSetCount).toBe(1);
+    expect(model.volume).toBe('0');
+    expect(model.volumeNote).toBeUndefined();
   });
 
   it('shows a blank row as absent values', () => {
