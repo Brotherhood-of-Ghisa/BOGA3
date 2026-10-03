@@ -25,12 +25,12 @@ import {
   setSessionDeletedState,
   type SessionSetTypeValue,
 } from '@/src/data';
+import { loadEarlierBestE1rmByDefinition } from '@/src/data/exercise-session-facts';
 import { parseCalculationSet } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
-import { loadHistoricalBestsExcluding } from '@/src/session-recorder/historical-bests';
 import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
@@ -79,12 +79,12 @@ export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
   loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
-  // The best 1RM of each exercise in every other completed session, for the
+  // The best 1RM of each exercise in the sessions before this one, for the
   // detail's record band. Optional: without it, no record shows.
   loadHistoricalBests?(
-    sessionId: string,
+    session: { sessionId: string; completedAt: Date },
     exerciseDefinitionIds: string[]
-  ): Promise<ReadonlyMap<string, number | null>>;
+  ): Promise<ReadonlyMap<string, number>>;
   appendCompletedSessionExerciseAsPlanned(
     sessionId: string,
     sessionExerciseId: string
@@ -236,8 +236,8 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
   async loadInsights(sessionId) {
     return loadCompletedSessionInsights(sessionId);
   },
-  async loadHistoricalBests(sessionId, exerciseDefinitionIds) {
-    return loadHistoricalBestsExcluding(sessionId, exerciseDefinitionIds);
+  async loadHistoricalBests(session, exerciseDefinitionIds) {
+    return loadEarlierBestE1rmByDefinition(session, exerciseDefinitionIds);
   },
   async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
     return appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
@@ -273,7 +273,7 @@ export function CompletedSessionDetailScreenShell({
     setSection('summary');
     setComparisonMode('exercise');
   }
-  const [historicalBests, setHistoricalBests] = useState<ReadonlyMap<string, number | null>>(
+  const [historicalBests, setHistoricalBests] = useState<ReadonlyMap<string, number>>(
     () => new Map()
   );
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -312,7 +312,10 @@ export function CompletedSessionDetailScreenShell({
           exercise.exerciseDefinitionId ? [exercise.exerciseDefinitionId] : []
         );
         void dataClient
-          .loadHistoricalBests(loadedSession.id, definitionIds)
+          .loadHistoricalBests(
+            { sessionId: loadedSession.id, completedAt: new Date(loadedSession.completedAt) },
+            definitionIds
+          )
           .then((bests) => {
             if (!cancelled) setHistoricalBests(bests);
           })

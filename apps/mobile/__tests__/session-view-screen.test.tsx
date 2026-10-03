@@ -78,6 +78,7 @@ import { SessionViewScreen } from '../app/session/[sessionId]/index';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
 import { gyms, sessions } from '@/src/data/schema';
+import * as sessionFacts from '@/src/data/exercise-session-facts';
 import * as sessionDrafts from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
@@ -226,6 +227,22 @@ describe('Session view', () => {
     fireEvent.press(screen.getByLabelText(FLY_LABEL));
     expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${FLY}`);
     expect(screen.queryByText('No comparison history yet')).toBeNull();
+  });
+
+  it('shows no record, and keeps the cards, when the earlier-bests read fails', async () => {
+    const failedRead = jest
+      .spyOn(sessionFacts, 'loadEarlierBestE1rmByDefinition')
+      .mockRejectedValueOnce(new Error('Facts read failed'));
+    await seed();
+    render(<SessionViewScreen sessionId={SESSION} />);
+
+    await waitFor(() => expect(failedRead).toHaveBeenCalled());
+    await act(async () => {
+      await failedRead.mock.results[0].value.catch(() => undefined);
+    });
+    expect(screen.getByLabelText('Barbell Bench Press, 3 of 5 sets done')).toBeTruthy();
+    expect(screen.queryByTestId(`session-view-exercise-${BENCH}-record`)).toBeNull();
+    expect(screen.queryByTestId('session-view-error')).toBeNull();
   });
 
   it('links each card to its exercise page', async () => {
@@ -907,12 +924,61 @@ describe('Session view: editing a completed session', () => {
     await expectActiveFixtureUntouched();
   });
 
-  it('measures its records against the rest of history, not against itself', async () => {
-    await openCompleted();
+  // Another completed session with one Bench set, written through the same path.
+  const completeBenchSession = async (id: string, completedAt: Date, weightValue: string) => {
+    await sessionDrafts.persistSessionDraftSnapshot(
+      {
+        sessionId: id,
+        gymId: 'gym-iron',
+        startedAt: new Date(completedAt.getTime() - 30 * 60_000),
+        exercises: [{ ...benchWith([performed(`${id}-set`, weightValue, '8', 'rir_1')]), id: `${id}-bench` }] as never,
+      },
+      { now: completedAt }
+    );
+    await sessionDrafts.completeSessionDraft(id, { completedAt, now: completedAt });
+  };
 
-    // Its 160 × 8 (1RM 204.3) beats the fixture history's best Bench 1RM (≈ 197.9); measured
-    // against itself it would only tie.
+  it('measures its records against the sessions before it, not itself or later ones', async () => {
+    await openCompleted(undefined, async () => {
+      // 150 × 8 (1RM 190) the week before; 170 × 8 (1RM 215.3) the week after.
+      await completeBenchSession('bench_before', new Date(2026, 1, 18, 10, 0), '150');
+      await completeBenchSession('bench_after', new Date(2026, 2, 4, 10, 0), '170');
+    });
+
+    // Its 160 × 8 (1RM 204.3) beats the earlier 190; counted against itself it would only tie.
     expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new 1RM record 204.3')).toBeTruthy();
+  });
+
+  it('re-reads its records when a saved End moves it past a heavier session', async () => {
+    await openCompleted(undefined, async () => {
+      await completeBenchSession('bench_before', new Date(2026, 1, 18, 10, 0), '150');
+      await completeBenchSession('bench_after', new Date(2026, 2, 4, 10, 0), '170');
+    });
+    expect(await screen.findByTestId('session-view-exercise-done_bench-record')).toBeTruthy();
+
+    // Now after the 170 × 8 (1RM 215.3) session, its 204.3 is no longer a record.
+    const end = screen.getByTestId('session-view-end-time');
+    fireEvent.changeText(end, '2026-03-10 10:45');
+    await act(async () => {
+      fireEvent(end, 'blur');
+    });
+
+    await waitFor(() => expect(screen.queryByTestId('session-view-exercise-done_bench-record')).toBeNull());
+    expect(sessionRow(DONE)?.completedAt).toEqual(new Date(2026, 2, 10, 10, 45, 0, 0));
+    expect(screen.getByLabelText('Barbell Bench Press, 1 of 2 sets done')).toBeTruthy();
+  });
+
+  it('shows no record when no session before it has the exercise', async () => {
+    const earlierBests = jest.spyOn(sessionFacts, 'loadEarlierBestE1rmByDefinition');
+    // The fixture's Bench history is all later than this session.
+    await renderCompleted();
+
+    await waitFor(() => expect(earlierBests).toHaveBeenCalled());
+    await act(async () => {
+      expect(await earlierBests.mock.results[0].value).toEqual(new Map());
+    });
+    expect(screen.getByLabelText('Barbell Bench Press, 1 of 2 sets done')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-exercise-done_bench-record')).toBeNull();
   });
 
   it('says so when the completed session was deleted', async () => {

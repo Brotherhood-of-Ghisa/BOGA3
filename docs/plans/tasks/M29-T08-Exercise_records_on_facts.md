@@ -46,8 +46,7 @@ bests from the facts table instead.
 
 ## Open — resolve with the user at session start
 
-None left from planning. M30-T01 (merged) settled these, which the facts read
-must keep:
+M30-T01 (merged) settled these, which the facts read must keep:
 
 - `Last` is the newest session with a working set: a warm-up-only session is
   skipped. Its set list still shows that session's warm-up lines.
@@ -56,6 +55,12 @@ must keep:
 - The `Vol` record's "N sets" already counts working sets.
 - `ExerciseHistorySessionEntry.estimatedOneRepMax` / `topWeightSet` already
   read working sets only.
+
+Open, added by T07: the session view's live record marker now counts only the
+sessions before the viewed one (spec 05, "Live record markers"). The exercise
+page's all-time records, opened from a completed edit, still count later
+sessions (`excludeSessionId` drops only the edited one). Keep that as an
+all-time view, or match T07? Confirm with the user.
 
 ## Deliverables and acceptance
 

@@ -34,6 +34,7 @@ import {
   loadActiveSessionGraph,
   loadEditableSessionGraph,
   saveCompletedSessionEdit,
+  setCompletedSessionTimes,
   setSessionGym,
 } from '@/src/session-recorder/session-lifecycle';
 import {
@@ -154,7 +155,15 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         : null,
     [state]
   );
-  const times = useCompletedSessionTimes({ sessionId, persisted: completedTimes });
+  const times = useCompletedSessionTimes({
+    sessionId,
+    persisted: completedTimes,
+    // Records count the sessions before End, so a saved End re-reads them.
+    save: async (id, nextTimes) => {
+      await setCompletedSessionTimes(id, nextTimes);
+      await reload();
+    },
+  });
 
   const model = useMemo(
     () =>

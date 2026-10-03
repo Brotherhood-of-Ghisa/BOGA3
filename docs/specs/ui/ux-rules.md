@@ -321,8 +321,8 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    VOL` (`W-Up`, `RIR n` for any valid stored RIR, `—` for none). An exercise
    with no such set is left out. There are no tags, no collapse and no set
    numbers.
-6. A card whose set has the exercise's best 1RM against every other completed
-   session shows that 1RM in `record` and a `New 1RM record` band — the same
+6. A card whose set has the exercise's best 1RM against every completed
+   session before this one shows that 1RM in `record` and a `New 1RM record` band — the same
    derivation, and the same card, as the session view's completed edit
    (§14b.4, §14b.7), so the `Edit`/`Done` loop shows one card on both sides.
    History is optional enrichment: while it loads, or if it fails, no record
@@ -821,8 +821,9 @@ unchanged. What differs is presentation:
    prescription. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests (tried on device 2026-09-23:
    too noisy). The one highlight is a done set whose 1RM beats the exercise's
-   completed history: that 1RM is shown in `record` and earns the card a
-   `record` band (`New 1RM record · <1RM>`), from the same derivation
+   completed sessions before this one (all of them while it is active): that
+   1RM is shown in `record` and earns the card a `record` band
+   (`New 1RM record · <1RM>`), from the same derivation
    (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
    (§7.7).
 5. The summary counts only confirmed performed sets (warm-ups included) and
@@ -841,8 +842,8 @@ unchanged. What differs is presentation:
    reveals invalid times and writes nothing; otherwise it asks §14b.2's
    questions with completed-edit labels (`… and save changes`), saves the
    confirmed rows only, and goes back where the edit was opened. It never
-   replays completion. Records compare against the rest of history, not the
-   session itself.
+   replays completion. Records compare against the completed sessions before
+   it, never the session itself or later ones.
 
 ### 15. Documentation maintenance rule (UI semantics)
 

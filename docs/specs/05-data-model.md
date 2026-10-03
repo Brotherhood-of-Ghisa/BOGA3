@@ -157,6 +157,13 @@ at least one working set: `session_id`, `exercise_definition_id`,
   the target, in the order above. The target's best set is a PR when it beats
   that best, which is the same test as its `pr_e1rm` flag. Jest holds the list
   equal to the replay `deriveSessionPersonalRecords`.
+- **Live record markers** (the session view's `record` band, active and
+  completed-edit, and the completed-session route's set cards) read the same
+  earlier best: the sessions before the viewed session's `completed_at`, or
+  before now while it is active, so its own row never counts. Later sessions
+  never count, so an old session's marker equals its `pr_e1rm` flag. The
+  in-memory session is compared with `deriveExercisePersonalRecord`; a
+  definition without an earlier 1RM shows no marker.
 - **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
   `exercise_sets`, `exercise_definitions` (load mode, contribution),
   `user_settings` (the bodyweight toggle) and `body_weight_measurements` queue

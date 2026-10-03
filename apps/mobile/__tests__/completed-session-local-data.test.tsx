@@ -681,7 +681,7 @@ describe('records, sharing and deleted sessions over real data', () => {
     }
   );
 
-  it('marks the set whose 1RM beats every other session with a record band', async () => {
+  it('marks the set whose 1RM beats every earlier session with a record band', async () => {
     await openSession({ sessionId: ONE_PR });
     await openSets();
 

@@ -444,6 +444,19 @@ describe('CompletedSessionDetailScreenShell', () => {
     return screen.getByTestId('completed-session-detail-options-sheet');
   };
 
+  it('asks for the bests before this session and bands the set that beats them', async () => {
+    const loadHistoricalBests = jest.fn().mockResolvedValue(new Map([['bench-press', 200]]));
+    await renderDetail(detailClient({ loadHistoricalBests }));
+
+    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record')).toBeTruthy();
+    expect(loadHistoricalBests).toHaveBeenCalledWith(
+      { sessionId: 'completed-under-test', completedAt: new Date('2026-02-20T16:58:00.000Z') },
+      ['bench-press', 'lat-pulldown']
+    );
+    // No earlier best for the pulldown: no band.
+    expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2-record')).toBeNull();
+  });
+
   it('shows no record while history is unavailable, and still renders the session', async () => {
     await renderDetail(
       detailClient({ loadHistoricalBests: jest.fn().mockRejectedValue(new Error('history unavailable')) })
