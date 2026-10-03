@@ -35,7 +35,7 @@ is a **confirmed performed set** whose `set_type` is not `warm_up`.
 - **Effort**: untagged sets, every RIR and unrecognised stored values are
   working sets. Only `warm_up` is excluded. The rule is not configurable
   (Settings’ visible effort labels only shape the picker and tap cycle).
-  Weekly muscle targets grade the resulting counts; neither visibility nor targets
+  One shared weekly working-set target grades each muscle’s resulting count; neither visibility nor targets
   alter eligibility, Volume, 1RM, records or counted sessions.
 - A **warm-up** keeps its own per-set figures (1RM, volume) wherever sets are
   listed (`calculateSetMetrics`). It feeds no aggregate, count, record, best,

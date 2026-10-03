@@ -31,9 +31,10 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
   Signed-out/local-only failures use that same row and Refresh inside the
   existing guidance card. Preference controls add no error boxes or Retry buttons.
 - Settings has a Progress section using the same Card, form-field and row
-  vocabulary: weekly muscle targets (a scrolling editor sheet with per-muscle
-  Reset), target-window and history-look-back week fields, the sole Daily/Weekly
-  view selector, and effort visibility checkboxes. W-Up and unspecified are
+  vocabulary: one inline “Weekly working sets per muscle” field applying the same
+  target to every muscle group, “Progress period (weeks)” and “History look-back
+  (weeks)” fields, the sole Daily/Weekly selector labelled “Heatmap view”, and
+  effort visibility checkboxes. W-Up and unspecified are
   locked visible; RIR 0–3 can be hidden individually and custom grades added.
   Checkbox labels include the grade and “Visible”, with 44pt targets. There is
   no working-set counting control. Numeric drafts commit on editing completion;

@@ -15,7 +15,6 @@ import { StyleSheet } from 'react-native';
 import {
   default as StatsRoute,
   StatsScreenShell,
-  computeFailureIntensityProgress,
   type StatsScreenShellProps,
   type ExerciseListItem,
   describeExerciseSortMode,
@@ -280,26 +279,6 @@ describe('stats row metric formatters', () => {
     expect(formatVolumeDelta(0, 100)).toEqual({ text: '−100%', tone: 'negative' });
     expect(formatVolumeDelta(100, 100)).toEqual({ text: '±0%', tone: 'neutral' });
     expect(formatVolumeDelta(117, 100)).toEqual({ text: '+17%', tone: 'positive' });
-  });
-});
-
-describe('computeFailureIntensityProgress', () => {
-  it.each([
-    [0, 7, 0],
-    [4, 7, 0.5],
-    [8, 7, 1],
-    [9, 7, 1],
-    [8, 30, 8 / (240 / 7)],
-    [34, 30, 34 / (240 / 7)],
-    [35, 30, 1],
-  ] as const)('scales %s failures across %s days', (failures, days, expected) => {
-    expect(computeFailureIntensityProgress(failures, days)).toBeCloseTo(expected, 6);
-  });
-
-  it('defensively clamps negative and non-finite values to zero', () => {
-    expect(computeFailureIntensityProgress(-1, 7)).toBe(0);
-    expect(computeFailureIntensityProgress(Number.NaN, 7)).toBe(0);
-    expect(computeFailureIntensityProgress(Number.POSITIVE_INFINITY, 7)).toBe(0);
   });
 });
 

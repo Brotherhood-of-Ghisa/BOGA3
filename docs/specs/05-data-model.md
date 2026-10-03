@@ -93,17 +93,17 @@ own synced raw rows; they never cross the wire.
 
 `apps/mobile/src/preferences/` owns typed account-local browsing and Progress choices:
 exercise sort, Show never-done, detail date format, past-records gym filter, weekly
-muscle-target overrides, visible RIR grades, target-window weeks, history-look-back
-weeks (1–156) and the Daily/Weekly history view. Ordinary scalar and JSON keys in the existing `expo-sqlite/kv-store` are scoped to the authenticated
+working-set target shared by all muscle groups, visible RIR grades, Progress-period
+weeks, history-look-back weeks (1–520) and the Daily/Weekly heatmap view. Ordinary scalar and JSON keys in the existing `expo-sqlite/kv-store` are scoped to the authenticated
 account ID; local-only builds have a distinct local profile. They are **out of
 sync scope**: device presentation choices, without dirty bits, sync nudges,
 `user_settings` columns or server counterparts. Types/defaults are import-free;
 shared hooks adapt the same store for screens. Each field has a scoped key; adding
 Progress fields preserves the four browsing fields and their migration.
 
-Progress defaults are eight W/sets per muscle per week (overrides keyed by stable
-muscle ID), visible RIR 0–3, a four-week target window, a 52-week history look-back
-and Weekly view. Targets are positive safe integers; target windows are 1–52
+Progress defaults are one shared target of eight W/sets per muscle per week,
+visible RIR 0–3, a four-week Progress period, a 52-week history look-back and
+Weekly heatmaps. The target is a positive safe integer; Progress periods are 1–52
 whole weeks; RIR grades are unique non-negative safe integers with at least one
 visible grade. Missing or malformed keys receive typed defaults. Failed writes
 preserve the last durable configuration and pending edits, retried by Settings’

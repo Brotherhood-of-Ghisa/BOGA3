@@ -17,6 +17,7 @@
 
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { uiRoles } from '@/components/ui';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -310,6 +311,24 @@ describe('Stats over real data', () => {
     // to; the warm-up adds neither a set nor volume.
     expect(screen.getByTestId('stats-muscle-sets-quads')).toHaveTextContent(/^Sets7/);
     expect(screen.getByTestId('stats-muscle-row-quads').props.accessibilityLabel).toContain('volume 3550');
+  });
+
+  it('uses the saved shared target for different muscles without changing counts or volume', async () => {
+    await renderSeededStats();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    await screen.findByTestId('stats-muscle-row-quads');
+    const volume = screen.getByTestId('stats-muscle-row-quads').props.accessibilityLabel;
+    for (const id of ['quads', 'glutes_max']) {
+      expect(screen.getByTestId(`stats-muscle-row-${id}-shade`)).toHaveStyle({ backgroundColor: uiRoles.viz4 });
+    }
+    act(() => updatePreferences({ weeklyWorkingSetTarget: 16 }));
+    for (const id of ['quads', 'glutes_max']) {
+      expect(screen.getByTestId(`stats-muscle-row-${id}-shade`)).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+      expect(screen.getByTestId(`stats-muscle-row-${id}`).props.accessibilityLabel).toContain('16 W/sets per week');
+      expect(screen.getByTestId(`stats-muscle-sets-${id}`)).toHaveTextContent(/^Sets7/);
+    }
+    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6 vs prev 1 wk');
+    expect(screen.getByTestId('stats-muscle-row-quads').props.accessibilityLabel.replace('16 W/sets', '8 W/sets')).toBe(volume);
   });
 
   it("opens a seeded exercise's history with all four metrics and both views, and dismisses it", async () => {

@@ -46,32 +46,41 @@ it('saves both window settings and the view, and retains invalid numeric drafts 
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('keeps a failed numeric save as a draft and retries it with Refresh', async () => {
+it.each([
+  ['settings-history-lookback', 'historyLookbackWeeks', 52, 104],
+  ['settings-weekly-working-set-target', 'weeklyWorkingSetTarget', 8, 12],
+] as const)('keeps a failed %s save as a draft and retries it with Refresh', async (id, field, previous, next) => {
   await openSettings();
   const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
-  editNumber('settings-history-lookback', '104');
-  expect(values().historyLookbackWeeks).toBe(52);
-  expect(screen.getByTestId('settings-history-lookback')).toHaveProp('value', '104');
+  editNumber(id, String(next));
+  expect(values()[field]).toBe(previous);
+  expect(screen.getByTestId(id)).toHaveProp('value', String(next));
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
   expect(screen.queryByText('Retry')).toBeNull();
   write.mockRestore();
   fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
-  await waitFor(() => expect(values().historyLookbackWeeks).toBe(104));
+  await waitFor(() => expect(values()[field]).toBe(next));
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('edits stable muscle targets and removes an override on Reset', async () => {
+it('edits one shared weekly target inline and retains invalid drafts in the centralized error flow', async () => {
   await openSettings();
-  fireEvent.press(screen.getByTestId('settings-muscle-targets-row'));
-  const input = await screen.findByTestId('settings-muscle-target-quads');
-  expect(input).toHaveProp('value', '8');
-  editNumber('settings-muscle-target-quads', '12');
-  expect(values().weeklyMuscleTargets).toEqual({ quads: 12 });
-  editNumber('settings-muscle-target-quads', '0');
-  expect(values().weeklyMuscleTargets).toEqual({ quads: 12 });
-  fireEvent.press(screen.getByTestId('settings-muscle-target-reset-quads'));
-  expect(values().weeklyMuscleTargets).toEqual({});
-  expect(screen.getByTestId('settings-muscle-target-quads')).toHaveProp('value', '8');
+  const id = 'settings-weekly-working-set-target';
+  expect(screen.getByLabelText('Weekly working sets per muscle')).toHaveProp('value', '8');
+  expect(screen.getByLabelText('Progress period (weeks)')).toHaveProp('value', '4');
+  expect(screen.getByLabelText('Heatmap view')).toBeTruthy();
+  expect(screen.queryByText('Weekly muscle targets')).toBeNull();
+  editNumber(id, '12');
+  expect(values().weeklyWorkingSetTarget).toBe(12);
+  editNumber(id, '0');
+  expect(values().weeklyWorkingSetTarget).toBe(12);
+  expect(screen.getByTestId(id)).toHaveProp('value', '0');
+  expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+    .toHaveTextContent(/positive whole number/);
+  expect(within(screen.getByTestId('settings-section-progress')).queryByText(/positive whole number/)).toBeNull();
+  editNumber(id, '8');
+  expect(values().weeklyWorkingSetTarget).toBe(8);
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
 it('offers visibility alone, locks W-Up and unspecified, adds RIR zero/custom grades and rejects the last removal', async () => {

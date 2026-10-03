@@ -92,13 +92,13 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - Loading, error (`Retry` on Sessions, T10-D6) and empty states are
   `StatePanel`s in a `Card`, with `…` for the ellipsis.
 
-Weekly muscle targets grade each muscle against quota × selected weeks. Group
+One shared weekly working-set target grades each muscle against quota × selected weeks. Group
 colour averages the individually capped attainment of all constituent muscles,
 including untrained ones. The configured N-week window and This week start at
 local Monday and run through now; the default is the configured window, labelled
 “So far”, with no quota proration. A one-week configuration has one range choice.
 History uses the saved look-back in both views. Muscle Sets cells compare daily
-or weekly counts against weekly quotas; other metric scaling stays unchanged.
+or weekly counts against that same weekly target; other metric scaling stays unchanged.
 Legends and accessibility labels explain target colouring.
 
 ## States

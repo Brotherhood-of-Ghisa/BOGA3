@@ -6,7 +6,7 @@
 
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
-import { groupedTargetAttainment, type MuscleTargets } from '@/src/preferences/targets';
+import { groupedTargetAttainment } from '@/src/preferences/targets';
 
 import {
   getCalendarHeatmapBucket,
@@ -60,7 +60,7 @@ export interface BuildHeatmapDataOptions {
    * to the 52-week default when there is less data), so the grid grows with the data.
    */
   weeks?: number | 'all';
-  muscleTargets?: { muscleIds: readonly string[]; weeklyTargets: MuscleTargets };
+  muscleTargets?: { muscleIds: readonly string[]; weeklyTarget: number };
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -262,7 +262,7 @@ export function buildHeatmapData(
   const target = metric === 'workingSetCount' ? options.muscleTargets : undefined;
   if (!target) return { daily, weekly, todayDateKey };
   const grade = (counts: Record<string, number> | undefined) =>
-    groupedTargetAttainment(target.muscleIds, counts ?? {}, target.weeklyTargets);
+    groupedTargetAttainment(target.muscleIds, counts ?? {}, target.weeklyTarget);
   const targetDaily = daily.map(day => withTargetLevel(day, grade(day.workingSetCountsByMuscle)));
   const totals = accumulateWeeks(daily, metric);
   const targetWeekly = weekly.map(week => withTargetLevel(week, grade(totals.get(week.weekStartDateKey)?.workingSetCountsByMuscle)));

@@ -638,7 +638,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    1RM or top weight is `—`.
 7. Muscle volume is the per-side, role-weighted aggregate across the selected
    muscle IDs; 1RM and top weight are exercise-level and not offered for muscles.
-8. The saved history look-back H (1–156 whole weeks, default 52) controls both query and
+8. The saved history look-back H (1–520 whole weeks, default 52) controls both query and
    grid bounds: the current local Monday-start week and preceding H−1 weeks,
    through today, using calendar arithmetic across DST. A shorter choice
    reduces the grid; longer choices load older available history. Dates beyond
@@ -714,12 +714,12 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 10. Exercise analytics uses calculated load × reps of working sets (§5.11) under the current private policy, with invalid/overflow coverage and no muscle-role weighting. A day or week with only warm-ups makes no heatmap cell, for exercises and muscles alike. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets`, its working sets, plus `Volume`, the working sets' volume. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use a signed absolute delta (`+4`, `−2`, `±0`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-13. Muscle row colour grades working sets against the saved weekly muscle quota
+13. Muscle row colour grades working sets against one saved weekly quota shared by all muscles
     (default eight) × selected weeks, capped at 100%, using `viz1`–`viz4`.
     A family averages each constituent muscle’s capped attainment, including
     muscles with zero sets; displayed count and metric aggregation retain their
     existing rules. Muscle-history Sets use each day’s or week’s count against
-    its weekly quota, independent of look-back length. Group history averages
+    the shared weekly quota, independent of look-back length. Group history averages
     the constituent attainments. Legends and accessibility labels explain the
     colour; Volume and exercise-only metrics retain their observed scaling.
 

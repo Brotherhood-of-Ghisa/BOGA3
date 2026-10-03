@@ -75,15 +75,15 @@ describe('buildHeatmapData', () => {
     const days = ['2026-06-03', '2026-06-04'].map(dateKey => ({ dateKey, totalVolume: 100,
       workingSetCount: 4, workingSetCountsByMuscle: { quads: 4 }, estimatedRM1: 50, highestWeight: 40 }));
     const data = buildHeatmapData(days, 'workingSetCount', { todayDateKey: TODAY, weeks: 4,
-      muscleTargets: { muscleIds: ['quads'], weeklyTargets: {} } });
+      muscleTargets: { muscleIds: ['quads'], weeklyTarget: 8 } });
     expect(data.daily.filter(day => day.hasTraining).map(day => [day.value, day.level, day.targetAttainment]))
       .toEqual([[4, 2, .5], [4, 2, .5]]);
     expect(data.weekly.at(-1)).toMatchObject({ value: 8, level: 4, targetAttainment: 1 });
     const group = buildHeatmapData(days, 'workingSetCount', { todayDateKey: TODAY, weeks: 104,
-      muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTargets: { quads: 4 } } });
+      muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTarget: 4 } });
     expect(group.weekly.at(-1)).toMatchObject({ value: 8, level: 2, targetAttainment: .5 });
     const volume = buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks: 4,
-      muscleTargets: { muscleIds: ['quads'], weeklyTargets: { quads: 1000 } } });
+      muscleTargets: { muscleIds: ['quads'], weeklyTarget: 1000 } });
     expect(volume.targetLegend).toBeUndefined();
     expect(volume.daily.find(day => day.hasTraining)).toMatchObject({ value: 100, level: 4 });
   });

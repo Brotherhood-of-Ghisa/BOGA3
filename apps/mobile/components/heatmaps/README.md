@@ -42,8 +42,8 @@ smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
 `hasTraining` distinguishes a known zero from rest in details and accessibility;
 `unavailable` preserves missing or incomplete load instead of treating it as zero.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
-against weekly quotas, capped before group averaging and including zero muscles.
-Daily and weekly cells use the same weekly quotas, independent of look-back;
+against one shared weekly target, capped before group averaging and including
+zero muscles. Daily and weekly cells use that same target, independent of look-back;
 legends and accessible labels report the target share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of

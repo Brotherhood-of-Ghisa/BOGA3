@@ -21,7 +21,7 @@ it('extends existing scoped browsing choices and restores all five settings afte
   Storage.setItemSync(preferenceKey('account:A', 'dateFormat'), 'MM-DD-YYYY');
   await account();
   expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY' });
-  const choices = { weeklyMuscleTargets: { quads: 12 }, visibleEffortGrades: [0, 2, 12],
+  const choices = { weeklyWorkingSetTarget: 12, visibleEffortGrades: [0, 2, 12],
     targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'daily' as const };
   setAccountLocalPreferences(choices);
   __resetAccountLocalPreferencesForTests();
@@ -29,17 +29,17 @@ it('extends existing scoped browsing choices and restores all five settings afte
   expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY', ...choices });
   await account('B'); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
   await account(null); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
-  await account('A'); expect(values().weeklyMuscleTargets).toEqual({ quads: 12 });
+  await account('A'); expect(values().weeklyWorkingSetTarget).toBe(12);
   await account(null, false); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
   setAccountLocalPreferences({ heatmapView: 'daily' });
   await account('A'); expect(values().historyLookbackWeeks).toBe(104);
   await account(null, false); expect(values().heatmapView).toBe('daily');
 });
 
-it.each(['invalid JSON', 'null', '[]', '{"quads":0}', '{"quads":1.5}', '{"quads":9007199254740992}'])
+it.each(['invalid JSON', 'null', '[]', '{}', '0', '-1', '1.5', '9007199254740992'])
 ('defaults malformed target storage %s', async raw => {
-  Storage.setItemSync(preferenceKey('account:A', 'weeklyMuscleTargets'), raw);
-  await account(); expect(values().weeklyMuscleTargets).toEqual({});
+  Storage.setItemSync(preferenceKey('account:A', 'weeklyWorkingSetTarget'), raw);
+  await account(); expect(values().weeklyWorkingSetTarget).toBe(8);
 });
 
 it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects invalid whole numbers %s without writing', async invalid => {
@@ -48,17 +48,15 @@ it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects inval
   setAccountLocalPreferences({ historyLookbackWeeks: invalid });
   expect(values().historyLookbackWeeks).toBe(52);
   expect(getAccountLocalPreferenceState().error).toMatch(/positive whole/);
-  setAccountLocalPreferences({ weeklyMuscleTargets: { quads: invalid } });
-  expect(values().weeklyMuscleTargets).toEqual({});
+  setAccountLocalPreferences({ weeklyWorkingSetTarget: invalid });
+  expect(values().weeklyWorkingSetTarget).toBe(8);
   expect(write).not.toHaveBeenCalled();
 });
 
 it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('targetWindowWeeks', 52)).toBe(true);
   expect(isPreferenceValue('targetWindowWeeks', 53)).toBe(false);
-  expect(isPreferenceValue('historyLookbackWeeks', 156)).toBe(true);
-  expect(isPreferenceValue('historyLookbackWeeks', 157)).toBe(false);
-  expect(isPreferenceValue('weeklyMuscleTargets', { '': 8 })).toBe(false);
+  expect(isPreferenceValue('weeklyWorkingSetTarget', { quads: 8 })).toBe(false);
   expect(isPreferenceValue('heatmapView', 'monthly')).toBe(false);
   for (const invalid of [[], [0, 0], [-1], [1.5], [NaN], [Infinity], [Number.MAX_SAFE_INTEGER + 1]]) {
     expect(isPreferenceValue('visibleEffortGrades', invalid)).toBe(false);
@@ -107,8 +105,9 @@ it('caps constituent muscle attainment before averaging, including untrained mus
   expect(muscleTargetAttainment(4, 8)).toBe(.5);
   expect(muscleTargetAttainment(16, 8, 4)).toBe(.5);
   expect(muscleTargetAttainment(16, 8)).toBe(1);
-  expect(groupedTargetAttainment(['quads', 'calves'], { quads: 100 }, { quads: 4 })).toBe(.5);
-  expect(groupedTargetAttainment([], {}, {})).toBe(0);
+  expect(groupedTargetAttainment(['quads', 'calves'], { quads: 100 }, 4)).toBe(.5);
+  expect(groupedTargetAttainment(['quads', 'chest'], { quads: 6, chest: 6 }, 12)).toBe(.5);
+  expect(groupedTargetAttainment([], {}, 8)).toBe(0);
 });
 
 it('aligns to local Monday, keeps the same elapsed previous span, and recovers week selection', () => {

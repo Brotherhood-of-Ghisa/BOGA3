@@ -47,7 +47,7 @@ import {
 } from '@/src/data';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
-import { groupedTargetAttainment, muscleTargetAttainment, type MuscleTargets } from '@/src/preferences/targets';
+import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
 import { useHistory } from '@/components/stats/use-history';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -163,20 +163,6 @@ export const formatVolumeDelta = (current: number | null, previous: number | nul
   };
 };
 
-export const fullScaleFailureCount = (periodDays: StatsPeriodDays): number =>
-  (8 * periodDays) / 7;
-
-export const computeFailureIntensityProgress = (
-  workingSetCount: number,
-  periodDays: StatsPeriodDays
-): number => {
-  const fullScale = fullScaleFailureCount(periodDays);
-  if (!Number.isFinite(workingSetCount) || workingSetCount <= 0 || !Number.isFinite(fullScale)) {
-    return 0;
-  }
-  return Math.min(1, workingSetCount / fullScale);
-};
-
 const describeCountDifference = (difference: number, label: string): string => {
   if (difference > 0) return `up ${formatNumber(difference)} ${label}`;
   if (difference < 0) return `down ${formatNumber(Math.abs(difference))} ${label}`;
@@ -198,7 +184,6 @@ const buildMuscleRowAccessibilityLabel = ({
   previousWorkingSetCount,
   volume,
   volumeDelta,
-  periodDays,
   targetDescription,
 }: {
   actionLabel: string;
@@ -206,17 +191,14 @@ const buildMuscleRowAccessibilityLabel = ({
   previousWorkingSetCount: number;
   volume: number | null;
   volumeDelta: DeltaDisplay;
-  periodDays: StatsPeriodDays;
-  targetDescription?: string;
+  targetDescription: string;
 }): string =>
   [
     actionLabel,
     `${formatNumber(workingSetCount)} sets`,
     describeCountDifference(workingSetCount - previousWorkingSetCount, 'sets'),
     `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
-    targetDescription ?? `failure background reaches its strongest shade at ${formatNumber(
-      fullScaleFailureCount(periodDays)
-    )} sets for the selected ${periodDays}-day period`,
+    targetDescription,
   ].join('. ');
 
 export const nextExerciseSortMode = (
@@ -321,7 +303,7 @@ export type StatsScreenShellProps = {
   periodDays: StatsPeriodDays;
   targetWindowWeeks?: number;
   historyLookbackWeeks?: number;
-  weeklyMuscleTargets?: MuscleTargets;
+  weeklyWorkingSetTarget?: number;
   onSelectPeriod: (period: StatsPeriodDays) => void;
   onPressSessionsCard: () => void;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
@@ -364,7 +346,7 @@ export function StatsScreenShell({
   periodDays,
   targetWindowWeeks = 4,
   historyLookbackWeeks = 52,
-  weeklyMuscleTargets = {},
+  weeklyWorkingSetTarget = 8,
   onSelectPeriod,
   onPressSessionsCard,
   onPressMuscleHistory,
@@ -573,7 +555,7 @@ export function StatsScreenShell({
                   families={filteredFamilies}
                   previousFamilies={summary.previous.totals.muscleFamilies}
                   periodDays={periodDays}
-                  weeklyMuscleTargets={weeklyMuscleTargets}
+                  weeklyWorkingSetTarget={weeklyWorkingSetTarget}
                   onPressMuscleHistory={onPressMuscleHistory}
                 />
               )
@@ -600,7 +582,7 @@ export function StatsScreenShell({
           view={muscleHistoryView}
           weeklyEffort={muscleHistoryWeeklyEffort}
           lookbackWeeks={historyLookbackWeeks}
-          muscleTargets={{ muscleIds: selectedMuscle.muscleGroupIds, weeklyTargets: weeklyMuscleTargets }}
+          muscleTargets={{ muscleIds: selectedMuscle.muscleGroupIds, weeklyTarget: weeklyWorkingSetTarget }}
         />
       ) : null}
       {selectedExercise ? (
@@ -753,13 +735,13 @@ function MuscleFamilyList({
   families,
   previousFamilies,
   periodDays,
-  weeklyMuscleTargets,
+  weeklyWorkingSetTarget,
   onPressMuscleHistory,
 }: {
   families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
   periodDays: StatsPeriodDays;
-  weeklyMuscleTargets: MuscleTargets;
+  weeklyWorkingSetTarget: number;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   const previousByFamilyName = new Map(previousFamilies.map((family) => [family.familyName, family]));
@@ -780,7 +762,7 @@ function MuscleFamilyList({
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
           periodDays={periodDays}
-          weeklyMuscleTargets={weeklyMuscleTargets}
+          weeklyWorkingSetTarget={weeklyWorkingSetTarget}
           onPressMuscleHistory={onPressMuscleHistory}
         />
       ))}
@@ -799,7 +781,7 @@ function MuscleFamilyCard({
   previousFamily,
   previousMusclesById,
   periodDays,
-  weeklyMuscleTargets,
+  weeklyWorkingSetTarget,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
@@ -807,7 +789,7 @@ function MuscleFamilyCard({
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
   periodDays: StatsPeriodDays;
-  weeklyMuscleTargets: MuscleTargets;
+  weeklyWorkingSetTarget: number;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
@@ -824,7 +806,6 @@ function MuscleFamilyCard({
           previousWorkingSetCount: previousFamily?.workingSetCount ?? 0,
           volume: family.totalVolume,
           volumeDelta,
-          periodDays,
           targetDescription: `Colour: average attainment of ${family.muscles.length} muscle targets over ${periodDays / 7} weeks, capped per muscle at 100%`,
         })}
         divider={false}
@@ -840,7 +821,7 @@ function MuscleFamilyCard({
         setsDelta={formatCountDelta(family.workingSetCount, previousFamily?.workingSetCount ?? 0)}
         setsTestID={`stats-family-sets-${testIdSlug}`}
         shade={selectFailureShade(groupedTargetAttainment(family.muscles.map(muscle => muscle.muscleGroupId),
-          Object.fromEntries(family.muscles.map(muscle => [muscle.muscleGroupId, muscle.workingSetCount])), weeklyMuscleTargets, periodDays / 7))}
+          Object.fromEntries(family.muscles.map(muscle => [muscle.muscleGroupId, muscle.workingSetCount])), weeklyWorkingSetTarget, periodDays / 7))}
         testID={
           collapsedMuscle
             ? `stats-family-header-button-${collapsedMuscle.muscleGroupId}`
@@ -868,8 +849,7 @@ function MuscleFamilyCard({
                   previousWorkingSetCount: previousMuscle?.workingSetCount ?? 0,
                   volume: muscle.totalVolume,
                   volumeDelta: muscleVolumeDelta,
-                  periodDays,
-                  targetDescription: `Colour: ${weeklyMuscleTargets[muscle.muscleGroupId] ?? 8} W/sets per week × ${periodDays / 7} weeks`,
+                  targetDescription: `Colour: ${weeklyWorkingSetTarget} W/sets per week × ${periodDays / 7} weeks`,
                 })}
                 divider
                 key={muscle.muscleGroupId}
@@ -880,7 +860,7 @@ function MuscleFamilyCard({
                 setsDelta={formatCountDelta(muscle.workingSetCount, previousMuscle?.workingSetCount ?? 0)}
                 setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
                 shade={selectFailureShade(
-                  muscleTargetAttainment(muscle.workingSetCount, weeklyMuscleTargets[muscle.muscleGroupId] ?? 8, periodDays / 7)
+                  muscleTargetAttainment(muscle.workingSetCount, weeklyWorkingSetTarget, periodDays / 7)
                 )}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}
                 untrained={muscle.workingSetCount === 0 && muscle.totalVolume === 0}
@@ -1132,7 +1112,7 @@ function StatsContent() {
         estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
     }), [catalog.exercises, stats]);
   return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
-    historyLookbackWeeks={values.historyLookbackWeeks} weeklyMuscleTargets={values.weeklyMuscleTargets}
+    historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={days => setThisWeek(days === 7)} onPressSessionsCard={() => router.push('/sessions')}
     onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onSelectMuscleHistoryWeek={muscle.selectWeek}
     selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}

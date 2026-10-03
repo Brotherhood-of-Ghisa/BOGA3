@@ -3,13 +3,13 @@ export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 export type PastRecordsGymScope = 'all' | 'current-gym';
 export type HeatmapView = 'daily' | 'weekly';
-export const MAX_HISTORY_LOOKBACK_WEEKS = 156;
+export const MAX_HISTORY_LOOKBACK_WEEKS = 520;
 export type AccountLocalPreferences = {
   sort: ExerciseListSort;
   showNeverDone: boolean;
   dateFormat: ExerciseDateFormat;
   pastRecordsGymScope: PastRecordsGymScope;
-  weeklyMuscleTargets: Record<string, number>;
+  weeklyWorkingSetTarget: number;
   visibleEffortGrades: number[];
   targetWindowWeeks: number;
   historyLookbackWeeks: number;
@@ -26,7 +26,7 @@ export const DEFAULT_EXERCISE_LIST_PREFERENCES: ExerciseListPreferences = {
 
 export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   ...DEFAULT_EXERCISE_LIST_PREFERENCES,
-  weeklyMuscleTargets: {},
+  weeklyWorkingSetTarget: 8,
   visibleEffortGrades: [0, 1, 2, 3],
   targetWindowWeeks: 4,
   historyLookbackWeeks: 52,
@@ -43,16 +43,12 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   showNeverDone: 'Choose whether to show never-done exercises.',
   dateFormat: 'Choose a valid date format.',
   pastRecordsGymScope: 'Choose a valid gym filter.',
-  weeklyMuscleTargets: 'Muscle targets must be positive whole numbers.',
+  weeklyWorkingSetTarget: 'Weekly working-set target must be a positive whole number.',
   visibleEffortGrades: 'Choose at least one RIR grade. RIR values must be non-negative whole numbers.',
-  targetWindowWeeks: 'Target window must be a whole number of weeks from 1 to 52.',
+  targetWindowWeeks: 'Progress period must be a whole number of weeks from 1 to 52.',
   historyLookbackWeeks: `History look-back must be a positive whole number of weeks up to ${MAX_HISTORY_LOOKBACK_WEEKS}.`,
-  heatmapView: 'Choose Daily or Weekly for history.',
+  heatmapView: 'Choose Daily or Weekly for heatmaps.',
 };
-
-const isMuscleTargets = (value: unknown): value is Record<string, number> =>
-  Boolean(value && typeof value === 'object' && !Array.isArray(value) &&
-    Object.entries(value).every(([id, quota]) => id.length > 0 && isPositiveSafeInteger(quota)));
 
 export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
   field: K, value: unknown,
@@ -62,7 +58,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'showNeverDone': return typeof value === 'boolean';
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';
-    case 'weeklyMuscleTargets': return isMuscleTargets(value);
+    case 'weeklyWorkingSetTarget': return isPositiveSafeInteger(value);
     case 'visibleEffortGrades': return Array.isArray(value) && value.length > 0 &&
       value.every(isNonNegativeSafeInteger) && new Set(value).size === value.length;
     case 'targetWindowWeeks': return isPositiveSafeInteger(value) && value <= 52;
