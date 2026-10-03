@@ -10,6 +10,7 @@ import { flushLogs, logEvent, setLoggingUserId } from '@/src/logging';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 import { requestSync } from '@/src/sync/scheduler';
+import { setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 
 export type AuthBootstrapStatus = 'idle' | 'restoring' | 'ready';
 
@@ -66,6 +67,7 @@ let authSubscription: { unsubscribe: () => void } | null = null;
 let lastKnownUserId: string | null = null;
 
 const emitAuthSnapshot = () => {
+  setAccountLocalPreferenceAccount(authSnapshot.user?.id ?? null, authSnapshot.isConfigured);
   for (const listener of listeners) {
     listener();
   }

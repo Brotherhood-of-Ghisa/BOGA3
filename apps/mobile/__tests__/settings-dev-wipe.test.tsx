@@ -54,6 +54,10 @@ jest.mock('@/components/sync-status/sync-status-panel', () => ({
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 
+import {
+  getExerciseListPreferencesSnapshot,
+  setExerciseListPreferences,
+} from '@/src/exercise-catalog/list-preferences';
 import SettingsRoute from '../app/(tabs)/settings';
 import * as devReset from '@/src/data/dev-reset';
 import * as devAffordances from '@/src/sync/dev-affordances';
@@ -120,6 +124,7 @@ describe('settings developer data affordances', () => {
   it('resets local data after confirmation: history and custom exercises gone, the catalog re-seeded', async () => {
     await openSettings();
     expect(count('sessions')).toBeGreaterThan(0);
+    act(() => setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' }));
 
     expect(screen.getByTestId('settings-dev-tools-card')).toBeTruthy();
     fireEvent.press(screen.getByTestId('settings-dev-reset-button'));
@@ -140,6 +145,7 @@ describe('settings developer data affordances', () => {
     expect(count('gyms')).toBe(0);
     expect(count('exercise_definitions', "id = 'custom-press'")).toBe(0);
     expect(count('exercise_definitions', STARTER_EXERCISE)).toBe(1);
+    expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD');
   });
 
   it('surfaces a failed reset inline without crashing the screen (a failed write)', async () => {

@@ -1,10 +1,10 @@
 import { cleanup } from '@testing-library/react-native';
 import {
-  __resetExerciseListPreferencesForTests,
-} from '@/src/exercise-catalog/list-preferences';
+  __resetAccountLocalPreferencesForTests,
+} from '@/src/preferences/account-local';
 
 beforeEach(() => {
-  __resetExerciseListPreferencesForTests();
+  __resetAccountLocalPreferencesForTests();
   // The kv-store mock below keeps one store per test file; start each test
   // empty. The launch theme was read at import, before any test.
   (jest.requireMock('expo-sqlite/kv-store') as typeof import('expo-sqlite/kv-store')).Storage.clearSync();

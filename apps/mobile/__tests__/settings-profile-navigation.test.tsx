@@ -51,6 +51,7 @@ jest.mock('@/src/data/bootstrap', () =>
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
+import { Storage } from 'expo-sqlite/kv-store';
 
 import {
   __resetExerciseListPreferencesForTests,
@@ -164,6 +165,19 @@ describe('settings and profile routes', () => {
     fireEvent.press(screen.getByTestId('settings-connected-agents-row'));
 
     expect(mockPush).toHaveBeenCalledWith('/connected-agents');
+  });
+
+  it('reports a failed date-format save, retains the durable choice and lets Retry save the attempted format', async () => {
+    await ensureExerciseListPreferencesLoaded();
+    render(<SettingsRoute />);
+    const save = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
+    fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
+    expect(screen.getByTestId('preferences-error')).toHaveTextContent(/Preferences could not be saved\./);
+    expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('DD-MM-YYYY');
+    fireEvent.press(screen.getByLabelText('Retry preferences'));
+    await waitFor(() => expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD'));
+    expect(screen.queryByTestId('preferences-error')).toBeNull();
+    save.mockRestore();
   });
 
   it('renders the Preferences card and allows changing the date format setting', async () => {

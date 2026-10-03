@@ -50,6 +50,15 @@ import {
   updateUserEmail,
   updateUserPassword,
 } from '@/src/auth';
+import { Storage } from 'expo-sqlite/kv-store';
+import {
+  ensureAccountLocalPreferencesLoaded,
+  getAccountLocalPreferenceState,
+  setAccountLocalPreferences,
+} from '@/src/preferences/account-local';
+import { migrationCompleteKey } from '@/src/preferences/migration';
+import { preferenceKey } from '@/src/preferences/storage';
+import { subscribeToAuthState } from '@/src/auth/service';
 import {
   __resetAuthRequiredSignalForTests,
   getAuthRequiredSignal,
@@ -227,6 +236,45 @@ describe('auth service bootstrap', () => {
     expect(snapshot.session).toBe(storedSession);
     expect(snapshot.user?.id).toBe('user-1');
     expect(snapshot.user?.email).toBe('user@example.test');
+  });
+
+  it('publishes account preferences before auth listeners, preserves them through sign-out and restores on return', async () => {
+    Storage.setItemSync(preferenceKey('account:user-1', 'sort'), 'name');
+    Storage.setItemSync(migrationCompleteKey('account:user-1'), 'true');
+    const storedSession = createMockSession();
+    mockGetSession.mockResolvedValue({ data: { session: storedSession }, error: null });
+    const seen: string[] = [];
+    const unsubscribe = subscribeToAuthState(() => {
+      if (getAuthSnapshot().user) seen.push(getAccountLocalPreferenceState().values.sort);
+    });
+    await bootstrapAuthState();
+    expect(seen).toEqual(['name']);
+    setAccountLocalPreferences({ dateFormat: 'YYYY-MM-DD' });
+    mockSignOut.mockResolvedValue({ error: null });
+    await signOut();
+    expect(getAccountLocalPreferenceState().values.sort).toBe('favourite');
+    expect(Storage.getItemSync(preferenceKey('account:user-1', 'sort'))).toBe('name');
+    mockSignInWithPassword.mockResolvedValue({ data: { session: storedSession }, error: null });
+    await signInWithPassword({ email: 'user@example.test', password: 'test-password' });
+    await ensureAccountLocalPreferencesLoaded();
+    expect(getAccountLocalPreferenceState().values).toMatchObject({ sort: 'name', dateFormat: 'YYYY-MM-DD' });
+    unsubscribe();
+  });
+
+  it('auth callbacks switch scoped choices on A/B changes and hide them when the session is revoked', async () => {
+    Storage.setItemSync(preferenceKey('account:A', 'sort'), 'name');
+    Storage.setItemSync(preferenceKey('account:B', 'dateFormat'), 'YYYY-MM-DD');
+    Storage.setItemSync(migrationCompleteKey('account:A'), 'true');
+    Storage.setItemSync(migrationCompleteKey('account:B'), 'true');
+    mockGetSession.mockResolvedValue({ data: { session: createMockSession({ userId: 'A' }) }, error: null });
+    await bootstrapAuthState();
+    const callback = mockOnAuthStateChange.mock.calls[0][0];
+    callback('SIGNED_IN', createMockSession({ userId: 'B' }));
+    expect(getAccountLocalPreferenceState().values).toMatchObject({ sort: 'favourite', dateFormat: 'YYYY-MM-DD' });
+    callback('SIGNED_OUT', null);
+    expect(getAccountLocalPreferenceState()).toMatchObject({ values: { sort: 'favourite', dateFormat: 'DD-MM-YYYY' }, pending: {}, error: null });
+    callback('SIGNED_IN', createMockSession({ userId: 'A' }));
+    expect(getAccountLocalPreferenceState().values.sort).toBe('name');
   });
 
   it('surfaces session restore failures without leaving the bootstrap stuck', async () => {

@@ -1,6 +1,7 @@
 import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { PreferenceFeedback } from '@/components/preferences/preference-feedback';
 import { Card } from '@/components/ui/card';
 import { ChipGroup } from '@/components/ui/chip-group';
 import { Icon } from '@/components/ui/icon';
@@ -25,6 +26,7 @@ type PreferenceControlsProps = {
 export function ExerciseListPreferenceControls({ preferences, onChangePreferences }: PreferenceControlsProps) {
   return (
     <View style={styles.controlsRoot}>
+      <PreferenceFeedback />
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>Sort</Text>
       <SegmentedControl
         onChange={(sort) => onChangePreferences({ sort })}

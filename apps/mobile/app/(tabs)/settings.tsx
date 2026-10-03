@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { PreferenceFeedback } from '@/components/preferences/preference-feedback';
 import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
@@ -245,6 +246,7 @@ export default function SettingsScreen() {
           <Text allowFontScaling={false} style={styles.bodyMuted}>
             Configure how dates and other details are displayed throughout BoGa.
           </Text>
+          <PreferenceFeedback />
           <View style={styles.preference}>
             <Text allowFontScaling={false} style={styles.fieldLabel}>Date format</Text>
             <SegmentedControl

@@ -304,7 +304,13 @@ Brief entrypoint map of the current mobile screens.
     on tap, and a note that a new theme applies the next time BoGa opens; a
     failed save restores the previous choice and says nothing changed
     (`settings-appearance-error`). Rules: `ux-rules.md` §9b
-  - Preferences card: date format (`settings-date-format-<format>`)
+  - Preferences card: date format (`settings-date-format-<format>`) and past-records
+    gym filter (`settings-records-gym-<scope>`) are account-local on this device.
+    Sign-out hides the choices and returning to the account restores them;
+    database rebuilds preserve them. Read/save failure shows a live `danger`
+    notice (`preferences-error`) and Retry, retaining durable values and failed
+    input. The three exercise browsers share the same failure feedback.
+    Theme and the synced bodyweight toggle retain their separate storage paths.
   - AI coaching always offers an external `Connect an AI coach` setup link and
     states the read-only/revocable boundary; browser-launch failure stays inline
     and retryable. The separate Connected agents row is signed-in only.
