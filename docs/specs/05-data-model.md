@@ -139,21 +139,14 @@ at least one working set: `session_id`, `exercise_definition_id`,
   does; `volume_kg` is the known subtotal when `volume_complete` is false.
   `working_sets` counts the sets the row was derived from (*Sync v2
   data-model contract* #5).
-- **Ties inside a session** go to the first set in session order (block, then
-  set). One rule picks the best-1RM set
-  (`apps/mobile/src/exercise-calculations/best-set.ts`). The facts derive with
-  it, and the session view and completed-session detail apply it to an
-  in-memory session.
-- **PR flags.** History is ordered by `completed_at`, then `session_id`. A
-  metric is flagged when the session's value strictly beats the best of every
-  earlier session for that definition; at most one set per metric per session
-  carries it. The first session with a value is the baseline, never a PR, and
-  a session with no value neither counts as the baseline nor raises the bar.
-  An incomplete volume is never a volume PR and never raises the volume bar.
-  The 1RM flag equals `deriveSessionPersonalRecords` on every session.
+- **Bests and PR flags** are the record rules of
+  `tech/training-metrics-contract.md` §3: a row holds the session's values
+  (`summarizeSessionBests`), and a flag is set when the record book
+  (`createRecordBook`) says the session set that record. The 1RM flag equals
+  `deriveSessionPersonalRecords` on every session.
 - **Completed-session PRs** (completion screen, completed-session route, share
-  preview) read each definition's best `best_e1rm_kg` from the sessions before
-  the target, in the order above. The target's best set is a PR when it beats
+  preview) read each definition's records from the sessions before the target
+  (`loadEarlierBestsByDefinition`, the same fold as the records panel). The target's best set is a PR when it beats
   that best, which is the same test as its `pr_e1rm` flag. Jest holds the list
   equal to the replay `deriveSessionPersonalRecords`.
 - **Live record markers** (the session view's `record` band, active and
@@ -162,16 +155,13 @@ at least one working set: `session_id`, `exercise_definition_id`,
   before now while it is active, so its own row never counts. Later sessions
   never count, so an old session's marker equals its `pr_e1rm` flag. The
   in-memory session is compared with `deriveExercisePersonalRecord`; a
-  definition without an earlier 1RM shows no marker.
+  definition without an earlier 1RM record shows no marker.
 - **Exercise records** (the exercise page's records panel, exercise history's
-  `All-time bests`) fold one definition's rows in the order above: a value
-  must strictly beat the best so far, so a tie across sessions keeps the
-  earliest session, and an equal top weight goes to more reps. Volume counts
-  only rows with `volume_complete`. One query joins each row's best sets and
-  its session's gym. An optional gym scope (or no gym) and an optional
-  completed session to count before (the panel in a completed edit, the live
-  record rule above) narrow the rows; the newest row left names the panel's
-  `Last`, and only that session's sets are read.
+  `All-time bests`) fold one definition's rows through the record book
+  (`loadExerciseBests`). One query joins each row's best sets and its
+  session's gym. An optional gym scope (or no gym) and an optional completed
+  session to count before narrow the rows; the newest row left names the
+  panel's `Last`, and only that session's sets are read.
 - **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
   `exercise_sets`, `exercise_definitions` (load mode, contribution),
   `user_settings` (the bodyweight toggle) and `body_weight_measurements` queue

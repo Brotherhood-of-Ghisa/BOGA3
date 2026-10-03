@@ -15,7 +15,7 @@ const set = (id: string, weight: string, reps: string, setType: string | null,
 
 describe('agent-api training projection', () => {
   it('labels the working-set meaning of its figures', () => {
-    expect(METRIC_REVISION).toBe('working_sets_v1');
+    expect(METRIC_REVISION).toBe('working_sets_v2');
   });
 
   it('lists a heavier warm-up with its own figures but excludes it from every aggregate', () => {

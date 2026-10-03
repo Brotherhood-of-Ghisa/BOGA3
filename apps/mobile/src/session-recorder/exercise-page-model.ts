@@ -1,4 +1,6 @@
-import { enteredWeightKg } from '@/src/exercise-calculations/analytics';
+import {
+  pickSessionRecordSet, type RecordBaseline, type RecordSetCandidate,
+} from '@/src/exercise-calculations/records';
 import { calculateSetMetrics, type LoadContext } from '@/src/exercise-calculations/load-metrics';
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
@@ -32,18 +34,15 @@ export type SetRowView = {
   reps: number | null;
   oneRepMax: number | null;
   volume: number | null;
-  // A performed weight or 1RM beating the all-time best before today — the
-  // only figures the row highlights (`design-language.md` §5).
+  // The session's record set beating the records before this session — the
+  // only figures the row highlights (`records.ts`, `design-language.md` §5).
   weightRecord: boolean;
   oneRepMaxRecord: boolean;
 };
 
-// The lifter's all-time bests before today, from completed history. A value
-// today that beats one of these is a record (`design-language.md` §5).
-export type ExerciseRecordBaseline = {
-  oneRepMax: number | null;
-  weight: number | null;
-};
+// The lifter's records before this session, from completed history: a value
+// that beats one is a record (`records.ts`, `design-language.md` §5).
+export type ExerciseRecordBaseline = RecordBaseline;
 
 export const EFFORT_OPTIONS = SESSION_SET_TYPE_CYCLE;
 
@@ -122,73 +121,72 @@ export const previewMetrics = (weightValue: string, repsValue: string, context: 
   return { oneRepMax, volume };
 };
 
-const beats = (value: number | null, record: number | null): boolean =>
-  value !== null && record !== null && value > record;
+/** The session's blocks of this exercise, so the record is the session's (`ux-rules.md` §14a.4). */
+export type SetRowSession = {
+  blockId: string;
+  blocks: readonly { id: string; sets: readonly ExercisePageSet[] }[];
+};
 
 /**
- * The one set of the session whose record is highlighted (`design-language.md`
- * §5: one superlative). A performed set qualifies when its 1RM or its top
- * weight beats the all-time best before today. The best qualifying 1RM wins;
- * when no 1RM beats it, the heaviest qualifying weight does; a tie keeps the
- * set that reached the value first.
+ * The page's block and the session's other blocks of its current exercise, in
+ * session order. Filtering at render keeps the grouping right after a swap.
  */
-export const bestRecordSetId = (
-  candidates: { id: string; oneRepMaxRecord: boolean; oneRepMax: number | null; weightRecord: boolean; weight: number | null }[]
-): string | null => {
-  let best: { id: string; oneRepMax: number | null; weight: number | null } | null = null;
-  for (const candidate of candidates) {
-    const oneRepMax = candidate.oneRepMaxRecord ? candidate.oneRepMax : null;
-    const weight = candidate.weightRecord ? candidate.weight : null;
-    if (oneRepMax === null && weight === null) continue;
-    const takesOver =
-      best === null ||
-      (oneRepMax !== null
-        ? best.oneRepMax === null || oneRepMax > best.oneRepMax
-        : best.oneRepMax === null && weight !== null && (best.weight === null || weight > best.weight));
-    if (takesOver) best = { id: candidate.id, oneRepMax, weight };
-  }
-  return best?.id ?? null;
+export const sessionRecordBlocks = (
+  block: { id: string; exerciseDefinitionId: string },
+  sessionBlocks: readonly { id: string; exerciseDefinitionId: string; sets: readonly ExercisePageSet[] }[],
+): SetRowSession => ({
+  blockId: block.id,
+  blocks: sessionBlocks.some((candidate) => candidate.id === block.id)
+    ? sessionBlocks.filter((candidate) =>
+      candidate.id === block.id || candidate.exerciseDefinitionId === block.exerciseDefinitionId)
+    : [{ id: block.id, sets: [] }],
+});
+
+const recordCandidate = (set: ExercisePageSet, context: LoadContext): RecordSetCandidate | null => {
+  if (!isWorkingSet({
+    weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
+  })) return null;
+  const metrics = metricsOf(set.weightValue, set.repsValue, context);
+  return { id: set.id, oneRepMax: metrics.oneRepMax, weight: metrics.weight, reps: metrics.reps };
 };
 
 /**
  * Builds the rows. Every figure takes its row's colour and weight; the one
- * highlight is a performed working set's weight or 1RM that beats the lifter's
- * all-time best before today, shown as a `record` — and only on the session's
- * single best such set (`bestRecordSetId`), never on every qualifying row. A
- * warm-up keeps its own figures but is never a record. Volume is never one here:
- * its record is a whole session's, so no single set can beat it.
+ * highlight is the session's record set (`pickSessionRecordSet`): a performed
+ * working set whose 1RM, else Weight, beats the lifter's records before this
+ * session, across every block of the exercise in the session. A warm-up keeps
+ * its own figures but is never a record. Volume is never one here: its record
+ * is a whole session's, so no single set can beat it.
  */
 export const buildSetRows = (
   sets: ExercisePageSet[],
   baseline: ExerciseRecordBaseline | null = null,
-  context: LoadContext
+  context: LoadContext,
+  session: SetRowSession | null = null,
 ): SetRowView[] => {
   const cursorIndex = findCursorIndex(sets);
-  const evaluated = sets.map((set, index): SetRowView => {
+  const sessionSets = session
+    ? session.blocks.flatMap((block) => (block.id === session.blockId ? sets : block.sets))
+    : sets;
+  const winner = pickSessionRecordSet(
+    sessionSets.flatMap((set) => recordCandidate(set, context) ?? []),
+    baseline,
+  );
+  return sets.map((set, index): SetRowView => {
     const values = displayedValues(set);
     const metrics = metricsOf(values.weightValue, values.repsValue, context);
-    const performed = isPerformed(set);
-    const working = isWorkingSet({
-      weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
-    });
+    const isWinner = winner !== null && winner.id === set.id;
     return {
       id: set.id,
       number: index + 1,
-      kind: performed ? 'performed' : 'pending',
+      kind: isPerformed(set) ? 'performed' : 'pending',
       isCursor: index === cursorIndex,
       setType: values.setType,
       ...metrics,
-      // Top weight is always raw entered kg, independent of calculation policy.
-      weightRecord: working && beats(enteredWeightKg(values), baseline?.weight ?? null),
-      oneRepMaxRecord: working && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
+      weightRecord: isWinner && winner.weight,
+      oneRepMaxRecord: isWinner && winner.oneRepMax,
     };
   });
-  const winnerId = bestRecordSetId(evaluated);
-  return evaluated.map((row) => ({
-    ...row,
-    weightRecord: winnerId !== null && row.id === winnerId && row.weightRecord,
-    oneRepMaxRecord: winnerId !== null && row.id === winnerId && row.oneRepMaxRecord,
-  }));
 };
 
 export type SetListRecordBand = {
@@ -197,9 +195,9 @@ export type SetListRecordBand = {
 };
 
 /**
- * The record band for the set list, from the built rows: the session's best
- * record set announced with the same words as the session view's card band.
- * `null` when no performed set beats the baseline.
+ * The record band for the set list, from the built rows: the session's record
+ * set announced with the same words as the session view's card band. `null`
+ * when no performed set beats the baseline.
  */
 export const recordBandFor = (rows: SetRowView[]): SetListRecordBand | null => {
   const winner = rows.find((row) => row.oneRepMaxRecord || row.weightRecord);

@@ -37,7 +37,7 @@ When disabled, it hides the field and preserves its value. The in-place logger
 keeps one kg `Weight` field, reps, effort and confirmation; bodyweight arithmetic
 stays internal. Rows and analytics say `Weight`, `Top weight`, `1RM` and
 `Volume`; missing personal context never makes them unavailable. Valid zero
-renders as `0` and earns no record state.
+renders as `0` and earns no record state (`tech/training-metrics-contract.md` §3).
 
 Groups own an independent admin toggle and conditional group contribution.
 Strict group calculation may omit a dependent score, but group surfaces use
@@ -110,9 +110,8 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      elapsed day, today included, times the month's days. The summary line
      sets the projection against the previous month's total, and sessions and
      PRs so far against the previous month's to the same day.
-   - A PR is a working set whose estimated 1RM beats every earlier completed
-     session's working sets on that exercise, at most one per exercise per
-     session (the completed session's PR rule, §5.11).
+   - A PR is a 1RM record (`tech/training-metrics-contract.md` §3), at most
+     one per exercise per session.
    - The latest completed session is one row; full history is the Sessions
      list (`All sessions`). The row carries no group tags: which groups a
      session was shared to is decided on the server, and the device does not
@@ -799,20 +798,18 @@ unchanged. What differs is presentation:
    volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
    like any set. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests, matching the session view
-   (§14b.4; aligned 2026-09-23). The one highlight is a performed working set's
-   weight or 1RM beating the all-time best before today, shown in `record`
-   (brass) — and only on the session's best such set: the highest beating 1RM,
-   else the heaviest beating weight, a tie keeping the set that reached the
-   value first (2026-10-01, one superlative per exercise; `design-language.md` §5);
-   a warm-up is never one (§5.11), and volume is never one, since its record is
-   a whole session's. That best set earns the set list the `record` band, in the
+   (§14b.4; aligned 2026-09-23). The one highlight, in `record` (brass), is the
+   session's record set (`tech/training-metrics-contract.md` §3: the highest
+   1RM beating the record, else the heaviest Weight, across every block of the
+   exercise in the session; one superlative per exercise, `design-language.md`
+   §5). A warm-up is never one (§5.11), and volume is never one, since its
+   record is a whole session's. That best set earns the set list the `record` band, in the
    session view's card words: `New 1RM record · <1RM>`, or `New top weight · <weight>`
    when only the weight beat the baseline. The records panel counts working
    sets only (§5.11): records, their baseline and the `Last` summary read working
    sets, `Last` is the newest session with a working set, and its set list still
    shows that session's warm-up lines. Records and `Last` read the exercise
-   session facts (spec 05): a record tied across sessions belongs to the
-   earliest session, and an equal top weight goes to more reps. The current-gym
+   session facts (spec 05) under the record rules (contract §3). The current-gym
    filter scopes both. A completed session being edited (§14b.7) counts only
    the sessions before it, the session view's live record rule (spec 05, "Live
    record markers"), so `Last` is the session before it. `Records` | `Last` chooses what the
@@ -859,8 +856,9 @@ unchanged. What differs is presentation:
    (values `inkFaint`, legends `inkGhost`), a planned row showing its
    prescription. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests (tried on device 2026-09-23:
-   too noisy). The one highlight is a done set whose 1RM beats the exercise's
-   completed sessions before this one (all of them while it is active): that
+   too noisy). The one highlight is a done set holding a 1RM record
+   (`tech/training-metrics-contract.md` §3) against the completed sessions
+   before this one (all of them while it is active): that
    1RM is shown in `record` and earns the card a `record` band
    (`New 1RM record · <1RM>`), from the same derivation
    (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
@@ -898,7 +896,7 @@ Personal figures use the same `Top weight`, `1RM` and `Volume` labels for every
 exercise. Set rows show only entered kg Weight/reps/effort; records never expose
 the contribution, reading or calculated-load breakdown. Missing personal
 reading uses the zero fallback and is not an unavailable/incomplete state.
-Valid zero is displayed numerically and excluded from records/rankings.
+Valid zero is displayed numerically and is never a record or rank (`tech/training-metrics-contract.md` §3).
 
 Reading, preference, contribution and session-time changes refresh History,
 Stats, heatmaps, records, completion and share projections. Raw logged rows and

@@ -293,9 +293,9 @@ other figure takes its row's colour and
 weight — **no screen bolds the best value in the current context.** Decided on
 device 2026-09-23: per-column bold "best today" figures read as noise, first on
 the session view, then aligned on the exercise page; `Stat` no longer offers a
-`best` emphasis (`ux-rules.md` §14a.4, §14b.4). Only the session's best such
-set is highlighted on the exercise page — the highest beating 1RM, else the
-heaviest beating weight — never every qualifying row (2026-10-01).
+`best` emphasis (`ux-rules.md` §14a.4, §14b.4). Only the session's record set
+is highlighted, never every qualifying row (2026-10-01); which set that is, and
+what beats a record, is `tech/training-metrics-contract.md` §3.
 
 **State is carried by a control glyph**, not by a word: a filled check means
 done, an `accent` ring means current, a dashed ring means planned. Planned items

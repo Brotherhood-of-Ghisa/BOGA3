@@ -3,8 +3,9 @@
 // flags with it, and the session view and completed-session detail pick
 // their PR set on an in-memory session with it. Only working sets compete.
 
-import { calculateAnalyticsSetMetrics } from './analytics.ts';
-import type { LoadContext, SetMetrics } from './load-metrics.ts';
+import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg } from './analytics.ts';
+import { summarizeVolume, type LoadContext, type SetMetrics } from './load-metrics.ts';
+import { compareWeightRecord } from './records.ts';
 import { isWorkingSet, type SessionSetPerformanceStatus } from './set-semantics.ts';
 
 type Ordered = { orderIndex: number; id: string };
@@ -69,4 +70,53 @@ export const pickBestEstimatedOneRepMaxSet = <B, S>(
     best = { ...eligible, estimatedOneRepMaxKg: value, enteredWeightKg: load.enteredWeightKg };
   }
   return best;
+};
+
+export type TopWeightSet<B, S> = EligibleSessionSet<B, S> & { weight: number; reps: number };
+
+/**
+ * The set with the top Weight among sets in session order: the highest raw
+ * entered kg, then more reps (`compareWeightRecord`); the first set keeps a
+ * full tie.
+ */
+export const pickTopWeightSet = <B, S extends { weightValue: string; repsValue: string }>(
+  setsInSessionOrder: readonly EligibleSessionSet<B, S>[],
+): TopWeightSet<B, S> | null => {
+  let best: TopWeightSet<B, S> | null = null;
+  for (const eligible of setsInSessionOrder) {
+    const weight = enteredWeightKg(eligible.set);
+    if (weight === null) continue;
+    const value = { weight, reps: eligible.metric.reps };
+    if (best !== null && compareWeightRecord(value, best) <= 0) continue;
+    best = { ...eligible, ...value };
+  }
+  return best;
+};
+
+/**
+ * One session's bests for one exercise, from its blocks' working sets
+ * (`eligibleSetsByBlockInSessionOrder`): the inputs of every record
+ * (`records.ts`). Null when the session has no working set of it.
+ */
+export const summarizeSessionBests = <S extends BestSetSetInput, B extends BestSetBlockInput<S>>(
+  blocks: readonly B[],
+) => {
+  const byBlock = eligibleSetsByBlockInSessionOrder<S, B>(blocks).filter((sets) => sets.length > 0);
+  if (byBlock.length === 0) return null;
+  const sets = byBlock.flat();
+  let knownVolume: number | null = 0;
+  let totalVolume: number | null = 0;
+  // Each block sums alone, as the completed-session volume comparison does.
+  for (const blockSets of byBlock) {
+    const coverage = summarizeVolume(blockSets.map(({ metric }) => metric));
+    knownVolume = addFiniteVolume(knownVolume, coverage.knownVolumeKgReps);
+    totalVolume = addFiniteVolume(totalVolume, coverage.totalVolumeKgReps);
+  }
+  return {
+    oneRepMax: pickBestEstimatedOneRepMaxSet(sets),
+    topWeight: pickTopWeightSet(sets),
+    volumeKg: totalVolume ?? knownVolume,
+    volumeComplete: totalVolume !== null,
+    workingSets: sets.length,
+  };
 };
