@@ -6,8 +6,8 @@ import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import type { Session } from '@/components/session-recorder/types';
 import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
 import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
+import { loadEarlierBestE1rmByDefinition } from '@/src/data/exercise-session-facts';
 
-import { loadHistoricalBestsExcluding } from './historical-bests';
 import { mapDraftSnapshotToSession } from './session-model';
 
 export type SessionViewData = ResolvedSessionWeight & {
@@ -23,8 +23,9 @@ export type SessionViewData = ResolvedSessionWeight & {
   comparisonAt: Date;
   insightHistory: PersonalRecordSessionInput[];
   insightHistoryState: 'loading' | 'ready' | 'error';
-  // Keyed by exercise definition; filled once each history read settles.
-  historicalBestByDefinitionId: ReadonlyMap<string, number | null>;
+  // Each exercise definition's best 1RM in the sessions before this one;
+  // a definition without an earlier 1RM is absent. Filled once the read settles.
+  historicalBestByDefinitionId: ReadonlyMap<string, number>;
 };
 
 export type SessionViewState =
@@ -53,8 +54,8 @@ const loadViewedSession = async (sessionId: string | null) => {
  * Loads the session for the session view on every focus, as the recorder
  * does, so edits made on the exercise page (or in the recorder) show on return.
  * History for records is optional enrichment: while it loads, or if it fails,
- * cards show no record rather than blocking the view. A completed session is
- * measured against the rest of history, not against itself.
+ * cards show no record rather than blocking the view. Records compare against
+ * the sessions before this one (before now while it is active), never itself.
  */
 export function useSessionView(sessionId: string | null) {
   const [state, setState] = useState<SessionViewState>({ status: 'loading' });
@@ -105,15 +106,15 @@ export function useSessionView(sessionId: string | null) {
       // Independent optional enrichments: a failed comparison read must not
       // block logging or hide a record, and a blurred generation cannot land.
       await Promise.all([
-        loadHistoricalBestsExcluding(
-          snapshot.sessionId,
+        loadEarlierBestE1rmByDefinition(
+          { sessionId: snapshot.sessionId, completedAt: base.comparisonAt },
           session.exercises.map((exercise) => exercise.exerciseDefinitionId)
         ).then((historicalBestByDefinitionId) => {
           if (!isCurrent()) return;
           setState((current) => current.status === 'ready'
             ? { status: 'ready', data: { ...current.data, historicalBestByDefinitionId } }
             : current);
-        }),
+        }).catch(() => undefined),
         loadSessionInsightHistory({
           targetSessionId: snapshot.sessionId,
           completedAt: base.comparisonAt,

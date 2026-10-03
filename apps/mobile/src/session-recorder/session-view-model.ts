@@ -1,7 +1,6 @@
 import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
 import type { Session, SessionSet } from '@/components/session-recorder/types';
-import type { ExerciseBlockHistoryBlock } from '@/src/data';
 import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord } from '@/src/session-insights';
@@ -139,19 +138,12 @@ const toRowFigures = (set: SessionSet, context: LoadContext): RowFigures => {
   };
 };
 
-/** The historical best 1RM the recorder compares against, from completed history. */
-export const historicalBestOneRepMax = (blocks: ExerciseBlockHistoryBlock[]): number | null => {
-  const values = blocks
-    .map((block) => block.estimatedOneRepMax)
-    .filter((value): value is number => value !== null && Number.isFinite(value));
-  return values.length > 0 ? Math.max(...values) : null;
-};
-
 export const buildSessionViewModel = (
   session: Session,
-  // Keyed by exercise definition; absent while history loads or when it failed,
+  // The best 1RM of each exercise definition in the sessions before this one;
+  // absent without an earlier 1RM, while history loads or when it failed,
   // which shows no record rather than a wrong one.
-  historicalBestByDefinitionId: ReadonlyMap<string, number | null>
+  historicalBestByDefinitionId: ReadonlyMap<string, number>
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
   let performedSetCount = 0;

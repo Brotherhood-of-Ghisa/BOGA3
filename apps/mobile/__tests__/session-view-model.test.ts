@@ -8,7 +8,6 @@ import {
 import {
   buildSessionViewModel,
   formatElapsed,
-  historicalBestOneRepMax,
 } from '@/src/session-recorder/session-view-model';
 
 const doneSet = (id: string, weight: string, reps: string, setType: SessionSet['setType']): SessionSet => ({
@@ -93,8 +92,8 @@ describe('session view model', () => {
     const notBeaten = buildSessionViewModel(session([bench]), new Map([['def_bench', 210]])).cards[0];
     expect(notBeaten.recordOneRepMax).toBeNull();
 
-    // No history for the exercise (first time, or not loaded yet): no record.
-    const firstTime = buildSessionViewModel(session([bench]), new Map([['def_bench', null]])).cards[0];
+    // No earlier 1RM for the exercise (first time, or not loaded yet): no record.
+    const firstTime = buildSessionViewModel(session([bench]), new Map([['def_other', 100]])).cards[0];
     expect(firstTime.recordOneRepMax).toBeNull();
   });
 
@@ -126,21 +125,6 @@ describe('session view model', () => {
     ).cards;
     expect(card.rows[0]).toMatchObject({ typeLabel: '—', weightReps: '— × —', oneRepMax: '—', volume: '—', done: false });
     expect(card.doneCount).toBe(0);
-  });
-
-  it('reads the best historical 1RM from completed blocks', () => {
-    const block = (estimatedOneRepMax: number | null) => ({
-      sessionId: 's',
-      completedAt: new Date(0),
-      daysAgo: 1,
-      sessionExerciseIds: [],
-      estimatedOneRepMax,
-      totalVolume: 0,
-      highestWeight: null,
-      workingSetCount: 0,
-    });
-    expect(historicalBestOneRepMax([block(180), block(null), block(197.9)])).toBe(197.9);
-    expect(historicalBestOneRepMax([block(null)])).toBeNull();
   });
 
   it('formats elapsed time as m:ss, then h:mm:ss', () => {

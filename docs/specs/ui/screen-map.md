@@ -211,7 +211,7 @@ Brief entrypoint map of the current mobile screens.
     once it is left; while either is invalid, autosave pauses and the card says
     `Autosave paused until Start/End times are valid.` Gym, `+ Add exercise` and
     the cards work as for an active session, written back to the completed
-    session; records compare against the rest of history, not the session itself
+    session; records compare against the completed sessions before it, never the session itself or later ones
   - shared live exercise/muscle comparisons after the exercise cards, using
     confirmed sets and earlier completed history (loading/error is nonblocking)
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /

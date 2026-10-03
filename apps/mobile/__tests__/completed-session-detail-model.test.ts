@@ -58,7 +58,7 @@ describe('buildCompletedSessionDetailModel', () => {
     expect(model.volume).toBe('0');
   });
 
-  it('marks the best set when it beats every other session, and nothing otherwise', () => {
+  it('marks the best set when it beats every earlier session, and nothing otherwise', () => {
     const beaten = buildCompletedSessionDetailModel([bench], new Map([['bench-def', 80]])).cards[0];
     expect(beaten.recordOneRepMax).toMatch(/^\d+\.\d$/);
     expect(beaten.rows.find((row) => row.oneRepMaxRecord)?.id).toBe('b2');
@@ -83,8 +83,6 @@ describe('buildCompletedSessionDetailModel', () => {
 
   it('shows no record without history, or for an exercise without a definition', () => {
     expect(buildCompletedSessionDetailModel([bench], new Map()).cards[0].recordOneRepMax).toBeNull();
-    // A null historical best (no other session) is not a record either.
-    expect(buildCompletedSessionDetailModel([bench], new Map([['bench-def', null]])).cards[0].recordOneRepMax).toBeNull();
     expect(buildCompletedSessionDetailModel([legacy], new Map()).cards[0].recordOneRepMax).toBeNull();
   });
 });

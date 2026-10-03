@@ -14,7 +14,7 @@ import { canonicalizeWeightForReps, isConfirmedPerformedSet, type SessionSetPerf
  * View Session's presentation model: what a finished session did, set by set.
  * Only confirmed sets with valid values are shown, and an exercise with none is
  * left out. A record is the session view's (`session-view-model.ts`): a set
- * whose 1RM beats every other completed session of that exercise. Pure — the
+ * whose 1RM beats every completed session of that exercise before this one. Pure — the
  * route loads the session and the history and renders what this returns.
  */
 
@@ -78,9 +78,10 @@ const toInsightExercises = (exercises: CompletedSessionDetailExerciseInput[]): S
 
 export const buildCompletedSessionDetailModel = (
   exercises: CompletedSessionDetailExerciseInput[],
-  // Keyed by exercise definition; absent while history loads or when it failed,
+  // The best 1RM of each exercise definition in the sessions before this one;
+  // absent without an earlier 1RM, while history loads or when it failed,
   // which shows no record rather than a wrong one.
-  historicalBestByDefinitionId: ReadonlyMap<string, number | null>
+  historicalBestByDefinitionId: ReadonlyMap<string, number>
 ): CompletedSessionDetailModel => {
   const insightExercises = toInsightExercises(exercises);
   let performedSetCount = 0;
