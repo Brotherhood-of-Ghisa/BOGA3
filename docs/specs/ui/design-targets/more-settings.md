@@ -25,6 +25,11 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
   Offline is the `offline` (wifi-off) glyph plus "Offline" in `ink`, never a
   warning hue (G3); an unknown network (before NetInfo reports) is "Checking…"
   with no glyph; a cycle error is `danger`. `Refresh` is an outline.
+- Preference-storage failures share Data & Sync's existing Error row with sync
+  errors (operator decision, 2026-10-03). Retain both when they coexist; the
+  existing Refresh retries preferences and refreshes sync when signed in.
+  Signed-out/local-only failures use that same row and Refresh inside the
+  existing guidance card. Preference controls add no error boxes or Retry buttons.
 - Neither screen has an `accent` button.
 - Developer tools (dev builds only) is one `Card` headed by the `warning` glyph
   and a micro-label. Its buttons are outlines, `Wipe remote` an outline in
@@ -44,6 +49,7 @@ Device: iPhone simulator at 390pt width, light.
 | `06-settings-sections-top` (`ios-auth-profile`) | Settings, signed in: Account and AI coaching |
 | `07-settings-about-metadata` (ad hoc) | Settings: About |
 | `settings-preferences` (ad hoc) | Settings: the date format |
+| `settings-centralized-preference-save-error` (ad hoc) | Preference failure in Data & Sync, followed by Refresh recovery |
 | `18-first-run-roundtrip-reading-synced` (`ios-sync-e2e`) | the sync-status panel after a sync |
 | `02-dev-wipe-local-settings`, `03-dev-wipe-local-feedback` (ad hoc) | Developer tools, and a success `Notice` (information only) |
 | `dev-logs` (ad hoc) | Logs (information only) |

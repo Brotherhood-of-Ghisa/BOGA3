@@ -49,6 +49,102 @@ const renderPanel = (overrides: Partial<SyncStatusSnapshot> = {}, onRequestSync 
 };
 
 describe('Settings sync-status panel', () => {
+  it('keeps simultaneous sync and preference errors in one Error row and uses Refresh for both', async () => {
+    const readStatus = jest.fn().mockResolvedValue({ ...baseStatus, errorMessage: 'server unreachable' });
+    const onRequestSync = jest.fn();
+    const onRefreshPreferences = jest.fn().mockResolvedValue(undefined);
+    const preferenceError = 'Preferences could not be saved. Try again.';
+    const { rerender } = render(<SyncStatusPanel readStatus={readStatus} onRequestSync={onRequestSync}
+      onRefreshPreferences={onRefreshPreferences} preferenceError={preferenceError} />);
+    await waitFor(() => expect(screen.getByTestId('settings-sync-status-error'))
+      .toHaveTextContent(/server unreachable[\s\S]*Preferences could not be saved\. Try again\./));
+    expect(screen.getAllByTestId('settings-sync-status-error-row')).toHaveLength(1);
+    expect(screen.queryByText('Retry')).toBeNull();
+    const readsBefore = readStatus.mock.calls.length;
+    await act(async () => { fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button')); });
+    expect(onRefreshPreferences).toHaveBeenCalledTimes(1);
+    expect(onRequestSync).toHaveBeenCalledTimes(1);
+    expect(readStatus.mock.calls.length).toBeGreaterThan(readsBefore);
+    rerender(<SyncStatusPanel readStatus={readStatus} onRequestSync={onRequestSync}
+      onRefreshPreferences={onRefreshPreferences} preferenceError={null} />);
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('server unreachable');
+    expect(screen.getByTestId('settings-sync-status-error')).not.toHaveTextContent(preferenceError);
+  });
+
+  it('uses the existing signed-out card for preference failures and Refresh retries without starting sync', async () => {
+    const readStatus = jest.fn();
+    const onRequestSync = jest.fn();
+    const onRefreshPreferences = jest.fn().mockResolvedValue(undefined);
+    const preferenceError = 'Preferences could not be loaded. Try again.';
+    const { rerender } = render(<SyncStatusPanel isSignedIn={false} readStatus={readStatus}
+      onRequestSync={onRequestSync} onRefreshPreferences={onRefreshPreferences} preferenceError={preferenceError} />);
+    expect(screen.getByTestId('settings-sync-signed-out-card')).toBeTruthy();
+    expect(screen.queryByTestId('settings-sync-status-card')).toBeNull();
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(preferenceError);
+    expect(screen.queryByTestId('settings-sync-status-network')).toBeNull();
+    await act(async () => { fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button')); });
+    expect(onRefreshPreferences).toHaveBeenCalledTimes(1);
+    expect(readStatus).not.toHaveBeenCalled();
+    expect(onRequestSync).not.toHaveBeenCalled();
+    rerender(<SyncStatusPanel isSignedIn={false} readStatus={readStatus} onRequestSync={onRequestSync} />);
+    expect(screen.getByText('Sign in through Account to sync your training data.')).toBeTruthy();
+    expect(screen.queryByTestId('settings-sync-status-error')).toBeNull();
+    expect(screen.queryByTestId('settings-sync-status-refresh-button')).toBeNull();
+  });
+
+  it('hides a previous account’s sync error when signed out while keeping current preference feedback', async () => {
+    const readStatus = jest.fn().mockResolvedValue({ ...baseStatus, errorMessage: 'previous sync failed' });
+    const { rerender } = render(<SyncStatusPanel readStatus={readStatus} />);
+    await waitFor(() => expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('previous sync failed'));
+    rerender(<SyncStatusPanel isSignedIn={false} readStatus={readStatus}
+      preferenceError="Preferences could not be saved. Try again." />);
+    expect(screen.getByTestId('settings-sync-status-error')).not.toHaveTextContent('previous sync failed');
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Preferences could not be saved. Try again.');
+  });
+
+  it.each(['sign-out', 'unmount'])('cancels deferred Refresh after %s without starting sync or leaving a timer', async transition => {
+    jest.useFakeTimers();
+    const scheduleTimeout = jest.spyOn(global, 'setTimeout');
+    try {
+      let finishRecovery!: () => void;
+      const recovery = new Promise<void>(resolve => { finishRecovery = resolve; });
+      const readStatus = jest.fn().mockResolvedValue(baseStatus);
+      const onRequestSync = jest.fn();
+      const props = { readStatus, onRequestSync, onRefreshPreferences: () => recovery,
+        preferenceError: 'Preferences could not be saved. Try again.' };
+      const { rerender, unmount } = render(<SyncStatusPanel {...props} />);
+      await act(async () => { fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button')); });
+      if (transition === 'sign-out') rerender(<SyncStatusPanel {...props} isSignedIn={false} />);
+      else unmount();
+      scheduleTimeout.mockClear();
+      await act(async () => { finishRecovery(); });
+      expect(onRequestSync).not.toHaveBeenCalled();
+      expect(readStatus).toHaveBeenCalledTimes(1);
+      expect(scheduleTimeout).not.toHaveBeenCalledWith(expect.any(Function), 1500);
+      if (transition === 'sign-out') {
+        expect(screen.getByTestId('settings-sync-status-refresh-button')).toHaveTextContent('Refresh');
+        unmount();
+      }
+    } finally {
+      scheduleTimeout.mockRestore();
+      jest.useRealTimers();
+    }
+  });
+
+  it('discards a delayed status read across sign-out and sign-in', async () => {
+    let finishOldRead!: (status: SyncStatusSnapshot) => void;
+    const oldRead = new Promise<SyncStatusSnapshot>(resolve => { finishOldRead = resolve; });
+    const readStatus = jest.fn().mockReturnValueOnce(oldRead)
+      .mockResolvedValue({ ...baseStatus, dirtyCount: 2, errorMessage: 'current error' });
+    const { rerender } = render(<SyncStatusPanel readStatus={readStatus} />);
+    rerender(<SyncStatusPanel isSignedIn={false} readStatus={readStatus} />);
+    rerender(<SyncStatusPanel readStatus={readStatus} />);
+    await waitFor(() => expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('current error'));
+    await act(async () => { finishOldRead({ ...baseStatus, dirtyCount: 9, errorMessage: 'previous error' }); });
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('current error');
+    expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('2');
+  });
+
   it('renders the card and every field testID', async () => {
     renderPanel();
     await waitFor(() => {

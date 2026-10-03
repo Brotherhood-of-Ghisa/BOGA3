@@ -682,6 +682,17 @@ label says Weight in kilograms. The figure and label remain legible at 375pt.
   summaries. Wire guards will fail closed if a group payload contains a private
   reading value/date/id or dependency digest.
 
+### Data and sync status
+
+- `SyncStatusPanel` (`components/sync-status/sync-status-panel.tsx`) reuses one
+  Settings Data & Sync card. Signed-in fields show sync time, pending changes
+  and network; the Error row combines sync and preference-storage failures.
+  `isSignedIn`, `preferenceError` and `onRefreshPreferences` let Settings keep
+  local-only failures in the existing signed-out card. Refresh retries
+  preferences and nudges/reads sync only when signed in; it is the only action.
+  Error feedback uses `settings-sync-status-error`; the existing Refresh keeps
+  `settings-sync-status-refresh-button`.
+
 ## Maintenance rule
 
 If a task adds/removes/renames reusable UI components or changes their role,
