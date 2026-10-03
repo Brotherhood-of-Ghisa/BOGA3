@@ -2,16 +2,32 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
+import { loadExerciseSessionEntries } from '@/src/data/exercise-history';
+import { loadExerciseBests, type ExerciseBestsScope } from '@/src/data/exercise-session-facts';
 
 import type { PastRecordsGymScope } from '@/src/exercise-catalog/list-model';
 
-import { deriveExerciseRecords, type ExerciseRecordsSummary } from './exercise-records';
+import { deriveLastSession, exerciseRecordsFrom, type ExerciseRecordsSummary } from './exercise-records';
 
 export type ExerciseRecordsState =
   { status: 'loading' } | { status: 'error' } | { status: 'ready'; summary: ExerciseRecordsSummary };
 
-export type LoadExerciseHistory = typeof loadExercisePerformanceHistory;
+/**
+ * Records from the exercise session facts; `Last` is the newest fact row in
+ * scope, and only that session's sets are loaded.
+ */
+export const loadExerciseRecords = async (scope: ExerciseBestsScope): Promise<ExerciseRecordsSummary> => {
+  const bests = await loadExerciseBests(scope);
+  const entries = bests.latest
+    ? await loadExerciseSessionEntries({
+        exerciseDefinitionId: scope.exerciseDefinitionId,
+        sessionId: bests.latest.sessionId,
+      })
+    : [];
+  return { records: exerciseRecordsFrom(bests), last: deriveLastSession(entries) };
+};
+
+export type LoadExerciseRecords = typeof loadExerciseRecords;
 
 export type ExerciseRecordsGymFilter = {
   scope: PastRecordsGymScope;
@@ -20,13 +36,13 @@ export type ExerciseRecordsGymFilter = {
 
 /**
  * All-time records and the previous session for one exercise definition.
- * `excludeSessionId` leaves out a completed session being edited, so it is
- * measured against the rest of history rather than against itself.
+ * `beforeSessionId` names a completed session being edited: only the sessions
+ * before it count, the session view's live record rule.
  */
 export const useExerciseRecords = (
   exerciseDefinitionId: string | null,
-  load: LoadExerciseHistory = loadExercisePerformanceHistory,
-  excludeSessionId: string | null = null,
+  load: LoadExerciseRecords = loadExerciseRecords,
+  beforeSessionId: string | null = null,
   gymFilter?: ExerciseRecordsGymFilter,
   refreshKey: string | number = 0
 ): ExerciseRecordsState => {
@@ -42,17 +58,13 @@ export const useExerciseRecords = (
     if (!exerciseDefinitionId) return;
     let cancelled = false;
     setState({ status: 'loading' });
-    void load({ exerciseDefinitionId, period: 'all' })
-      .then((history) => {
-        if (cancelled) return;
-        let sessions = (history?.sessions ?? []).filter((entry) => entry.sessionId !== excludeSessionId);
-        if (filterScope === 'current-gym' && filterGymId) {
-          sessions = sessions.filter((entry) => entry.gymId === filterGymId);
-        }
-        setState({
-          status: 'ready',
-          summary: deriveExerciseRecords(sessions),
-        });
+    void load({
+      exerciseDefinitionId,
+      beforeSessionId,
+      ...(filterScope === 'current-gym' && filterGymId ? { gymId: filterGymId } : {}),
+    })
+      .then((summary) => {
+        if (!cancelled) setState({ status: 'ready', summary });
       })
       .catch(() => {
         if (!cancelled) setState({ status: 'error' });
@@ -62,7 +74,7 @@ export const useExerciseRecords = (
     };
   // The explicit revision invalidates history after a saved-weight or load review.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [excludeSessionId, exerciseDefinitionId, filterGymId, filterScope, load, refreshKey, datedWeightRevision]));
+  }, [beforeSessionId, exerciseDefinitionId, filterGymId, filterScope, load, refreshKey, datedWeightRevision]));
 
   return state;
 };

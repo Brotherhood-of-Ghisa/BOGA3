@@ -10,7 +10,8 @@ import { aggregateExerciseCatalogStats } from '@/src/data/exercise-catalog-stats
 import { buildSessionViewModel } from '@/src/session-recorder/session-view-model';
 import { buildSetRows, previewMetrics } from '@/src/session-recorder/exercise-page-model';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
-import { deriveExerciseRecords } from '@/src/session-recorder/exercise-records';
+import { deriveLastSession } from '@/src/session-recorder/exercise-records';
+import { summarizeFactSession } from '@/src/data/exercise-session-facts-derive';
 import { deriveSessionExerciseVolumeComparisons, deriveSessionPersonalRecords, type PersonalRecordSessionInput } from '@/src/session-insights';
 
 const day = new Date('2026-09-20T12:00:00Z');
@@ -27,7 +28,7 @@ function fixture(B: number | null, c: number, amount: string,
   const sessionRow = { sessionId: 'session', sessionExerciseId: 'exercise', completedAt: day, gymName: null,
     bodyWeightKg: B, bodyWeightSource: B === null ? null : 'reading' as const, bodyWeightMeasurementId: B === null ? null : 'reading', bodyWeightMeasuredAt: B === null ? null : day };
   const history = aggregateExerciseHistory({ exerciseDefinition: definition, period: 'all', appliedTagDefinitionId: null,
-    sessionsInPeriod: [sessionRow], sessionsAllTime: [sessionRow], setsBySessionExerciseId: { exercise: [set] }, tagsBySessionExerciseId: {} });
+    sessionsInPeriod: [sessionRow], allTimeBest: { estimatedOneRepMax: null, topWeight: null }, setsBySessionExerciseId: { exercise: [set] }, tagsBySessionExerciseId: {} });
   const exercise = { id: 'exercise', exerciseDefinitionId: 'pull', exerciseName: 'Pull-up', orderIndex: 0,
     loadContext: context, sets: [set] };
   const performance: PersonalRecordSessionInput = { sessionId: 'session', status: 'completed', completedAt: day, bodyWeightKg: B, exercises: [exercise] };
@@ -73,9 +74,11 @@ it.each([
   equalMetric(previewMetrics(amount, '8', f.context).volume, volume);
   equalMetric(blocks.blocks[0].totalVolume, volume); equalMetric(catalog.totalVolume, volume);
   equalMetric(collectMuscleSetContributions(f.muscle)[0].weightedVolume, muscleVolume);
-  const records = deriveExerciseRecords(f.history.sessions);
-  equalMetric(records.last?.volume, volume);
-  equalMetric(records.records.volume?.value ?? null, volume);
+  equalMetric(deriveLastSession(f.history.sessions)?.volume, volume);
+  // The records panel's volume record reads the facts' session volume.
+  const fact = summarizeFactSession('pull', { sessionId: 'session', completedAt: day,
+    blocks: [{ id: 'exercise', orderIndex: 0, loadContext: f.context, sets: [f.set] }] });
+  equalMetric(fact?.volumeComplete ? fact.volumeKg : null, volume);
   expect(daily.estimatedRM1).toBe(entry.estimatedOneRepMax);
   expect(blocks.blocks[0].estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
   expect(catalog.estimatedOneRepMax).toBe(entry.estimatedOneRepMax);

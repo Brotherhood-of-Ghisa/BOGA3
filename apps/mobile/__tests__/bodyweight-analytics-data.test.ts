@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
-import { useExerciseRecords } from '@/src/session-recorder/use-exercise-records';
+import { loadExerciseRecords, useExerciseRecords } from '@/src/session-recorder/use-exercise-records';
 import { eq } from 'drizzle-orm';
 import { exerciseDefinitions, exerciseMuscleMappings, exerciseSets, muscleGroups, sessionExercises, sessions, gyms, bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import { loadExercisePerformanceHistory } from '@/src/data/exercise-history';
@@ -115,7 +115,7 @@ it('keeps gym-scoped history and records on the same dated bodyweight context af
   expect(initial?.allTimeBest.estimatedOneRepMax?.sessionId).toBe('old');
 
   const hook = renderHook(({ scope, revision }: { scope: 'all' | 'current-gym'; revision: number }) =>
-    useExerciseRecords('pull', loadExercisePerformanceHistory, null, { scope, currentGymId: 'home' }, revision),
+    useExerciseRecords('pull', loadExerciseRecords, null, { scope, currentGymId: 'home' }, revision),
   { initialProps: { scope: 'current-gym', revision: 0 } });
   await waitFor(() => expect(hook.result.current).toMatchObject({ status: 'ready', summary: {
     records: { oneRepMax: { gymName: 'Home' }, volume: { value: 640 } },

@@ -42,7 +42,7 @@ import {
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
-import { useExerciseRecords, type LoadExerciseHistory } from '@/src/session-recorder/use-exercise-records';
+import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
 import { useSessionExerciseDraft } from '@/src/session-recorder/use-session-exercise-draft';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
@@ -59,7 +59,7 @@ type ExercisePageScreenProps = {
   sessionExerciseId: string;
   // Injected by tests; production uses the session repositories.
   draftClient?: SessionExerciseDraftClient;
-  loadHistory?: LoadExerciseHistory;
+  loadRecords?: LoadExerciseRecords;
 };
 
 type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'edit';
@@ -86,7 +86,7 @@ export function ExercisePageScreen({
   sessionId,
   sessionExerciseId,
   draftClient,
-  loadHistory,
+  loadRecords,
 }: ExercisePageScreenProps) {
   const router = useRouter();
   const bodyweightCalculationsEnabled = useBodyweightCalculationsEnabled();
@@ -112,7 +112,7 @@ export function ExercisePageScreen({
   const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
-    loadHistory,
+    loadRecords,
     isCompletedSession ? sessionId : null,
     {
       scope: listPreferences.pastRecordsGymScope,

@@ -330,6 +330,19 @@ describe('ExercisePageScreen', () => {
     expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 7')).toBeTruthy();
   });
 
+  it('measures a completed session being edited against the sessions before it only', async () => {
+    await seedPage();
+    // The older history session is edited; the newer one came after it, so
+    // nothing counts yet, as on the session view's record band.
+    render(<ExercisePageScreen sessionExerciseId={`${OLDER_HISTORY}_bench`} sessionId={OLDER_HISTORY} />);
+    await screen.findByTestId('exercise-page');
+
+    fireEvent.press(screen.getByTestId('exercise-records-toggle'));
+    expect(await screen.findByTestId('exercise-records-empty')).toHaveTextContent(
+      'No completed sessions with this exercise yet.'
+    );
+  });
+
   it('edits an exercise of a completed session, writing it back as completed with its times', async () => {
     await seedPage();
     const before = await readSession(NEWER_HISTORY);
