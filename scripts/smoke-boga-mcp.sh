@@ -113,6 +113,8 @@ else
   run_psql "
     begin;
       set constraints all deferred;
+      -- The owner's identity lets a re-run update user A's existing settings row.
+      select set_config('request.jwt.claims', json_build_object('sub', '${USER_UUID}', 'role', 'authenticated')::text, true);
       insert into app_public.gyms
         (owner_user_id,id,name,created_at,updated_at,client_updated_at_ms)
       values
@@ -134,7 +136,9 @@ else
         $((NOW_MS - 900000)),${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.user_settings
         (owner_user_id,id,bodyweight_calculations_enabled,created_at,updated_at,client_updated_at_ms)
-      values ('${USER_UUID}'::uuid,'settings',true,${NOW_MS},${NOW_MS},${NOW_MS});
+      values ('${USER_UUID}'::uuid,'settings',true,${NOW_MS},${NOW_MS},${NOW_MS})
+      on conflict(owner_user_id,id) do update set bodyweight_calculations_enabled=true,
+        deleted_at=null,updated_at=excluded.updated_at,client_updated_at_ms=excluded.client_updated_at_ms;
       insert into app_public.session_exercises
         (owner_user_id,id,session_id,exercise_definition_id,order_index,name,
          created_at,updated_at,client_updated_at_ms)
@@ -142,10 +146,12 @@ else
         ('${USER_UUID}'::uuid,'${BLOCK_ID}','${SESSION_ID}','${EXERCISE_ID}',0,
          '${EXERCISE_QUERY}',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_sets
-        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,
+        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
          created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8',
+        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8',null,
+         ${NOW_MS},${NOW_MS},${NOW_MS}),
+        ('${USER_UUID}'::uuid,'${SET_ID}-warm-up','${BLOCK_ID}',1,'60','5','warm_up',
          ${NOW_MS},${NOW_MS},${NOW_MS});
     commit;
   " >/dev/null

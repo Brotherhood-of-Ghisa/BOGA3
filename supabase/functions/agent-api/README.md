@@ -129,26 +129,34 @@ by another user and a nonexistent exercise produce the same `404` envelope.
     "started_at": "2026-07-25T17:00:00.000Z",
     "completed_at": "2026-07-25T18:00:00.000Z",
     "duration_seconds": 3600,
-    "volume": { "value": 2500, "unit": "kg_reps" },
-    "estimated_one_rep_max": { "value": 100, "unit": "kg" },
+    "volume": { "value": 640, "unit": "kg_reps" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
     "sets": [{
       "id": "set-id",
       "order_index": 0,
       "load": { "value": 80, "unit": "kg" },
       "reps": 8,
-      "set_type": "working",
+      "set_type": "rir_2",
+      "performance_status": null,
+      "outcome": "completed"
+    }, {
+      "id": "warm-up-set-id",
+      "order_index": 1,
+      "load": { "value": 60, "unit": "kg" },
+      "reps": 5,
+      "set_type": "warm_up",
       "performance_status": null,
       "outcome": "completed"
     }]
   }],
   "personal_records": {
-    "estimated_one_rep_max": { "value": 100, "unit": "kg" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
     "top_weight": { "value": 80, "reps": 8, "unit": "kg" },
-    "max_session_volume": { "value": 2500, "unit": "kg_reps" }
+    "max_session_volume": { "value": 640, "unit": "kg_reps" }
   },
   "volume_series": [{
     "completed_at": "2026-07-25T18:00:00.000Z",
-    "value": 2500,
+    "value": 640,
     "unit": "kg_reps"
   }],
   "last_performed_at": "2026-07-25T18:00:00.000Z",
@@ -162,9 +170,10 @@ by another user and a nonexistent exercise produce the same `404` envelope.
 ```
 
 Personal-record and volume calculations import the canonical mobile domain
-calculation module. BoGa has no canonical user-authored note field or failed-set
-meaning, so this API reports those fields unavailable instead of inventing
-semantics.
+calculation module and read [working sets only](#working-sets-only): the
+warm-up above is listed but feeds no session or record figure. BoGa has no
+canonical user-authored note field or failed-set meaning, so this API reports
+those fields unavailable instead of inventing semantics.
 
 ## Recent workouts
 
@@ -197,14 +206,42 @@ semantics.
 ```
 
 At most 50 compact exercise blocks are embedded per workout; `truncated` makes
-any internal safety cap explicit.
+any internal safety cap explicit. `exercises` lists every block, while
+`exercise_count` counts only blocks with at least one working set, and
+`completed_set_count`, `set_count` and every volume count working sets
+([working sets only](#working-sets-only)).
+
+## Working sets only
+
+A **working set** is a confirmed performed set (valid reps and Weight, no
+`performance_status`) whose `set_type` is not `"warm_up"`. Untagged sets, every
+RIR and unrecognised stored values are working sets. The rule is the app's
+(`isWorkingSet` in the shared calculation kernel), so coaching and app figures
+agree.
+
+- Every derived figure reads working sets only: `personal_records`
+  (1RM, top weight, max session volume), each performance's `volume` and
+  `estimated_one_rep_max`, `volume_series`, a workout's `total_volume` and each
+  exercise's `volume`, and their coverage counts (`eligible_set_count` and the
+  rest).
+- Every count does too: `completed_set_count`, `exercises[].set_count`, and
+  `exercise_count` (blocks with at least one working set).
+- A warm-up stays in the raw per-set output with its `set_type` and its own
+  `calculated_load`, `estimated_one_rep_max` and `volume`. Those describe that
+  set only.
+- In exercise context, a session where the exercise had only warm-ups has no
+  stat footprint: it is absent from `recent_performances` and `volume_series`,
+  sets no `last_performed_at`, and is not an excluded-volume session.
+
+`metric_revision: "working_sets_v1"` marks this meaning. The previous
+`"bodyweight_optional_v1"` counted warm-ups in every figure.
 
 ## Optional bodyweight calculation response
 
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "bodyweight_optional_v1"`. Routes, arguments, authorization
+`metric_revision: "working_sets_v1"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

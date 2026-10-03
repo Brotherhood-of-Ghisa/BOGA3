@@ -104,15 +104,20 @@ try {
   }
   if (process.env.BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT === '1') {
     const performance = Array.isArray(context.recent_performances) ? context.recent_performances[0] : null;
-    const set = isObject(performance) && Array.isArray(performance.sets) ? performance.sets[0] : null;
+    const sets = isObject(performance) && Array.isArray(performance.sets) ? performance.sets : [];
+    const set = sets[0];
+    const warmUp = sets[1];
     const workout = workoutRows.find(row => isObject(row) && row.id === expectedSessionId);
-    if (context.metric_revision !== 'bodyweight_optional_v1' || !isObject(performance) ||
+    // The seeded warm-up is listed with its set_type but feeds no volume or count.
+    if (context.metric_revision !== 'working_sets_v1' || !isObject(performance) ||
+      sets.length !== 2 || !isObject(warmUp) || warmUp.set_type !== 'warm_up' ||
       !isObject(performance.volume) || performance.volume.value !== 800 || performance.volume.complete !== true ||
       !isObject(performance.session_body_weight) || performance.session_body_weight.value !== 80 ||
       !isObject(set) || !isObject(set.load) || set.load.value !== 20 ||
       !isObject(set.calculated_load) || set.calculated_load.value !== 100 ||
-      !isObject(workout) || !isObject(workout.total_volume) || workout.total_volume.value !== 800) {
-      throw new Error('Bodyweight context or volume changed across the real OAuth-to-MCP path.');
+      !isObject(workout) || !isObject(workout.total_volume) || workout.total_volume.value !== 800 ||
+      workout.completed_set_count !== 1) {
+      throw new Error('Bodyweight context, working-set volume or counts changed across the real OAuth-to-MCP path.');
     }
   }
 } finally {

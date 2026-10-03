@@ -908,7 +908,8 @@ const getExerciseContext = async (
       ...projectTrainingSets((blocksBySession.get(session.id) ?? [])
         .flatMap(block => setsByBlock.get(block.id) ?? []), definition, session, bodyweightCalculationsEnabled),
     }))
-    .filter(row => row.sets.length > 0);
+    // A session with only warm-ups for this exercise has no stat footprint.
+    .filter(row => row.workingSetCount > 0);
 
   const topWeight = performanceRows.reduce<{ weight: number; reps: number } | null>((best, row) => {
     const candidate = row.topWeightSet;
@@ -1073,7 +1074,7 @@ const getRecentWorkouts = async (
         setsByBlock.get(block.id) ?? [], definitionsById.get(block.exercise_definition_id ?? '') ?? null, session,
         bodyweightCalculationsEnabled,
       ));
-      const coverage = summarizeVolume(projections.flatMap(row => row.metrics));
+      const coverage = summarizeVolume(projections.flatMap(row => row.workingMetrics));
       const usesBodyweightContext = projections.some(row => row.usesBodyweightContext);
       return {
         id: session.id,
@@ -1083,7 +1084,7 @@ const getRecentWorkouts = async (
         gym: session.gym_id
           ? { id: session.gym_id, name: gymById.get(session.gym_id) ?? null }
           : null,
-        exercise_count: workoutBlocks.length,
+        exercise_count: projections.filter(row => row.workingSetCount > 0).length,
         completed_set_count: coverage.eligibleSetCount,
         ...(usesBodyweightContext ? { session_body_weight: sessionWeightPayload(session) } : {}),
         total_volume: volumePayload(coverage, blocksTruncated || setResult.truncated),
@@ -1092,7 +1093,7 @@ const getRecentWorkouts = async (
           exercise_id: block.exercise_definition_id,
           name: block.name,
           equipment: block.machine_name,
-          set_count: (setsByBlock.get(block.id) ?? []).length,
+          set_count: projections[index].workingSetCount,
           ...(definitionsById.has(block.exercise_definition_id ?? '')
             ? exerciseLoadPayload(
               definitionsById.get(block.exercise_definition_id ?? '')!, bodyweightCalculationsEnabled,

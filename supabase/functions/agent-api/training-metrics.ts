@@ -6,13 +6,13 @@ import {
 import type { VolumeCoverage } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import {
-  canonicalizeWeightForReps, type SessionSetPerformanceStatus,
+  canonicalizeWeightForReps, isWorkingSetType, type SessionSetPerformanceStatus,
 } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import {
   isValidSessionWeight, type ResolvedSessionWeight,
 } from '../../../apps/mobile/src/bodyweight/as-of.ts';
 
-export const METRIC_REVISION = 'bodyweight_optional_v1';
+export const METRIC_REVISION = 'working_sets_v1';
 
 export type ExerciseLoadRow = {
   bodyweight_contribution: number;
@@ -89,17 +89,26 @@ export function projectTrainingSets(
     bodyweightContribution,
     loadInputMode: definition.load_input_mode === 'per_side_load' ? 'per_side_load' : 'total_load',
   } : null, usesBodyweightContext ? contextFor(session) : null);
-  const summary = summarizeExerciseLoad(sets.map(set => ({
+  const inputs = sets.map(set => ({
     weightValue: set.weight_value, repsValue: set.reps_value,
     setType: set.set_type,
     // Every non-null wire status is ineligible, including unknown future values.
     performanceStatus: set.performance_status === null ? null : set.performance_status as SessionSetPerformanceStatus,
-  })), context);
+  }));
+  // Every performed row keeps its own figures; only working sets feed the
+  // aggregates and counts (a warm-up is listed but never a stat).
+  const perSet = summarizeExerciseLoad(inputs, context);
+  const summary = summarizeExerciseLoad(inputs.filter(set => isWorkingSetType(set.setType)), context);
   return {
-    ...summary,
+    volumeCoverage: summary.volumeCoverage,
+    estimatedOneRepMax: summary.estimatedOneRepMax,
+    topWeightSet: summary.topWeightSet,
+    // Working sets only: not aligned with the input rows or `sets`.
+    workingMetrics: summary.metrics,
+    workingSetCount: summary.volumeCoverage.eligibleSetCount,
     usesBodyweightContext,
     sets: sets.flatMap((set, index) => {
-      const metric = summary.metrics[index];
+      const metric = perSet.metrics[index];
       if (!metric.eligible) return [];
       const amount = parseSetWeight(canonicalizeWeightForReps(set.weight_value, set.reps_value));
       return [{
