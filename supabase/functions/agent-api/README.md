@@ -129,8 +129,8 @@ by another user and a nonexistent exercise produce the same `404` envelope.
     "started_at": "2026-07-25T17:00:00.000Z",
     "completed_at": "2026-07-25T18:00:00.000Z",
     "duration_seconds": 3600,
-    "volume": { "value": 2500, "unit": "kg_reps" },
-    "estimated_one_rep_max": { "value": 100, "unit": "kg" },
+    "volume": { "value": 640, "unit": "kg_reps" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
     "sets": [{
       "id": "set-id",
       "order_index": 0,
@@ -150,13 +150,13 @@ by another user and a nonexistent exercise produce the same `404` envelope.
     }]
   }],
   "personal_records": {
-    "estimated_one_rep_max": { "value": 100, "unit": "kg" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
     "top_weight": { "value": 80, "reps": 8, "unit": "kg" },
-    "max_session_volume": { "value": 2500, "unit": "kg_reps" }
+    "max_session_volume": { "value": 640, "unit": "kg_reps" }
   },
   "volume_series": [{
     "completed_at": "2026-07-25T18:00:00.000Z",
-    "value": 2500,
+    "value": 640,
     "unit": "kg_reps"
   }],
   "last_performed_at": "2026-07-25T18:00:00.000Z",
@@ -171,9 +171,9 @@ by another user and a nonexistent exercise produce the same `404` envelope.
 
 Personal-record and volume calculations import the canonical mobile domain
 calculation module and read [working sets only](#working-sets-only): the
-warm-up above is listed but feeds no session or record figure. BoGa has no canonical user-authored note field or failed-set
-meaning, so this API reports those fields unavailable instead of inventing
-semantics.
+warm-up above is listed but feeds no session or record figure. BoGa has no
+canonical user-authored note field or failed-set meaning, so this API reports
+those fields unavailable instead of inventing semantics.
 
 ## Recent workouts
 

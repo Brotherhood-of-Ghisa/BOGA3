@@ -100,7 +100,11 @@ export function projectTrainingSets(
   const perSet = summarizeExerciseLoad(inputs, context);
   const summary = summarizeExerciseLoad(inputs.filter(set => isWorkingSetType(set.setType)), context);
   return {
-    ...summary,
+    volumeCoverage: summary.volumeCoverage,
+    estimatedOneRepMax: summary.estimatedOneRepMax,
+    topWeightSet: summary.topWeightSet,
+    // Working sets only: not aligned with the input rows or `sets`.
+    workingMetrics: summary.metrics,
     workingSetCount: summary.volumeCoverage.eligibleSetCount,
     usesBodyweightContext,
     sets: sets.flatMap((set, index) => {

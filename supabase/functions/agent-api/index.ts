@@ -1074,7 +1074,7 @@ const getRecentWorkouts = async (
         setsByBlock.get(block.id) ?? [], definitionsById.get(block.exercise_definition_id ?? '') ?? null, session,
         bodyweightCalculationsEnabled,
       ));
-      const coverage = summarizeVolume(projections.flatMap(row => row.metrics));
+      const coverage = summarizeVolume(projections.flatMap(row => row.workingMetrics));
       const usesBodyweightContext = projections.some(row => row.usesBodyweightContext);
       return {
         id: session.id,

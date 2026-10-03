@@ -27,7 +27,7 @@ describe('agent-api training projection', () => {
     ], ordinary, noReading, false);
 
     expect(projection.workingSetCount).toBe(2);
-    expect(projection.metrics.map(metric => metric.volumeKgReps)).toEqual([800, 525, null]);
+    expect(projection.workingMetrics.map(metric => metric.volumeKgReps)).toEqual([800, 525, null]);
     expect(projection.volumeCoverage).toMatchObject({
       totalVolumeKgReps: 1325, eligibleSetCount: 2, knownSetCount: 2, complete: true,
     });
