@@ -19,7 +19,7 @@
    - `sessions.source_plan_id -> session_plans(id)`
    - `session_exercises.source_plan_exercise_id -> session_plan_exercises(id)`
    - `exercise_sets.source_plan_set_id -> session_plan_sets(id)`
-   Partial unique indexes ensure at most one live (non-deleted) performed session per whole-plan start, at most one live performed exercise card per plan block, and at most one live performed set per plan target set. Retries and multi-device sync converge deterministically.
+   Partial unique indexes ensure at most one live (non-deleted) performed session per whole-plan start, at most one live performed exercise card per plan block, and at most one live performed set per plan target set. Retries and multi-device sync converge deterministically, including concurrent block attachments (§4.5).
 5. **Set Reordering Invariant:**
    Inside an exercise card, performed sets can be reordered freely (manual warm-ups added before or after planned sets). Reordering mutates only performed `exercise_sets.order_index`. It never alters source-plan target order, row identities, or provenance links (`source_plan_set_id`).
 6. **Separate, Opt-In Agent Permissions:**
@@ -124,6 +124,7 @@ A performed set with `source_plan_set_id IS NOT NULL` is valid **if and only if*
 - An unsourced exercise card cannot contain source-derived sets.
 - A sourced card may mix matching source-derived sets with null-linked manual sets (warm-ups/drop sets).
 - Server sync push triggers and local transactions reject cross-level mismatches atomically.
+- These indexes also arbitrate concurrent attachments of the same block (§4.5): the first committed attachment wins, the loser reverts deterministically.
 
 ---
 
@@ -186,18 +187,13 @@ With M23, Sync v2 expands from **twelve to sixteen** user-owned entity types.
 2. Every FK points to a strictly lower layer index.
 3. No self-referencing entities.
 
-### 3.2 Client Pull Cursor Migration Strategy
+### 3.2 Pull Cursor Reset and Protocol-4 Gate
 
-In the 12-entity schema, `sessions` was in Layer 1, `session_exercises` in Layer 2, and `exercise_sets` in Layer 3. In the 16-entity schema, they sit in Layers 2, 3, and 4 respectively.
+In the 12-entity schema, `sessions` was in Layer 1, `session_exercises` in Layer 2, and `exercise_sets` in Layer 3. In the 16-entity schema, they sit in Layers 2, 3, and 4 respectively — and Layers 0–3 each additionally gain at least one new entity type. No cursor arithmetic preserves every entity's unread range across that reshuffle: a shifted cursor lets a `session_plan` download without its `training_programmes` parent (FK failure on insert) or silently skips new blocks and sets, and shifting into Layer 4 destroys the independent `body_weight_measurements` cursor. Cursor remapping is therefore rejected; the client resets instead.
 
 Because client pull cursors are stored as a JSON dictionary `pull_cursor` in `sync_runtime_state` keyed by layer integer (`{"0": ..., "1": ...}`):
-- **Local SQLite Migration (0013):** During migration to the 16-entity schema, the client updates `pull_cursor` by shifting the cursor map:
-  - `cursor[4] := cursor[3]` (old exercise_sets cursor)
-  - `cursor[3] := cursor[2]` (old session_exercises cursor)
-  - `cursor[2] := cursor[1]` (old sessions cursor)
-  - `cursor[1] := null` (new session_plans layer)
-- This guarantees upgraded clients continue pulling from their exact previous server receipt position without orphaning data or re-downloading entire historical graphs.
-- Server `sync_pull` updates its layer-to-table projection to reflect the 16-entity mapping.
+- **Local SQLite Migration (0013):** During migration to the 16-entity schema, the client sets `pull_cursor` to `{}`. The next sync re-drains every layer from its earliest position; replayed rows upsert as idempotent LWW merges (rows already at their current state are no-ops), so the replay is safe and converges to the same state. The cost is one full historical replay per device after upgrading — accepted in exchange for deleting the bespoke remapping and its orphaning failure modes.
+- **Protocol-4 Gate (server):** The server's layer-to-table projection flip in `sync_pull`/`sync_push` is a breaking protocol change and is gated on sync protocol 4 (`x-boga-sync-protocol: 4`), following the protocol-3 cutover precedent in [sync-v2-server-contract](sync-v2-server-contract.md) ("Migration-in-flight contract"): the compatibility client ships first, sync is stopped with `UPDATE_REQUIRED`, the server switches the projection, and only protocol-4 clients resume. A protocol-3 client never observes the new mapping, so a client filtering rows by its own layer list can never advance the page cursor past rows it dropped.
 
 ---
 
@@ -228,8 +224,9 @@ stateDiagram-v2
    - Return typed `ACTIVE_SESSION_CONFLICT`.
    - UI routes to **Resume Active Session**; never replaces or auto-completes.
 2. **Transaction:** In one local database transaction:
+   - If no block qualifies under the eligibility rule below, return typed `NO_PENDING_BLOCKS` and create nothing.
    - Create `sessions` row with `source_plan_id = plan.id`, `gym_id = plan.gym_id`, `status = 'active'`, `started_at = Date.now()`.
-   - For each non-deleted `session_plan_exercises` block (ordered by `order_index`):
+   - For each eligible pending block — `progress_status = 'pending'` and `deleted_at IS NULL`, ordered by `order_index`. Completed and skipped blocks are never re-materialized (doing so would violate source-block uniqueness and re-materialize skipped work):
      - Create `session_exercises` row with `session_id = session.id`, `source_plan_exercise_id = plan_exercise.id`, exercise name snapshot, machine snapshot, `order_index`.
      - For each non-deleted `session_plan_sets` row:
        - Create `exercise_sets` row with `session_exercise_id = session_exercise.id`, `source_plan_set_id = plan_set.id`, `order_index = plan_set.order_index`.
@@ -237,10 +234,10 @@ stateDiagram-v2
        - Actuals blank: `weight_value = ''`, `reps_value = ''`, `set_type = 'work'`.
        - Status: `performance_status = 'planned'`.
 3. **Deterministic ID Generation:**
-   - Generated IDs use deterministic hashes based on owner and source ID:
-     - `session_id = generateDeterministicUlid(ownerId, plan.id, 'start')`
-     - `session_exercise_id = generateDeterministicUlid(ownerId, plan_exercise.id, 'start')`
-     - `exercise_set_id = generateDeterministicUlid(ownerId, plan_set.id, 'start')`
+   - Generated IDs reuse the existing deterministic text-ID pattern (`exerciseGroupLinkId` in `src/data/exercise-group-links.ts`), composed from owner and source ID:
+     - `session_id`: `` `${ownerId}:${plan.id}:start` ``
+     - `session_exercise_id`: `` `${ownerId}:${plan_exercise.id}:start` ``
+     - `exercise_set_id`: `` `${ownerId}:${plan_set.id}:start` ``
    - Retries on the same plan return the existing active session without duplicating rows.
 
 ### 4.3 Add Plan Block (`addPlanBlockToSession`)
@@ -274,6 +271,14 @@ reorderSessionExerciseSets(sessionExerciseId: string, orderedSetIds: string[]): 
    - Updates `exercise_sets.order_index` to match the array index (0, 1, 2, ...).
    - Keeps `id`, `source_plan_set_id`, `planned_*`, actual values, and performance state untouched.
    - Source plan order in `session_plan_sets` remains completely immutable.
+
+### 4.5 Provenance Arbitration for Concurrent Attachments
+
+Two offline devices can attach the same plan block to two different unsourced cards (§4.3 Cases B–D). The cards keep their own IDs, so per-row LWW cannot reconcile them. The §2.2 partial unique indexes are the arbiter, and the loser's repair path is defined so the permitted operation can never block sync:
+
+1. **Server Arbitration:** `sync_push` is atomic per batch (single ack, no per-row outcomes). When a batch would create a second live provenance row for the same `(owner_user_id, source_plan_exercise_id)` on `session_exercises` — or the same `source_plan_set_id` on `exercise_sets` — the whole batch fails with typed error `BLOCK_ALREADY_ATTACHED`, carrying the winning card ID (the live row the index protects). The first committed attachment wins; server commit order is the only tiebreak.
+2. **Loser Repair (deterministic):** On `BLOCK_ALREADY_ATTACHED`, the client pulls first so the winning card is visible, then reverts its own losing attachment: clear `source_plan_exercise_id` on the losing card and clear `source_plan_set_id` on its source-derived sets. Entered actuals and manual sets on that card are preserved; the card returns to unsourced, keeping the Cross-Level Provenance Invariant (§2.2) intact. The client then re-pushes the repaired batch.
+3. **Convergence:** Every device ends with exactly one live card carrying the provenance link (the server-accepted winner), while the losing card keeps all user work as unsourced rows. Whole-plan starts need no arbitration: their deterministic IDs (§4.2) make a competing Start all resolve to the same row, not a second one.
 
 ---
 
@@ -358,6 +363,8 @@ Mutation tools use annotations:
 | `PLAN_PERMISSION_REQUIRED` | 403 | Client lacks active plan permission in `agent_plan_permissions` |
 | `ACTIVE_SESSION_CONFLICT` | 409 | Start all attempted while another session is currently active |
 | `AMBIGUOUS_COMPATIBLE_CARDS` | 409 | Multiple compatible unsourced exercise cards exist; selection required |
+| `NO_PENDING_BLOCKS` | 409 | Start all attempted with no eligible pending block remaining (§4.2) |
+| `BLOCK_ALREADY_ATTACHED` | 409 | Concurrent attachment of the same plan block; server arbitrated, loser reverts (§4.5) |
 | `IDEMPOTENCY_CONFLICT` | 409 | Same idempotency key submitted with different payload |
 | `FOREIGN_RESOURCE_REFERENCE` | 400 | Referenced exercise, gym, or plan does not belong to user |
 | `INVALID_BLOCK_RESOLUTION` | 400 | Attempted to complete a block without at least 1 confirmed planned set |
