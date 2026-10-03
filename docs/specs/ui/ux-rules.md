@@ -108,9 +108,9 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      elapsed day, today included, times the month's days. The summary line
      sets the projection against the previous month's total, and sessions and
      PRs so far against the previous month's to the same day.
-   - A PR is a set whose estimated 1RM beats every earlier completed session
-     on that exercise, at most one per exercise per session (the completed
-     session's PR rule).
+   - A PR is a working set whose estimated 1RM beats every earlier completed
+     session's working sets on that exercise, at most one per exercise per
+     session (the completed session's PR rule, §5.11).
    - The latest completed session is one row; full history is the Sessions
      list (`All sessions`). The row carries no group tags: which groups a
      session was shared to is decided on the server, and the device does not
