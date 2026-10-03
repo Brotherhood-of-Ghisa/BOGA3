@@ -213,11 +213,11 @@ any internal safety cap explicit. `exercises` lists every block, while
 
 ## Working sets only
 
-A **working set** is a confirmed performed set (valid reps and Weight, no
-`performance_status`) whose `set_type` is not `"warm_up"`. Untagged sets, every
-RIR and unrecognised stored values are working sets. The rule is the app's
-(`isWorkingSet` in the shared calculation kernel), so coaching and app figures
-agree.
+The API reads the app's own rule for which sets and sessions count
+([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
+§1–§2), through the shared calculation modules, so coaching and app figures
+agree. In short, only `set_type: "warm_up"` and unconfirmed rows are left out.
+This section lists the fields that rule governs.
 
 - Every derived figure reads working sets only: `personal_records`
   (1RM, top weight, max session volume), each performance's `volume` and

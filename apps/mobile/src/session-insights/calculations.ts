@@ -5,7 +5,6 @@ import {
   eligibleSetsByBlockInSessionOrder,
   pickBestEstimatedOneRepMaxSet,
 } from '@/src/exercise-calculations/best-set';
-import { isWorkingSessionSetType } from "@/src/data/set-types";
 import {
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
@@ -13,10 +12,6 @@ import {
   type MuscleContributionRole,
 } from "@/src/data/muscle-analytics";
 import {
-  parseSetReps,
-  parseSetWeight,
-} from "@/src/exercise-calculations";
-import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
   type SessionSetPerformanceStatus,
 } from "@/src/exercise-calculations/set-semantics";
@@ -182,9 +177,7 @@ const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
     reps: set.repsValue,
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
-  }) &&
-  parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)) !== null &&
-  parseSetReps(set.repsValue) !== null;
+  });
 
 export const calculateLinearPercentile = (
   sortedValues: number[],
@@ -256,10 +249,8 @@ export const summarizeCurrentSessionMuscleLoad = (
   const muscleGroupById = new Map(
     input.muscleGroups.map((group) => [group.id, group]),
   );
-  // Every figure, the set counts included, reads working sets only.
-  const contributions = collectMuscleSetContributions(analyticsInput).filter(
-    (contribution) => isWorkingSessionSetType(contribution.setType),
-  );
+  // Contributions are working sets only (§1): every figure, the set counts included.
+  const contributions = collectMuscleSetContributions(analyticsInput);
   const mappedSetIdentities = new Set(
     contributions
       .filter((contribution) => muscleGroupById.has(contribution.muscleGroupId))
@@ -744,7 +735,6 @@ export const deriveSessionMuscleVolumeComparisons = (
     }>();
     for (const contribution of contributions) {
       if (!groupById.has(contribution.muscleGroupId)) continue;
-      if (!isWorkingSessionSetType(contribution.setType)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
         weightedVolume: 0,
         knownVolume: 0,

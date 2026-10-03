@@ -201,6 +201,29 @@ describe('aggregateExerciseHistory', () => {
     expect(summary.tagOptions[1].occurrenceCount).toBe(1);
   });
 
+  it('counts in a chip only the cards it shows: rows with a performed set', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        sessionsInPeriod: [
+          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+          sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-13T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
+        ],
+        tagsBySessionExerciseId: groupBy([
+          tagRow({ sessionExerciseId: 'se1', tagDefinitionId: 'tag-a', name: 'Bravo' }),
+          tagRow({ sessionExerciseId: 'se2', tagDefinitionId: 'tag-a', name: 'Bravo' }),
+        ]),
+        setsBySessionExerciseId: {
+          se1: [setRow({ setId: 'st1', sessionExerciseId: 'se1', orderIndex: 0 })],
+          se2: [setRow({ setId: 'st2', sessionExerciseId: 'se2', orderIndex: 0, performanceStatus: 'unperformed' })],
+        },
+      })
+    );
+
+    expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s1']);
+    expect(summary.tagOptions[0].occurrenceCount).toBe(1);
+    expect(summary.gymOptions).toEqual([{ gymId: 'gym-a', name: 'Alpha Gym', occurrenceCount: 1 }]);
+  });
+
   it('filters sessions to those carrying the applied tag', () => {
     const summary = aggregateExerciseHistory(
       buildInput({

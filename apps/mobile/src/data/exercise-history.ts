@@ -24,7 +24,6 @@ import {
   userSettings,
 } from './schema';
 import {
-  isWorkingSessionSetType,
   normalizeSessionSetType,
   type SessionSetTypeValue,
 } from './set-types';
@@ -235,7 +234,9 @@ const buildSessionEntry = (
     weightValue: row.weightValue,
     repsValue: row.repsValue,
     setType: normalizeSessionSetType(row.setType),
-    isWorking: isWorkingSessionSetType(row.setType),
+    isWorking: isWorkingSet({
+      weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
+    }),
   }));
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
@@ -330,8 +331,13 @@ export const aggregateExerciseHistory = (
   input: ExerciseHistoryAggregationInput
 ): ExerciseHistorySummary => {
   const appliedGymId = input.appliedGymId ?? null;
-  const tagOptions = buildTagOptions(input.sessionsInPeriod, input.tagsBySessionExerciseId);
-  const gymOptions = buildGymOptions(input.sessionsInPeriod);
+  // A chip counts the cards it shows: rows with at least one performed set.
+  const listedRows = input.sessionsInPeriod.filter((row) =>
+    (input.setsBySessionExerciseId[row.sessionExerciseId] ?? []).some((set) => isConfirmedPerformedSet({
+      reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus,
+    })));
+  const tagOptions = buildTagOptions(listedRows, input.tagsBySessionExerciseId);
+  const gymOptions = buildGymOptions(listedRows);
 
   let filteredSessionRows = input.appliedTagDefinitionId
     ? input.sessionsInPeriod.filter((row) =>

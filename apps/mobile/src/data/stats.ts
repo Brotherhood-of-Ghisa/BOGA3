@@ -8,6 +8,7 @@ import {
   aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
+  countedMuscleAnalyticsSessionIds,
   countMuscleAnalyticsWorkingSets,
   type AggregateSelectedMuscleDailyEffortOptions,
   type DailyEffortMetrics,
@@ -24,7 +25,6 @@ import {
   sessions,
   userSettings,
 } from './schema';
-import { isWorkingSessionSetType } from './set-types';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
@@ -118,9 +118,8 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   };
   const accumulatorsByMuscleId = new Map<string, MuscleAccumulator>();
 
+  // Contributions are working sets only (§1): every figure, the set count included.
   for (const contribution of collectMuscleSetContributions(input)) {
-    // Every figure, the set count included, reads working sets only.
-    if (!isWorkingSessionSetType(contribution.setType)) continue;
     const accumulator = accumulatorsByMuscleId.get(contribution.muscleGroupId) ?? {
       workingSetIdentities: new Set<string>(),
       totalVolume: 0,
@@ -184,7 +183,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
     });
 
   return {
-    sessionCount: input.sessions.length,
+    sessionCount: countedMuscleAnalyticsSessionIds(input).size,
     workingSetCount: countMuscleAnalyticsWorkingSets(input),
     muscleFamilies,
   };

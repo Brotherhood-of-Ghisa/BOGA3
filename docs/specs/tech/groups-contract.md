@@ -392,7 +392,7 @@ invisible.
 | `performed` | The session screens' rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
 | `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (M25-T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
-| `working` | The app's working-set rule (`isWorkingSessionSetType` over the synced `set_type`: every set but a warm-up), independent of `performed`. Null on a fact from before rules version 4. Read by the contract-1 boards (§2.11), both certify RPCs (`group_set_is_warm_up`, §4.6, §11.3) and the week summary (§4.7). |
+| `working` | The effort half of the app's working-set rule (`isWorkingSetType` over the synced `set_type`: every set but a warm-up; `training-metrics-contract.md` §1), independent of `performed`. Null on a fact from before rules version 4. Read by the contract-1 boards (§2.11), both certify RPCs (`group_set_is_warm_up`, §4.6, §11.3) and the week summary (§4.7). |
 | `achieved_at_ms` | `sessions.started_at` |
 | `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (M25-T06) can compare a live row without the evaluator. |
 | `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
@@ -520,7 +520,7 @@ Archive and leave queue nothing: the board freezes.
 
 **Rules version 4** adds the facts' `working`, so the evaluator stores the
 app's working-set rule without a SQL copy of it; a change to
-`isWorkingSessionSetType` needs a version bump. Its migration queues every
+`isWorkingSetType` (`training-metrics-contract.md` §1) needs a version bump. Its migration queues every
 session with older facts, so the sweep re-normalizes them within its next
 rounds; until then a session's facts read `working` null and its sets count no
 working sets in §4.7. The contract-1 boards and both certify RPCs read the

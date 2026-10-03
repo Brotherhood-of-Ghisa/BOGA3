@@ -4,6 +4,7 @@ import {
   appendSuggestedPlan,
   describeSubmitCleanupPrompt,
   nextSubmitCleanup,
+  sessionHasInvalidSetValues,
 } from '@/src/session-recorder/session-model';
 import {
   buildSessionViewModel,
@@ -143,6 +144,21 @@ describe('session view model', () => {
     expect(formatElapsed(start, new Date('2026-09-23T09:47:12Z'))).toBe('47:12');
     expect(formatElapsed(start, new Date('2026-09-23T10:05:03Z'))).toBe('1:05:03');
     expect(formatElapsed(start, new Date('2026-09-23T08:59:00Z'))).toBe('0:00');
+  });
+});
+
+describe('set field validation', () => {
+  // The field check uses the calculation parser, so a value it accepts counts everywhere.
+  it.each(['1e3', '0x10', '-5'])('marks weight %p invalid', (weight) => {
+    expect(sessionHasInvalidSetValues(session([{ ...bench, sets: [doneSet('w', weight, '5', null)] }]))).toBe(true);
+  });
+
+  it.each(['', '42.', '.5', '100'])('accepts weight %p', (weight) => {
+    expect(sessionHasInvalidSetValues(session([{ ...bench, sets: [doneSet('w', weight, '5', null)] }]))).toBe(false);
+  });
+
+  it.each(['0', '1.5', '1e1'])('marks reps %p invalid', (reps) => {
+    expect(sessionHasInvalidSetValues(session([{ ...bench, sets: [doneSet('r', '100', reps, null)] }]))).toBe(true);
   });
 });
 

@@ -1,3 +1,5 @@
+import { parseSetReps, parseSetWeight } from './parse.ts';
+
 export type SetValueInput = {
   reps: string;
   weight: string;
@@ -9,15 +11,7 @@ export type SetPerformanceInput = SetValueInput & {
   performanceStatus?: SessionSetPerformanceStatus;
 };
 
-export const hasPositiveIntegerReps = (reps: string): boolean => {
-  const trimmed = reps.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    return false;
-  }
-
-  const parsed = Number(trimmed);
-  return Number.isInteger(parsed) && parsed > 0;
-};
+export const hasPositiveIntegerReps = (reps: string): boolean => parseSetReps(reps) !== null;
 
 export const canonicalizeWeightForReps = (weight: string, reps: string): string =>
   weight.trim().length === 0 && hasPositiveIntegerReps(reps) ? '0' : weight;
@@ -27,19 +21,10 @@ export const canonicalizeSetValues = <T extends SetValueInput>(set: T): T => {
   return weight === set.weight ? set : { ...set, weight };
 };
 
-export const hasValidActualValues = (set: SetValueInput): boolean => {
-  if (!hasPositiveIntegerReps(set.reps)) {
-    return false;
-  }
-
-  const canonicalWeight = canonicalizeWeightForReps(set.weight, set.reps).trim();
-  if (canonicalWeight.length === 0) {
-    return false;
-  }
-
-  const parsedWeight = Number(canonicalWeight);
-  return Number.isFinite(parsedWeight) && parsedWeight >= 0;
-};
+/** Valid reps and Weight under the one parser (`parse.ts`); blank Weight with valid reps is `0`. */
+export const hasValidActualValues = (set: SetValueInput): boolean =>
+  hasPositiveIntegerReps(set.reps) &&
+  parseSetWeight(canonicalizeWeightForReps(set.weight, set.reps)) !== null;
 
 /**
  * A valid legacy row with no explicit status is confirmed. Every non-null
@@ -50,20 +35,49 @@ export const isConfirmedPerformedSet = (set: SetPerformanceInput): boolean =>
   (set.performanceStatus === null || set.performanceStatus === undefined);
 
 /**
- * The working-set rule over a stored effort: every set that is not a warm-up.
- * Untagged, any RIR and unrecognised stored values all count. The group
- * evaluator stores it on every set fact: changing it needs a
- * `GROUP_EVAL_RULES_VERSION` bump.
+ * The effort half of the counted-set rule: every set type but a warm-up.
+ * Untagged, any RIR and unrecognised stored values all count. Read it alone
+ * only where performance is already settled (a stored flag, a projection of
+ * performed sets); otherwise use `isWorkingSet`. The group evaluator stores it
+ * on every set fact: changing it needs a `GROUP_EVAL_RULES_VERSION` bump.
  */
 export const isWorkingSetType = (setType: unknown): boolean => setType !== 'warm_up';
 
+export type WorkingSetInput = SetPerformanceInput & { setType?: unknown };
+
 /**
- * The one rule for what counts toward a stat (`ux-rules.md` §5.11): a
- * confirmed performed set that is not a warm-up. A warm-up row keeps its own
- * per-set figures, but feeds no record, best, PR or baseline.
+ * The counted-set rule (`training-metrics-contract.md` §1): a confirmed
+ * performed set that is not a warm-up. A warm-up row keeps its own per-set
+ * figures, but feeds no statistic, record, best, PR or baseline.
  */
-export const isWorkingSet = (set: SetPerformanceInput & { setType?: unknown }): boolean =>
+export const isWorkingSet = (set: WorkingSetInput): boolean =>
   isConfirmedPerformedSet(set) && isWorkingSetType(set.setType);
+
+/**
+ * The counted-session rule (`training-metrics-contract.md` §2): a session —
+ * or one exercise or muscle within it, given only that scope's sets — counts
+ * toward a statistic when it holds at least one working set.
+ */
+export const isCountedSession = <T>(
+  sets: Iterable<T>,
+  read: (set: T) => WorkingSetInput,
+): boolean => {
+  for (const set of sets) if (isWorkingSet(read(set))) return true;
+  return false;
+};
+
+/** The sessions among `rows` that count (`isCountedSession`), by session id. */
+export const countedSessionIds = <T>(
+  rows: Iterable<T>,
+  read: (row: T) => WorkingSetInput & { sessionId: string | null | undefined },
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const set = read(row);
+    if (set.sessionId != null && isWorkingSet(set)) ids.add(set.sessionId);
+  }
+  return ids;
+};
 
 export const normalizeSessionSetPerformanceStatus = (
   status: string | null | undefined

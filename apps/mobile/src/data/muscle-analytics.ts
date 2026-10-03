@@ -7,11 +7,11 @@ import {
   parseSetReps,
   parseSetWeight,
 } from '@/src/exercise-calculations';
-import { canonicalizeWeightForReps,
-  isConfirmedPerformedSet,
+import {
+  countedSessionIds,
+  isWorkingSet,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
-import { isWorkingSessionSetType } from './set-types';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
@@ -111,16 +111,16 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
   return 0;
 };
 
-const isMuscleAnalyticsPerformedSet = (
+/** Muscle analytics reads working sets only (`isWorkingSet`); a warm-up contributes nothing. */
+const isMuscleAnalyticsWorkingSet = (
   set: MuscleAnalyticsInput['exerciseSets'][number]
 ): boolean =>
-  isConfirmedPerformedSet({
+  isWorkingSet({
     reps: set.repsValue,
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
-  }) &&
-  parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)) !== null &&
-  parseSetReps(set.repsValue) !== null;
+    setType: set.setType,
+  });
 
 export const computeMuscleSetVolume = (weightValue: string, repsValue: string): number => {
   const weight = parseSetWeight(weightValue);
@@ -138,21 +138,32 @@ export const computePerSideMuscleSetVolume = (
   return loadInputMode === 'total_load' ? enteredLoadVolume / 2 : enteredLoadVolume;
 };
 
-export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): number => {
+const sessionIdByExerciseId = (input: MuscleAnalyticsInput): Map<string, string> => {
   const sessionIds = new Set(input.sessions.map((session) => session.id));
-  const includedExerciseIds = new Set<string>();
+  const byExerciseId = new Map<string, string>();
   for (const exercise of input.sessionExercises) {
-    if (sessionIds.has(exercise.sessionId)) {
-      includedExerciseIds.add(exercise.id);
-    }
+    if (sessionIds.has(exercise.sessionId)) byExerciseId.set(exercise.id, exercise.sessionId);
   }
+  return byExerciseId;
+};
 
+export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): number => {
+  const sessionIdOf = sessionIdByExerciseId(input);
   return input.exerciseSets.filter(
-    (set) =>
-      includedExerciseIds.has(set.sessionExerciseId) &&
-      isMuscleAnalyticsPerformedSet(set) &&
-      isWorkingSessionSetType(set.setType)
+    (set) => sessionIdOf.has(set.sessionExerciseId) && isMuscleAnalyticsWorkingSet(set)
   ).length;
+};
+
+/** The input's sessions that count toward a statistic (`isCountedSession`), by id. */
+export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): Set<string> => {
+  const sessionIdOf = sessionIdByExerciseId(input);
+  return countedSessionIds(input.exerciseSets, (set) => ({
+    sessionId: sessionIdOf.get(set.sessionExerciseId),
+    reps: set.repsValue,
+    weight: set.weightValue,
+    performanceStatus: set.performanceStatus,
+    setType: set.setType,
+  }));
 };
 
 const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
@@ -204,8 +215,9 @@ export const collectMuscleSetContributions = (
   );
   const contributions: MuscleSetContribution[] = [];
 
+  // Every contribution is a working set's: no consumer re-checks the rule.
   for (const [setIndex, set] of input.exerciseSets.entries()) {
-    if (!isMuscleAnalyticsPerformedSet(set)) {
+    if (!isMuscleAnalyticsWorkingSet(set)) {
       continue;
     }
 
@@ -304,8 +316,6 @@ export const aggregateSelectedMuscleDailyEffort = (
     };
 
     entriesByDate.set(dateKey, entry);
-    // Every figure, the set count included, reads working sets only.
-    if (!isWorkingSessionSetType(contribution.setType)) continue;
     entry.setCount += 1;
     entry.sessionIds.add(contribution.sessionId);
     entry.knownWeight = addFiniteVolume(entry.knownWeight, contribution.weightedVolume ?? 0);
@@ -313,9 +323,8 @@ export const aggregateSelectedMuscleDailyEffort = (
     entry.contributions.push(contribution);
   }
 
-  // A warm-up-only day makes no heatmap cell.
+  // Contributions are working sets only, so a warm-up-only day makes no cell.
   return Array.from(entriesByDate.values())
-    .filter((entry) => entry.sessionIds.size > 0)
     .map(({ sessionIds, ...entry }) => ({
       ...entry,
       sessionCount: sessionIds.size,
@@ -376,9 +385,7 @@ export const accumulateContributionMetrics = (
   acc.knownVolume = addFiniteVolume(acc.knownVolume, contribution.weightedVolume ?? 0);
   acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume);
 
-  if (isWorkingSessionSetType(contribution.setType)) {
-    acc.workingSetCount += 1;
-  }
+  acc.workingSetCount += 1;
 
   const weight = contribution.enteredWeightKg === undefined
     ? parseSetWeight(contribution.weightValue) : contribution.enteredWeightKg;

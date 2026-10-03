@@ -2,7 +2,7 @@
 // sets and its PRs by the session's `completed_at`, the stamp both the stats
 // aggregation and the exercise session facts use.
 
-import { countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
+import { countedMuscleAnalyticsSessionIds, countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
 import type { StatsAggregationInput } from '@/src/data/stats';
 import {
   daysInLocalMonth,
@@ -71,7 +71,7 @@ export type TodayProgress =
 
 export type TodayProgressInput = {
   now: Date;
-  /** Completed sessions covering at least `todayProgressLoadWindow(now)`. */
+  /** Counted sessions (`workingSetsBySession`) covering at least `todayProgressLoadWindow(now)`. */
   sessions: ProgressSession[];
   /** `completed_at` of each 1RM PR fact over the same range. */
   prAchievedAt: Date[];
@@ -100,12 +100,16 @@ const groupBy = <T>(items: readonly T[], keyOf: (item: T) => string | undefined)
   return groups;
 };
 
-/** Each session's working sets under the stats aggregation's own rule. */
+/**
+ * Each counted session (`isCountedSession`: at least one working set) with its
+ * working sets. A warm-up-only or empty session is not a session here.
+ */
 export const workingSetsBySession = (input: StatsAggregationInput): ProgressSession[] => {
+  const counted = countedMuscleAnalyticsSessionIds(input);
   const exercisesBySession = groupBy(input.sessionExercises, (exercise) => exercise.sessionId);
   const sessionIdByExercise = new Map(input.sessionExercises.map((exercise) => [exercise.id, exercise.sessionId]));
   const setsBySession = groupBy(input.exerciseSets, (set) => sessionIdByExercise.get(set.sessionExerciseId));
-  return input.sessions.map((session) => ({
+  return input.sessions.filter((session) => counted.has(session.id)).map((session) => ({
     id: session.id,
     completedAt: session.completedAt,
     workingSets: countMuscleAnalyticsWorkingSets({

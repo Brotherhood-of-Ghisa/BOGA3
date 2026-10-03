@@ -4,6 +4,9 @@ This folder holds subsystem-level implementation references that sit below the t
 
 Current docs:
 
+- `training-metrics-contract.md`: the one definition of what counts toward a
+  statistic — the working set and the counted session — and where records and
+  calculations are owned.
 - `bodyweight-load-contract.md`: current contract for ordinary and optional
   private/group bodyweight calculations, kg-only migration, dated readings,
   privacy and rollout.

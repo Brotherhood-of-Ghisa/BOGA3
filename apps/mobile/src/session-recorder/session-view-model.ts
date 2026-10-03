@@ -7,7 +7,7 @@ import { deriveExercisePersonalRecord } from '@/src/session-insights';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import {
-  canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSetType,
+  canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -166,7 +166,7 @@ export const buildSessionViewModel = (
     const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
 
     const rows = figures.map((row): SessionViewSetRow => {
-      if (row.done && isWorkingSetType(row.set.setType)) workingMetrics.push(row.metric);
+      if (isWorkingSet(row.set)) workingMetrics.push(row.metric);
       return formatSetRow({
         id: row.set.id,
         ...row.shown,

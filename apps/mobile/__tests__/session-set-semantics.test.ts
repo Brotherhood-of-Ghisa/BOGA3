@@ -3,11 +3,61 @@ import {
   canonicalizeWeightForReps,
   hasValidActualValues,
   hasPositiveIntegerReps,
+  countedSessionIds,
   hydrateSessionSetPerformanceStatus,
   isConfirmedPerformedSet,
+  isCountedSession,
   isPerformedSet,
+  isWorkingSet,
   normalizeSessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
+
+describe('one parser decides validity everywhere', () => {
+  // `Number()` accepts these, the calculation parser does not: a set must be
+  // valid for every figure or for none.
+  it.each(['1e3', '0x10', '-1', '1,5', 'Infinity', '20kg'])('rejects weight %p as not performed', (weight) => {
+    expect(hasValidActualValues({ weight, reps: '5' })).toBe(false);
+    expect(isConfirmedPerformedSet({ weight, reps: '5', performanceStatus: null })).toBe(false);
+  });
+
+  it.each(['42.', '.5', '0', '', ' 12.5 '])('accepts weight %p like the calculation parser', (weight) => {
+    expect(hasValidActualValues({ weight, reps: '5' })).toBe(true);
+  });
+});
+
+describe('the counted-set and counted-session rules', () => {
+  const set = (setType: string | null, extra: Partial<{ weight: string; reps: string; performanceStatus: 'unperformed' | null }> = {}) => ({
+    weight: '100', reps: '5', performanceStatus: null, setType, ...extra,
+  });
+
+  it('counts every confirmed set but a warm-up', () => {
+    expect(isWorkingSet(set(null))).toBe(true);
+    expect(isWorkingSet(set('rir_0'))).toBe(true);
+    expect(isWorkingSet(set('unknown_future'))).toBe(true);
+    expect(isWorkingSet(set('warm_up'))).toBe(false);
+    expect(isWorkingSet(set(null, { performanceStatus: 'unperformed' }))).toBe(false);
+    expect(isWorkingSet(set(null, { reps: '' }))).toBe(false);
+  });
+
+  it('counts a session with at least one working set', () => {
+    const identity = <T,>(value: T) => value;
+    expect(isCountedSession([set('warm_up'), set('rir_2')], identity)).toBe(true);
+    expect(isCountedSession([set('warm_up'), set('warm_up')], identity)).toBe(false);
+    expect(isCountedSession([set(null, { performanceStatus: 'unperformed' })], identity)).toBe(false);
+    expect(isCountedSession([], identity)).toBe(false);
+  });
+
+  it('collects the counted sessions by id', () => {
+    const ids = countedSessionIds([
+      { sessionId: 'working', ...set('warm_up') },
+      { sessionId: 'working', ...set(null) },
+      { sessionId: 'warm-up-only', ...set('warm_up') },
+      { sessionId: 'unconfirmed', ...set(null, { performanceStatus: 'unperformed' }) },
+      { sessionId: null, ...set(null) },
+    ], (row) => row);
+    expect([...ids]).toEqual(['working']);
+  });
+});
 
 describe('session set semantics', () => {
   it.each(['1', '5', '0012'])('accepts positive integer reps: %s', (reps) => {

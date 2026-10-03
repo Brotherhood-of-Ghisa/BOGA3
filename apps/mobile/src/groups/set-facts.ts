@@ -7,7 +7,7 @@ import {
   canonicalizeWeightForReps,
   isConfirmedPerformedSet,
 } from '../exercise-calculations/set-semantics.ts';
-import { isWorkingSessionSetType } from '../data/set-types.ts';
+import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
 export const GROUP_EVAL_RULES_VERSION = 4;
@@ -70,7 +70,7 @@ export type GroupSetFact = {
   weight_kg: number | null;
   reps: number | null;
   e1rm_kg: number | null;
-  /** The app's working-set rule (`isWorkingSessionSetType`) over the set's effort; a working set is a performed one with it. */
+  /** The effort half of the counted-set rule (`isWorkingSetType`); a working set is a performed one with it. */
   working: boolean;
   achieved_at_ms: number;
   fingerprint: string;
@@ -100,7 +100,7 @@ export const normalizeGroupSetFacts = (rows: GroupEvalSessionRows): GroupSetFact
       weight_kg: parsed?.weightKg ?? null,
       reps: parsed?.reps ?? null,
       e1rm_kg: parsed === null ? null : estimateOneRepMax(parsed.weightKg, parsed.reps),
-      working: isWorkingSessionSetType(set.set_type),
+      working: isWorkingSetType(set.set_type),
       achieved_at_ms: startedAtMs,
       fingerprint: set.fingerprint,
       rules_version: GROUP_EVAL_RULES_VERSION,
