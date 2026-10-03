@@ -164,6 +164,15 @@ at least one working set: `session_id`, `exercise_definition_id`,
   never count, so an old session's marker equals its `pr_e1rm` flag. The
   in-memory session is compared with `deriveExercisePersonalRecord`; a
   definition without an earlier 1RM shows no marker.
+- **Exercise records** (the exercise page's records panel, exercise history's
+  `All-time bests`) fold one definition's rows in the order above: a value
+  must strictly beat the best so far, so a tie across sessions keeps the
+  earliest session, and an equal top weight goes to more reps. Volume counts
+  only rows with `volume_complete`. One query joins each row's best sets and
+  its session's gym. An optional gym scope (or no gym) and an optional
+  completed session to count before (the panel in a completed edit, the live
+  record rule above) narrow the rows; the newest row left names the panel's
+  `Last`, and only that session's sets are read.
 - **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
   `exercise_sets`, `exercise_definitions` (load mode, contribution),
   `user_settings` (the bodyweight toggle) and `body_weight_measurements` queue

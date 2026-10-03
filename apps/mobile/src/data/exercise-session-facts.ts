@@ -4,9 +4,14 @@
 // read never returns facts built from older rows or older rules.
 
 import { and, eq, gte, inArray, isNotNull, isNull, lt, max, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
-import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
+import {
+  canonicalizeWeightForReps,
+  normalizeSessionSetPerformanceStatus,
+} from '@/src/exercise-calculations/set-semantics';
 
 import { loadAsOfWeightResolver } from './bodyweight';
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
@@ -25,6 +30,7 @@ import {
   exerciseSessionFactsStale,
   exerciseSessionFactsState,
   exerciseSets,
+  gyms,
   sessionExercises,
   sessions,
   userSettings,
@@ -335,4 +341,144 @@ export const loadEarlierBestE1rmByDefinition = async (
     }
   }
   return best;
+};
+
+/** Which sessions count toward one exercise's all-time bests. */
+export type ExerciseBestsScope = {
+  exerciseDefinitionId: string;
+  /** Omitted: every gym. `null`: only sessions with no gym. */
+  gymId?: string | null;
+  /** Only the sessions before this completed session, in PR-history order. */
+  beforeSessionId?: string | null;
+};
+
+export type ExerciseBestSession = {
+  sessionId: string;
+  completedAt: Date;
+  gymId: string | null;
+  gymName: string | null;
+};
+
+export type ExerciseBests = {
+  oneRepMax: (ExerciseBestSession & { value: number; weight: number; reps: number }) | null;
+  topWeight: (ExerciseBestSession & { weight: number; reps: number }) | null;
+  /** The best complete session volume. */
+  volume: (ExerciseBestSession & { value: number; workingSets: number }) | null;
+  /** The newest session in scope: every fact row has a working set. */
+  latest: ExerciseBestSession | null;
+};
+
+const bestE1rmSet = alias(exerciseSets, 'best_e1rm_set');
+const topWeightSet = alias(exerciseSets, 'top_weight_set');
+
+const bestsColumns = {
+  sessionId: exerciseSessionFacts.sessionId,
+  completedAt: exerciseSessionFacts.achievedAt,
+  gymId: sessions.gymId,
+  gymName: gyms.name,
+  bestE1rmKg: exerciseSessionFacts.bestE1rmKg,
+  e1rmWeightValue: bestE1rmSet.weightValue,
+  e1rmRepsValue: bestE1rmSet.repsValue,
+  topWeightKg: exerciseSessionFacts.topWeightKg,
+  topWeightRepsValue: topWeightSet.repsValue,
+  volumeKg: exerciseSessionFacts.volumeKg,
+  volumeComplete: exerciseSessionFacts.volumeComplete,
+  workingSets: exerciseSessionFacts.workingSets,
+};
+
+type BestsRow = {
+  sessionId: string;
+  completedAt: Date;
+  gymId: string | null;
+  gymName: string | null;
+  bestE1rmKg: number | null;
+  e1rmWeightValue: string | null;
+  e1rmRepsValue: string | null;
+  topWeightKg: number | null;
+  topWeightRepsValue: string | null;
+  volumeKg: number | null;
+  volumeComplete: boolean;
+  workingSets: number;
+};
+
+// The derivation names its best sets in the same drained transaction, so a
+// missing or unparseable set is a facts bug, not a user state.
+const bestSetReps = (repsValue: string | null): number => {
+  const reps = parseSetReps(repsValue);
+  if (reps === null) throw new Error('exercise session fact names a missing or invalid set');
+  return reps;
+};
+
+const bestSetWeight = (weightValue: string | null, repsValue: string | null): number => {
+  const weight = parseSetWeight(canonicalizeWeightForReps(weightValue ?? '', repsValue ?? ''));
+  if (weight === null) throw new Error('exercise session fact names a missing or invalid set');
+  return weight;
+};
+
+const gymScope = (gymId: string | null | undefined) => {
+  if (gymId === undefined) return undefined;
+  return gymId === null ? isNull(sessions.gymId) : eq(sessions.gymId, gymId);
+};
+
+/** Keeps the rows before `beforeSessionId` in PR-history order. */
+const rowsBefore = (database: LocalDatabase, rows: BestsRow[], beforeSessionId: string | null | undefined) => {
+  if (!beforeSessionId) return rows;
+  const target = database.select({ completedAt: sessions.completedAt }).from(sessions)
+    .where(eq(sessions.id, beforeSessionId)).get();
+  const completedAt = target?.completedAt;
+  if (!completedAt) throw new Error(`session ${beforeSessionId} is not completed`);
+  return rows.filter((row) => compareFactSessionOrder(row, { completedAt, sessionId: beforeSessionId }) < 0);
+};
+
+/**
+ * Folds rows in PR-history order. A value must strictly beat the best so far,
+ * so a tie keeps the earliest session; an equal top weight goes to more reps.
+ */
+const pickBests = (rows: BestsRow[]): ExerciseBests => {
+  const bests: ExerciseBests = { oneRepMax: null, topWeight: null, volume: null, latest: null };
+  for (const row of rows) {
+    const session = { sessionId: row.sessionId, completedAt: row.completedAt, gymId: row.gymId, gymName: row.gymName };
+    if (row.bestE1rmKg !== null && (bests.oneRepMax === null || row.bestE1rmKg > bests.oneRepMax.value)) {
+      bests.oneRepMax = {
+        ...session,
+        value: row.bestE1rmKg,
+        weight: bestSetWeight(row.e1rmWeightValue, row.e1rmRepsValue),
+        reps: bestSetReps(row.e1rmRepsValue),
+      };
+    }
+    if (row.topWeightKg !== null) {
+      const top = bests.topWeight;
+      const reps = bestSetReps(row.topWeightRepsValue);
+      if (top === null || row.topWeightKg > top.weight || (row.topWeightKg === top.weight && reps > top.reps)) {
+        bests.topWeight = { ...session, weight: row.topWeightKg, reps };
+      }
+    }
+    if (row.volumeComplete && row.volumeKg !== null && (bests.volume === null || row.volumeKg > bests.volume.value)) {
+      bests.volume = { ...session, value: row.volumeKg, workingSets: row.workingSets };
+    }
+    bests.latest = session;
+  }
+  return bests;
+};
+
+/**
+ * One exercise's all-time 1RM, top weight and best complete volume, each with
+ * its session, gym and (for 1RM and top weight) the set that holds it, plus
+ * the newest session in scope.
+ */
+export const loadExerciseBests = async (scope: ExerciseBestsScope): Promise<ExerciseBests> => {
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  const rows = database.select(bestsColumns).from(exerciseSessionFacts)
+    .innerJoin(sessions, liveSessionJoin)
+    .leftJoin(gyms, eq(gyms.id, sessions.gymId))
+    .leftJoin(bestE1rmSet, eq(bestE1rmSet.id, exerciseSessionFacts.bestE1rmSetId))
+    .leftJoin(topWeightSet, eq(topWeightSet.id, exerciseSessionFacts.topWeightSetId))
+    .where(and(
+      eq(exerciseSessionFacts.exerciseDefinitionId, scope.exerciseDefinitionId),
+      gymScope(scope.gymId),
+    ))
+    .all()
+    .sort(compareFactSessionOrder);
+  return pickBests(rowsBefore(database, rows, scope.beforeSessionId));
 };

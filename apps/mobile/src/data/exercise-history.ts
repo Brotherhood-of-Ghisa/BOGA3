@@ -12,6 +12,7 @@ import {
 } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { loadExerciseBests } from './exercise-session-facts';
 import {
   exerciseDefinitions,
   exerciseSets,
@@ -137,7 +138,8 @@ export type ExerciseHistoryAggregationInput = {
   appliedTagDefinitionId: string | null;
   appliedGymId?: string | null;
   sessionsInPeriod: ExerciseHistorySessionRow[];
-  sessionsAllTime: ExerciseHistorySessionRow[];
+  /** All-time, gym-scoped like the sessions, never by tag or period. */
+  allTimeBest: ExerciseHistoryBest;
   setsBySessionExerciseId: Record<string, ExerciseHistorySetRow[]>;
   tagsBySessionExerciseId: Record<string, ExerciseHistoryTagRow[]>;
 };
@@ -150,7 +152,14 @@ export type ExerciseHistoryStore = {
     exerciseDefinitionId: string;
     start: Date | null;
     end: Date | null;
+    /** Only this session's blocks. */
+    sessionId?: string;
   }): Promise<ExerciseHistorySessionRow[]>;
+  /** `gymId` omitted: every gym; `null`: sessions with no gym. */
+  loadAllTimeBest(input: {
+    exerciseDefinitionId: string;
+    gymId?: string | null;
+  }): Promise<ExerciseHistoryBest>;
   loadSetsForSessionExercises(input: {
     sessionExerciseIds: string[];
   }): Promise<ExerciseHistorySetRow[]>;
@@ -260,44 +269,6 @@ const buildSessionEntry = (
   };
 };
 
-const computeBest = (
-  entries: ExerciseHistorySessionEntry[]
-): ExerciseHistoryBest => {
-  let bestOneRepMax: ExerciseHistoryBest['estimatedOneRepMax'] = null;
-  let bestTopWeight: ExerciseHistoryBest['topWeight'] = null;
-
-  for (const entry of entries) {
-    if (
-      entry.estimatedOneRepMax !== null &&
-      (bestOneRepMax === null || entry.estimatedOneRepMax > bestOneRepMax.value)
-    ) {
-      bestOneRepMax = {
-        value: entry.estimatedOneRepMax,
-        sessionId: entry.sessionId,
-        completedAt: entry.completedAt,
-      };
-    }
-
-    if (entry.topWeightSet) {
-      const candidate = entry.topWeightSet;
-      if (
-        bestTopWeight === null ||
-        candidate.weight > bestTopWeight.weight ||
-        (candidate.weight === bestTopWeight.weight && candidate.reps > bestTopWeight.reps)
-      ) {
-        bestTopWeight = {
-          weight: candidate.weight,
-          reps: candidate.reps,
-          sessionId: entry.sessionId,
-          completedAt: entry.completedAt,
-        };
-      }
-    }
-  }
-
-  return { estimatedOneRepMax: bestOneRepMax, topWeight: bestTopWeight };
-};
-
 const buildTagOptions = (
   sessionsInPeriod: ExerciseHistorySessionRow[],
   tagsBySessionExerciseId: Record<string, ExerciseHistoryTagRow[]>
@@ -388,23 +359,6 @@ export const aggregateExerciseHistory = (
     )
     .filter((entry) => entry.sets.length > 0);
 
-  const filteredAllTimeRows = appliedGymId
-    ? input.sessionsAllTime.filter((row) =>
-        appliedGymId === 'no-gym' ? (!row.gymId || row.gymId === null) : row.gymId === appliedGymId
-      )
-    : input.sessionsAllTime;
-
-  const allTimeEntries = filteredAllTimeRows
-    .map((row) =>
-      buildSessionEntry(
-        row,
-        input.setsBySessionExerciseId[row.sessionExerciseId] ?? [],
-        input.tagsBySessionExerciseId[row.sessionExerciseId] ?? [],
-        input.exerciseDefinition
-      )
-    )
-    .filter((entry) => entry.sets.length > 0);
-
   return {
     exerciseDefinitionId: input.exerciseDefinition.id,
     exerciseName: input.exerciseDefinition.name,
@@ -416,7 +370,7 @@ export const aggregateExerciseHistory = (
     tagOptions,
     gymOptions,
     sessions,
-    allTimeBest: computeBest(allTimeEntries),
+    allTimeBest: input.allTimeBest,
   };
 };
 
@@ -443,7 +397,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .get()?.enabled ?? false;
     return { ...row, bodyweightCalculationsEnabled, deletedAt: row.deletedAt ?? null };
   },
-  async loadSessionsForExercise({ exerciseDefinitionId, start, end }) {
+  async loadSessionsForExercise({ exerciseDefinitionId, start, end, sessionId }) {
     const database = await bootstrapLocalDataLayer();
     const resolveWeight = loadAsOfWeightResolver(database);
 
@@ -460,6 +414,9 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
     if (end) {
       conditions.push(lt(sessions.completedAt, end));
     }
+    if (sessionId) {
+      conditions.push(eq(sessions.id, sessionId));
+    }
 
     const rows = database
       .select({
@@ -474,7 +431,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
       .leftJoin(gyms, eq(sessions.gymId, gyms.id))
       .where(and(...conditions))
-      .orderBy(desc(sessions.completedAt))
+      .orderBy(desc(sessions.completedAt), asc(sessionExercises.orderIndex))
       .all();
 
     return rows
@@ -490,6 +447,17 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         gymName: row.gymName ?? null,
         ...resolveWeight(row.startedAt),
       }));
+  },
+  async loadAllTimeBest({ exerciseDefinitionId, gymId }) {
+    const { oneRepMax, topWeight } = await loadExerciseBests({ exerciseDefinitionId, gymId });
+    return {
+      estimatedOneRepMax: oneRepMax
+        ? { value: oneRepMax.value, sessionId: oneRepMax.sessionId, completedAt: oneRepMax.completedAt }
+        : null,
+      topWeight: topWeight
+        ? { weight: topWeight.weight, reps: topWeight.reps, sessionId: topWeight.sessionId, completedAt: topWeight.completedAt }
+        : null,
+    };
   },
   async loadSetsForSessionExercises({ sessionExerciseIds }) {
     if (sessionExerciseIds.length === 0) return [];
@@ -579,28 +547,19 @@ export const createExerciseHistoryRepository = (
       end = bounds.end;
     }
 
-    const [sessionsInPeriod, sessionsAllTime] = await Promise.all([
+    const [sessionsInPeriod, allTimeBest] = await Promise.all([
       store.loadSessionsForExercise({
         exerciseDefinitionId: options.exerciseDefinitionId,
         start,
         end,
       }),
-      period === 'all'
-        ? Promise.resolve<ExerciseHistorySessionRow[]>([])
-        : store.loadSessionsForExercise({
-            exerciseDefinitionId: options.exerciseDefinitionId,
-            start: null,
-            end: null,
-          }),
+      store.loadAllTimeBest({
+        exerciseDefinitionId: options.exerciseDefinitionId,
+        ...(appliedGymId ? { gymId: appliedGymId === 'no-gym' ? null : appliedGymId } : {}),
+      }),
     ]);
 
-    const allTimeRows = period === 'all' ? sessionsInPeriod : sessionsAllTime;
-
-    const sessionExerciseIdSet = new Set<string>();
-    for (const row of sessionsInPeriod) sessionExerciseIdSet.add(row.sessionExerciseId);
-    for (const row of allTimeRows) sessionExerciseIdSet.add(row.sessionExerciseId);
-    const sessionExerciseIds = Array.from(sessionExerciseIdSet);
-
+    const sessionExerciseIds = sessionsInPeriod.map((row) => row.sessionExerciseId);
     const [setRows, tagRows] = await Promise.all([
       store.loadSetsForSessionExercises({ sessionExerciseIds }),
       store.loadTagsForSessionExercises({ sessionExerciseIds }),
@@ -612,13 +571,30 @@ export const createExerciseHistoryRepository = (
       appliedTagDefinitionId,
       appliedGymId,
       sessionsInPeriod,
-      sessionsAllTime: allTimeRows,
+      allTimeBest,
       setsBySessionExerciseId: groupBySessionExerciseId(setRows),
       tagsBySessionExerciseId: groupBySessionExerciseId(tagRows),
     });
+  },
+  /** One completed session's blocks of the exercise, in block order, without tags. */
+  async loadSessionEntries(input: {
+    exerciseDefinitionId: string;
+    sessionId: string;
+  }): Promise<ExerciseHistorySessionEntry[]> {
+    const exerciseDefinition = await store.loadExerciseDefinition({
+      exerciseDefinitionId: input.exerciseDefinitionId,
+    });
+    if (!exerciseDefinition) return [];
+    const blocks = await store.loadSessionsForExercise({ ...input, start: null, end: null });
+    const sets = groupBySessionExerciseId(await store.loadSetsForSessionExercises({
+      sessionExerciseIds: blocks.map((row) => row.sessionExerciseId),
+    }));
+    return blocks.map((row) => buildSessionEntry(row, sets[row.sessionExerciseId] ?? [], [], exerciseDefinition));
   },
 });
 
 const defaultExerciseHistoryRepository = createExerciseHistoryRepository();
 
 export const loadExercisePerformanceHistory = defaultExerciseHistoryRepository.load;
+
+export const loadExerciseSessionEntries = defaultExerciseHistoryRepository.loadSessionEntries;

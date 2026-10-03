@@ -66,6 +66,8 @@ const groupBy = <T extends { sessionExerciseId: string }>(rows: T[]): Record<str
   return result;
 };
 
+const NO_BEST = { estimatedOneRepMax: null, topWeight: null };
+
 const buildInput = (
   overrides: Partial<ExerciseHistoryAggregationInput> = {}
 ): ExerciseHistoryAggregationInput => {
@@ -105,7 +107,7 @@ const buildInput = (
     appliedTagDefinitionId: overrides.appliedTagDefinitionId ?? null,
     appliedGymId: overrides.appliedGymId ?? null,
     sessionsInPeriod,
-    sessionsAllTime: overrides.sessionsAllTime ?? sessionsInPeriod,
+    allTimeBest: overrides.allTimeBest ?? NO_BEST,
     setsBySessionExerciseId: overrides.setsBySessionExerciseId ?? groupBy(setRows),
     tagsBySessionExerciseId: overrides.tagsBySessionExerciseId ?? groupBy(tagRows),
   };
@@ -131,7 +133,7 @@ describe('aggregateExerciseHistory', () => {
     expect(benchFirst?.sets[1].setType).toBeNull();
   });
 
-  it('never takes a warm-up heavier than the working sets as the 1RM, top set or all-time best', () => {
+  it('never takes a warm-up heavier than the working sets as the 1RM or top set', () => {
     const summary = aggregateExerciseHistory(
       buildInput({
         setsBySessionExerciseId: groupBy([
@@ -147,8 +149,6 @@ describe('aggregateExerciseHistory', () => {
     expect(withWarmUp?.sets.map((set) => set.setType)).toEqual(['warm_up', 'rir_1']);
     expect(withWarmUp?.topWeightSet).toEqual({ weight: 100, reps: 5 });
     expect(withWarmUp?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
-    expect(summary.allTimeBest.topWeight).toMatchObject({ weight: 100, sessionId: 's1' });
-    expect(summary.allTimeBest.estimatedOneRepMax?.value).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
   });
 
   it('keeps a warm-up-only session with its rows, but no 1RM, top set or volume', () => {
@@ -176,9 +176,6 @@ describe('aggregateExerciseHistory', () => {
           setRow({ setId: 'st-3', sessionExerciseId: 'se1', orderIndex: 2, weightValue: '95', repsValue: '10' }),
         ]),
         sessionsInPeriod: [
-          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z') }),
-        ],
-        sessionsAllTime: [
           sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z') }),
         ],
       })
@@ -281,57 +278,10 @@ describe('aggregateExerciseHistory', () => {
     expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s2']);
   });
 
-  it('scopes all-time best to the applied gym', () => {
-    const summary = aggregateExerciseHistory(
-      buildInput({
-        appliedGymId: 'gym-a',
-        sessionsInPeriod: [
-          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
-        ],
-        sessionsAllTime: [
-          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z'), gymId: 'gym-a', gymName: 'Alpha Gym' }),
-          sessionRow({ sessionId: 's2', sessionExerciseId: 'se2', completedAt: new Date('2026-05-15T16:00:00.000Z'), gymId: 'gym-b', gymName: 'Beta Gym' }),
-        ],
-        setsBySessionExerciseId: {
-          se1: [setRow({ setId: 'st1', sessionExerciseId: 'se1', orderIndex: 0, weightValue: '100', repsValue: '5' })],
-          se2: [setRow({ setId: 'st2', sessionExerciseId: 'se2', orderIndex: 0, weightValue: '150', repsValue: '5' })],
-        },
-      })
-    );
-
-    expect(summary.allTimeBest.topWeight?.weight).toBe(100);
-    expect(summary.allTimeBest.topWeight?.sessionId).toBe('s1');
-  });
-
-  it('computes all-time best from the all-time pool, independent of the period filter', () => {
-    const summary = aggregateExerciseHistory(
-      buildInput({
-        // Period has lighter sets; all-time has a heavier session not in period.
-        sessionsInPeriod: [
-          sessionRow({ sessionId: 's-recent', sessionExerciseId: 'se-recent', completedAt: new Date('2026-05-15T16:00:00.000Z') }),
-        ],
-        sessionsAllTime: [
-          sessionRow({ sessionId: 's-recent', sessionExerciseId: 'se-recent', completedAt: new Date('2026-05-15T16:00:00.000Z') }),
-          sessionRow({ sessionId: 's-old', sessionExerciseId: 'se-old', completedAt: new Date('2025-12-01T16:00:00.000Z') }),
-        ],
-        setsBySessionExerciseId: groupBy([
-          setRow({ setId: 'r1', sessionExerciseId: 'se-recent', orderIndex: 0, weightValue: '80', repsValue: '5' }),
-          setRow({ setId: 'o1', sessionExerciseId: 'se-old', orderIndex: 0, weightValue: '150', repsValue: '3' }),
-        ]),
-        tagsBySessionExerciseId: {},
-      })
-    );
-
-    expect(summary.allTimeBest.topWeight?.weight).toBe(150);
-    expect(summary.allTimeBest.topWeight?.sessionId).toBe('s-old');
-    expect(summary.allTimeBest.estimatedOneRepMax?.sessionId).toBe('s-old');
-  });
-
   it('returns an empty session list and null best when no sessions are present', () => {
     const summary = aggregateExerciseHistory(
       buildInput({
         sessionsInPeriod: [],
-        sessionsAllTime: [],
         setsBySessionExerciseId: {},
         tagsBySessionExerciseId: {},
       })
@@ -339,7 +289,6 @@ describe('aggregateExerciseHistory', () => {
 
     expect(summary.sessions).toEqual([]);
     expect(summary.tagOptions).toEqual([]);
-    expect(summary.allTimeBest).toEqual({ estimatedOneRepMax: null, topWeight: null });
   });
 
   it('excludes unconfirmed sets and sessions that contain no confirmed sets', () => {
@@ -358,7 +307,6 @@ describe('aggregateExerciseHistory', () => {
     const summary = aggregateExerciseHistory(
       buildInput({
         sessionsInPeriod: sessions,
-        sessionsAllTime: sessions,
         setsBySessionExerciseId: groupBy([
           setRow({
             setId: 'confirmed',
@@ -382,7 +330,6 @@ describe('aggregateExerciseHistory', () => {
     );
 
     expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s-confirmed']);
-    expect(summary.allTimeBest.topWeight?.weight).toBe(100);
   });
 
   it('surfaces deleted tags so chips remain visible for past assignments', () => {
@@ -410,9 +357,6 @@ describe('aggregateExerciseHistory', () => {
         sessionsInPeriod: [
           sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z') }),
         ],
-        sessionsAllTime: [
-          sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z') }),
-        ],
         setsBySessionExerciseId: groupBy([
           setRow({ setId: 'st-1', sessionExerciseId: 'se1', orderIndex: 0, weightValue: '', repsValue: '' }),
         ]),
@@ -421,7 +365,14 @@ describe('aggregateExerciseHistory', () => {
     );
 
     expect(summary.sessions).toEqual([]);
-    expect(summary.allTimeBest).toEqual({ estimatedOneRepMax: null, topWeight: null });
+  });
+
+  it('passes the all-time best through: the repository reads it from the facts', () => {
+    const allTimeBest = {
+      estimatedOneRepMax: { value: 120, sessionId: 's-old', completedAt: new Date('2025-12-01T16:00:00.000Z') },
+      topWeight: { weight: 110, reps: 3, sessionId: 's-old', completedAt: new Date('2025-12-01T16:00:00.000Z') },
+    };
+    expect(aggregateExerciseHistory(buildInput({ allTimeBest })).allTimeBest).toBe(allTimeBest);
   });
 });
 
@@ -433,6 +384,7 @@ describe('createExerciseHistoryRepository', () => {
     loadSessionsForExercise: jest.fn().mockResolvedValue([]),
     loadSetsForSessionExercises: jest.fn().mockResolvedValue([]),
     loadTagsForSessionExercises: jest.fn().mockResolvedValue([]),
+    loadAllTimeBest: jest.fn().mockResolvedValue(NO_BEST),
     ...overrides,
   });
 
@@ -450,37 +402,60 @@ describe('createExerciseHistoryRepository', () => {
 
     const now = new Date('2026-05-19T15:00:00.000Z');
     await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 7, now });
-    // Bounded period: two calls (period window + all-time). The bounded one carries the dates.
-    const sevenDayCalls = loadSessionsForExercise.mock.calls.map((args) => args[0]);
-    expect(sevenDayCalls).toContainEqual(
-      expect.objectContaining({
-        exerciseDefinitionId: 'ex-bench',
-        start: new Date('2026-05-12T15:00:00.000Z'),
-        end: now,
-      })
-    );
-    expect(sevenDayCalls).toContainEqual(
-      expect.objectContaining({ start: null, end: null })
-    );
+    // One session read, for the period window; the all-time bests come from the facts.
+    expect(loadSessionsForExercise).toHaveBeenCalledTimes(1);
+    expect(loadSessionsForExercise).toHaveBeenLastCalledWith({
+      exerciseDefinitionId: 'ex-bench',
+      start: new Date('2026-05-12T15:00:00.000Z'),
+      end: now,
+    });
 
     loadSessionsForExercise.mockClear();
     await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 'all', now });
-    // "all" period: single call with null bounds.
     expect(loadSessionsForExercise).toHaveBeenCalledTimes(1);
     expect(loadSessionsForExercise).toHaveBeenLastCalledWith(
       expect.objectContaining({ start: null, end: null })
     );
   });
 
-  it('only loads the all-time session list when a bounded period is requested', async () => {
-    const loadSessionsForExercise = jest.fn().mockResolvedValue([]);
-    const repo = createExerciseHistoryRepository(buildStore({ loadSessionsForExercise }));
+  it('reads the all-time best for the applied gym, never by period or tag', async () => {
+    const best = {
+      estimatedOneRepMax: null,
+      topWeight: { weight: 150, reps: 3, sessionId: 's-old', completedAt: new Date('2025-12-01T16:00:00.000Z') },
+    };
+    const loadAllTimeBest = jest.fn().mockResolvedValue(best);
+    const repo = createExerciseHistoryRepository(buildStore({ loadAllTimeBest }));
 
-    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 'all' });
-    expect(loadSessionsForExercise).toHaveBeenCalledTimes(1);
+    const summary = await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 7, tagDefinitionId: 'tag-a' });
+    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: 'gym-a' });
+    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, gymId: 'no-gym' });
 
-    loadSessionsForExercise.mockClear();
-    await repo.load({ exerciseDefinitionId: exerciseDefinition.id, period: 30 });
-    expect(loadSessionsForExercise).toHaveBeenCalledTimes(2);
+    expect(summary?.allTimeBest).toBe(best);
+    expect(loadAllTimeBest.mock.calls.map(([input]) => input)).toEqual([
+      { exerciseDefinitionId: 'ex-bench' },
+      { exerciseDefinitionId: 'ex-bench', gymId: 'gym-a' },
+      { exerciseDefinitionId: 'ex-bench', gymId: null },
+    ]);
+  });
+
+  it('loads one session\'s blocks of the exercise, without tags', async () => {
+    const loadSessionsForExercise = jest.fn().mockResolvedValue([
+      sessionRow({ sessionId: 's1', sessionExerciseId: 'se1', completedAt: new Date('2026-05-12T16:00:00.000Z') }),
+    ]);
+    const loadSetsForSessionExercises = jest.fn().mockResolvedValue([
+      setRow({ setId: 'st-1', sessionExerciseId: 'se1', orderIndex: 0 }),
+    ]);
+    const loadTagsForSessionExercises = jest.fn();
+    const repo = createExerciseHistoryRepository(
+      buildStore({ loadSessionsForExercise, loadSetsForSessionExercises, loadTagsForSessionExercises })
+    );
+
+    const entries = await repo.loadSessionEntries({ exerciseDefinitionId: 'ex-bench', sessionId: 's1' });
+
+    expect(loadSessionsForExercise).toHaveBeenCalledWith({ exerciseDefinitionId: 'ex-bench', sessionId: 's1', start: null, end: null });
+    expect(entries.map((entry) => [entry.sessionId, entry.sets.map((set) => set.setId), entry.tagIds])).toEqual([['s1', ['st-1'], []]]);
+    expect(loadTagsForSessionExercises).not.toHaveBeenCalled();
+    expect(await createExerciseHistoryRepository(buildStore({ loadExerciseDefinition: jest.fn().mockResolvedValue(null) }))
+      .loadSessionEntries({ exerciseDefinitionId: 'missing', sessionId: 's1' })).toEqual([]);
   });
 });

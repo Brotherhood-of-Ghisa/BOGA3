@@ -1,4 +1,5 @@
 import type { ExerciseHistorySessionEntry } from '@/src/data/exercise-history';
+import type { ExerciseBests } from '@/src/data/exercise-session-facts';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
@@ -11,8 +12,8 @@ import type { ExerciseRecordBaseline } from './exercise-page-model';
  * The exercise page's records panel (`ux-rules` §14a.4): the
  * lifter's all-time 1RM, heaviest weight and best session volume for one
  * exercise, each with where it was set, and the sets of the previous session.
- * Derived from the completed history `loadExercisePerformanceHistory` returns
- * (confirmed performed sets only, the active session excluded). Only working
+ * The records come from the exercise session facts (`ExerciseBests`); `Last`
+ * is built from that one session's completed history entries. Only working
  * sets count toward a record or a summary figure; a warm-up keeps its own line
  * in `Last`, and a session with no working set is not one for this exercise.
  */
@@ -137,67 +138,39 @@ const bestOneRepMax = (sets: RecordSet[]) =>
     null
   );
 
-/** `entries` in any order; the newest session is `last`. */
-export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): ExerciseRecordsSummary => {
-  const blocks = groupBySession(entries);
-  const records: ExerciseRecords = {
-    oneRepMax: null,
-    maxWeight: null,
-    volume: null,
-  };
+const sessionOf = (best: { completedAt: Date; gymId: string | null; gymName: string | null }) => ({
+  completedAt: best.completedAt,
+  gymId: best.gymId,
+  gymName: best.gymName,
+});
 
-  // Oldest first, so a tie keeps the session that set the value first.
-  for (const block of [...blocks].reverse()) {
-    for (const set of block.workingSets) {
-      if (set.oneRepMax !== null && (records.oneRepMax === null || set.oneRepMax > records.oneRepMax.value)) {
-        records.oneRepMax = {
-          value: set.oneRepMax,
-          completedAt: block.completedAt,
-          weight: set.weight,
-          reps: set.reps,
-          gymId: block.gymId,
-          gymName: block.gymName,
-        };
-      }
-      const max = records.maxWeight;
-      if (max === null || set.weight > max.weight || (set.weight === max.weight && set.reps > max.reps)) {
-        records.maxWeight = {
-          weight: set.weight,
-          reps: set.reps,
-          completedAt: block.completedAt,
-          gymId: block.gymId,
-          gymName: block.gymName,
-        };
-      }
-    }
-    const volume = sumVolume(block.workingSets);
-    if (volume !== null && (records.volume === null || volume > records.volume.value)) {
-      records.volume = {
-        value: volume,
-        completedAt: block.completedAt,
-        setCount: block.workingSets.length,
-        gymId: block.gymId,
-        gymName: block.gymName,
-      };
-    }
-  }
+export const exerciseRecordsFrom = (bests: ExerciseBests): ExerciseRecords => ({
+  oneRepMax: bests.oneRepMax
+    ? { ...sessionOf(bests.oneRepMax), value: bests.oneRepMax.value, weight: bests.oneRepMax.weight, reps: bests.oneRepMax.reps }
+    : null,
+  maxWeight: bests.topWeight
+    ? { ...sessionOf(bests.topWeight), weight: bests.topWeight.weight, reps: bests.topWeight.reps }
+    : null,
+  volume: bests.volume
+    ? { ...sessionOf(bests.volume), value: bests.volume.value, setCount: bests.volume.workingSets }
+    : null,
+});
 
-  const newest = blocks[0];
+/** `entries` in any order; the newest session with a working set is `Last`. */
+export const deriveLastSession = (entries: ExerciseHistorySessionEntry[]): LastSession | null => {
+  const newest = groupBySession(entries)[0];
+  if (!newest) return null;
+  const volume = sumVolume(newest.workingSets);
   return {
-    records,
-    last: newest
-      ? {
-          completedAt: newest.completedAt,
-          gymId: newest.gymId,
-          gymName: newest.gymName,
-          oneRepMax: bestOneRepMax(newest.workingSets),
-          maxWeight: Math.max(...newest.workingSets.map((set) => set.weight)),
-          volume: sumVolume(newest.workingSets),
-          knownVolume: newest.workingSets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
-          volumeComplete: sumVolume(newest.workingSets) !== null,
-          sets: newest.sets,
-        }
-      : null,
+    completedAt: newest.completedAt,
+    gymId: newest.gymId,
+    gymName: newest.gymName,
+    oneRepMax: bestOneRepMax(newest.workingSets),
+    maxWeight: Math.max(...newest.workingSets.map((set) => set.weight)),
+    volume,
+    knownVolume: newest.workingSets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
+    volumeComplete: volume !== null,
+    sets: newest.sets,
   };
 };
 

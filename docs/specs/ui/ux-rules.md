@@ -713,7 +713,10 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
     with its figure in bold Plex Mono `record` (brass: the all-time best, the
     one superlative, T10-D2) over its date in Plex Mono `ink-muted`; a row
     opens the session that holds it. A missing best is `—` in `ink-faint` and
-    opens nothing. The label is `1RM`, never `Est. 1RM` (G7).
+    opens nothing. The label is `1RM`, never `Est. 1RM` (G7). The bests are
+    all-time whatever the period or tag, scoped by the gym filter (`No gym`
+    included), and read from the exercise session facts (spec 05); a best tied
+    across sessions belongs to the earliest session.
 16. Each session in view is View Session's exercise card (`ExerciseSetsCard`,
     T10-D1), a link to View Session: the header is the completion stamp
     (`YYYY-MM-DD HH:mm`, Plex Mono) and `<n> sets`; under it the gym (`No gym`
@@ -808,7 +811,12 @@ unchanged. What differs is presentation:
    when only the weight beat the baseline. The records panel counts working
    sets only (§5.11): records, their baseline and the `Last` summary read working
    sets, `Last` is the newest session with a working set, and its set list still
-   shows that session's warm-up lines. `Records` | `Last` chooses what the
+   shows that session's warm-up lines. Records and `Last` read the exercise
+   session facts (spec 05): a record tied across sessions belongs to the
+   earliest session, and an equal top weight goes to more reps. The current-gym
+   filter scopes both. A completed session being edited (§14b.7) counts only
+   the sessions before it, the session view's live record rule (spec 05, "Live
+   record markers"), so `Last` is the session before it. `Records` | `Last` chooses what the
    panel shows and never expands or collapses it; only the chevron does.
    Collapsed, its `1RM` / `Max` / `Vol` row sums up the chosen view: the
    all-time records, or the previous session's best 1RM, heaviest weight and
