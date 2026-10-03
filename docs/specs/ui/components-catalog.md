@@ -35,7 +35,10 @@ Brief entrypoint inventory of the current reusable UI component set.
 - `apps/mobile/components/session-list/`
   - shared building blocks originally extracted from the retired session-list
     screen (summary line, active-session row, history list, data hook); now
-    consumed by Progress/`stats-history`, Today, and session-list flows
+    consumed by Progress/`stats-history` and session-list flows
+- `apps/mobile/components/today/`
+  - Today's Progress card: the week figures and their share bars, the month
+    chart, the latest-session row and the progress read hook
 - `apps/mobile/components/heatmaps/` and `apps/mobile/components/stats/`
   - Progress's calendar heatmaps and its history sheet (`DailyHeatmap` /
     `WeeklyHeatmap`, and `HistorySheet` below)
@@ -322,7 +325,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/session-list/session-summary-line.tsx`
 - Purpose:
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by
-    `ActiveSessionRow`, `HistoryList`, Today recents, and Progress history
+    `ActiveSessionRow`, `HistoryList`, and Progress history
   - figures in Plex Mono (`ink` for the start and duration, `ink-muted` for the
     counts), the gym in Source Sans, `·` separators in `ink-faint` (DLM-T03)
 
@@ -546,6 +549,37 @@ Brief entrypoint inventory of the current reusable UI component set.
   - covered by `apps/mobile/__tests__/gyms-screen.test.tsx`,
     `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
     `ios-session-view` lane
+
+19. Today's Progress card
+- Folder: `apps/mobile/components/today/`; the read is
+  `apps/mobile/src/progress-summary/`
+- Purpose (target `design-targets/today-landing.md`; semantics `ux-rules.md` §7):
+  - `TodayProgressCard` — one `Card`: `WeekFigures`, a `rule-soft` hairline,
+    `MonthPace`, a hairline, then `Latest session` with its `All sessions`
+    text button and the latest-session link row (summary line, `W/sets ·
+    exercises`, the exercise names on one ellipsised line, a `record` PR count
+    when it has one). testIDs `today-progress-card`, `today-all-sessions-button`,
+    `today-latest-session` (`-start`, `-figures`, `-exercises`, `-prs`)
+  - `WeekFigures` — `This week` with the Mon–Sun range in `ink-faint`, then
+    `Sessions`, `W/sets` and `PRs` (Plex Mono 700; a non-zero PR count in
+    `record` with its `arrow-up`), each over a `ShareBar` and `of <n> last wk`.
+    testIDs `today-progress-week` (`-range`), `today-progress-week-<sessions |
+    working-sets | prs>` (`-value`, `-bar`, `-bar-fill`, `-previous`)
+  - `ShareBar` — a 6pt bar: a `viz0` track and a `viz3` fill for a share of a
+    total, full in `viz4` once the total is reached
+  - `MonthPace` — `<Month> so far` and its working sets, the signed difference
+    from the previous month at the same day with `ahead of / behind / level
+    with <Mon>'s pace`, a `react-native-svg` cumulative chart (this month
+    `ink` over a `viz0` fill, the previous month dashed `ink-faint`, the
+    projection dotted `ink-ghost`, a dot on each line at today, `1` / today /
+    last-day axis labels) that is one accessible image labelled with its
+    summary sentence, and the `ink-muted` summary line. testIDs
+    `today-progress-month` (`-working-sets`, `-difference`, `-pace`,
+    `-summary`), `today-progress-chart`
+  - `useTodayProgress` — the read on every focus: loading only before the
+    first result, a retryable error
+  - covered by `apps/mobile/__tests__/today-screen.test.tsx` (over real data)
+    and `today-progress-format.test.ts` (words and chart geometry)
 
 ### Optional bodyweight settings and readings
 

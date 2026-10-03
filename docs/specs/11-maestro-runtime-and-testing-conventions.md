@@ -336,7 +336,11 @@ Priority rule:
    - `maestroHistory=fail-once|slow-once` delays the next exercise-history read, optionally failing it, for browser loading/error/Retry evidence (development only);
    - `fixture=session-view` to seed that history plus one active session drawn
      like the accepted `V6-Session` artboard (`src/maestro/session-view-fixture.ts`);
-   - `teleport=session-list|exercise-catalog|completed-session|exercise-page|session-view` to land on the target screen (`session-view` needs `sessionId`, an active draft or a completed session to edit; `exercise-page` also needs `sessionExerciseId`);
+   - `fixture=today-progress` to seed a completed history dated relative to now
+     (the previous month every third day, this month every other day) that
+     draws every part of Today's Progress card, for gallery captures
+     (`src/maestro/today-progress-fixture.ts`; no committed flow uses it);
+   - `teleport=session-list|exercise-catalog|completed-session|exercise-page|session-view|today` to land on the target screen (`session-view` needs `sessionId`, an active draft or a completed session to edit; `exercise-page` also needs `sessionExerciseId`);
    - optional `intent` and `sessionId` when the target route needs them;
    - `presentation=completion` to open a completed session in its completion
      presentation rather than the historical summary;

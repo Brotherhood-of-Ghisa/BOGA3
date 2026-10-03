@@ -1,8 +1,7 @@
 import type { CurrentGroupStreamItem as StreamItem } from '@/src/groups/metric-wire';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
 import { useIsFocused, useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   GroupInlineError,
@@ -14,32 +13,12 @@ import {
   pickInlineError,
 } from '@/components/groups';
 import {
-  DEFAULT_SESSION_LIST_DATA_CLIENT,
-  DEFAULT_SESSION_LIST_ITEMS,
-  SessionSummaryLine,
-  formatCompactDuration,
-  formatDateTimeStamp,
-  formatExerciseCount,
-  formatLocationLabel,
-  formatSetCount,
-  useSessionListData,
-  type SessionListDataClient,
-  type SessionListItem,
-} from '@/components/session-list';
-import {
-  ActionButton,
-  Card,
-  Icon,
-  ListRow,
-  PageHeader,
-  ScreenScroll,
-  SectionHeader,
-  StatePanel,
-  uiFonts,
-  uiRoles,
-  uiSpace,
-  uiTypography,
-} from '@/components/ui';
+  TodayProgressCard,
+  useTodayProgress,
+  type TodayProgressLoader,
+  type TodayProgressState,
+} from '@/components/today';
+import { Card, ScreenScroll, SectionHeader, StatePanel, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   buildStreamViewModel,
@@ -48,42 +27,8 @@ import {
   type GroupApiError,
 } from '@/src/groups';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
-import {
-  DEFAULT_SESSION_ENTRY_COORDINATOR,
-  type PlannedSessionMaterializer,
-  type SessionEntryCoordinator,
-} from '@/src/session-entry';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
-const RECENT_SESSION_LIMIT = 3;
 const SOCIAL_ACTIVITY_LIMIT = 3;
-
-const completedSessionAccessibilityLabel = (session: SessionListItem): string => {
-  const duration = session.durationDisplay || formatCompactDuration(session.durationSec);
-  const location = formatLocationLabel(session.gymName);
-
-  return [
-    `Completed session on ${formatDateTimeStamp(session.completedAt ?? session.startedAt)}`,
-    duration,
-    formatSetCount(session.setCount),
-    formatExerciseCount(session.exerciseCount),
-    location ? `at ${location}` : null,
-  ]
-    .filter((part): part is string => part !== null)
-    .join(', ');
-};
-
-export type TodayPlanState =
-  | { status: 'unavailable' }
-  | { status: 'loading' }
-  | { status: 'empty' }
-  | { status: 'error'; message: string; retry?: () => void }
-  | {
-      status: 'ready';
-      title: string;
-      detail: string;
-      materialize: PlannedSessionMaterializer;
-    };
 
 export type TodaySocialState =
   | { status: 'auth-unavailable' }
@@ -99,114 +44,38 @@ export type TodaySocialState =
     };
 
 export type TodayScreenProps = {
-  dataClient?: SessionListDataClient;
-  initialSessions?: SessionListItem[];
   isFocused?: boolean;
-  planState?: TodayPlanState;
-  sessionEntry?: Pick<SessionEntryCoordinator, 'startPlannedOrResume'>;
+  // The progress read and its clock; the route uses the device's.
+  loadProgress?: TodayProgressLoader;
+  now?: () => Date;
   socialState: TodaySocialState;
 };
 
-export function TodayScreen({
-  dataClient,
-  initialSessions = DEFAULT_SESSION_LIST_ITEMS,
-  isFocused = true,
-  planState = { status: 'unavailable' },
-  sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
-  socialState,
-}: TodayScreenProps) {
+// Today has no title and no primary action (`design-targets/today-landing.md`):
+// it opens on the Progress card, then the group activity.
+export function TodayScreen({ isFocused = true, loadProgress, now, socialState }: TodayScreenProps) {
   const router = useRouter();
-  const [planLaunchError, setPlanLaunchError] = useState<string | null>(null);
-  const [isStartingPlan, setIsStartingPlan] = useState(false);
-  const planLaunchInFlightRef = useRef(false);
-  const { sessions, isLoadingSessions, loadErrorMessage, loadedAtMs, reloadSessions } = useSessionListData({
-    dataClient,
-    initialSessions,
-    showDeletedSessions: false,
-    isFocused,
-  });
-
-  const { activeSession, recentSessions } = useMemo(() => {
-    const active = sessions.find(
-      (session) => session.status === 'active' && session.deletedAt === null,
-    );
-    const recent = sessions
-      .filter(
-        (session) =>
-          session.status === 'completed' &&
-          session.deletedAt === null &&
-          session.completedAt !== null,
-      )
-      .sort(
-        (left, right) =>
-          new Date(right.completedAt ?? 0).getTime() -
-          new Date(left.completedAt ?? 0).getTime(),
-      )
-      .slice(0, RECENT_SESSION_LIMIT);
-
-    return { activeSession: active, recentSessions: recent };
-  }, [sessions]);
-
-  const startPlan = async () => {
-    if (planState.status !== 'ready' || planLaunchInFlightRef.current) {
-      return;
-    }
-
-    planLaunchInFlightRef.current = true;
-    setIsStartingPlan(true);
-    setPlanLaunchError(null);
-    try {
-      const entry = await sessionEntry.startPlannedOrResume(planState.materialize);
-      router.push(sessionViewHref(entry.sessionId));
-    } catch {
-      setPlanLaunchError("Couldn't start this planned session. Try again.");
-    } finally {
-      planLaunchInFlightRef.current = false;
-      setIsStartingPlan(false);
-    }
-  };
+  const { state: progressState, retry: retryProgress } = useTodayProgress({ isFocused, load: loadProgress, now });
 
   return (
     <ScreenScroll
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="today-screen">
-      <PageHeader intro="Your next workout, group activity, and recent training at a glance." title="Today" />
-
-      <View style={styles.section} testID="today-training-section">
-        <SectionHeader title={activeSession ? 'Workout in progress' : 'Next workout'} />
-        {activeSession ? (
-          <Card style={styles.card} testID="today-active-session-card">
-            <View style={styles.cardCopy}>
-              {/* "Current" is the ring glyph and the words, never a colour (G3). */}
-              <View style={styles.statusRow}>
-                <Icon name="set-current" size="sm" testID="today-active-session-glyph" />
-                <Text allowFontScaling={false} style={styles.cardTitle}>Active session</Text>
-              </View>
-              <SessionSummaryLine
-                nowMs={loadedAtMs}
-                session={activeSession}
-                testIdPrefix={`today-active-session-${activeSession.id}`}
-              />
-            </View>
-            <ActionButton
-              label="Resume workout"
-              onPress={() => router.push(sessionViewHref(activeSession.id))}
-              testID="today-resume-session-button"
-              variant="primary"
-            />
-          </Card>
-        ) : (
-          <TodayPlanCard
-            errorMessage={planLaunchError}
-            isStarting={isStartingPlan}
-            onOpenTrain={() => router.push('/train')}
-            onStart={() => {
-              void startPlan();
-            }}
-            planState={planState}
-          />
-        )}
+      <View style={styles.section} testID="today-progress-section">
+        <SectionHeader
+          action={{ label: 'View progress', onPress: () => router.push('/progress'), testID: 'today-view-progress-button' }}
+          title="Progress"
+        />
+        <TodayProgressSection
+          onOpenSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
+          onOpenSessions={() => router.push('/sessions')}
+          onOpenTrain={() => router.push('/train')}
+          onRetry={() => {
+            void retryProgress();
+          }}
+          state={progressState}
+        />
       </View>
 
       <View style={styles.section} testID="today-social-section">
@@ -223,142 +92,58 @@ export function TodayScreen({
           socialState={socialState}
         />
       </View>
-
-      <View style={styles.section} testID="today-recents-section">
-        <SectionHeader
-          action={{ label: 'View progress', onPress: () => router.push('/progress'), testID: 'today-view-progress-button' }}
-          title="Recent sessions"
-        />
-        {isLoadingSessions ? (
-          <StatePanel fill={false} kind="loading" testID="today-recents-loading" title="Loading sessions…" />
-        ) : loadErrorMessage ? (
-          <Card>
-            <StatePanel
-              action={{
-                label: 'Retry',
-                onPress: () => {
-                  void reloadSessions();
-                },
-                testID: 'today-recents-error-retry',
-              }}
-              body={loadErrorMessage}
-              fill={false}
-              kind="error"
-              testID="today-recents-error"
-              title="Couldn't load recent sessions"
-            />
-          </Card>
-        ) : recentSessions.length === 0 ? (
-          <Card>
-            <StatePanel
-              action={{ label: 'Open Train', onPress: () => router.push('/train'), testID: 'today-empty-open-train' }}
-              body="Completed workouts will appear here. Start from Train when you're ready."
-              fill={false}
-              testID="today-recents-empty"
-              title="No sessions yet"
-            />
-          </Card>
-        ) : (
-          <Card>
-            {recentSessions.map((session, index) => (
-              <ListRow
-                accessibilityHint="Opens the completed session"
-                accessibilityLabel={completedSessionAccessibilityLabel(session)}
-                density="list"
-                divider={index > 0}
-                key={session.id}
-                onPress={() => router.push(`/completed-session/${session.id}`)}
-                testID={`today-recent-session-${session.id}`}
-                trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}>
-                <View style={styles.recentSummary}>
-                  <SessionSummaryLine
-                    session={session}
-                    testIdPrefix={`today-recent-session-summary-${session.id}`}
-                  />
-                </View>
-              </ListRow>
-            ))}
-          </Card>
-        )}
-      </View>
     </ScreenScroll>
   );
 }
 
-function TodayPlanCard({
-  errorMessage,
-  isStarting,
+function TodayProgressSection({
+  onOpenSession,
+  onOpenSessions,
   onOpenTrain,
-  onStart,
-  planState,
+  onRetry,
+  state,
 }: {
-  errorMessage: string | null;
-  isStarting: boolean;
+  onOpenSession: (sessionId: string) => void;
+  onOpenSessions: () => void;
   onOpenTrain: () => void;
-  onStart: () => void;
-  planState: TodayPlanState;
+  onRetry: () => void;
+  state: TodayProgressState;
 }) {
-  if (planState.status === 'loading') {
-    return <StatePanel fill={false} kind="loading" testID="today-plan-loading" title="Loading your plan…" />;
+  if (state.status === 'loading') {
+    return <StatePanel fill={false} kind="loading" testID="today-progress-loading" title="Loading your progress…" />;
   }
 
-  if (planState.status === 'error') {
+  if (state.status === 'error') {
     return (
       <Card>
         <StatePanel
-          action={{
-            label: planState.retry ? 'Retry' : 'Open Train',
-            onPress: planState.retry ?? onOpenTrain,
-            testID: 'today-plan-error-action',
-          }}
-          body={planState.message}
+          action={{ label: 'Retry', onPress: onRetry, testID: 'today-progress-error-retry' }}
+          body={state.message}
           fill={false}
           kind="error"
-          testID="today-plan-error"
-          title="Couldn't load your plan"
+          testID="today-progress-error"
+          title="Couldn't load your progress"
         />
       </Card>
     );
   }
 
-  if (planState.status === 'ready') {
+  if (state.progress.status === 'empty') {
     return (
-      <Card style={styles.card} testID="today-planned-session-card">
-        <View style={styles.cardCopy}>
-          <Text allowFontScaling={false} style={styles.cardTitle}>{planState.title}</Text>
-          <Text allowFontScaling={false} style={styles.cardBody}>{planState.detail}</Text>
-          {errorMessage ? (
-            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="today-plan-launch-error">
-              {errorMessage}
-            </Text>
-          ) : null}
-        </View>
-        <ActionButton
-          disabled={isStarting}
-          label={isStarting ? 'Starting…' : 'Start planned workout'}
-          onPress={onStart}
-          testID="today-start-planned-session-button"
-          variant="primary"
+      <Card>
+        <StatePanel
+          action={{ label: 'Open Train', onPress: onOpenTrain, testID: 'today-empty-open-train' }}
+          body="Log a workout and your sessions, working sets and PRs show up here, against last month."
+          fill={false}
+          testID="today-progress-empty"
+          title="Your week starts here"
         />
       </Card>
     );
   }
 
-  const unavailable = planState.status === 'unavailable';
   return (
-    <Card>
-      <StatePanel
-        action={{ label: 'Open Train', onPress: onOpenTrain, testID: 'today-open-train-button' }}
-        body={
-          unavailable
-            ? 'Personal planning is warming up. Empty workouts are ready now in Train.'
-            : 'Nothing is scheduled. Open Train to start an empty workout or manage your plan.'
-        }
-        fill={false}
-        testID={unavailable ? 'today-plan-unavailable' : 'today-plan-empty'}
-        title={unavailable ? 'Watch this space 👀' : 'No workout planned'}
-      />
-    </Card>
+    <TodayProgressCard onOpenSession={onOpenSession} onOpenSessions={onOpenSessions} progress={state.progress} />
   );
 }
 
@@ -505,11 +290,7 @@ export default function TodayRoute() {
   }
 
   return (
-    <TodayScreen
-      dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
-      isFocused={isFocused}
-      socialState={socialState}
-    />
+    <TodayScreen isFocused={isFocused} socialState={socialState} />
   );
 }
 
@@ -521,43 +302,7 @@ const styles = StyleSheet.create({
   section: {
     gap: uiSpace.md,
   },
-  card: {
-    padding: uiSpace.md,
-    gap: uiSpace.md,
-  },
-  cardCopy: {
-    gap: uiSpace.sm,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  cardTitle: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  cardBody: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
   list: {
     gap: uiSpace.sm,
-  },
-  recentSummary: {
-    paddingVertical: uiSpace.sm,
-  },
-  errorText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.danger,
   },
 });

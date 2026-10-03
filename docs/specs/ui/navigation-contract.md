@@ -33,12 +33,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   those destinations. Canonical routes are visible; preserved roots are
   registered with `href: null` and map to their canonical owner when opened
   directly.
-  `/today` now renders its real overview by composing the existing active/recent
-  session repository and joined-group stream; the planning slot reports the
-  current unavailable dependency instead of inventing plan data.
-  `/train` now renders its real session-entry hub. Today and Train share one
-  coordinator that rechecks for an active draft and serializes empty/planned
-  launch requests before persistence or materialization.
+  `/today` is a landing page: the local progress summary and the joined-group
+  stream. It starts and resumes nothing.
+  `/train` now renders its real session-entry hub, through one coordinator that
+  rechecks for an active draft and serializes empty/planned launch requests
+  before persistence or materialization.
   `/progress` now renders the exact existing Stats / History implementation;
   `/stats-history` remains available with unchanged behavior as its legacy path.
   `/more` renders the secondary-feature hub.
@@ -59,21 +58,17 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - composes an active-session resume or planning state, a bounded joined-group
-    stream snapshot, and the three most recent non-deleted completed sessions
-    from the existing feature hooks/repository
+  - composes the Progress card (the local progress summary, read again on each
+    focus) and a bounded joined-group stream snapshot
+  - Progress: `View progress` opens `/progress`, `All sessions` opens
+    `/sessions`, the latest-session row opens `/completed-session/[sessionId]`,
+    and with no completed session the empty panel's `Open Train` opens
+    `/train` (transition 55). Nothing on Today opens `/session/<id>`: an
+    active workout is reached from Train
   - group activity preserves signed-out, auth-unavailable, cached/offline,
     missing-data, and inline-error states; a session card opens the
     friend-session route, while a record card or membership row opens
     `/groups?groupId=<groupId>` (records are read-only here, with no Certify)
-  - an active session replaces the planned-session action and resumes at
-    `/session/<id>` (transition 46); any future ready plan is launched through the shared
-    active-draft coordinator; recent rows open
-    `/completed-session/[sessionId]` and the section-level action opens
-    `/progress`
-  - until the separate planning milestone ships a read/materialization API, the
-    planning slot uses the approved `Watch this space 👀` placeholder and links
-    to `/train`; no scheduled data or materialization behavior is synthesized
 
 1c. `/train` (canonical tab)
 - File: `apps/mobile/app/(tabs)/train.tsx`
@@ -498,7 +493,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
 45. `/today` -> `/groups?groupId=<groupId>`
    - a Group activity record card or membership row
-46. `/today`, `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
+46. `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
    - every active-session entry (Resume, a new launch, Sessions' review/complete,
      and the append of transition 9), through `sessionViewHref` (`router.push`)
 47. `/session/<sessionId>` -> `/completed-session/<sessionId>?presentation=completion`
@@ -520,6 +515,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
      of the `Bodyweight calculations` preference; header Back returns to
      Settings. Workout/session routes never navigate to reading entry or
      history, so the dated kg timeline is managed only from Settings
+55. `/today` -> `/progress`, `/sessions`, `/completed-session/<sessionId>`, `/train`
+   - the Progress card (`router.push`): `View progress`, `All sessions`, the
+     latest-session row, and the empty panel's `Open Train`. A session deleted
+     since the read is gone on return: Today reads again on focus
 
 Note:
 

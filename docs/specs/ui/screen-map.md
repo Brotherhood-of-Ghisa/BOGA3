@@ -25,33 +25,33 @@ Brief entrypoint map of the current mobile screens.
 1b. `/today` (canonical tab)
 - File: `apps/mobile/app/(tabs)/today.tsx`
 - Purpose:
-  - concise orientation surface for current personal training, joined-group
-    activity, and recent completed sessions
+  - a landing page: how this week and this month are going, the latest
+    session, and joined-group activity, each linking to its full screen
 - Key states (high level):
-  - an active draft takes priority and exposes one resume action; without one,
-    the planning slot renders ready/loading/empty/error/unavailable states
+  - Progress (`components/today/`, from `src/progress-summary`): this week's
+    sessions, working sets and PRs, each with a bar against last week's whole
+    total; the month's working sets against the previous month at the same
+    day, a cumulative line chart with a projection, and one summary line; the
+    latest completed session as one link row. Loading and a retryable error
+    are `StatePanel`s; with no completed session, `Your week starts here` with
+    `Open Train`. Read again on every focus, keeping the figures on screen
   - group activity is bounded to the three newest session, record, or
     membership items visible to the user's joined groups (certified or not);
     record cards are read-only here (no `Certify`) and open the Groups screen
     on their group, as membership rows do; link and record-removed items stay
     in the full Groups feed. Today preserves auth-unavailable, signed-out,
     cached/offline, missing-data, empty, and inline-error behavior
-  - recent activity is bounded to the three newest non-deleted completed
-    sessions and preserves repository loading/error/empty behavior
-- Presentation (design language, DLM-T03): `paper` ground, a `PageHeader`
-  and one `SectionHeader` per section (its `View groups` / `View progress`
-  link a caps text button). An active workout is a `Card` marked by the
-  `set-current` ring and "Active session", with `Resume workout` as the one
-  `accent`. The recent sessions are one `Card` of `ListRow`s. State panels are
-  `StatePanel`s. The group activity items are the Groups stream's own cards
-  and panels (DLM-T11: session and record `Card`s, the offline `Notice`)
-  - until the separate planning milestone supplies its read/materialization
-    interface, the planning slot uses the approved `Watch this space 👀`
-    placeholder and links to Train without inventing plan data
+  - no in-progress workout and no plan: Train owns starting and resuming
+- Presentation: `design-targets/today-landing.md`. `paper` ground, no page
+  title, one `SectionHeader` per section (`View progress` / `View groups` caps
+  text buttons), each section one `Card`. No `accent`: Today has no primary
+  action; `record` marks PRs and the `viz` ramp draws the bars and the chart
+  fill. The group activity items are the Groups stream's own cards and panels
+  (DLM-T11: session and record `Card`s, the offline `Notice`)
 - Key exits:
-  - `/session/<id>`, `/train`, `/groups`, `/group/[groupId]`,
-    `/group-session/[memberId]/[sessionId]`,
-    `/completed-session/[sessionId]`, `/progress`, and `/sign-in`
+  - `/progress`, `/sessions`, `/completed-session/[sessionId]`, `/train`,
+    `/groups`, `/group/[groupId]`, `/group-session/[memberId]/[sessionId]`,
+    and `/sign-in`
 
 1c. `/train` (canonical tab)
 - File: `apps/mobile/app/(tabs)/train.tsx`
@@ -67,7 +67,8 @@ Brief entrypoint map of the current mobile screens.
   - planning loading/error/empty/ready/unavailable states; production uses the
     approved `Watch this space 👀` placeholder until M23 supplies a plan
     read/materialization and management interface
-- Presentation (design language, DLM-T03): as Today. One `accent` at a time:
+- Presentation (design language, DLM-T03): `paper` ground, a `PageHeader`
+  and one `SectionHeader` per section. One `accent` at a time:
   `Resume workout`, or `Start planned workout` when a plan is ready (with
   `Start empty workout` as an outline), else `Start empty workout`
 - Key exits:
