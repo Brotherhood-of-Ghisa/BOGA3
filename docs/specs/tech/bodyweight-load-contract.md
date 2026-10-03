@@ -107,7 +107,8 @@ or achievement. Invalid input never becomes zero implicitly.
 
 Top weight is always the highest raw entered Weight in kg. It never includes
 bodyweight contribution and never changes after a preference, contribution or
-reading edit. Warm-ups remain eligible for load metrics but not working sets;
+reading edit. A warm-up keeps its own per-set load metrics but is not a
+working set, and never feeds a record, PR or best (`ux-rules.md` §5.11);
 planned, unperformed, invalid, deleted and tombstoned rows remain ineligible.
 
 For muscle analytics, ordinary total input contributes `E / 2` per side and

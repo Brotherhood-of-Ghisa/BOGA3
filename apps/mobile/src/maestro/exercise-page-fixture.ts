@@ -55,9 +55,9 @@ const bench = (id: string, sets: SessionDraftExerciseInput['sets']): SessionDraf
   sets,
 });
 
-// Oldest first. The older session holds the volume record (2560, 5 sets); the
-// newer one the 1RM (80 × 8 → 102.1) and heaviest weight (82.5 × 6), and is
-// "Last" (VOL 2375).
+// Oldest first. The older session holds the volume record (2080 over its 4
+// working sets; warm-ups count toward no record); the newer one the 1RM
+// (80 × 8 → 102.1) and heaviest weight (82.5 × 6), and is "Last" (VOL 1775).
 const HISTORY: { id: string; daysAgo: number; sets: FixtureSet[] }[] = [
   {
     id: 'maestro_exercise_page_history_1',

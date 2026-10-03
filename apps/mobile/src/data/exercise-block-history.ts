@@ -10,6 +10,7 @@ import {
 } from '@/src/exercise-calculations';
 import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
+  isWorkingSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
@@ -219,22 +220,30 @@ export const aggregateExerciseBlockHistory = (
       .sort(compareSetOrder);
     if (setRows.length === 0) continue;
 
-    const calculationSets = setRows.map((row) => ({
+    const toCalculationSet = (row: ExerciseBlockHistorySetRow) => ({
       weightValue: row.weightValue,
       repsValue: row.repsValue,
       setType: row.setType,
-    }));
-    const summary = summarizeExerciseLoad(calculationSets, session.loadContext ?? ordinaryLoadContext());
+    });
+    const loadContext = session.loadContext ?? ordinaryLoadContext();
+    const summary = summarizeExerciseLoad(setRows.map(toCalculationSet), loadContext);
+    // The 1RM and top weight are bests (the PR baseline): working sets only.
+    const bests = summarizeExerciseLoad(
+      setRows.filter((row) => isWorkingSet({
+        weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
+      })).map(toCalculationSet),
+      loadContext,
+    );
 
     blocks.push({
       sessionId: session.sessionId,
       completedAt: session.completedAt,
       daysAgo: computeDaysAgo(session.completedAt, input.now),
       sessionExerciseIds: matchingSessionExercises.map((row) => row.sessionExerciseId),
-      estimatedOneRepMax: summary.estimatedOneRepMax,
+      estimatedOneRepMax: bests.estimatedOneRepMax,
       totalVolume: summary.volumeCoverage.totalVolumeKgReps,
       knownVolume: summary.volumeCoverage.knownVolumeKgReps,
-      highestWeight: summary.topWeightSet?.weight ?? null,
+      highestWeight: bests.topWeightSet?.weight ?? null,
       workingSetCount: countWorkingSets(setRows),
     });
   }

@@ -6,6 +6,7 @@ import { personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calcu
 import type { LoadContext, LoadInputMode, VolumeCoverage } from '@/src/exercise-calculations/load-metrics';
 import {
   isConfirmedPerformedSet,
+  isWorkingSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
@@ -230,7 +231,14 @@ const buildSessionEntry = (
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
   const loadContext = personalLoadContext(definition.bodyweightCalculationsEnabled, definition, sessionRow);
-  const { estimatedOneRepMax, volumeCoverage, topWeightSet } = summarizeExerciseLoad(orderedSets, loadContext);
+  const { volumeCoverage } = summarizeExerciseLoad(orderedSets, loadContext);
+  // The session's 1RM and top set are bests (they feed `allTimeBest`): working sets only.
+  const { estimatedOneRepMax, topWeightSet } = summarizeExerciseLoad(
+    orderedSets.filter((row) => isWorkingSet({
+      weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
+    })),
+    loadContext,
+  );
   const totalVolume = volumeCoverage.totalVolumeKgReps;
 
   const tagIds = tagRows.map((row) => row.tagDefinitionId);
