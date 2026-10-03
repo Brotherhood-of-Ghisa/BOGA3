@@ -115,10 +115,9 @@ const collapsedRecordStats = ({ oneRepMax, maxWeight, volume }: ExerciseRecords)
 /** The previous session's best 1RM, heaviest set and volume, noting volume it could not total. */
 const collapsedLastStats = (last: LastSession | null): CollapsedStatValues => {
   if (!last) return NO_STATS;
-  const weights = last.sets.map(set => set.weight);
   return {
     oneRepMax: orDash(last.oneRepMax, formatOneRepMax),
-    maxWeight: weights.length ? formatWeight(Math.max(...weights)) : DASH,
+    maxWeight: orDash(last.maxWeight, formatWeight),
     volume: orDash(last.volume, formatVolume),
     coverageNote: last.volume === null ? formatVolumeWithCoverage(last.volume, last.knownVolume) : undefined,
   };

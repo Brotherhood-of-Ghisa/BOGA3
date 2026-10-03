@@ -98,6 +98,21 @@ describe('session view model', () => {
     expect(firstTime.recordOneRepMax).toBeNull();
   });
 
+  it('never marks a warm-up heavier than the working sets as the record', () => {
+    const heavyWarmUp = { ...bench, sets: [doneSet('w', '250', '5', 'warm_up'), ...bench.sets.slice(1)] };
+    const [card] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', 197.9]])).cards;
+
+    // The warm-up keeps its own figures, but the record is the best working set.
+    expect(card.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '250.0 × 5', volume: '1250', oneRepMaxRecord: false });
+    expect(card.rows.filter((row) => row.oneRepMaxRecord).map((row) => row.id)).toEqual(['b2']);
+    expect(card.recordOneRepMax).toBe('204.3');
+
+    // Only the warm-up beats the history: no record at all.
+    const [onlyWarmUpBeats] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', 210]])).cards;
+    expect(onlyWarmUpBeats.recordOneRepMax).toBeNull();
+    expect(onlyWarmUpBeats.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
+  });
+
   it('totals done sets and their volume, warm-ups included', () => {
     const model = buildSessionViewModel(session([bench]), new Map());
     expect(model.performedSetCount).toBe(3);

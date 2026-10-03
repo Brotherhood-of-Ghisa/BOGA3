@@ -49,6 +49,22 @@ export const isConfirmedPerformedSet = (set: SetPerformanceInput): boolean =>
   hasValidActualValues(set) &&
   (set.performanceStatus === null || set.performanceStatus === undefined);
 
+/**
+ * The working-set rule over a stored effort: every set that is not a warm-up.
+ * Untagged, any RIR and unrecognised stored values all count. The group
+ * evaluator stores it on every set fact: changing it needs a
+ * `GROUP_EVAL_RULES_VERSION` bump.
+ */
+export const isWorkingSetType = (setType: unknown): boolean => setType !== 'warm_up';
+
+/**
+ * The one rule for what counts toward a stat (`ux-rules.md` §5.11): a
+ * confirmed performed set that is not a warm-up. A warm-up row keeps its own
+ * per-set figures, but feeds no record, best, PR or baseline.
+ */
+export const isWorkingSet = (set: SetPerformanceInput & { setType?: unknown }): boolean =>
+  isConfirmedPerformedSet(set) && isWorkingSetType(set.setType);
+
 export const normalizeSessionSetPerformanceStatus = (
   status: string | null | undefined
 ): SessionSetPerformanceStatus =>

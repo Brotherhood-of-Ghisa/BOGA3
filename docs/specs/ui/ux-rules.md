@@ -220,7 +220,7 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
     - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
     - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
-    - `W-Up` marks a set as warm-up effort; warm-up sets still count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume statistics, but are not working sets. A working set is any valid confirmed set that is not `W-Up`: blank effort and every RIR count. The rule lives in one predicate, `isWorkingSessionSetType` (`src/data/set-types.ts`). Use `Working set(s)` where space permits and `W/set` / `W/sets` in compact UI.
+    - `W-Up` marks a set as warm-up effort. A working set is any valid confirmed set that is not `W-Up`: blank effort and every RIR count. Records, PRs, all-time bests and their baselines read working sets only: a warm-up is never a record (no `record` highlight), never a PR, and never the baseline a later set must beat, and a session whose only sets of an exercise are warm-ups sets no record or `Last` for it. A warm-up row still shows its own 1RM and volume, which describe that set alone. Volume, heatmaps and the other volume and usage statistics still include warm-ups. The rule lives in one predicate, `isWorkingSet` (`src/exercise-calculations/set-semantics.ts`; `isWorkingSessionSetType` in `src/data/set-types.ts` is the same rule over a set type); aggregates filter with it, and per-set maths (`calculateSetMetrics`) does not. Use `Working set(s)` where space permits and `W/set` / `W/sets` in compact UI.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
@@ -771,10 +771,13 @@ unchanged. What differs is presentation:
    volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
    like any set. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests, matching the session view
-   (§14b.4; aligned 2026-09-23). The one highlight is a performed weight or 1RM
-   beating the all-time best before today, shown in `record` (brass); volume is
-   never one, since its record is a whole session's. The records panel uses
-   History's rules (warm-ups count). `Records` | `Last` chooses what the
+   (§14b.4; aligned 2026-09-23). The one highlight is a performed working set's
+   weight or 1RM beating the all-time best before today, shown in `record`
+   (brass); a warm-up is never one (§5.11), and volume is never one, since its
+   record is a whole session's. The records panel counts working sets only
+   (§5.11): records, their baseline and the `Last` summary read working sets,
+   `Last` is the newest session with a working set, and its set list still
+   shows that session's warm-up lines. `Records` | `Last` chooses what the
    panel shows and never expands or collapses it; only the chevron does.
    Collapsed, its `1RM` / `Max` / `Vol` row sums up the chosen view: the
    all-time records, or the previous session's best 1RM, heaviest weight and

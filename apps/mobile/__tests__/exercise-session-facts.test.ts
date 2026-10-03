@@ -431,12 +431,16 @@ describe('exercise session facts — 1RM flags and completed-session PRs equal d
   })();
   const pick = <T>(values: readonly T[]): T => values[Math.floor(random() * values.length)];
 
-  const generateSet = (): SetSpec => [
-    pick(['60', '80', '80', '100', '100', '102.5', '110', '', '0']),
-    pick(['1', '3', '5', '5', '8', '']),
-    pick(['warm_up', 'rir_0', 'rir_2', 'rir_4', null]),
-    pick([null, null, null, null, 'unperformed', 'planned']),
-  ];
+  // Warm-ups are heavier than any working set, so one that counted would win.
+  const generateSet = (): SetSpec => {
+    const setType = pick(['warm_up', 'rir_0', 'rir_2', 'rir_4', null]);
+    return [
+      setType === 'warm_up' ? pick(['120', '140', '160']) : pick(['60', '80', '80', '100', '100', '102.5', '110', '', '0']),
+      pick(['1', '3', '5', '5', '8', '']),
+      setType,
+      pick([null, null, null, null, 'unperformed', 'planned']),
+    ];
+  };
 
   it('agrees on every session of a generated history, with ties and repeated blocks', async () => {
     db().insert(exerciseDefinitions).values({ id: 'def-row', name: 'Row', loadInputMode: 'per_side_load' }).run();
@@ -462,9 +466,13 @@ describe('exercise session facts — 1RM flags and completed-session PRs equal d
       { definitionId: BENCH, sets: [['130', '5']] },
     ]);
     sessionIds.push('gen-tie');
+    // A warm-up far above every earlier best is neither the session's best nor a PR.
+    insertSession('gen-warm', 61, [{ definitionId: BENCH, sets: [['300', '5', 'warm_up'], ['60', '5']] }]);
+    sessionIds.push('gen-warm');
 
     drainExerciseSessionFacts(asLocal());
     expect(factFor('gen-tie', BENCH)).toMatchObject({ prE1rm: true, bestE1rmSetId: 'gen-tie-b0-s1' });
+    expect(factFor('gen-warm', BENCH)).toMatchObject({ prE1rm: false, prWeight: false, bestE1rmSetId: 'gen-warm-b0-s1', topWeightKg: 60 });
     const flagged = allFacts().filter((row) => row.prE1rm);
     expect(flagged.length).toBeGreaterThan(3);
 

@@ -1,17 +1,18 @@
 // The one best-set rule for a session's estimated 1RM (spec 05, "Exercise
 // session facts"): the exercise session facts derive their 1RM bests and PR
 // flags with it, and the session view and completed-session detail pick
-// their PR set on an in-memory session with it.
+// their PR set on an in-memory session with it. Only working sets compete.
 
 import { calculateAnalyticsSetMetrics } from './analytics.ts';
 import type { LoadContext, SetMetrics } from './load-metrics.ts';
-import type { SessionSetPerformanceStatus } from './set-semantics.ts';
+import { isWorkingSet, type SessionSetPerformanceStatus } from './set-semantics.ts';
 
 type Ordered = { orderIndex: number; id: string };
 
 export type BestSetSetInput = Ordered & {
   weightValue: string;
   repsValue: string;
+  setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
   deletedAt?: Date | null;
 };
@@ -32,13 +33,16 @@ export type EligibleSessionSet<B, S> = {
 export const compareSessionPosition = (left: Ordered, right: Ordered): number =>
   left.orderIndex - right.orderIndex || left.id.localeCompare(right.id);
 
-/** Each block's eligible, non-deleted sets, blocks and sets in session order. */
+/** Each block's non-deleted working sets with their metrics, blocks and sets in session order. */
 export const eligibleSetsByBlockInSessionOrder = <S extends BestSetSetInput, B extends BestSetBlockInput<S>>(
   blocks: readonly B[],
 ): EligibleSessionSet<B, S>[][] =>
   [...blocks].sort(compareSessionPosition).map((block) =>
     [...block.sets].sort(compareSessionPosition).flatMap((set) => {
       if ((set.deletedAt ?? null) !== null) return [];
+      if (!isWorkingSet({
+        weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
+      })) return [];
       const metric = calculateAnalyticsSetMetrics({ ...set, ...block.loadContext });
       return metric.eligible ? [{ block, set, metric }] : [];
     }),

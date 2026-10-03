@@ -49,10 +49,10 @@ const flags = (rows: ReturnType<typeof deriveExerciseSessionFacts>) =>
   rows.map(({ sessionId, prE1rm, prWeight, prVolume }) => ({ sessionId, prE1rm, prWeight, prVolume }));
 
 describe('exercise session facts — metrics', () => {
-  it('takes 1RM, top weight, volume and working sets from eligible sets, warm-ups included', () => {
+  it('takes 1RM, top weight, volume and working sets from working sets only', () => {
     const bests = summarizeFactSession(DEFINITION, session('s1', 1, [
       block('b1', 0, [
-        ['120', '3', 'warm_up'], // the warm-up is the best set
+        ['120', '3', 'warm_up'], // heavier than every working set, yet never a best
         ['100', '5'],
         ['100', '5', 'rir_2', 'planned'], // not performed
         ['', ''], // not a set
@@ -63,14 +63,37 @@ describe('exercise session facts — metrics', () => {
       sessionId: 's1',
       exerciseDefinitionId: DEFINITION,
       achievedAt: new Date(Date.UTC(2026, 0, 1, 18)),
-      bestE1rmKg: estimateOneRepMax(120, 3),
-      bestE1rmSetId: 'b1-s0',
-      topWeightKg: 120,
-      topWeightSetId: 'b1-s0',
-      volumeKg: 120 * 3 + 100 * 5,
+      bestE1rmKg: estimateOneRepMax(100, 5),
+      bestE1rmSetId: 'b1-s1',
+      topWeightKg: 100,
+      topWeightSetId: 'b1-s1',
+      volumeKg: 100 * 5,
       volumeComplete: true,
       workingSets: 1,
     });
+  });
+
+  it('gives a session with only warm-ups for the definition no row', () => {
+    const warmUpOnly = session('s2', 2, [block('b1', 0, [['140', '2', 'warm_up'], ['120', '3', 'warm_up']])]);
+
+    expect(summarizeFactSession(DEFINITION, warmUpOnly)).toBeNull();
+    expect(deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])]),
+      warmUpOnly,
+    ]).map((row) => row.sessionId)).toEqual(['s1']);
+  });
+
+  it('never lets a heavier warm-up raise the PR bars', () => {
+    const rows = deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['200', '5', 'warm_up'], ['100', '5']])]),
+      session('s2', 2, [block('b1', 0, [['105', '5']])]),
+    ]);
+
+    expect(rows.map(({ sessionId, prE1rm, prWeight, prVolume }) => ({ sessionId, prE1rm, prWeight, prVolume })))
+      .toEqual([
+        { sessionId: 's1', prE1rm: false, prWeight: false, prVolume: false },
+        { sessionId: 's2', prE1rm: true, prWeight: true, prVolume: true },
+      ]);
   });
 
   it('folds repeated blocks into one row and breaks ties in session order (block, then set)', () => {
@@ -215,10 +238,11 @@ describe('exercise session facts — rules version', () => {
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(2);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(3);
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s1', 1, [block('a1', 0, [['100', '5', 'rir_3'], ['60', '10', 'warm_up'], ['90', '8', 'rir_4']])]),
-      session('s2', 2, [block('b1', 0, [['', '12', 'rir_0'], ['102.5', '5', null], ['110', '1', 'rir_1', 'planned']])]),
+      session('s2', 2, [block('b1', 0, [['', '12', 'rir_0'], ['102.5', '5', null], ['110', '1', 'rir_1', 'planned'], ['130', '2', 'warm_up']])]),
+      session('s3', 3, [block('c1', 0, [['140', '1', 'warm_up']])]),
     ]);
 
     expect(rows.map(({ achievedAt: _achievedAt, bestE1rmKg, volumeKg, ...row }) => ({
@@ -228,7 +252,7 @@ describe('exercise session facts — rules version', () => {
     }))).toEqual([
       {
         sessionId: 's1', exerciseDefinitionId: DEFINITION, bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
-        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1820, volumeComplete: true, workingSets: 2,
+        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, volumeComplete: true, workingSets: 2,
         prE1rm: false, prWeight: false, prVolume: false,
       },
       {

@@ -7,6 +7,8 @@
  * `weight_value` / `reps_value` columns into trusted numerics.
  */
 
+import { isWorkingSetType } from './set-semantics.ts';
+
 export type CalculationSetInput = {
   weightValue: string | null | undefined;
   repsValue: string | null | undefined;
@@ -17,11 +19,6 @@ export type ParsedCalculationSet = {
   weight: number;
   reps: number;
   setType: string | null;
-};
-
-export type CalculationOptions = {
-  /** When false, warm-up sets are excluded. Defaults to true. */
-  includeWarmUps?: boolean;
 };
 
 export type MaxRepsAtWeight = {
@@ -80,16 +77,11 @@ export const parseCalculationSet = (set: CalculationSetInput): ParsedCalculation
   };
 };
 
-const WARM_UP_SET_TYPE = 'warm_up';
-
-const collectParsedSets = (
-  sets: CalculationSetInput[],
-  options: CalculationOptions | undefined
-): ParsedCalculationSet[] => {
-  const includeWarmUps = options?.includeWarmUps ?? true;
+/** The parseable working sets: a warm-up counts toward none of these aggregates. */
+const collectParsedSets = (sets: CalculationSetInput[]): ParsedCalculationSet[] => {
   const parsed: ParsedCalculationSet[] = [];
   for (const raw of sets) {
-    if (!includeWarmUps && (raw.setType ?? null) === WARM_UP_SET_TYPE) continue;
+    if (!isWorkingSetType(raw.setType ?? null)) continue;
     const parsedSet = parseCalculationSet(raw);
     if (parsedSet === null) continue;
     parsed.push(parsedSet);
@@ -128,10 +120,9 @@ export const computeSetVolume = (weight: number, reps: number): number => {
  * first set in input order so callers get a stable source set for summaries.
  */
 export const findBestEstimatedOneRepMaxSet = (
-  sets: CalculationSetInput[],
-  options?: CalculationOptions
+  sets: CalculationSetInput[]
 ): BestEstimatedOneRepMaxSet | null => {
-  const parsed = collectParsedSets(sets, options);
+  const parsed = collectParsedSets(sets);
   let best: BestEstimatedOneRepMaxSet | null = null;
   for (const set of parsed) {
     const estimate = estimateOneRepMax(set.weight, set.reps);
@@ -152,16 +143,14 @@ export const findBestEstimatedOneRepMaxSet = (
  * across the eligible sets. Returns `null` when no eligible set exists.
  */
 export const estimateExerciseOneRepMax = (
-  sets: CalculationSetInput[],
-  options?: CalculationOptions
+  sets: CalculationSetInput[]
 ): number | null =>
-  findBestEstimatedOneRepMaxSet(sets, options)?.estimatedOneRepMax ?? null;
+  findBestEstimatedOneRepMaxSet(sets)?.estimatedOneRepMax ?? null;
 
 export const computeExerciseVolume = (
-  sets: CalculationSetInput[],
-  options?: CalculationOptions
+  sets: CalculationSetInput[]
 ): number => {
-  const parsed = collectParsedSets(sets, options);
+  const parsed = collectParsedSets(sets);
   let total = 0;
   for (const set of parsed) {
     total += computeSetVolume(set.weight, set.reps);
@@ -178,10 +167,9 @@ export const computeExerciseVolume = (
  * like `'42.5'` and `'42.50'` collapse into a single row.
  */
 export const computeMaxRepsByWeight = (
-  sets: CalculationSetInput[],
-  options?: CalculationOptions
+  sets: CalculationSetInput[]
 ): MaxRepsAtWeight[] => {
-  const parsed = collectParsedSets(sets, options);
+  const parsed = collectParsedSets(sets);
   const maxByWeight = new Map<number, number>();
   for (const set of parsed) {
     const existing = maxByWeight.get(set.weight);

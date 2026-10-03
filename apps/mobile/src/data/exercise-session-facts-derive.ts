@@ -1,6 +1,7 @@
 // Pure derivation of exercise session facts (spec 05, "Exercise session
 // facts"): one exercise definition's completed history in, one row per session
-// out, each with the session's bests and its personal-record flags.
+// out, each with the session's bests and its personal-record flags. Only
+// working sets count: a session with none for the definition has no row.
 
 import { addFiniteVolume, enteredWeightKg } from '@/src/exercise-calculations/analytics';
 import {
@@ -12,13 +13,12 @@ import { summarizeVolume, type LoadContext } from '@/src/exercise-calculations/l
 import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseSessionFact } from './schema';
-import { isWorkingSessionSetType } from './set-types';
 
 /**
  * Bump when a rule below changes what a row holds. Every device then rebuilds
  * the whole table once before its next facts read.
  */
-export const EXERCISE_SESSION_FACTS_RULES_VERSION = 2;
+export const EXERCISE_SESSION_FACTS_RULES_VERSION = 3;
 
 export type FactsSetInput = {
   id: string;
@@ -69,7 +69,7 @@ const pickTopWeight = (best: Best | null, { set, metric }: EligibleSet): Best | 
   return { value, setId: set.id, reps: metric.reps };
 };
 
-/** The session's bests for one definition, or null when it has no eligible set. */
+/** The session's bests for one definition, or null when it has no working set. */
 export const summarizeFactSession = (
   exerciseDefinitionId: string,
   session: FactsSessionInput,
@@ -87,10 +87,8 @@ export const summarizeFactSession = (
     const coverage = summarizeVolume(sets.map(({ metric }) => metric));
     knownVolume = addFiniteVolume(knownVolume, coverage.knownVolumeKgReps);
     totalVolume = addFiniteVolume(totalVolume, coverage.totalVolumeKgReps);
-    for (const eligible of sets) {
-      topWeight = pickTopWeight(topWeight, eligible);
-      if (isWorkingSessionSetType(eligible.set.setType)) workingSets += 1;
-    }
+    workingSets += sets.length;
+    for (const eligible of sets) topWeight = pickTopWeight(topWeight, eligible);
   }
 
   return {
