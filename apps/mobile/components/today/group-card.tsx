@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 2,
+    gap: uiSpace.xs,
   },
   boardFigure: {
     fontFamily: uiFonts.figure.family,
