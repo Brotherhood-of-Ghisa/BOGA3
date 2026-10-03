@@ -210,7 +210,7 @@ workout history or advance programme progress.
 
 ## Data and sync contract
 
-M23 expands Sync v2 from ten to fourteen user-owned entity types.
+M23 expands Sync v2 from twelve to sixteen user-owned entity types.
 
 | Entity | Purpose | Important fields / rules |
 | --- | --- | --- |
@@ -246,25 +246,28 @@ grants, LWW/tombstone behavior, server receipt ordering, and account wipe
 contract. Agent OAuth tokens still cannot call PostgREST or `sync_push`
 directly.
 
-The expected five-layer topology is:
+The expected five-layer topology across all sixteen entities is:
 
 ```text
-L0  gyms, exercise_definitions, muscle_groups, training_programmes
+L0  gyms, exercise_definitions, muscle_groups, user_settings, training_programmes
 L1  session_plans, exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links
 L2  sessions, session_plan_exercises
 L3  session_exercises, session_plan_sets
-L4  exercise_sets, session_exercise_tags
+L4  exercise_sets, session_exercise_tags, body_weight_measurements
 ```
 
 The new `exercise_sets.source_plan_set_id -> session_plan_sets` edge is from L4
-to L3, so it does not add an entity or another layer; the expected count remains
-fourteen entities in five layers.
+to L3, and `body_weight_measurements` (an independent root) remains in L4, so
+the graph contains sixteen entities in five layers.
 
-The schema task must confirm this graph against the actual foreign keys and
-update the canonical topology if an implementation detail changes it. It also
-updates push/pull projections, per-layer cursors, dirty counts, FK preflight,
-schema drift, restore/first-sync, tombstones, and account wipe; adding local
-tables alone is not complete.
+Because `sessions.source_plan_id` requires `sessions` to sit in L2 below
+`session_plans` (L1), existing tables shift layer indices (`sessions` L1->L2,
+`session_exercises` L2->L3, `exercise_sets` L3->L4). The schema task must
+update the canonical topology, push/pull projections, per-layer cursors, dirty
+counts, FK preflight, schema drift, restore/first-sync, tombstones, and account
+wipe. T01 and T02 must explicitly define the client pull-cursor migration or
+protocol versioning strategy (e.g. protocol 4 or local cursor remapping) so
+upgraded devices preserve sync continuity.
 
 ## Agent authorization and API contract
 
@@ -388,12 +391,15 @@ recommendation engine in M23.
 
 - `/sessions` becomes the planning home as well as the complete session list,
   with clearly separated **Active**, **Upcoming**, **Unscheduled**, and
-  **Completed** sections.
+  **Completed** sections. Alongside the Today landing page (M29), Today surfaces
+  the next actionable scheduled plan or unresolved programme block, while
+  `/sessions` owns full queue management and authoring.
 - `/session-plan/new` creates a one-off plan.
 - `/session-plan/[planId]` views and edits a plan, offers Start all, Duplicate,
   and Delete where lifecycle permits, and offers Add block on each available
   exercise block. Attached/resolved blocks are read-only and link to their
-  performed session; future unattached blocks remain editable.
+  performed session; future unattached blocks remain editable. Target loads
+  respect the exercise's `load_input_mode` (`per_side_load` vs `total_load`) per M19.
 - `/programme/new` creates a programme and its ordered sessions.
 - `/programme/[programmeId]` views/edits the programme, identifies the next
   unresolved block, opens each plan, and can add an available block to the
@@ -410,9 +416,11 @@ recommendation engine in M23.
 - A programme-sourced exercise card identifies its source block, and each
   planned set identifies its source target independently from manual sets on
   the same card. The card exposes Complete block when it has a valid confirmed
-  source-derived set. Completion is explicit, target mismatch is allowed, and
-  the recorder remains open for arbitrary freeform work. Skip is a distinct
-  programme action and never records work.
+  source-derived set (`source_plan_set_id IS NOT NULL`). Completion is explicit,
+  target mismatch is allowed, and the recorder remains open for arbitrary freeform
+  work. Skip is a distinct programme action and never records work. Under M30
+  working-set rules, manual warm-ups alone cannot complete the block, and confirmed
+  performed sets contribute to exercise session facts/stats according to their set type.
 - The recorder gives each movable set a subtle playlist-style grab handle for
   direct reordering, without a separate mode or persistent up/down button
   clutter. Equivalent Move earlier/Move later accessibility actions remain
@@ -421,11 +429,16 @@ recommendation engine in M23.
   identity.
 
 Planner implementation belongs in a dedicated `apps/mobile/src/session-planner/`
-domain module instead of adding a third mode to the recorder. UI composes the
-existing exercise picker, gym picker, set-type vocabulary, shared tokens,
-primitives, list rows, inputs, buttons, error/empty/loading patterns, and
-accessibility conventions. New routes, components, and interactions are added
-to the canonical UI docs in the same task that ships them.
+domain module instead of adding a third mode to the recorder. It complies with
+dependency-cruiser layering rules (PR #453), consuming shared set semantics from
+`apps/mobile/src/exercise-calculations/set-semantics.ts` and date helpers from
+`apps/mobile/src/utils/local-time.ts`. UI composes the existing exercise picker,
+gym picker, set-type vocabulary, shared tokens, primitives, list rows, inputs,
+buttons, error/empty/loading patterns, and accessibility conventions. Component
+and integration tests live outside `apps/mobile/app/` (PR #469), residing under
+`apps/mobile/__tests__/` or `apps/mobile/src/session-planner/__tests__/`. New routes,
+components, and interactions are added to the canonical UI docs in the same task
+that ships them.
 
 ### Required states
 
@@ -570,7 +583,7 @@ any agent mutation of active, completed, or deleted workout history.
   deterministic retries, filter-bound cursor validation, page-size-independent
   exact aggregates, API/MCP schemas, annotations, response parsing, and error
   translation.
-- **Sync:** schema drift over fourteen entities, the five-layer FK graph,
+- **Sync:** schema drift over sixteen entities, the five-layer FK graph,
   push/pull round trips, server-created plan pulls, tombstones, first-sync
   restore, dirty counts, wipe coverage, session/block/set provenance fields,
   performed-set order, and block-resolution behavior.
@@ -661,7 +674,12 @@ T01 ──► T02 ──► T03 ──► T04 ──► T05 ──┐
 
 - **Sync expansion is cross-cutting.** Missing any registry, cursor, wipe, FK,
   drift, or restore site can strand data. T02 owns an explicit inventory and
-  fourteen-entity round trip.
+  sixteen-entity round trip.
+- **Sync layer shifting and client cursor migration.** Moving `sessions` (L1->L2),
+  `session_exercises` (L2->L3), and `exercise_sets` (L3->L4) alters the integer layer
+  indices. Existing clients holding integer-keyed `pull_cursor` entries in
+  `sync_runtime_state` must be migrated cleanly via SQLite local cursor remapping
+  or protocol version negotiation so an upgrade does not orphan or duplicate records.
 - **Block attachment is a multi-device race.** Deterministic block/set IDs plus
   server uniqueness are both required; either alone leaves duplicate live uses
   or ambiguous completion. T01 must specify how two devices attaching the same

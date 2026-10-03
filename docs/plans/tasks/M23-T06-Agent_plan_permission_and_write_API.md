@@ -161,7 +161,7 @@ database access; a custom OAuth application scope; hosted recommendation logic.
 - Extend `agent-api` contract coverage for permission RLS, grant generation,
   route validation, owner isolation, transaction rollback, receipts,
   concurrency, revocation, audit, and performed-session denial.
-- Add mobile hook and Connected Agents component tests.
+- Add mobile hook and Connected Agents component tests (placed outside `app/` per PR #469).
 - Before PR: `./boga test fast`, `./boga test backend`, and
   `./boga test frontend`.
 - T07 owns protocol-level MCP and hosted end-to-end smoke after these routes

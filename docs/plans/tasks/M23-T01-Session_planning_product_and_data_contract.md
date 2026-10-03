@@ -44,17 +44,26 @@ inventing incompatible field names, bounds, lifecycle rules, or errors.
 
 - Create `docs/specs/tech/session-planning-contract.md`.
 - Inventory the current performed-session graph, planned-vs-performed set
-  semantics, ten-entity Sync v2 registry, Sessions routes, agent API, OAuth
-  boundary, Connected Agents surface, and four MCP tools.
+  semantics, twelve-entity Sync v2 registry (including user_settings and
+  body_weight_measurements), Sessions routes, Today landing page (M29), agent API,
+  OAuth boundary, Connected Agents surface, and four MCP tools.
 - Lock:
   - the four table schemas, performed session/block/set provenance fields,
     constraints, indexes, owner-scoped FKs, tombstones, block progress, and
     provenance, including `sessions.source_plan_id`,
     `session_exercises.source_plan_exercise_id`, and
     `exercise_sets.source_plan_set_id`;
-  - the fourteen-entity/five-layer wire and FK graph;
+  - the sixteen-entity/five-layer wire and FK graph, including layer shifts
+    (`sessions` L1->L2, `session_exercises` L2->L3, `exercise_sets` L3->L4,
+    `body_weight_measurements` in L4) and the client pull-cursor migration or
+    protocol versioning strategy;
   - block and derived parent lifecycle, including pending, attached, completed,
     skipped, and the human actions valid in each state;
+  - block completion under M30 working-set rules: completion requires at least
+    one confirmed source-derived set (`source_plan_set_id IS NOT NULL`); manual
+    warm-ups alone cannot complete the block;
+  - target load representation and validation respecting exercise `load_input_mode`
+    (`per_side_load` vs `total_load`) per M19;
   - atomic whole-plan and single-block materialization, including compatible
     exercise-card selection, ambiguity handling, per-set source identity,
     explicit resolution, and the deterministic-ID algorithm;
@@ -77,9 +86,14 @@ inventing incompatible field names, bounds, lifecycle rules, or errors.
     non-drag accessibility actions without permanent button clutter;
   - target normalization, graph cardinality, text, date, cursor, and payload
     limits shared by mobile/API/MCP;
+  - architectural boundaries for `src/session-planner/` under dependency-cruiser
+    rules (PR #453), consuming `src/exercise-calculations/set-semantics.ts` and
+    `src/utils/local-time.ts`, with tests placed outside `app/` (PR #469);
   - current-grant-matched permission and receipt-table semantics;
   - agent route request/response/error envelopes and MCP input/output schemas;
-  - mobile routes, screen states, copy requirements, and accessibility intent;
+  - mobile routes, screen states, copy requirements, accessibility intent, and
+    Today tab coordination (Today surfaces next upcoming plan/block; `/sessions`
+    manages full queues);
   - deployment compatibility and rollback expectations.
 - Add the contract to `docs/specs/tech/README.md` and align this milestone if a
   detailed decision reveals a contradiction.
@@ -96,7 +110,7 @@ claim planned behavior is already shipped.
 2. The schema section names every column, type, nullability rule, check,
    uniqueness rule, index, FK action, RLS/grant posture, and Sync v2 metadata
    field for all new or changed tables.
-3. The sync section names all fourteen entities and five layers and inventories
+3. The sync section names all sixteen entities and five layers and inventories
    every registry/projection/cursor/dirty-count/FK/drift/wipe/restore surface
    T02 must update.
 4. The materialization algorithms define Start-all conflict behavior, Add-block

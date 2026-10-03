@@ -49,7 +49,8 @@ introducing recurrence or automatic load/rep progression semantics.
   including partially consumed child plans.
 - Programme summary/progress in `/sessions`, deterministic next unresolved
   block in programme-order then exercise-order, available-block selection, and
-  navigation to programme and child-plan detail.
+  navigation to programme and child-plan detail. Coordinate with the Today tab
+  (M29) which surfaces the next unresolved programme block directly to the user.
 - Add one block to an active/new session, Complete after valid confirmed work,
   or explicitly Skip without performed work. Pulling alone never advances.
 - Offline-first authoring and later sync with no server-only draft state.
@@ -176,8 +177,9 @@ programme templates, and any special hard-coded "wave" formula.
 
 ## Testing and verification approach
 
-- Add focused component/route tests and extend planning Maestro coverage owned
-  by T07.
+- Add focused component/route tests (placed outside `app/` per PR #469, in
+  `apps/mobile/__tests__/` or `src/session-planner/__tests__/`) and extend
+  planning Maestro coverage owned by T07.
 - Before PR: `./boga test fast` and `./boga test frontend`.
 - Run `./boga test for --diff origin/main`; report measured timings only from
   `./boga timings`.
