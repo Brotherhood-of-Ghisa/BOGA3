@@ -10,7 +10,7 @@ import {
 } from '@/src/exercise-calculations/best-set';
 
 const set = (id: string, orderIndex: number, weightValue: string, repsValue = '5', extra: Partial<BestSetSetInput> = {}) =>
-  ({ id, orderIndex, weightValue, repsValue, ...extra });
+  ({ id, orderIndex, weightValue, repsValue, setType: null, ...extra });
 const block = (id: string, orderIndex: number, sets: BestSetSetInput[]) =>
   ({ id, orderIndex, loadContext: ordinaryLoadContext(), sets });
 
@@ -43,6 +43,21 @@ describe('best estimated 1RM set', () => {
 
     expect(picked).toMatchObject({ set: { id: 'b1-s1' }, block: { id: 'b1' }, enteredWeightKg: 130 });
     expect(picked!.estimatedOneRepMaxKg).toBe(picked!.metric.estimatedOneRepMaxKg);
+  });
+
+  it('drops warm-ups, so a warm-up heavier than every working set is never the best', () => {
+    const blocks = [
+      block('b1', 0, [
+        set('b1-warm', 0, '200', '3', { setType: 'warm_up' }),
+        set('b1-work', 1, '100', '5', { setType: 'rir_2' }),
+      ]),
+      block('b2', 1, [set('b2-untagged', 0, '90', '5')]),
+    ];
+
+    expect(eligibleSetsByBlockInSessionOrder(blocks).map((sets) => sets.map((entry) => entry.set.id)))
+      .toEqual([['b1-work'], ['b2-untagged']]);
+    expect(best(blocks)).toMatchObject({ set: { id: 'b1-work' }, enteredWeightKg: 100 });
+    expect(best([block('b1', 0, [set('b1-warm', 0, '200', '3', { setType: 'warm_up' })])])).toBeNull();
   });
 
   it('returns null when no set has a 1RM', () => {

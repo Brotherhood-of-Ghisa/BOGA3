@@ -148,18 +148,18 @@ describe('exercise calculations: estimateExerciseOneRepMax', () => {
     expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(expected, 5);
   });
 
-  it('includes warm-up sets by default', () => {
+  it('excludes a warm-up heavier than the working sets', () => {
     const sets = [set('200', '1', 'warm_up'), set('100', '5')];
     expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(
-      estimateOneRepMax(200, 1) as number,
+      estimateOneRepMax(100, 5) as number,
       5
     );
   });
 
-  it('excludes warm-up sets when explicitly requested', () => {
-    const sets = [set('200', '1', 'warm_up'), set('100', '5')];
-    expect(estimateExerciseOneRepMax(sets, { includeWarmUps: false })).toBeCloseTo(
-      estimateOneRepMax(100, 5) as number,
+  it('counts untagged, RIR and unrecognised efforts as working sets', () => {
+    const sets = [set('200', '1', 'warm_up'), set('100', '5', 'rir_2'), set('110', '3', 'legacy'), set('90', '8', null)];
+    expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(
+      estimateOneRepMax(110, 3) as number,
       5
     );
   });
@@ -174,11 +174,8 @@ describe('exercise calculations: estimateExerciseOneRepMax', () => {
 
   it('returns null when no eligible set is present', () => {
     expect(estimateExerciseOneRepMax([])).toBeNull();
-    expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up')])).toBeCloseTo(
-      estimateOneRepMax(100, 5) as number,
-      5
-    );
-    expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up')], { includeWarmUps: false })).toBeNull();
+    expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up')])).toBeNull();
+    expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up'), set('', '5')])).toBeNull();
     expect(estimateExerciseOneRepMax([set('', '')])).toBeNull();
   });
 });
@@ -198,10 +195,9 @@ describe('exercise calculations: findBestEstimatedOneRepMaxSet', () => {
     });
   });
 
-  it('ignores invalid and excluded warm-up sets', () => {
+  it('ignores invalid sets and a heavier warm-up', () => {
     const result = findBestEstimatedOneRepMaxSet(
-      [set('', '5'), set('200', '1', 'warm_up'), set('100', '5')],
-      { includeWarmUps: false }
+      [set('', '5'), set('200', '1', 'warm_up'), set('100', '5')]
     );
 
     expect(result).toEqual({
@@ -226,10 +222,10 @@ describe('exercise calculations: computeExerciseVolume', () => {
     expect(computeExerciseVolume(sets)).toBe(100 * 5 + 110 * 3 + 90 * 8);
   });
 
-  it('includes warm-up sets by default and excludes them when opted out', () => {
+  it('excludes warm-up sets', () => {
     const sets = [set('40', '10', 'warm_up'), set('100', '5')];
-    expect(computeExerciseVolume(sets)).toBe(40 * 10 + 500);
-    expect(computeExerciseVolume(sets, { includeWarmUps: false })).toBe(500);
+    expect(computeExerciseVolume(sets)).toBe(500);
+    expect(computeExerciseVolume([set('40', '10', 'warm_up')])).toBe(0);
   });
 
   it('returns 0 for empty or fully invalid input', () => {
@@ -254,14 +250,14 @@ describe('exercise calculations: computeMaxRepsByWeight', () => {
     ]);
   });
 
-  it('includes warm-up sets by default', () => {
+  it('excludes a warm-up with more reps at the same weight', () => {
     const sets = [set('100', '10', 'warm_up'), set('100', '5')];
-    expect(computeMaxRepsByWeight(sets)).toEqual([{ weight: 100, maxReps: 10 }]);
+    expect(computeMaxRepsByWeight(sets)).toEqual([{ weight: 100, maxReps: 5 }]);
   });
 
-  it('excludes warm-up sets when opted out', () => {
-    const sets = [set('100', '10', 'warm_up'), set('100', '5')];
-    expect(computeMaxRepsByWeight(sets, { includeWarmUps: false })).toEqual([{ weight: 100, maxReps: 5 }]);
+  it('excludes a warm-up at a weight no working set used', () => {
+    const sets = [set('140', '2', 'warm_up'), set('100', '5')];
+    expect(computeMaxRepsByWeight(sets)).toEqual([{ weight: 100, maxReps: 5 }]);
   });
 
   it('ignores invalid sets and returns an empty list when nothing is eligible', () => {

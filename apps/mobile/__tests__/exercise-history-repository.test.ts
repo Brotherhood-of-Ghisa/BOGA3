@@ -1,3 +1,4 @@
+import { estimateOneRepMax } from '@/src/exercise-calculations';
 import {
   aggregateExerciseHistory,
   createExerciseHistoryRepository,
@@ -111,7 +112,7 @@ const buildInput = (
 };
 
 describe('aggregateExerciseHistory', () => {
-  it('orders sessions newest first and includes warm-ups in per-session metrics', () => {
+  it('orders sessions newest first; per-session volume still includes warm-ups', () => {
     const summary = aggregateExerciseHistory(buildInput());
 
     expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s2', 's1']);
@@ -127,6 +128,26 @@ describe('aggregateExerciseHistory', () => {
     expect(benchFirst?.sets[0].setType).toBe('warm_up');
     expect(benchFirst?.sets[1].isWorking).toBe(true);
     expect(benchFirst?.sets[1].setType).toBeNull();
+  });
+
+  it('never takes a warm-up heavier than the working sets as the 1RM, top set or all-time best', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        setsBySessionExerciseId: groupBy([
+          setRow({ setId: 'st-1', sessionExerciseId: 'se1', orderIndex: 0, weightValue: '200', repsValue: '5', setType: 'warm_up' }),
+          setRow({ setId: 'st-2', sessionExerciseId: 'se1', orderIndex: 1, weightValue: '100', repsValue: '5', setType: 'rir_1' }),
+          setRow({ setId: 'st-3', sessionExerciseId: 'se2', orderIndex: 0, weightValue: '90', repsValue: '5' }),
+        ]),
+      })
+    );
+
+    const withWarmUp = summary.sessions.find((entry) => entry.sessionId === 's1');
+    // The warm-up row still shows; it just is not a best.
+    expect(withWarmUp?.sets.map((set) => set.setType)).toEqual(['warm_up', 'rir_1']);
+    expect(withWarmUp?.topWeightSet).toEqual({ weight: 100, reps: 5 });
+    expect(withWarmUp?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
+    expect(summary.allTimeBest.topWeight).toMatchObject({ weight: 100, sessionId: 's1' });
+    expect(summary.allTimeBest.estimatedOneRepMax?.value).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
   });
 
   it('tie-breaks top weight by max reps at that weight', () => {

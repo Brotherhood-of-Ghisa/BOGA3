@@ -28,8 +28,13 @@ T01's predicate:
   - `session-insights/calculations.ts`: comparisons and muscle load.
   - `session-view-model.ts` and `completed-session-detail-model.ts` summary
     volume.
-  - `exercise-history.ts` per-session 1RM, `Top set` and `Vol`.
-  - `exercise-block-history.ts` aggregates.
+  - `exercise-history.ts` per-session `Vol` (T01 already moved the per-session
+    1RM and `Top set`, since the all-time bests read them).
+  - `exercise-block-history.ts` aggregates other than the 1RM and top weight
+    (T01 moved those: they are the PR baseline). Whether a warm-up-only block
+    stays in the list is this task's call (D2).
+  - The muscle-load and comparison Jest cases that still assert "warm-ups
+    included" (`session-insights.test.ts`, `session-view-model.test.ts`).
   - `groups/session-metrics.ts` volume.
   - `analytics.ts` coverage note ("X of Y working sets").
   - Specs: `ux-rules.md` :180, :809 and the comparison rules;

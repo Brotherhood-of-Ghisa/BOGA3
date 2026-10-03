@@ -316,7 +316,6 @@ additionally render faded (§6).
   values in `ink-faint`, legends in `ink-ghost` (decided on device 2026-09-22;
   the faintest ink for the values themselves read too faint to use).
 - **Warm-ups are presented exactly like working sets**, including a real 1RM.
-  They count toward 1RM and records, but not toward working sets (kept as
-  shipped, decided 2026-09-23): `isWorkingSessionSetType`
-  (`src/data/set-types.ts`) feeds only the working-set count.
-  The full rule is `ux-rules.md` §5.11.
+  That 1RM and volume describe the warm-up row alone: a warm-up is never a
+  record (brass) and feeds no record, PR or best (decided 2026-10-02).
+  The full rule is `ux-rules.md` §5.11 (`isWorkingSet`).

@@ -3,7 +3,7 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 
-import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
+import { canonicalizeWeightForReps, isWorkingSet } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 
@@ -12,8 +12,9 @@ import type { ExerciseRecordBaseline } from './exercise-page-model';
  * lifter's all-time 1RM, heaviest weight and best session volume for one
  * exercise, each with where it was set, and the sets of the previous session.
  * Derived from the completed history `loadExercisePerformanceHistory` returns
- * (confirmed performed sets only, the active session excluded), under the same
- * rules as History: warm-ups count like any other set.
+ * (confirmed performed sets only, the active session excluded). Only working
+ * sets count toward a record or a summary figure; a warm-up keeps its own line
+ * in `Last`, and a session with no working set is not one for this exercise.
  */
 
 export type RecordSet = {
@@ -54,7 +55,10 @@ export type LastSession = {
   gymId?: string | null;
   gymName?: string | null;
   oneRepMax: number | null;
+  /** The heaviest working set's entered weight. */
+  maxWeight: number | null;
   volume: number | null;
+  /** Every line, warm-ups included; the figures above read working sets only. */
   sets: RecordSet[];
   knownVolume?: number | null;
   volumeComplete?: boolean;
@@ -70,10 +74,15 @@ type SessionBlock = {
   completedAt: Date;
   gymId: string | null;
   gymName: string | null;
+  /** Every line, warm-ups included. */
   sets: RecordSet[];
+  /** The lines that count toward records and summaries. */
+  workingSets: RecordSet[];
 };
 
-const toRecordSet = (set: ExerciseHistorySessionEntry['sets'][number], entry: ExerciseHistorySessionEntry): RecordSet | null => {
+type HistorySet = ExerciseHistorySessionEntry['sets'][number];
+
+const toRecordSet = (set: HistorySet, entry: ExerciseHistorySessionEntry): RecordSet | null => {
   const rawWeight = parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue));
   const reps = parseSetReps(set.repsValue);
   if (rawWeight === null || reps === null) return null;
@@ -99,15 +108,20 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
       gymId: entry.gymId ?? null,
       gymName: entry.gymName ?? null,
       sets: [],
+      workingSets: [],
     };
     for (const set of entry.sets) {
       const recordSet = toRecordSet(set, entry);
-      if (recordSet) block.sets.push(recordSet);
+      if (!recordSet) continue;
+      block.sets.push(recordSet);
+      if (isWorkingSet({ weight: set.weightValue, reps: set.repsValue, setType: set.setType })) {
+        block.workingSets.push(recordSet);
+      }
     }
     blocks.set(entry.sessionId, block);
   }
   return [...blocks.values()]
-    .filter((block) => block.sets.length > 0)
+    .filter((block) => block.workingSets.length > 0)
     .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime());
 };
 
@@ -134,7 +148,7 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
 
   // Oldest first, so a tie keeps the session that set the value first.
   for (const block of [...blocks].reverse()) {
-    for (const set of block.sets) {
+    for (const set of block.workingSets) {
       if (set.oneRepMax !== null && (records.oneRepMax === null || set.oneRepMax > records.oneRepMax.value)) {
         records.oneRepMax = {
           value: set.oneRepMax,
@@ -156,12 +170,12 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
         };
       }
     }
-    const volume = sumVolume(block.sets);
+    const volume = sumVolume(block.workingSets);
     if (volume !== null && (records.volume === null || volume > records.volume.value)) {
       records.volume = {
         value: volume,
         completedAt: block.completedAt,
-        setCount: block.sets.length,
+        setCount: block.workingSets.length,
         gymId: block.gymId,
         gymName: block.gymName,
       };
@@ -176,10 +190,11 @@ export const deriveExerciseRecords = (entries: ExerciseHistorySessionEntry[]): E
           completedAt: newest.completedAt,
           gymId: newest.gymId,
           gymName: newest.gymName,
-          oneRepMax: bestOneRepMax(newest.sets),
-          volume: sumVolume(newest.sets),
-          knownVolume: newest.sets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
-          volumeComplete: sumVolume(newest.sets) !== null,
+          oneRepMax: bestOneRepMax(newest.workingSets),
+          maxWeight: Math.max(...newest.workingSets.map((set) => set.weight)),
+          volume: sumVolume(newest.workingSets),
+          knownVolume: newest.workingSets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
+          volumeComplete: sumVolume(newest.workingSets) !== null,
           sets: newest.sets,
         }
       : null,

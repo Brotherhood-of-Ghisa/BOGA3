@@ -46,7 +46,16 @@ bests from the facts table instead.
 
 ## Open — resolve with the user at session start
 
-None left from planning; check M30-T01's outcome for drift.
+None left from planning. M30-T01 (merged) settled these, which the facts read
+must keep:
+
+- `Last` is the newest session with a working set: a warm-up-only session is
+  skipped. Its set list still shows that session's warm-up lines.
+- `LastSession.maxWeight` is the heaviest working set; the collapsed `Max`
+  reads it, not `sets`.
+- The `Vol` record's "N sets" already counts working sets.
+- `ExerciseHistorySessionEntry.estimatedOneRepMax` / `topWeightSet` already
+  read working sets only.
 
 ## Deliverables and acceptance
 

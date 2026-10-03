@@ -4,7 +4,9 @@ import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 
-import { canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from '@/src/exercise-calculations/set-semantics';
+import {
+  canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet,
+} from '@/src/exercise-calculations/set-semantics';
 
 /**
  * Pure rules of the exercise page (`docs/specs/ui/ux-rules.md` §14a). The
@@ -122,8 +124,9 @@ export const previewMetrics = (weightValue: string, repsValue: string, context: 
 
 /**
  * Builds the rows. Every figure takes its row's colour and weight; the one
- * highlight is a performed weight or 1RM that beats the lifter's all-time best
- * before today, shown as a `record`. Volume is never one here: its record is a
+ * highlight is a performed working set's weight or 1RM that beats the lifter's
+ * all-time best before today, shown as a `record`. A warm-up keeps its own
+ * figures but is never a record. Volume is never one here: its record is a
  * whole session's, so no single set can beat it.
  */
 export const buildSetRows = (
@@ -138,6 +141,9 @@ export const buildSetRows = (
     const values = displayedValues(set);
     const metrics = metricsOf(values.weightValue, values.repsValue, context);
     const performed = isPerformed(set);
+    const working = isWorkingSet({
+      weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
+    });
     return {
       id: set.id,
       number: index + 1,
@@ -146,8 +152,8 @@ export const buildSetRows = (
       setType: values.setType,
       ...metrics,
       // Top weight is always raw entered kg, independent of calculation policy.
-      weightRecord: performed && beats(enteredWeightKg(values), baseline?.weight ?? null),
-      oneRepMaxRecord: performed && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
+      weightRecord: working && beats(enteredWeightKg(values), baseline?.weight ?? null),
+      oneRepMaxRecord: working && beats(metrics.oneRepMax, baseline?.oneRepMax ?? null),
     };
   });
 };

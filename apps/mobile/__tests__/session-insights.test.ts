@@ -723,9 +723,72 @@ describe("deriveExercisePersonalRecord", () => {
 
     expect(record?.setId).toBe("set-a");
   });
+
+  it("never takes a warm-up heavier than the working sets as the PR set", () => {
+    const warmUpHeavier = insightExercise({
+      ...exercise,
+      sets: [
+        insightSet("warm-up", { orderIndex: 0, weightValue: "200", repsValue: "5", setType: "warm_up" }),
+        insightSet("working", { orderIndex: 1, weightValue: "110", repsValue: "5", setType: "rir_1" }),
+      ],
+    });
+    const historicalBest = estimateOneRepMax(100, 5) as number;
+
+    expect(deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [warmUpHeavier],
+      historicalBestEstimatedOneRepMax: historicalBest,
+    })).toMatchObject({ setId: "working", weight: 110 });
+    // Only a warm-up beats the baseline: no PR.
+    expect(deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [warmUpHeavier],
+      historicalBestEstimatedOneRepMax: estimateOneRepMax(150, 5) as number,
+    })).toBeNull();
+  });
 });
 
 describe("deriveSessionPersonalRecords", () => {
+  it("never lets an earlier warm-up set the baseline", () => {
+    const records = deriveSessionPersonalRecords({
+      targetSession: completedSession({
+        sessionId: "target",
+        exercises: [insightExercise({
+          id: "target-row",
+          exerciseDefinitionId: "bench",
+          sets: [insightSet("target-set", { weightValue: "110", setType: "rir_2" })],
+        })],
+      }),
+      historicalSessions: [
+        completedSession({
+          sessionId: "earlier",
+          completedAt: new Date("2026-09-11T10:00:00.000Z"),
+          exercises: [insightExercise({
+            id: "earlier-row",
+            exerciseDefinitionId: "bench",
+            sets: [
+              insightSet("earlier-warm-up", { orderIndex: 0, weightValue: "200", setType: "warm_up" }),
+              insightSet("earlier-working", { orderIndex: 1, weightValue: "100", setType: "rir_2" }),
+            ],
+          })],
+        }),
+        // A warm-up-only session is no baseline at all.
+        completedSession({
+          sessionId: "warm-up-only",
+          completedAt: new Date("2026-09-11T11:00:00.000Z"),
+          exercises: [insightExercise({
+            id: "warm-up-only-row",
+            exerciseDefinitionId: "bench",
+            sets: [insightSet("only-warm-up", { weightValue: "300", setType: "warm_up" })],
+          })],
+        }),
+      ],
+    });
+
+    expect(records).toEqual([expect.objectContaining({ setId: "target-set", weight: 110 })]);
+    expect(records[0].historicalBestEstimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number);
+  });
+
   it("uses only earlier completed, non-deleted history in (completedAt, sessionId) order", () => {
     const target = completedSession({
       sessionId: "target-b",
