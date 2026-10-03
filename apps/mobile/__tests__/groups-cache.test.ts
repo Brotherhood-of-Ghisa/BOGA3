@@ -48,6 +48,7 @@ describe('group cache', () => {
     expect(groupCacheKeys.session('u2', 's1')).toBe('session:v4:u2:s1');
     expect(groupCacheKeys.groupExercises('g1')).toBe('group-exercises:v4:g1');
     expect(groupCacheKeys.boards('g1')).toBe('boards:v4:g1');
+    expect(groupCacheKeys.weekSummary('g1')).toBe('week:v4:g1');
   });
 
   it('round-trips a payload and its fetch time for the owning user', () => {
@@ -84,23 +85,25 @@ describe('group cache', () => {
     expect(() => readGroupCache(db(), 'groups:mine', 'user-1')).toThrow(SyntaxError);
   });
 
-  it('evictGroup removes group:<id>, stream:<id>, group-exercises:<id>, boards:<id>, and every session:* entry, and nothing else', () => {
+  it('evictGroup removes group:<id>, stream:<id>, group-exercises:<id>, boards:<id>, week:<id>, and every session:* entry, and nothing else', () => {
     put(groupCacheKeys.mine);
     put(groupCacheKeys.streamAll);
     put(groupCacheKeys.group('g1'));
     put(groupCacheKeys.stream('g1'));
     put(groupCacheKeys.groupExercises('g1'));
     put(groupCacheKeys.boards('g1'));
+    put(groupCacheKeys.weekSummary('g1'));
     put(groupCacheKeys.group('g2'));
     put(groupCacheKeys.stream('g2'));
     put(groupCacheKeys.groupExercises('g2'));
     put(groupCacheKeys.boards('g2'));
+    put(groupCacheKeys.weekSummary('g2'));
     put(groupCacheKeys.session('u2', 's1'));
     put(groupCacheKeys.session('u3', 's9'), 'user-2');
 
     evictGroup(db(), 'g1');
 
-    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:v4:g2', 'groups:v4:mine', 'stream:v4:all', 'stream:v4:g2']);
+    expect(allKeys()).toEqual(['boards:v4:g2', 'group-exercises:v4:g2', 'group:v4:g2', 'groups:v4:mine', 'stream:v4:all', 'stream:v4:g2', 'week:v4:g2']);
   });
 
   it('never reads a v1 payload under a v2 key and evicts both generations on access loss', () => {

@@ -117,11 +117,24 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      know it.
    - With no completed session, the card is `Your week starts here` with
      `Open Train`.
-   - Joined-group activity reuses the group stream session cards, record cards,
-     membership rows, and offline/error patterns and is limited to the three
-     newest session, record, or membership items. Records show whether or not
-     they are certified, read-only (no `Certify`); a record or membership row
-     opens the Groups screen on its group.
+   - Group activity shows one group at a time: the group chips appear only
+     with more than one group, and the selected group is the Groups screen's
+     (last viewed, else the first), so a pick on either screen moves both.
+   - The board is this local week's top three members by working sets
+     (completed sessions shared to the group), each with a `viz` bar as a
+     share of the leader's (the leader in the darker step) and `PRs`. On the
+     group card a PR is a **group record** (the member took #1 on a board), not
+     a personal PR, so the two cards' PR counts follow different rules. Ranks
+     tie; when the user is outside the three rows, a `You · <rank>` line
+     closes the board.
+   - The latest activity is one row: one member training now opens their
+     session; several collapse into `<n> training now` with their names and
+     gyms and open the Groups screen; otherwise the latest completed session
+     (at any time) with its group record line opens that session. A group
+     with neither says so in one muted line.
+   - No group: `Train with friends` with `Find a group` (My groups). Offline,
+     the cached week stays under the offline `Notice`; a cached earlier week is
+     never shown as this one.
 8. Train is the personal-training entry hub, while the session view remains
    focused on performing one workout.
    - Active-session detection must succeed before Train exposes any new-session

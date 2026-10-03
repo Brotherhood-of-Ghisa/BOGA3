@@ -1437,7 +1437,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:all`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>` and `boards:v4:<groupId>`; full boards and history are never cached |
+| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:all`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>`, `boards:v4:<groupId>` and `week:v4:<groupId>` (Today's week summary, stamped with its window start; a cached earlier week is never shown as the current one); full boards and history are never cached |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1449,7 +1449,7 @@ migration via `npm run db:generate`.
 - **Wiped on sign-out and account switch:** one `delete` is added to
   `wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`).
 - **Access loss (C3.6.8).** A `NOT_FOUND` on a group evicts `group:<id>`,
-  `stream:<id>`, `group-exercises:<id>` (M25-T07), `boards:<id>` (M25-T09), and every `session:*`
+  `stream:<id>`, `group-exercises:<id>` (M25-T07), `boards:<id>` (M25-T09), `week:<id>`, and every `session:*`
   entry. The member's `exercise_group_links` rows are synced data and are never
   evicted. A successful All refresh replaces
   `stream:all`, which no longer contains that group. The group screen shows
@@ -1899,12 +1899,13 @@ group screen, and Today details above where they differ. No server change.
   `Exercises` title and `GroupExercisesPage`, read on mount
   (`group-exercises:<id>`). No stream or podium reads; lost access follows
   `group_get` or `group_exercise_list` `NOT_FOUND`.
-- **Today** (`/today`, the `stream:all` read). Group activity keeps
-  `session`, `record`, and `membership` items (certified or not) and shows the
-  newest three after `buildStreamViewModel` attaches records below their
-  session card. Record cards are read-only (`GroupStreamRecordCard` without
-  `onCertify`), name their group, and, like membership rows, open
-  `groupsStreamPath(groupId)` = `/groups?groupId=<id>`, where Certify lives.
+- **Today** (`/today`). The Group activity card reads My groups and one
+  `group_week_summary` (§4.7) for the selected group over the local week,
+  both cache-first (`week:v4:<groupId>`). The selection is the Groups
+  screen's (`last-viewed-group`, else the first group), shared both ways; the
+  chips show only with more than one group. The card reads no stream, and
+  certifying stays on the Groups screen. `NOT_FOUND` evicts the group and
+  re-reads My groups. Rules: `ui/ux-rules.md` (Today).
 - **Back affordance.** The root stack's `screenOptions` set
   `headerBackButtonDisplayMode: 'minimal'` with no custom `headerBackTitle`
   on every detail screen (group routes included): react-native-screens turns a
@@ -1913,11 +1914,11 @@ group screen, and Today details above where they differ. No server change.
 - **Evidence.** Jest: `groups-screens.test.tsx`, `groups-write-screens.test.tsx`,
   `groups-exercise-screens.test.tsx`, `groups-leaderboards-screens.test.tsx`,
   `groups-record-set-sheet.test.tsx`, `groups-stream-view-model.test.ts`,
-  `today-screen.test.tsx`, `more-screen.test.tsx`,
+  `today-screen.test.tsx`, `today-group-card.test.tsx`,
+  `groups-week-summary-view-model.test.ts`, `more-screen.test.tsx`,
   `root-layout-auth-bootstrap.test.tsx`. Maestro: `groups-two-user-stream.yaml`
   (stream and leaderboards through `boga3://groups?groupId=<id>`, the group
-  page for members and exercises, and new step 7c-0: the record on Today,
-  read-only, opening the Groups screen).
+  page for members and exercises).
 
 ## 7. Freshness and offline
 

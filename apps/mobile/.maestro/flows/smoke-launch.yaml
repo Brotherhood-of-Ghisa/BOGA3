@@ -11,7 +11,8 @@ appId: com.dinoderek.mobile
 #   2. real tab navigation;
 #   3. the root-stack push over the tabs.
 # Jest counterpart: __tests__/main-tabs.test.tsx (tabs, the tray's
-#   collapse/expand), __tests__/today-screen.test.tsx (the Progress card) and
+#   collapse/expand), __tests__/today-screen.test.tsx (the Progress card),
+#   __tests__/today-group-card.test.tsx (the Group activity card) and
 #   __tests__/train-screen.test.tsx (leading with the active session).
 #
 # No per-openLink Open/Continue/Close dismissal taps: the URL-scheme trust dialog

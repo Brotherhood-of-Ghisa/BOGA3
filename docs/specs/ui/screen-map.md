@@ -35,19 +35,23 @@ Brief entrypoint map of the current mobile screens.
     latest completed session as one link row. Loading and a retryable error
     are `StatePanel`s; with no completed session, `Your week starts here` with
     `Open Train`. Read again on every focus, keeping the figures on screen
-  - group activity is bounded to the three newest session, record, or
-    membership items visible to the user's joined groups (certified or not);
-    record cards are read-only here (no `Certify`) and open the Groups screen
-    on their group, as membership rows do; link and record-removed items stay
-    in the full Groups feed. Today preserves auth-unavailable, signed-out,
-    cached/offline, missing-data, empty, and inline-error behavior
+  - Group activity (`components/today/`, one `group_week_summary` read per
+    group, cache-first): a group `ChipGroup` only with more than one group
+    (the Groups screen's selection, shared both ways), this week's top three
+    by working sets with group records as `PRs`, a `You · <rank>` line when
+    the user is outside them, then the latest activity row (one member
+    training now, `<n> training now`, or the latest completed session with its
+    group record). Signed out and auth-unavailable keep their `StatePanel`s;
+    no group is `Train with friends` with `Find a group`; offline shows the
+    cached week under the offline `Notice`, never an earlier week; a failed
+    refresh is an inline `Notice` with `Retry` above the card
   - no in-progress workout and no plan: Train owns starting and resuming
 - Presentation: `design-targets/today-landing.md`. `paper` ground, no page
   title, one `SectionHeader` per section (`View progress` / `View groups` caps
   text buttons), each section one `Card`. No `accent`: Today has no primary
   action; `record` marks PRs and the `viz` ramp draws the bars and the chart
-  fill. The group activity items are the Groups stream's own cards and panels
-  (DLM-T11: session and record `Card`s, the offline `Notice`)
+  fill. The group card reuses the Groups screen's chips (`GroupFilterChips`),
+  offline `Notice` and missing-data panels
 - Key exits:
   - `/progress`, `/sessions`, `/completed-session/[sessionId]`, `/train`,
     `/groups`, `/group/[groupId]`, `/group-session/[memberId]/[sessionId]`,

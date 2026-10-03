@@ -23,6 +23,8 @@ export const groupCacheKeys = {
   groupExercises: (groupId: string) => `group-exercises:v4:${groupId}`,
   /** Versioned podium payload. Full boards and history are never cached. */
   boards: (groupId: string) => `boards:v4:${groupId}`,
+  /** Today's group card: the latest week read, stamped with its window (one entry per group). */
+  weekSummary: (groupId: string) => `week:v4:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
@@ -82,7 +84,7 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 
 /**
  * Access loss removes the current versioned group, stream, exercise, board,
- * and every session entry. Session entries are not
+ * week summary, and every session entry. Session entries are not
  * group-scoped (a session can be shared into several groups), so all of them
  * go. The member's `exercise_group_links` rows are synced data and are never
  * touched here.
@@ -97,6 +99,7 @@ export const evictGroup = (database: GroupCacheDatabase, groupId: string): void 
           groupCacheKeys.stream(groupId),
           groupCacheKeys.groupExercises(groupId),
           groupCacheKeys.boards(groupId),
+          groupCacheKeys.weekSummary(groupId),
           `group:${groupId}`, `stream:${groupId}`, `group-exercises:${groupId}`, `boards:${groupId}`,
         ]),
         like(groupCache.cacheKey, SESSION_KEY_PATTERN),
