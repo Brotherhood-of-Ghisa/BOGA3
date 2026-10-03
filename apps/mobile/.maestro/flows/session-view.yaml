@@ -112,9 +112,9 @@ appId: com.dinoderek.mobile
     visible:
       text: "Edit gym Canal Street Gym"
     timeout: 10000
-# The native back item is arrow-only; its accessibility label is the session
-# view's stack title, "Session".
-- tapOn: "Session"
+# The native back item is arrow-only and exposes "Back" as its accessibility
+# label rather than the previous screen's title.
+- tapOn: "Back"
 - extendedWaitUntil:
     visible:
       text: "Select gym Canal Street Gym"

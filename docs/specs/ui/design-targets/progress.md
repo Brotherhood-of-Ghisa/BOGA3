@@ -43,7 +43,7 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - Each muscle family is a `Card`: the family row, then its nested muscles
   indented one step, each a `ListRow` with two stacked `Stat`s (`Sets`,
   `Volume`) and their deltas. A row with working sets takes one uniform
-  failure shade, `viz1`–`viz4`, the same ramp for families and muscles
+  target-attainment shade, `viz1`–`viz4`, the same ramp for families and muscles
   (T08-D3); on it every text is `ink`.
 - Loading, error and empty states are `StatePanel`s inside a `Card`; the copy
   is unchanged.
@@ -53,8 +53,9 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - The two legacy overlays are one `HistorySheet` (`components/stats/`), a
   `Sheet` over about three quarters of the screen with no close button: the
   backdrop, Android back and the VoiceOver escape dismiss it (G5, T09-D1/D2).
-- Eyebrow micro-label and the name in Archivo 800; `Metric` and `View`
-  `SegmentedControl`s under micro-labels; in Weekly a `rule-soft` banner with
+- Eyebrow micro-label and the name in Archivo 800; a `Metric`
+  `SegmentedControl` under its micro-label and a static saved view/window label;
+  Daily/Weekly is chosen only in Settings; in Weekly a `rule-soft` banner with
   the week's range in Source Sans `ink-muted` and the value in Plex Mono `ink`.
 - Loading, error and no history are inline `StatePanel`s; the empty heatmap
   still shows under the no-history panel.
@@ -90,6 +91,15 @@ rule that comes with it: text on a `viz` ground is `ink`.
   active `Delete`, which confirms in an `Alert` (T10-D4).
 - Loading, error (`Retry` on Sessions, T10-D6) and empty states are
   `StatePanel`s in a `Card`, with `…` for the ellipsis.
+
+One shared weekly working-set target grades each muscle against quota × selected weeks. Group
+colour averages the individually capped attainment of all constituent muscles,
+including untrained ones. The configured N-week window and This week start at
+local Monday and run through now; the default is the configured window, labelled
+“So far”, with no quota proration. A one-week configuration has one range choice.
+History uses the saved look-back in both views. Muscle Sets cells compare daily
+or weekly counts against that same weekly target; other metric scaling stays unchanged.
+Legends and accessibility labels explain target colouring.
 
 ## States
 

@@ -155,11 +155,11 @@ Brief entrypoint map of the current mobile screens.
     between per-exercise and per-muscle summaries while preserving the Sessions
     drill-down and the history sheets
 - Query params:
-  - `period` (optional; `7` or `30`; absent/invalid values default to `7`)
+  - `period` (optional; `7` for This week, `30` for the configured window; absent/invalid values use the configured window)
   - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
 - Key states (high level):
   - one `ScreenScroll` on `paper`: two micro-labelled `SegmentedControl` rows
-    (`Time range` 7/30 days, `Breakdown` `By Exercise` / `By Muscle`), the two
+    (`Time range` configured N weeks / This week, `Breakdown` `By Exercise` / `By Muscle`), the two
     summary `Card`s, the `SearchField` filter, then the table or the family
     cards; loading, error and empty states are `StatePanel`s in a `Card`
   - valid query values set the initial controls, including the completion
@@ -172,7 +172,7 @@ Brief entrypoint map of the current mobile screens.
     exercise names to wrap without truncation, retain complete accessibility
     wording, and open the exercise's history sheet as one whole-row
     action. Only exercises with at least one working set in the selected
-    7-/30-day window appear; `Vol` and `1RM` read working sets only.
+    calendar-week window appear; `Vol` and `1RM` read working sets only.
   - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
     Exercise cycles most/least recently completed across all-time working-set history;
     Sets and Vol each cycle high/low. The 1RM header is static. Missing recency stays last, and ties use
@@ -182,10 +182,10 @@ Brief entrypoint map of the current mobile screens.
     wording retains the complete sort mode and next action. Mounted sort choice
     survives time-range, search, and Breakdown changes.
   - per-muscle family and nested rows show `Sets` (working sets) plus per-side, role-weighted `Volume` of working sets; set comparisons are signed absolute deltas while volume comparisons are percentage-only with explicit zero-baseline states
-  - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight working sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
+  - per-muscle family rows and visible nested-muscle rows use the target-attainment ramp (`viz1`–`viz4`): one shared weekly muscle quota × selected weeks, capped at 100%; families average all constituent muscles, including untrained ones. Exact counts remain readable/accessibly labelled
   - in By Muscle, a nested muscle row and a collapsed single-muscle family header open that muscle's history; a multi-muscle family header opens the whole family's (`Muscle Group History`)
   - in By Exercise, a table row opens the exercise's history
-  - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `Sets`, plus `1RM` / `Top weight` for an exercise) and `View` (`Weekly` / `Daily`) `SegmentedControl`s, the week banner in Weekly, and the 365-day daily or weekly heatmap; loading, error and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so switching is immediate and keeps each view's selection and scroll
+  - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `Sets`, plus `1RM` / `Top weight` for an exercise) `SegmentedControl`, a static saved view/window label, the week banner in Weekly, and the saved look-back heatmap; the only Daily/Weekly selector is in Settings; loading, error and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so preference changes reuse each view’s selection and scroll
 - Notes:
   - preserved tab-group route with `headerShown: false`; its exact existing UI
     is also exposed canonically at `/progress`. `BottomTray` composes

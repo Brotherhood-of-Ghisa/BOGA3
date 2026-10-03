@@ -1,8 +1,8 @@
 import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -36,11 +36,6 @@ import {
   uiTypography,
 } from '@/components/ui';
 import {
-  computeSelectedExerciseDailyEffort,
-  computeSelectedExerciseWeeklyEffort,
-  computeSelectedMuscleDailyEffortMetrics,
-  computeSelectedMuscleWeeklyEffort,
-  computeStatsSummary,
   type CalendarHeatmapMetric,
   type DailyEffortMetrics,
   type SelectedExerciseWeeklyEffort,
@@ -50,17 +45,13 @@ import {
   type StatsPeriodDays,
   type StatsSummary,
 } from '@/src/data';
+import { useAuth } from '@/src/auth';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
+import { useHistory } from '@/components/stats/use-history';
+import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
-
-const PERIOD_OPTIONS = [
-  { value: 7 as StatsPeriodDays, label: 'Last 7 days' },
-  { value: 30 as StatsPeriodDays, label: 'Last 30 days' },
-] as const;
-
-const MUSCLE_HISTORY_WINDOW_DAYS = 365;
-const EXERCISE_HISTORY_WINDOW_DAYS = 365;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 type DeltaDisplay = {
   text: string;
@@ -125,7 +116,7 @@ const firstRouteParam = (value: string | string[] | undefined): string | undefin
 
 export const resolveStatsInitialPeriod = (
   value: string | string[] | undefined
-): StatsPeriodDays => (firstRouteParam(value) === '30' ? 30 : 7);
+): StatsPeriodDays => (firstRouteParam(value) === '7' ? 7 : 28);
 
 export const resolveStatsInitialBreakdown = (
   value: string | string[] | undefined
@@ -150,7 +141,7 @@ export const formatCountDelta = (current: number, previous: number): DeltaDispla
 };
 
 /** What the summary cards' deltas compare against: the adjacent earlier period. */
-export const formatPeriodComparison = (periodDays: StatsPeriodDays): string => `vs prev ${periodDays} days`;
+export const formatPeriodComparison = (periodDays: StatsPeriodDays): string => `vs prev ${periodDays / 7} ${periodDays === 7 ? 'wk' : 'wks'}`;
 
 export const formatVolumeDelta = (current: number | null, previous: number | null): DeltaDisplay => {
   if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) return { text: 'Incomplete', tone: 'neutral' };
@@ -170,20 +161,6 @@ export const formatVolumeDelta = (current: number | null, previous: number | nul
     text: `${percentDifference > 0 ? '+' : '−'}${Math.abs(percentDifference)}%`,
     tone: percentDifference > 0 ? 'positive' : 'negative',
   };
-};
-
-export const fullScaleFailureCount = (periodDays: StatsPeriodDays): number =>
-  (8 * periodDays) / 7;
-
-export const computeFailureIntensityProgress = (
-  workingSetCount: number,
-  periodDays: StatsPeriodDays
-): number => {
-  const fullScale = fullScaleFailureCount(periodDays);
-  if (!Number.isFinite(workingSetCount) || workingSetCount <= 0 || !Number.isFinite(fullScale)) {
-    return 0;
-  }
-  return Math.min(1, workingSetCount / fullScale);
 };
 
 const describeCountDifference = (difference: number, label: string): string => {
@@ -207,23 +184,21 @@ const buildMuscleRowAccessibilityLabel = ({
   previousWorkingSetCount,
   volume,
   volumeDelta,
-  periodDays,
+  targetDescription,
 }: {
   actionLabel: string;
   workingSetCount: number;
   previousWorkingSetCount: number;
   volume: number | null;
   volumeDelta: DeltaDisplay;
-  periodDays: StatsPeriodDays;
+  targetDescription: string;
 }): string =>
   [
     actionLabel,
     `${formatNumber(workingSetCount)} sets`,
     describeCountDifference(workingSetCount - previousWorkingSetCount, 'sets'),
     `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
-    `failure background reaches its strongest shade at ${formatNumber(
-      fullScaleFailureCount(periodDays)
-    )} sets for the selected ${periodDays}-day period`,
+    targetDescription,
   ].join('. ');
 
 export const nextExerciseSortMode = (
@@ -326,6 +301,9 @@ const formatTotalWeight = (value: number | null): string => value === null ? '�
 export type StatsScreenShellProps = {
   summary: StatsSummary | null;
   periodDays: StatsPeriodDays;
+  targetWindowWeeks?: number;
+  historyLookbackWeeks?: number;
+  weeklyWorkingSetTarget?: number;
   onSelectPeriod: (period: StatsPeriodDays) => void;
   onPressSessionsCard: () => void;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
@@ -342,7 +320,6 @@ export type StatsScreenShellProps = {
   muscleHistoryMetric: MuscleHistoryMetric;
   muscleHistoryView: HeatmapView;
   onSelectMuscleHistoryMetric: (metric: MuscleHistoryMetric) => void;
-  onSelectMuscleHistoryView: (view: HeatmapView) => void;
   viewMode: StatsViewMode;
   onSelectViewMode: (mode: StatsViewMode) => void;
   exerciseListItems: ExerciseListItem[];
@@ -358,7 +335,6 @@ export type StatsScreenShellProps = {
   onDismissExerciseHistory: () => void;
   onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
   onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
-  onSelectExerciseHistoryView: (view: HeatmapView) => void;
   /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
   historyTodayDateKey?: string;
   searchQuery: string;
@@ -368,6 +344,9 @@ export type StatsScreenShellProps = {
 export function StatsScreenShell({
   summary,
   periodDays,
+  targetWindowWeeks = 4,
+  historyLookbackWeeks = 52,
+  weeklyWorkingSetTarget = 8,
   onSelectPeriod,
   onPressSessionsCard,
   onPressMuscleHistory,
@@ -384,7 +363,6 @@ export function StatsScreenShell({
   muscleHistoryMetric,
   muscleHistoryView,
   onSelectMuscleHistoryMetric,
-  onSelectMuscleHistoryView,
   viewMode,
   onSelectViewMode,
   exerciseListItems,
@@ -400,7 +378,6 @@ export function StatsScreenShell({
   onDismissExerciseHistory,
   onSelectExerciseHistoryWeek,
   onSelectExerciseHistoryMetric,
-  onSelectExerciseHistoryView,
   historyTodayDateKey,
   searchQuery,
   onSearchQueryChange,
@@ -473,12 +450,14 @@ export function StatsScreenShell({
           <Text allowFontScaling={false} style={styles.microLabel}>Time range</Text>
           <SegmentedControl
             accessibilityLabel="Select stats time range"
-            options={PERIOD_OPTIONS}
+            options={targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
+              { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }]}
             value={periodDays}
             onChange={onSelectPeriod}
             testIDPrefix="stats-period-chip"
           />
         </View>
+        <Text allowFontScaling={false} style={styles.microLabel} testID="stats-so-far">So far</Text>
         <View style={styles.controlGroup} testID="stats-breakdown-controls">
           <Text allowFontScaling={false} style={styles.microLabel}>Breakdown</Text>
           <SegmentedControl
@@ -576,6 +555,7 @@ export function StatsScreenShell({
                   families={filteredFamilies}
                   previousFamilies={summary.previous.totals.muscleFamilies}
                   periodDays={periodDays}
+                  weeklyWorkingSetTarget={weeklyWorkingSetTarget}
                   onPressMuscleHistory={onPressMuscleHistory}
                 />
               )
@@ -595,14 +575,14 @@ export function StatsScreenShell({
           metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissMuscleHistory}
           onSelectMetric={onSelectMuscleHistoryMetric}
-          onSelectView={onSelectMuscleHistoryView}
           onSelectWeek={onSelectMuscleHistoryWeek}
           selectedWeekKey={selectedMuscleHistoryWeekKey}
           title={selectedMuscle.displayName}
           todayDateKey={historyTodayDateKey}
           view={muscleHistoryView}
           weeklyEffort={muscleHistoryWeeklyEffort}
-          windowDays={MUSCLE_HISTORY_WINDOW_DAYS}
+          lookbackWeeks={historyLookbackWeeks}
+          muscleTargets={{ muscleIds: selectedMuscle.muscleGroupIds, weeklyTarget: weeklyWorkingSetTarget }}
         />
       ) : null}
       {selectedExercise ? (
@@ -616,14 +596,13 @@ export function StatsScreenShell({
           metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissExerciseHistory}
           onSelectMetric={onSelectExerciseHistoryMetric}
-          onSelectView={onSelectExerciseHistoryView}
           onSelectWeek={onSelectExerciseHistoryWeek}
           selectedWeekKey={selectedExerciseHistoryWeekKey}
           title={selectedExercise.displayName}
           todayDateKey={historyTodayDateKey}
           view={exerciseHistoryView}
           weeklyEffort={exerciseHistoryWeeklyEffort}
-          windowDays={EXERCISE_HISTORY_WINDOW_DAYS}
+          lookbackWeeks={historyLookbackWeeks}
         />
       ) : null}
     </Screen>
@@ -655,6 +634,7 @@ function Delta({
   return (
     <Text
       allowFontScaling={false}
+      accessibilityLabel={comparison ? `${delta.text} ${comparison.replace('vs prev', 'versus previous').replace(/wks?$/, 'weeks')}, same elapsed calendar span` : undefined}
       numberOfLines={1}
       style={[styles.delta, (delta.tone === 'new' || onViz) && styles.deltaInk]}>
       {comparison ? `${delta.text} ${comparison}` : delta.text}
@@ -755,11 +735,13 @@ function MuscleFamilyList({
   families,
   previousFamilies,
   periodDays,
+  weeklyWorkingSetTarget,
   onPressMuscleHistory,
 }: {
   families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
   periodDays: StatsPeriodDays;
+  weeklyWorkingSetTarget: number;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   const previousByFamilyName = new Map(previousFamilies.map((family) => [family.familyName, family]));
@@ -780,6 +762,7 @@ function MuscleFamilyList({
           previousFamily={previousByFamilyName.get(family.familyName) ?? null}
           previousMusclesById={previousMusclesById}
           periodDays={periodDays}
+          weeklyWorkingSetTarget={weeklyWorkingSetTarget}
           onPressMuscleHistory={onPressMuscleHistory}
         />
       ))}
@@ -798,6 +781,7 @@ function MuscleFamilyCard({
   previousFamily,
   previousMusclesById,
   periodDays,
+  weeklyWorkingSetTarget,
   onPressMuscleHistory,
 }: {
   family: StatsMuscleFamilyPerformance;
@@ -805,6 +789,7 @@ function MuscleFamilyCard({
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
   periodDays: StatsPeriodDays;
+  weeklyWorkingSetTarget: number;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
@@ -821,7 +806,7 @@ function MuscleFamilyCard({
           previousWorkingSetCount: previousFamily?.workingSetCount ?? 0,
           volume: family.totalVolume,
           volumeDelta,
-          periodDays,
+          targetDescription: `Colour: average attainment of ${family.muscles.length} muscle targets over ${periodDays / 7} weeks, capped per muscle at 100%`,
         })}
         divider={false}
         level="family"
@@ -835,7 +820,8 @@ function MuscleFamilyCard({
         sets={formatNumber(family.workingSetCount)}
         setsDelta={formatCountDelta(family.workingSetCount, previousFamily?.workingSetCount ?? 0)}
         setsTestID={`stats-family-sets-${testIdSlug}`}
-        shade={selectFailureShade(computeFailureIntensityProgress(family.workingSetCount, periodDays))}
+        shade={selectFailureShade(groupedTargetAttainment(family.muscles.map(muscle => muscle.muscleGroupId),
+          Object.fromEntries(family.muscles.map(muscle => [muscle.muscleGroupId, muscle.workingSetCount])), weeklyWorkingSetTarget, periodDays / 7))}
         testID={
           collapsedMuscle
             ? `stats-family-header-button-${collapsedMuscle.muscleGroupId}`
@@ -863,7 +849,7 @@ function MuscleFamilyCard({
                   previousWorkingSetCount: previousMuscle?.workingSetCount ?? 0,
                   volume: muscle.totalVolume,
                   volumeDelta: muscleVolumeDelta,
-                  periodDays,
+                  targetDescription: `Colour: ${weeklyWorkingSetTarget} W/sets per week × ${periodDays / 7} weeks`,
                 })}
                 divider
                 key={muscle.muscleGroupId}
@@ -874,7 +860,7 @@ function MuscleFamilyCard({
                 setsDelta={formatCountDelta(muscle.workingSetCount, previousMuscle?.workingSetCount ?? 0)}
                 setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
                 shade={selectFailureShade(
-                  computeFailureIntensityProgress(muscle.workingSetCount, periodDays)
+                  muscleTargetAttainment(muscle.workingSetCount, weeklyWorkingSetTarget, periodDays / 7)
                 )}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}
                 untrained={muscle.workingSetCount === 0 && muscle.totalVolume === 0}
@@ -1095,305 +1081,49 @@ function ExerciseSortHeaderCell({
 }
 
 export default function StatsRoute() {
+  const { user } = useAuth();
+  return <StatsContent key={user?.id ?? 'local'} />;
+}
+
+function StatsContent() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    period?: string | string[];
-    breakdown?: string | string[];
-  }>();
-  const [periodDays, setPeriodDays] = useState<StatsPeriodDays>(() =>
-    resolveStatsInitialPeriod(params.period)
-  );
-  const [summary, setSummary] = useState<StatsSummary | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [selectedMuscle, setSelectedMuscle] = useState<MuscleHistoryTarget | null>(null);
-  const [muscleHistoryWeeklyEffort, setMuscleHistoryWeeklyEffort] = useState<SelectedMuscleWeeklyEffort[]>([]);
-  const [muscleHistoryDailyMetrics, setMuscleHistoryDailyMetrics] = useState<DailyEffortMetrics[]>([]);
-  const [isMuscleHistoryLoading, setIsMuscleHistoryLoading] = useState(false);
-  const [muscleHistoryErrorMessage, setMuscleHistoryErrorMessage] = useState<string | null>(null);
-  const [selectedMuscleHistoryWeekKey, setSelectedMuscleHistoryWeekKey] = useState<string | null>(null);
-  const [muscleHistoryMetric, setMuscleHistoryMetric] = useState<MuscleHistoryMetric>('totalVolume');
-  const [muscleHistoryView, setMuscleHistoryView] = useState<HeatmapView>('weekly');
-  const muscleHistoryRequestIdRef = useRef(0);
-
-  const [viewMode, setViewMode] = useState<StatsViewMode>(() =>
-    resolveStatsInitialBreakdown(params.breakdown)
-  );
+  const params = useLocalSearchParams<{ period?: string | string[]; breakdown?: string | string[] }>();
+  const { values } = useAccountLocalPreferenceState();
+  const [thisWeek, setThisWeek] = useState(firstRouteParam(params.period) === '7');
+  const weeks = thisWeek ? 1 : values.targetWindowWeeks;
+  const periodDays = weeks * 7;
+  const catalogPeriod = useMemo(() => ({ weeks }), [weeks]);
+  const catalog = useExerciseCatalog();
+  const { stats, reload } = useExerciseCatalogStats(catalogPeriod);
+  const revision = useBodyWeightContextRevision();
+  const summary = useStatsSummary(weeks, revision, reload);
+  const muscle = useHistory<MuscleHistoryTarget>(values.historyLookbackWeeks, revision);
+  const exercise = useHistory<ExerciseHeatmapTarget>(values.historyLookbackWeeks, revision);
+  const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
+  const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
+  const [viewMode, setViewMode] = useState<StatsViewMode>(() => resolveStatsInitialBreakdown(params.breakdown));
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedExercise, setSelectedExercise] = useState<ExerciseHeatmapTarget | null>(null);
-  const [exerciseHistoryWeeklyEffort, setExerciseHistoryWeeklyEffort] = useState<SelectedExerciseWeeklyEffort[]>([]);
-  const [exerciseHistoryDailyMetrics, setExerciseHistoryDailyMetrics] = useState<DailyEffortMetrics[]>([]);
-  const [isExerciseHistoryLoading, setIsExerciseHistoryLoading] = useState(false);
-  const [exerciseHistoryErrorMessage, setExerciseHistoryErrorMessage] = useState<string | null>(null);
-  const [selectedExerciseHistoryWeekKey, setSelectedExerciseHistoryWeekKey] = useState<string | null>(null);
-  const [exerciseHistoryMetric, setExerciseHistoryMetric] = useState<CalendarHeatmapMetric>('totalVolume');
-  const [exerciseHistoryView, setExerciseHistoryView] = useState<HeatmapView>('weekly');
-  const exerciseHistoryRequestIdRef = useRef(0);
-
-  const catalogSnapshot = useExerciseCatalog();
-  const { stats: exerciseCatalogStats, reload: reloadExerciseCatalogStats } =
-    useExerciseCatalogStats(periodDays);
-
-  const datedWeightRevision = useBodyWeightContextRevision();
-  const loadSummary = useCallback(async (period: StatsPeriodDays) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    try {
-      const next = await computeStatsSummary({ periodDays: period });
-      setSummary(next);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      // Both the muscle summary and the exercise list recompute from the DB on
-      // focus, so directly-seeded or out-of-band data (e.g. a session logged in
-      // another tab) is reflected without relying on a catalog-invalidation event.
-      void loadSummary(periodDays);
-      reloadExerciseCatalogStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
-    }, [loadSummary, periodDays, reloadExerciseCatalogStats, datedWeightRevision])
-  );
-
-  const handleSelectPeriod = useCallback(
-    (next: StatsPeriodDays) => {
-      setPeriodDays(next);
-      void loadSummary(next);
-    },
-    [loadSummary]
-  );
-
-  const handlePressSessionsCard = useCallback(() => {
-    router.push('/sessions');
-  }, [router]);
-
-  const handlePressMuscleHistory = useCallback(async (muscle: MuscleHistoryTarget) => {
-    const requestId = muscleHistoryRequestIdRef.current + 1;
-    muscleHistoryRequestIdRef.current = requestId;
-    const end = new Date();
-    const start = new Date(end.getTime() - MUSCLE_HISTORY_WINDOW_DAYS * MS_PER_DAY);
-
-    setSelectedMuscle(muscle);
-    setMuscleHistoryWeeklyEffort([]);
-    setMuscleHistoryDailyMetrics([]);
-    setSelectedMuscleHistoryWeekKey(null);
-    setMuscleHistoryErrorMessage(null);
-    setIsMuscleHistoryLoading(true);
-
-    try {
-      const [nextEffort, nextDaily] = await Promise.all([
-        computeSelectedMuscleWeeklyEffort({
-          muscleGroupIds: muscle.muscleGroupIds,
-          start,
-          end,
-        }),
-        computeSelectedMuscleDailyEffortMetrics({
-          muscleGroupIds: muscle.muscleGroupIds,
-          start,
-          end,
-        }),
-      ]);
-      if (muscleHistoryRequestIdRef.current !== requestId) return;
-      setMuscleHistoryWeeklyEffort(nextEffort);
-      setMuscleHistoryDailyMetrics(nextDaily);
-    } catch (error) {
-      if (muscleHistoryRequestIdRef.current !== requestId) return;
-      setMuscleHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      if (muscleHistoryRequestIdRef.current !== requestId) return;
-      setIsMuscleHistoryLoading(false);
-    }
-  }, []);
-
-  const handleDismissMuscleHistory = useCallback(() => {
-    muscleHistoryRequestIdRef.current += 1;
-    setSelectedMuscle(null);
-    setMuscleHistoryWeeklyEffort([]);
-    setMuscleHistoryDailyMetrics([]);
-    setSelectedMuscleHistoryWeekKey(null);
-    setMuscleHistoryErrorMessage(null);
-    setIsMuscleHistoryLoading(false);
-  }, []);
-
-  const handleSelectMuscleHistoryWeek = useCallback((weekKey: string | null) => {
-    setSelectedMuscleHistoryWeekKey(weekKey);
-  }, []);
-
-  const handleSelectViewMode = useCallback((mode: StatsViewMode) => {
-    setViewMode(mode);
-    setSearchQuery('');
-    setSelectedExercise(null);
-    setExerciseHistoryWeeklyEffort([]);
-    setExerciseHistoryDailyMetrics([]);
-    setSelectedExerciseHistoryWeekKey(null);
-    setExerciseHistoryErrorMessage(null);
-    setIsExerciseHistoryLoading(false);
-  }, []);
-
-  const handlePressExerciseHistory = useCallback(async (exercise: ExerciseHeatmapTarget) => {
-    const requestId = exerciseHistoryRequestIdRef.current + 1;
-    exerciseHistoryRequestIdRef.current = requestId;
-    const end = new Date();
-    const start = new Date(end.getTime() - EXERCISE_HISTORY_WINDOW_DAYS * MS_PER_DAY);
-
-    setSelectedExercise(exercise);
-    setExerciseHistoryWeeklyEffort([]);
-    setExerciseHistoryDailyMetrics([]);
-    setSelectedExerciseHistoryWeekKey(null);
-    setExerciseHistoryErrorMessage(null);
-    setIsExerciseHistoryLoading(true);
-
-    try {
-      const [nextEffort, nextDaily] = await Promise.all([
-        computeSelectedExerciseWeeklyEffort({
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          start,
-          end,
-        }),
-        computeSelectedExerciseDailyEffort({
-          exerciseDefinitionId: exercise.exerciseDefinitionId,
-          start,
-          end,
-        }),
-      ]);
-      if (exerciseHistoryRequestIdRef.current !== requestId) return;
-      setExerciseHistoryWeeklyEffort(nextEffort);
-      setExerciseHistoryDailyMetrics(nextDaily);
-    } catch (error) {
-      if (exerciseHistoryRequestIdRef.current !== requestId) return;
-      setExerciseHistoryErrorMessage(error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      if (exerciseHistoryRequestIdRef.current !== requestId) return;
-      setIsExerciseHistoryLoading(false);
-    }
-  }, []);
-
-  const observedWeightRevision = useRef(datedWeightRevision);
-  useEffect(() => {
-    if (observedWeightRevision.current === datedWeightRevision) return;
-    observedWeightRevision.current = datedWeightRevision;
-    const refresh = setTimeout(() => {
-      if (selectedMuscle) void handlePressMuscleHistory(selectedMuscle);
-      if (selectedExercise) void handlePressExerciseHistory(selectedExercise);
-    }, 0);
-    return () => clearTimeout(refresh);
-  }, [datedWeightRevision, selectedMuscle, selectedExercise, handlePressMuscleHistory, handlePressExerciseHistory]);
-
-  const handleDismissExerciseHistory = useCallback(() => {
-    exerciseHistoryRequestIdRef.current += 1;
-    setSelectedExercise(null);
-    setExerciseHistoryWeeklyEffort([]);
-    setExerciseHistoryDailyMetrics([]);
-    setSelectedExerciseHistoryWeekKey(null);
-    setExerciseHistoryErrorMessage(null);
-    setIsExerciseHistoryLoading(false);
-  }, []);
-
-  const handleSelectExerciseHistoryWeek = useCallback((weekKey: string | null) => {
-    setSelectedExerciseHistoryWeekKey(weekKey);
-  }, []);
-
-  const exerciseListItems = useMemo<ExerciseListItem[]>(() => {
-    const { exercises } = catalogSnapshot;
-    const { aggregatesById, lastCompletedAtById } = exerciseCatalogStats;
-    return exercises
-      .filter((ex) => (aggregatesById.get(ex.id)?.workingSetCount ?? 0) > 0)
-      .map((ex) => {
-        const agg = aggregatesById.get(ex.id) ?? null;
-        return {
-          id: ex.id,
-          name: ex.name,
-          workingSetCount: agg?.workingSetCount ?? 0,
-          totalVolume: agg ? agg.totalVolume : 0,
-          knownVolume: agg ? agg.knownVolume : 0,
-          estimatedOneRepMax: agg?.estimatedOneRepMax ?? null,
-          lastCompletedAt: lastCompletedAtById.get(ex.id) ?? null,
-        };
-      });
-  }, [catalogSnapshot, exerciseCatalogStats]);
-
-  // useMemo prevents unnecessary re-renders of the shell when the route re-renders.
-  const shellProps = useMemo<StatsScreenShellProps>(
-    () => ({
-      summary,
-      periodDays,
-      onSelectPeriod: handleSelectPeriod,
-      onPressSessionsCard: handlePressSessionsCard,
-      onPressMuscleHistory: handlePressMuscleHistory,
-      onDismissMuscleHistory: handleDismissMuscleHistory,
-      onSelectMuscleHistoryWeek: handleSelectMuscleHistoryWeek,
-      isLoading,
-      errorMessage,
-      selectedMuscle,
-      muscleHistoryWeeklyEffort,
-      muscleHistoryDailyMetrics,
-      isMuscleHistoryLoading,
-      muscleHistoryErrorMessage,
-      selectedMuscleHistoryWeekKey,
-      muscleHistoryMetric,
-      muscleHistoryView,
-      onSelectMuscleHistoryMetric: setMuscleHistoryMetric,
-      onSelectMuscleHistoryView: setMuscleHistoryView,
-      viewMode,
-      onSelectViewMode: handleSelectViewMode,
-      exerciseListItems,
-      selectedExercise,
-      exerciseHistoryWeeklyEffort,
-      exerciseHistoryDailyMetrics,
-      isExerciseHistoryLoading,
-      exerciseHistoryErrorMessage,
-      selectedExerciseHistoryWeekKey,
-      exerciseHistoryMetric,
-      exerciseHistoryView,
-      onPressExerciseHistory: handlePressExerciseHistory,
-      onDismissExerciseHistory: handleDismissExerciseHistory,
-      onSelectExerciseHistoryWeek: handleSelectExerciseHistoryWeek,
-      onSelectExerciseHistoryMetric: setExerciseHistoryMetric,
-      onSelectExerciseHistoryView: setExerciseHistoryView,
-      searchQuery,
-      onSearchQueryChange: setSearchQuery,
-    }),
-    [
-      summary,
-      periodDays,
-      handleSelectPeriod,
-      handlePressSessionsCard,
-      handlePressMuscleHistory,
-      handleDismissMuscleHistory,
-      handleSelectMuscleHistoryWeek,
-      isLoading,
-      errorMessage,
-      selectedMuscle,
-      muscleHistoryWeeklyEffort,
-      muscleHistoryDailyMetrics,
-      isMuscleHistoryLoading,
-      muscleHistoryErrorMessage,
-      selectedMuscleHistoryWeekKey,
-      muscleHistoryMetric,
-      muscleHistoryView,
-      viewMode,
-      handleSelectViewMode,
-      exerciseListItems,
-      selectedExercise,
-      exerciseHistoryWeeklyEffort,
-      exerciseHistoryDailyMetrics,
-      isExerciseHistoryLoading,
-      exerciseHistoryErrorMessage,
-      selectedExerciseHistoryWeekKey,
-      exerciseHistoryMetric,
-      exerciseHistoryView,
-      handlePressExerciseHistory,
-      handleDismissExerciseHistory,
-      handleSelectExerciseHistoryWeek,
-      searchQuery,
-    ]
-  );
-
-  return <StatsScreenShell {...shellProps} />;
+  const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
+    .filter(item => (stats.aggregatesById.get(item.id)?.workingSetCount ?? 0) > 0)
+    .map(item => {
+      const aggregate = stats.aggregatesById.get(item.id)!;
+      return { id: item.id, name: item.name, workingSetCount: aggregate.workingSetCount,
+        totalVolume: aggregate.totalVolume, knownVolume: aggregate.knownVolume,
+        estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
+    }), [catalog.exercises, stats]);
+  return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
+    historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
+    onSelectPeriod={days => setThisWeek(days === 7)} onPressSessionsCard={() => router.push('/sessions')}
+    onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onSelectMuscleHistoryWeek={muscle.selectWeek}
+    selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}
+    isMuscleHistoryLoading={muscle.loading} muscleHistoryErrorMessage={muscle.error} selectedMuscleHistoryWeekKey={muscle.weekKey}
+    muscleHistoryMetric={muscleMetric} muscleHistoryView={values.heatmapView} onSelectMuscleHistoryMetric={setMuscleMetric}
+    viewMode={viewMode} onSelectViewMode={mode => { setViewMode(mode); setSearchQuery(''); exercise.dismiss(); muscle.dismiss(); }}
+    exerciseListItems={exerciseListItems} selectedExercise={exercise.selected} exerciseHistoryWeeklyEffort={exercise.weekly}
+    exerciseHistoryDailyMetrics={exercise.daily} isExerciseHistoryLoading={exercise.loading} exerciseHistoryErrorMessage={exercise.error}
+    selectedExerciseHistoryWeekKey={exercise.weekKey} exerciseHistoryMetric={exerciseMetric} exerciseHistoryView={values.heatmapView}
+    onPressExerciseHistory={exercise.select} onDismissExerciseHistory={exercise.dismiss} onSelectExerciseHistoryWeek={exercise.selectWeek}
+    onSelectExerciseHistoryMetric={setExerciseMetric} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
 }
 
 // The width the Exercise header reserves for its `Recent` + arrow indicator,

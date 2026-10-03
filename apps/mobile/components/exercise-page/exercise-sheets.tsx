@@ -4,8 +4,9 @@ import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
 import { uiRoles } from '@/components/ui/tokens';
-import type { SessionSetTypeValue } from '@/src/data/set-types';
-import { EFFORT_OPTIONS, formatEffort } from '@/src/session-recorder/exercise-page-model';
+import { getSessionSetTypeCycle, type SessionSetTypeValue } from '@/src/data/set-types';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { formatEffort } from '@/src/session-recorder/exercise-page-model';
 
 type EffortSheetProps = {
   visible: boolean;
@@ -17,6 +18,8 @@ type EffortSheetProps = {
 // Long-press alternative to cycling, including an explicit blank effort.
 export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSheetProps) {
   const { height } = useWindowDimensions();
+  const { values } = useAccountLocalPreferenceState();
+  const options = getSessionSetTypeCycle(values.visibleEffortGrades);
   return (
     <Sheet
       dismissLabel="Dismiss effort picker"
@@ -25,7 +28,7 @@ export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSh
       title="Effort"
       visible={visible}>
       <ScrollView style={{ maxHeight: height * 0.65, flexGrow: 0 }}>
-        {EFFORT_OPTIONS.map((option) => {
+        {options.map((option) => {
           const isSelected = option === selected;
           return (
             <ListRow

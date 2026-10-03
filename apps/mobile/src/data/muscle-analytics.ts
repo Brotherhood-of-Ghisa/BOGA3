@@ -332,6 +332,8 @@ export type SelectedMuscleWeeklyEffort = {
  */
 export type DailyEffortMetrics = {
   dateKey: string;
+  /** Per-muscle counts for target grading; the existing displayed metrics are unchanged. */
+  workingSetCountsByMuscle?: Record<string, number>;
   totalVolume: number | null;
   knownVolume?: number | null;
   workingSetCount: number;
@@ -466,11 +468,16 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
   dailyEffort
     .map((day) => {
       const acc = createEffortMetricAccumulator();
+      const identitiesByMuscle = new Map<string, Set<string>>();
       for (const contribution of day.contributions) {
         accumulateContributionMetrics(acc, contribution);
+        const identities = identitiesByMuscle.get(contribution.muscleGroupId) ?? new Set<string>();
+        identities.add(contribution.setIdentity);
+        identitiesByMuscle.set(contribution.muscleGroupId, identities);
       }
       return {
         dateKey: day.dateKey,
+        workingSetCountsByMuscle: Object.fromEntries([...identitiesByMuscle].map(([id, identities]) => [id, identities.size])),
         totalVolume: acc.totalVolume, knownVolume: acc.knownVolume,
         workingSetCount: acc.workingSetCount,
         estimatedRM1: acc.bestRM1,
