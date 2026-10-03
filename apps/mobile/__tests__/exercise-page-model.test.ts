@@ -171,6 +171,19 @@ describe('exercise page model', () => {
     expect(recordBandFor([])).toBeNull();
   });
 
+  it('never marks a warm-up as a record, though it keeps its own figures', () => {
+    const rows = rowsFor([
+      performedSet('w', '120', '5', 'warm_up'),
+      performedSet('k', '90', '5', 'rir_1'),
+    ], { oneRepMax: 102.2, weight: 85 });
+
+    // The warm-up beats both records on its figures, which still show.
+    expect(rows[0]).toMatchObject({ setType: 'warm_up', weight: 120, reps: 5, volume: 600 });
+    expect(rows[0]?.oneRepMax).toBeGreaterThan(102.2);
+    expect(rows[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+    expect(rows[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: true });
+  });
+
   it('shows entered values over the plan once the lifter starts typing', () => {
     const [set] = updateLoggerValues([plannedSet('p', '82.5', '6', 'rir_1')], 'p', { weightValue: '80' });
     expect(set).toMatchObject({

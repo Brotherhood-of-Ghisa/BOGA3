@@ -140,7 +140,7 @@ describe('ExercisePageScreen', () => {
 
     expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
     expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
-    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2560');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2080');
 
     expect(screen.getByTestId('exercise-set-1-values')).toHaveTextContent('60.0 × 10');
     expect(screen.getByTestId('exercise-set-1-1rm')).toHaveTextContent('1RM80.8');
@@ -450,14 +450,17 @@ describe('ExercisePageScreen', () => {
     await openPage();
 
     fireEvent.press(screen.getByTestId('exercise-records-toggle'));
-    // The newer session holds the 1RM (80 × 8) and heaviest weight; the older one the volume.
+    // The newer session holds the 1RM (80 × 8) and heaviest weight; the older one the
+    // volume, working sets only (its 60 × 8 warm-up is left out).
     expect(screen.getByTestId('exercise-record-1rm')).toHaveTextContent(new RegExp(`^1RM102\\.1${DATE} · 80\\.0 × 8$`));
     expect(screen.getByTestId('exercise-record-max')).toHaveTextContent(new RegExp(`^Max82\\.5${DATE} · 6 reps$`));
-    expect(screen.getByTestId('exercise-record-vol')).toHaveTextContent(new RegExp(`^Vol2560${DATE} · 5 sets$`));
+    expect(screen.getByTestId('exercise-record-vol')).toHaveTextContent(new RegExp(`^Vol2080${DATE} · 4 sets$`));
 
     fireEvent.press(screen.getByTestId('exercise-records-view-last'));
     const last = screen.getByTestId('exercise-records-last');
-    expect(within(last).getByText('1RM 102.1 · VOL 2375')).toBeTruthy();
+    expect(within(last).getByText('1RM 102.1 · VOL 1775')).toBeTruthy();
+    // Working sets only in the figures; the warm-up keeps its line (and its 1RM).
+    expect(screen.getByTestId('exercise-records-last-set-0')).toHaveTextContent(/^W-Up60\.0 × 10/);
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
     fireEvent.press(screen.getByTestId('exercise-records-history'));
@@ -484,12 +487,12 @@ describe('ExercisePageScreen', () => {
     // Collapsed: the row sums up Records, then Last, and stays collapsed.
     expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1');
     expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
-    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2560');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2080');
     fireEvent.press(screen.getByTestId('exercise-records-view-last'));
     expect(screen.getByTestId('exercise-records-collapsed')).toBeTruthy();
     expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1');
     expect(screen.getByTestId('exercise-records-max')).toHaveTextContent('Max82.5');
-    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2375');
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol1775');
     expect(screen.queryByTestId('exercise-records-last')).toBeNull();
     expect(screen.getByTestId('exercise-records-view-last')).toBeSelected();
 
@@ -672,8 +675,8 @@ describe('ExercisePageScreen', () => {
     });
     await renderPage();
 
-    // Only the newer session counts: its 2375 volume, not the older one's 2560.
-    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol2375');
+    // Only the newer session counts: its 1775 volume, not the older one's 2080.
+    expect(screen.getByTestId('exercise-records-vol')).toHaveTextContent('Vol1775');
     fireEvent.press(screen.getByTestId('exercise-records-toggle'));
     expect(screen.getByTestId('exercise-record-1rm')).toHaveTextContent(
       new RegExp(`^1RM102\\.1${DATE} · Metroflex · 80\\.0 × 8$`)

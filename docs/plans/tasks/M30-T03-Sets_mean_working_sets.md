@@ -25,7 +25,8 @@ collapse into that one count.
     comparison cards (`· W working`).
   - The group friend session `Sets` and the stream card `N sets`
     (`groups/session-metrics.ts`).
-  - The records panel's `Vol` detail.
+  - The records panel's `Vol` detail: done in T01 (the volume record and its
+    "N sets" count the record session's working sets); nothing left here.
   - The aggregator fields that become redundant (`setCount` vs
     `workingSetCount`): keep one.
   - Specs: `ux-rules.md` :297–347, :621–668 and :685–688; `screen-map.md`

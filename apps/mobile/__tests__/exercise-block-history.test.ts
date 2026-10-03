@@ -1,3 +1,4 @@
+import { estimateOneRepMax } from '@/src/exercise-calculations';
 import {
   aggregateExerciseBlockHistory,
   createExerciseBlockHistoryRepository,
@@ -88,7 +89,7 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(recent.daysAgo).toBe(2);
   });
 
-  it('includes warm-ups in metrics but not in working-set counts', () => {
+  it('leaves warm-ups out of the bests and working-set counts, but not yet out of volume', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
       sessions: [
@@ -107,10 +108,11 @@ describe('aggregateExerciseBlockHistory', () => {
 
     const block = summary.blocks[0];
     expect(block.totalVolume).toBe(500 * 5 + 100 * 5 + 90 * 4);
-    expect(block.highestWeight).toBe(500);
+    // The 500 kg warm-up is heavier than every working set, yet sets no best.
+    expect(block.highestWeight).toBe(100);
+    expect(block.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
     // rir-good and the untagged set; the warm-up and the invalid row are excluded.
     expect(block.workingSetCount).toBe(2);
-    expect(block.estimatedOneRepMax).not.toBeNull();
   });
 
   it('excludes valid but unconfirmed sets from history metrics and plan suggestions', () => {
@@ -165,8 +167,22 @@ describe('aggregateExerciseBlockHistory', () => {
       ]),
     });
 
-    expect(summary.blocks[0].estimatedOneRepMax).toBeCloseTo(269.49339896337074, 8);
-    expect(summary.blocks[0].highestWeight).toBe(200);
+    // The heavier warm-up (200 × 10) is neither the 1RM nor the top weight.
+    expect(summary.blocks[0].estimatedOneRepMax).toBeCloseTo(134.74669948168537, 8);
+    expect(summary.blocks[0].highestWeight).toBe(120);
+  });
+
+  it('gives a warm-up-only block no 1RM or top weight', () => {
+    const summary = aggregateExerciseBlockHistory({
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      sessions: [sessionRow({ sessionId: 'session-1', completedAt: new Date('2026-05-19T12:00:00.000Z') })],
+      sessionExercises: [sessionExerciseRow({ sessionId: 'session-1', sessionExerciseId: 'se-1' })],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'warm', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '200', repsValue: '5', setType: 'warm_up' }),
+      ]),
+    });
+
+    expect(summary.blocks[0] ?? { estimatedOneRepMax: null, highestWeight: null }).toMatchObject({ estimatedOneRepMax: null, highestWeight: null });
   });
 
   it('omits history blocks when no confirmed set parses cleanly', () => {

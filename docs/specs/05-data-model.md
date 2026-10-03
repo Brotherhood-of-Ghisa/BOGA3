@@ -118,7 +118,7 @@ own synced raw rows; they never cross the wire.
 ### Exercise session facts (local-only, derived)
 
 One row per completed, non-deleted session and linked exercise definition with
-at least one eligible performed set: `session_id`, `exercise_definition_id`,
+at least one working set: `session_id`, `exercise_definition_id`,
 `achieved_at` (the session's `completed_at`), `best_e1rm_kg` +
 `best_e1rm_set_id`, `top_weight_kg` + `top_weight_set_id`, `volume_kg` +
 `volume_complete`, `working_sets`, and the flags `pr_e1rm`, `pr_weight`,
@@ -130,16 +130,21 @@ at least one eligible performed set: `session_id`, `exercise_definition_id`,
 - **Grain.** Repeated blocks of one definition in a session fold into one row.
   Unlinked legacy session exercises, active sessions and deleted sessions have
   no rows.
-- **Metrics** use the existing rules unchanged. Eligible sets are valid
-  confirmed performed sets, warm-ups included. 1RM uses the personal
+- **Metrics** read working sets only (`isWorkingSet`, `ux-rules.md` §5.11):
+  valid confirmed performed sets that are not warm-ups. A session whose sets
+  of a definition are all warm-ups has no row, and a warm-up never sets a
+  best or a PR flag. 1RM uses the personal
   calculation policy (`tech/bodyweight-load-contract.md`). Top weight is the
   raw entered kg; an equal weight goes to the set with more reps. Volume is
   calculated load × reps, summed as the completed-session volume comparison
   does; `volume_kg` is the known subtotal when `volume_complete` is false.
-  Working sets follow `isWorkingSessionSetType` (*Sync v2 data-model
-  contract* #5).
+  `working_sets` counts the sets the row was derived from (*Sync v2
+  data-model contract* #5).
 - **Ties inside a session** go to the first set in session order (block, then
-  set). The completed-session PR badge uses the same order.
+  set). One rule picks the best-1RM set
+  (`apps/mobile/src/exercise-calculations/best-set.ts`). The facts derive with
+  it, and the session view and completed-session detail apply it to an
+  in-memory session.
 - **PR flags.** History is ordered by `completed_at`, then `session_id`. A
   metric is flagged when the session's value strictly beats the best of every
   earlier session for that definition; at most one set per metric per session
@@ -147,6 +152,11 @@ at least one eligible performed set: `session_id`, `exercise_definition_id`,
   a session with no value neither counts as the baseline nor raises the bar.
   An incomplete volume is never a volume PR and never raises the volume bar.
   The 1RM flag equals `deriveSessionPersonalRecords` on every session.
+- **Completed-session PRs** (completion screen, completed-session route, share
+  preview) read each definition's best `best_e1rm_kg` from the sessions before
+  the target, in the order above. The target's best set is a PR when it beats
+  that best, which is the same test as its `pr_e1rm` flag. Jest holds the list
+  equal to the replay `deriveSessionPersonalRecords`.
 - **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
   `exercise_sets`, `exercise_definitions` (load mode, contribution),
   `user_settings` (the bodyweight toggle) and `body_weight_measurements` queue
@@ -159,7 +169,7 @@ at least one eligible performed set: `session_id`, `exercise_definition_id`,
   the rules version the table was fully built under; a missing row (fresh
   install, wipe) or another version rebuilds every definition before the read.
   Changing a rule, including one in the shared calculation kernel or the
-  working-set rule (`isWorkingSessionSetType`), bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`; a Jest
+  working-set rule (`isWorkingSet`), bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`; a Jest
   fixture pins the values the current version derives and fails when a rule
   changes under it. Reads return rows in the derivation's order, not SQLite
   collation order.
@@ -401,7 +411,7 @@ section states only the data-model-level invariants.
    (first sign-in or wiped-client reinstall). It must be coherent across all
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
-5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | null`, where `n` is a canonical non-negative safe integer) and remains nullable for legacy/unspecified sets. RIR values are in sync scope through the existing nullable text fields (`set_type` and `planned_set_type`); no migration or wire-envelope change is needed. `warm_up` is an effort/display classification, not a general stats exclusion flag: valid warm-up sets count toward volume, estimated 1RM, highest/top weight, heatmaps, and other strength/volume metrics, but are not working sets. A working set is any valid confirmed set whose `set_type` is not `warm_up`: null/unclassified, any RIR, and unrecognised stored values all count; invalid and unconfirmed rows are not sets at all. `isWorkingSessionSetType` in `apps/mobile/src/data/set-types.ts` is the single predicate every working-set count uses. `apps/mobile/src/config/training.ts` sets `EFFORT_LOGGING_POLICY.maxSelectableRir` (default `3`) for generated picker/cycle choices. Reducing that range never clears stored or imported higher RIRs, their labels, or inherited effort; tapping a higher historical effort re-enters the current cycle at Warm-up. Working-set classification is independent of the selectable range; it is not a user preference or a synced field.
+5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | null`, where `n` is a canonical non-negative safe integer) and remains nullable for legacy/unspecified sets. RIR values are in sync scope through the existing nullable text fields (`set_type` and `planned_set_type`); no migration or wire-envelope change is needed. A working set is any valid confirmed set whose `set_type` is not `warm_up`: null/unclassified, any RIR, and unrecognised stored values all count; invalid and unconfirmed rows are not sets at all. Records, PRs, bests and their baselines read working sets only; a valid warm-up keeps its own per-set 1RM and volume and still counts toward volume, heatmaps and the other volume and usage metrics (`ux-rules.md` §5.11). `isWorkingSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts` is the single predicate (`isWorkingSessionSetType` in `apps/mobile/src/data/set-types.ts` re-exports its set-type half), used by every working-set count and record. `apps/mobile/src/config/training.ts` sets `EFFORT_LOGGING_POLICY.maxSelectableRir` (default `3`) for generated picker/cycle choices. Reducing that range never clears stored or imported higher RIRs, their labels, or inherited effort; tapping a higher historical effort re-enters the current cycle at Warm-up. Working-set classification is independent of the selectable range; it is not a user preference or a synced field.
 6. Planned workout execution targets and explicit performance state are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the existing push/pull wire envelope. `performance_status` is nullable unconstrained text; new writes use `planned` and `unperformed`, while a valid actual row with `null` is the confirmed/performed representation. The historical `skipped` value remains accepted for backward compatibility but hydrates as an untouched `planned` row and is never written by current session actions. This adds no column, server migration, or wire-envelope field.
    - New empty and copied/defaulted active rows use `unperformed`, even when copied values are already valid. For upgrade compatibility, a pre-existing valid row with legacy `null` remains confirmed; a blank or partial legacy draft row with `null` hydrates as `unperformed` so later entry cannot silently confirm it.
    - Active and completed-edit autosave preserve planned and unperformed rows losslessly. Completed-edit is the session view and exercise page editing a completed session (`/session/<id>`): their autosave writes the session back as `completed` through `persistCompletedSessionSnapshot`, never replaying completion. Legacy skipped rows normalize to planned on hydration. Final active-session submit and completed-edit save (the session view's `Done`) write completed workout history from valid confirmed actual rows only. Entered valid unconfirmed rows require a specific discard confirmation; they are never promoted or discarded implicitly.

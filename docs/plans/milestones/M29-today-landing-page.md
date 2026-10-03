@@ -135,7 +135,7 @@ server's own group records, so nothing server-side needs personal PR flags.
 | `M29-T03-Today_progress_card` | Rebuild Today with the Progress card; keep the current group snapshot | T02 | planned |
 | `M29-T04-Group_week_summary_RPC` | Server RPC + client for the group card's data | none | completed |
 | `M29-T05-Today_group_card_and_closeout` | The Group activity card, gallery acceptance, milestone closeout | T03, T04 | planned |
-| `M29-T06-Completion_PRs_on_facts` | Completed-session and completion-screen PRs read the facts table | T01 | planned |
+| `M29-T06-Completion_PRs_on_facts` | Completed-session and completion-screen PRs read the facts table | T01 | completed |
 | `M29-T07-Session_view_PRs_on_facts` | The session view's live PR bar reads earlier bests from the facts table | T01 | planned |
 | `M29-T08-Exercise_records_on_facts` | Exercise page and history records read the facts table | T01, `M30-T01` | planned |
 

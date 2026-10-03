@@ -27,6 +27,7 @@ const lastSession = (over: Partial<LastSession> = {}): LastSession => ({
   completedAt: SEP_12,
   gymName: 'Iron Den',
   oneRepMax: 140,
+  maxWeight: 100,
   volume: 1800,
   sets: [
     { setType: 'warm_up', weight: 60, reps: 8, oneRepMax: 75, volume: 480 },
@@ -96,8 +97,14 @@ describe('collapsed records panel', () => {
     expect(collapsedValues()).toEqual(['1RM —', 'Max —', 'Vol —']);
   });
 
-  it('sums up the last session: best 1RM, heaviest set, volume', () => {
-    renderPanel(ready(ALL_RECORDS, lastSession()), { view: 'last' });
+  it('sums up the last session: best 1RM, heaviest working set, volume', () => {
+    // The 120 kg warm-up line is heavier, but Max reads the working sets' figure.
+    renderPanel(ready(ALL_RECORDS, lastSession({
+      sets: [
+        { setType: 'warm_up', weight: 120, reps: 2, oneRepMax: 125, volume: 240 },
+        { setType: null, weight: 100, reps: 5, oneRepMax: 116.7, volume: 500 },
+      ],
+    })), { view: 'last' });
     expect(collapsedValues()).toEqual(['1RM 140.0', 'Max 100.0', 'Vol 1800']);
     expect(screen.queryByTestId('exercise-records-volume-coverage')).toBeNull();
   });
@@ -109,7 +116,7 @@ describe('collapsed records panel', () => {
   });
 
   it('notes incomplete volume when the last session has sets of unknown load', () => {
-    renderPanel(ready(ALL_RECORDS, lastSession({ oneRepMax: null, volume: null, knownVolume: 480, sets: [] })), {
+    renderPanel(ready(ALL_RECORDS, lastSession({ oneRepMax: null, maxWeight: null, volume: null, knownVolume: 480, sets: [] })), {
       view: 'last',
     });
     expect(collapsedValues()).toEqual(['1RM —', 'Max —', 'Vol —']);

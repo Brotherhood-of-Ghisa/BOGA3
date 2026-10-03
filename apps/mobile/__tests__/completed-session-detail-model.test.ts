@@ -68,6 +68,19 @@ describe('buildCompletedSessionDetailModel', () => {
     expect(notBeaten.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
   });
 
+  it('never marks a warm-up heavier than the working sets as the record', () => {
+    const heavyWarmUp = { ...bench, sets: [{ id: 'w', weight: '200', reps: '5', setType: 'warm_up' }, bench.sets[1]] };
+
+    const beaten = buildCompletedSessionDetailModel([heavyWarmUp], new Map([['bench-def', 80]])).cards[0];
+    expect(beaten.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '200.0 × 5', volume: '1000', oneRepMaxRecord: false });
+    expect(beaten.rows.filter((row) => row.oneRepMaxRecord).map((row) => row.id)).toEqual(['b2']);
+
+    // Only the warm-up beats the other sessions: no record.
+    const onlyWarmUpBeats = buildCompletedSessionDetailModel([heavyWarmUp], new Map([['bench-def', 150]])).cards[0];
+    expect(onlyWarmUpBeats.recordOneRepMax).toBeNull();
+    expect(onlyWarmUpBeats.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
+  });
+
   it('shows no record without history, or for an exercise without a definition', () => {
     expect(buildCompletedSessionDetailModel([bench], new Map()).cards[0].recordOneRepMax).toBeNull();
     // A null historical best (no other session) is not a record either.
