@@ -8,6 +8,7 @@ import {
   hasValidActualValues,
   isConfirmedPerformedSet,
 } from '@/src/exercise-calculations/set-semantics';
+import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations/parse';
 import { formatCurrentDateTime } from '@/src/utils/local-time';
 
 /**
@@ -121,29 +122,12 @@ function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet)
   };
 }
 
-const isNonNegativeDecimalInput = (value: string): boolean => {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return true;
-  }
+// A blank field is not an error; anything else must parse (`parse.ts`).
+const isNonNegativeDecimalInput = (value: string): boolean =>
+  value.trim().length === 0 || parseSetWeight(value) !== null;
 
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) && parsed >= 0;
-};
-
-const isPositiveIntegerInput = (value: string): boolean => {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return true;
-  }
-
-  if (!/^\d+$/.test(trimmed)) {
-    return false;
-  }
-
-  const parsed = Number(trimmed);
-  return Number.isInteger(parsed) && parsed > 0;
-};
+const isPositiveIntegerInput = (value: string): boolean =>
+  value.trim().length === 0 || parseSetReps(value) !== null;
 
 const hasSetFieldValidationError = (field: SetFieldName, value: string): boolean =>
   field === 'weight' ? !isNonNegativeDecimalInput(value) : !isPositiveIntegerInput(value);

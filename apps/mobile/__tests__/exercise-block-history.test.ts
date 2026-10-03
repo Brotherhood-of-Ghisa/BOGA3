@@ -294,6 +294,30 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(summary.blocks.map((block) => block.sessionId)).toEqual(['newest', 'middle']);
   });
 
+  it('gives a session that does not count no slot in the limit', () => {
+    const summary = aggregateExerciseBlockHistory({
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      limit: 2,
+      sessions: [
+        sessionRow({ sessionId: 'oldest', completedAt: new Date('2026-05-10T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'warm-up-only', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'middle', completedAt: new Date('2026-05-15T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'oldest', sessionExerciseId: 'se-oldest' }),
+        sessionExerciseRow({ sessionId: 'warm-up-only', sessionExerciseId: 'se-warm-up-only' }),
+        sessionExerciseRow({ sessionId: 'middle', sessionExerciseId: 'se-middle' }),
+      ],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'set-oldest', sessionExerciseId: 'se-oldest', orderIndex: 0 }),
+        setRow({ setId: 'set-warm-up', sessionExerciseId: 'se-warm-up-only', orderIndex: 0, setType: 'warm_up' }),
+        setRow({ setId: 'set-middle', sessionExerciseId: 'se-middle', orderIndex: 0 }),
+      ]),
+    });
+
+    expect(summary.blocks.map((block) => block.sessionId)).toEqual(['middle', 'oldest']);
+  });
+
   it('rejects invalid dates and invalid limits before returning a summary', () => {
     const validInput = {
       now: new Date('2026-05-20T12:00:00.000Z'),
@@ -448,16 +472,17 @@ describe('createExerciseBlockHistoryRepository', () => {
     expect(store.loadSetsForSessionExercises).not.toHaveBeenCalled();
   });
 
-  it('honors a caller-provided limit', async () => {
+  it('loads every session so the limit counts only sessions that count', async () => {
     const store = buildStore();
     const repository = createExerciseBlockHistoryRepository(store);
 
-    await repository.loadRecentBlocks({ exerciseDefinitionId: 'ex-bench', limit: 2 });
+    const summary = await repository.loadRecentBlocks({ exerciseDefinitionId: 'ex-bench', limit: 2 });
 
     expect(store.loadRecentCompletedSessionsForExercise).toHaveBeenCalledWith({
       exerciseDefinitionId: 'ex-bench',
-      limit: 2,
+      limit: undefined,
     });
+    expect(summary.limit).toBe(2);
   });
 
   it('derives max-capable metrics from the same returned blocks dataset', async () => {

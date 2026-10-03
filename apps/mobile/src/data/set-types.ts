@@ -1,7 +1,6 @@
 // The group-eval Edge Function loads this file (via src/groups/set-facts.ts), so
 // its imports name their .ts files.
 import { EFFORT_LOGGING_POLICY } from '../config/training.ts';
-import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
 
 export type RirSessionSetType = `rir_${number}`;
 export type SessionSetType = 'warm_up' | RirSessionSetType;
@@ -26,13 +25,6 @@ export const isSessionSetType = (value: unknown): value is SessionSetType =>
 
 export const normalizeSessionSetType = (value: unknown): SessionSetTypeValue =>
   isSessionSetType(value) ? value : null;
-
-/**
- * The working-set rule over a set type, owned by the calculation kernel
- * (`isWorkingSetType`). Callers decide set validity (performed, parseable)
- * before asking, or use `isWorkingSet` for both at once.
- */
-export const isWorkingSessionSetType = isWorkingSetType;
 
 /** Shared by current controls, history, completed sessions and group views. */
 export const formatSessionSetType = (value: unknown, style: 'full' | 'compact' = 'full'): string | null => {

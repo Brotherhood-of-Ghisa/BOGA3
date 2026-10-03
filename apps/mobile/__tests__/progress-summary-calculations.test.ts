@@ -147,17 +147,19 @@ describe('todayProgressLoadWindow', () => {
 });
 
 describe('workingSetsBySession', () => {
-  it('counts each session\'s non-warm-up, confirmed sets under the stats rule', () => {
+  it('lists each counted session with its working sets; a session without one is no session', () => {
     const input: StatsAggregationInput = {
       sessions: [
         { id: 'a', completedAt: local(2026, 3, 2) },
         { id: 'b', completedAt: local(2026, 3, 3) },
         { id: 'empty', completedAt: local(2026, 3, 4) },
+        { id: 'warm-up-only', completedAt: local(2026, 3, 5) },
       ],
       sessionExercises: [
         { id: 'a-1', sessionId: 'a', exerciseDefinitionId: 'bench' },
         { id: 'a-2', sessionId: 'a', exerciseDefinitionId: null }, // unlinked legacy exercise still counts
         { id: 'b-1', sessionId: 'b', exerciseDefinitionId: 'bench' },
+        { id: 'w-1', sessionId: 'warm-up-only', exerciseDefinitionId: 'bench' },
       ],
       exerciseSets: [
         { sessionExerciseId: 'a-1', setType: 'warm_up', weightValue: '60', repsValue: '5' },
@@ -168,12 +170,13 @@ describe('workingSetsBySession', () => {
         { sessionExerciseId: 'b-1', setType: 'rir_2', weightValue: '100', repsValue: '' },
         { sessionExerciseId: 'b-1', setType: 'rir_0', weightValue: '', repsValue: '8' },
         { sessionExerciseId: 'orphan', setType: 'rir_2', weightValue: '100', repsValue: '5' },
+        { sessionExerciseId: 'w-1', setType: 'warm_up', weightValue: '60', repsValue: '5' },
       ],
       muscleMappings: [],
       muscleGroups: [],
     };
 
     expect(workingSetsBySession(input).map(({ id, workingSets }) => [id, workingSets]))
-      .toEqual([['a', 3], ['b', 1], ['empty', 0]]);
+      .toEqual([['a', 3], ['b', 1]]);
   });
 });

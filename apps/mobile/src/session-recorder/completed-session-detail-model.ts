@@ -9,7 +9,7 @@ import {
   type SessionViewSetRow,
 } from './session-view-model';
 import {
-  canonicalizeWeightForReps, isConfirmedPerformedSet, isWorkingSetType, type SessionSetPerformanceStatus,
+  canonicalizeWeightForReps, isConfirmedPerformedSet, isWorkingSet, type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -111,7 +111,7 @@ export const buildCompletedSessionDetailModel = (
 
     // The counts and the summary Volume read working sets only; every row keeps
     // its own figures.
-    const working = performed.filter(({ set }) => isWorkingSetType(set.setType));
+    const working = performed.filter(({ set }) => isWorkingSet(set));
     for (const { set } of working) {
       metrics.push(calculateAnalyticsSetMetrics({
         ...(exercise.loadContext ?? ordinaryLoadContext()),

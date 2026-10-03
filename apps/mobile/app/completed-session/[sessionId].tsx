@@ -20,19 +20,18 @@ import {
   loadLocalGymById,
   loadSessionSnapshotById,
   appendCompletedSessionExerciseAsPlanned as appendCompletedSessionExerciseAsPlannedDraft,
-  isWorkingSessionSetType,
   normalizeSessionSetType,
   setSessionDeletedState,
   type SessionSetTypeValue,
 } from '@/src/data';
 import { loadEarlierBestE1rmByDefinition } from '@/src/data/exercise-session-facts';
-import { parseCalculationSet } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
-import { canonicalizeWeightForReps,
+import {
   isConfirmedPerformedSet,
+  isWorkingSet,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 import {
@@ -134,15 +133,7 @@ export const resolveCompletedSessionPresentation = (
 const getCompletedPerformedSets = (
   sets: CompletedSessionDetailSet[]
 ): CompletedSessionDetailSet[] =>
-  sets.filter(
-    (set) =>
-      isConfirmedPerformedSet(set) &&
-      parseCalculationSet({
-        weightValue: canonicalizeWeightForReps(set.weight, set.reps),
-        repsValue: set.reps,
-        setType: set.setType,
-      }) !== null
-  );
+  sets.filter((set) => isConfirmedPerformedSet(set));
 
 const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRecord> = {
   'session-completed-1': {
@@ -409,7 +400,7 @@ export function CompletedSessionDetailScreenShell({
     () =>
       performedExercises.reduce(
         (count, exercise) =>
-          count + exercise.sets.filter((set) => isWorkingSessionSetType(set.setType)).length,
+          count + exercise.sets.filter((set) => isWorkingSet(set)).length,
         0
       ),
     [performedExercises]

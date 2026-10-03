@@ -36,7 +36,7 @@ unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
 only: a warm-up is listed with its own per-set figures but feeds no record,
 volume, 1RM or count (see the
-[working-set rule](../../supabase/functions/agent-api/README.md#working-sets-only)).
+[working-set rule](../../docs/specs/tech/training-metrics-contract.md#1-counted-set)).
 All Weight is kg: `load`/`top_weight` are raw,
 while 1RM/Volume are derived under the owner's private preference. Preference
 off returns ordinary metrics and no reading context; preference on returns an

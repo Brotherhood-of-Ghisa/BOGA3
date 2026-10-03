@@ -165,7 +165,7 @@ Brief entrypoint map of the current mobile screens.
   - valid query values set the initial controls, including the completion
     handoff at `?period=7&breakdown=muscle`; later control changes remain
     in-route state and do not rewrite the query string
-  - top summary cards show `Sessions` (a link `Card` with a chevron) and `Sets` (working sets) as stacked `Stat`s; their previous-period deltas are signed, in `ink-muted`, and never include percentages
+  - top summary cards show `Sessions` (counted sessions, `tech/training-metrics-contract.md` §2; a link `Card` with a chevron) and `Sets` (working sets) as stacked `Stat`s; their previous-period deltas are signed, in `ink-muted`, and never include percentages
   - per-exercise history is a viewport-fitting table with compact, single-line
     `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values
     (`Sets` is working sets), use `—` for unavailable 1RM, allow
