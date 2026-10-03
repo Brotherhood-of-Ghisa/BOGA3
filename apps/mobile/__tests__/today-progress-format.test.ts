@@ -74,14 +74,22 @@ describe('week labels and bars', () => {
     expect(formatWeekRange(localWeekWindow(local(2026, 10, 1)))).toBe('Mon 28 Sep – Sun 4 Oct');
   });
 
-  it('fills a bar by this week over last week, full once reached, empty at zero', () => {
-    expect(weekShare({ current: 3, previous: 4 })).toEqual({ fraction: 0.75, reached: false });
-    expect(weekShare({ current: 4, previous: 4 })).toEqual({ fraction: 1, reached: true });
-    expect(weekShare({ current: 3, previous: 2 })).toEqual({ fraction: 1, reached: true });
+  it('fills a bar by this week over last week in laps of last week, empty at zero', () => {
+    // Up to last week's total: the first lap.
+    expect(weekShare({ current: 0, previous: 3 })).toEqual({ lap: 0, fraction: 0 });
+    expect(weekShare({ current: 2, previous: 4 })).toEqual({ lap: 0, fraction: 0.5 });
+    expect(weekShare({ current: 3, previous: 3 })).toEqual({ lap: 0, fraction: 1 });
+    // 4 to 6 over 3: the second lap.
+    expect(weekShare({ current: 4, previous: 3 }).lap).toBe(1);
+    expect(weekShare({ current: 4, previous: 3 }).fraction).toBeCloseTo(1 / 3);
+    expect(weekShare({ current: 6, previous: 3 })).toEqual({ lap: 1, fraction: 1 });
+    // The third lap, then the bar stops full.
+    expect(weekShare({ current: 15, previous: 6 })).toEqual({ lap: 2, fraction: 0.5 });
+    expect(weekShare({ current: 9, previous: 3 })).toEqual({ lap: 2, fraction: 1 });
+    expect(weekShare({ current: 20, previous: 3 })).toEqual({ lap: 2, fraction: 1 });
     // No last week to measure against: any figure has passed it.
-    expect(weekShare({ current: 1, previous: 0 })).toEqual({ fraction: 1, reached: true });
-    expect(weekShare({ current: 0, previous: 0 })).toEqual({ fraction: 0, reached: false });
-    expect(weekShare({ current: 0, previous: 5 })).toEqual({ fraction: 0, reached: false });
+    expect(weekShare({ current: 1, previous: 0 })).toEqual({ lap: 1, fraction: 1 });
+    expect(weekShare({ current: 0, previous: 0 })).toEqual({ lap: 0, fraction: 0 });
   });
 });
 
