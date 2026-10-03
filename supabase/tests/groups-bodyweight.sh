@@ -272,6 +272,75 @@ check 'stream exposes only ordinary metric names and no private reading fields' 
   ([..|objects|keys[]|select(startswith("body_weight_") or .=="body_weight_dependency_digest")]|length==0)'
 pass 'current board, certification and stream wire contracts are private and two-metric only'
 
+# Working sets only: a warm-up keeps its score row (a stored warm-up record is
+# checked against it and stands) but never counts, records or certifies.
+lifts() { # lifts <token> <session> <definition> <set-suffix>:<weight>:<reps>:<set_type>...
+  local token="$1" sid="$2" def="$3" clock_at at order=0 spec id w r ty
+  shift 3
+  next_cuam
+  clock_at="$(now_ms)"; START=$((START+1000)); (( START > clock_at )) || START=$((clock_at+1000)); at="${START}"
+  local -a rows=("$(e_session "${sid}" "${at}" completed "$((at+60000))" 60 null "${CUAM}")"
+                 "$(e_se "${sid}-se" "${sid}" "${def}" 0 'Row' "${CUAM}")")
+  for spec in "$@"; do
+    IFS=: read -r id w r ty <<<"${spec}"
+    rows+=("$(e_set "${T}-${id}" "${sid}-se" "${order}" "${w}" "${r}" '' "${CUAM}" null "${ty}")")
+    order=$((order+1))
+  done
+  push "${token}" "lifts ${sid}" "${rows[@]}"
+}
+GX="$(create_comparison "${OWNER_TOKEN}" "${GID}" 0)"
+DAW="${T}-athlete-row"; DRW="${T}-rival-row"
+next_cuam
+push "${ATHLETE_TOKEN}" 'athlete row definition and link' \
+  "$(e_def "${DAW}" 'Row' "${CUAM}" total_load)" "$(e_link "${DAW}" "${GID}" "${GX}" "${CUAM}")"
+next_cuam
+push "${RIVAL_TOKEN}" 'rival row definition and link' \
+  "$(e_def "${DRW}" 'Row' "${CUAM}" total_load)" "$(e_link "${DRW}" "${GID}" "${GX}" "${CUAM}")"
+lifts "${RIVAL_TOKEN}" "${T}-row-r1" "${DRW}" cr1:30:5:rir_1
+lifts "${ATHLETE_TOKEN}" "${T}-row-a1" "${DAW}" ca1:20:5:rir_1 ca2:40:5:warm_up
+drain 'working sets only'
+metric_board weight
+check 'a warm-up heavier than every working set never ranks' '
+  (.entries[]|select(.member.user_id==$a)|.value==20 and .set_id==$s) and .entries[0].member.user_id==$r' \
+  --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}" --arg s "${T}-ca1"
+REVISION="$(jq -er '.rules_revision' <<<"${BODY}")"
+expect_sql 'the warm-up made no record' "select count(*) from app_public.group_events where set_id='${T}-ca2';" 0
+expect_sql 'the warm-up keeps a score row that does not count' \
+  "select string_agg(metric||':'||counting,',' order by metric) from app_public.group_metric_set_scores
+    where group_exercise_id='${GX}' and set_id='${T}-ca2';" 'e1rm:false,weight:false'
+certify_warm_up() {
+  rpc "$1" group_metric_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" \
+    --arg s "${T}-ca2" --argjson r "${REVISION}" --arg f "$(run_psql "select fingerprint from
+      app_public.group_metric_set_scores where group_exercise_id='${GX}' and set_id='${T}-ca2'
+      and metric='weight';")" '
+    {p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"weight",
+      p_expected_revision:$r,p_expected_fingerprint:$f}')"
+  expect_error NOT_FOUND "$2"
+  check "$2: not a record set" '.message=="NOT_FOUND: record set not found for this metric"'
+}
+certify_warm_up "${RIVAL_TOKEN}" 'a warm-up cannot be certified'
+
+# A result stored before the rule: the same apply with the warm-up counted.
+run_psql "update app_public.group_metric_set_scores set counting=true
+    where group_exercise_id='${GX}' and set_id='${T}-ca2';
+  select app_public.group_metric_apply_member('${GID}','${ATHLETE_UID}','${GX}',${REVISION},
+    app_public.group_metric_eval_source_graph('${GID}','${GX}'),false);" >/dev/null
+WARM_RECORD="$(run_psql "select id from app_public.group_events where kind='record' and set_id='${T}-ca2';")"
+[[ -n "${WARM_RECORD}" ]] || fail 'the stored warm-up record exists'
+certify_warm_up "${RIVAL_TOKEN}" 'a stored warm-up record cannot be certified'
+WARM_MARK="$(run_psql "select max(seq) from app_public.group_events;")"
+lifts "${ATHLETE_TOKEN}" "${T}-row-a2" "${DAW}" ca3:25:5:rir_1
+drain 'rebuild after a stored warm-up record'
+expect_sql 'the warm-up best falls silently: no lead change, void or record' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and seq>${WARM_MARK};" 0
+expect_sql 'the stored warm-up record stands (forward only)' \
+  "select count(*) from app_public.group_events where kind='record_voided' and related_event_id='${WARM_RECORD}';" 0
+metric_board weight
+check 'the board falls to the best working set' '
+  (.entries[]|select(.member.user_id==$a)|.value==25 and .set_id==$s) and .entries[0].member.user_id==$r' \
+  --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}" --arg s "${T}-ca3"
+pass 'comparisons count working sets only; a stored warm-up record stands and its board moves silently'
+
 # The cutover schema and function signatures are complete on the backend.
 expect_sql 'final exercise definition columns exist' \
   "select count(*) from information_schema.columns where table_schema='app_public' and table_name='exercise_definitions' and column_name in ('load_input_mode','bodyweight_contribution');" 2
