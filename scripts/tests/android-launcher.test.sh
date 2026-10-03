@@ -99,7 +99,7 @@ done
 
 configure 1 http://localhost:55531
 EXPO_PUBLIC_SUPABASE_URL=https://stale.example.test launch run --no-bundler
-assert_log 'npx expo run:android --port 8083 --no-bundler'
+assert_log 'npx expo run:android --no-bundler'
 assert_log 'url=http://localhost:55531'
 assert_log 'adb reverse tcp:55531 tcp:55531'
 rm "$FIXTURE/apps/mobile/.maestro/maestro.env.local"
