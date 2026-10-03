@@ -9,13 +9,13 @@ type SessionExerciseCardProps = {
 };
 
 // An exercise in the session view: a read-only card that links to the exercise
-// page, showing its sets, an `n/m` done count and, when a set in it is an
-// all-time best, a `record` band.
+// page, showing its sets, an `n/m` done count and, when the exercise's record
+// set is in it, a `record` band.
 export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps) {
   const label = [
     card.name,
     `${card.doneCount} of ${card.totalCount} sets done`,
-    card.recordOneRepMax ? `new 1RM record ${card.recordOneRepMax}` : null,
+    card.record?.spoken,
   ]
     .filter(Boolean)
     .join(', ');
@@ -28,7 +28,7 @@ export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps)
       countMuted={card.doneCount === 0}
       name={card.name}
       onPress={onPress}
-      recordOneRepMax={card.recordOneRepMax}
+      record={card.record}
       rows={card.rows}
       testID={`session-view-exercise-${card.id}`}
     />

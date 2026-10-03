@@ -55,6 +55,35 @@ const formatSessionDate = (isoTimestamp: string): string => {
   }).format(parsed);
 };
 
+/** One record line: the kind in words (the image has no screen reader), the figures it set in `record`. */
+function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
+  const oneRepMax = record.estimatedOneRepMax === null ? '—' : formatOneRepMax(record.estimatedOneRepMax);
+  return (
+    <View style={styles.recordRow} testID={`session-share-card-pr-${record.exerciseDefinitionId}`}>
+      <View style={styles.recordNameRow}>
+        <Text allowFontScaling={false} numberOfLines={2} style={styles.recordName}>
+          {record.exerciseName}
+        </Text>
+        <Text
+          allowFontScaling={false}
+          style={styles.recordKind}
+          testID={`session-share-card-pr-${record.exerciseDefinitionId}-kind`}>
+          {record.kind === 'oneRepMax' ? '1RM' : 'Top weight'}
+        </Text>
+      </View>
+      <Text allowFontScaling={false} style={styles.recordFact}>
+        <Text allowFontScaling={false} style={record.weightRecord ? styles.recordFigure : null}>
+          {`${formatWeight(record.weight)} × ${record.reps}`}
+        </Text>
+        {'  1RM '}
+        <Text allowFontScaling={false} style={record.kind === 'oneRepMax' ? styles.recordFigure : null}>
+          {oneRepMax}
+        </Text>
+      </Text>
+    </View>
+  );
+}
+
 /**
  * The shared image: session totals, every PR and every exercise comparison, in
  * the design language. It never shows the gym or any location.
@@ -82,26 +111,11 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
           <View style={styles.recordsHeading}>
             <Icon color={uiRoles.record} name="arrow-up" size="xs" />
             <Text allowFontScaling={false} style={styles.recordsTitle}>
-              {`${snapshot.personalRecords.length} new 1RM ${
-                snapshot.personalRecords.length === 1 ? 'record' : 'records'
-              }`}
+              {formatCount(snapshot.personalRecords.length, 'new record')}
             </Text>
           </View>
           {snapshot.personalRecords.map((record) => (
-            <View
-              key={record.setId}
-              style={styles.recordRow}
-              testID={`session-share-card-pr-${record.exerciseDefinitionId}`}>
-              <Text allowFontScaling={false} numberOfLines={2} style={styles.recordName}>
-                {record.exerciseName}
-              </Text>
-              <Text allowFontScaling={false} style={styles.recordFact}>
-                {`${formatWeight(record.weight)} × ${record.reps}`}
-                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  1RM ${formatOneRepMax(
-                  record.estimatedOneRepMax
-                )}`}</Text>
-              </Text>
-            </View>
+            <ShareRecordRow key={record.setId} record={record} />
           ))}
         </View>
       ) : null}
@@ -337,7 +351,18 @@ const styles = StyleSheet.create({
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.recordRule,
   },
+  recordNameRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: uiSpace.sm,
+  },
+  recordKind: {
+    ...microLabel,
+    color: uiRoles.record,
+  },
   recordName: {
+    flexShrink: 1,
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
     fontSize: uiTypography.size.base,
@@ -351,7 +376,7 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.ink,
   },
-  recordOneRepMax: {
+  recordFigure: {
     fontWeight: '700',
     color: uiRoles.record,
   },

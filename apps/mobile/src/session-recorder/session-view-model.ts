@@ -4,7 +4,9 @@ import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary
 import type { Session, SessionSet } from '@/components/session-recorder/types';
 import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
-import { deriveExercisePersonalRecord } from '@/src/session-insights';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
+import { deriveExercisePersonalRecord, type ExercisePersonalRecord } from '@/src/session-insights';
+import { recordBand, type RecordBand } from '@/src/session-insights/record-band';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import {
@@ -29,8 +31,11 @@ export type SessionViewSetRow = {
   volume: string;
   // A confirmed performed set; every other row is shown faded as planned.
   done: boolean;
-  // This set's 1RM is an all-time best — the only figure the card highlights.
+  // The session's record set (`training-metrics-contract.md` §3): its 1RM,
+  // and its Weight, when they beat the records — the only figures a card
+  // highlights. A 1RM record set may also set the Weight record.
   oneRepMaxRecord: boolean;
+  weightRecord: boolean;
 };
 
 export type SessionViewExerciseCard = {
@@ -39,8 +44,8 @@ export type SessionViewExerciseCard = {
   doneCount: number;
   totalCount: number;
   rows: SessionViewSetRow[];
-  // The record 1RM, formatted, when a set in this card is an all-time best.
-  recordOneRepMax: string | null;
+  // The card's `record` band when the exercise's record set is in it.
+  record: RecordBand | null;
 };
 
 export type SessionViewModel = {
@@ -59,6 +64,7 @@ export type SetRowInput = {
   setType: unknown;
   done: boolean;
   oneRepMaxRecord?: boolean;
+  weightRecord?: boolean;
   loadContext?: LoadContext;
 };
 
@@ -67,7 +73,9 @@ export type SetRowInput = {
  * from plain values: the session view, View Session and the group session view
  * all format a row here, so a set reads the same on each.
  */
-export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord = false, loadContext = ordinaryLoadContext() }: SetRowInput): SessionViewSetRow => {
+export const formatSetRow = ({
+  id, weight, reps, setType, done, oneRepMaxRecord = false, weightRecord = false, loadContext = ordinaryLoadContext(),
+}: SetRowInput): SessionViewSetRow => {
   let oneRepMax = EMPTY_FIGURE;
   let volume = EMPTY_FIGURE;
   if (weight !== null && reps !== null) {
@@ -89,8 +97,25 @@ export const formatSetRow = ({ id, weight, reps, setType, done, oneRepMaxRecord 
     volume,
     done,
     oneRepMaxRecord,
+    weightRecord,
   };
 };
+
+/** A row's record flags: whether it is the card's record set, and which figures it highlights. */
+export const recordFlagsFor = (
+  record: ExercisePersonalRecord | null,
+  setId: string,
+): Pick<SessionViewSetRow, 'oneRepMaxRecord' | 'weightRecord'> => {
+  const isRecordSet = record !== null && record.setId === setId;
+  return {
+    oneRepMaxRecord: isRecordSet && record.kind === 'oneRepMax',
+    weightRecord: isRecordSet && record.weightRecord,
+  };
+};
+
+/** The card's band: only on the block holding the exercise's record set. */
+export const cardRecordBand = (record: ExercisePersonalRecord | null, blockId: string): RecordBand | null =>
+  record !== null && record.sessionExerciseId === blockId ? recordBand(record) : null;
 
 type ShownValues = { weight: number | null; reps: number | null; setType: string | null };
 
@@ -135,10 +160,10 @@ const toRowFigures = (set: SessionSet, context: LoadContext): RowFigures => {
 
 export const buildSessionViewModel = (
   session: Session,
-  // The best 1RM of each exercise definition in the sessions before this one;
-  // absent without an earlier 1RM, while history loads or when it failed,
+  // Each exercise definition's records in the sessions before this one;
+  // absent without an earlier record, while history loads or when it failed,
   // which shows no record rather than a wrong one.
-  historicalBestByDefinitionId: ReadonlyMap<string, number>
+  recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
   const workingMetrics: SetMetrics[] = [];
@@ -146,16 +171,12 @@ export const buildSessionViewModel = (
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
     const context = exercise.loadContext ?? ordinaryLoadContext();
     const figures = exercise.sets.map(set => toRowFigures(set, context));
-    const historicalBest = historicalBestByDefinitionId.get(exercise.exerciseDefinitionId);
-    const record =
-      historicalBest === undefined
-        ? null
-        : deriveExercisePersonalRecord({
-            exerciseDefinitionId: exercise.exerciseDefinitionId,
-            exercises: insightExercises,
-            historicalBestEstimatedOneRepMax: historicalBest,
-          });
-    const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
+    // One record set per exercise, across every block of it in the session.
+    const record = deriveExercisePersonalRecord({
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      exercises: insightExercises,
+      baseline: recordBaselineByDefinitionId.get(exercise.exerciseDefinitionId) ?? null,
+    });
 
     const rows = figures.map((row): SessionViewSetRow => {
       if (isWorkingSet(row.set)) workingMetrics.push(row.metric);
@@ -164,7 +185,7 @@ export const buildSessionViewModel = (
         ...row.shown,
         loadContext: context,
         done: row.done,
-        oneRepMaxRecord: row.set.id === recordSetId,
+        ...recordFlagsFor(record, row.set.id),
       });
     });
 
@@ -174,7 +195,7 @@ export const buildSessionViewModel = (
       doneCount: figures.filter((row) => row.done).length,
       totalCount: figures.length,
       rows,
-      recordOneRepMax: record && recordSetId ? formatOneRepMax(record.estimatedOneRepMax) : null,
+      record: cardRecordBand(record, exercise.id),
     };
   });
 

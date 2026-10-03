@@ -336,7 +336,7 @@ function SessionCard({
       name={date}
       nameFace="figure"
       onPress={onPress}
-      recordOneRepMax={null}
+      record={null}
       rowTestID={(row) => `exercise-history-set-row-${row.id}`}
       rows={rows}
       summary={

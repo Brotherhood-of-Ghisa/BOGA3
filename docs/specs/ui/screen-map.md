@@ -434,8 +434,8 @@ Brief entrypoint map of the current mobile screens.
   - `presentation=completion` (after Finish), in the design language
     (`components/session-complete/`): its own top bar `Session complete` ·
     `Done` (`accent`); a summary card (Duration / Exercises / Sets, then Gym)
-    with informational `Sets by muscle` pills; every new 1RM
-    record as a `record`-band card; per-exercise working-set volume versus
+    with informational `Sets by muscle` pills; every record set (1RM,
+    else Weight) as a `record`-band card; per-exercise working-set volume versus
     median with a descriptive P5/P95 range (a warm-up-only exercise is not
     compared); and `Share session` (outline), which opens a
     `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
@@ -455,9 +455,9 @@ Brief entrypoint map of the current mobile screens.
     (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume` (working
     sets only); Sets has one card
     per exercise with its confirmed sets as the session view's rows (`type ·
-    weight × reps · 1RM · VOL`, `n sets`), a brass record 1RM and `New 1RM
-    record` band where the session holds the exercise's best 1RM; no tags, no
-    collapse
+    weight × reps · 1RM · VOL`, `n sets`), the record set's beaten figures in
+    brass and a `record` band on its card (`tech/training-metrics-contract.md`
+    §3); no tags, no collapse
   - the session ⋮ opens a `Session` sheet: `Delete session` (danger), or
     `Undelete session` while deleted; a deleted session shows a `Deleted ·
     hidden from history` band and no `Edit`

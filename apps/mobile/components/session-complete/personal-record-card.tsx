@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { Stat } from '@/components/ui/stat';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExercisePersonalRecord } from '@/src/session-insights';
+import { recordBand } from '@/src/session-insights/record-band';
 
 type PersonalRecordCardProps = {
   personalRecord: ExercisePersonalRecord;
@@ -13,30 +14,45 @@ type PersonalRecordCardProps = {
 };
 
 /**
- * One exercise's new 1RM record on the completion screen, in the language's
- * one superlative: a `record` band, then the exercise and the set that set it,
- * its 1RM bold `record` (`design-language.md` §5).
+ * One exercise's record set on the completion screen, in the language's one
+ * superlative: a `record` band (`New 1RM record` or `New top weight`), then
+ * the exercise and the set, with the figures it set bold `record`
+ * (`design-language.md` §5). A Weight record's 1RM stays in `ink`.
  */
 export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCardProps) {
-  const oneRepMax = formatOneRepMax(personalRecord.estimatedOneRepMax);
+  const band = recordBand(personalRecord);
+  const oneRepMax =
+    personalRecord.estimatedOneRepMax === null ? '—' : formatOneRepMax(personalRecord.estimatedOneRepMax);
   const set = `${formatWeight(personalRecord.weight)} × ${personalRecord.reps}`;
+  const heading = personalRecord.kind === 'oneRepMax' ? 'New 1RM record' : 'New top weight';
 
   return (
     <Card testID={testID}>
       <View
-        accessibilityLabel={`New 1RM record for ${personalRecord.exerciseName}: ${set}, 1RM ${oneRepMax}`}
+        accessibilityLabel={`${heading} for ${personalRecord.exerciseName}: ${set}, 1RM ${oneRepMax}`}
         accessible>
         <View style={styles.band}>
           <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} style={styles.bandLabel}>{`New 1RM record · ${oneRepMax}`}</Text>
+          <Text allowFontScaling={false} style={styles.bandLabel}>{band.label}</Text>
         </View>
         <View style={styles.body}>
           <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {personalRecord.exerciseName}
           </Text>
           <View style={styles.row}>
-            <Text allowFontScaling={false} style={styles.set}>{set}</Text>
-            <Stat emphasis="record" label="1RM" layout="inline" value={oneRepMax} />
+            <Text
+              allowFontScaling={false}
+              style={[styles.set, personalRecord.weightRecord ? styles.setRecord : null]}
+              testID={`${testID}-set`}>
+              {set}
+            </Text>
+            <Stat
+              emphasis={personalRecord.kind === 'oneRepMax' ? 'record' : 'none'}
+              label="1RM"
+              layout="inline"
+              testID={`${testID}-1rm`}
+              value={oneRepMax}
+            />
           </View>
         </View>
       </View>
@@ -88,5 +104,9 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.ink,
+  },
+  setRecord: {
+    fontWeight: '700',
+    color: uiRoles.record,
   },
 });

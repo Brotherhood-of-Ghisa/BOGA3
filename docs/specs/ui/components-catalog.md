@@ -305,8 +305,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     uses its shared top-bar Edit action. Separate history/catalog states isolate
     optional enrichment failures; active sessions keep uncontrolled grouping.
   - `PersonalRecordCard` — a `Card` with a `record` band (`New 1RM record ·
-    <1RM>`), the exercise and its set (`185.0 × 8`), the 1RM bold `record`;
-    read as one accessibility element
+    <1RM>` or `New top weight · <weight> × <reps>`), the exercise and its set
+    (`185.0 × 8`), the figures the record set beat bold `record`; read as one
+    accessibility element
   - `ExerciseVolumeCard` — name, set counts, the `Vol` figure (no separator,
     no unit) and its delta from the median, and the P5–P95 range (`rule`
     track, `ink-muted` median tick, `ink` current dot) or the single/equal
@@ -488,10 +489,11 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - `SetSummaryRow` — one read-only set: effort label, weight × reps
     (`-values`), inline `Stat` 1RM / VOL with legends, all at the row's colour
-    and weight; only a record 1RM in `record`; planned rows faded
+    and weight; only the record set's beaten figures (1RM, Weight) in
+    `record`; planned rows faded
   - `ExerciseSetsCard` — `Card` per exercise: name, a count, an inline
     `accessory` (the session view's chevron) or a 44pt `control` (View Session's
-    ⋮), the set rows and the `record` band (`New 1RM record · <1RM>`). Given
+    ⋮), the set rows and the `record` band (`record`, a `RecordBand`). Given
     `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`
     (or the caller's `rowTestID`), `-record`. DLM-T10 added `nameFace="figure"`
     (a date as the name, in Plex Mono) and a `summary` slot under the header

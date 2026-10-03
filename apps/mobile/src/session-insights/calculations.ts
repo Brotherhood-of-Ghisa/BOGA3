@@ -1,11 +1,18 @@
 import { type LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { addFiniteVolume, ordinaryLoadContext, summarizeExerciseLoad, workingSetsOnly } from '@/src/exercise-calculations/analytics';
+import {
+  addFiniteVolume, enteredWeightKg, ordinaryLoadContext, summarizeExerciseLoad, workingSetsOnly,
+} from '@/src/exercise-calculations/analytics';
 import {
   compareSessionPosition,
   eligibleSetsByBlockInSessionOrder,
-  pickBestEstimatedOneRepMaxSet,
+  summarizeSessionBests,
 } from '@/src/exercise-calculations/best-set';
-import { beatsRecord, compareRecordOrder, createRecordBook } from '@/src/exercise-calculations/records';
+import {
+  compareRecordOrder,
+  createRecordBook,
+  pickSessionRecordSet,
+  type RecordBaseline,
+} from '@/src/exercise-calculations/records';
 import {
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
@@ -91,10 +98,21 @@ export type CurrentSessionMuscleSummary = {
 export type ExercisePersonalRecordInput = {
   exerciseDefinitionId: string;
   exercises: SessionInsightExerciseInput[];
-  historicalBestEstimatedOneRepMax: number | null;
+  // The definition's records before this session; null without any.
+  baseline: RecordBaseline | null;
 };
 
+/** Which record the record set is shown for: its 1RM, else its Weight. */
+export type PersonalRecordKind = "oneRepMax" | "weight";
+
+/**
+ * One exercise's record set in a session (`training-metrics-contract.md` §3):
+ * the one set a screen highlights.
+ */
 export type ExercisePersonalRecord = {
+  kind: PersonalRecordKind;
+  // The set also beats the Weight record; always true for a Weight record.
+  weightRecord: boolean;
   exerciseDefinitionId: string;
   exerciseName: string;
   sessionExerciseId: string;
@@ -103,8 +121,9 @@ export type ExercisePersonalRecord = {
   setOrderIndex: number;
   weight: number;
   reps: number;
-  estimatedOneRepMax: number;
-  historicalBestEstimatedOneRepMax: number;
+  // Null only for a Weight record whose load is unknown (no bodyweight reading).
+  estimatedOneRepMax: number | null;
+  baseline: RecordBaseline;
 };
 
 export type PersonalRecordSessionInput = {
@@ -123,7 +142,7 @@ export type SessionPersonalRecordsInput = {
 
 export type SessionPersonalRecordsFromBestsInput = {
   targetSession: PersonalRecordSessionInput;
-  historicalBestByDefinitionId: ReadonlyMap<string, number>;
+  recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>;
 };
 
 export type ExerciseVolumeComparisonState =
@@ -358,57 +377,53 @@ export const summarizeCurrentSessionMuscleLoad = (
   };
 };
 
-type PersonalRecordCandidate = Omit<
-  ExercisePersonalRecord,
-  "historicalBestEstimatedOneRepMax"
->;
+/** The definition's blocks in the session, in session order. */
+const definitionBlocks = (exerciseDefinitionId: string, exercises: SessionInsightExerciseInput[]) =>
+  exercises
+    .filter((exercise) =>
+      (exercise.deletedAt ?? null) === null && exercise.exerciseDefinitionId === exerciseDefinitionId)
+    .sort(compareSessionPosition)
+    .map((exercise) => ({ ...exercise, loadContext: exercise.loadContext ?? ordinaryLoadContext() }));
 
-const findBestPersonalRecordCandidate = (
-  exerciseDefinitionId: string,
-  exercises: SessionInsightExerciseInput[],
-): PersonalRecordCandidate | null => {
-  const orderedExercises = exercises
-    .filter(
-      (exercise) =>
-        (exercise.deletedAt ?? null) === null &&
-        exercise.exerciseDefinitionId === exerciseDefinitionId,
-    )
-    .sort(compareSessionPosition);
-  const groupOrderIndex = orderedExercises[0]?.orderIndex;
-  if (groupOrderIndex === undefined) return null;
-
-  const best = pickBestEstimatedOneRepMaxSet(eligibleSetsByBlockInSessionOrder(
-    orderedExercises.map((exercise) => ({ ...exercise, loadContext: exercise.loadContext ?? ordinaryLoadContext() })),
-  ).flat());
-  if (!best) return null;
-
+/**
+ * The session's record set for one definition (`pickSessionRecordSet`), over
+ * its working sets across every block: the highest 1RM that beats the 1RM
+ * record, else the heaviest Weight that beats the Weight record. Null without
+ * a baseline, or when nothing beats it.
+ */
+export const deriveExercisePersonalRecord = (
+  input: ExercisePersonalRecordInput,
+): ExercisePersonalRecord | null => {
+  const blocks = definitionBlocks(input.exerciseDefinitionId, input.exercises);
+  const groupOrderIndex = blocks[0]?.orderIndex;
+  if (groupOrderIndex === undefined || input.baseline === null) return null;
+  const sets = eligibleSetsByBlockInSessionOrder(blocks).flat().map((eligible) => ({
+    ...eligible,
+    candidate: {
+      id: eligible.set.id,
+      oneRepMax: eligible.metric.estimatedOneRepMaxKg,
+      weight: enteredWeightKg(eligible.set),
+      reps: eligible.metric.reps,
+    },
+  }));
+  const winner = pickSessionRecordSet(sets.map(({ candidate }) => candidate), input.baseline);
+  const best = winner && sets.find(({ set }) => set.id === winner.id);
+  if (!winner || !best) return null;
+  // A working set always has a valid Weight (§1).
+  if (best.candidate.weight === null) throw new Error(`record set ${best.set.id} has no Weight`);
   return {
-    exerciseDefinitionId,
+    kind: winner.oneRepMax ? "oneRepMax" : "weight",
+    weightRecord: winner.weight,
+    exerciseDefinitionId: input.exerciseDefinitionId,
     exerciseName: best.block.exerciseName,
     sessionExerciseId: best.block.id,
     sessionExerciseOrderIndex: groupOrderIndex,
     setId: best.set.id,
     setOrderIndex: best.set.orderIndex,
-    weight: best.enteredWeightKg,
-    reps: best.metric.reps,
-    estimatedOneRepMax: best.estimatedOneRepMaxKg,
-  };
-};
-
-export const deriveExercisePersonalRecord = (
-  input: ExercisePersonalRecordInput,
-): ExercisePersonalRecord | null => {
-  const historicalBest = input.historicalBestEstimatedOneRepMax;
-  const best = findBestPersonalRecordCandidate(
-    input.exerciseDefinitionId,
-    input.exercises,
-  );
-  // The 1RM record rule (`records.ts`): strictly above a positive record.
-  if (!best || historicalBest === null || !beatsRecord(best.estimatedOneRepMax, historicalBest)) return null;
-
-  return {
-    ...best,
-    historicalBestEstimatedOneRepMax: historicalBest,
+    weight: best.candidate.weight,
+    reps: best.candidate.reps,
+    estimatedOneRepMax: best.candidate.oneRepMax,
+    baseline: input.baseline,
   };
 };
 
@@ -423,11 +438,11 @@ const isBeforeInRecordOrder = (
     { sessionId: target.sessionId, completedAt: target.completedAt },
   ) < 0;
 
-/** The replay reference's earlier 1RM records, folded by the record book from raw sets. */
-const collectHistoricalBestByExerciseDefinition = (
+/** The replay reference's earlier 1RM and Weight records, folded by the record book from raw sets. */
+const collectRecordBaselineByExerciseDefinition = (
   targetSession: PersonalRecordSessionInput,
   historicalSessions: PersonalRecordSessionInput[],
-): Map<string, number> => {
+): Map<string, RecordBaseline> => {
   const books = new Map<string, ReturnType<typeof createRecordBook>>();
   const earlier = historicalSessions
     .filter((session) =>
@@ -447,19 +462,26 @@ const collectHistoricalBestByExerciseDefinition = (
         .filter((id): id is string => id !== null),
     );
     for (const exerciseDefinitionId of exerciseDefinitionIds) {
-      const candidate = findBestPersonalRecordCandidate(exerciseDefinitionId, session.exercises);
-      if (!candidate) continue;
+      const bests = summarizeSessionBests(definitionBlocks(exerciseDefinitionId, session.exercises));
+      if (!bests) continue;
       const book = books.get(exerciseDefinitionId) ?? createRecordBook();
       books.set(exerciseDefinitionId, book);
-      book.add({ oneRepMax: { value: candidate.estimatedOneRepMax }, weight: null, volume: null });
+      book.add({
+        oneRepMax: bests.oneRepMax ? { value: bests.oneRepMax.estimatedOneRepMaxKg } : null,
+        weight: bests.topWeight ? { weight: bests.topWeight.weight, reps: bests.topWeight.reps } : null,
+        volume: null,
+      });
     }
   }
 
-  const bestByDefinition = new Map<string, number>();
-  for (const [exerciseDefinitionId, book] of books) {
-    if (book.holders.oneRepMax) bestByDefinition.set(exerciseDefinitionId, book.holders.oneRepMax.value);
+  const baselineByDefinition = new Map<string, RecordBaseline>();
+  for (const [exerciseDefinitionId, { holders }] of books) {
+    baselineByDefinition.set(exerciseDefinitionId, {
+      oneRepMax: holders.oneRepMax?.value ?? null,
+      weight: holders.weight,
+    });
   }
-  return bestByDefinition;
+  return baselineByDefinition;
 };
 
 const isLiveCompletedTarget = (target: PersonalRecordSessionInput): boolean => {
@@ -475,9 +497,9 @@ const isLiveCompletedTarget = (target: PersonalRecordSessionInput): boolean => {
 };
 
 /**
- * The target's 1RM PRs against each definition's best from earlier completed
- * sessions, in first-exercise order. A definition absent from the map has no
- * earlier 1RM and so no PR.
+ * The target's record sets (1RM, else Weight) against each definition's
+ * records from earlier completed sessions, in first-exercise order. A
+ * definition absent from the map has no earlier record and so no PR.
  */
 export const deriveSessionPersonalRecordsFromBests = (
   input: SessionPersonalRecordsFromBestsInput,
@@ -501,8 +523,7 @@ export const deriveSessionPersonalRecordsFromBests = (
     const record = deriveExercisePersonalRecord({
       exerciseDefinitionId,
       exercises: orderedTargetExercises,
-      historicalBestEstimatedOneRepMax:
-        input.historicalBestByDefinitionId.get(exerciseDefinitionId) ?? null,
+      baseline: input.recordBaselineByDefinitionId.get(exerciseDefinitionId) ?? null,
     });
     if (record) records.push(record);
   }
@@ -511,7 +532,7 @@ export const deriveSessionPersonalRecordsFromBests = (
 };
 
 /**
- * The replay reference for the 1RM PR rule: earlier bests recomputed from
+ * The replay reference for the PR rule: earlier records recomputed from
  * every earlier session's sets. Runtime reads take the earlier bests from the
  * exercise session facts instead; Jest holds the two equal.
  */
@@ -521,7 +542,7 @@ export const deriveSessionPersonalRecords = (
   if (!isLiveCompletedTarget(input.targetSession)) return [];
   return deriveSessionPersonalRecordsFromBests({
     targetSession: input.targetSession,
-    historicalBestByDefinitionId: collectHistoricalBestByExerciseDefinition(
+    recordBaselineByDefinitionId: collectRecordBaselineByExerciseDefinition(
       input.targetSession,
       input.historicalSessions,
     ),
@@ -810,7 +831,7 @@ export const deriveSessionMuscleVolumeComparisons = (
 };
 
 export type CompletedSessionInsightsInput = SessionMuscleVolumeComparisonsInput &
-  Pick<SessionPersonalRecordsFromBestsInput, "historicalBestByDefinitionId">;
+  Pick<SessionPersonalRecordsFromBestsInput, "recordBaselineByDefinitionId">;
 
 /** PRs read the supplied earlier bests; the comparisons read the earlier session graphs. */
 export const deriveCompletedSessionInsights = (
