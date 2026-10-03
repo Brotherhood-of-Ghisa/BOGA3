@@ -257,7 +257,14 @@ cmd_android_launch() {
   fi
   echo "[boga android ${action}] launching Expo (Metro port ${port})"
   if [[ "${action}" == "run" ]]; then
-    (cd "${mobile_dir}" && exec npx expo run:android --port "${port}" ${expo_args[@]+"${expo_args[@]}"})
+    local port_args=(--port "${port}")
+    for arg in ${expo_args[@]+"${expo_args[@]}"}; do
+      if [[ "${arg}" == "--no-bundler" ]]; then
+        port_args=()
+        break
+      fi
+    done
+    (cd "${mobile_dir}" && exec npx expo run:android ${port_args[@]+"${port_args[@]}"} ${expo_args[@]+"${expo_args[@]}"})
   else
     (cd "${mobile_dir}" && exec npx expo start --dev-client --port "${port}" ${expo_args[@]+"${expo_args[@]}"})
   fi
