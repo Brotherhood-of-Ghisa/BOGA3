@@ -33,8 +33,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   those destinations. Canonical routes are visible; preserved roots are
   registered with `href: null` and map to their canonical owner when opened
   directly.
-  `/today` is a landing page: the local progress summary and the joined-group
-  stream. It starts and resumes nothing.
+  `/today` is a landing page: the local progress summary and one joined
+  group's week. It starts and resumes nothing.
   `/train` now renders its real session-entry hub, through one coordinator that
   rechecks for an active draft and serializes empty/planned launch requests
   before persistence or materialization.
@@ -59,16 +59,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - none
 - Behavior:
   - composes the Progress card (the local progress summary, read again on each
-    focus) and a bounded joined-group stream snapshot
+    focus) and the Group activity card (one group's week)
   - Progress: `View progress` opens `/progress`, `All sessions` opens
     `/sessions`, the latest-session row opens `/completed-session/[sessionId]`,
     and with no completed session the empty panel's `Open Train` opens
     `/train` (transition 55). Nothing on Today opens `/session/<id>`: an
     active workout is reached from Train
-  - group activity preserves signed-out, auth-unavailable, cached/offline,
-    missing-data, and inline-error states; a session card opens the
-    friend-session route, while a record card or membership row opens
-    `/groups?groupId=<groupId>` (records are read-only here, with no Certify)
+  - Group activity: `View groups`, the board and the `<n> training now` row
+    open `/groups?groupId=<selected group>` (`/groups` with no group); the
+    one-member training-now row and the latest completed session open
+    `/group-session/<memberId>/<sessionId>`; `Find a group` (no group) opens
+    `/group/mine`; `Sign in` (signed out) opens `/sign-in`. Picking a chip
+    changes the selection Today shares with the Groups screen; it does not
+    navigate
 
 1c. `/train` (canonical tab)
 - File: `apps/mobile/app/(tabs)/train.tsx`
@@ -462,7 +465,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - row tap in My groups, the only way to the group page from the Groups
      screen (stream membership items do not navigate)
 30. `/groups` / `/today` -> `/group-session/<memberId>/<sessionId>`
-   - stream session-card tap (`router.push`)
+   - stream session-card tap; on Today, the latest-activity row for one member training now or the latest completed session (`router.push`)
 31. `/groups` (signed out, auth configured) -> `/sign-in`
    - `Sign in` action on the sign-in-required card
 32. `/groups` / `/group/mine` -> `/group/new`, `/group/join`
@@ -491,8 +494,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
 44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
    - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
-45. `/today` -> `/groups?groupId=<groupId>`
-   - a Group activity record card or membership row
+45. `/today` -> `/groups?groupId=<groupId>`, `/group/mine`
+   - `View groups`, the week board or the `<n> training now` row (the selected group); `Find a group` with no group
 46. `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
    - every active-session entry (Resume, a new launch, Sessions' review/complete,
      and the append of transition 9), through `sessionViewHref` (`router.push`)

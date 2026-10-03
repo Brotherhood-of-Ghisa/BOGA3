@@ -61,6 +61,7 @@ import {
   groupCacheKeys,
   mergeStreamPages,
   readGroupCache,
+  getLastViewedGroupId,
   setLastViewedGroupId,
   writeGroupCache,
   type GroupGetResult,
@@ -356,6 +357,23 @@ describe('Groups tab', () => {
     render(<GroupsTabRoute />);
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(screen.getByTestId('groups-stream-filter-group-b').props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it("shares its selection with Today's group card: a later pick there wins over an earlier chip here", async () => {
+    api.getGroupStream.mockImplementation(async ({ groupId }) =>
+      groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
+    );
+    render(<GroupsTabRoute />);
+    await screen.findByTestId(cardID('friend-1:s-1'));
+    fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
+    await screen.findByTestId(cardID('friend-2:s-2'));
+    expect(getLastViewedGroupId()).toBe('group-b');
+
+    // Today's card picks group A while this screen stays mounted.
+    setLastViewedGroupId('group-a');
+    screen.rerender(<GroupsTabRoute />);
+    await screen.findByTestId(cardID('friend-1:s-1'));
+    expect(screen.getByTestId('groups-stream-filter-group-a').props.accessibilityState).toEqual({ selected: true });
   });
 
   it("switches to the selected group's leaderboards", async () => {

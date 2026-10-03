@@ -1,7 +1,7 @@
 import { getGroupMetricPodiums } from '@/src/groups/api';
 import type { GroupMetricPodiumWire } from '@/src/groups/metric-wire';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import {
@@ -62,18 +62,25 @@ function GroupsTabContent({ userId }: { userId: string }) {
   const mine = useGroupResource<GroupListMineResult>({ userId, cacheKey: groupCacheKeys.mine, fetcher: listMyGroups });
   const groups = mine.data?.groups ?? null;
 
-  const [pickedGroupId, setPickedGroupId] = useState<string | null>(requestedGroupId);
+  // The selection is `last-viewed-group`, shared with Today's group card: a pick
+  // on either screen moves both. Read again on focus, and after a chip pick.
+  const [, rerender] = useReducer((count: number) => count + 1, 0);
+  useFocusEffect(useCallback(() => rerender(), []));
+  const pickGroup = useCallback((groupId: string) => {
+    setLastViewedGroupId(groupId);
+    rerender();
+  }, []);
   const [segment, setSegment] = useState<GroupsSegment>('stream');
-  // A new link (a Today record or membership row) wins over the last pick and opens its Stream.
-  const [followedRequest, setFollowedRequest] = useState(requestedGroupId);
+  // A new link (Today's `View groups`, a membership row) wins over the last pick and opens its Stream.
+  const [followedRequest, setFollowedRequest] = useState<string | null>(null);
   if (followedRequest !== requestedGroupId) {
     setFollowedRequest(requestedGroupId);
     if (requestedGroupId) {
-      setPickedGroupId(requestedGroupId);
+      setLastViewedGroupId(requestedGroupId);
       setSegment('stream');
     }
   }
-  const selectedGroupId = groups ? resolveSelectedGroupId(groups, pickedGroupId, getLastViewedGroupId()) : null;
+  const selectedGroupId = groups ? resolveSelectedGroupId(groups, getLastViewedGroupId()) : null;
   useEffect(() => {
     if (selectedGroupId) setLastViewedGroupId(selectedGroupId);
   }, [selectedGroupId]);
@@ -130,7 +137,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
       ) : null}
       {hasGroups ? (
         <>
-          <GroupFilterChips groups={groups} onChange={setPickedGroupId} selectedGroupId={selectedGroupId} />
+          <GroupFilterChips groups={groups} onChange={pickGroup} selectedGroupId={selectedGroupId} />
           <SegmentedControl
             accessibilityLabel="Stream or leaderboards"
             onChange={setSegment}

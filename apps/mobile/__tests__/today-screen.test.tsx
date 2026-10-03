@@ -7,9 +7,9 @@
  * clock. Only the native database open and the router are replaced. The suite
  * runs in Europe/London (jest.config.js).
  *
- * The joined-group activity stays injected (`socialState`): the route builds
- * it from the group stream read from the server. Named states real data
- * cannot produce: a pending progress read and a failed one.
+ * The group card is injected signed out (`groupState`); its own suite is
+ * today-group-card.test.tsx. Named states real data cannot produce: a pending
+ * progress read and a failed one.
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
@@ -28,15 +28,12 @@ jest.mock('expo-router', () => ({
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
-import { GroupApiError, type StreamItem } from '@/src/groups';
 import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
-import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { loadTodayProgress, type TodayProgress } from '@/src/progress-summary';
 
-import { recordItem } from './helpers/group-record-fixtures';
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 
-import { TodayScreen, type TodayScreenProps, type TodaySocialState } from '../app/(tabs)/today';
+import { TodayScreen, type TodayScreenProps } from '../app/(tabs)/today';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
   new Date(year, month - 1, day, hour, minute);
@@ -45,55 +42,7 @@ const local = (year: number, month: number, day: number, hour = 0, minute = 0) =
 const NOW = local(2026, 10, 16, 12);
 const clock = () => NOW;
 
-const streamSession = (key: string, memberId: string, sessionId: string): StreamItem => ({
-  kind: 'session',
-  key,
-  sort_at_ms: Date.parse('2026-09-16T10:00:00.000Z'),
-  member: { user_id: memberId, username: 'Alex' },
-  session_id: sessionId,
-  groups: [{ group_id: 'group-1', name: 'Morning Crew' }],
-  gym_name: 'Iron House',
-  status: 'completed',
-  started_at_ms: Date.parse('2026-09-16T09:00:00.000Z'),
-  completed_at_ms: Date.parse('2026-09-16T10:00:00.000Z'),
-  duration_sec: 3_600,
-  exercises: [],
-});
-
-const membershipItem: StreamItem = {
-  kind: 'membership',
-  key: 'membership-1:joined',
-  sort_at_ms: Date.parse('2026-09-16T08:00:00.000Z'),
-  event: 'joined',
-  group: { group_id: 'group-2', name: 'Lunch Lifters' },
-  member: { user_id: 'member-2', username: 'Bea' },
-};
-
-const linkItem: StreamItem = {
-  kind: 'link',
-  key: 'link-1',
-  sort_at_ms: Date.parse('2026-09-16T11:00:00.000Z'),
-  event: 'link',
-  group: { group_id: 'group-3', name: 'Evening Crew' },
-  member: { user_id: 'member-4', username: 'Dana' },
-  group_exercise: {
-    group_exercise_id: 'group-exercise-1',
-    name: 'Bench Press',
-    load_input_mode: 'total_load',
-  },
-  exercises: [{ exercise_definition_id: 'exercise-1', name: 'Bench Press' }],
-  effects: [],
-};
-
-const socialState = (items: StreamItem[] = []): TodaySocialState => ({
-  status: 'available',
-  hasData: true,
-  offline: false,
-  error: null,
-  lastUpdatedAtMs: Date.parse('2026-09-16T10:00:00.000Z'),
-  items,
-  refresh: jest.fn().mockResolvedValue(undefined),
-});
+const signedOut = { status: 'signed-out' } as const;
 
 // A completed 1-hour session at Iron House from `startedAt`: bench at
 // `benchKg` then squat at 100, three working sets each. A heavier bench than
@@ -136,7 +85,7 @@ const logHistory = async () => {
 
 const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
   await bootLocalApp();
-  const view = render(<TodayScreen now={clock} socialState={socialState()} {...props} />);
+  const view = render(<TodayScreen now={clock} groupState={signedOut} {...props} />);
   await waitFor(() => expect(screen.queryByTestId('today-progress-loading')).toBeNull());
   return view;
 };
@@ -254,8 +203,8 @@ describe('Today: the Progress card over real data', () => {
     await renderToday({ loadProgress });
 
     await logSession('oct-16', local(2026, 10, 16, 8), 120);
-    screen.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} socialState={socialState()} />);
-    screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} socialState={socialState()} />);
+    screen.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
+    screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     expect(screen.queryByTestId('today-progress-loading')).toBeNull();
     await waitFor(() => expect(text('today-progress-week-sessions-value')).toHaveTextContent('2'));
     expect(text('today-latest-session-start')).toHaveTextContent('10/16 08:00');
@@ -263,8 +212,8 @@ describe('Today: the Progress card over real data', () => {
     await act(async () => {
       await setSessionDeletedState('oct-16', true);
     });
-    screen.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} socialState={socialState()} />);
-    screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} socialState={socialState()} />);
+    screen.rerender(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
+    screen.rerender(<TodayScreen isFocused loadProgress={loadProgress} now={clock} groupState={signedOut} />);
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12'));
     expect(loadProgress).toHaveBeenCalledTimes(3);
     expect(loadProgress).toHaveBeenLastCalledWith(NOW);
@@ -291,7 +240,7 @@ describe('Today: the today-progress harness fixture', () => {
 describe('Today: progress read states', () => {
   it('shows loading while the first read is pending (a pending read)', async () => {
     await bootLocalApp();
-    render(<TodayScreen loadProgress={() => new Promise<TodayProgress>(() => {})} now={clock} socialState={socialState()} />);
+    render(<TodayScreen loadProgress={() => new Promise<TodayProgress>(() => {})} now={clock} groupState={signedOut} />);
 
     expect(text('today-progress-loading')).toBeTruthy();
     expect(screen.getByText('Loading your progress…')).toBeTruthy();
@@ -315,71 +264,9 @@ describe('Today: progress read states', () => {
   it('does not read while unfocused', async () => {
     const loadProgress = jest.fn<Promise<TodayProgress>, [Date]>().mockResolvedValue({ status: 'empty' });
     await bootLocalApp();
-    render(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} socialState={socialState()} />);
+    render(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
 
     expect(loadProgress).not.toHaveBeenCalled();
     expect(text('today-progress-loading')).toBeTruthy();
-  });
-});
-
-describe('Today: group activity (unchanged until the group card)', () => {
-  it('bounds joined-group activity to sessions, records and membership changes', async () => {
-    await renderToday({
-      socialState: socialState([
-        linkItem,
-        streamSession('member-1:session-1', 'member-1', 'session-1'),
-        recordItem({ member: { user_id: 'member-1', username: 'Alex' }, session_id: 'session-1' }),
-        membershipItem,
-        streamSession('member-3:session-3', 'member-3', 'session-3'),
-      ]),
-    });
-
-    expect(screen.getByTestId('group-stream-session-card-member-1:session-1')).toBeTruthy();
-    expect(screen.getByTestId('group-stream-record-card-ev-record-1')).toBeTruthy();
-    expect(screen.getByTestId('group-stream-membership-membership-1:joined')).toBeTruthy();
-    expect(screen.queryByTestId('group-stream-link-link-1')).toBeNull();
-    expect(screen.queryByTestId('group-stream-session-card-member-3:session-3')).toBeNull();
-    // Read-only on Today: certifying happens on the Groups screen.
-    expect(screen.queryByTestId('group-stream-record-card-ev-record-1-certify')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('group-stream-session-card-member-1:session-1'));
-    fireEvent.press(screen.getByTestId('group-stream-record-card-ev-record-1-open'));
-    fireEvent.press(screen.getByTestId('group-stream-membership-membership-1:joined'));
-    fireEvent.press(screen.getByTestId('today-view-groups-button'));
-
-    expect(mockPush).toHaveBeenNthCalledWith(1, '/group-session/member-1/session-1');
-    expect(mockPush).toHaveBeenNthCalledWith(2, '/groups?groupId=g1');
-    expect(mockPush).toHaveBeenNthCalledWith(3, '/groups?groupId=group-2');
-    expect(mockPush).toHaveBeenNthCalledWith(4, '/groups');
-  });
-
-  it('keeps signed-out and offline-without-cache group states explicit', async () => {
-    await renderToday({ socialState: { status: 'signed-out' } });
-
-    fireEvent.press(screen.getByTestId('today-social-sign-in'));
-    expect(mockPush).toHaveBeenCalledWith(SIGN_IN_ROUTE);
-
-    screen.rerender(
-      <TodayScreen
-        now={clock}
-        socialState={{
-          status: 'available',
-          hasData: false,
-          offline: true,
-          error: new GroupApiError('NETWORK', 'offline'),
-          lastUpdatedAtMs: null,
-          items: [],
-          refresh: jest.fn().mockResolvedValue(undefined),
-        }}
-      />,
-    );
-
-    expect(screen.getByTestId('groups-offline-banner')).toBeTruthy();
-    expect(screen.getByTestId('today-social-offline-empty-state')).toBeTruthy();
-  });
-
-  it('keeps the auth-unavailable group panel', async () => {
-    await renderToday({ socialState: { status: 'auth-unavailable' } });
-    expect(screen.getByTestId('today-social-auth-unavailable')).toBeTruthy();
   });
 });

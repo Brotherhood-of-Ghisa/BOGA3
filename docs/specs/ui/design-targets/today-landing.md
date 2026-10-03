@@ -4,8 +4,8 @@ Target record per `../ai-design-policy.md`. Accepted by the user on
 2026-10-02 from a Claude Design canvas drawn in the app's vocabulary. It
 replaces the layout half of `today-train.md` for Today (the next-workout card,
 the separate recent-sessions list and the group stream snapshot); Train is
-unchanged. **Integrated rendering and gallery acceptance remain required**
-before the build closes.
+unchanged. **Built**: both cards are integrated, and the user accepted the
+runtime gallery of every state below on 2026-10-03.
 
 ## Target
 
@@ -53,7 +53,9 @@ before the build closes.
   user belongs to more than one group; with one group the board's micro-label
   names it (`<group> · this week`). The board is the top three members by
   working sets this week: rank, member (`You` in Source Sans 600 on `paper`),
-  a `viz` bar (the leader one step darker), `W/S` and `PRs` columns. When the
+  a `viz` bar (the leader one step darker), `W/S` and `PRs` columns. The
+  card's `PRs` are **group records** (the member took #1 on a group board),
+  not personal PRs, so they need not match the Progress card's. When the
   user is outside the top three, a `You · <rank>` line with their figures
   closes the board.
 - **Group card, bottom: latest activity.** A `Latest activity` micro-label,
@@ -88,21 +90,46 @@ Where the build departs from the canvas or settles what the brief left open:
 - **The chart.** The longer of the two months spans the width. The chart is
   one image for VoiceOver, labelled with its summary sentence (not shown on
   screen); the visible summary line under it stays.
-- **Group activity** keeps the current stream snapshot until the group card
-  is built.
+- **The group selection is the Groups screen's.** With several groups the
+  card shows the group last viewed on either screen (else the first), and a
+  chip pick moves both; `View groups` and the board open the Groups screen on
+  that group.
+- **The board and the several-training row are links** to the Groups screen
+  on the group; one member training now and the latest completed session
+  open that group session.
+- **Member names get 72pt** on the board and ellipsise; the bars take the
+  rest.
+- **The latest completed row** stamps its start as the Progress card does
+  (`10/16 06:10 · Iron Works`); a training-now start is the clock time today
+  (`Started 07:40`), else the date and time.
+- **The record line** leads with the first group record, 1RM before Weight:
+  the figure (`Deadlift 1RM 213.3`) in `record` Plex Mono, then
+  `· group record` in `ink-muted` body (`· <n> group records` with more).
+- **No live or completed session** in the group: one muted line, `No sessions
+  shared to this group yet.`
+- **Offline** keeps the cached week under the offline `Notice`; the cached
+  week carries its window, so last week's board never shows as this week's.
+- **Signed out never reaches Today** in a configured build (root route access
+  keeps a signed-out user on `/sign-in`); the card's sign-in panel stays for
+  that state, and an unconfigured build shows the auth-unavailable panel.
 
 ## States
 
-Device: iPhone simulator at 390pt width, light. Lanes and screenshot names are
-set by the build; capture at least:
+Device: iPhone 17 Pro simulator (402pt, the slot simulator), light. Captured
+from live data on a local Supabase stack by one-off flows over the harness
+(`bootstrap=complete`, `fixture=today-progress`, `teleport=today`); no
+committed flow asserts Today beyond `today-screen` in `smoke-launch.yaml`
+(lane `ios-smoke`): Jest owns Today (`today-screen.test.tsx`,
+`today-group-card.test.tsx`, `groups-week-summary-view-model.test.ts`).
 
-| State | Proves |
-| --- | --- |
-| Today with data, two groups, latest group activity completed | the whole page |
-| New user, no group | both empty panels |
-| One group, one member training now | no switcher; the live row |
-| Several training now, the user outside the top three | the switcher; `You · <rank>`; the collapsed row |
-| Signed out | the group card's sign-in panel |
+| Screenshot | State | Proves |
+| --- | --- | --- |
+| `today-group-05-whole-page-top` / `-bottom` | two groups, latest group activity completed | the whole page; the group record line |
+| `today-group-02-no-group` | new user, no group | both empty panels |
+| `today-group-03-one-group-training` | one group, one member training now | no switcher; the group-named board; the live row |
+| `today-group-04-several-training` | several training now, the user outside the top three | the switcher; `You · <rank>`; the collapsed row |
+| `today-group-01-auth-unavailable-bottom` | an unconfigured build | the no-account group panel (signed out never reaches Today) |
 
+Offline, the error states and Retry are Jest-only (`today-group-card.test.tsx`).
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.

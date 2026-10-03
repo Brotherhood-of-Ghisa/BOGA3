@@ -61,7 +61,6 @@ Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream
 | `groups-06-completed-edited-card` | the same card `Completed · 45m`, its metrics updated |
 | `groups-07b-6-stream-link-item` | a link item in the stream |
 | `groups-07b-7-row-detail` | the record sheet from a board row: converted value, `Certify` |
-| `groups-07c-0-today-record` | Today's group activity with the record card, read-only |
 | `groups-07c-1-record-card` | a record card under its session card (`1 record`) |
 | `groups-07c-2-certified-card` | the card after `Certify`: the notice and `Certified by you` |
 | `groups-07c-6-row-detail-certified` | the record sheet, certified: `Remove my certification` |
