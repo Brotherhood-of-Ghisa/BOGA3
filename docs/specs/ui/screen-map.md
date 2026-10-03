@@ -303,7 +303,14 @@ Brief entrypoint map of the current mobile screens.
     on tap, and a note that a new theme applies the next time BoGa opens; a
     failed save restores the previous choice and says nothing changed
     (`settings-appearance-error`). Rules: `ux-rules.md` §9b
-  - Preferences card: date format (`settings-date-format-<format>`)
+  - Preferences card: date format (`settings-date-format-<format>`) and past-records
+    gym filter (`settings-records-gym-<scope>`) are account-local on this device.
+    Sign-out hides the choices and returning to the account restores them;
+    database rebuilds preserve them. Read/save failure retains durable values
+    and failed input; feedback lives centrally in Data & Sync's Error row,
+    with its existing Refresh action retrying storage. Preference controls and
+    the three exercise browsers add no error boxes or Retry buttons.
+    Theme and the synced bodyweight toggle retain their separate storage paths.
   - AI coaching always offers an external `Connect an AI coach` setup link and
     states the read-only/revocable boundary; browser-launch failure stays inline
     and retryable. The separate Connected agents row is signed-in only.
@@ -312,12 +319,15 @@ Brief entrypoint map of the current mobile screens.
     to push across the user-owned tables), network state (online/offline, or
     `Checking…` until NetInfo reports a determined `isConnected` — never shown
     as offline or online before then), and
-    the latest sync error (or a sign-in-required hint); a Refresh action nudges a
-    sync cycle. The card refreshes on screen focus and on a short interval while
+    the latest sync error (or a sign-in-required hint) alongside any preference
+    storage failure in the same live Error row; Refresh retries preferences,
+    nudges a sync cycle and reads sync status. The card refreshes on screen focus and on a short interval while
     focused. Card/fields carry stable testIDs (`settings-sync-status-card`,
     `settings-sync-status-last-success`, `settings-sync-status-dirty-count`,
     `settings-sync-status-network`, `settings-sync-status-error`).
-  - signed-out Data & sync guidance instead of usable sync controls
+  - signed-out Data & sync guidance in the existing card. A preference-storage
+    failure adds the Error row and Refresh within that card; Refresh retries
+    only preferences, without starting sync or reading signed-in sync status
   - About shows installed native version/build where available, optional release
     codename, and Preview/Local flavor only outside production
   - a developer-tools card (`isDevMode()` only), last and separate from the

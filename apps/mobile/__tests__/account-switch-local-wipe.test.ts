@@ -86,6 +86,16 @@ import {
   syncRuntimeState,
   userSettings,
 } from '@/src/data/schema';
+import { Storage } from 'expo-sqlite/kv-store';
+import {
+  ensureAccountLocalPreferencesLoaded,
+  getAccountLocalPreferenceState,
+  setAccountLocalPreferenceAccount,
+  setAccountLocalPreferences,
+} from '@/src/preferences/account-local';
+import { migrationCompleteKey } from '@/src/preferences/migration';
+import { preferenceKey } from '@/src/preferences/storage';
+import * as writeNudge from '@/src/sync/write-nudge';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 
 // The twelve syncable, per-user entity tables the wipe must clear, paired with a
@@ -196,6 +206,28 @@ describe('sign-out / account-switch local wipe', () => {
     fixture.close();
     mockBootstrapState.database = null;
     mockClientState.client = null;
+  });
+
+  it('local preference edits leave synced settings and nudges unchanged; the account wipe preserves their keys and the device theme', async () => {
+    Storage.setItemSync(migrationCompleteKey('account:A'), 'true');
+    Storage.setItemSync('boga3.themePreset.v1', 'forest');
+    setAccountLocalPreferenceAccount('A', true);
+    await ensureAccountLocalPreferencesLoaded();
+    db().update(userSettings).set({ localDirty: false }).run();
+    const settingsBefore = db().select().from(userSettings).all();
+    const nudge = jest.spyOn(writeNudge, 'notifyLocalWrite');
+    setAccountLocalPreferences({ sort: 'name', dateFormat: 'YYYY-MM-DD' });
+    expect(db().select().from(userSettings).all()).toEqual(settingsBefore);
+    expect(nudge).not.toHaveBeenCalled();
+    nudge.mockRestore();
+    await wipeLocalForAccountSwitch();
+    expect(Storage.getItemSync(preferenceKey('account:A', 'sort'))).toBe('name');
+    expect(Storage.getItemSync('boga3.themePreset.v1')).toBe('forest');
+    setAccountLocalPreferenceAccount(null, true);
+    setAccountLocalPreferenceAccount('A', true);
+    await ensureAccountLocalPreferencesLoaded();
+    expect(getAccountLocalPreferenceState().values).toMatchObject({ sort: 'name', dateFormat: 'YYYY-MM-DD' });
+    expect(db().select().from(userSettings).all()).toEqual([]);
   });
 
   it('clears every one of the twelve syncable entity tables', async () => {

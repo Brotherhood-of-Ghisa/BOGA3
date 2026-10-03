@@ -6,7 +6,7 @@
  * app data; the screen runs over the in-memory SQLite fixture
  * (helpers/local-data.ts) with its real preferences store. Replaced: the
  * router, the system browser, the auth hook, dev mode, build metadata and the
- * sync-status panel (its own spec).
+ * native navigation focus lifecycle.
  */
 
 const mockOpenUrl = jest.fn();
@@ -20,17 +20,18 @@ jest.mock('expo-linking', () => ({
 // Reading entry/navigation is covered by bodyweight-screen.test.tsx.
 jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
 
-jest.mock('expo-router', () => ({
+jest.mock('expo-router', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
+  const { useEffect } = require('react');
+  return {
+  useFocusEffect: (callback: () => void | (() => void)) => useEffect(callback, [callback]),
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: mockPush }),
-}));
+  };
+});
 
 jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
-}));
-
-jest.mock('@/components/sync-status/sync-status-panel', () => ({
-  SyncStatusPanel: () => null,
 }));
 
 jest.mock('@/src/data/bootstrap', () =>

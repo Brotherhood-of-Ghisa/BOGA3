@@ -16,7 +16,6 @@ import {
   PageHeader,
   ScreenScroll,
   SegmentedControl,
-  StatePanel,
   uiFonts,
   uiGeometry,
   uiRoles,
@@ -29,7 +28,7 @@ import {
   wipeLocalAndReBootstrap,
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
-import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { setExerciseListPreferences, useExerciseListPreferenceState } from '@/src/exercise-catalog/list-preferences';
 import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
@@ -39,7 +38,7 @@ type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [listPreferences, setListPreferences] = useExerciseListPreferences();
+  const { values: listPreferences, error: preferenceError, retry: refreshPreferences } = useExerciseListPreferenceState();
   const [connectError, setConnectError] = useState<string | null>(null);
   const runtimeMetadata = readAppRuntimeMetadata();
   const versionBuild = formatVersionBuild(runtimeMetadata);
@@ -249,7 +248,7 @@ export default function SettingsScreen() {
             <Text allowFontScaling={false} style={styles.fieldLabel}>Date format</Text>
             <SegmentedControl
               accessibilityLabel="Date format"
-              onChange={(format) => setListPreferences({ dateFormat: format })}
+              onChange={(format) => setExerciseListPreferences({ dateFormat: format })}
               options={DATE_FORMAT_OPTIONS}
               testIDPrefix="settings-date-format"
               value={listPreferences.dateFormat}
@@ -259,7 +258,7 @@ export default function SettingsScreen() {
             <Text allowFontScaling={false} style={styles.fieldLabel}>Past records gym filter</Text>
             <SegmentedControl
               accessibilityLabel="Past records gym filter"
-              onChange={(scope) => setListPreferences({ pastRecordsGymScope: scope })}
+              onChange={(scope) => setExerciseListPreferences({ pastRecordsGymScope: scope })}
               options={PAST_RECORDS_GYM_SCOPE_OPTIONS}
               testIDPrefix="settings-records-gym"
               value={listPreferences.pastRecordsGymScope}
@@ -270,13 +269,12 @@ export default function SettingsScreen() {
 
       <View style={styles.section} testID="settings-section-data-sync">
         <SectionLabel title="Data & sync" />
-        {user ? (
-          <SyncStatusPanel />
-        ) : (
-          <Card testID="settings-sync-signed-out-card">
-            <StatePanel body="Sign in through Account to sync your training data." fill={false} />
-          </Card>
-        )}
+        <SyncStatusPanel
+          key={user ? `account:${user.id}` : 'local'}
+          isSignedIn={Boolean(user)}
+          onRefreshPreferences={refreshPreferences}
+          preferenceError={preferenceError}
+        />
       </View>
 
       <View style={styles.section} testID="settings-section-about">

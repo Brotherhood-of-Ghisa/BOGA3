@@ -89,6 +89,38 @@ own synced raw rows; they never cross the wire.
   exercises to a group exercise; deterministic id
   `<group_id>:<exercise_definition_id>` (see Sync v2 data-model contract #11)
 
+### Device-local preferences
+
+`apps/mobile/src/preferences/` owns typed account-local browsing choices (exercise
+sort, Show never-done, detail date format and past-records gym filter). Ordinary
+scalar keys in the existing `expo-sqlite/kv-store` are scoped to the authenticated
+account ID; local-only builds have a distinct local profile. They are **out of
+sync scope**: device presentation choices, without dirty bits, sync nudges,
+`user_settings` columns or server counterparts. Types/defaults are import-free;
+browsing hooks adapt the store for screens.
+
+Auth selects the scope before its snapshot reaches consumers. Sign-out hides
+account values and clears failed input; saved keys survive sign-out, account
+switches, and sync database rebuilds. Returning to an account restores them;
+reinstallation starts from defaults. Any future explicit preference reset must
+address only its intended profile and fields, never clear the whole key-value
+store. The theme remains device-scoped under `boga3.themePreset.v1`, read
+synchronously before tokens evaluate and applied on the next launch. The private
+bodyweight toggle remains account-synced through `user_settings`.
+
+The legacy SecureStore key `boga3.exerciseListPreferences.v1` has no owner.
+Migration durably claims it for the first migrating authenticated account before
+reading it; signed-out and local-only profiles defer the claim. The claim survives
+failed reads and interrupted writes. Valid scoped values (including edits during
+the async read) win; absent/invalid fields receive normalized legacy values,
+including the `recentsOnTop` alias. Obsolete grouping/period fields are ignored.
+The legacy source is deleted only after all four fields are durable, before
+completion is recorded; failed cleanup remains retryable. This prevents a
+keychain value that survives iOS reinstallation being claimed by another user. Late migration
+results never update a different active profile. Read failures block edits until
+a successful re-read; failed saves publish only durable scalar changes and retain
+unsaved input for Retry.
+
 ### Test/runtime-only data (not user backup scope)
 
 - `smoke_records`

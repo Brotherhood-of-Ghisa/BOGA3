@@ -19,22 +19,21 @@ const mockAlert = jest.fn();
 // Reading entry/navigation is covered by bodyweight-screen.test.tsx.
 jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow: () => null }));
 
-jest.mock('expo-router', () => ({
+jest.mock('expo-router', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
+  const { useEffect } = require('react');
+  return {
+  useFocusEffect: (callback: () => void | (() => void)) => useEffect(callback, [callback]),
   useLocalSearchParams: () => mockSearchParams,
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
   }),
-}));
+  };
+});
 
 jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
-}));
-
-// The sync-status panel has its own spec; stub it here so the Settings render
-// stays focused on navigation and the account surface.
-jest.mock('@/components/sync-status/sync-status-panel', () => ({
-  SyncStatusPanel: () => null,
 }));
 
 jest.mock('@/src/auth/profile', () => ({
@@ -49,14 +48,16 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert } from 'react-native';
+import { Storage } from 'expo-sqlite/kv-store';
 
 import {
   __resetExerciseListPreferencesForTests,
   ensureExerciseListPreferencesLoaded,
   getExerciseListPreferencesSnapshot,
 } from '@/src/exercise-catalog/list-preferences';
+import * as syncStatusSource from '@/src/sync/sync-status';
 import ProfileRoute from '../app/profile';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import SettingsRoute from '../app/(tabs)/settings';
@@ -164,6 +165,48 @@ describe('settings and profile routes', () => {
     fireEvent.press(screen.getByTestId('settings-connected-agents-row'));
 
     expect(mockPush).toHaveBeenCalledWith('/connected-agents');
+  });
+
+  it('reports a failed date-format save only under Data & Sync and retries it through Refresh', async () => {
+    await ensureExerciseListPreferencesLoaded();
+    render(<SettingsRoute />);
+    const save = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
+    fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
+    const error = /Preferences could not be saved\./;
+    expect(within(screen.getByTestId('settings-section-data-sync')).getByTestId('settings-sync-status-error'))
+      .toHaveTextContent(error);
+    expect(within(screen.getByTestId('settings-preferences-card')).queryByText(error)).toBeNull();
+    expect(screen.queryByTestId('preferences-error')).toBeNull();
+    expect(screen.queryByText('Retry')).toBeNull();
+    expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('DD-MM-YYYY');
+    fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
+    await waitFor(() => expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD'));
+    expect(screen.queryByTestId('settings-sync-status-error')).toBeNull();
+    save.mockRestore();
+  });
+
+  it('clears account status on switching users and discards a delayed previous-account read', async () => {
+    await ensureExerciseListPreferencesLoaded();
+    const status = { lastSuccessAtMs: null, dirtyCount: 4, errorMessage: 'Account A error',
+      authRequired: false, networkState: 'online' as const, bootstrapCompleted: true, blockedRowCount: 0 };
+    let finishAccountBRead!: (value: typeof status) => void;
+    const accountBRead = new Promise<typeof status>(resolve => { finishAccountBRead = resolve; });
+    jest.spyOn(syncStatusSource, 'getSyncStatus').mockResolvedValueOnce(status)
+      .mockReturnValueOnce(accountBRead).mockResolvedValue({ ...status, dirtyCount: 1, errorMessage: 'Account C error' });
+    const switchAccount = (id: string) => mockUseAuth.mockReturnValue(createAuthValue({ user: { id } }));
+    switchAccount('account-a');
+    const { rerender } = render(<SettingsRoute />);
+    await waitFor(() => expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Account A error'));
+    switchAccount('account-b');
+    rerender(<SettingsRoute />);
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+    expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('0');
+    switchAccount('account-c');
+    rerender(<SettingsRoute />);
+    await waitFor(() => expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Account C error'));
+    await act(async () => { finishAccountBRead({ ...status, dirtyCount: 8, errorMessage: 'Account B error' }); });
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('Account C error');
+    expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('1');
   });
 
   it('renders the Preferences card and allows changing the date format setting', async () => {

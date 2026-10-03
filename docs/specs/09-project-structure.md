@@ -83,6 +83,11 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/exercise-calculations/`
   - owns the load calculation kernel (`load-metrics.ts`, `analytics.ts`) and the set rules every reader shares (`set-semantics.ts`: which sets count as performed, the canonical weight for the reps). Persistence (`src/data`), the session recorder, session insights and groups import them; this directory never imports `src/data`, hooks or UI.
   - the `agent-api` and `group-eval` Edge Functions load it by relative path, so its whole import graph uses relative `.ts` specifiers (never `@/`).
+- `apps/mobile/src/preferences/`
+  - owns import-free account-local preference types/defaults, scalar key-value storage,
+    retryable legacy browsing migration and the active profile's external store.
+  - auth selects its scope; browsing hooks adapt its typed access for screens. It
+    never imports the domain database, sync cycle or UI, and never nudges sync.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-insights/`
