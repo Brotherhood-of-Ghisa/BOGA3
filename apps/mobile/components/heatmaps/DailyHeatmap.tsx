@@ -4,7 +4,7 @@
 // the daily view is for per-day inspection, the weekly view for weekly rollups.
 
 import React, { useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 
 import { Card, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
@@ -52,7 +52,7 @@ export function DailyHeatmap({
 }: Props) {
   const [gridW, setGridW] = useState(0);
   const [pickedDateKey, setPickedDateKey] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const GUT = 20;
   const GAP = 3;
   // Tile size is keyed to a ~3-month viewport: ~13 week columns fill the visible width,

@@ -370,7 +370,7 @@ describe('Invite (flow 2)', () => {
   });
 
   it('shows the code and shares it with the boga3:// link', async () => {
-    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction', activityType: undefined });
     render(<GroupInviteRoute />);
     expect(await screen.findByTestId('group-invite-code')).toHaveTextContent('ABCD2345');
     expect(screen.getByTestId('group-invite-link')).toHaveTextContent('boga3://group/join?code=ABCD2345');

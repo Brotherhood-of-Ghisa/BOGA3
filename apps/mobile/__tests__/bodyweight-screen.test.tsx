@@ -38,8 +38,9 @@ import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './h
 
 // A reading or preference write invalidates the exercise catalog, whose reload
 // runs on Jest's synchronous SQLite driver: it can hold the event loop past
-// waitFor's 1 s default when the full suite runs in parallel.
-const AFTER_WRITE = { timeout: 5000 };
+// waitFor's default when the full suite runs in parallel.
+jest.setTimeout(90000);
+const AFTER_WRITE = { timeout: 35000 };
 
 const readings = () => localDatabase().select().from(bodyWeightMeasurements).all();
 const storedPreference = () =>
@@ -68,6 +69,11 @@ const pressAlertButton = (style: AlertButton['style']) => {
 };
 
 describe('body weight log', () => {
+  beforeAll(async () => {
+    await bootLocalApp();
+    closeLocalData();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     resetLocalData();

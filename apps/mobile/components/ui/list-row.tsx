@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
@@ -48,7 +48,7 @@ export type ListRowProps = {
   // like a pressable row. Leave unset when a control inside must stay reachable.
   accessible?: boolean;
   // The row's host view, e.g. to move accessibility focus back to it.
-  ref?: Ref<View>;
+  ref?: Ref<ViewInstance>;
   testID?: string;
 };
 

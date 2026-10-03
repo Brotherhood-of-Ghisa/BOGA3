@@ -1,6 +1,6 @@
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ViewInstance, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
@@ -28,7 +28,7 @@ export type SessionShareSnapshot = {
 };
 
 type CaptureSessionShareImage = (
-  target: View,
+  target: ViewInstance,
   dimensions: SessionShareCaptureDimensions
 ) => Promise<string>;
 
@@ -152,7 +152,7 @@ export function SessionShareSheet({
   releaseImageAction = releaseSessionShareImage,
 }: SessionShareSheetProps) {
   const { height } = useWindowDimensions();
-  const shareCardRef = useRef<View | null>(null);
+  const shareCardRef = useRef<ViewInstance | null>(null);
   const hasFailedShareRef = useRef(false);
   const [cardDimensions, setCardDimensions] = useState<SessionShareCaptureDimensions | null>(null);
   const [isSharing, setIsSharing] = useState(false);

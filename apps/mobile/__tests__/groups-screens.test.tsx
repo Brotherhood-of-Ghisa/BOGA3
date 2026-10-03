@@ -407,7 +407,7 @@ describe('Groups tab', () => {
 
     render(<GroupsTabRoute />);
     expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
-    expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
+    expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
     expect(screen.queryByTestId('groups-inline-error')).toBeNull();
   });
 
