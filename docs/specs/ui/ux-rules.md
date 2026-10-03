@@ -105,9 +105,9 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    - The month compares its working sets so far with the previous month up to
      the same day of month (its last day when shorter), as a signed absolute
      count (`+4`, `−3`, `±0`; §13.2). The projection is linear: so far per
-     elapsed day, today included, times the month's days. The summary line
-     sets the projection against the previous month's total, and sessions and
-     PRs so far against the previous month's to the same day.
+     elapsed day, today included, times the month's days; the chart draws it
+     (and its spoken label states it). No summary line sits under the chart.
+   - Each week figure's caption is `vs <n> last wk`.
    - A PR is a working set whose estimated 1RM beats every earlier completed
      session's working sets on that exercise, at most one per exercise per
      session (the completed session's PR rule, §5.11).
@@ -237,7 +237,7 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
-12. Session comparisons are shared across active sessions, completion and View Session Summary. The live comparison body follows the exercise cards and Add exercise; logging stays usable while history loads or fails.
+12. Session comparisons are shared across active sessions, completion and View Session Summary. An active session's live comparison body is its own screen, `Session vs history`, opened from the session view's ⋮ (§14b.3), not a section of the view; logging stays usable while history loads or fails.
 13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. The primary list marks the current choice with `radio-on`; the secondary list offers only muscles not already chosen, each with `plus`. Secondary muscles are `ListRow`s in a `Card`, each removed by a `danger` `x`. It exposes a two-choice `Total load` / `Per side` `SegmentedControl`, preselects the stored value while editing, and defaults new custom exercises to total load.
 14. GPS gym detection is quiet assistance, and it **suggests only** (decided
     2026-09-23):
@@ -693,7 +693,9 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 8. Both controls use the design-language `SegmentedControl` (selected segment
    solid `ink`); neither is styled locally, and there are no raw colour
    literals. Summary deltas keep their sign (`+`, `−`, `±0`) in Plex Mono
-   `ink-muted`, with `new` in `ink`; they carry no green or red (G3). Volumes
+   `ink-muted`, with `new` in `ink`; they carry no green or red (G3). The
+   Sessions and Sets cards name what their delta is against: the adjacent
+   earlier period of the selected range (`−3 vs prev 7 days`). Volumes
    and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
 10. Exercise analytics uses calculated load × reps of working sets (§5.11) under the current private policy, with invalid/overflow coverage and no muscle-role weighting. A day or week with only warm-ups makes no heatmap cell, for exercises and muscles alike. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
@@ -850,7 +852,8 @@ unchanged. What differs is presentation:
    and submit`; single-kind copy when only one applies). Declining any writes
    nothing. Invalid set values block it with an alert naming the exercises to
    fix.
-3. ⋮ is a menu sheet even with one item. `Abandon session` is `danger` and
+3. ⋮ is a menu sheet: `Session vs history` (a chevron row that opens the
+   session's live comparisons, §12.12), then `Abandon session`, `danger` and
    confirms (`Abandon session?` · `Keep session` / `Abandon`) before the same
    soft delete as the Sessions list's delete; the sheet's backdrop, Android
    back and the VoiceOver escape dismiss it.

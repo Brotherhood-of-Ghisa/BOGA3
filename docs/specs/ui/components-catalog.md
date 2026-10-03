@@ -472,7 +472,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     `n/m`, a chevron, the read-only set rows and the `record` band. testID
     `session-view-exercise-<id>` with `-count`, `-set-<n>` (`-values`, `-1rm`,
     `-vol`), `-record`
-  - `SessionOptionsSheet` — `Sheet` + one danger `ListRow` (`Abandon session`)
+  - `SessionOptionsSheet` — `Sheet` + a `Session vs history` chevron `ListRow`
+    (`session-view-compare`) and a danger `ListRow` (`Abandon session`)
   - `SessionGymSheet` — `Sheet` + `ListRow`s: the optional `Nearby · <gym>`
     suggestion row (its host runs the lookup and passes `suggestion`), `No gym`
     and the gyms with the current one checked, and a `Manage gyms` footer row.
@@ -562,7 +563,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `today-latest-session` (`-start`, `-figures`, `-exercises`, `-prs`)
   - `WeekFigures` — `This week` with the Mon–Sun range in `ink-faint`, then
     `Sessions`, `Sets` and `PRs` (Plex Mono 700; a non-zero PR count in
-    `record` with its `arrow-up`), each over a `ShareBar` and `of <n> last wk`.
+    `record` with its `arrow-up`), each over a `ShareBar` and `vs <n> last wk`.
     testIDs `today-progress-week` (`-range`), `today-progress-week-<sessions |
     working-sets | prs>` (`-value`, `-bar`, `-bar-fill`, `-previous`)
   - `ShareBar` — a 6pt bar: a `viz0` track and a `viz3` fill for a share of a
@@ -573,9 +574,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     `ink` over a `viz0` fill, the previous month dashed `ink-faint`, the
     projection dotted `ink-ghost`, a dot on each line at today, `1` / today /
     last-day axis labels) that is one accessible image labelled with its
-    summary sentence, and the `ink-muted` summary line. testIDs
-    `today-progress-month` (`-working-sets`, `-difference`, `-pace`,
-    `-summary`), `today-progress-chart`
+    summary sentence. testIDs
+    `today-progress-month` (`-working-sets`, `-difference`, `-pace`),
+    `today-progress-chart`
   - `useTodayProgress` — the read on every focus: loading only before the
     first result, a retryable error
   - covered by `apps/mobile/__tests__/today-screen.test.tsx` (over real data)

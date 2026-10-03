@@ -8,7 +8,6 @@ import type { TodayProgressMonth } from '@/src/progress-summary';
 import {
   CHART_HEIGHT,
   formatPacePhrase,
-  formatSessionCount,
   formatSignedCount,
   monthChartAccessibilityLabel,
   monthChartGeometry,
@@ -109,16 +108,14 @@ function MonthChart({ month, geometry }: { month: TodayProgressMonth; geometry: 
 }
 
 // `<Month> so far`: the month's working sets against the previous month at the
-// same day (a signed absolute difference, never a percentage), the cumulative
-// line by day, and one summary line.
+// same day (a signed absolute difference, never a percentage) and the
+// cumulative line by day.
 export function MonthPace({ month }: { month: TodayProgressMonth }) {
   const [width, setWidth] = useState(FALLBACK_CHART_WIDTH);
   const onLayout = (event: LayoutChangeEvent) => {
     const measured = Math.round(event.nativeEvent.layout.width);
     if (measured > 0 && measured !== width) setWidth(measured);
   };
-  const previousName = shortMonthName(month.previous.window.start);
-  const previousSameDay = month.previous.toSameDay;
 
   return (
     <View style={styles.block} testID="today-progress-month">
@@ -151,14 +148,6 @@ export function MonthPace({ month }: { month: TodayProgressMonth }) {
           <MonthChart geometry={monthChartGeometry(month, width)} month={month} />
         </Svg>
       </View>
-      <Text allowFontScaling={false} style={todayText.mutedLine} testID="today-progress-month-summary">
-        On course for <Text allowFontScaling={false} style={todayText.inlineFigure}>{month.projectedWorkingSets}</Text> vs {previousName}&apos;s{' '}
-        <Text allowFontScaling={false} style={todayText.inlineFigure}>{month.previous.total.workingSets}</Text> ·{' '}
-        {formatSessionCount(month.toDate.sessions)} vs {previousSameDay.sessions} ·{' '}
-        <Text allowFontScaling={false} style={month.toDate.prs > 0 ? todayText.record : todayText.inlineFigure}>{month.toDate.prs}</Text>
-        {month.toDate.prs === 1 ? ' PR' : ' PRs'} vs{' '}
-        <Text allowFontScaling={false} style={todayText.inlineFigure}>{previousSameDay.prs}</Text>
-      </Text>
     </View>
   );
 }

@@ -53,7 +53,7 @@ function WeekFigure({ label, current, previous, record = false, testID }: Figure
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
       <Text allowFontScaling={false} style={todayText.detailFigure} testID={`${testID}-previous`}>
-        of {previous} last wk
+        vs {previous} last wk
       </Text>
     </View>
   );

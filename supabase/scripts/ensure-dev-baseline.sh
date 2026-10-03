@@ -110,4 +110,9 @@ fi
   --email "${DEV_RICH_HISTORY_EMAIL}" \
   --password "${DEV_RICH_HISTORY_PASSWORD}")
 
+# After the rich history: the group's backdated memberships must exist before
+# the recent sessions are pushed, so the share trigger puts them in the group.
+echo "[dev-baseline] seeding the Dev crew group (history@ owner, b@ member) and recent sessions (idempotent)"
+(cd "${SCRIPT_DIR}/../../apps/mobile" && npm run seed:dev-groups)
+
 echo "[dev-baseline] dev baseline ready — dev data preserved, no reset performed"

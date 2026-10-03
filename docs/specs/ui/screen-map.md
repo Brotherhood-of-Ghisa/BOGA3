@@ -31,7 +31,7 @@ Brief entrypoint map of the current mobile screens.
   - Progress (`components/today/`, from `src/progress-summary`): this week's
     sessions, working sets and PRs, each with a bar against last week's whole
     total; the month's working sets against the previous month at the same
-    day, a cumulative line chart with a projection, and one summary line; the
+    day and a cumulative line chart with a projection; the
     latest completed session as one link row. Loading and a retryable error
     are `StatePanel`s; with no completed session, `Your week starts here` with
     `Open Train`. Read again on every focus, keeping the figures on screen
@@ -215,8 +215,6 @@ Brief entrypoint map of the current mobile screens.
     `Autosave paused until Start/End times are valid.` Gym, `+ Add exercise` and
     the cards work as for an active session, written back to the completed
     session; records compare against the completed sessions before it, never the session itself or later ones
-  - shared live exercise/muscle comparisons after the exercise cards, using
-    working sets and earlier completed history (loading/error is nonblocking)
   - summary card: Time (elapsed, ticking) / Gym / Sets (performed working sets) /
     Volume (the working sets' entered-load volume, warm-ups left out); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
@@ -235,8 +233,9 @@ Brief entrypoint map of the current mobile screens.
     (`components/session-recorder/exercise-picker.tsx`), and writes the new
     exercise (one empty set) or appended plan straight to the draft. Design
     target: `design-targets/exercise-catalogue.md`
-  - ⋮ opens the `Session` menu sheet with `Abandon session` (danger), which
-    confirms before its soft delete
+  - ⋮ opens the `Session` menu sheet: `Session vs history` (opens
+    `/session/<id>/compare`) and `Abandon session` (danger), which confirms
+    before its soft delete
   - `Finish` runs the shared cleanup prompts (unconfirmed sets, then one
     prompt for incomplete sets and empty exercises, as alerts) and completion
     write; invalid set values block it with an alert naming the
@@ -672,6 +671,17 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - entered from the session view's exercise cards, or by deep link (Maestro `teleport=exercise-page`); with no screen to go back to, back goes to `/train`
 
+21b. `/session/[sessionId]/compare` (Session vs history)
+- File: `apps/mobile/app/session/[sessionId]/compare.tsx`
+- Purpose: the open session's live exercise/muscle volume comparisons against
+  earlier completed history (working sets), off the session view so logging
+  stays uncluttered.
+- Key states: the shared `SessionInsightPresentation` (By exercise / By
+  muscle); loading and failed history reads are explicit in it; an in-route
+  loading, retryable error, or `This session is no longer active.` state.
+- Entry: the session view's ⋮ `Session vs history`. Exit: the native header's
+  Back.
+
 22. `/gyms` (Gyms screen)
 - File: `apps/mobile/app/gyms.tsx` (composition in `apps/mobile/components/gyms/`)
 - Purpose:
@@ -705,7 +715,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the root stack in the restore guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which shows a neutral loading view instead of the navigator while the session restore is in flight (boot only)
   - the root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under one `Stack.Protected` group per access level — `sign-in`, `sync-setup`, the app — and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one at a time, so login-on-start and the first-sync block are enforced by the navigator without unmounting it; see `navigation-contract.md` "Router baseline"
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page))
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page), and `session/[sessionId]/compare` with the native header `Session vs history`)
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only

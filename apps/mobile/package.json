@@ -36,7 +36,8 @@
     "import:boga-json:local": "tsx scripts/import/import-boga-json-local.ts",
     "import:boga-json:remote": "tsx scripts/import/import-boga-json-remote.ts",
     "import:boga-json:enrich-set-types": "tsx scripts/import/enrich-boga-import-set-types.ts",
-    "seed:dev-rich-history": "tsx scripts/import/seed-dev-rich-history.ts"
+    "seed:dev-rich-history": "tsx scripts/import/seed-dev-rich-history.ts",
+    "seed:dev-groups": "tsx scripts/import/seed-dev-groups.ts"
   },
   "dependencies": {
     "@expo-google-fonts/archivo": "^0.4.2",

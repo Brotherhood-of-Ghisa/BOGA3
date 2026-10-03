@@ -141,18 +141,18 @@ describe('Today: the Progress card over real data', () => {
 
     const sessions = figure('sessions');
     expect(sessions.value).toHaveTextContent('1');
-    expect(sessions.previous).toHaveTextContent('of 2 last wk');
+    expect(sessions.previous).toHaveTextContent('vs 2 last wk');
     expect(sessions.fill).toHaveStyle({ width: '50%' });
-    expect(text('today-progress-week-sessions')).toHaveProp('accessibilityLabel', 'Sessions 1, of 2 last week');
+    expect(text('today-progress-week-sessions')).toHaveProp('accessibilityLabel', 'Sessions 1, vs 2 last week');
 
     const workingSets = figure('working-sets');
     expect(workingSets.value).toHaveTextContent('6');
-    expect(workingSets.previous).toHaveTextContent('of 12 last wk');
+    expect(workingSets.previous).toHaveTextContent('vs 12 last wk');
 
     // Thu 15's bench beat Thu 8's: one PR, matching last week's one — a full bar.
     const prs = figure('prs');
     expect(prs.value).toHaveTextContent('1');
-    expect(prs.previous).toHaveTextContent('of 1 last wk');
+    expect(prs.previous).toHaveTextContent('vs 1 last wk');
     expect(prs.fill).toHaveStyle({ width: '100%' });
   });
 
@@ -166,8 +166,9 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
     expect(text('today-progress-month-difference')).toHaveTextContent('+12');
     expect(text('today-progress-month-pace')).toHaveTextContent("ahead of Sep's pace");
-    // 18 over 16 days, across 31: 34.9 → 35.
-    expect(text('today-progress-month-summary')).toHaveTextContent("On course for 35 vs Sep's 12 · 3 sessions vs 1 · 2 PRs vs 0");
+    // No summary line under the chart; its spoken label still carries the
+    // projection the chart draws (18 over 16 days, across 31: 34.9 → 35).
+    expect(screen.queryByTestId('today-progress-month-summary')).toBeNull();
     expect(text('today-progress-chart')).toHaveProp(
       'accessibilityLabel',
       'Cumulative sets: October 18 by the 16th against September 6 by the 16th; September finished at 12. On course for 35.',
@@ -228,10 +229,9 @@ describe('Today: the today-progress harness fixture', () => {
     await renderToday();
 
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('3');
-    expect(text('today-progress-week-sessions-previous')).toHaveTextContent('of 4 last wk');
+    expect(text('today-progress-week-sessions-previous')).toHaveTextContent('vs 4 last wk');
     expect(text('today-progress-week-prs-value')).toHaveTextContent('1');
     expect(text('today-progress-month-difference')).toHaveTextContent('+36');
-    expect(text('today-progress-month-summary')).toHaveTextContent("On course for 157 vs Sep's 90 · 9 sessions vs 5 · 2 PRs vs 1");
     expect(text('today-latest-session-start')).toHaveTextContent('10/16 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('9 sets · 3 exercises');
   });

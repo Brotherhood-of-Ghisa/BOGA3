@@ -78,7 +78,6 @@ export const monthChartAccessibilityLabel = (month: TodayProgressMonth): string 
   ].join(' ');
 };
 
-export const formatSessionCount = (count: number): string => plural(count, 'session', 'sessions');
 export const formatPrCount = (count: number): string => plural(count, 'PR', 'PRs');
 
 /** `12 sets · 4 exercises`: the working sets (`ux-rules.md` §5.11). */
@@ -103,7 +102,7 @@ export const latestSessionAccessibilityLabel = (latest: LatestSessionSummary): s
 };
 
 export const weekFigureAccessibilityLabel = (label: string, counts: { current: number; previous: number }): string =>
-  `${label} ${counts.current}, of ${counts.previous} last week`;
+  `${label} ${counts.current}, vs ${counts.previous} last week`;
 
 // --- The month chart's geometry -------------------------------------------
 

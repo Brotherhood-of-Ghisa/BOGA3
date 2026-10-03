@@ -3,11 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  SYSTEM_EXERCISE_DEFINITION_SEEDS,
-  SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS,
-  SYSTEM_MUSCLE_GROUP_SEEDS,
-} from '../../src/data/exercise-catalog-seeds';
-import {
   validateBogaSessionImportPackage,
   type BogaImportExerciseDecision,
   type BogaSessionImportPackage,
@@ -20,24 +15,16 @@ import {
   generatedSessionId,
   generatedSetId,
 } from './boga-import-ids';
-
-type WireValue = string | number | boolean | null;
-
-type WireEntity = {
-  type:
-    | 'user_settings'
-    | 'body_weight_measurements'
-    | 'gyms'
-    | 'exercise_definitions'
-    | 'muscle_groups'
-    | 'exercise_muscle_mappings'
-    | 'sessions'
-    | 'session_exercises'
-    | 'exercise_sets';
-  id: string;
-  client_updated_at_ms: number;
-  fields: Record<string, WireValue>;
-};
+import {
+  buildSystemCatalogEntities,
+  countByType,
+  pushEntities,
+  pushUnique,
+  required,
+  signIn,
+  sortByLayer,
+  type WireEntity,
+} from './dev-seed-sync';
 
 type CliFlags = {
   input?: string;
@@ -52,7 +39,6 @@ type CliFlags = {
 const DEFAULT_INPUT = resolve(__dirname, 'fixtures/dev-rich-history.boga-import.json');
 const DEFAULT_EMAIL = 'history@dev.local';
 const DEFAULT_PASSWORD = 'dev123';
-const BATCH_SIZE = 200;
 
 const parseCliFlags = (argv: string[]): CliFlags => {
   const flags: CliFlags = { dryRun: false, help: false };
@@ -112,28 +98,12 @@ Options:
 `);
 };
 
-const required = (value: string | undefined, label: string) => {
-  if (!value || value.trim() === '') {
-    throw new Error(`${label} is required`);
-  }
-  return value;
-};
-
 const epochMs = (value: string, label: string) => {
   const ms = new Date(value).getTime();
   if (!Number.isFinite(ms)) {
     throw new Error(`${label} must be a valid ISO timestamp`);
   }
   return ms;
-};
-
-const pushUnique = (entities: WireEntity[], seen: Set<string>, entity: WireEntity) => {
-  const key = `${entity.type}\0${entity.id}`;
-  if (seen.has(key)) {
-    return;
-  }
-  seen.add(key);
-  entities.push(entity);
 };
 
 const generatedExerciseIdForDecision = (pkg: BogaSessionImportPackage, decision: BogaImportExerciseDecision) =>
@@ -191,37 +161,8 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
     });
   }
 
-  for (const muscleGroup of SYSTEM_MUSCLE_GROUP_SEEDS) {
-    pushUnique(entities, seen, {
-      type: 'muscle_groups',
-      id: muscleGroup.id,
-      client_updated_at_ms: generatedAtMs,
-      fields: {
-        display_name: muscleGroup.displayName,
-        family_name: muscleGroup.familyName,
-        sort_order: muscleGroup.sortOrder,
-        is_editable: muscleGroup.isEditable,
-        created_at: generatedAtMs,
-        updated_at: generatedAtMs,
-        deleted_at: null,
-      },
-    });
-  }
-
-  for (const exercise of SYSTEM_EXERCISE_DEFINITION_SEEDS) {
-    pushUnique(entities, seen, {
-      type: 'exercise_definitions',
-      id: exercise.id,
-      client_updated_at_ms: generatedAtMs,
-      fields: {
-        name: exercise.name,
-        load_input_mode: exercise.loadInputMode,
-        bodyweight_contribution: exercise.bodyweightContribution,
-        created_at: generatedAtMs,
-        updated_at: generatedAtMs,
-        deleted_at: null,
-      },
-    });
+  for (const entity of buildSystemCatalogEntities(generatedAtMs)) {
+    pushUnique(entities, seen, entity);
   }
 
   for (const exercise of pkg.target.catalogSnapshot.exercises) {
@@ -233,23 +174,6 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
         name: exercise.name,
         load_input_mode: 'total_load',
         bodyweight_contribution: 0,
-        created_at: generatedAtMs,
-        updated_at: generatedAtMs,
-        deleted_at: null,
-      },
-    });
-  }
-
-  for (const mapping of SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS) {
-    pushUnique(entities, seen, {
-      type: 'exercise_muscle_mappings',
-      id: mapping.id,
-      client_updated_at_ms: generatedAtMs,
-      fields: {
-        exercise_definition_id: mapping.exerciseDefinitionId,
-        muscle_group_id: mapping.muscleGroupId,
-        weight: mapping.weight,
-        role: mapping.role,
         created_at: generatedAtMs,
         updated_at: generatedAtMs,
         deleted_at: null,
@@ -367,61 +291,6 @@ const buildWireEntities = (pkg: BogaSessionImportPackage): WireEntity[] => {
   return entities;
 };
 
-const signIn = async (apiUrl: string, anonKey: string, email: string, password: string) => {
-  const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: {
-      apikey: anonKey,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok || typeof body?.access_token !== 'string') {
-    throw new Error(`Sign-in failed for ${email}: HTTP ${response.status} ${JSON.stringify(body)}`);
-  }
-  return body.access_token as string;
-};
-
-const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: WireEntity[]) => {
-  const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
-    method: 'POST',
-    headers: {
-      apikey: anonKey,
-      authorization: `Bearer ${token}`,
-      'content-type': 'application/json',
-      accept: 'application/json',
-      'accept-profile': 'app_public',
-      'content-profile': 'app_public',
-      'x-boga-sync-protocol': '3',
-    },
-    body: JSON.stringify({ entities: batch }),
-  });
-  const body = await response.text();
-  if (!response.ok) {
-    throw new Error(`sync_push failed: HTTP ${response.status} ${body}`);
-  }
-};
-
-const layerRank = (type: WireEntity['type']) => {
-  switch (type) {
-    case 'user_settings':
-    case 'gyms':
-    case 'exercise_definitions':
-    case 'muscle_groups':
-      return 0;
-    case 'exercise_muscle_mappings':
-    case 'sessions':
-      return 1;
-    case 'session_exercises':
-      return 2;
-    case 'exercise_sets':
-      return 3;
-    case 'body_weight_measurements':
-      return 4;
-  }
-};
-
 export const runDevRichHistorySeedCli = async (argv: string[]) => {
   const flags = parseCliFlags(argv);
   if (flags.help) {
@@ -445,24 +314,16 @@ export const runDevRichHistorySeedCli = async (argv: string[]) => {
     throw new Error(`Rich-history package is invalid:\n${validation.errors.join('\n')}`);
   }
 
-  const entities = buildWireEntities(pkg).sort((left, right) => layerRank(left.type) - layerRank(right.type));
-  const countsByType = entities.reduce<Record<string, number>>((counts, entity) => {
-    counts[entity.type] = (counts[entity.type] ?? 0) + 1;
-    return counts;
-  }, {});
+  const entities = sortByLayer(buildWireEntities(pkg));
+  const countsByType = countByType(entities);
 
   if (flags.dryRun) {
     console.log(JSON.stringify({ dryRun: true, input: inputPath, email, entities: entities.length, countsByType }, null, 2));
     return 0;
   }
 
-  const token = await signIn(required(apiUrl, 'API_URL'), required(anonKey, 'ANON_KEY'), email, password);
-  let pushed = 0;
-  for (let index = 0; index < entities.length; index += BATCH_SIZE) {
-    const batch = entities.slice(index, index + BATCH_SIZE);
-    await pushBatch(required(apiUrl, 'API_URL'), required(anonKey, 'ANON_KEY'), token, batch);
-    pushed += batch.length;
-  }
+  const { token } = await signIn(required(apiUrl, 'API_URL'), required(anonKey, 'ANON_KEY'), email, password);
+  const pushed = await pushEntities(required(apiUrl, 'API_URL'), required(anonKey, 'ANON_KEY'), token, entities);
 
   console.log(JSON.stringify({ seeded: true, input: inputPath, email, pushed, countsByType }, null, 2));
   return 0;

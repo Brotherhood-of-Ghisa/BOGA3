@@ -126,8 +126,8 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
     // One figure, the working sets (the squat warm-up is no set), against the
     // adjacent previous 7 days of the same fixture.
-    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6');
-    expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*6\s*\+3/);
+    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6 vs prev 7 days');
+    expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*6\s*\+3 vs prev 7 days/);
     expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toBeTruthy();
     // A row's own figures, from the same week.
     expect(screen.getByTestId(`stats-exercise-name-${SQUAT}`)).toHaveTextContent('Barbell Back Squat');
@@ -144,13 +144,13 @@ describe('Stats over real data', () => {
 
     fireEvent.press(screen.getByTestId('stats-period-chip-30'));
     await waitFor(() =>
-      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets14+14')
+      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets14+14 vs prev 30 days')
     );
     expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*11/);
 
     fireEvent.press(screen.getByTestId('stats-period-chip-7'));
     await waitFor(() =>
-      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6')
+      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6 vs prev 7 days')
     );
   });
 
@@ -160,7 +160,7 @@ describe('Stats over real data', () => {
     await renderStats();
 
     await waitFor(() =>
-      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets14+14')
+      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets14+14 vs prev 30 days')
     );
     expect(screen.getByTestId('stats-period-chip-30')).toHaveProp('accessibilityState', { selected: true });
     expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveProp('accessibilityState', { selected: true });
