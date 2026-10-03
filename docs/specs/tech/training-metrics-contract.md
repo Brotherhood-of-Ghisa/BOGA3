@@ -248,6 +248,11 @@ after a preference, contribution or reading edit.
   then halves it.
 - The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
 
+**Sets by muscle** (a session's summary) applies the same role factor to
+working sets: a muscle's sets are its primary sets plus half its secondary
+sets. A set counts once per muscle, at its strongest role; a stabilizer adds
+nothing (`summarizeCurrentSessionMuscleLoad`).
+
 No derived figure is written back to a set or session.
 
 **Display** (`format.ts`). Every figure has one format on every screen, the

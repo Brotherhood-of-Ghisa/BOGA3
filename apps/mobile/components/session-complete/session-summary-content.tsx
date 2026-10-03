@@ -4,7 +4,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SessionInsightPresentation, type SessionComparisonMode } from '@/components/session-recorder/session-insight-presentation';
 import { ActionButton } from '@/components/ui/action-button';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { CurrentSessionMuscleSummary, ExerciseVolumeComparison } from '@/src/session-insights';
+import type {
+  CurrentSessionMuscleSummary, ExerciseVolumeComparison, SessionMuscleWorkingSetEntry,
+} from '@/src/session-insights';
 import { PersonalRecordCard } from './personal-record-card';
 import { SessionShareSheet, type SessionShareSnapshot } from './session-share-sheet';
 
@@ -12,6 +14,21 @@ export type MuscleCatalogState = 'loading' | 'ready' | 'error';
 
 const formatCount = (count: number, singular: string): string =>
   `${count} ${count === 1 ? singular : `${singular}s`}`;
+
+const MUSCLE_TABLE_COLUMNS = ['Pri', 'Sec', 'Sets'] as const;
+
+const muscleRowLabel = (muscle: SessionMuscleWorkingSetEntry): string =>
+  `${muscle.displayName}, ${formatCount(muscle.weightedSetCount, 'set')}: ` +
+  `${muscle.primarySetCount} primary, ${muscle.secondarySetCount} secondary`;
+
+// A role with no sets is an absent value: a dash in `ink-ghost`.
+function RoleCount({ count }: { count: number }) {
+  return (
+    <Text allowFontScaling={false} style={[styles.count, styles.countCell, count === 0 && styles.absent]}>
+      {count === 0 ? '—' : String(count)}
+    </Text>
+  );
+}
 
 export function SessionMuscleBreakdown({
   workingSetCount, muscleSummary, muscleCatalogState, standalone = false,
@@ -28,16 +45,26 @@ export function SessionMuscleBreakdown({
         <View style={[styles.muscles, standalone && styles.standaloneMuscles]} testID="session-completion-muscle-breakdown">
           <Text allowFontScaling={false} style={styles.microLabel}>Sets by muscle</Text>
           {workingSetsByMuscle.length > 0 ? (
-            <View style={styles.pills}>
+            <View testID="session-completion-muscle-table">
+              <View style={styles.tableRow}>
+                <Text allowFontScaling={false} style={[styles.microLabel, styles.nameCell]}>Muscle</Text>
+                {MUSCLE_TABLE_COLUMNS.map((column) => (
+                  <Text allowFontScaling={false} key={column} style={[styles.microLabel, styles.countCell]}>{column}</Text>
+                ))}
+              </View>
               {workingSetsByMuscle.map((muscle) => (
                 <View
-                  accessibilityLabel={`${muscle.displayName}, ${formatCount(muscle.workingSetCount, 'set')}`}
+                  accessibilityLabel={muscleRowLabel(muscle)}
                   accessible
                   key={muscle.id}
-                  style={styles.pill}
+                  style={[styles.tableRow, styles.bodyRow]}
                   testID={`session-completion-muscle-${muscle.id}`}>
-                  <Text allowFontScaling={false} style={styles.pillName}>{muscle.displayName}</Text>
-                  <Text allowFontScaling={false} style={styles.pillCount}>{muscle.workingSetCount}</Text>
+                  <Text allowFontScaling={false} style={[styles.muscleName, styles.nameCell]}>{muscle.displayName}</Text>
+                  <RoleCount count={muscle.primarySetCount} />
+                  <RoleCount count={muscle.secondarySetCount} />
+                  <Text allowFontScaling={false} style={[styles.count, styles.countCell, styles.total]}>
+                    {String(muscle.weightedSetCount)}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -50,6 +77,9 @@ export function SessionMuscleBreakdown({
                   : 'No mapped working sets for this session.'}
             </Text>
           )}
+          {workingSetsByMuscle.length > 0 ? (
+            <Text allowFontScaling={false} style={styles.footnote}>Sets = primary + ½ secondary</Text>
+          ) : null}
         </View>
       ) : null}
     </>
@@ -158,35 +188,50 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     paddingTop: uiSpace.md,
   },
-  pills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: uiSpace.sm,
-  },
-  pill: {
+  tableRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.sm,
-    paddingVertical: uiSpace.xs,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.paper,
   },
-  pillName: {
+  bodyRow: {
+    paddingVertical: uiSpace.xs,
+    borderTopWidth: uiBorder.width,
+    borderTopColor: uiRoles.ruleSoft,
+  },
+  nameCell: {
+    flex: 1,
+  },
+  countCell: {
+    width: uiGeometry.metricValueWidth,
+    textAlign: 'right',
+  },
+  muscleName: {
     fontFamily: uiFonts.display.family,
     fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
+    fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.ink,
+  },
+  count: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.inkMuted,
   },
-  pillCount: {
-    fontFamily: uiFonts.figure.family,
+  total: {
     fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
+  },
+  absent: {
+    color: uiRoles.inkGhost,
+  },
+  footnote: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.xs,
+    lineHeight: uiTypography.lineHeight.xs,
+    color: uiRoles.inkFaint,
   },
   muted: {
     fontFamily: uiFonts.body.family,

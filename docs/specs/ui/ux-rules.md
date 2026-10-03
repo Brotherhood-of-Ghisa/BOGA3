@@ -354,8 +354,10 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    a record set, contract §3), one `Exercise volume` card
    per performed exercise, and `Share session` (an outline). The summary card
    shows `Duration`, `Exercises`, `Sets` (working sets, §5.11) and `Gym` as
-   stacked figures, then `Sets by muscle`: non-interactive per-muscle pills
-   (name and the number of physical working sets mapped to that muscle). It never links to muscle
+   stacked figures, then `Sets by muscle`: a non-interactive table, one row per muscle — `Muscle`,
+   `Pri` and `Sec` (physical working sets mapping to it as primary /
+   secondary; none is `—` in `ink-ghost`) and `Sets`, primary + ½ secondary,
+   the sort key — with the footnote `Sets = primary + ½ secondary`. It never links to muscle
    analytics. Personal-record/comparison history is optional enrichment: its
    loading or failure never blocks stored context or exits, and current
    exercise rows still render with an explicit no-history state.

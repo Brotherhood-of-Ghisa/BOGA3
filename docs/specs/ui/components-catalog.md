@@ -289,12 +289,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `SessionCompletionScreen` — the post-submit composition on `paper`:
     `SessionTopBar mode="complete"` (`Session complete` · Done), a
     `SessionFactsCard` (Duration / Exercises / Sets / Working, then Gym) with
-    the working-sets-by-muscle pills under a `rule-soft` divider, every
+    the sets-by-muscle table (primary / secondary / weighted sets) under a `rule-soft` divider, every
     `PersonalRecordCard`, shared exercise/muscle comparisons and the
-    `Share session` outline `ActionButton`. Muscle pills are informational,
+    `Share session` outline `ActionButton`. The muscle table is informational,
     never analytics links; all PRs stay visible together
   - `SessionMuscleBreakdown` / `SessionSummaryContent` (`session-summary-content.tsx`)
-    share muscle pills, records, comparisons and Share between completion and
+    share the muscle table, records, comparisons and Share between completion and
     historical review. Hosts own their facts/top bar; completion keeps its
     post-Finish composition and share-image content.
   - `SessionInsightPresentation` (`components/session-recorder/`) — shared by
@@ -501,7 +501,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `SessionFactsCard` — `Card` with an optional header slot, a finished
     session's `Start` / `End` read-only (the completed edit's field layout),
     one or more rows of stacked `Stat`s (a `text` fact takes the spare width)
-    and an optional footer (the completion's muscle pills)
+    and an optional footer (the completion's sets-by-muscle table)
   - covered by `completed-session-detail-screen.test.tsx`,
     `session-view-screen.test.tsx`, `completed-session-detail-model.test.ts`
     and `exercise-history-screen.test.tsx`
