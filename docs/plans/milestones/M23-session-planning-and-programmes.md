@@ -4,7 +4,7 @@
 
 - Milestone ID: `M23`
 - Title: Milestone: Session Planning and Programmes
-- Status: `planned`
+- Status: `in_progress`
 
 ## Parent references
 
@@ -632,7 +632,7 @@ Each card is intended to be one reviewable PR.
 
 1. `docs/plans/tasks/M23-T01-Session_planning_product_and_data_contract.md` — lock
    exact product, schema, lifecycle, validation, API, and error contracts
-   (`planned`).
+   (`completed`).
 2. `docs/plans/tasks/M23-T02-Synced_session_plan_schema_and_server_contract.md` —
    add the four synced entities, performed session/block/set provenance, and
    full Sync v2 expansion (`planned`).

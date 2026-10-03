@@ -18,6 +18,10 @@ Current docs:
   - the `SECURITY DEFINER` RPC wire contract and error tokens;
   - stream-card metrics and the SQL/TS parity vectors;
   - the mobile `src/groups` client, local cache, and routes.
+- `session-planning-contract.md`: authoritative technical contract for session
+  planning and programmes (M23): data model, schema, 16-entity Sync v2 expansion,
+  materialization algorithms, block lifecycle, set reordering invariants, agent
+  write permissions/API, and MCP tools.
 
 Maintenance rule:
 
