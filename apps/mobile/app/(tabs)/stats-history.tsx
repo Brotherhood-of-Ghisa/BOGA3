@@ -148,6 +148,9 @@ export const formatCountDelta = (current: number, previous: number): DeltaDispla
   };
 };
 
+/** What the summary cards' deltas compare against: the adjacent earlier period. */
+export const formatPeriodComparison = (periodDays: StatsPeriodDays): string => `vs prev ${periodDays} days`;
+
 export const formatVolumeDelta = (current: number | null, previous: number | null): DeltaDisplay => {
   if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) return { text: 'Incomplete', tone: 'neutral' };
   if (current === 0 && previous === 0) {
@@ -496,7 +499,7 @@ export function StatsScreenShell({
               <View style={styles.summaryCardBody}>
                 <View style={styles.summaryFigures}>
                   <Stat label="Sessions" value={formatNumber(summary.current.totals.sessionCount)} />
-                  {sessionDelta ? <Delta delta={sessionDelta} /> : null}
+                  {sessionDelta ? <Delta comparison={formatPeriodComparison(periodDays)} delta={sessionDelta} /> : null}
                 </View>
                 <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
               </View>
@@ -509,7 +512,7 @@ export function StatsScreenShell({
                     label="Sets"
                     value={formatNumber(summary.current.totals.workingSetCount)}
                   />
-                  {setsDelta ? <Delta delta={setsDelta} /> : null}
+                  {setsDelta ? <Delta comparison={formatPeriodComparison(periodDays)} delta={setsDelta} /> : null}
                 </View>
               </View>
             </Card>
@@ -636,7 +639,16 @@ const selectFailureShade = (progress: number): string | null => {
   return FAILURE_SHADES[index];
 };
 
-function Delta({ delta, onViz = false }: { delta: DeltaDisplay; onViz?: boolean }) {
+function Delta({
+  delta,
+  onViz = false,
+  comparison,
+}: {
+  delta: DeltaDisplay;
+  onViz?: boolean;
+  /** Names what the delta is against (`vs prev 7 days`), after the figure. */
+  comparison?: string;
+}) {
   // The sign carries the direction (G3); "new" is the one delta set in `ink`.
   // On a `viz` ground every text is `ink`.
   return (
@@ -644,7 +656,7 @@ function Delta({ delta, onViz = false }: { delta: DeltaDisplay; onViz?: boolean 
       allowFontScaling={false}
       numberOfLines={1}
       style={[styles.delta, (delta.tone === 'new' || onViz) && styles.deltaInk]}>
-      {delta.text}
+      {comparison ? `${delta.text} ${comparison}` : delta.text}
     </Text>
   );
 }

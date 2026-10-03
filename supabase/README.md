@@ -164,7 +164,9 @@ reset/wipe `user_a`/`user_b`:
 These dev accounts are plain auth users (no `--fixture-key`, not in
 `public.dev_fixture_principals`); credentials live in
 `supabase/scripts/dev-account-constants.sh`. `history@dev.local` is the rich
-GymBook-history account seeded by `boga db dev`. See `RUNBOOK.md` → "Log into a
+GymBook-history account seeded by `boga db dev`, which also seeds the `Dev crew`
+group (owner `history@dev.local`, member `b@dev.local`) with four weeks of
+recent sessions for both (`apps/mobile/scripts/import/seed-dev-groups.ts`). See `RUNBOOK.md` → "Log into a
 development database" for the full account inventory and sign-in flow.
 
 Provision or update one user (local, or any environment where `API_URL` + `SERVICE_ROLE_KEY` or `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are exported):

@@ -107,6 +107,7 @@ export function RootStack() {
           name="session/[sessionId]/exercise/[sessionExerciseId]"
           options={{ headerShown: false, title: 'Exercise' }}
         />
+        <Stack.Screen name="session/[sessionId]/compare" options={{ title: 'Session vs history' }} />
       </Stack.Protected>
       {/* Dev/test only (self-gated). Reachable while first sync is pending too: it is
           what lifts the block in tests. Not while signed out. */}

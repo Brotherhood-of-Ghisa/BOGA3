@@ -20,6 +20,7 @@ import {
   type ExerciseListItem,
   describeExerciseSortMode,
   formatCountDelta,
+  formatPeriodComparison,
   formatVolumeDelta,
   nextExerciseSortMode,
   sortExerciseListItems,
@@ -252,6 +253,13 @@ describe('Progress route parity', () => {
   });
 });
 
+describe('formatPeriodComparison', () => {
+  it('names the adjacent earlier period of the selected range', () => {
+    expect(formatPeriodComparison(7)).toBe('vs prev 7 days');
+    expect(formatPeriodComparison(30)).toBe('vs prev 30 days');
+  });
+});
+
 describe('formatCountDelta', () => {
   it('renders an absolute neutral delta when both periods are equal', () => {
     expect(formatCountDelta(0, 0)).toEqual({ text: '±0', tone: 'neutral' });
@@ -398,7 +406,7 @@ describe('StatsScreenShell', () => {
 
     const setsCard = screen.getByTestId('stats-card-sets');
     // One figure: the working sets, with a single absolute delta.
-    expect(setsCard).toHaveTextContent(/^Sets38\+8$/);
+    expect(setsCard).toHaveTextContent(/^Sets38\+8 vs prev 7 days$/);
     expect(setsCard).not.toHaveTextContent('%');
   });
 
@@ -908,7 +916,7 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     const sessions = within(screen.getByTestId('stats-card-sessions'));
     const sets = within(screen.getByTestId('stats-card-sets'));
-    for (const node of [sessions.getByText('+1'), sets.getByText('+8')]) {
+    for (const node of [sessions.getByText('+1 vs prev 7 days'), sets.getByText('+8 vs prev 7 days')]) {
       expect(StyleSheet.flatten(node.props.style).color).toBe(uiRoles.inkMuted);
     }
     // The Sessions card is a link to the list, marked by a chevron.

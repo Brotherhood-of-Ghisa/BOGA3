@@ -7,11 +7,11 @@ type SessionOptionsSheetProps = {
   visible: boolean;
   onDismiss: () => void;
   onAbandon: () => void;
+  onCompare: () => void;
 };
 
-// The session ⋮: a menu even while Abandon session is its only item, like the
-// exercise ⋮ (`ux-rules` §14b.3).
-export function SessionOptionsSheet({ visible, onDismiss, onAbandon }: SessionOptionsSheetProps) {
+// The session ⋮ (`ux-rules` §14b.3): Session vs history, then Abandon session.
+export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare }: SessionOptionsSheetProps) {
   return (
     <Sheet
       dismissLabel="Dismiss session options"
@@ -20,6 +20,14 @@ export function SessionOptionsSheet({ visible, onDismiss, onAbandon }: SessionOp
       title="Session"
       visible={visible}>
       <ListRow
+        label="Session vs history"
+        leading={<Icon color={uiRoles.inkMuted} name="list" size="md" />}
+        onPress={onCompare}
+        testID="session-view-compare"
+        trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+      />
+      <ListRow
+        divider
         label="Abandon session"
         leading={<Icon color={uiRoles.danger} name="trash" size="md" />}
         onPress={onAbandon}

@@ -30,7 +30,8 @@ runtime gallery of every state below on 2026-10-03.
   `Sets` (working sets, `ux-rules.md` §5.11) and `PRs` (the `record` figure
   with its up arrow). Under each figure a thin bar on the `viz` ramp shows this
   week as a share of **last week's total** (full, in the darker step, once it
-  is passed) and a caption `of <n> last wk`. No signed deltas: a part week
+  is passed) and a caption `vs <n> last wk` (was `of <n> last wk`; changed
+  on operator review of the phone build, 2026-10-03). No signed deltas: a part week
   against a whole one says little.
 - **Progress card, middle: the month.** `<Month> so far` with the month's
   working sets in Plex Mono 700, and on the right the signed absolute
@@ -40,8 +41,8 @@ runtime gallery of every state below on 2026-10-03.
   today with a `viz0` fill under it, the previous month dashed `ink-faint`
   across its whole length, a `ink-ghost` dotted projection from today to month
   end, a dot for today on each line, and `1` / today / last-day axis labels.
-  Under it one `ink-muted` line: `On course for <projection> vs <prev>'s
-  <total> · <n> sessions vs <n> · <n> PRs vs <n>`.
+  No line under it: the `On course for …` summary line was removed on
+  operator review of the phone build (2026-10-03).
 - **Progress card, bottom: latest session.** A `Latest session` micro-label
   with `All sessions` (caps text button → the Sessions list), then the most
   recent completed session as one link row: the session summary line (stamp ·
@@ -89,7 +90,7 @@ Where the build departs from the canvas or settles what the brief left open:
   above zero; `0` is plain `ink`.
 - **The chart.** The longer of the two months spans the width. The chart is
   one image for VoiceOver, labelled with its summary sentence (not shown on
-  screen); the visible summary line under it stays.
+  screen).
 - **The group selection is the Groups screen's.** With several groups the
   card shows the group last viewed on either screen (else the first), and a
   chip pick moves both; `View groups` and the board open the Groups screen on

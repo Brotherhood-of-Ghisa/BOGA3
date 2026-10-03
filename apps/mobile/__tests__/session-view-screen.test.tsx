@@ -74,6 +74,7 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
   useGroupLinkingUserId: () => null,
 }));
 
+import { SessionCompareScreen } from '../app/session/[sessionId]/compare';
 import { SessionViewScreen } from '../app/session/[sessionId]/index';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
@@ -209,25 +210,14 @@ describe('Session view', () => {
     expect(screen.getAllByText('1RM').length).toBeGreaterThan(0);
   });
 
-  it('compares the session with its exercise and muscle history', async () => {
+  it('leaves the history comparison off the view and opens it from the ⋮ sheet', async () => {
     await openSession();
 
-    await screen.findByText(/above median/);
-    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets\. .*Historical median/)).toBeTruthy();
-    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByLabelText(/Chest, \d+ sets?\. .*Historical median/)).toBeTruthy();
-  });
+    expect(screen.queryByTestId('session-insight-presentation')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-view-options-button'));
+    fireEvent.press(screen.getByTestId('session-view-compare'));
 
-  it('keeps logging usable when the comparison-history read fails (a failed read)', async () => {
-    jest
-      .spyOn(insightsRepository, 'loadSessionInsightHistory')
-      .mockRejectedValueOnce(new Error('History read failed'));
-    await openSession();
-
-    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
-    fireEvent.press(screen.getByLabelText(FLY_LABEL));
-    expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${FLY}`);
-    expect(screen.queryByText('No comparison history yet')).toBeNull();
+    expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION}/compare`);
   });
 
   it('shows no record, and keeps the cards, when the earlier-bests read fails', async () => {
@@ -986,5 +976,34 @@ describe('Session view: editing a completed session', () => {
     await openCompleted(undefined, () => setSessionDeletedState(DONE, true));
 
     expect(await screen.findByTestId('session-view-missing')).toBeTruthy();
+  });
+});
+
+describe('Session vs history', () => {
+  it('compares the open session with its exercise and muscle history', async () => {
+    await seed();
+    render(<SessionCompareScreen sessionId={SESSION} />);
+
+    await screen.findByText(/above median/);
+    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets\. .*Historical median/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(screen.getByLabelText(/Chest, \d+ sets?\. .*Historical median/)).toBeTruthy();
+  });
+
+  it('says the comparisons are unavailable when the history read fails', async () => {
+    jest
+      .spyOn(insightsRepository, 'loadSessionInsightHistory')
+      .mockRejectedValueOnce(new Error('History read failed'));
+    await seed();
+    render(<SessionCompareScreen sessionId={SESSION} />);
+
+    await screen.findByText('Comparisons unavailable. Return to this session to retry.');
+    expect(screen.queryByText('No comparison history yet')).toBeNull();
+  });
+
+  it('says the session is gone when it no longer exists', async () => {
+    render(<SessionCompareScreen sessionId="missing-session" />);
+
+    expect(await screen.findByText('This session is no longer active.')).toBeTruthy();
   });
 });

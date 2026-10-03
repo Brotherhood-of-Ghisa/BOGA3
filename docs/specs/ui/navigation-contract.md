@@ -375,6 +375,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - no query params; the records panel, the open set and every sheet are in-route state
   - registered with `headerShown: false`: the page draws its own top bar
 
+20b. `/session/[sessionId]/compare`
+- File: `apps/mobile/app/session/[sessionId]/compare.tsx`
+- Path params:
+  - `sessionId` (required; the session the view has open). A missing or deleted session renders an in-route message
+- Behavior:
+  - no query params; the By exercise / By muscle grouping is in-route state
+  - root-stack screen with the native header `Session vs history`; native Back returns to the session view
+  - built by `sessionCompareHref` (`apps/mobile/src/navigation/active-session-entry.ts`)
+
 21. `/gyms`
 - File: `apps/mobile/app/gyms.tsx`
 - Query params:
@@ -522,6 +531,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - the Progress card (`router.push`): `View progress`, `All sessions`, the
      latest-session row, and the empty panel's `Open Train`. A session deleted
      since the read is gone on return: Today reads again on focus
+56. `/session/<sessionId>` -> `/session/<sessionId>/compare`
+   - the ⋮ sheet's `Session vs history` (the sheet closes, then `router.push`); native Back returns and the session view reloads on focus
 
 Note:
 

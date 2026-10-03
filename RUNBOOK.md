@@ -451,9 +451,9 @@ Auth on whichever stack it targets.
 
 | Account | Email | Password | Use it for | Touched by tests? |
 | --- | --- | --- | --- | --- |
-| **Dev A** | `a@dev.local` | `dev123` | **Manual development** — sign in and click around | No |
-| **Dev B** | `b@dev.local` | `dev123` | Second human account (cross-user / sharing / sync) | No |
-| **Rich History** | `history@dev.local` | `dev123` | Manual/dev testing with imported GymBook history | No |
+| **Dev A** | `a@dev.local` | `dev123` | **Manual development** — a near-blank account: sign in and click around | No |
+| **Dev B** | `b@dev.local` | `dev123` | Second human account (cross-user / sharing / sync); member of `Dev crew` with four weeks of recent sessions | No |
+| **Rich History** | `history@dev.local` | `dev123` | Manual/dev testing with imported GymBook history, four weeks of recent sessions, and the `Dev crew` group it owns | No |
 | Fixture `user_a` | `user_a.local@example.test` | `ScaffoldingUserA!234` | Integration-test fixture (primary owner) | **Yes — reset / mutated / wiped every run** |
 | Fixture `user_b` | `user_b.local@example.test` | `ScaffoldingUserB!234` | Integration-test fixture (cross-user denial) | **Yes** |
 | `service_role_helper` | — (no login) | — | Service-role setup fixture | Yes |
@@ -483,8 +483,12 @@ if present).
 gates use — so **running `boga test *` never wipes your dev data or session.**
 They run the **dev DB baseline** on every start: reuse the dev stack **without
 resetting it** (your logged data survives), apply any pending migrations in
-place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, and push the
-rich imported history into the `history@dev.local` account. The full isolation
+place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, push the
+rich imported history into the `history@dev.local` account, and seed the
+`Dev crew` group (`npm run seed:dev-groups`): owned by `history@dev.local`, with
+`b@dev.local` as a member, both memberships backdated, and the last four weeks of
+sessions for both pushed so the group's stream and week board have content.
+`a@dev.local` stays near-blank. The full isolation
 contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
 stack). Commands:
 
