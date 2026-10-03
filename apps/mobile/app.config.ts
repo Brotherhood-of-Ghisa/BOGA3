@@ -111,6 +111,9 @@ export default ({ config }: { config: ExpoConfig }) => ({
     },
 
     plugins: [
+        // SDK 57 keeps the legacy lifecycle by default. iOS 27 requires scenes
+        // for binaries built with Xcode 27; Expo owns the delegate and manifest.
+        ["expo-build-properties", { ios: { enableSceneSupport: true } }],
         "expo-dev-client",
         "expo-router",
         [

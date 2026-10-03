@@ -118,6 +118,13 @@ cd apps/mobile
 ./scripts/maestro-ios-dev-client-build.sh --force
 ```
 
+If Boga quits immediately on iOS 27 and the crash report names
+`UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`, rebuild the
+development client from the current checkout and reinstall it. SDK 57 builds
+must enable `ios.enableSceneSupport` in `expo-build-properties` (configured in
+`apps/mobile/app.config.ts`); the old shared binary has no scene manifest and
+iOS stops it before JavaScript starts. Reloading Metro cannot repair that binary.
+
 For GPS/location flows on iOS Simulator, choose a simulated location before testing:
 Simulator -> Features -> Location -> any option other than None.
 
