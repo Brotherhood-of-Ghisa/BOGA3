@@ -21,7 +21,7 @@ export type SessionShareSnapshot = {
   completedAt: string;
   durationDisplay: string;
   exerciseCount: number;
-  performedSetCount: number;
+  // Working sets (`ux-rules.md` §5.11): the image's one set count.
   workingSetCount: number;
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
@@ -69,12 +69,12 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
       <Text allowFontScaling={false} style={styles.shareTitle}>Workout complete</Text>
       <Text allowFontScaling={false} style={styles.totals}>
         {`${snapshot.durationDisplay} · ${formatCount(snapshot.exerciseCount, 'exercise')} · ${formatCount(
-          snapshot.performedSetCount,
+          snapshot.workingSetCount,
           'set'
         )}`}
       </Text>
       <Text allowFontScaling={false} style={styles.meta}>
-        {`${formatCount(snapshot.workingSetCount, 'working set')} · ${formatSessionDate(snapshot.completedAt)}`}
+        {formatSessionDate(snapshot.completedAt)}
       </Text>
 
       {snapshot.personalRecords.length > 0 ? (

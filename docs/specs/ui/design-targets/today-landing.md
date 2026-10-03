@@ -27,7 +27,7 @@ runtime gallery of every state below on 2026-10-03.
   `View groups` (the Groups tab). Each section is one `Card`.
 - **Progress card, top: this week** (Mon–Sun, local). A `This week` micro-label
   with the date range in `ink-faint`, then three stacked figures: `Sessions`,
-  `W/sets` (working sets, `ux-rules.md` §5.11) and `PRs` (the `record` figure
+  `Sets` (working sets, `ux-rules.md` §5.11) and `PRs` (the `record` figure
   with its up arrow). Under each figure a thin bar on the `viz` ramp shows this
   week as a share of **last week's total** (full, in the darker step, once it
   is passed) and a caption `of <n> last wk`. No signed deltas: a part week
@@ -45,7 +45,7 @@ runtime gallery of every state below on 2026-10-03.
 - **Progress card, bottom: latest session.** A `Latest session` micro-label
   with `All sessions` (caps text button → the Sessions list), then the most
   recent completed session as one link row: the session summary line (stamp ·
-  duration @ gym), `<n> W/sets · <n> exercises`, the leading exercise names
+  duration @ gym), `<n> sets · <n> exercises`, the leading exercise names
   (one line, ellipsised), its PR count in `record` and a `Tag` per group it was
   shared to. Opens the completed session. No in-progress state: an active
   workout is reached from Train.
@@ -53,14 +53,14 @@ runtime gallery of every state below on 2026-10-03.
   user belongs to more than one group; with one group the board's micro-label
   names it (`<group> · this week`). The board is the top three members by
   working sets this week: rank, member (`You` in Source Sans 600 on `paper`),
-  a `viz` bar (the leader one step darker), `W/S` and `PRs` columns. The
+  a `viz` bar (the leader one step darker), `Sets` and `PRs` columns. The
   card's `PRs` are **group records** (the member took #1 on a group board),
   not personal PRs, so they need not match the Progress card's. When the
   user is outside the top three, a `You · <rank>` line with their figures
   closes the board.
 - **Group card, bottom: latest activity.** A `Latest activity` micro-label,
   then one link row: one member training now (the `set-current` ring and
-  `Training now`, start · gym, `<n> W/sets · <n> exercises`; opens the group
+  `Training now`, start · gym, `<n> sets · <n> exercises`; opens the group
   session); else the most recent completed session (`Completed · <duration>`,
   its group record as a `record` line; opens the group session). When several
   members are training now, the row is `<n> training now`, their names and

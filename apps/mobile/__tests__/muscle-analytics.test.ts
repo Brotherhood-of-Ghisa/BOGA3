@@ -302,14 +302,14 @@ describe('aggregateSelectedMuscleDailyEffort', () => {
     ]);
   });
 
-  it('reads working sets only: a warm-up adds a set but no volume, session or contribution to a day', () => {
+  it('reads working sets only: a warm-up adds no set, volume, session or contribution to a day', () => {
     const entries = aggregateSelectedMuscleDailyEffort(buildAnalyticsInput(), {
       muscleGroupIds: ['chest_sternal'],
       timeZone: 'Europe/London',
     });
 
     const sunday = entries.find((entry) => entry.dateKey === '2026-03-29');
-    expect(sunday).toMatchObject({ sessionCount: 1, setCount: 2, totalWeight: 500 });
+    expect(sunday).toMatchObject({ sessionCount: 1, setCount: 1, totalWeight: 500 });
     expect(sunday?.contributions.map((contribution) => contribution.setId)).toEqual(['set-sunday-work']);
   });
 

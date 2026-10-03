@@ -163,14 +163,14 @@ describe('Today: the Progress card over real data', () => {
 
     // October: 3 sessions, 18 working sets, 2 PRs. September to the 16th: 1, 6, 0; all of it: 2, 12, 1.
     expect(screen.getByText('October so far')).toBeTruthy();
-    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 W/sets');
+    expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
     expect(text('today-progress-month-difference')).toHaveTextContent('+12');
     expect(text('today-progress-month-pace')).toHaveTextContent("ahead of Sep's pace");
     // 18 over 16 days, across 31: 34.9 → 35.
     expect(text('today-progress-month-summary')).toHaveTextContent("On course for 35 vs Sep's 12 · 3 sessions vs 1 · 2 PRs vs 0");
     expect(text('today-progress-chart')).toHaveProp(
       'accessibilityLabel',
-      'Cumulative working sets: October 18 by the 16th against September 6 by the 16th; September finished at 12. On course for 35.',
+      'Cumulative sets: October 18 by the 16th against September 6 by the 16th; September finished at 12. On course for 35.',
     );
     expect(text('today-progress-chart')).toHaveProp('accessibilityRole', 'image');
   });
@@ -183,10 +183,10 @@ describe('Today: the Progress card over real data', () => {
     const row = text('today-latest-session');
     expect(row).toHaveProp(
       'accessibilityLabel',
-      'Completed session on 10/15 07:12, 1h, 6 working sets, 2 exercises, at Iron House, 1 PR',
+      'Completed session on 10/15 07:12, 1h, 6 sets, 2 exercises, at Iron House, 1 PR',
     );
     expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12');
-    expect(text('today-latest-session-figures')).toHaveTextContent('6 W/sets · 2 exercises');
+    expect(text('today-latest-session-figures')).toHaveTextContent('6 sets · 2 exercises');
     expect(text('today-latest-session-exercises')).toHaveTextContent('Barbell Bench Press, Barbell Back Squat');
     expect(text('today-latest-session-prs')).toHaveTextContent('1 PR');
 
@@ -233,7 +233,7 @@ describe('Today: the today-progress harness fixture', () => {
     expect(text('today-progress-month-difference')).toHaveTextContent('+36');
     expect(text('today-progress-month-summary')).toHaveTextContent("On course for 157 vs Sep's 90 · 9 sessions vs 5 · 2 PRs vs 1");
     expect(text('today-latest-session-start')).toHaveTextContent('10/16 07:00');
-    expect(text('today-latest-session-figures')).toHaveTextContent('9 W/sets · 3 exercises');
+    expect(text('today-latest-session-figures')).toHaveTextContent('9 sets · 3 exercises');
   });
 });
 

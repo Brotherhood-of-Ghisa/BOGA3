@@ -18,8 +18,8 @@ export const formatVolumeFigure = (value: number): string => String(Math.abs(val
 // The spoken form keeps the unit: a screen reader has no legend to lean on.
 const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable or incomplete' : `${formatVolumeFigure(value)} kg reps`;
 
-export const formatExerciseSetCounts = (setCount: number, workingSetCount: number): string =>
-  `${setCount} ${setCount === 1 ? 'set' : 'sets'} · ${workingSetCount} working`;
+export const formatExerciseSetCount = (workingSetCount: number): string =>
+  `${workingSetCount} ${workingSetCount === 1 ? 'set' : 'sets'}`;
 
 export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeComparison): string => {
   if (comparison.currentVolume === null) return 'Incomplete · comparison unavailable';
@@ -38,10 +38,7 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
 
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
   const excluded = comparison.excludedHistoricalSessionCount ?? 0;
-  const base = `${comparison.exerciseName}, ${formatExerciseSetCounts(
-    comparison.setCount,
-    comparison.workingSetCount
-  )}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.${excluded > 0 ? ` ${excluded} earlier ${excluded === 1 ? 'session excluded' : 'sessions excluded'} because volume is incomplete.` : ''}`;
+  const base = `${comparison.exerciseName}, ${formatExerciseSetCount(comparison.workingSetCount)}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.${excluded > 0 ? ` ${excluded} earlier ${excluded === 1 ? 'session excluded' : 'sessions excluded'} because volume is incomplete.` : ''}`;
   if (comparison.currentVolume === null) return `${base} Missing load context prevents comparison. Reps and set counts remain available.`;
   if (
     comparison.medianVolume === null ||
@@ -104,7 +101,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
           <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {comparison.exerciseName}
           </Text>
-          <Text allowFontScaling={false} style={styles.counts}>{formatExerciseSetCounts(comparison.setCount, comparison.workingSetCount)}</Text>
+          <Text allowFontScaling={false} style={styles.counts}>{formatExerciseSetCount(comparison.workingSetCount)}</Text>
         </View>
         <View style={styles.valueRow}>
           <View style={styles.legend}>

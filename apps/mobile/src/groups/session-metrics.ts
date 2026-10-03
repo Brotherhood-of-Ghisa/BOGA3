@@ -29,7 +29,8 @@ export type GroupPerformedExercise = {
   sets: GroupPerformedSet[];
 };
 export type GroupSessionMetrics = {
-  performedSets: number;
+  /** `Sets`: the performed working sets (`ux-rules.md` §5.11). */
+  workingSets: number;
   /** Working sets only; null only when a working row is invalid. */
   totalVolumeKg: number | null;
   exerciseCount: number;
@@ -77,7 +78,8 @@ export function computeGroupSessionMetrics(
 ): GroupSessionMetrics {
   const performed = selectGroupPerformedExercises(exercises);
   const sets = performed.flatMap(exercise => exercise.sets);
-  const coverage = summarizeVolume(sets.flatMap(set => isWorkingSetType(set.setType) ? [set.metrics] : []));
-  return { performedSets: sets.length, totalVolumeKg: coverage.totalVolumeKgReps,
+  const working = sets.filter(set => isWorkingSetType(set.setType));
+  const coverage = summarizeVolume(working.map(set => set.metrics));
+  return { workingSets: working.length, totalVolumeKg: coverage.totalVolumeKgReps,
     exerciseCount: performed.length, coverage };
 }

@@ -1343,7 +1343,7 @@ TS the session screens use. Nothing is mirrored in SQL.
   skipped and unrecognized non-null statuses do not count. The shared parser
   canonicalizes blank weight with valid reps to zero; invalid decimal amounts
   (for example `1e3`) do not produce a performed row.
-- **Sets** — the count of performed sets.
+- **Sets** — the count of performed working sets (a warm-up adds nothing).
 - **Volume** — the ordinary kg calculation uses raw entered Weight and the
   source exercise's `load_input_mode`, over working sets only (warm-ups add no
   volume; the coverage note counts working sets). This shared

@@ -14,7 +14,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -522,7 +522,11 @@ describe('ExerciseHistoryScreenShell — design language (DLM-T10)', () => {
     expect(screen.getByTestId('exercise-history-set-row-st-1-values')).toHaveTextContent('135.0 × 8');
     expect(screen.getByTestId('exercise-history-set-row-st-1')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-history-set-row-st-2')).toHaveTextContent(/RIR 1/);
-    expect(screen.getByTestId('exercise-history-session-card-se-newest-count')).toHaveTextContent('2 sets');
+    // The card's count and its `Sets` stat are the working sets: the warm-up
+    // keeps its row but is no set.
+    expect(screen.getByTestId('exercise-history-session-card-se-newest-count')).toHaveTextContent('1 set');
+    expect(within(screen.getByTestId('exercise-history-session-card-se-newest')).getByLabelText('Sets 1')).toBeTruthy();
+    expect(screen.queryByText('W/sets')).toBeNull();
     expect(screen.getByTestId('exercise-history-session-card-se-newest')).toHaveTextContent(/Westside Barbell Club/);
     expect(screen.getByTestId('exercise-history-session-card-se-older')).toHaveTextContent(/No gym/);
   });

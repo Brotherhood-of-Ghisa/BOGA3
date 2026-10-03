@@ -129,7 +129,7 @@ export function MonthPace({ month }: { month: TodayProgressMonth }) {
           </Text>
           <Text allowFontScaling={false} style={todayText.headlineFigure} testID="today-progress-month-working-sets">
             {month.toDate.workingSets}
-            <Text allowFontScaling={false} style={todayText.detailFigure}> W/sets</Text>
+            <Text allowFontScaling={false} style={todayText.detailFigure}> sets</Text>
           </Text>
         </View>
         <View style={styles.difference}>

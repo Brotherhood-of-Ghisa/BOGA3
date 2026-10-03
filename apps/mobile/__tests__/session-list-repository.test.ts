@@ -1,5 +1,5 @@
 import {
-  countConfirmedSessionSets,
+  countWorkingSessionSets,
   createSessionListRepository,
   type SessionListStore,
   type SessionListStoreRecord,
@@ -26,32 +26,59 @@ const buildRecord = (overrides: Partial<SessionListStoreRecord> = {}): SessionLi
 });
 
 describe('session list repository', () => {
-  it('counts only valid explicitly confirmed sets in list summaries', () => {
-    const counts = countConfirmedSessionSets(
+  it('counts only valid confirmed working sets in list summaries', () => {
+    const counts = countWorkingSessionSets(
       [
         {
           sessionExerciseId: 'se-1',
           repsValue: '5',
           weightValue: '100',
           performanceStatus: null,
+          setType: 'rir_1',
+        },
+        {
+          sessionExerciseId: 'se-1',
+          repsValue: '8',
+          weightValue: '90',
+          performanceStatus: null,
+          setType: null,
+        },
+        {
+          sessionExerciseId: 'se-1',
+          repsValue: '10',
+          weightValue: '60',
+          performanceStatus: null,
+          setType: 'warm_up',
         },
         {
           sessionExerciseId: 'se-1',
           repsValue: '10',
           weightValue: '500',
           performanceStatus: 'unperformed',
+          setType: 'rir_0',
         },
         {
           sessionExerciseId: 'se-1',
           repsValue: '',
           weightValue: '100',
           performanceStatus: null,
+          setType: 'rir_0',
         },
       ],
       new Map([['se-1', 'session-1']])
     );
 
-    expect(counts.get('session-1')).toBe(1);
+    // The warm-up, the unperformed set and the blank one add nothing.
+    expect(counts.get('session-1')).toBe(2);
+  });
+
+  it('gives a warm-up-only session no sets', () => {
+    const counts = countWorkingSessionSets(
+      [{ sessionExerciseId: 'se-1', repsValue: '10', weightValue: '60', performanceStatus: null, setType: 'warm_up' }],
+      new Map([['se-1', 'session-1']])
+    );
+
+    expect(counts.get('session-1')).toBeUndefined();
   });
 
   it('surfaces the most recent active session and orders completed sessions by completedAt desc', async () => {

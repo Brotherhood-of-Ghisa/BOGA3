@@ -8,7 +8,6 @@ import {
 import { isWorkingSessionSetType } from "@/src/data/set-types";
 import {
   collectMuscleSetContributions,
-  countMuscleAnalyticsPerformedSets,
   countMuscleAnalyticsWorkingSets,
   type MuscleAnalyticsInput,
   type MuscleContributionRole,
@@ -84,7 +83,6 @@ export type SessionMuscleWorkingSetEntry = SessionInsightMuscleGroup & {
 
 export type CurrentSessionMuscleSummary = {
   state: "empty" | "unmapped" | "mapped";
-  performedSetCount: number;
   workingSetCount: number;
   mappedSetCount: number;
   unmappedSetCount: number;
@@ -144,7 +142,6 @@ export type ExerciseVolumeComparison = {
   exerciseName: string;
   sessionExerciseIds: string[];
   sessionExerciseOrderIndex: number;
-  setCount: number;
   workingSetCount: number;
   currentVolume: number | null;
   knownVolume?: number | null;
@@ -255,12 +252,14 @@ export const summarizeCurrentSessionMuscleLoad = (
   input: CurrentSessionMuscleSummaryInput,
 ): CurrentSessionMuscleSummary => {
   const analyticsInput = adaptCurrentSessionToMuscleAnalyticsInput(input);
-  const performedSetCount = countMuscleAnalyticsPerformedSets(analyticsInput);
   const workingSetCount = countMuscleAnalyticsWorkingSets(analyticsInput);
   const muscleGroupById = new Map(
     input.muscleGroups.map((group) => [group.id, group]),
   );
-  const contributions = collectMuscleSetContributions(analyticsInput);
+  // Every figure, the set counts included, reads working sets only.
+  const contributions = collectMuscleSetContributions(analyticsInput).filter(
+    (contribution) => isWorkingSessionSetType(contribution.setType),
+  );
   const mappedSetIdentities = new Set(
     contributions
       .filter((contribution) => muscleGroupById.has(contribution.muscleGroupId))
@@ -269,10 +268,8 @@ export const summarizeCurrentSessionMuscleLoad = (
   const weightedVolumeByMuscle = new Map<string, number | null>();
   const workingSetIdentitiesByMuscle = new Map<string, Set<string>>();
 
-  // Muscle load reads working sets only: a warm-up adds no volume or bar.
   for (const contribution of contributions) {
     if (!muscleGroupById.has(contribution.muscleGroupId)) continue;
-    if (!isWorkingSessionSetType(contribution.setType)) continue;
     weightedVolumeByMuscle.set(
       contribution.muscleGroupId,
       addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
@@ -354,15 +351,14 @@ export const summarizeCurrentSessionMuscleLoad = (
 
   return {
     state:
-      performedSetCount === 0
+      workingSetCount === 0
         ? "empty"
         : mappedSetCount === 0
           ? "unmapped"
           : "mapped",
-    performedSetCount,
     workingSetCount,
     mappedSetCount,
-    unmappedSetCount: Math.max(0, performedSetCount - mappedSetCount),
+    unmappedSetCount: Math.max(0, workingSetCount - mappedSetCount),
     contributingMuscleCount: muscles.length,
     volumeComplete: Array.from(weightedVolumeByMuscle.values()).every(volume => volume !== null),
     muscles,
@@ -553,7 +549,6 @@ type ExerciseVolumeObservation = {
   exerciseName: string;
   sessionExerciseIds: string[];
   sessionExerciseOrderIndex: number;
-  setCount: number;
   workingSetCount: number;
   volume: number | null;
   knownVolume: number | null;
@@ -581,14 +576,12 @@ const collectExerciseVolumeObservations = (
       exerciseName: exercise.exerciseName,
       sessionExerciseIds: [],
       sessionExerciseOrderIndex: exercise.orderIndex,
-      setCount: 0,
       workingSetCount: 0,
       volume: 0,
       knownVolume: 0,
     };
 
     current.sessionExerciseIds.push(exercise.id);
-    current.setCount += eligibleSets.length;
     current.workingSetCount += workingSets.length;
     const coverage = summarizeExerciseLoad(workingSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
     current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
@@ -747,20 +740,17 @@ export const deriveSessionMuscleVolumeComparisons = (
     const byMuscle = new Map<string, {
       weightedVolume: number | null;
       knownVolume: number | null;
-      setIds: Set<string>;
       workingSetIds: Set<string>;
     }>();
     for (const contribution of contributions) {
       if (!groupById.has(contribution.muscleGroupId)) continue;
+      if (!isWorkingSessionSetType(contribution.setType)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
         weightedVolume: 0,
         knownVolume: 0,
-        setIds: new Set<string>(),
         workingSetIds: new Set<string>(),
       };
-      observation.setIds.add(contribution.setIdentity);
       byMuscle.set(contribution.muscleGroupId, observation);
-      if (!isWorkingSessionSetType(contribution.setType)) continue;
       observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
       observation.workingSetIds.add(contribution.setIdentity);
@@ -769,7 +759,6 @@ export const deriveSessionMuscleVolumeComparisons = (
       ...groupById.get(id)!,
       weightedVolume: observation.weightedVolume,
       knownVolume: observation.knownVolume,
-      setCount: observation.setIds.size,
       workingSetCount: observation.workingSetIds.size,
     })).filter((muscle) => muscle.workingSetCount > 0).sort((left, right) =>
       (right.knownVolume ?? -1) - (left.knownVolume ?? -1) ||
@@ -817,7 +806,6 @@ export const deriveSessionMuscleVolumeComparisons = (
       exerciseName: muscle.displayName,
       sessionExerciseIds: [muscle.id],
       sessionExerciseOrderIndex: index,
-      setCount: muscle.setCount,
       workingSetCount: muscle.workingSetCount,
       currentVolume: muscle.weightedVolume,
       knownVolume: muscle.knownVolume,

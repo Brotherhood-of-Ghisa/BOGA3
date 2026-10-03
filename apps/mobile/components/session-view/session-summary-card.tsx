@@ -11,7 +11,7 @@ import { SessionTimesFields, type SessionTimesFieldsProps } from './session-time
 type SessionSummaryCardProps = {
   startedAt: Date;
   gymName: string | null;
-  performedSetCount: number;
+  workingSetCount: number;
   volume: string;
   volumeNote?: string;
   // Opens the gym picker; the whole Gym cell is the target.
@@ -41,7 +41,7 @@ const systemNow = () => new Date();
 export function SessionSummaryCard({
   startedAt,
   gymName,
-  performedSetCount,
+  workingSetCount,
   volume,
   volumeNote,
   onPressGym,
@@ -63,7 +63,7 @@ export function SessionSummaryCard({
           testID="session-view-summary-gym-button">
           <Stat kind="text" label="Gym" testID="session-view-summary-gym" value={gymName ?? 'No gym'} />
         </Pressable>
-        <Stat label="Sets" testID="session-view-summary-sets" value={String(performedSetCount)} />
+        <Stat label="Sets" testID="session-view-summary-sets" value={String(workingSetCount)} />
         <Stat align="end" label={volumeNote && volume !== '—' ? 'Known vol' : 'Volume'} testID="session-view-summary-volume" value={volume} />
       </View>
       {volumeNote ? <Text allowFontScaling={false} style={styles.coverageNote}

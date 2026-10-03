@@ -167,8 +167,9 @@ describe('group stream view model', () => {
         startedAtLabel: formatStreamStartedAt(1_757_500_000_000),
         gymName: 'Iron Temple',
         groupNames: ['Crew', 'Gym pals'],
-        setsLabel: '3 sets',
-        volumeLabel: '1152.5 kg', // the 60 × 10 warm-up adds no volume
+        // The 60 × 10 warm-up adds no set and no volume.
+        setsLabel: '2 sets',
+        volumeLabel: '1152.5 kg',
         volumeNote: null,
         exercisesLabel: '2 exercises',
         recordsLabel: null,

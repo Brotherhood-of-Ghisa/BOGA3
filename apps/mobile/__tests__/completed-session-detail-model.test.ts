@@ -25,24 +25,25 @@ const legacy = {
 };
 
 describe('buildCompletedSessionDetailModel', () => {
-  it('keeps confirmed sets with valid values and totals them', () => {
+  it('keeps confirmed sets with valid values and counts the working ones', () => {
     const model = buildCompletedSessionDetailModel([bench, legacy], new Map());
 
     expect(model.cards.map((card) => card.id)).toEqual(['bench', 'legacy']);
-    expect(model.cards[0].setCount).toBe(3);
+    // The card's `<n> sets` counts working sets; the warm-up keeps its row.
+    expect(model.cards[0].setCount).toBe(2);
     expect(model.cards[0].rows.map((row) => row.id)).toEqual(['b1', 'b2', 'b-zero']);
     expect(model.cards[0].rows[2]).toMatchObject({ weightReps: '0.0 × 5', volume: '0', oneRepMax: '0.0' });
-    expect(model.performedSetCount).toBe(4);
+    expect(model.workingSetCount).toBe(3);
     // Working sets only: 100×5 + 0×5 + 82.5×8, rounded, no separator; the
     // 60×10 warm-up keeps its row and adds no volume.
     expect(model.volume).toBe('1160');
   });
 
-  it('keeps a warm-up-only exercise card, with no volume', () => {
+  it('keeps a warm-up-only exercise card, with no sets or volume', () => {
     const warmUpOnly = { ...bench, sets: [{ id: 'w', weight: '60', reps: '10', setType: 'warm_up' }] };
     const model = buildCompletedSessionDetailModel([warmUpOnly], new Map());
-    expect(model.cards[0]).toMatchObject({ setCount: 1, rows: [expect.objectContaining({ id: 'w', volume: '600' })] });
-    expect(model.performedSetCount).toBe(1);
+    expect(model.cards[0]).toMatchObject({ setCount: 0, rows: [expect.objectContaining({ id: 'w', volume: '600' })] });
+    expect(model.workingSetCount).toBe(0);
     expect(model.volume).toBe('0');
   });
 
@@ -63,7 +64,7 @@ describe('buildCompletedSessionDetailModel', () => {
     );
 
     expect(model.cards).toEqual([]);
-    expect(model.performedSetCount).toBe(0);
+    expect(model.workingSetCount).toBe(0);
     expect(model.volume).toBe('0');
   });
 

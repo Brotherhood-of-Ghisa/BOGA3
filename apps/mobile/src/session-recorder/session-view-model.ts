@@ -44,7 +44,8 @@ export type SessionViewExerciseCard = {
 
 export type SessionViewModel = {
   cards: SessionViewExerciseCard[];
-  performedSetCount: number;
+  // The summary's `Sets`: the performed working sets (`ux-rules.md` §5.11).
+  workingSetCount: number;
   volume: string;
   volumeNote?: string;
 };
@@ -148,7 +149,6 @@ export const buildSessionViewModel = (
   historicalBestByDefinitionId: ReadonlyMap<string, number>
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
-  let performedSetCount = 0;
   const workingMetrics: SetMetrics[] = [];
 
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
@@ -166,10 +166,7 @@ export const buildSessionViewModel = (
     const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
 
     const rows = figures.map((row): SessionViewSetRow => {
-      if (row.done) {
-        performedSetCount += 1;
-        if (isWorkingSetType(row.set.setType)) workingMetrics.push(row.metric);
-      }
+      if (row.done && isWorkingSetType(row.set.setType)) workingMetrics.push(row.metric);
       return formatSetRow({
         id: row.set.id,
         ...row.shown,
@@ -189,7 +186,7 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, performedSetCount, ...sessionVolumeSummary(summarizeVolume(workingMetrics)) };
+  return { cards, workingSetCount: workingMetrics.length, ...sessionVolumeSummary(summarizeVolume(workingMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */

@@ -197,7 +197,7 @@ describe('Session view', () => {
       'accessibilityLabel',
       `Gym ${SESSION_VIEW_FIXTURE.gymName}`
     );
-    expect(screen.getByLabelText(`Sets ${SESSION_VIEW_FIXTURE.performedSetCount}`)).toBeTruthy();
+    expect(screen.getByLabelText(`Sets ${SESSION_VIEW_FIXTURE.workingSetCount}`)).toBeTruthy();
     // Working sets only: the bench's 100 × 10 warm-up adds no volume.
     expect(screen.getByLabelText('Volume 3200')).toBeTruthy();
     expect(screen.getByTestId(`session-view-exercise-${BENCH}-record`)).toBeTruthy();
@@ -213,9 +213,9 @@ describe('Session view', () => {
     await openSession();
 
     await screen.findByText(/above median/);
-    expect(screen.getByLabelText(/Barbell Bench Press, 3 sets · 2 working.*Historical median/)).toBeTruthy();
+    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets\. .*Historical median/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByLabelText(/Chest, .* sets · .* working.*Historical median/)).toBeTruthy();
+    expect(screen.getByLabelText(/Chest, \d+ sets?\. .*Historical median/)).toBeTruthy();
   });
 
   it('keeps logging usable when the comparison-history read fails (a failed read)', async () => {

@@ -38,7 +38,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
         reps: set.reps, setType: set.setType, done: true, loadContext: exercise.loadContext })),
     }));
     const summary = sessionVolumeSummary(metrics.coverage);
-    return { cards, setCount: metrics.performedSets, volume: summary.volume,
+    return { cards, setCount: metrics.workingSets, volume: summary.volume,
       note: summary.volumeNote };
   }, [session]);
 

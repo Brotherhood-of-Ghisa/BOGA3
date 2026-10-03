@@ -114,7 +114,7 @@ describe('the month against the previous month', () => {
       toSameDay: counts(98),
     });
     expect(monthChartAccessibilityLabel(october)).toBe(
-      'Cumulative working sets: October 102 by the 16th against September 98 by the 16th; September finished at 193. On course for 198.',
+      'Cumulative sets: October 102 by the 16th against September 98 by the 16th; September finished at 193. On course for 198.',
     );
 
     // 31 March against February: the comparison stops at February's last day.
@@ -201,16 +201,16 @@ describe('the month chart geometry', () => {
 
 describe('the latest session row', () => {
   it('says its figures and its whole summary', () => {
-    expect(formatLatestFigures(latest())).toBe('12 W/sets · 4 exercises');
-    expect(formatLatestFigures(latest({ exerciseCount: 1 }))).toBe('12 W/sets · 1 exercise');
+    expect(formatLatestFigures(latest())).toBe('12 sets · 4 exercises');
+    expect(formatLatestFigures(latest({ exerciseCount: 1 }))).toBe('12 sets · 1 exercise');
     expect(latestSessionAccessibilityLabel(latest())).toBe(
-      'Completed session on 10/15 07:12, 1h 5m, 12 working sets, 4 exercises, at Canal Street Gym, 2 PRs',
+      'Completed session on 10/15 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
     );
   });
 
   it('leaves out a missing gym and a session without PRs', () => {
     expect(latestSessionAccessibilityLabel(latest({ gymName: '  ', prs: 0, workingSets: 1, exerciseCount: 1 }))).toBe(
-      'Completed session on 10/15 07:12, 1h 5m, 1 working set, 1 exercise',
+      'Completed session on 10/15 07:12, 1h 5m, 1 set, 1 exercise',
     );
     expect(latestSessionAccessibilityLabel(latest({ gymName: null, prs: 1 }))).toContain('4 exercises, 1 PR');
   });

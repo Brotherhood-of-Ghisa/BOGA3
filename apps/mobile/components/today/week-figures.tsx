@@ -85,7 +85,7 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
         />
         <WeekFigure
           current={week.current.workingSets}
-          label="W/sets"
+          label="Sets"
           previous={week.previous.workingSets}
           testID="today-progress-week-working-sets"
         />

@@ -155,20 +155,6 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
   ).length;
 };
 
-export const countMuscleAnalyticsPerformedSets = (input: MuscleAnalyticsInput): number => {
-  const sessionIds = new Set(input.sessions.map((session) => session.id));
-  const includedExerciseIds = new Set(
-    input.sessionExercises
-      .filter((exercise) => sessionIds.has(exercise.sessionId))
-      .map((exercise) => exercise.id)
-  );
-
-  return input.exerciseSets.filter(
-    (set) =>
-      includedExerciseIds.has(set.sessionExerciseId) && isMuscleAnalyticsPerformedSet(set)
-  ).length;
-};
-
 const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
   const mappingsByExerciseDefinitionId = new Map<string, MuscleAnalyticsInput['muscleMappings']>();
   for (const mapping of input.muscleMappings) {
@@ -317,10 +303,10 @@ export const aggregateSelectedMuscleDailyEffort = (
       sessionIds: new Set<string>(),
     };
 
-    entry.setCount += 1;
     entriesByDate.set(dateKey, entry);
-    // Everything but the set count reads working sets only.
+    // Every figure, the set count included, reads working sets only.
     if (!isWorkingSessionSetType(contribution.setType)) continue;
+    entry.setCount += 1;
     entry.sessionIds.add(contribution.sessionId);
     entry.knownWeight = addFiniteVolume(entry.knownWeight, contribution.weightedVolume ?? 0);
     entry.totalWeight = addFiniteVolume(entry.totalWeight, contribution.weightedVolume);

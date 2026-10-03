@@ -77,8 +77,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
   the figure in bold Plex Mono `record` (brass, T10-D2) over its date in Plex
   Mono `ink-muted`. `1RM`, never `Est. 1RM` (G7).
 - Each session is View Session's `ExerciseSetsCard` as a link (T10-D1): the
-  completion stamp in Plex Mono and `<n> sets`; the gym, `Tag`s and stacked
-  `Stat`s (`1RM`, `Top set`, `Vol`, `W/sets`); then `SetSummaryRow`s
+  completion stamp in Plex Mono and `<n> sets` (working sets); the gym, `Tag`s
+  and stacked `Stat`s (`1RM`, `Top set`, `Vol`, `Sets`); then `SetSummaryRow`s
   (`type · weight × reps · 1RM · VOL`), warm-ups like working sets.
 - Sessions is one `ScreenScroll`: `Active` and `History` micro-labels; the
   active session a `Card` with the `set-current` glyph and 44pt `check` and ⋮;

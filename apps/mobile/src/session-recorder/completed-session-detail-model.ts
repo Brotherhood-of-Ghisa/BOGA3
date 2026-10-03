@@ -39,6 +39,7 @@ export type CompletedSessionDetailExerciseInput = {
 export type CompletedSessionDetailCard = {
   id: string;
   name: string;
+  // The card's `<n> sets`: its working sets (`ux-rules.md` §5.11).
   setCount: number;
   rows: SessionViewSetRow[];
   // The record 1RM, formatted, when a set in this exercise is an all-time best.
@@ -47,7 +48,8 @@ export type CompletedSessionDetailCard = {
 
 export type CompletedSessionDetailModel = {
   cards: CompletedSessionDetailCard[];
-  performedSetCount: number;
+  // The summary's `Sets`: the performed working sets.
+  workingSetCount: number;
   volume: string;
   volumeNote?: string;
 };
@@ -86,7 +88,6 @@ export const buildCompletedSessionDetailModel = (
   historicalBestByDefinitionId: ReadonlyMap<string, number>
 ): CompletedSessionDetailModel => {
   const insightExercises = toInsightExercises(exercises);
-  let performedSetCount = 0;
   const metrics: SetMetrics[] = [];
 
   const cards = exercises.flatMap((exercise): CompletedSessionDetailCard[] => {
@@ -108,9 +109,10 @@ export const buildCompletedSessionDetailModel = (
           });
     const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
 
-    performedSetCount += performed.length;
-    // The summary Volume reads working sets only; every row keeps its own figures.
-    for (const { set } of performed.filter(({ set }) => isWorkingSetType(set.setType))) {
+    // The counts and the summary Volume read working sets only; every row keeps
+    // its own figures.
+    const working = performed.filter(({ set }) => isWorkingSetType(set.setType));
+    for (const { set } of working) {
       metrics.push(calculateAnalyticsSetMetrics({
         ...(exercise.loadContext ?? ordinaryLoadContext()),
         weightValue: set.weight,
@@ -123,7 +125,7 @@ export const buildCompletedSessionDetailModel = (
       {
         id: exercise.id,
         name: exercise.name,
-        setCount: performed.length,
+        setCount: working.length,
         rows: performed.map(({ set, weight, reps }) =>
           formatSetRow({
             id: set.id,
@@ -140,5 +142,5 @@ export const buildCompletedSessionDetailModel = (
     ];
   });
 
-  return { cards, performedSetCount, ...sessionVolumeSummary(summarizeVolume(metrics)) };
+  return { cards, workingSetCount: metrics.length, ...sessionVolumeSummary(summarizeVolume(metrics)) };
 };

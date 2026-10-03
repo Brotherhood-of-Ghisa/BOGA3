@@ -233,7 +233,7 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
     - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
     - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
-    - `W-Up` marks a set as warm-up effort. A working set is any valid confirmed set that is not `W-Up`: blank effort and every RIR count. Records, PRs, all-time bests and their baselines read working sets only: a warm-up is never a record (no `record` highlight), never a PR, and never the baseline a later set must beat, and a session whose only sets of an exercise are warm-ups sets no record or `Last` for it. A warm-up row still shows its own 1RM and volume, which describe that set alone. Every other statistic reads working sets too: volume and its coverage note (`Known subtotal from X of Y working sets`), heatmaps, muscle volume, muscle load and failure intensity, the exercise and muscle comparisons with their medians and ranges, favourites, `Last:`, "done" and per-exercise and per-muscle session counts. An exercise whose only sets in a session are warm-ups did not happen as far as statistics go: it is not done, adds no session, heatmap cell, muscle-load bar or comparison, and gives no baseline, while its rows still show wherever the session's sets are listed. Set counts that still include warm-ups say so where they are defined. The rule lives in one predicate, `isWorkingSet` (`src/exercise-calculations/set-semantics.ts`; `isWorkingSessionSetType` in `src/data/set-types.ts` is the same rule over a set type); aggregates filter with it, and per-set maths (`calculateSetMetrics`) does not. Use `Working set(s)` where space permits and `W/set` / `W/sets` in compact UI.
+    - `W-Up` marks a set as warm-up effort. A working set is any valid confirmed set that is not `W-Up`: blank effort and every RIR count. Records, PRs, all-time bests and their baselines read working sets only: a warm-up is never a record (no `record` highlight), never a PR, and never the baseline a later set must beat, and a session whose only sets of an exercise are warm-ups sets no record or `Last` for it. A warm-up row still shows its own 1RM and volume, which describe that set alone. Every other statistic reads working sets too: volume and its coverage note (`Known subtotal from X of Y working sets`), heatmaps, muscle volume, muscle load and failure intensity, the exercise and muscle comparisons with their medians and ranges, favourites, `Last:`, "done" and per-exercise and per-muscle session counts. An exercise whose only sets in a session are warm-ups did not happen as far as statistics go: it is not done, adds no session, heatmap cell, muscle-load bar or comparison, and gives no baseline, while its rows still show wherever the session's sets are listed. A set count with no qualifier is working sets too, labelled `Sets` (`<n> sets` inline), and no screen shows a second all-sets count beside it; only row counts that are not statistics (the session view card's `n of m sets done` and the remove-exercise alert's `its N sets`) count every row. The rule lives in one predicate, `isWorkingSet` (`src/exercise-calculations/set-semantics.ts`; `isWorkingSessionSetType` in `src/data/set-types.ts` is the same rule over a set type); aggregates filter with it, and per-set maths (`calculateSetMetrics`) does not.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
@@ -324,13 +324,13 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
 4. The summary card shows `Start` and `End` as `YYYY-MM-DD HH:mm` (the layout of
    the completed edit's fields, read-only), then `Duration`, `Gym`, `Sets` and
-   `Volume`. `Sets` counts the confirmed sets with valid values; `Volume` is
-   their working sets' volume (§5.11) under the current private policy, with
+   `Volume`. `Sets` counts the working sets (§5.11); `Volume` is
+   their volume (§5.11) under the current private policy, with
    invalid/overflow coverage and no thousands separator. Below it, `Summary | Sets` defaults to
    Summary for every historical entry. Switching stays in place and retains the
    chart grouping; Edit → Done retains both selections while reloading facts,
    sets and insights. A different session starts at Summary / By exercise.
-5. Each exercise card in Sets shows its name, `n sets` and one row per confirmed set
+5. Each exercise card in Sets shows its name, `n sets` (its working sets) and one row per confirmed set
    with valid values — the session view's row, `type · weight × reps · 1RM ·
    VOL` (`W-Up`, `RIR n` for any valid stored RIR, `—` for none). An exercise
    with no such set is left out. There are no tags, no collapse and no set
@@ -347,24 +347,24 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    `Done` (`accent`, where the session view's Finish sat); then the summary
    card, every `Personal records` card when present, one `Exercise volume` card
    per performed exercise, and `Share session` (an outline). The summary card
-   shows `Duration`, `Exercises`, `Sets`, `Working` and `Gym` as stacked
-   figures, then non-interactive per-muscle pills (name and the number of
-   physical working sets mapped to that muscle). It never links to muscle
+   shows `Duration`, `Exercises`, `Sets` (working sets, §5.11) and `Gym` as
+   stacked figures, then `Sets by muscle`: non-interactive per-muscle pills
+   (name and the number of physical working sets mapped to that muscle). It never links to muscle
    analytics. Personal-record/comparison history is optional enrichment: its
    loading or failure never blocks stored context or exits, and current
    exercise rows still render with an explicit no-history state.
 8. A personal record is shown in the language's one superlative: a `record`
    band (`New 1RM record · <1RM>`), the exercise and its set (`185.0 × 8`), the
    1RM bold `record` — no `kg`, no "est.". Exercise-volume cards show the
-   exercise name with smaller performed/working-set counts, the session's `Vol`
+   exercise name with its smaller working-set count (`3 sets`), the session's `Vol`
    figure (no separator, no unit) versus the historical median, and a
    horizontal P5–P95 range with median/current markers when a distribution
    exists. Single/equal baselines and no-history rows use explicit
    non-distribution states; range bars are descriptive context, never targets
    or readiness guidance, so they use no `accent`. The local `By exercise` /
    `By muscle` control defaults to exercise when a summary opens. Muscle rows
-   use per-side role-weighted volume, count all valid mapped performed sets
-   separately from working sets, and retain zero-load observations. Every
+   use per-side role-weighted volume, count the mapped working sets, and
+   retain zero-load observations. Every
    comparison reads working sets (§5.11): the current and historical volumes,
    median and P5–P95 range leave warm-ups out, and an exercise or muscle with
    only warm-ups in a session is neither compared nor a baseline. Each row
@@ -377,7 +377,7 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 9. `Share session` opens a `Sheet` previewing the exact session-summary image;
    `Share image` is its one action, and the backdrop closes it (there is no
    Cancel; it cannot close while an image is being prepared). The captured PNG
-   contains session/date/count totals, working sets, every PR, and every
+   contains session/date/count totals (one `sets` count), every PR, and every
    exercise comparison; it excludes gym/location data. Nothing is uploaded or
    published by BOGA. Native-sheet cancellation is silent, capture/launch
    failure is inline and retryable, and temporary image cleanup cannot turn a
@@ -618,7 +618,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    The backdrop, Android back and the VoiceOver escape dismiss it; there is no
    close button.
 3. Under the eyebrow and the name, a `Metric` and a `View` `SegmentedControl`,
-   each under a micro-label. Muscle history offers `Volume` and `W/sets`;
+   each under a micro-label. Muscle history offers `Volume` and `Sets`;
    exercise history adds `1RM` and `Top weight`. Both default to `Volume` and
    `Weekly`, and the selected metric drives both views.
 4. Loading, error and no-history are inline `StatePanel`s in the sheet's scroll
@@ -651,25 +651,23 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    stays visible, exactly one per row exposes selected state, and `Last 7 days`
    / `By Exercise` remain the defaults. The controls, the summary, the filter
    and the list share one scroll.
-2. The summary keeps the actionable `Sessions` card and shows a second `Sets (W/Sets)` card as `<all valid performed sets> (<working sets>)`. Sessions use a signed absolute delta, and the set card uses a signed absolute pair; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
+2. The summary keeps the actionable `Sessions` card and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
 3. In per-exercise mode, exercises with at least one working set in the
    selected 7-/30-day window render in one compact, viewport-fitting table with
    shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
-   row shows `<valid performed sets> (<working sets>)`, effective exercise volume and
+   row shows its working sets, effective exercise volume and
    estimated 1RM (both from working sets only), and its session count counts the
    sessions with a working set of it; unavailable 1RM values render as `—`. Exercise names receive
    the remaining flexible width and wrap to their full value rather than being
    capped at an assumed line count.
-   A working set is every valid confirmed set except warm-ups (§5.11);
-   warm-up rows remain in the leading set count but not the parenthesized
-   count. Whole data rows remain the only controls that
+   A working set is every valid confirmed set except warm-ups (§5.11); a
+   warm-up counts toward no figure in the table. Whole data rows remain the only controls that
    open exercise history; repeated per-row metric labels are omitted visually
    but all values and their meanings remain in each row's accessibility label.
 4. `Exercise`, `Sets`, and `Vol` are the only exercise-sort controls; `1RM` is
    a static column header. Initial order is `Sets — high to low`. Repeated
    presses cycle `Exercise` through most then
-   least recent; `Sets` through sets high-to-low, sets low-to-high,
-   working sets high-to-low, then working sets low-to-high; and `Vol` through
+   least recent; `Sets` through high-to-low then low-to-high; and `Vol` through
    high-to-low then low-to-high. Pressing a different sortable header always
    starts that header's cycle at its first state. Recency comes from the
    latest valid performed set in completed, non-deleted all-time history and is
@@ -681,8 +679,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    header becomes active. Only the active slot is visible, on the same line,
    with the active label in `ink`: `Recent` plus an arrow for Exercise, or an arrow alone for Sets and Vol.
    Each sortable header exposes button semantics, a mobile-sized touch target,
-   selected state when active, the complete current sort wording (including
-   Sets versus Working sets), and the next activation's outcome to assistive
+   selected state when active, the complete current sort wording, and the
+   next activation's outcome to assistive
    technology; the interaction never relies on color or arrow direction alone.
    Sort choice is volatile but survives time-range, search, and Breakdown
    changes for the mounted screen, while each new metric result is sorted again
@@ -690,7 +688,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 6. Tapping an exercise row in per-exercise mode opens the exercise's history
    sheet (§12): the same `HistorySheet` as muscle history.
 7. The exercise sheet renders the daily and weekly heatmaps over a 365-day
-   window with all four metrics (`Volume` / `W/sets` / `1RM` / `Top weight`) and
+   window with all four metrics (`Volume` / `Sets` / `1RM` / `Top weight`) and
    the week banner.
 8. Both controls use the design-language `SegmentedControl` (selected segment
    solid `ink`); neither is styled locally, and there are no raw colour
@@ -699,8 +697,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    and 1RMs are full integers, never `2.5k` (`design-language.md` §6).
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
 10. Exercise analytics uses calculated load × reps of working sets (§5.11) under the current private policy, with invalid/overflow coverage and no muscle-role weighting. A day or week with only warm-ups makes no heatmap cell, for exercises and muscles alike. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
-11. In the per-muscle mode every family and visible nested-muscle row shows `Sets` in the same `<set count> (<working-set count>)` form plus `Volume`, the working sets' volume. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
-12. Per-muscle previous-period set comparisons use signed absolute pairs (`+4 (+1)`, `−2 (−1)`, `±0 (−1)`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
+11. In the per-muscle mode every family and visible nested-muscle row shows `Sets`, its working sets, plus `Volume`, the working sets' volume. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
+12. Per-muscle previous-period set comparisons use a signed absolute delta (`+4`, `−2`, `±0`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
 13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(workingSetCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no working sets keep the default surface. The background is decorative and supplements the readable working-set count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact working-set count and selected-period threshold.
 14. The `/exercise-history` route (opened from the exercise page's `History`)
     is one `ScreenScroll` on `paper` over the `MainTabs` strip (Progress
@@ -719,9 +717,9 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
     across sessions belongs to the earliest session.
 16. Each session in view is View Session's exercise card (`ExerciseSetsCard`,
     T10-D1), a link to View Session: the header is the completion stamp
-    (`YYYY-MM-DD HH:mm`, Plex Mono) and `<n> sets`; under it the gym (`No gym`
-    when none), the session's tags as `Tag`s, and a row of stacked `Stat`s
-    (`1RM`, `Top set`, `Vol`, `W/sets`); then one `SetSummaryRow` per set,
+    (`YYYY-MM-DD HH:mm`, Plex Mono) and `<n> sets` (working sets); under it
+    the gym (`No gym` when none), the session's tags as `Tag`s, and a row of
+    stacked `Stat`s (`1RM`, `Top set`, `Vol`, `Sets`); then one `SetSummaryRow` per set,
     `type · weight × reps · 1RM · VOL`. Warm-ups are shown like working sets,
     named by their type column (`W-Up`); there is no set-number column. Figures
     use the session view's formatters: weights with one decimal, 1RM with one,
@@ -866,8 +864,8 @@ unchanged. What differs is presentation:
    (`New 1RM record · <1RM>`), from the same derivation
    (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
    (§7.7).
-5. The summary's `Sets` counts the confirmed performed sets (warm-ups
-   included); its `Volume` is their working sets' calculated volume under the
+5. The summary's `Sets` counts the performed working sets (§5.11; a
+   performed warm-up adds nothing); its `Volume` is their calculated volume under the
    current private policy (§5.11), and an incomplete Volume's note reads
    `Known subtotal from X of Y working sets`; Time is elapsed since the session's start.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is

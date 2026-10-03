@@ -148,11 +148,35 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
     expect(summary).toEqual({
       state: "empty",
       volumeComplete: true,
-      performedSetCount: 0,
       workingSetCount: 0,
       mappedSetCount: 0,
       unmappedSetCount: 0,
       contributingMuscleCount: 0,
+      muscles: [],
+      workingSetsByMuscle: [],
+    });
+  });
+
+  it("keeps a warm-up-only session empty: a warm-up is no set", () => {
+    const summary = summarizeCurrentSessionMuscleLoad(
+      muscleInput({
+        exerciseDefinitions: [{ bodyweightContribution: 0, id: "bench", loadInputMode: "per_side_load" }],
+        exercises: [
+          insightExercise({
+            id: "bench-row",
+            exerciseDefinitionId: "bench",
+            sets: [insightSet("warm-up", { weightValue: "60", repsValue: "10", setType: "warm_up" })],
+          }),
+        ],
+        muscleMappings: [{ exerciseDefinitionId: "bench", muscleGroupId: "chest", role: "primary" }],
+      }),
+    );
+
+    expect(summary).toMatchObject({
+      state: "empty",
+      workingSetCount: 0,
+      mappedSetCount: 0,
+      unmappedSetCount: 0,
       muscles: [],
       workingSetsByMuscle: [],
     });
@@ -227,9 +251,9 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(summary).toMatchObject({
       state: "mapped",
-      performedSetCount: 3,
+      // The counts read working sets: the bench warm-up adds nothing.
       workingSetCount: 2,
-      mappedSetCount: 3,
+      mappedSetCount: 2,
       unmappedSetCount: 0,
       contributingMuscleCount: 3,
     });
@@ -341,7 +365,7 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(partial).toMatchObject({
       state: "mapped",
-      performedSetCount: 3,
+      workingSetCount: 3,
       mappedSetCount: 1,
       unmappedSetCount: 2,
       contributingMuscleCount: 1,
@@ -361,7 +385,7 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
     );
     expect(unmapped).toMatchObject({
       state: "unmapped",
-      performedSetCount: 1,
+      workingSetCount: 1,
       mappedSetCount: 0,
       unmappedSetCount: 1,
       muscles: [],
@@ -397,7 +421,7 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
       }),
     );
 
-    expect(summary.performedSetCount).toBe(1);
+    expect(summary.workingSetCount).toBe(1);
     expect(summary.muscles.map((muscle) => muscle.id)).toEqual([
       "biceps",
       "chest",
@@ -498,9 +522,9 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         exerciseName: "Bench Press",
         sessionExerciseIds: ["target-bench-a", "target-bench-b"],
         sessionExerciseOrderIndex: 2,
-        setCount: 2,
+        // The working 120 × 5 only; the 100 × 5 warm-up is neither a set
+        // nor volume.
         workingSetCount: 1,
-        // The working 120 × 5 only; the 100 × 5 warm-up still counts as a set.
         currentVolume: 600,
         knownVolume: 600,
         historicalSessionCount: 3,
@@ -548,7 +572,6 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
     ).toEqual([
       expect.objectContaining({
         exerciseDefinitionId: "squat",
-        setCount: 2,
         workingSetCount: 1,
         currentVolume: 500,
         historicalSessionCount: 1,

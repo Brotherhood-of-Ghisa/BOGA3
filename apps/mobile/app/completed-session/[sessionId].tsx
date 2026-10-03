@@ -405,10 +405,6 @@ export function CompletedSessionDetailScreenShell({
         .filter((exercise) => exercise.sets.length > 0) ?? [],
     [session]
   );
-  const performedSetCount = useMemo(
-    () => performedExercises.reduce((count, exercise) => count + exercise.sets.length, 0),
-    [performedExercises]
-  );
   const workingSetCount = useMemo(
     () =>
       performedExercises.reduce(
@@ -648,7 +644,6 @@ export function CompletedSessionDetailScreenShell({
           muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
           muscleVolumeComparisons={completedInsights?.muscleVolumeComparisons ?? []}
           onDone={handleCompletionExit}
-          performedSetCount={performedSetCount}
           personalRecords={personalRecords}
           shouldFailNextShare={shouldFailNextMaestroShare}
           workingSetCount={workingSetCount}
@@ -665,11 +660,11 @@ export function CompletedSessionDetailScreenShell({
         onSectionChange={setSection}
         summaryContent={
           <>
-            {performedSetCount > 0 ? (
+            {workingSetCount > 0 ? (
               <Card>
                 <SessionMuscleBreakdown
                   standalone
-                  performedSetCount={performedSetCount}
+                  workingSetCount={workingSetCount}
                   muscleSummary={shouldFailNextMaestroCatalog ? null : sessionMuscleSummary}
                   muscleCatalogState={muscleCatalogState}
                 />
@@ -679,7 +674,6 @@ export function CompletedSessionDetailScreenShell({
               completedAt={session.completedAt}
               durationDisplay={session.durationDisplay}
               exerciseCount={performedExercises.length}
-              performedSetCount={performedSetCount}
               workingSetCount={workingSetCount}
               personalRecords={completedInsights?.personalRecords ?? []}
               exerciseVolumeComparisons={completedInsights?.exerciseVolumeComparisons ?? []}

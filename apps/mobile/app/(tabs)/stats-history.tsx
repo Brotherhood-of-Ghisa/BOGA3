@@ -80,7 +80,6 @@ export type ExerciseHeatmapTarget = {
 export type ExerciseListItem = {
   id: string;
   name: string;
-  setCount: number;
   workingSetCount: number;
   totalVolume: number | null;
   knownVolume?: number | null;
@@ -94,8 +93,6 @@ export type ExerciseSortMode =
   | 'recency-asc'
   | 'sets-desc'
   | 'sets-asc'
-  | 'working-sets-desc'
-  | 'working-sets-asc'
   | 'volume-desc'
   | 'volume-asc';
 
@@ -103,7 +100,7 @@ export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'sets-desc';
 
 const EXERCISE_SORT_CYCLES: Record<ExerciseSortHeader, ExerciseSortMode[]> = {
   exercise: ['recency-desc', 'recency-asc'],
-  sets: ['sets-desc', 'sets-asc', 'working-sets-desc', 'working-sets-asc'],
+  sets: ['sets-desc', 'sets-asc'],
   volume: ['volume-desc', 'volume-asc'],
 };
 
@@ -112,8 +109,6 @@ const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader>
   'recency-asc': 'exercise',
   'sets-desc': 'sets',
   'sets-asc': 'sets',
-  'working-sets-desc': 'sets',
-  'working-sets-asc': 'sets',
   'volume-desc': 'volume',
   'volume-asc': 'volume',
 };
@@ -150,25 +145,6 @@ export const formatCountDelta = (current: number, previous: number): DeltaDispla
   return {
     text: formatSignedCount(difference),
     tone: difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral',
-  };
-};
-
-export const formatSetCountPair = (setCount: number, workingSetCount: number): string =>
-  `${formatNumber(setCount)} (${formatNumber(workingSetCount)})`;
-
-export const formatSetCountPairDelta = (
-  currentSetCount: number,
-  currentWorkingSetCount: number,
-  previousSetCount: number,
-  previousWorkingSetCount: number
-): DeltaDisplay => {
-  const setDifference = currentSetCount - previousSetCount;
-  const workingSetDifference = currentWorkingSetCount - previousWorkingSetCount;
-  const toneDifference = setDifference === 0 ? workingSetDifference : setDifference;
-  return {
-    text: `${formatSignedCount(setDifference)} (${formatSignedCount(workingSetDifference)})`,
-    tone:
-      toneDifference > 0 ? 'positive' : toneDifference < 0 ? 'negative' : 'neutral',
   };
 };
 
@@ -223,18 +199,14 @@ const describeVolumeDifference = (delta: DeltaDisplay): string => {
 
 const buildMuscleRowAccessibilityLabel = ({
   actionLabel,
-  setCount,
   workingSetCount,
-  previousSetCount,
   previousWorkingSetCount,
   volume,
   volumeDelta,
   periodDays,
 }: {
   actionLabel: string;
-  setCount: number;
   workingSetCount: number;
-  previousSetCount: number;
   previousWorkingSetCount: number;
   volume: number | null;
   volumeDelta: DeltaDisplay;
@@ -242,15 +214,12 @@ const buildMuscleRowAccessibilityLabel = ({
 }): string =>
   [
     actionLabel,
-    `${formatNumber(setCount)} sets, ${formatNumber(workingSetCount)} working sets`,
-    `${describeCountDifference(setCount - previousSetCount, 'sets')} and ${describeCountDifference(
-      workingSetCount - previousWorkingSetCount,
-      'working sets'
-    )}`,
+    `${formatNumber(workingSetCount)} sets`,
+    describeCountDifference(workingSetCount - previousWorkingSetCount, 'sets'),
     `volume ${formatTotalWeight(volume)}, ${describeVolumeDifference(volumeDelta)}`,
     `failure background reaches its strongest shade at ${formatNumber(
       fullScaleFailureCount(periodDays)
-    )} working sets for the selected ${periodDays}-day period`,
+    )} sets for the selected ${periodDays}-day period`,
   ].join('. ');
 
 export const nextExerciseSortMode = (
@@ -274,10 +243,6 @@ export const describeExerciseSortMode = (mode: ExerciseSortMode): string => {
       return 'Sets — high to low';
     case 'sets-asc':
       return 'Sets — low to high';
-    case 'working-sets-desc':
-      return 'Working sets — high to low';
-    case 'working-sets-asc':
-      return 'Working sets — low to high';
     case 'volume-desc':
       return 'Volume — high to low';
     case 'volume-asc':
@@ -328,15 +293,9 @@ export const sortExerciseListItems = (
         comparison = compareOptionalNumbers(completedTimestamp(left), completedTimestamp(right), false);
         break;
       case 'sets-desc':
-        comparison = compareNumbers(left.setCount, right.setCount, true);
-        break;
-      case 'sets-asc':
-        comparison = compareNumbers(left.setCount, right.setCount, false);
-        break;
-      case 'working-sets-desc':
         comparison = compareNumbers(left.workingSetCount, right.workingSetCount, true);
         break;
-      case 'working-sets-asc':
+      case 'sets-asc':
         comparison = compareNumbers(left.workingSetCount, right.workingSetCount, false);
         break;
       case 'volume-desc':
@@ -452,10 +411,8 @@ export function StatsScreenShell({
       )
     : null;
   const setsDelta = summary
-    ? formatSetCountPairDelta(
-        summary.current.totals.setCount,
+    ? formatCountDelta(
         summary.current.totals.workingSetCount,
-        summary.previous.totals.setCount,
         summary.previous.totals.workingSetCount
       )
     : null;
@@ -549,11 +506,8 @@ export function StatsScreenShell({
               <View style={styles.summaryCardBody}>
                 <View style={styles.summaryFigures}>
                   <Stat
-                    label="Sets (W/Sets)"
-                    value={formatSetCountPair(
-                      summary.current.totals.setCount,
-                      summary.current.totals.workingSetCount
-                    )}
+                    label="Sets"
+                    value={formatNumber(summary.current.totals.workingSetCount)}
                   />
                   {setsDelta ? <Delta delta={setsDelta} /> : null}
                 </View>
@@ -850,9 +804,7 @@ function MuscleFamilyCard({
       <MuscleRow
         accessibilityLabel={buildMuscleRowAccessibilityLabel({
           actionLabel: `Open ${family.familyName} history`,
-          setCount: family.setCount,
           workingSetCount: family.workingSetCount,
-          previousSetCount: previousFamily?.setCount ?? 0,
           previousWorkingSetCount: previousFamily?.workingSetCount ?? 0,
           volume: family.totalVolume,
           volumeDelta,
@@ -867,13 +819,8 @@ function MuscleFamilyCard({
             collapsedMuscle ? toMuscleHistoryTarget(collapsedMuscle) : toFamilyHistoryTarget(family)
           )
         }
-        sets={formatSetCountPair(family.setCount, family.workingSetCount)}
-        setsDelta={formatSetCountPairDelta(
-          family.setCount,
-          family.workingSetCount,
-          previousFamily?.setCount ?? 0,
-          previousFamily?.workingSetCount ?? 0
-        )}
+        sets={formatNumber(family.workingSetCount)}
+        setsDelta={formatCountDelta(family.workingSetCount, previousFamily?.workingSetCount ?? 0)}
         setsTestID={`stats-family-sets-${testIdSlug}`}
         shade={selectFailureShade(computeFailureIntensityProgress(family.workingSetCount, periodDays))}
         testID={
@@ -881,7 +828,7 @@ function MuscleFamilyCard({
             ? `stats-family-header-button-${collapsedMuscle.muscleGroupId}`
             : `stats-family-header-${testIdSlug}`
         }
-        untrained={family.setCount === 0 && family.totalVolume === 0}
+        untrained={family.workingSetCount === 0 && family.totalVolume === 0}
         volume={compactVolumeFigure(family.totalVolume, family.knownVolume)}
         volumeIncomplete={family.totalVolume === null}
         volumeDelta={volumeDelta}
@@ -899,9 +846,7 @@ function MuscleFamilyCard({
               <MuscleRow
                 accessibilityLabel={buildMuscleRowAccessibilityLabel({
                   actionLabel: `Open ${muscle.displayName} history`,
-                  setCount: muscle.setCount,
                   workingSetCount: muscle.workingSetCount,
-                  previousSetCount: previousMuscle?.setCount ?? 0,
                   previousWorkingSetCount: previousMuscle?.workingSetCount ?? 0,
                   volume: muscle.totalVolume,
                   volumeDelta: muscleVolumeDelta,
@@ -912,19 +857,14 @@ function MuscleFamilyCard({
                 level="muscle"
                 name={muscle.displayName}
                 onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
-                sets={formatSetCountPair(muscle.setCount, muscle.workingSetCount)}
-                setsDelta={formatSetCountPairDelta(
-                  muscle.setCount,
-                  muscle.workingSetCount,
-                  previousMuscle?.setCount ?? 0,
-                  previousMuscle?.workingSetCount ?? 0
-                )}
+                sets={formatNumber(muscle.workingSetCount)}
+                setsDelta={formatCountDelta(muscle.workingSetCount, previousMuscle?.workingSetCount ?? 0)}
                 setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
                 shade={selectFailureShade(
                   computeFailureIntensityProgress(muscle.workingSetCount, periodDays)
                 )}
                 testID={`stats-muscle-row-${muscle.muscleGroupId}`}
-                untrained={muscle.setCount === 0 && muscle.totalVolume === 0}
+                untrained={muscle.workingSetCount === 0 && muscle.totalVolume === 0}
                 volume={compactVolumeFigure(muscle.totalVolume, muscle.knownVolume)}
                 volumeIncomplete={muscle.totalVolume === null}
                 volumeDelta={muscleVolumeDelta}
@@ -1014,8 +954,8 @@ function ExerciseListView({
         <ListRow
           key={item.id}
           accessibilityLabel={`Open ${item.name} heatmap. ${formatNumber(
-            item.setCount
-          )} sets, ${formatNumber(item.workingSetCount)} working sets. Volume ${formatVolumeWithCoverage(
+            item.workingSetCount
+          )} sets. Volume ${formatVolumeWithCoverage(
             item.totalVolume, item.knownVolume
           )}${
             item.estimatedOneRepMax === null
@@ -1029,7 +969,7 @@ function ExerciseListView({
                 allowFontScaling={false}
                 style={[styles.tableFigure, styles.setsColumn]}
                 testID={`stats-exercise-sets-${item.id}`}>
-                {formatSetCountPair(item.setCount, item.workingSetCount)}
+                {formatNumber(item.workingSetCount)}
               </Text>
               <Text
                 allowFontScaling={false}
@@ -1066,7 +1006,7 @@ const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
     case 'exercise':
       return 'Exercise';
     case 'sets':
-      return 'Sets and working sets';
+      return 'Sets';
     case 'volume':
       return 'Volume';
   }
@@ -1348,13 +1288,12 @@ export default function StatsRoute() {
     const { exercises } = catalogSnapshot;
     const { aggregatesById, lastCompletedAtById } = exerciseCatalogStats;
     return exercises
-      .filter((ex) => (aggregatesById.get(ex.id)?.setCount ?? 0) > 0)
+      .filter((ex) => (aggregatesById.get(ex.id)?.workingSetCount ?? 0) > 0)
       .map((ex) => {
         const agg = aggregatesById.get(ex.id) ?? null;
         return {
           id: ex.id,
           name: ex.name,
-          setCount: agg?.setCount ?? 0,
           workingSetCount: agg?.workingSetCount ?? 0,
           totalVolume: agg ? agg.totalVolume : 0,
           knownVolume: agg ? agg.knownVolume : 0,

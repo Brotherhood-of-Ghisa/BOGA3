@@ -21,7 +21,6 @@ export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays;
 export type ExerciseAggregate = {
   exerciseDefinitionId: string;
   sessionCount: number;
-  setCount: number;
   workingSetCount: number;
   totalVolume: number | null;
   knownVolume?: number | null;
@@ -176,7 +175,6 @@ const computeSetRecencyScore = (completedAt: Date, now: Date): number => {
 const emptyAggregate = (exerciseDefinitionId: string): ExerciseAggregate => ({
   exerciseDefinitionId,
   sessionCount: 0,
-  setCount: 0,
   workingSetCount: 0,
   totalVolume: 0,
   knownVolume: 0,
@@ -219,8 +217,7 @@ const addWorkingSetToAggregate = (
 /**
  * Every figure reads working sets (`ux-rules.md` §5.11): "done", `Last:`,
  * favourite recency, session count, volume and 1RM. A warm-up-only exercise
- * did not happen as far as these go and gets no aggregate. `setCount` still
- * counts every performed set.
+ * did not happen as far as these go and gets no aggregate.
  */
 export const aggregateExerciseCatalogStats = (
   raw: ExerciseCatalogStatsRawHistory,
@@ -267,11 +264,9 @@ export const aggregateExerciseCatalogStats = (
       }
     }
 
-    if (!isInWindow(completedAt, window)) continue;
+    if (!working || !isInWindow(completedAt, window)) continue;
     const aggregate = aggregatesById.get(defId) ?? emptyAggregate(defId);
     aggregatesById.set(defId, aggregate);
-    aggregate.setCount += 1;
-    if (!working) continue;
     addWorkingSetToAggregate(aggregate, metric);
     const sessionsSeen = sessionsSeenByDef.get(defId) ?? new Set<string>();
     sessionsSeenByDef.set(defId, sessionsSeen);
@@ -279,10 +274,6 @@ export const aggregateExerciseCatalogStats = (
       sessionsSeen.add(link.sessionId);
       aggregate.sessionCount += 1;
     }
-  }
-
-  for (const [defId, aggregate] of aggregatesById) {
-    if (aggregate.sessionCount === 0) aggregatesById.delete(defId);
   }
 
   return { aggregatesById, recencyScoresById, everDoneIds, lastCompletedAtById };

@@ -556,12 +556,12 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose (target `design-targets/today-landing.md`; semantics `ux-rules.md` §7):
   - `TodayProgressCard` — one `Card`: `WeekFigures`, a `rule-soft` hairline,
     `MonthPace`, a hairline, then `Latest session` with its `All sessions`
-    text button and the latest-session link row (summary line, `W/sets ·
+    text button and the latest-session link row (summary line, `sets ·
     exercises`, the exercise names on one ellipsised line, a `record` PR count
     when it has one). testIDs `today-progress-card`, `today-all-sessions-button`,
     `today-latest-session` (`-start`, `-figures`, `-exercises`, `-prs`)
   - `WeekFigures` — `This week` with the Mon–Sun range in `ink-faint`, then
-    `Sessions`, `W/sets` and `PRs` (Plex Mono 700; a non-zero PR count in
+    `Sessions`, `Sets` and `PRs` (Plex Mono 700; a non-zero PR count in
     `record` with its `arrow-up`), each over a `ShareBar` and `of <n> last wk`.
     testIDs `today-progress-week` (`-range`), `today-progress-week-<sessions |
     working-sets | prs>` (`-value`, `-bar`, `-bar-fill`, `-previous`)
