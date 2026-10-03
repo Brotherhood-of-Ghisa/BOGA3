@@ -90,7 +90,7 @@ describe('group evaluator set facts', () => {
       fingerprint: 'fp-s1',
       rules_version: GROUP_EVAL_RULES_VERSION,
     });
-    expect(GROUP_EVAL_RULES_VERSION).toBe(4);
+    expect(GROUP_EVAL_RULES_VERSION).toBe(5);
   });
 
   it("stores the app's working-set rule: every set but a warm-up", () => {
@@ -109,8 +109,10 @@ describe('group evaluator set facts', () => {
     expect(factOf(row('s1', '30', '10'))).toMatchObject({ weight_kg: 30, e1rm_kg: estimateOneRepMax(30, 10) });
   });
 
-  it('counts a blank weight with valid reps as a performed 0 kg set with numeric zero e1RM', () => {
-    expect(factOf(row('s1', '', '8'))).toMatchObject({ performed: true, weight_kg: 0, reps: 8, e1rm_kg: 0 });
+  it('stores no e1RM at 0 kg: typed zero or blank weight with valid reps is performed, never a 1RM result', () => {
+    expect(factOf(row('s1', '', '8'))).toMatchObject({ performed: true, working: true, weight_kg: 0, reps: 8, e1rm_kg: null });
+    expect(factOf(row('s1', '0', '5'))).toMatchObject({ performed: true, working: true, weight_kg: 0, reps: 5, e1rm_kg: null });
+    expect(factOf(row('s1', '0.5', '1'))).toMatchObject({ weight_kg: 0.5, e1rm_kg: estimateOneRepMax(0.5, 1) });
   });
 
   it('nulls the numbers of a set that is not performed and passes live through', () => {

@@ -2,10 +2,13 @@ import {
   GROUP_METRICS,
   GROUP_METRIC_UNITS,
   checkGroupLinkCompatibility,
+  groupEnteredWeightFactor,
   isGroupMetricValue,
   validateGroupExerciseRules,
   type GroupExerciseRules,
 } from '@/src/groups/metric-contract';
+import loadFactorVectors from '@/src/groups/load-factor-vectors.json';
+import type { LoadInputMode } from '@/src/exercise-core';
 
 const pull: GroupExerciseRules = {
   name: 'Pull-up',
@@ -16,6 +19,13 @@ const pull: GroupExerciseRules = {
 };
 
 describe('group metric contract', () => {
+  it('matches the shared D6 load-factor vectors the server runs against group_board_load_factor', () => {
+    expect(loadFactorVectors.cases).toHaveLength(4);
+    for (const { source, target, factor } of loadFactorVectors.cases) {
+      expect(groupEnteredWeightFactor(source as LoadInputMode, target as LoadInputMode)).toBe(factor);
+    }
+  });
+
   it('uses the same Weight/1RM vocabulary for every calculation policy', () => {
     expect(GROUP_METRICS).toEqual(['weight', 'e1rm']);
     for (const defaultMetric of GROUP_METRICS) {

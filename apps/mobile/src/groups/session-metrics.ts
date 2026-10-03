@@ -33,6 +33,7 @@ export type GroupSessionMetrics = {
   workingSets: number;
   /** Working sets only; null only when a working row is invalid. */
   totalVolumeKg: number | null;
+  /** Exercises with at least one working set, as the group week summary and agent API count them. */
   exerciseCount: number;
   /** Volume coverage over the working sets. */
   coverage: VolumeCoverage;
@@ -76,10 +77,11 @@ export function selectGroupPerformedExercises(
 export function computeGroupSessionMetrics(
   exercises: GroupSessionExercise[],
 ): GroupSessionMetrics {
-  const performed = selectGroupPerformedExercises(exercises);
-  const sets = performed.flatMap(exercise => exercise.sets);
-  const working = sets.filter(set => isWorkingSetType(set.setType));
+  // Every set here is already performed, so the working-set rule is its type.
+  const workingByExercise = selectGroupPerformedExercises(exercises)
+    .map(exercise => exercise.sets.filter(set => isWorkingSetType(set.setType)));
+  const working = workingByExercise.flat();
   const coverage = summarizeVolume(working.map(set => set.metrics));
   return { workingSets: working.length, totalVolumeKg: coverage.totalVolumeKgReps,
-    exerciseCount: performed.length, coverage };
+    exerciseCount: workingByExercise.filter(sets => sets.length > 0).length, coverage };
 }

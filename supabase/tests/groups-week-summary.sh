@@ -370,6 +370,26 @@ expect_sql "facts store the working-set rule (w), independent of performed (!)" 
                      || (case when performed then '' else '!' end), ',' order by set_id)
      from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-a1';" \
   "a1=w,a2=w,a4=w!,a5=w,a6=w,a7=-,a8=w,a9=w"
+# One predicate for `working`: a fact the evaluator has not re-normalized yet
+# (working null) counts as working in the week counts and on the boards, and
+# is never a warm-up. R1's warm-up r1c, read as such a fact, in a rolled-back
+# transaction: `sets/exercises|counting on Bench|warm-up`.
+expect_sql "a fact with working null counts as working everywhere, and is not a warm-up" \
+  "begin;
+   select concat_ws('|',
+     (select working_sets || '/' || exercise_count from app_public.group_week_session_counts('${RIVAL_UID}', '${T}-r1')),
+     (select count(*) from app_public.group_board_counting('${GID}', '${RIVAL_UID}', '${GX_BENCH}')
+       where session_id = '${T}-r1'),
+     app_public.group_set_is_warm_up('${RIVAL_UID}', '${T}-r1c'));
+   update app_public.group_set_facts set working = null where member_user_id = '${RIVAL_UID}' and set_id = '${T}-r1c';
+   select concat_ws('|',
+     (select working_sets || '/' || exercise_count from app_public.group_week_session_counts('${RIVAL_UID}', '${T}-r1')),
+     (select count(*) from app_public.group_board_counting('${GID}', '${RIVAL_UID}', '${GX_BENCH}')
+       where session_id = '${T}-r1'),
+     app_public.group_set_is_warm_up('${RIVAL_UID}', '${T}-r1c'));
+   rollback;" \
+  "4/1|4|t
+5/1|5|f"
 # M1: 130 × 1 takes #1 on Weight (a group record).
 sess "${MEMBER_TOKEN}" "${T}-m1" completed "$(at 3)" "${T}-m-bench" m1:130:1:rir_0
 drain "M1"

@@ -288,8 +288,8 @@ describe('Groups tab', () => {
     expect(completed.getByText('alex')).toBeTruthy();
     expect(completed.getByText('Completed · 1h 5m')).toBeTruthy();
     expect(completed.getByText('9/11 09:05 · Iron Temple')).toBeTruthy();
-    // The 60 × 10 warm-up adds no set and no volume.
-    expect(completed.getByText('2 sets · 1012.5 kg · 2 exercises')).toBeTruthy();
+    // The 60 × 10 warm-up adds no set, no volume and, alone on its exercise, no exercise.
+    expect(completed.getByText('2 sets · 1012.5 kg · 1 exercise')).toBeTruthy();
     // One group's stream does not repeat the group name on each card.
     expect(completed.queryByText('Garage Gym')).toBeNull();
     expect(within(screen.getByTestId(cardID('friend-2:s-2'))).getByText('Training now')).toBeTruthy();
