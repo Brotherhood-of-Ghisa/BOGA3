@@ -115,7 +115,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
     {
       annotations: readOnlyAnnotations,
       description:
-        'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user. Weight is the entered kg value. When the user enables bodyweight calculations for an exercise with a positive contribution, derived metrics use the latest applicable dated reading; otherwise they use ordinary load math. Check completeness and null values; known_subtotal is not a complete total.',
+        'Get coaching context, recent performances, records, and trends for one exercise owned by the authorizing user. Weight is the entered kg value. When the user enables bodyweight calculations for an exercise with a positive contribution, derived metrics use the latest applicable dated reading; otherwise they use ordinary load math. Records, volume, 1RM and counts use working sets only: warm-ups (set_type "warm_up") are listed with their own figures but never count, and a session with only warm-ups for this exercise is left out. Check completeness and null values; known_subtotal is not a complete total.',
       inputSchema: z.object({
         exercise_id: z.string().min(1).max(200),
         recent_sessions: z.number().int().min(1).max(20).optional(),
@@ -131,7 +131,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
     {
       annotations: readOnlyAnnotations,
       description:
-        'Get compact, bounded summaries of the authorizing user’s recent completed workouts and volume coverage. Bodyweight context appears only when the user enabled it and the exercise has a positive contribution. A null total_volume.value is unavailable; known_subtotal must not be described as the total.',
+        'Get compact, bounded summaries of the authorizing user’s recent completed workouts and volume coverage. Volume and set and exercise counts use working sets only; warm-ups never count. Bodyweight context appears only when the user enabled it and the exercise has a positive contribution. A null total_volume.value is unavailable; known_subtotal must not be described as the total.',
       inputSchema: z.object({
         cursor: z.string().max(500).optional(),
         limit: z.number().int().min(1).max(25).optional(),

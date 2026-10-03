@@ -125,7 +125,7 @@ follow D1/D2, and the 1RM flags still equal `deriveSessionPersonalRecords`.
 | `M30-T01-Working_set_rule_and_records` | Shared predicate; facts v3; every PR, record and best excludes warm-ups; rule specs | none | completed |
 | `M30-T02-Working_set_measures` | Volume, heatmaps, muscle analytics, comparisons, favourites and "done" exclude warm-ups | T01 | planned |
 | `M30-T03-Sets_mean_working_sets` | Every unqualified set count is working sets; the pairs collapse | T02 | planned |
-| `M30-T04-Agent_API_working_sets` | Agent API and MCP metrics and counts exclude warm-ups | T01 | planned |
+| `M30-T04-Agent_API_working_sets` | Agent API and MCP metrics and counts exclude warm-ups | T01 | completed |
 | `M30-T05-Group_results_working_sets` | Group boards, records, certifications and week summary exclude warm-ups, forward only | T01 | planned |
 
 T01 decisions (2026-10-03): the predicate is `isWorkingSet` (plus
@@ -135,6 +135,12 @@ and callers filter, so `agent-api` output is untouched until T04. The records
 panel's `Last` skips a warm-up-only session (D2). T01 also moved exercise
 history's per-session 1RM and `Top set`, and block history's 1RM and top weight,
 because the bests read them. T02 keeps their volume.
+
+T04 decisions (2026-10-03): `agent-api` filters in its own adapter
+(`projectTrainingSets`), and the kernel is unchanged. `metric_revision` is now
+`working_sets_v1`. `exercises[].set_count` counts working sets, and
+`exercise_count` counts blocks with a working set. A warm-up-only session drops
+out of exercise context (D2).
 
 T02, T04 and T05 can run in parallel after T01. T03 follows T02 because both
 edit the same aggregators and Progress screens. `M29-T08` (exercise records on

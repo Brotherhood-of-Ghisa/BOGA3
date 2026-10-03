@@ -309,6 +309,10 @@ BLOCK_A="agent-api-${RUN_TAG}-block-a"
 SET_A1="agent-api-${RUN_TAG}-set-a1"
 SET_A2="agent-api-${RUN_TAG}-set-a2"
 SET_A3="agent-api-${RUN_TAG}-set-a3-unperformed"
+SET_A4="agent-api-${RUN_TAG}-set-a4-warm-up"
+BLOCK_A2="agent-api-${RUN_TAG}-block-a2-warm-up-only"
+SET_A2_W1="agent-api-${RUN_TAG}-set-a2-w1"
+SET_A2_W2="agent-api-${RUN_TAG}-set-a2-w2"
 NOW_MS="$(($(date +%s) * 1000))"
 STARTED_MS="$((NOW_MS - 3600000))"
 COMPLETED_MS="$((NOW_MS - 3000000))"
@@ -350,17 +354,27 @@ run_psql "
        created_at,updated_at,client_updated_at_ms)
     values
       ('${USER_A_UUID}'::uuid,'${BLOCK_A}','${SESSION_A}','${EXERCISE_A}',0,
-       'Agent A Bench','Rack 1',${NOW_MS},${NOW_MS},${NOW_MS});
+       'Agent A Bench','Rack 1',${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${BLOCK_A2}','${SESSION_A}','${EXERCISE_A2}',1,
+       'Agent A Squat',null,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_sets
       (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
        performance_status,created_at,updated_at,client_updated_at_ms)
     values
-      ('${USER_A_UUID}'::uuid,'${SET_A1}','${BLOCK_A}',0,'100','8','working',
+      ('${USER_A_UUID}'::uuid,'${SET_A1}','${BLOCK_A}',0,'100','8','rir_2',
        null,${NOW_MS},${NOW_MS},${NOW_MS}),
-      ('${USER_A_UUID}'::uuid,'${SET_A2}','${BLOCK_A}',1,'105','5','working',
+      ('${USER_A_UUID}'::uuid,'${SET_A2}','${BLOCK_A}',1,'105','5',null,
        null,${NOW_MS},${NOW_MS},${NOW_MS}),
-      ('${USER_A_UUID}'::uuid,'${SET_A3}','${BLOCK_A}',2,'200','10','working',
-       'unperformed',${NOW_MS},${NOW_MS},${NOW_MS});
+      ('${USER_A_UUID}'::uuid,'${SET_A3}','${BLOCK_A}',2,'200','10','rir_0',
+       'unperformed',${NOW_MS},${NOW_MS},${NOW_MS}),
+      -- A warm-up heavier than every working set: listed, never a stat.
+      ('${USER_A_UUID}'::uuid,'${SET_A4}','${BLOCK_A}',3,'140','5','warm_up',
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      -- A warm-up-only exercise has no stat footprint for its session.
+      ('${USER_A_UUID}'::uuid,'${SET_A2_W1}','${BLOCK_A2}',0,'60','10','warm_up',
+       null,${NOW_MS},${NOW_MS},${NOW_MS}),
+      ('${USER_A_UUID}'::uuid,'${SET_A2_W2}','${BLOCK_A2}',1,'100','5','warm_up',
+       null,${NOW_MS},${NOW_MS},${NOW_MS});
   commit;
 " >/dev/null
 
@@ -397,7 +411,7 @@ assert_status "200" "owned exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e \
   --arg exercise "${EXERCISE_A}" '
     .data.exercise.id == $exercise
-    and (.data.recent_performances[0].sets | length == 2)
+    and (.data.recent_performances[0].sets | map(.set_type)) == ["rir_2", null, "warm_up"]
     and (.data.recent_performances[0].sets | map(.performance_status) | all(. == null))
     and .data.recent_performances[0].volume.unit == "kg_reps"
     and .data.personal_records.estimated_one_rep_max.unit == "kg"
@@ -445,6 +459,48 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and (.data.workouts[0].completed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
   ' >/dev/null || fail "recent workout response is not compact and explicit"
 
+echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
+agent_get "exercises/${EXERCISE_A}/context"
+assert_status "200" "working-set exercise context"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.metric_revision == "working_sets_v1"
+  and .data.recent_performances[0].volume.value == 1325
+  and .data.recent_performances[0].volume.eligible_set_count == 2
+  and .data.recent_performances[0].estimated_one_rep_max.value < 140
+  and .data.recent_performances[0].sets[2].set_type == "warm_up"
+  and .data.recent_performances[0].sets[2].volume.value == 700
+  and .data.recent_performances[0].sets[2].estimated_one_rep_max.value > 140
+  and .data.personal_records.top_weight.value == 105
+  and .data.personal_records.estimated_one_rep_max.value < 140
+  and .data.personal_records.max_session_volume.value == 1325
+  and .data.volume_series[-1].value == 1325
+' >/dev/null || fail "a heavier warm-up leaked into exercise-context figures"
+agent_get "exercises/${EXERCISE_A2}/context"
+assert_status "200" "warm-up-only exercise context"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.recent_performances == []
+  and .data.volume_series == []
+  and .data.last_performed_at == null
+  and .data.personal_records.estimated_one_rep_max == null
+  and .data.personal_records.top_weight == null
+  and .data.personal_records.max_session_volume == null
+  and .data.personal_records.excluded_incomplete_volume_sessions == 0
+' >/dev/null || fail "a warm-up-only session left a stat footprint"
+agent_get "workouts/recent?limit=1"
+assert_status "200" "working-set recent workouts"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.metric_revision == "working_sets_v1"
+  and .data.workouts[0].exercise_count == 1
+  and (.data.workouts[0].exercises | length) == 2
+  and .data.workouts[0].completed_set_count == 2
+  and .data.workouts[0].total_volume.value == 1325
+  and .data.workouts[0].total_volume.eligible_set_count == 2
+  and .data.workouts[0].exercises[0].set_count == 2
+  and .data.workouts[0].exercises[0].volume.value == 1325
+  and .data.workouts[0].exercises[1].set_count == 0
+  and .data.workouts[0].exercises[1].volume.value == 0
+' >/dev/null || fail "warm-ups leaked into workout counts or volume"
+
 # Exercise and workout projections share the mobile load-calculation kernel.
 # Updates use the owner's database identity, as ordinary sync writes do, while
 # ownership triggers remain active throughout every parity vector.
@@ -465,7 +521,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "bodyweight_optional_v1"
+  .data.metric_revision == "working_sets_v1"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325

@@ -142,10 +142,12 @@ else
         ('${USER_UUID}'::uuid,'${BLOCK_ID}','${SESSION_ID}','${EXERCISE_ID}',0,
          '${EXERCISE_QUERY}',${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_sets
-        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,
+        (owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,
          created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8',
+        ('${USER_UUID}'::uuid,'${SET_ID}','${BLOCK_ID}',0,'20','8',null,
+         ${NOW_MS},${NOW_MS},${NOW_MS}),
+        ('${USER_UUID}'::uuid,'${SET_ID}-warm-up','${BLOCK_ID}',1,'60','5','warm_up',
          ${NOW_MS},${NOW_MS},${NOW_MS});
     commit;
   " >/dev/null
