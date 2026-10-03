@@ -60,7 +60,7 @@ import {
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
-import { closeLocalData, resetLocalData } from './helpers/local-data';
+import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 
 import TodayRoute from '../app/(tabs)/today';
 
@@ -114,9 +114,19 @@ const live = (userId: string) => ({
 
 const signedIn = () => mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: ME } });
 
+// waitFor predicates throw a plain error rather than `expect(…).toBeNull()`: a
+// failed matcher pretty-prints the route's whole fiber on every poll, which on a
+// slow runner outlasts waitFor's timeout.
+const waitForGone = (testID: string) =>
+  waitFor(() => {
+    if (screen.queryByTestId(testID)) throw new Error(`${testID} is still on screen`);
+  });
+
+// Boot first, as the app's root layout does.
 const renderToday = async () => {
+  await bootLocalApp();
   const view = render(<TodayRoute />);
-  await waitFor(() => expect(screen.queryByTestId('today-progress-loading')).toBeNull());
+  await waitForGone('today-progress-loading');
   return view;
 };
 
@@ -304,7 +314,7 @@ describe('Today: the group card offline and on errors', () => {
     await act(async () => {
       fireEvent.press(byId('today-group-inline-error-retry'));
     });
-    await waitFor(() => expect(screen.queryByTestId('today-group-inline-error')).toBeNull());
+    await waitForGone('today-group-inline-error');
   });
 
   it('moves to a remaining group when access to the shown one is lost', async () => {
