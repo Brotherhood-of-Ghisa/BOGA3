@@ -146,16 +146,19 @@ at least one working set: `session_id`, `exercise_definition_id`,
   `deriveSessionPersonalRecords` on every session.
 - **Completed-session PRs** (completion screen, completed-session route, share
   preview) read each definition's records from the sessions before the target
-  (`loadEarlierBestsByDefinition`, the same fold as the records panel). The target's best set is a PR when it beats
-  that best, which is the same test as its `pr_e1rm` flag. Jest holds the list
-  equal to the replay `deriveSessionPersonalRecords`.
+  (`loadEarlierBestsByDefinition`, the same fold as the records panel). The PR
+  is the target's record set (`tech/training-metrics-contract.md` §3). A 1RM
+  record set is the `pr_e1rm` best set. Otherwise a Weight record set is the
+  `pr_weight` top-weight set. Jest holds the list equal to the replay
+  `deriveSessionPersonalRecords`.
 - **Live record markers** (the session view's `record` band, active and
   completed-edit, and the completed-session route's set cards) read the same
   earlier best: the sessions before the viewed session's `completed_at`, or
   before now while it is active, so its own row never counts. Later sessions
-  never count, so an old session's marker equals its `pr_e1rm` flag. The
-  in-memory session is compared with `deriveExercisePersonalRecord`; a
-  definition without an earlier 1RM record shows no marker.
+  never count, so an old session's marker matches its `pr_e1rm` / `pr_weight`
+  flags. The in-memory session's record set comes from
+  `deriveExercisePersonalRecord` (contract §3). A definition without an earlier
+  record shows no marker.
 - **Exercise records** (the exercise page's records panel, exercise history's
   `All-time bests`) fold one definition's rows through the record book
   (`loadExerciseBests`). One query joins each row's best sets and its

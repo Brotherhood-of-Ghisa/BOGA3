@@ -1,3 +1,4 @@
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
@@ -16,6 +17,11 @@ const bench = {
     { id: 'b-skipped', weight: '140', reps: '5', setType: 'rir_0', performanceStatus: 'unperformed' as const },
   ],
 };
+
+const baseline = (oneRepMax: number, weight: number, reps: number): RecordBaseline => ({
+  oneRepMax,
+  weight: { weight, reps },
+});
 
 const legacy = {
   id: 'legacy',
@@ -68,32 +74,44 @@ describe('buildCompletedSessionDetailModel', () => {
     expect(model.volume).toBe('0');
   });
 
-  it('marks the best set when it beats every earlier session, and nothing otherwise', () => {
-    const beaten = buildCompletedSessionDetailModel([bench], new Map([['bench-def', 80]])).cards[0];
-    expect(beaten.recordOneRepMax).toMatch(/^\d+\.\d$/);
-    expect(beaten.rows.find((row) => row.oneRepMaxRecord)?.id).toBe('b2');
+  const flagged = (rows: { id: string; oneRepMaxRecord: boolean; weightRecord: boolean }[]) =>
+    rows.flatMap(({ id, oneRepMaxRecord, weightRecord }) =>
+      oneRepMaxRecord || weightRecord ? [{ id, oneRepMaxRecord, weightRecord }] : []);
 
-    const notBeaten = buildCompletedSessionDetailModel([bench], new Map([['bench-def', 500]])).cards[0];
-    expect(notBeaten.recordOneRepMax).toBeNull();
-    expect(notBeaten.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
+  it('marks the record set when it beats every earlier session, and nothing otherwise', () => {
+    const beaten = buildCompletedSessionDetailModel([bench], new Map([['bench-def', baseline(80, 120, 1)]])).cards[0];
+    expect(beaten.record).toEqual({ kind: 'oneRepMax', label: 'New 1RM record · 116.6', spoken: 'new 1RM record 116.6' });
+    expect(flagged(beaten.rows)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
+
+    const notBeaten = buildCompletedSessionDetailModel([bench], new Map([['bench-def', baseline(500, 120, 1)]])).cards[0];
+    expect(notBeaten.record).toBeNull();
+    expect(flagged(notBeaten.rows)).toEqual([]);
+  });
+
+  it('marks a Weight record when no 1RM beats the record', () => {
+    // As heavy as the record with more reps: a Weight record, not a 1RM one.
+    const [card] = buildCompletedSessionDetailModel([bench], new Map([['bench-def', baseline(500, 100, 4)]])).cards;
+    expect(flagged(card.rows)).toEqual([{ id: 'b2', oneRepMaxRecord: false, weightRecord: true }]);
+    expect(card.record).toEqual({ kind: 'weight', label: 'New top weight · 100.0 × 5', spoken: 'new top weight 100.0 × 5' });
   });
 
   it('never marks a warm-up heavier than the working sets as the record', () => {
     const heavyWarmUp = { ...bench, sets: [{ id: 'w', weight: '200', reps: '5', setType: 'warm_up' }, bench.sets[1]] };
 
-    const beaten = buildCompletedSessionDetailModel([heavyWarmUp], new Map([['bench-def', 80]])).cards[0];
-    expect(beaten.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '200.0 × 5', volume: '1000', oneRepMaxRecord: false });
-    expect(beaten.rows.filter((row) => row.oneRepMaxRecord).map((row) => row.id)).toEqual(['b2']);
+    const beaten = buildCompletedSessionDetailModel([heavyWarmUp], new Map([['bench-def', baseline(80, 90, 5)]])).cards[0];
+    expect(beaten.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '200.0 × 5', volume: '1000', oneRepMaxRecord: false, weightRecord: false });
+    expect(flagged(beaten.rows)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: true }]);
 
     // Only the warm-up beats the other sessions: no record.
-    const onlyWarmUpBeats = buildCompletedSessionDetailModel([heavyWarmUp], new Map([['bench-def', 150]])).cards[0];
-    expect(onlyWarmUpBeats.recordOneRepMax).toBeNull();
-    expect(onlyWarmUpBeats.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
+    const onlyWarmUpBeats = buildCompletedSessionDetailModel([heavyWarmUp], new Map([['bench-def', baseline(150, 150, 1)]])).cards[0];
+    expect(onlyWarmUpBeats.record).toBeNull();
+    expect(flagged(onlyWarmUpBeats.rows)).toEqual([]);
   });
 
-  it('shows no record without history, or for an exercise without a definition', () => {
-    expect(buildCompletedSessionDetailModel([bench], new Map()).cards[0].recordOneRepMax).toBeNull();
-    expect(buildCompletedSessionDetailModel([legacy], new Map()).cards[0].recordOneRepMax).toBeNull();
+  it('shows no record without history, against a zero baseline, or for an exercise without a definition', () => {
+    expect(buildCompletedSessionDetailModel([bench], new Map()).cards[0].record).toBeNull();
+    expect(buildCompletedSessionDetailModel([bench], new Map([['bench-def', baseline(0, 0, 9)]])).cards[0].record).toBeNull();
+    expect(buildCompletedSessionDetailModel([legacy], new Map()).cards[0].record).toBeNull();
   });
 });
 

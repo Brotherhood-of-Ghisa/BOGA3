@@ -162,8 +162,13 @@ API's `metric_revision`.
 | --- | --- |
 | Exercise page set list and band | The record set: 1RM, else Weight |
 | Exercise page records panel, exercise history `All-time bests` | All three holders, each with its session and gym |
-| Session view, completed-session cards, completion and share | 1RM records |
+| Session view, completed-session cards, completion and share | The record set: 1RM, else Weight (`deriveExercisePersonalRecord`, from `loadEarlierBestsByDefinition`) |
 | Today `PRs` | 1RM records (`pr_e1rm`) |
+
+Every screen that shows the record set highlights the figures it beat. A 1RM
+record set that is also heavier (or as heavy with more reps) than the Weight
+record highlights both. Every band reads the same words
+(`session-insights/record-band.ts`).
 
 Group boards keep their own contract (`tech/groups-contract.md`), but follow
 the same zero rule.

@@ -6,8 +6,9 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 
 // One read-only set: type · weight × reps · 1RM · VOL. No control column — a
 // card of these rows is read, not edited (`ux-rules` §14b.4). Every
-// figure in a row shares the row's colour and weight; only a record 1RM stands
-// out, in `record` (decided on device 2026-09-23: per-column bests read as noise).
+// figure in a row shares the row's colour and weight; only the record set's
+// 1RM and Weight records stand out, in `record`, as on the exercise page
+// (decided on device 2026-09-23: per-column bests read as noise).
 export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string }) {
   const state = row.done ? 'realised' : 'planned';
   return (
@@ -18,7 +19,7 @@ export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID:
       <Text
         allowFontScaling={false}
         numberOfLines={1}
-        style={[styles.weightReps, row.done ? null : styles.valuePlanned]}
+        style={[styles.weightReps, row.done ? (row.weightRecord ? styles.valueRecord : null) : styles.valuePlanned]}
         testID={`${testID}-values`}>
         {row.weightReps}
       </Text>
@@ -73,5 +74,9 @@ const styles = StyleSheet.create({
   },
   valuePlanned: {
     color: uiRoles.inkFaint,
+  },
+  valueRecord: {
+    fontWeight: '700',
+    color: uiRoles.record,
   },
 });

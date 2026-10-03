@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import type { RecordBand } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
 import { SetSummaryRow } from './set-summary-row';
@@ -18,8 +19,8 @@ type ExerciseSetsCardBaseProps = {
   // Faded when nothing is done yet.
   countMuted?: boolean;
   rows: SessionViewSetRow[];
-  // The record 1RM, formatted, when a set in this exercise is an all-time best.
-  recordOneRepMax: string | null;
+  // The `record` band when the exercise's record set is in this card.
+  record: RecordBand | null;
   // Under the header, before the set rows (exercise history's gym, tags and
   // session stats). It brings its own insets.
   summary?: ReactNode;
@@ -43,7 +44,7 @@ type ExerciseSetsCardProps = ExerciseSetsCardBaseProps &
   );
 
 // One exercise's sets as a card: name · count · accessory or control, the set
-// rows, and a `record` band when a set in it is an all-time best. The session
+// rows, and a `record` band when the exercise's record set is in it. The session
 // view, View Session and the group session view all draw an exercise with it.
 export function ExerciseSetsCard({
   name,
@@ -51,7 +52,7 @@ export function ExerciseSetsCard({
   count,
   countMuted = false,
   rows,
-  recordOneRepMax,
+  record,
   summary,
   accessory,
   control,
@@ -84,10 +85,10 @@ export function ExerciseSetsCard({
           ))}
         </View>
       ) : null}
-      {recordOneRepMax ? (
+      {record ? (
         <View style={styles.band} testID={`${testID}-record`}>
           <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} style={styles.bandLabel}>{`New 1RM record · ${recordOneRepMax}`}</Text>
+          <Text allowFontScaling={false} style={styles.bandLabel}>{record.label}</Text>
         </View>
       ) : null}
     </>

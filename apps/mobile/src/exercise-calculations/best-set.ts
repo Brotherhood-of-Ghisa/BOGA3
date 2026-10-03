@@ -1,7 +1,7 @@
 // The one best-set rule for a session's estimated 1RM (spec 05, "Exercise
 // session facts"): the exercise session facts derive their 1RM bests and PR
-// flags with it, and the session view and completed-session detail pick
-// their PR set on an in-memory session with it. Only working sets compete.
+// flags with it, and the session's record set (`records.ts`) is picked over
+// the same eligible sets. Only working sets compete.
 
 import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg } from './analytics.ts';
 import { summarizeVolume, type LoadContext, type SetMetrics } from './load-metrics.ts';

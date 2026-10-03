@@ -85,7 +85,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
             count={formatSetCount(card.rows.length)}
             key={card.id}
             name={card.name}
-            recordOneRepMax={null}
+            record={null}
             rowTestID={(row) => `group-session-set-row-${row.id}`}
             rows={card.rows}
             testID={`group-session-exercise-${card.id}`}

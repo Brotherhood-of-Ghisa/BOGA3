@@ -1,4 +1,3 @@
-import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import {
   pickSessionRecordSet, type RecordBaseline, type RecordSetCandidate,
 } from '@/src/exercise-calculations/records';
@@ -6,6 +5,7 @@ import { calculateSetMetrics, type LoadContext } from '@/src/exercise-calculatio
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import { recordBand, type RecordBand } from '@/src/session-insights/record-band';
 
 import {
   canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet,
@@ -182,26 +182,22 @@ export const buildSetRows = (
   });
 };
 
-export type SetListRecordBand = {
-  kind: 'oneRepMax' | 'weight';
-  label: string;
-};
+export type SetListRecordBand = RecordBand;
 
 /**
  * The record band for the set list, from the built rows: the session's record
- * set announced with the same words as the session view's card band. `null`
- * when no performed set beats the baseline.
+ * set announced with the same words as the session view's card band
+ * (`recordBand`). `null` when no performed set beats the baseline.
  */
 export const recordBandFor = (rows: SetRowView[]): SetListRecordBand | null => {
   const winner = rows.find((row) => row.oneRepMaxRecord || row.weightRecord);
-  if (!winner) return null;
-  if (winner.oneRepMaxRecord && winner.oneRepMax !== null) {
-    return { kind: 'oneRepMax', label: `New 1RM record · ${formatOneRepMax(winner.oneRepMax)}` };
-  }
-  if (winner.weight !== null) {
-    return { kind: 'weight', label: `New top weight · ${formatWeight(winner.weight)}` };
-  }
-  return null;
+  if (!winner || winner.weight === null || winner.reps === null) return null;
+  return recordBand({
+    kind: winner.oneRepMaxRecord ? 'oneRepMax' : 'weight',
+    weight: winner.weight,
+    reps: winner.reps,
+    estimatedOneRepMax: winner.oneRepMax,
+  });
 };
 
 /** The values the logger opens with: the row as displayed. */

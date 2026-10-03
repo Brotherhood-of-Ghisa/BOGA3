@@ -4,9 +4,10 @@ import { useCallback, useRef, useState } from 'react';
 
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import type { Session } from '@/components/session-recorder/types';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
 import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
-import { loadEarlierBestE1rmByDefinition } from '@/src/data/exercise-session-facts';
+import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
 
 import { mapDraftSnapshotToSession } from './session-model';
 
@@ -23,9 +24,9 @@ export type SessionViewData = ResolvedSessionWeight & {
   comparisonAt: Date;
   insightHistory: PersonalRecordSessionInput[];
   insightHistoryState: 'loading' | 'ready' | 'error';
-  // Each exercise definition's best 1RM in the sessions before this one;
-  // a definition without an earlier 1RM is absent. Filled once the read settles.
-  historicalBestByDefinitionId: ReadonlyMap<string, number>;
+  // Each exercise definition's records in the sessions before this one;
+  // a definition without an earlier record is absent. Filled once the read settles.
+  recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>;
 };
 
 export type SessionViewState =
@@ -94,25 +95,26 @@ export function useSessionView(sessionId: string | null) {
         comparisonAt: snapshot.completedAt ?? new Date(),
         insightHistory: [],
         insightHistoryState: 'loading',
-        historicalBestByDefinitionId: new Map(),
+        recordBaselineByDefinitionId: new Map(),
       };
       setState((current) =>
         // Keep the records already known for these exercises while history reloads.
         current.status === 'ready' && current.data.sessionId === base.sessionId
-          ? { status: 'ready', data: { ...base, historicalBestByDefinitionId: current.data.historicalBestByDefinitionId } }
+          ? { status: 'ready', data: { ...base, recordBaselineByDefinitionId: current.data.recordBaselineByDefinitionId } }
           : { status: 'ready', data: base }
       );
 
       // Independent optional enrichments: a failed comparison read must not
       // block logging or hide a record, and a blurred generation cannot land.
       await Promise.all([
-        loadEarlierBestE1rmByDefinition(
+        loadEarlierBestsByDefinition(
           { sessionId: snapshot.sessionId, completedAt: base.comparisonAt },
           session.exercises.map((exercise) => exercise.exerciseDefinitionId)
-        ).then((historicalBestByDefinitionId) => {
+        ).then((bests) => {
           if (!isCurrent()) return;
+          const recordBaselineByDefinitionId = recordBaselinesOf(bests);
           setState((current) => current.status === 'ready'
-            ? { status: 'ready', data: { ...current.data, historicalBestByDefinitionId } }
+            ? { status: 'ready', data: { ...current.data, recordBaselineByDefinitionId } }
             : current);
         }).catch(() => undefined),
         loadSessionInsightHistory({

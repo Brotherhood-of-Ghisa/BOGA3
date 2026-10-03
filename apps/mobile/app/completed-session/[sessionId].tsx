@@ -24,7 +24,8 @@ import {
   setSessionDeletedState,
   type SessionSetTypeValue,
 } from '@/src/data';
-import { loadEarlierBestE1rmByDefinition } from '@/src/data/exercise-session-facts';
+import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
@@ -78,12 +79,12 @@ export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
 export type CompletedSessionDetailDataClient = {
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
   loadInsights?(sessionId: string): Promise<CompletedSessionInsights | null>;
-  // The best 1RM of each exercise in the sessions before this one, for the
+  // Each exercise's records in the sessions before this one, for the
   // detail's record band. Optional: without it, no record shows.
   loadHistoricalBests?(
     session: { sessionId: string; completedAt: Date },
     exerciseDefinitionIds: string[]
-  ): Promise<ReadonlyMap<string, number>>;
+  ): Promise<ReadonlyMap<string, RecordBaseline>>;
   appendCompletedSessionExerciseAsPlanned(
     sessionId: string,
     sessionExerciseId: string
@@ -228,7 +229,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
     return loadCompletedSessionInsights(sessionId);
   },
   async loadHistoricalBests(session, exerciseDefinitionIds) {
-    return loadEarlierBestE1rmByDefinition(session, exerciseDefinitionIds);
+    return recordBaselinesOf(await loadEarlierBestsByDefinition(session, exerciseDefinitionIds));
   },
   async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
     return appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
@@ -264,7 +265,7 @@ export function CompletedSessionDetailScreenShell({
     setSection('summary');
     setComparisonMode('exercise');
   }
-  const [historicalBests, setHistoricalBests] = useState<ReadonlyMap<string, number>>(
+  const [historicalBests, setHistoricalBests] = useState<ReadonlyMap<string, RecordBaseline>>(
     () => new Map()
   );
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);

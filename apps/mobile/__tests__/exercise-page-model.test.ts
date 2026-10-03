@@ -163,7 +163,9 @@ describe('exercise page model', () => {
     );
     expect(heavy[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
     expect(heavy[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
-    expect(recordBandFor(heavy)).toEqual({ kind: 'weight', label: 'New top weight · 95.0' });
+    expect(recordBandFor(heavy)).toEqual({
+      kind: 'weight', label: 'New top weight · 95.0 × 1', spoken: 'new top weight 95.0 × 1',
+    });
   });
 
   it('makes a Weight record of more reps at the record weight, never of a zero', () => {
@@ -208,7 +210,9 @@ describe('exercise page model', () => {
     expect(recordBandFor(rowsFor(quietSets()))).toBeNull();
 
     const oneRepMax = rowsFor([performedSet('a', '100', '3', 'rir_0')], { oneRepMax: 100, weight: { weight: 200, reps: 5 } });
-    expect(recordBandFor(oneRepMax)).toEqual({ kind: 'oneRepMax', label: 'New 1RM record · 109.0' });
+    expect(recordBandFor(oneRepMax)).toEqual({
+      kind: 'oneRepMax', label: 'New 1RM record · 109.0', spoken: 'new 1RM record 109.0',
+    });
 
     expect(recordBandFor([])).toBeNull();
   });
