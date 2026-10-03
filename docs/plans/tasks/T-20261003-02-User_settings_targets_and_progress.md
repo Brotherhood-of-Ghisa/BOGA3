@@ -1,10 +1,10 @@
 # T-20261003-02 — New settings, UX and application integration
 
 - Status: `planned`
-- Depends on: `T-20261003-01-Settings_storage_and_migration` (merged)
+- Depends on: `T-20261003-01-Settings_storage_and_migration` (implementation PR merged)
 - Milestone: none; independent of M31
 - Areas: frontend / settings / personal analytics / effort logging; UI impact: yes
-- Delivery: one implementation task, session, worktree and PR after the settings migration
+- Delivery: one implementation task, session, worktree and PR after account-local preference isolation
 
 ## Objective
 
@@ -60,19 +60,21 @@ Changing either must not change the other or the weekly quota.
 
 All six settings are persistent: weekly muscle targets, working-set efforts,
 visible effort grades, target window, history look-back and heatmap view.
-Add them to the account-local versioned JSON record supplied by the settings
-handling task. Use its typed defaults, validation, patch updates, persistence
-and subscriptions. All six remain device-only and isolated per account.
+Add them through the account-local preference access supplied by the settings
+handling task, using the existing `expo-sqlite/kv-store`. Reuse typed defaults,
+validation, updates, persistence and subscriptions. All six remain device-only
+and isolated per account.
 
-Extend the account-local schema with muscle-target overrides keyed by stable
-muscle ID, the two independent effort selections, target-window weeks,
-history-look-back weeks and heatmap view. Existing migrated browsing preferences
-must survive these additions and every patch update. Older records missing the
-new fields receive the defaults above; do not repeat the legacy migration.
+Use scoped preference keys for muscle-target overrides keyed by stable muscle
+ID, the two independent effort selections, target-window weeks,
+history-look-back weeks and heatmap view. Missing values receive the defaults
+above. Existing browsing preferences survive these additions and every update;
+their migration is owned by the dependency task.
 
-The foundation task owns storage scopes and migration. The bodyweight setting
-remains in account-synced JSON and the theme in device JSON. This task does not
-change their ownership, synchronization or upgrade behaviour.
+The foundation task owns storage scopes and browsing migration. Bodyweight
+remains on its existing typed synced `user_settings` column, and the theme on
+its existing device-wide key. This task does not change their ownership,
+synchronization or upgrade behaviour.
 
 Settings survive relaunch and sign-out. Failed saves retain draft input and the
 last saved configuration.
@@ -141,8 +143,8 @@ and unsafe numeric inputs.
 
 ## Implementation boundaries
 
-- Reuse the settings boundary and migration shipped by the dependency. Extend
-  its account-local record and subscriptions; do not add another settings store
+- Reuse the account-local preference access shipped by the dependency. Extend
+  its typed keys and subscriptions; do not add another settings store
   or migration path. Its sign-out, failure and account-isolation rules apply.
 - Pass an explicit personal counting policy into calculations. Refresh mounted
   personal readers and validate derived facts against the policy fingerprint
@@ -173,7 +175,7 @@ and unsafe numeric inputs.
    grades, hidden historical/prescribed/inherited values and independence from
    W/sets counting. Prove both checkbox columns can be toggled independently,
    locked W-Up controls and accessible checkbox labels. Cover extension of an
-   existing migrated JSON record, defaults for the new fields and patch updates
+   account's existing scoped preferences, defaults for missing keys and updates
    preserving migrated browsing preferences.
    Read each test directory's README before edits.
 5. Update the owning data and UI specifications for shipped behaviour. Delete
