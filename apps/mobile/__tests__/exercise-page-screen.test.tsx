@@ -48,7 +48,8 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
 
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
-import { uiRoles } from '@/components/ui/tokens';
+import { Icon } from '@/components/ui/icon';
+import { uiIconSize, uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { sessions } from '@/src/data/schema';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
@@ -195,6 +196,25 @@ describe('ExercisePageScreen', () => {
 
     // The best record of the session earns the set list its band.
     expect(screen.getByTestId('exercise-record-band')).toHaveTextContent('New 1RM record · 108.3');
+  });
+
+  it('keeps both swipe symbols inside the exposed edge of the opaque logger', async () => {
+    await openPage();
+
+    const row = screen.getByTestId('exercise-set-swipe-3');
+    const [confirm, discard] = within(row).UNSAFE_getAllByType(Icon);
+    for (const [icon, edge] of [[confirm, 'left'], [discard, 'right']] as const) {
+      const style = StyleSheet.flatten(icon.parent?.props.style);
+      expect(style).toMatchObject({ [edge]: 0, alignItems: 'center' });
+      expect(style[edge === 'left' ? 'right' : 'left']).toBeUndefined();
+      // The whole glyph must clear the foreground by the 56pt trigger,
+      // independent of row width (the drag is capped at 88pt).
+      const glyphSize = uiIconSize[(icon.props.size ?? 'md') as keyof typeof uiIconSize];
+      expect((style.width - glyphSize) / 2).toBeGreaterThanOrEqual(0);
+      expect((style.width + glyphSize) / 2).toBeLessThanOrEqual(56);
+    }
+    expect(confirm.props.name).toBe('check');
+    expect(discard.props.name).toBe('x');
   });
 
   it('confirms the in-progress set from the swipe action, advancing like the tick', async () => {

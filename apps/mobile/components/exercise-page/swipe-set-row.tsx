@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui/icon';
-import { uiGeometry, uiRoles } from '@/components/ui/tokens';
+import { uiRoles } from '@/components/ui/tokens';
 
 // A drag claims the gesture only past this horizontal distance, and only
 // before the row has moved this far vertically — scrolling always wins.
@@ -80,18 +80,17 @@ const styles = StyleSheet.create({
   underlay: {
     position: 'absolute',
     top: 0,
-    left: 0,
-    right: 0,
     bottom: 0,
+    width: MAX_DRAG,
     alignItems: 'center',
     justifyContent: 'center',
   },
   underlayRight: {
+    left: 0,
     backgroundColor: uiRoles.accentWash,
-    paddingLeft: uiGeometry.tapTarget,
   },
   underlayLeft: {
+    right: 0,
     backgroundColor: uiRoles.paper,
-    paddingRight: uiGeometry.tapTarget,
   },
 });

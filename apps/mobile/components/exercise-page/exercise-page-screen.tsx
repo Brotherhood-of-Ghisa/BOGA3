@@ -208,15 +208,9 @@ export function ExercisePageScreen({
   const onSwipeRight = (setId: string) => {
     Keyboard.dismiss();
     const isTargetOpen = openSet?.id === setId;
-    const values =
-      isTargetOpen && loggerValues
-        ? loggerValues
-        : (() => {
-            const target = sets.find((s) => s.id === setId);
-            return target ? loggerValuesFor(target) : null;
-          })();
-    if (!values) return;
-    const committed = commitSet(sets, setId, values);
+    const target = sets.find((s) => s.id === setId);
+    if (!target) return;
+    const committed = commitSet(sets, setId, loggerValuesFor(target));
     if (committed === sets) return;
     if (sets[sets.length - 1]?.id !== setId) {
       updateSets(() => committed, 'structural');
