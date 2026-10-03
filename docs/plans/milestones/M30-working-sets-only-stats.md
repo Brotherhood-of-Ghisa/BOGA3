@@ -126,7 +126,7 @@ follow D1/D2, and the 1RM flags still equal `deriveSessionPersonalRecords`.
 | `M30-T02-Working_set_measures` | Volume, heatmaps, muscle analytics, comparisons, favourites and "done" exclude warm-ups | T01 | planned |
 | `M30-T03-Sets_mean_working_sets` | Every unqualified set count is working sets; the pairs collapse | T02 | planned |
 | `M30-T04-Agent_API_working_sets` | Agent API and MCP metrics and counts exclude warm-ups | T01 | completed |
-| `M30-T05-Group_results_working_sets` | Group boards, records, certifications and week summary exclude warm-ups, forward only | T01 | planned |
+| `M30-T05-Group_results_working_sets` | Group boards, records, certifications and week summary exclude warm-ups, forward only | T01 | completed |
 
 T01 decisions (2026-10-03): the predicate is `isWorkingSet` (plus
 `isWorkingSetType`) in `src/exercise-calculations/set-semantics.ts`, and
@@ -141,6 +141,13 @@ T04 decisions (2026-10-03): `agent-api` filters in its own adapter
 `working_sets_v1`. `exercises[].set_count` counts working sets, and
 `exercise_count` counts blocks with a working set. A warm-up-only session drops
 out of exercise context (D2).
+
+T05 decisions (2026-10-03): no `GROUP_EVAL_RULES_VERSION` bump (facts already
+store `working`; nothing is re-normalized or requeued). A best that was a
+warm-up falls silently at the target's next apply (attribution class `rules`:
+no lead change, void or record), and a stored warm-up record stands. Both
+certify RPCs reject a warm-up as `NOT_FOUND: record set not found`. Contract 2
+keeps a warm-up's score row with `counting = false`.
 
 T02, T04 and T05 can run in parallel after T01. T03 follows T02 because both
 edit the same aggregators and Progress screens. `M29-T08` (exercise records on

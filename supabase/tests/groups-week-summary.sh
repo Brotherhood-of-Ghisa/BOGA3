@@ -9,6 +9,7 @@
 #   - posture: the RPC is the only client-executable function; preamble,
 #     membership and validation errors, in that order;
 #   - the evaluator stores the app's working-set rule (every set but a warm-up);
+#     an exercise counts once it has a working set (warm-up-only adds none);
 #   - the board: working sets (working, performed, live, rows present)
 #     and group records (non-voided, #1 on a board) over completed, live,
 #     shared sessions started in [start, end); every current member ranked,
@@ -476,11 +477,16 @@ pass "only sessions shared to the group count"
 echo "[${LANE_LABEL}] training now"
 # =============================================================================
 
-# R4: active at a gym, two working sets on an unlinked exercise. Its session
-# and exercise rows are backdated, but its sets are fresh: still training.
+# R4: active at a gym, two working sets on an unlinked exercise, and a second
+# exercise with only a warm-up, which adds no exercise. Its session and
+# exercise rows are backdated, but its sets are fresh: still training.
 next_cuam
 push "${RIVAL_TOKEN}" "gym" "$(e_gym "${T}-gym" "Iron Temple" "${CUAM}")"
 SESSION_GYM="${T}-gym" sess "${RIVAL_TOKEN}" "${T}-r4" active "$(at 11)" "${T}-r-free" r4a:70:5:rir_1 r4b:70:5:rir_1 r4c:40:8:warm_up
+next_cuam
+push "${RIVAL_TOKEN}" "R4 warm-up-only exercise" \
+  "$(e_se "${T}-r4-se2" "${T}-r4" "${T}-r-free" 1 "Lift" "${CUAM}")" \
+  "$(e_set2 "${T}-r4w" "${T}-r4-se2" 0 40 8 warm_up "" "${CUAM}")"
 # M stale: active, every row last written three hours ago.
 sess "${MEMBER_TOKEN}" "${T}-mst" active "$(at 12)" "${T}-m-bench" ms1:20:5:rir_0
 # X: active and fresh (until removed below).

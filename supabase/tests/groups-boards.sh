@@ -8,6 +8,8 @@
 #
 #   - posture of group_board_entries / group_board_state and the read RPCs;
 #   - every row of design §5's change table (R1–R10), one section each;
+#   - working sets only: a warm-up never ranks, records or certifies, and a
+#     stored warm-up record stands while its board moves silently (forward only);
 #   - the provisional rule for active sessions (T8), D6 conversion, P7 ties,
 #     rejoin catch-up, the per-group advisory lock, apply failure isolation;
 #   - group_board_podiums / group_board / group_board_history shapes, paging,
@@ -188,8 +190,8 @@ SESSION_AT=0
 next_session_at() { SESSION_AT=$(( SESSION_AT + 60000 )); }
 
 # sess <token> <session> <active|completed> <definition> <set-spec>...
-#   set-spec = <set-suffix>:<weight>:<reps>[:<status>[:<deleted>]] on one
-#   exercise `<session>-se`; the session starts at SESSION_AT.
+#   set-spec = <set-suffix>:<weight>:<reps>[:<status>[:<deleted>[:<set_type>]]] on
+#   one exercise `<session>-se`; the session starts at SESSION_AT.
 sess() {
   local token="$1" sid="$2" status="$3" def="$4"
   shift 4
@@ -198,10 +200,10 @@ sess() {
   if [[ "${status}" == "completed" ]]; then done=$(( SESSION_AT + 3600000 )); dur=3600; fi
   local -a rows=("$(e_session "${sid}" "${SESSION_AT}" "${status}" "${done}" "${dur}" null "${CUAM}")"
                  "$(e_se "${sid}-se" "${sid}" "${def}" 0 "Lift" "${CUAM}")")
-  local order=0 spec id w r st del
+  local order=0 spec id w r st del ty
   for spec in "$@"; do
-    IFS=: read -r id w r st del <<<"${spec}"
-    rows+=("$(e_set "${T}-${id}" "${sid}-se" "${order}" "${w}" "${r}" "${st:-}" "${CUAM}" "${del:-null}")")
+    IFS=: read -r id w r st del ty <<<"${spec}"
+    rows+=("$(e_set "${T}-${id}" "${sid}-se" "${order}" "${w}" "${r}" "${st:-}" "${CUAM}" "${del:-null}" "${ty:-working}")")
     order=$(( order + 1 ))
   done
   push "${token}" "session ${sid}" "${rows[@]}"
@@ -664,6 +666,90 @@ expect_entry "${GX1}" A weight "105@r1c1" "R10 the recompute corrects entries"
 expect_sql "R10 the recompute writes no event in the group" \
   "select count(*) from app_public.group_events where group_id = '${GID}' and seq > ${MARK};" "0"
 pass "R10: rules recompute corrects entries silently"
+
+# =============================================================================
+echo "[${LANE_LABEL}] working sets only — a warm-up never counts, forward only"
+# =============================================================================
+
+GXW="$(gx "W bench" total_load)"
+DAW="${T}-dAW"; DRW="${T}-dRW"
+def "${ATHLETE_TOKEN}" "${DAW}" total_load
+link "${ATHLETE_TOKEN}" "${DAW}" "${GID}" "${GXW}"
+def "${RIVAL_TOKEN}" "${DRW}" total_load
+link "${RIVAL_TOKEN}" "${DRW}" "${GID}" "${GXW}"
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-sw-r1" completed "${DRW}" "wr1:110:5"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sw-a1" completed "${DAW}" "wa1:100:5" "wa2:130:3:::warm_up"
+drain "W baseline"
+expect_entry "${GXW}" A weight "100@wa1" "W the warm-up does not count"
+expect_entry "${GXW}" A e1rm "$(e1rm 100 5)@wa1" "W the warm-up does not count"
+expect_sql "W the warm-up made no record" \
+  "select count(*) from app_public.group_events where set_id = '${T}-wa2';" "0"
+
+# A result stored before the rule: the same apply with the warm-up's fact
+# counted, as the old board filter did. Then the fact is as it really is.
+run_psql "update app_public.group_set_facts set working = true where set_id = '${T}-wa2';
+          select app_public.group_eval_apply_legacy('${GID}', '${ATHLETE_UID}', '${GXW}', array['set']);
+          update app_public.group_set_facts set working = false where set_id = '${T}-wa2';" >/dev/null
+expect_entry "${GXW}" A weight "130@wa2" "W the stored warm-up best"
+WA2_RECORD="$(run_psql "select id from app_public.group_events where kind = 'record' and set_id = '${T}-wa2';")"
+[[ -n "${WA2_RECORD}" ]] || fail "W the stored warm-up record exists"
+
+mark
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-sw-a2" completed "${DAW}" "wa3:105:5"
+drain "W re-evaluation"
+expect_since "${GXW}" "" "W the warm-up best falls silently: no lead change, void or record"
+expect_entry "${GXW}" A weight "105@wa3" "W the entry falls to the best working set"
+expect_entry "${GXW}" A e1rm "$(e1rm 105 5)@wa3" "W the entry falls to the best working set"
+board "${OWNER_TOKEN}" "${GXW}" weight false
+expect_ok "W board"
+check_args "W the rival leads again" --arg r "${RIVAL_UID}" '.rows[0].member.user_id == $r and .rows[0].value_kg == 110'
+expect_sql "W the stored warm-up record stands (forward only)" \
+  "select count(*) from app_public.group_events where kind = 'record_voided' and related_event_id = '${WA2_RECORD}';" "0"
+
+# group_certify <token> <lifter-uid> <set-suffix>
+certify_set() {
+  rpc "$1" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GXW}" --arg m "$2" --arg s "${T}-$3" \
+      '{p_group_id: $g, p_group_exercise_id: $x, p_member_user_id: $m, p_set_id: $s}')"
+}
+certify_set "${RIVAL_TOKEN}" "${ATHLETE_UID}" wa2
+expect_error NOT_FOUND "W a stored warm-up record cannot be certified"
+check "W ... as not a record set" '.message == "NOT_FOUND: record set not found"'
+
+mark
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-sw-r2" completed "${DRW}" "wr2:200:3:::warm_up" "wr3:112:5"
+drain "W heavy warm-up"
+expect_since "${GXW}" "record@R" "W only the working set is a record"
+[[ "$(boards_of "${GXW}")" == "e1rm:$(e1rm 110 5):true,weight:110:true" ]] || fail "W record boards: $(boards_of "${GXW}")"
+expect_entry "${GXW}" R weight "112@wr3" "W a warm-up heavier than every working set never ranks"
+expect_entry "${GXW}" R e1rm "$(e1rm 112 5)@wr3" "W a warm-up heavier than every working set never ranks"
+certify_set "${ATHLETE_TOKEN}" "${RIVAL_UID}" wr2
+expect_error NOT_FOUND "W a heavy warm-up cannot be certified"
+certify_set "${ATHLETE_TOKEN}" "${RIVAL_UID}" wr3
+expect_ok "W the working record set can be certified"
+
+# A stored warm-up record whose set is edited is voided as any record is, and
+# its board move keeps its void attribution.
+DMW="${T}-dMW"
+def "${AWAY_TOKEN}" "${DMW}" total_load
+link "${AWAY_TOKEN}" "${DMW}" "${GID}" "${GXW}"
+next_session_at
+sess "${AWAY_TOKEN}" "${T}-sw-m1" completed "${DMW}" "wm0:90:5" "wm1:150:3:::warm_up"
+drain "W member warm-up"
+run_psql "update app_public.group_set_facts set working = true where set_id = '${T}-wm1';
+          select app_public.group_eval_apply_legacy('${GID}', '${AWAY_UID}', '${GXW}', array['set']);
+          update app_public.group_set_facts set working = false where set_id = '${T}-wm1';" >/dev/null
+expect_entry "${GXW}" M weight "150@wm1" "W the member's stored warm-up best leads"
+mark
+next_cuam
+push "${AWAY_TOKEN}" "edit wm1" "$(e_set "${T}-wm1" "${T}-sw-m1-se" 1 80 3 "" "${CUAM}" null warm_up)"
+drain "W warm-up record edited"
+expect_since "${GXW}" "record_voided:edited@M,lead_change:void:weight@M,lead_change:void:e1rm@M" \
+  "W an edited warm-up record is voided with its lead changes"
+pass "working sets only: never ranks, records or certifies; a stored warm-up record stands, its board moves silently"
 
 # =============================================================================
 echo "[${LANE_LABEL}] provisional records in an active session (T8)"
