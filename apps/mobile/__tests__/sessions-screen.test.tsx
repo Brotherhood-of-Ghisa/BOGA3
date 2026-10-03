@@ -105,6 +105,12 @@ describe('Sessions over real data', () => {
       'maestro_exercise_block_history_squat_5',
       'maestro_exercise_block_history_squat_6_outside_limit',
     ]);
+    // A row's `sets` are its working sets: this session's warm-up is no set,
+    // nor is the active session's bench warm-up.
+    expect(screen.getByTestId('session-summary-maestro_exercise_block_history_squat_1-sets')).toHaveTextContent('3 sets');
+    expect(screen.getByTestId(`session-summary-${ACTIVE}-sets`)).toHaveTextContent(
+      `${SESSION_VIEW_FIXTURE.workingSetCount} sets`
+    );
   });
 
   it('opens the session view when resuming the active session', async () => {

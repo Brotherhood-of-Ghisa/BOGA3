@@ -23,7 +23,8 @@ export const SESSION_VIEW_FIXTURE = {
   benchExerciseId: 'maestro_session_view_bench',
   inclineExerciseId: 'maestro_session_view_incline',
   flyExerciseId: 'maestro_session_view_fly',
-  performedSetCount: 6,
+  // The summary's `Sets`: the done sets but the bench warm-up.
+  workingSetCount: 5,
 } as const;
 
 const done = (id: string, weightValue: string, repsValue: string, setType: 'warm_up' | 'rir_0' | 'rir_1' | 'rir_2') => ({

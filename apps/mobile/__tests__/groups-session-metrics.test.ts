@@ -87,25 +87,25 @@ describe('group session metrics', () => {
       exercise('empty', []),
     ];
 
-    it('counts performed sets, sums kg × reps of working sets, and counts exercises with a performed set', () => {
-      // 102.5 × 5 + 80 × 8; the 60 × 10 warm-up counts as a set, not as volume.
+    it('counts and sums kg × reps of working sets, and counts exercises with a performed set', () => {
+      // 102.5 × 5 + 80 × 8; the 60 × 10 warm-up is neither a set nor volume.
       expect(computeGroupSessionMetrics(exercises)).toMatchObject({
-        performedSets: 3,
+        workingSets: 2,
         totalVolumeKg: 1152.5,
         exerciseCount: 2,
       });
     });
 
-    it('adds no volume or coverage for a warm-up-only exercise', () => {
+    it('adds no set, volume or coverage for a warm-up-only exercise', () => {
       const metrics = computeGroupSessionMetrics([exercise('warm', [rawSet('w1', '60', '10', { set_type: 'warm_up' })])]);
-      expect(metrics).toMatchObject({ performedSets: 1, totalVolumeKg: 0, exerciseCount: 1 });
+      expect(metrics).toMatchObject({ workingSets: 0, totalVolumeKg: 0, exerciseCount: 1 });
       expect(metrics.coverage).toMatchObject({ eligibleSetCount: 0, complete: true });
     });
 
     it('is all zeros before anything is performed', () => {
-      expect(computeGroupSessionMetrics([])).toMatchObject({ performedSets: 0, totalVolumeKg: 0, exerciseCount: 0 });
+      expect(computeGroupSessionMetrics([])).toMatchObject({ workingSets: 0, totalVolumeKg: 0, exerciseCount: 0 });
       expect(computeGroupSessionMetrics([exercises[2], exercises[3]])).toMatchObject({
-        performedSets: 0,
+        workingSets: 0,
         totalVolumeKg: 0,
         exerciseCount: 0,
       });
@@ -129,7 +129,7 @@ describe('shared-session presentation', () => {
   it('uses the same entered Weight and volume presentation as an ordinary exercise', () => {
     const row = exercise('pull-up', [rawSet('set', '10', '5')]);
     expect(computeGroupSessionMetrics([row])).toMatchObject({
-      performedSets: 1,
+      workingSets: 1,
       totalVolumeKg: 50,
       exerciseCount: 1,
     });

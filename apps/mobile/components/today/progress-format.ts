@@ -71,7 +71,7 @@ const ordinal = (day: number): string => {
 export const monthChartAccessibilityLabel = (month: TodayProgressMonth): string => {
   const sameDay = Math.min(month.dayOfMonth, month.previous.daysInMonth);
   return [
-    `Cumulative working sets: ${monthName(month.window.start)} ${month.toDate.workingSets} by the ${ordinal(month.dayOfMonth)}`,
+    `Cumulative sets: ${monthName(month.window.start)} ${month.toDate.workingSets} by the ${ordinal(month.dayOfMonth)}`,
     `against ${monthName(month.previous.window.start)} ${month.previous.toSameDay.workingSets} by the ${ordinal(sameDay)};`,
     `${monthName(month.previous.window.start)} finished at ${month.previous.total.workingSets}.`,
     `On course for ${month.projectedWorkingSets}.`,
@@ -81,9 +81,9 @@ export const monthChartAccessibilityLabel = (month: TodayProgressMonth): string 
 export const formatSessionCount = (count: number): string => plural(count, 'session', 'sessions');
 export const formatPrCount = (count: number): string => plural(count, 'PR', 'PRs');
 
-/** `12 W/sets · 4 exercises`. */
+/** `12 sets · 4 exercises`: the working sets (`ux-rules.md` §5.11). */
 export const formatLatestFigures = (latest: LatestSessionSummary): string =>
-  `${latest.workingSets} W/sets · ${plural(latest.exerciseCount, 'exercise', 'exercises')}`;
+  `${plural(latest.workingSets, 'set', 'sets')} · ${plural(latest.exerciseCount, 'exercise', 'exercises')}`;
 
 export const formatLatestDuration = (latest: LatestSessionSummary): string =>
   formatCompactDuration(latest.durationSec);
@@ -93,7 +93,7 @@ export const latestSessionAccessibilityLabel = (latest: LatestSessionSummary): s
   return [
     `Completed session on ${formatMonthDayTime(latest.startedAt.getTime())}`,
     formatLatestDuration(latest),
-    plural(latest.workingSets, 'working set', 'working sets'),
+    plural(latest.workingSets, 'set', 'sets'),
     plural(latest.exerciseCount, 'exercise', 'exercises'),
     gym ? `at ${gym}` : null,
     latest.prs > 0 ? formatPrCount(latest.prs) : null,

@@ -54,7 +54,7 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(result.everDoneIds.size).toBe(0);
   });
 
-  it('leaves warm-up sets out of volume and 1RM but still counts them as sets', () => {
+  it('leaves warm-up sets out of volume, 1RM and the set count', () => {
     const result = aggregateExerciseCatalogStats(buildRawHistory(), 7, NOW);
     const bench = result.aggregatesById.get('ex-bench');
     expect(bench).toBeDefined();
@@ -62,12 +62,12 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(bench?.totalVolume).toBe(900);
     // Best Wathan estimate of 100x5 vs 100x4 — 5 reps is higher
     expect(bench?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5)!, 5);
-    expect(bench?.setCount).toBe(3);
     // Unclassified and RIR sets are working sets; the warm-up is not.
     expect(bench?.workingSetCount).toBe(2);
+    expect(bench).not.toHaveProperty('setCount');
   });
 
-  it('counts valid performed sets and the non-warm-up working subset', () => {
+  it('counts the valid performed working sets only', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -97,7 +97,6 @@ describe('aggregateExerciseCatalogStats', () => {
 
     expect(result.aggregatesById.get('ex-counts')).toEqual(
       expect.objectContaining({
-        setCount: 5,
         workingSetCount: 4,
       })
     );
@@ -168,7 +167,7 @@ describe('aggregateExerciseCatalogStats', () => {
       NOW
     );
     expect(result.aggregatesById.get('ex-mixed')).toEqual(expect.objectContaining({
-      sessionCount: 1, setCount: 3, workingSetCount: 1, totalVolume: 300,
+      sessionCount: 1, workingSetCount: 1, totalVolume: 300,
       estimatedOneRepMax: estimateOneRepMax(60, 5),
     }));
     expect(result.lastCompletedAtById.get('ex-mixed')).toEqual(daysBefore(NOW, 10));
@@ -300,7 +299,7 @@ describe('Favourite and all-time browser history', () => {
       ],
     };
     const stats = aggregateExerciseCatalogStats(raw, 'all', NOW);
-    expect(stats.aggregatesById.get('valid')).toMatchObject({ sessionCount: 2, setCount: 4 });
+    expect(stats.aggregatesById.get('valid')).toMatchObject({ sessionCount: 2, workingSetCount: 4 });
     expect(stats.recencyScoresById.get('valid')?.completedSetCount).toBe(3);
     expect([...stats.everDoneIds]).toEqual(['valid']);
     expect([...stats.lastCompletedAtById.keys()]).toEqual(['valid']);

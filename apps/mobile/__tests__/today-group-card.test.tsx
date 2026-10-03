@@ -200,6 +200,9 @@ describe('Today: the group card', () => {
     expect(screen.queryByTestId('today-group-board-row-me')).toBeNull();
     expect(byId('today-group-board-me-rank')).toHaveTextContent('You · 4th');
     expect(byId('today-group-board-me-working-sets')).toHaveTextContent('21');
+    // The count column is the working sets, labelled `Sets` like every set count.
+    expect(within(byId('today-group-board')).getByText('Sets')).toBeTruthy();
+    expect(byId('today-group-board').props.accessibilityLabel).toContain('You, 4th, 21 sets,');
 
     fireEvent.press(byId('today-group-latest-completed'));
     fireEvent.press(byId('today-group-board'));

@@ -123,8 +123,8 @@ describe('buildLatestActivity', () => {
       sessionId: 'maria-live',
       name: 'maria',
       context: 'Started 07:40 · Iron Works',
-      figures: '7 W/sets · 3 exercises',
-      accessibilityLabel: 'maria, training now, Started 07:40 · Iron Works, 7 W/sets · 3 exercises',
+      figures: '7 sets · 3 exercises',
+      accessibilityLabel: 'maria, training now, Started 07:40 · Iron Works, 7 sets · 3 exercises',
     });
   });
 
@@ -171,9 +171,9 @@ describe('buildLatestActivity', () => {
       name: 'dave',
       status: 'Completed · 52m',
       context: '10/16 06:10 · Iron Works',
-      figures: '18 W/sets · 4 exercises',
+      figures: '18 sets · 4 exercises',
       record: { lead: 'Deadlift 1RM 213.3', note: 'group record' },
-      accessibilityLabel: 'dave, Completed · 52m, 10/16 06:10 · Iron Works, 18 W/sets · 4 exercises, Deadlift 1RM 213.3 · group record',
+      accessibilityLabel: 'dave, Completed · 52m, 10/16 06:10 · Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 · group record',
     });
   });
 

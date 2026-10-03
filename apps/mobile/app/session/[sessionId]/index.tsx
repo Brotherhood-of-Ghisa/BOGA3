@@ -424,7 +424,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         <SessionSummaryCard
           gymName={data.gymName}
           onPressGym={openGymPicker}
-          performedSetCount={model.performedSetCount}
+          workingSetCount={model.workingSetCount}
           startedAt={data.startedAt}
           times={
             data.status === 'completed'

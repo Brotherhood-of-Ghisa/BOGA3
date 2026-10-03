@@ -82,7 +82,7 @@ it.each([
   expect(daily.estimatedRM1).toBe(entry.estimatedOneRepMax);
   expect(blocks.blocks[0].estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
   expect(catalog.estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
-  expect(entry.workingSetCount).toBe(1); expect(catalog.setCount).toBe(1); expect(daily.workingSetCount).toBe(1);
+  expect(entry.workingSetCount).toBe(1); expect(catalog.workingSetCount).toBe(1); expect(daily.workingSetCount).toBe(1);
   const shown = volume === null ? '—' : String(Math.round(volume));
   expect(buildSessionViewModel(f.session, new Map()).volume).toBe(shown);
   expect(buildCompletedSessionDetailModel([f.uiExercise], new Map()).volume).toBe(shown);
@@ -93,7 +93,7 @@ it('keeps partial volume out of baselines and never awards an unavailable streng
   const invalid = fixture(80, Number.NaN, '100');
   const target = { ...known.performance, sessionId: 'later', completedAt: now };
   const incomplete = deriveSessionExerciseVolumeComparisons({ targetSession: invalid.performance, historicalSessions: [] })[0];
-  expect(incomplete).toMatchObject({ currentVolume: null, state: 'incomplete', setCount: 1, workingSetCount: 1 });
+  expect(incomplete).toMatchObject({ currentVolume: null, state: 'incomplete', workingSetCount: 1 });
   const baseline = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [invalid.performance] })[0];
   expect(baseline).toMatchObject({ currentVolume: 640, historicalSessionCount: 0, excludedHistoricalSessionCount: 1, state: 'no-history' });
   expect(deriveSessionPersonalRecords({ targetSession: { ...invalid.performance, sessionId: 'later', completedAt: now }, historicalSessions: [known.performance] })).toEqual([]);
@@ -111,12 +111,12 @@ it('withholds overflowing aggregates without losing independent counts or later 
     .toMatchObject({ totalWeight: null, knownWeight: null, setCount: 50 });
   expect(aggregateSelectedMuscleWeeklyEffort(aggregateSelectedMuscleDailyEffort(muscle, { muscleGroupIds: ['left'] }))[0])
     .toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
-  expect(aggregateStats(muscle).muscleFamilies[0]).toMatchObject({ totalVolume: null, knownVolume: null, setCount: 50 });
+  expect(aggregateStats(muscle).muscleFamilies[0]).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
   const target = { ...f.performance, exercises: [{ ...f.performance.exercises[0], sets }] };
   expect(deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [] })[0])
-    .toMatchObject({ currentVolume: null, knownVolume: null, state: 'incomplete', setCount: 50 });
+    .toMatchObject({ currentVolume: null, knownVolume: null, state: 'incomplete', workingSetCount: 50 });
   const catalog = aggregateExerciseCatalogStats({ ...muscle, exerciseDefinitions: [f.definition] }, 'all', now).aggregatesById.get('pull');
-  expect(catalog).toMatchObject({ totalVolume: null, knownVolume: null, setCount: 50 });
+  expect(catalog).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
   expect(addFiniteVolume(null, 20)).toBeNull();
   expect(formatVolumeWithCoverage(null, null)).toBe('— · unavailable');
 });

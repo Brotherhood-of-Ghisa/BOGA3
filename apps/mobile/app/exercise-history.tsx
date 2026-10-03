@@ -333,7 +333,7 @@ function SessionCard({
   return (
     <ExerciseSetsCard
       accessibilityLabel={`Open session from ${date}`}
-      count={`${rows.length} ${rows.length === 1 ? 'set' : 'sets'}`}
+      count={`${entry.workingSetCount} ${entry.workingSetCount === 1 ? 'set' : 'sets'}`}
       name={date}
       nameFace="figure"
       onPress={onPress}
@@ -357,7 +357,7 @@ function SessionCard({
             <Stat label="Top set" rank="secondary" value={formatTopSet(entry.topWeightSet)} />
             <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
               rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />
-            <Stat label="W/sets" rank="secondary" value={String(entry.workingSetCount)} />
+            <Stat label="Sets" rank="secondary" value={String(entry.workingSetCount)} />
           </View>
           {entry.totalVolume === null ? <Text allowFontScaling={false} style={styles.gym}
             testID={`exercise-history-coverage-${entry.sessionExerciseId}`}>

@@ -206,7 +206,7 @@ const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel =
     startedAtLabel: formatStreamStartedAt(item.started_at_ms),
     gymName: item.gym_name,
     groupNames: item.groups.map((group) => group.name),
-    setsLabel: formatSetCount(metrics.performedSets),
+    setsLabel: formatSetCount(metrics.workingSets),
     volumeLabel: metrics.totalVolumeKg === null
       ? `${summary.volume} kg · ${metrics.coverage.knownSetCount > 0 ? 'incomplete' : 'unavailable'}`
       : formatVolumeKg(metrics.totalVolumeKg),

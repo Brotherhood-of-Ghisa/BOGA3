@@ -124,19 +124,19 @@ describe('Stats over real data', () => {
     await renderSeededStats();
 
     expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
-    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/Sets \(W\/Sets\)\s*10 \(9\)/);
-    // Against the adjacent previous 7 days of the same fixture.
+    // One figure, the working sets (the squat warm-up is no set), against the
+    // adjacent previous 7 days of the same fixture.
+    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6');
     expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*6\s*\+3/);
-    expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/\+7 \(\+6\)/);
     expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toBeTruthy();
     // A row's own figures, from the same week.
     expect(screen.getByTestId(`stats-exercise-name-${SQUAT}`)).toHaveTextContent('Barbell Back Squat');
-    expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent(/8 \(7\)/);
-    // Volume reads the 7 working sets; the warm-up counts toward Sets only.
+    expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent(/^7$/);
+    // Sets and Volume read the 7 working sets; the warm-up adds to neither.
     expect(screen.getByTestId(`stats-exercise-volume-${SQUAT}`)).toHaveTextContent('7100');
     expect(screen.getByTestId(`stats-exercise-1rm-${SQUAT}`)).toHaveTextContent('321');
     expect(screen.queryByTestId(`stats-exercise-sessions-${SQUAT}`)).toBeNull();
-    expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel).toContain('8 sets, 7 working sets');
+    expect(screen.getByTestId(SQUAT_ROW).props.accessibilityLabel).toContain('7 sets. Volume');
   });
 
   it('re-queries the 30-day period, dropping the fixture invalid set, and back', async () => {
@@ -144,13 +144,13 @@ describe('Stats over real data', () => {
 
     fireEvent.press(screen.getByTestId('stats-period-chip-30'));
     await waitFor(() =>
-      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/15 \(14\)/)
+      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets14+14')
     );
     expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*11/);
 
     fireEvent.press(screen.getByTestId('stats-period-chip-7'));
     await waitFor(() =>
-      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/10 \(9\)/)
+      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets9+6')
     );
   });
 
@@ -160,7 +160,7 @@ describe('Stats over real data', () => {
     await renderStats();
 
     await waitFor(() =>
-      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent(/15 \(14\)/)
+      expect(screen.getByTestId('stats-card-sets')).toHaveTextContent('Sets14+14')
     );
     expect(screen.getByTestId('stats-period-chip-30')).toHaveProp('accessibilityState', { selected: true });
     expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveProp('accessibilityState', { selected: true });
@@ -248,9 +248,9 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-family-sets-legs')).toBeTruthy();
     expect(screen.getByTestId('stats-family-volume-legs')).toBeTruthy();
     expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
-    // Squat's 8 sets (7 working: all but the warm-up) land on each muscle it
-    // maps to; only the working sets add volume.
-    expect(screen.getByTestId('stats-muscle-sets-quads')).toHaveTextContent(/8 \(7\)/);
+    // Squat's 7 working sets (all but the warm-up) land on each muscle it maps
+    // to; the warm-up adds neither a set nor volume.
+    expect(screen.getByTestId('stats-muscle-sets-quads')).toHaveTextContent(/^Sets7/);
     expect(screen.getByTestId('stats-muscle-row-quads').props.accessibilityLabel).toContain('volume 3550');
   });
 

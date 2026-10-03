@@ -165,28 +165,27 @@ Brief entrypoint map of the current mobile screens.
   - valid query values set the initial controls, including the completion
     handoff at `?period=7&breakdown=muscle`; later control changes remain
     in-route state and do not rewrite the query string
-  - top summary cards show `Sessions` (a link `Card` with a chevron) and `Sets (W/Sets)` as stacked `Stat`s; their previous-period deltas are signed, in `ink-muted`, and never include percentages
+  - top summary cards show `Sessions` (a link `Card` with a chevron) and `Sets` (working sets) as stacked `Stat`s; their previous-period deltas are signed, in `ink-muted`, and never include percentages
   - per-exercise history is a viewport-fitting table with compact, single-line
-    `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values, keep
-    the working-set count in parentheses, use `—` for unavailable 1RM, allow
+    `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values
+    (`Sets` is working sets), use `—` for unavailable 1RM, allow
     exercise names to wrap without truncation, retain complete accessibility
     wording, and open the exercise's history sheet as one whole-row
     action. Only exercises with at least one working set in the selected
     7-/30-day window appear; `Vol` and `1RM` read working sets only.
   - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
     Exercise cycles most/least recently completed across all-time working-set history;
-    Sets cycles all sets high/low then working sets high/low; and Vol cycles
-    high/low. The 1RM header is static. Missing recency stays last, and ties use
+    Sets and Vol each cycle high/low. The 1RM header is static. Missing recency stays last, and ties use
     name then ID. Each sortable header reserves its inline indicator width so
     labels do not move when selection changes; the active slot alone is visible
     (`Recent` plus arrow for Exercise, arrow only for Sets/Vol). Accessibility
     wording retains the complete sort mode and next action. Mounted sort choice
     survives time-range, search, and Breakdown changes.
-  - per-muscle family and nested rows show the same set/working-set count grammar plus per-side, role-weighted `Volume` of working sets; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
+  - per-muscle family and nested rows show `Sets` (working sets) plus per-side, role-weighted `Volume` of working sets; set comparisons are signed absolute deltas while volume comparisons are percentage-only with explicit zero-baseline states
   - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight working sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - in By Muscle, a nested muscle row and a collapsed single-muscle family header open that muscle's history; a multi-muscle family header opens the whole family's (`Muscle Group History`)
   - in By Exercise, a table row opens the exercise's history
-  - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `W/sets`, plus `1RM` / `Top weight` for an exercise) and `View` (`Weekly` / `Daily`) `SegmentedControl`s, the week banner in Weekly, and the 365-day daily or weekly heatmap; loading, error and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so switching is immediate and keeps each view's selection and scroll
+  - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `Sets`, plus `1RM` / `Top weight` for an exercise) and `View` (`Weekly` / `Daily`) `SegmentedControl`s, the week banner in Weekly, and the 365-day daily or weekly heatmap; loading, error and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so switching is immediate and keeps each view's selection and scroll
 - Notes:
   - preserved tab-group route with `headerShown: false`; its exact existing UI
     is also exposed canonically at `/progress`. `BottomTray` composes
@@ -218,7 +217,7 @@ Brief entrypoint map of the current mobile screens.
     session; records compare against the completed sessions before it, never the session itself or later ones
   - shared live exercise/muscle comparisons after the exercise cards, using
     working sets and earlier completed history (loading/error is nonblocking)
-  - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
+  - summary card: Time (elapsed, ticking) / Gym / Sets (performed working sets) /
     Volume (the working sets' entered-load volume, warm-ups left out); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
     lookup (1.5 s budget), and exactly one confident match shows first as
@@ -425,8 +424,8 @@ Brief entrypoint map of the current mobile screens.
   - loading / error / not-found (on `paper`, with the top bar's back) / detail
   - `presentation=completion` (after Finish), in the design language
     (`components/session-complete/`): its own top bar `Session complete` ·
-    `Done` (`accent`); a summary card (Duration / Exercises / Sets / Working,
-    then Gym) with informational per-muscle working-set pills; every new 1RM
+    `Done` (`accent`); a summary card (Duration / Exercises / Sets, then Gym)
+    with informational `Sets by muscle` pills; every new 1RM
     record as a `record`-band card; per-exercise working-set volume versus
     median with a descriptive P5/P95 range (a warm-up-only exercise is not
     compared); and `Share session` (outline), which opens a

@@ -214,7 +214,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const loadInsights = jest.fn().mockReturnValue(new Promise((_resolve, reject) => { rejectInsights = reject; }));
     render(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
     await screen.findByText('Loading comparisons…');
-    expect(screen.getByTestId('completed-session-detail-sets')).toHaveProp('accessibilityLabel', 'Sets 5');
+    expect(screen.getByTestId('completed-session-detail-sets')).toHaveProp('accessibilityLabel', 'Sets 4');
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
     expect(screen.getByTestId('completed-session-detail-exercise-exercise-1')).toBeTruthy();
     await act(async () => rejectInsights(new Error('history offline')));

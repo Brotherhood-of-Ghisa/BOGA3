@@ -88,7 +88,7 @@ export function ViewSessionScreen({
               kind: 'text',
               testID: 'completed-session-detail-gym',
             },
-            { label: 'Sets', value: String(model.performedSetCount), testID: 'completed-session-detail-sets' },
+            { label: 'Sets', value: String(model.workingSetCount), testID: 'completed-session-detail-sets' },
             { label: model.volumeNote && model.volume !== '—' ? 'Known vol' : 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
           ]}
           note={model.volumeNote}

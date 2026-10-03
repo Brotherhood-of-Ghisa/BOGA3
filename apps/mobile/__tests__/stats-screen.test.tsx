@@ -20,7 +20,6 @@ import {
   type ExerciseListItem,
   describeExerciseSortMode,
   formatCountDelta,
-  formatSetCountPairDelta,
   formatVolumeDelta,
   nextExerciseSortMode,
   sortExerciseListItems,
@@ -40,13 +39,11 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 4,
-      setCount: 50,
       workingSetCount: 38,
       muscleFamilies: [
         {
           familyName: 'Chest',
           sortOrder: 10,
-          setCount: 12,
           workingSetCount: 3,
           totalVolume: 1800,
           muscles: [
@@ -55,7 +52,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Chest',
               familyName: 'Chest',
               sortOrder: 10,
-              setCount: 12,
               workingSetCount: 3,
               totalVolume: 1800,
             },
@@ -64,7 +60,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
         {
           familyName: 'Shoulders',
           sortOrder: 20,
-          setCount: 10,
           workingSetCount: 4,
           totalVolume: 900,
           muscles: [
@@ -73,7 +68,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Front Delts',
               familyName: 'Shoulders',
               sortOrder: 20,
-              setCount: 8,
               workingSetCount: 4,
               totalVolume: 600,
             },
@@ -82,7 +76,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Rear Delts',
               familyName: 'Shoulders',
               sortOrder: 21,
-              setCount: 2,
               workingSetCount: 0,
               totalVolume: 300,
             },
@@ -91,7 +84,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
         {
           familyName: 'Legs',
           sortOrder: 40,
-          setCount: 0,
           workingSetCount: 0,
           totalVolume: 0,
           muscles: [
@@ -100,7 +92,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Calves',
               familyName: 'Legs',
               sortOrder: 40,
-              setCount: 0,
               workingSetCount: 0,
               totalVolume: 0,
             },
@@ -117,13 +108,11 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
     },
     totals: {
       sessionCount: 3,
-      setCount: 40,
       workingSetCount: 30,
       muscleFamilies: [
         {
           familyName: 'Chest',
           sortOrder: 10,
-          setCount: 8,
           workingSetCount: 2,
           totalVolume: 1500,
           muscles: [
@@ -132,7 +121,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Chest',
               familyName: 'Chest',
               sortOrder: 10,
-              setCount: 8,
               workingSetCount: 2,
               totalVolume: 1500,
             },
@@ -141,7 +129,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
         {
           familyName: 'Shoulders',
           sortOrder: 20,
-          setCount: 8,
           workingSetCount: 3,
           totalVolume: 600,
           muscles: [
@@ -150,7 +137,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Front Delts',
               familyName: 'Shoulders',
               sortOrder: 20,
-              setCount: 6,
               workingSetCount: 3,
               totalVolume: 400,
             },
@@ -159,7 +145,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Rear Delts',
               familyName: 'Shoulders',
               sortOrder: 21,
-              setCount: 2,
               workingSetCount: 0,
               totalVolume: 200,
             },
@@ -168,7 +153,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
         {
           familyName: 'Legs',
           sortOrder: 40,
-          setCount: 0,
           workingSetCount: 0,
           totalVolume: 0,
           muscles: [
@@ -177,7 +161,6 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
               displayName: 'Calves',
               familyName: 'Legs',
               sortOrder: 40,
-              setCount: 0,
               workingSetCount: 0,
               totalVolume: 0,
             },
@@ -285,25 +268,6 @@ describe('formatCountDelta', () => {
 });
 
 describe('stats row metric formatters', () => {
-  it('formats positive, negative, mixed, and unchanged set-count pairs as absolute changes', () => {
-    expect(formatSetCountPairDelta(12, 3, 8, 2)).toEqual({
-      text: '+4 (+1)',
-      tone: 'positive',
-    });
-    expect(formatSetCountPairDelta(6, 1, 8, 2)).toEqual({
-      text: '−2 (−1)',
-      tone: 'negative',
-    });
-    expect(formatSetCountPairDelta(8, 1, 8, 2)).toEqual({
-      text: '±0 (−1)',
-      tone: 'negative',
-    });
-    expect(formatSetCountPairDelta(8, 2, 8, 2)).toEqual({
-      text: '±0 (±0)',
-      tone: 'neutral',
-    });
-  });
-
   it('formats volume as percentage-only change with explicit zero baselines', () => {
     expect(formatVolumeDelta(0, 0)).toEqual({ text: '—', tone: 'neutral' });
     expect(formatVolumeDelta(100, 0)).toEqual({ text: 'new', tone: 'new' });
@@ -340,7 +304,6 @@ describe('sortExerciseListItems', () => {
   ): ExerciseListItem => ({
     id,
     name: id,
-    setCount: 0,
     workingSetCount: 0,
     totalVolume: 0,
     estimatedOneRepMax: null,
@@ -350,9 +313,7 @@ describe('sortExerciseListItems', () => {
 
   it('cycles each header exactly and starts a newly selected header at its first state', () => {
     expect(nextExerciseSortMode('sets-desc', 'sets')).toBe('sets-asc');
-    expect(nextExerciseSortMode('sets-asc', 'sets')).toBe('working-sets-desc');
-    expect(nextExerciseSortMode('working-sets-desc', 'sets')).toBe('working-sets-asc');
-    expect(nextExerciseSortMode('working-sets-asc', 'sets')).toBe('sets-desc');
+    expect(nextExerciseSortMode('sets-asc', 'sets')).toBe('sets-desc');
 
     expect(nextExerciseSortMode('sets-desc', 'exercise')).toBe('recency-desc');
     expect(nextExerciseSortMode('recency-desc', 'exercise')).toBe('recency-asc');
@@ -368,8 +329,6 @@ describe('sortExerciseListItems', () => {
       'recency-asc',
       'sets-desc',
       'sets-asc',
-      'working-sets-desc',
-      'working-sets-asc',
       'volume-desc',
       'volume-asc',
     ].map((mode) => describeExerciseSortMode(mode as Parameters<typeof describeExerciseSortMode>[0])))
@@ -378,8 +337,6 @@ describe('sortExerciseListItems', () => {
         'Least recent exercise',
         'Sets — high to low',
         'Sets — low to high',
-        'Working sets — high to low',
-        'Working sets — low to high',
         'Volume — high to low',
         'Volume — low to high',
       ]);
@@ -401,26 +358,24 @@ describe('sortExerciseListItems', () => {
     ]);
   });
 
-  it('sorts all-set, working-set, and volume values in both directions', () => {
+  it('sorts set (working-set) and volume values in both directions', () => {
     const items = [
-      item('alpha', { name: 'Alpha', setCount: 8, workingSetCount: 1, totalVolume: 300 }),
-      item('beta', { name: 'Beta', setCount: 4, workingSetCount: 3, totalVolume: 100 }),
-      item('gamma', { name: 'Gamma', setCount: 6, workingSetCount: 2, totalVolume: 200 }),
+      item('alpha', { name: 'Alpha', workingSetCount: 1, totalVolume: 300 }),
+      item('beta', { name: 'Beta', workingSetCount: 3, totalVolume: 100 }),
+      item('gamma', { name: 'Gamma', workingSetCount: 2, totalVolume: 200 }),
     ];
 
-    expect(sortExerciseListItems(items, 'sets-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
-    expect(sortExerciseListItems(items, 'sets-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
-    expect(sortExerciseListItems(items, 'working-sets-desc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
-    expect(sortExerciseListItems(items, 'working-sets-asc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
+    expect(sortExerciseListItems(items, 'sets-desc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+    expect(sortExerciseListItems(items, 'sets-asc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
     expect(sortExerciseListItems(items, 'volume-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
     expect(sortExerciseListItems(items, 'volume-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
   });
 
   it('uses name then ID tie-breakers and never mutates the input array', () => {
     const items = [
-      item('z', { name: 'Same', setCount: 4 }),
-      item('b', { name: 'Bench Press', setCount: 7 }),
-      item('a', { name: 'Same', setCount: 4 }),
+      item('z', { name: 'Same', workingSetCount: 4 }),
+      item('b', { name: 'Bench Press', workingSetCount: 7 }),
+      item('a', { name: 'Same', workingSetCount: 4 }),
     ];
     const originalOrder = [...items];
     const sorted = sortExerciseListItems(items);
@@ -442,9 +397,8 @@ describe('StatsScreenShell', () => {
     expect(sessionsCard).not.toHaveTextContent('%');
 
     const setsCard = screen.getByTestId('stats-card-sets');
-    expect(setsCard).toHaveTextContent(/Sets \(W\/Sets\)/i);
-    expect(setsCard).toHaveTextContent(/50 \(38\)/);
-    expect(setsCard).toHaveTextContent(/\+10 \(\+8\)/);
+    // One figure: the working sets, with a single absolute delta.
+    expect(setsCard).toHaveTextContent(/^Sets38\+8$/);
     expect(setsCard).not.toHaveTextContent('%');
   });
 
@@ -452,8 +406,7 @@ describe('StatsScreenShell', () => {
     renderStatsScreenShell();
 
     const shouldersSets = screen.getByTestId('stats-family-sets-shoulders');
-    expect(shouldersSets).toHaveTextContent(/10 \(4\)/);
-    expect(shouldersSets).toHaveTextContent(/\+2 \(\+1\)/);
+    expect(shouldersSets).toHaveTextContent(/^Sets4\+1$/);
     expect(shouldersSets).not.toHaveTextContent('%');
 
     const shouldersVolume = screen.getByTestId('stats-family-volume-shoulders');
@@ -463,8 +416,7 @@ describe('StatsScreenShell', () => {
 
     // Nested muscle row also carries its own delta.
     const frontDeltsSets = screen.getByTestId('stats-muscle-sets-front_delts');
-    expect(frontDeltsSets).toHaveTextContent(/8 \(4\)/);
-    expect(frontDeltsSets).toHaveTextContent(/\+2 \(\+1\)/);
+    expect(frontDeltsSets).toHaveTextContent(/^Sets4\+1$/);
 
     expect(screen.queryByText('Total weight')).toBeNull();
     expect(screen.queryByTestId('stats-family-sessions-shoulders')).toBeNull();
@@ -488,7 +440,7 @@ describe('StatsScreenShell', () => {
     // `ink-muted` are illegible there.
     const shadedSets = within(screen.getByTestId('stats-family-sets-shoulders'));
     expect(StyleSheet.flatten(shadedSets.getByText('Sets').props.style).color).toBe(uiRoles.ink);
-    expect(StyleSheet.flatten(shadedSets.getByText('+2 (+1)').props.style).color).toBe(uiRoles.ink);
+    expect(StyleSheet.flatten(shadedSets.getByText('+1').props.style).color).toBe(uiRoles.ink);
     expect(
       screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
     ).toBeNull();
@@ -509,7 +461,6 @@ describe('StatsScreenShell', () => {
             {
               id: 'bench',
               name: 'Bench Press',
-              setCount: 8,
               workingSetCount: 4,
               totalVolume: 1000,
               estimatedOneRepMax: 100,
@@ -528,13 +479,13 @@ describe('StatsScreenShell', () => {
     renderStatsScreenShell();
 
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      '10 sets, 4 working sets. up 2 sets and up 1 working sets'
+      '4 sets. up 1 sets'
     );
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      'strongest shade at 8 working sets for the selected 7-day period'
+      'strongest shade at 8 sets for the selected 7-day period'
     );
     expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
-      '8 sets, 4 working sets'
+      '4 sets. up 1 sets'
     );
   });
 
@@ -793,9 +744,9 @@ describe('StatsScreenShell', () => {
     );
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
-      /W\/sets: 2/
+      /Sets: 2/
     );
-    expect(screen.getByText('W/sets per day')).toBeTruthy();
+    expect(screen.getByText('Sets per day')).toBeTruthy();
   });
 
   it('shows the selected metric in the week selection banner', () => {
@@ -833,7 +784,7 @@ describe('StatsScreenShell', () => {
       />
     );
     expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /W\/sets: 2/
+      /Sets: 2/
     );
   });
 
@@ -872,7 +823,6 @@ describe('StatsScreenShell — view mode toggle', () => {
   ): ExerciseListItem => ({
     id,
     name,
-    setCount: 5,
     workingSetCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
@@ -958,7 +908,7 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     const sessions = within(screen.getByTestId('stats-card-sessions'));
     const sets = within(screen.getByTestId('stats-card-sets'));
-    for (const node of [sessions.getByText('+1'), sets.getByText('+10 (+8)')]) {
+    for (const node of [sessions.getByText('+1'), sets.getByText('+8')]) {
       expect(StyleSheet.flatten(node.props.style).color).toBe(uiRoles.inkMuted);
     }
     // The Sessions card is a link to the list, marked by a chevron.
@@ -976,8 +926,9 @@ describe('StatsScreenShell — view mode toggle', () => {
     });
 
     expect(screen.getByTestId('stats-exercise-table-header')).toBeTruthy();
-    expect(screen.getByText('Exercise')).toBeTruthy();
-    expect(screen.getByText('Sets')).toBeTruthy();
+    const header = within(screen.getByTestId('stats-exercise-table-header'));
+    expect(header.getByText('Exercise')).toBeTruthy();
+    expect(header.getByText('Sets')).toBeTruthy();
     expect(screen.getByText('Vol')).toBeTruthy();
     expect(screen.getByText('1RM')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-header-oneRepMax').props.accessibilityRole).toBe(
@@ -999,7 +950,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       flexDirection: 'row',
       minHeight: uiGeometry.tapTarget,
     });
-    expect(screen.getByText('Sets').props.numberOfLines).toBe(1);
+    expect(header.getByText('Sets').props.numberOfLines).toBe(1);
     expect(screen.getByTestId('stats-exercise-1rm-missing')).toHaveTextContent('—');
     expect(screen.getByTestId('stats-exercise-row-missing').props.accessibilityLabel).toContain(
       'Estimated one rep max unavailable'
@@ -1025,22 +976,19 @@ describe('StatsScreenShell — view mode toggle', () => {
       onPressExerciseHistory,
       exerciseListItems: [
         buildExerciseListItem('alpha', 'Alpha', {
-          setCount: 10,
-          workingSetCount: 1,
+          workingSetCount: 10,
           totalVolume: 100,
           estimatedOneRepMax: null,
           lastCompletedAt: new Date('2026-01-01T00:00:00Z'),
         }),
         buildExerciseListItem('beta', 'Beta', {
-          setCount: 5,
-          workingSetCount: 3,
+          workingSetCount: 5,
           totalVolume: 300,
           estimatedOneRepMax: 90,
           lastCompletedAt: new Date('2026-03-01T00:00:00Z'),
         }),
         buildExerciseListItem('gamma', 'Gamma', {
-          setCount: 7,
-          workingSetCount: 2,
+          workingSetCount: 7,
           totalVolume: 200,
           estimatedOneRepMax: 120,
           lastCompletedAt: new Date('2026-02-01T00:00:00Z'),
@@ -1056,19 +1004,11 @@ describe('StatsScreenShell — view mode toggle', () => {
     );
     expect(sortArrow('sets')).toBe('up');
     fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
-    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
-      'Current sort: Working sets — high to low'
-    );
-    expect(sortArrow('sets')).toBe('down');
-    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
     expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);
-    expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
-      'Current sort: Working sets — low to high'
-    );
-    fireEvent.press(screen.getByTestId('stats-exercise-sort-sets'));
     expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityLabel).toContain(
       'Current sort: Sets — high to low'
     );
+    expect(sortArrow('sets')).toBe('down');
 
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
     expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
@@ -1187,7 +1127,6 @@ describe('StatsScreenShell — search & filtering', () => {
   const buildExerciseListItem = (id: string, name: string) => ({
     id,
     name,
-    setCount: 5,
     workingSetCount: 2,
     totalVolume: 2500,
     estimatedOneRepMax: 110,
@@ -1316,12 +1255,12 @@ describe('StatsScreenShell — search & filtering', () => {
 
 it('keeps partial volume readable and uses ordinary strength copy for bodyweight arithmetic', () => {
   render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseListItems: [{
-    id: 'bw', name: 'Pull-up', setCount: 2, workingSetCount: 2,
+    id: 'bw', name: 'Pull-up', workingSetCount: 2,
     totalVolume: null, knownVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
   }] })} />);
   expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');
   expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
   expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
-    .toBe('Open Pull-up heatmap. 2 sets, 2 working sets. Volume 800 · incomplete. Estimated one rep max 128 kg');
+    .toBe('Open Pull-up heatmap. 2 sets. Volume 800 · incomplete. Estimated one rep max 128 kg');
 });

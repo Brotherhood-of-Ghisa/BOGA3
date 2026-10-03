@@ -9,7 +9,7 @@ const partial: VolumeCoverage = { knownVolumeKgReps: 500, totalVolumeKgReps: nul
 const note = 'Volume incomplete. Known subtotal from 1 of 2 working sets.';
 
 it('keeps an active session subtotal compact and its incomplete coverage readable', () => {
-  render(<SessionSummaryCard startedAt={new Date()} gymName={null} performedSetCount={2}
+  render(<SessionSummaryCard startedAt={new Date()} gymName={null} workingSetCount={2}
     {...sessionVolumeSummary(partial)} onPressGym={() => {}} />);
   expect(screen.getByTestId('session-view-summary-volume').props.accessibilityLabel).toBe('Known vol 500');
   expect(screen.getByTestId('session-view-summary-volume-note')).toHaveTextContent(note);
@@ -18,7 +18,7 @@ it('keeps an active session subtotal compact and its incomplete coverage readabl
 it('keeps the same coverage visible on a completed session', () => {
   render(<ViewSessionScreen section="sets" onSectionChange={() => {}} summaryContent={null}
     summary={{ start: '2026-09-20 12:00', end: '2026-09-20 13:00', duration: '1h', gymName: null, deleted: false }}
-    model={{ cards: [], performedSetCount: 2, ...sessionVolumeSummary(partial) }} error={null}
+    model={{ cards: [], workingSetCount: 2, ...sessionVolumeSummary(partial) }} error={null}
     onBack={() => {}} onEdit={() => {}} onToggleDeleted={() => {}} onAppend={() => {}} />);
   expect(screen.getByTestId('completed-session-detail-volume').props.accessibilityLabel).toBe('Known vol 500');
   expect(screen.getByTestId('completed-session-detail-summary-note')).toHaveTextContent(note);

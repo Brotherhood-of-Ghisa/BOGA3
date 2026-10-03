@@ -72,8 +72,8 @@ function BoardRow({ row }: { row: WeekBoardRowViewModel }) {
 const boardAccessibilityLabel = (title: string, board: WeekBoardViewModel): string =>
   [
     title,
-    ...board.rows.map((row) => `${row.rank}, ${row.name}, ${row.workingSets} working sets, ${row.groupRecords} PRs`),
-    board.me ? `You, ${board.me.rankLabel}, ${board.me.workingSets} working sets, ${board.me.groupRecords} PRs` : null,
+    ...board.rows.map((row) => `${row.rank}, ${row.name}, ${row.workingSets} sets, ${row.groupRecords} PRs`),
+    board.me ? `You, ${board.me.rankLabel}, ${board.me.workingSets} sets, ${board.me.groupRecords} PRs` : null,
   ]
     .filter(Boolean)
     .join('; ');
@@ -99,7 +99,7 @@ function WeekBoard({ board, title, onPress }: { board: WeekBoardViewModel; title
           {title}
         </Text>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.columnLabel]}>
-          W/S
+          Sets
         </Text>
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelFaint, styles.columnLabel]}>
           PRs
@@ -273,7 +273,8 @@ export function TodayGroupCard({
 const BAR_HEIGHT = 12;
 const RANK_WIDTH = 14;
 const NAME_WIDTH = 72;
-const FIGURE_WIDTH = 30;
+// Fits the widest column label, `SETS`.
+const FIGURE_WIDTH = 36;
 
 const styles = StyleSheet.create({
   switcher: {

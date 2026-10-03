@@ -292,7 +292,7 @@ describe('completion presentation over real data', () => {
       /\d+% (above|below) median|At median/
     );
     // Neither set has an effort; untagged sets are working sets.
-    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 working set');
+    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set');
     expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
@@ -475,9 +475,9 @@ describe('a session written through the app', () => {
     expect(label('completed-session-detail-times-end')).toMatch(/^End \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     expect(label('completed-session-detail-duration')).toBe('Duration 58m');
     expect(label('completed-session-detail-gym')).toBe('Gym Westside Barbell Club');
-    expect(label('completed-session-detail-sets')).toBe('Sets 5');
     // Working sets only: 185×8 + 185×6 + 185×5 + 120×12, no thousands
-    // separator; the 135×8 warm-up counts as a set but adds no volume.
+    // separator; the 135×8 warm-up is neither a set nor volume.
+    expect(label('completed-session-detail-sets')).toBe('Sets 4');
     expect(label('completed-session-detail-volume')).toBe('Volume 4955');
     // The bench comparison reads the same working sets: 185×8 + 185×6 + 185×5.
     expect(
@@ -488,7 +488,8 @@ describe('a session written through the app', () => {
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
     const bench = within(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}`));
     expect(bench.getByText('Barbell Bench Press')).toBeTruthy();
-    expect(bench.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-count`)).toHaveTextContent('4 sets');
+    // Three working sets; the warm-up keeps its row.
+    expect(bench.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-count`)).toHaveTextContent('3 sets');
     for (const type of ['W-Up', 'RIR 0', 'RIR 1', 'RIR 3']) {
       expect(bench.getByText(type)).toBeTruthy();
     }
@@ -548,14 +549,15 @@ describe('a session written through the app', () => {
     );
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
 
+    // The warm-up keeps its row but is no set.
     expect(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-count`)).toHaveTextContent(
-      '5 sets'
+      '4 sets'
     );
     expect(screen.getByText('0.0 × 5')).toBeTruthy();
     expect(screen.queryByText('-1.0 × 5')).toBeNull();
     expect(screen.queryByText('500.0 × 10')).toBeNull();
     expect(screen.queryByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}`)).toBeNull();
-    expect(label('completed-session-detail-sets')).toBe('Sets 5');
+    expect(label('completed-session-detail-sets')).toBe('Sets 4');
   });
 
   it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {
@@ -568,14 +570,17 @@ describe('a session written through the app', () => {
     expect(within(screen.getByTestId('session-completion-top-bar')).getByText('Session complete')).toBeTruthy();
     expect(label('session-completion-duration')).toBe('Duration 58m');
     expect(label('session-completion-exercises')).toBe('Exercises 2');
-    expect(label('session-completion-sets')).toBe('Sets 5');
-    expect(label('session-completion-working-sets')).toBe('Working 4');
+    // One set count, the working sets: no separate `Working` fact.
+    expect(label('session-completion-sets')).toBe('Sets 4');
+    expect(screen.queryByTestId('session-completion-working-sets')).toBeNull();
     expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 working sets');
-    expect(screen.getByText('4 sets · 3 working')).toBeTruthy();
+    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 sets');
+    // Each comparison card counts working sets only, with no second count.
+    expect(screen.getByText('3 sets')).toBeTruthy();
     // The untagged pulldown set is a working set.
-    expect(screen.getByText('1 set · 1 working')).toBeTruthy();
+    expect(screen.getByText('1 set')).toBeTruthy();
+    expect(screen.queryByText(/· \d+ working/)).toBeNull();
     expect(screen.queryByText('Numbers in brackets are working sets.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-action-bar')).toBeNull();
@@ -583,6 +588,12 @@ describe('a session written through the app', () => {
 
     fireEvent.press(screen.getByTestId('session-completion-done'));
     expect(mockReplace).toHaveBeenCalledWith('/progress');
+
+    // The share image shows one set count, the working sets.
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    const shareCard = within(screen.getByTestId('session-share-card'));
+    expect(shareCard.getByText('58m · 2 exercises · 4 sets')).toBeTruthy();
+    expect(shareCard.queryByText(/working/)).toBeNull();
   });
 
   it('restores section and grouping on return from editing, re-reading facts, sets and comparisons', async () => {

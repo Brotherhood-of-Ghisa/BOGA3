@@ -35,7 +35,7 @@ export type HistoryMetricOption<TMetric extends CalendarHeatmapMetric> = {
 
 const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
   totalVolume: 'Volume',
-  workingSetCount: 'W/sets',
+  workingSetCount: 'Sets',
   estimatedRM1: '1RM',
   highestWeight: 'Top weight',
 };

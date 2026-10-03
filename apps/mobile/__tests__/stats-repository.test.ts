@@ -53,12 +53,13 @@ const flattenMuscles = (totals: ReturnType<typeof aggregateStats>) =>
   totals.muscleFamilies.flatMap((family) => family.muscles);
 
 describe('aggregateStats', () => {
-  it('counts all valid performed sets and the non-warm-up working subset', () => {
+  it('counts the valid performed working sets: a warm-up is no set', () => {
     const totals = aggregateStats(buildAggregationInput());
 
     expect(totals.sessionCount).toBe(2);
-    expect(totals.setCount).toBe(7);
+    // Seven valid performed sets, one of them a warm-up.
     expect(totals.workingSetCount).toBe(6);
+    expect(totals).not.toHaveProperty('setCount');
   });
 
   it('excludes valid but unconfirmed sets from set and muscle totals', () => {
@@ -73,10 +74,8 @@ describe('aggregateStats', () => {
 
     const totals = aggregateStats(input);
     const byId = new Map(flattenMuscles(totals).map((entry) => [entry.muscleGroupId, entry]));
-    expect(totals.setCount).toBe(7);
     expect(totals.workingSetCount).toBe(6);
     expect(byId.get('chest_sternal')?.totalVolume).toBe(1300);
-    expect(byId.get('chest_sternal')?.setCount).toBe(4);
     expect(byId.get('chest_sternal')?.workingSetCount).toBe(3);
   });
 
@@ -88,21 +87,17 @@ describe('aggregateStats', () => {
     );
 
     // chest_sternal (primary): working bench sets 100x5 + 110×4 + 120×3 = 1300;
-    // the 100×5 warm-up counts as a set but adds no volume.
+    // the 100×5 warm-up adds no set and no volume.
     expect(byId.get('chest_sternal')?.totalVolume).toBe(1300);
-    expect(byId.get('chest_sternal')?.setCount).toBe(4);
     expect(byId.get('chest_sternal')?.workingSetCount).toBe(3);
     // triceps (secondary on bench): 1300 × 0.5 = 650
     expect(byId.get('triceps')?.totalVolume).toBe(650);
-    expect(byId.get('triceps')?.setCount).toBe(4);
     expect(byId.get('triceps')?.workingSetCount).toBe(3);
     // biceps (primary on curl): 20×10 + 20×8 = 360
     expect(byId.get('biceps')?.totalVolume).toBe(360);
-    expect(byId.get('biceps')?.setCount).toBe(2);
     expect(byId.get('biceps')?.workingSetCount).toBe(2);
     // calves only stabilizer mapping → 0
     expect(byId.get('calves')?.totalVolume).toBe(0);
-    expect(byId.get('calves')?.setCount).toBe(0);
     expect(byId.get('calves')?.workingSetCount).toBe(0);
   });
 
@@ -112,17 +107,14 @@ describe('aggregateStats', () => {
     const familiesByName = new Map(totals.muscleFamilies.map((family) => [family.familyName, family]));
 
     // Chest family: just chest_sternal so it inherits its totals.
-    expect(familiesByName.get('Chest')?.setCount).toBe(4);
     expect(familiesByName.get('Chest')?.workingSetCount).toBe(3);
     expect(familiesByName.get('Chest')?.totalVolume).toBe(1300);
 
-    // Arms family: six distinct physical sets across biceps and triceps.
-    expect(familiesByName.get('Arms')?.setCount).toBe(6);
+    // Arms family: five distinct physical working sets across biceps and triceps.
     expect(familiesByName.get('Arms')?.workingSetCount).toBe(5);
     expect(familiesByName.get('Arms')?.totalVolume).toBe(360 + 650);
 
     // Legs untrained.
-    expect(familiesByName.get('Legs')?.setCount).toBe(0);
     expect(familiesByName.get('Legs')?.workingSetCount).toBe(0);
     expect(familiesByName.get('Legs')?.totalVolume).toBe(0);
   });
@@ -138,9 +130,8 @@ describe('aggregateStats', () => {
     const totals = aggregateStats(input);
     const arms = totals.muscleFamilies.find((family) => family.familyName === 'Arms');
 
-    // The four bench sets contribute to both biceps and triceps, but count once
-    // at family level; the two curl sets remain distinct.
-    expect(arms?.setCount).toBe(6);
+    // The three working bench sets contribute to both biceps and triceps, but
+    // count once at family level; the two curl sets remain distinct.
     expect(arms?.workingSetCount).toBe(5);
     expect(arms?.totalVolume).toBe(360 + 1300 + 650);
   });
@@ -184,12 +175,11 @@ describe('aggregateStats', () => {
     const totals = aggregateStats(input);
     const chest = flattenMuscles(totals).find((entry) => entry.muscleGroupId === 'chest_sternal');
     // Confirmed blank weight with valid reps is another zero-load working set.
-    expect(totals.setCount).toBe(4);
     expect(totals.workingSetCount).toBe(3);
-    expect(chest).toMatchObject({ setCount: 4, workingSetCount: 3, totalVolume: 100 });
+    expect(chest).toMatchObject({ workingSetCount: 3, totalVolume: 100 });
   });
 
-  it('gives a muscle trained only by warm-ups no volume, while the session still counts', () => {
+  it('gives a muscle trained only by warm-ups no sets or volume, while the session still counts', () => {
     const input = buildAggregationInput({
       sessions: [{ id: 'session-1', completedAt: new Date('2026-05-12T10:00:00.000Z') }],
       sessionExercises: [{ id: 'se-1', sessionId: 'session-1', exerciseDefinitionId: 'ex-bench' }],
@@ -199,7 +189,9 @@ describe('aggregateStats', () => {
     const totals = aggregateStats(input);
     const chest = flattenMuscles(totals).find((entry) => entry.muscleGroupId === 'chest_sternal');
     expect(totals.sessionCount).toBe(1);
-    expect(chest).toMatchObject({ setCount: 1, workingSetCount: 0, totalVolume: 0, knownVolume: 0 });
+    expect(totals.workingSetCount).toBe(0);
+    expect(chest).toMatchObject({ workingSetCount: 0, totalVolume: 0, knownVolume: 0 });
+    expect(chest).not.toHaveProperty('setCount');
   });
 
   it('always returns the full muscle taxonomy grouped by family', () => {
@@ -224,12 +216,10 @@ describe('aggregateStats', () => {
     );
 
     expect(totals.sessionCount).toBe(0);
-    expect(totals.setCount).toBe(0);
     expect(totals.workingSetCount).toBe(0);
     expect(
       totals.muscleFamilies.every(
         (family) =>
-          family.setCount === 0 &&
           family.workingSetCount === 0 &&
           family.totalVolume === 0
       )

@@ -1,6 +1,6 @@
 import { appendSuggestedPlan, createExercise } from '@/src/session-recorder/session-model';
 import { isWorkingSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
-import { countMuscleAnalyticsPerformedSets, countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
+import { countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
 
 // The session view's set factories. Copying the previous set's effort when a
 // set is added is the exercise page's `addSet` (exercise-page-model.test.ts).
@@ -54,8 +54,8 @@ describe('working-set rule', () => {
       muscleMappings: [],
       muscleGroups: [],
     };
+    // Seven valid performed sets, one of them a warm-up.
     expect(countMuscleAnalyticsWorkingSets(input)).toBe(6);
-    expect(countMuscleAnalyticsPerformedSets(input)).toBe(7);
   });
 
   it('does not count invalid performed sets', () => {

@@ -17,7 +17,6 @@ type SessionCompletionScreenProps = {
   durationDisplay: string;
   exerciseCount: number;
   gymName: string | null;
-  performedSetCount: number;
   workingSetCount: number;
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
@@ -30,8 +29,7 @@ type SessionCompletionScreenProps = {
 
 /**
  * The completion screen after Finish, in the design language: `Session
- * complete` · Done (where Finish sat), the summary card with working sets by
- * muscle, every new 1RM record, each exercise's volume against its history,
+ * complete` · Done (where Finish sat), the summary card with sets by muscle, every new 1RM record, each exercise's volume against its history,
  * and `Share session`. Stored context only; history is optional enrichment.
  */
 export function SessionCompletionScreen({
@@ -39,7 +37,6 @@ export function SessionCompletionScreen({
   durationDisplay,
   exerciseCount,
   gymName,
-  performedSetCount,
   workingSetCount,
   personalRecords,
   exerciseVolumeComparisons,
@@ -58,13 +55,7 @@ export function SessionCompletionScreen({
             [
               { label: 'Duration', value: durationDisplay, testID: 'session-completion-duration' },
               { label: 'Exercises', value: String(exerciseCount), testID: 'session-completion-exercises' },
-              { label: 'Sets', value: String(performedSetCount), testID: 'session-completion-sets' },
-              {
-                label: 'Working',
-                value: String(workingSetCount),
-                align: 'end',
-                testID: 'session-completion-working-sets',
-              },
+              { label: 'Sets', value: String(workingSetCount), align: 'end', testID: 'session-completion-sets' },
             ],
             [
               {
@@ -77,7 +68,7 @@ export function SessionCompletionScreen({
           ]}
           testID="session-completion-context">
           <SessionMuscleBreakdown
-            performedSetCount={performedSetCount}
+            workingSetCount={workingSetCount}
             muscleSummary={muscleSummary}
             muscleCatalogState={muscleCatalogState}
           />
@@ -87,7 +78,6 @@ export function SessionCompletionScreen({
           completedAt={completedAt}
           durationDisplay={durationDisplay}
           exerciseCount={exerciseCount}
-          performedSetCount={performedSetCount}
           workingSetCount={workingSetCount}
           personalRecords={personalRecords}
           exerciseVolumeComparisons={exerciseVolumeComparisons}

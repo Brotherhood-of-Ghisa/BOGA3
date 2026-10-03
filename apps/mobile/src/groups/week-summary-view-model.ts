@@ -67,9 +67,9 @@ export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string): 
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** `7 W/sets · 3 exercises`. */
+/** `7 sets · 3 exercises`: the working sets (`ux-rules.md` §5.11). */
 export const formatWeekSessionFigures = (session: { working_sets: number; exercise_count: number }): string =>
-  `${session.working_sets} W/sets · ${formatExerciseCount(session.exercise_count)}`;
+  `${plural(session.working_sets, 'set', 'sets')} · ${formatExerciseCount(session.exercise_count)}`;
 
 const isSameLocalDay = (a: number, b: number): boolean => new Date(a).toDateString() === new Date(b).toDateString();
 

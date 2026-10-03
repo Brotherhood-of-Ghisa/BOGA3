@@ -101,11 +101,6 @@
       "count": 1
     }
   },
-  "src/data/exercise-catalog-stats.ts": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "src/data/muscle-analytics.ts": {
     "sonarjs/cognitive-complexity": {
       "count": 1

@@ -286,8 +286,8 @@ describe('Groups tab', () => {
     expect(completed.getByText('alex')).toBeTruthy();
     expect(completed.getByText('Completed · 1h 5m')).toBeTruthy();
     expect(completed.getByText('9/11 09:05 · Iron Temple')).toBeTruthy();
-    // The 60 × 10 warm-up counts as a set but adds no volume.
-    expect(completed.getByText('3 sets · 1012.5 kg · 2 exercises')).toBeTruthy();
+    // The 60 × 10 warm-up adds no set and no volume.
+    expect(completed.getByText('2 sets · 1012.5 kg · 2 exercises')).toBeTruthy();
     // One group's stream does not repeat the group name on each card.
     expect(completed.queryByText('Garage Gym')).toBeNull();
     expect(within(screen.getByTestId(cardID('friend-2:s-2'))).getByText('Training now')).toBeTruthy();
@@ -568,6 +568,8 @@ describe("Friend's session view", () => {
     expect(screen.queryByText(/New 1RM record/)).toBeNull();
     // The server sends the planned set too; the device shows performed sets only.
     expect(screen.queryByTestId('group-session-set-row-set-3')).toBeNull();
+    // `Sets` counts working sets: the warm-up keeps its row but is no set.
+    expect(screen.getByTestId('group-session-sets').props.accessibilityLabel).toBe('Sets 1');
     expect(screen.getByText('Bench Press')).toBeTruthy();
     expect(screen.getByText('alex')).toBeTruthy();
     expect(screen.getByText('Completed · 1h 5m')).toBeTruthy();

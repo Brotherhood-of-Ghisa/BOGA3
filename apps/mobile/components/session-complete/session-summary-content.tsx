@@ -14,9 +14,9 @@ const formatCount = (count: number, singular: string): string =>
   `${count} ${count === 1 ? singular : `${singular}s`}`;
 
 export function SessionMuscleBreakdown({
-  performedSetCount, muscleSummary, muscleCatalogState, standalone = false,
+  workingSetCount, muscleSummary, muscleCatalogState, standalone = false,
 }: {
-  performedSetCount: number;
+  workingSetCount: number;
   muscleSummary: CurrentSessionMuscleSummary | null;
   muscleCatalogState: MuscleCatalogState;
   standalone?: boolean;
@@ -24,14 +24,14 @@ export function SessionMuscleBreakdown({
   const workingSetsByMuscle = muscleSummary?.workingSetsByMuscle ?? [];
   return (
     <>
-      {performedSetCount > 0 ? (
+      {workingSetCount > 0 ? (
         <View style={[styles.muscles, standalone && styles.standaloneMuscles]} testID="session-completion-muscle-breakdown">
-          <Text allowFontScaling={false} style={styles.microLabel}>Working sets by muscle</Text>
+          <Text allowFontScaling={false} style={styles.microLabel}>Sets by muscle</Text>
           {workingSetsByMuscle.length > 0 ? (
             <View style={styles.pills}>
               {workingSetsByMuscle.map((muscle) => (
                 <View
-                  accessibilityLabel={`${muscle.displayName}, ${formatCount(muscle.workingSetCount, 'working set')}`}
+                  accessibilityLabel={`${muscle.displayName}, ${formatCount(muscle.workingSetCount, 'set')}`}
                   accessible
                   key={muscle.id}
                   style={styles.pill}
@@ -68,7 +68,7 @@ export type SessionSummaryContentProps = SessionShareSnapshot & {
 
 /** Shared summary body; each host owns its facts, header and navigation. */
 export function SessionSummaryContent({
-  completedAt, durationDisplay, exerciseCount, performedSetCount, workingSetCount,
+  completedAt, durationDisplay, exerciseCount, workingSetCount,
   personalRecords, exerciseVolumeComparisons, muscleVolumeComparisons = [],
   historyState = 'ready', unavailableMessage, muscleCatalogState = 'ready', comparisonMode, onComparisonModeChange,
   shouldFailNextShare = false,
@@ -116,7 +116,6 @@ export function SessionSummaryContent({
           completedAt,
           durationDisplay,
           exerciseCount,
-          performedSetCount,
           workingSetCount,
           personalRecords,
           exerciseVolumeComparisons,
