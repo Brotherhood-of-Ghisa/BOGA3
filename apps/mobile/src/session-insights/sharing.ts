@@ -1,5 +1,5 @@
 import * as Sharing from 'expo-sharing';
-import type { View } from 'react-native';
+import type { ViewInstance } from 'react-native';
 import { captureRef, releaseCapture } from 'react-native-view-shot';
 
 const SESSION_SHARE_IMAGE_WIDTH_PX = 1080;
@@ -22,7 +22,7 @@ export type SessionShareImageClient = {
 };
 
 export const captureSessionShareImage = async (
-  target: View,
+  target: ViewInstance,
   dimensions: SessionShareCaptureDimensions
 ): Promise<string> => {
   if (

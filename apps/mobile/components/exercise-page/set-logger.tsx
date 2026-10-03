@@ -1,6 +1,6 @@
 import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
 import { forwardRef } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } from 'react-native';
 
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
@@ -53,7 +53,7 @@ const DASH = '—';
  * The tick is the screen's one `accent` primary; it is disabled until the
  * values are a valid set.
  */
-export const SetLogger = forwardRef<TextInput, SetLoggerProps>(function SetLogger(
+export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function SetLogger(
   { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext },
   weightInputRef
 ) {

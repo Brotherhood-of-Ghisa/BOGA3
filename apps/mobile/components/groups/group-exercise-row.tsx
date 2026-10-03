@@ -1,5 +1,5 @@
 import type { Ref } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
 import { ActionButton, Icon, ListRow, Tag, uiBorder, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { GroupExerciseRowViewModel } from '@/src/groups';
@@ -16,7 +16,7 @@ type GroupExerciseRowProps = {
   onLink?: () => void;
   onUnlink?: () => void;
   unlinkPending?: boolean;
-  focusRef?: Ref<View>;
+  focusRef?: Ref<ViewInstance>;
   /** A `rule-soft` hairline above the item (every item but the card's first). */
   divider?: boolean;
 };

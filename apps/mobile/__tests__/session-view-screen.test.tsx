@@ -132,8 +132,9 @@ const sessionRow = (sessionId: string) =>
 const answerAlerts = (answer: (title: string) => string) => {
   const titles: string[] = [];
   jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
-    titles.push(title);
-    const choice = answer(title);
+    const safeTitle = title ?? '';
+    titles.push(safeTitle);
+    const choice = answer(safeTitle);
     buttons?.find((button) => button.text === choice)?.onPress?.();
   });
   return titles;

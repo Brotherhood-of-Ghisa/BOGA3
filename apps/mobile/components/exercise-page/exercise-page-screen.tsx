@@ -8,7 +8,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  type TextInput,
+  type TextInputInstance,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -128,7 +128,7 @@ export function ExercisePageScreen({
   // `null` follows the cursor: the logger sits on the first set not performed.
   const [openSetId, setOpenSetId] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
-  const weightInputRef = useRef<TextInput>(null);
+  const weightInputRef = useRef<TextInputInstance>(null);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();

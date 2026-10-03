@@ -33,7 +33,7 @@ const stub = (testID: string) =>
   };
 
 it('opens Settings from the More row, inside the tab shell with More still active', async () => {
-  const router = renderRouter(
+  const router = await renderRouter(
     {
       '(tabs)/_layout': TabsLayout,
       '(tabs)/today': stub('today-stub'),

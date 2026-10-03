@@ -69,8 +69,8 @@ function RootLayout() {
   );
 }
 
-const render = (initialUrl: string) =>
-  renderRouter(
+const render = async (initialUrl: string) =>
+  await renderRouter(
     {
       _layout: RootLayout,
       'sign-in': SignInRoute,
@@ -123,7 +123,7 @@ afterEach(() => {
 
 it('keeps a cold-launch deep link through the session restore and the first flag read', async () => {
   mockAuth = { ...mockAuth, status: 'idle' };
-  const router = render('/profile');
+  const router = await render('/profile');
   expect(await screen.findByTestId('auth-guard-loading')).toBeTruthy();
 
   await act(async () => mockSetAuth({ status: 'restoring' }));
@@ -137,14 +137,14 @@ it('keeps a cold-launch deep link through the session restore and the first flag
 });
 
 it('lands a signed-out launch on sign-in', async () => {
-  const router = render('/');
+  const router = await render('/');
 
   expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
   expect(router.getPathname()).toBe('/sign-in');
 });
 
 it('keeps a signed-out deep link to an app route on sign-in', async () => {
-  const router = render('/profile');
+  const router = await render('/profile');
 
   expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
   expect(router.getPathname()).toBe('/sign-in');
@@ -152,7 +152,7 @@ it('keeps a signed-out deep link to an app route on sign-in', async () => {
 });
 
 it('moves from sign-in to the first-sync block, then to the app once the first sync drains', async () => {
-  const router = render('/');
+  const router = await render('/');
   await screen.findByTestId('sign-in-screen');
 
   await signIn();
@@ -167,7 +167,7 @@ it('moves from sign-in to the first-sync block, then to the app once the first s
 it('goes straight to the app when a restored session has already synced', async () => {
   mockAuth = { ...mockAuth, session: SESSION };
   await setBootstrapped(true);
-  const router = render('/');
+  const router = await render('/');
 
   expect(await screen.findByTestId('today-stub')).toBeTruthy();
   expect(router.getPathname()).toBe('/today');
@@ -176,7 +176,7 @@ it('goes straight to the app when a restored session has already synced', async 
 it('returns to sign-in from a pushed app screen on sign-out, and back to the app on sign-in', async () => {
   mockAuth = { ...mockAuth, session: SESSION };
   await setBootstrapped(true);
-  const router = render('/');
+  const router = await render('/');
   await screen.findByTestId('today-stub');
   act(() => navigate.push('/profile'));
   expect(screen.getByTestId('profile-stub')).toBeTruthy();
@@ -192,7 +192,7 @@ it('returns to sign-in from a pushed app screen on sign-out, and back to the app
 it('routes a signed-in user to sign-in when a cycle reports no signed-in user', async () => {
   mockAuth = { ...mockAuth, session: SESSION };
   await setBootstrapped(true);
-  const router = render('/');
+  const router = await render('/');
   await screen.findByTestId('today-stub');
 
   await act(async () => markAuthRequired());
@@ -202,7 +202,7 @@ it('routes a signed-in user to sign-in when a cycle reports no signed-in user', 
 });
 
 it('holds on sign-in, without looping, while a live session still has auth-required raised', async () => {
-  const router = render('/');
+  const router = await render('/');
   await screen.findByTestId('sign-in-screen');
   markAuthRequired();
 
@@ -218,20 +218,20 @@ it('holds on sign-in, without looping, while a live session still has auth-requi
 it('keeps the dev/test harness reachable over the first-sync block, and not while signed out', async () => {
   mockAuth = { ...mockAuth, session: SESSION };
   await setBootstrapped(false);
-  const signedInRouter = render('/maestro-harness');
+  const signedInRouter = await render('/maestro-harness');
   expect(await screen.findByTestId('harness-stub')).toBeTruthy();
   expect(signedInRouter.getPathname()).toBe('/maestro-harness');
   signedInRouter.unmount();
 
   mockAuth = { ...mockAuth, session: null };
-  const signedOutRouter = render('/maestro-harness');
+  const signedOutRouter = await render('/maestro-harness');
   expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
   expect(signedOutRouter.getPathname()).toBe('/sign-in');
 });
 
 it('opens the app on an unconfigured build and still reaches the disabled sign-in screen', async () => {
   mockAuth = { isConfigured: false, session: null, status: 'ready' };
-  const router = render('/');
+  const router = await render('/');
 
   expect(await screen.findByTestId('today-stub')).toBeTruthy();
   act(() => navigate.push('/sign-in'));

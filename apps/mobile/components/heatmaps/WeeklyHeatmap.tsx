@@ -3,7 +3,7 @@
 // 12-week average baseline · selection lifted to the history sheet's week banner.
 
 import React, { useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, uiGeometry, uiRoles, uiSpace } from '@/components/ui';
 
@@ -43,7 +43,7 @@ export function WeeklyHeatmap({
 }: Props) {
   const weeks = data.weekly;
   const [chartW, setChartW] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const GAP = 4;
   // Bar width is keyed to a ~3-month viewport (~13 week columns fill the visible width),
   // matching the daily view; older history is reachable by scrolling horizontally.
