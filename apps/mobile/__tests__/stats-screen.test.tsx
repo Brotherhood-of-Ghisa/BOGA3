@@ -194,7 +194,6 @@ const buildShellProps = (
   muscleHistoryMetric: 'totalVolume',
   muscleHistoryView: 'weekly',
   onSelectMuscleHistoryMetric: jest.fn(),
-  onSelectMuscleHistoryView: jest.fn(),
   viewMode: 'muscle',
   onSelectViewMode: jest.fn(),
   exerciseListItems: [],
@@ -210,7 +209,6 @@ const buildShellProps = (
   onDismissExerciseHistory: jest.fn(),
   onSelectExerciseHistoryWeek: jest.fn(),
   onSelectExerciseHistoryMetric: jest.fn(),
-  onSelectExerciseHistoryView: jest.fn(),
   historyTodayDateKey: '2026-06-05',
   searchQuery: '',
   onSearchQueryChange: jest.fn(),
@@ -255,8 +253,8 @@ describe('Progress route parity', () => {
 
 describe('formatPeriodComparison', () => {
   it('names the adjacent earlier period of the selected range', () => {
-    expect(formatPeriodComparison(7)).toBe('vs prev 7 days');
-    expect(formatPeriodComparison(30)).toBe('vs prev 30 days');
+    expect(formatPeriodComparison(7)).toBe('vs prev 1 wk');
+    expect(formatPeriodComparison(28)).toBe('vs prev 4 wks');
   });
 });
 
@@ -406,7 +404,7 @@ describe('StatsScreenShell', () => {
 
     const setsCard = screen.getByTestId('stats-card-sets');
     // One figure: the working sets, with a single absolute delta.
-    expect(setsCard).toHaveTextContent(/^Sets38\+8 vs prev 7 days$/);
+    expect(setsCard).toHaveTextContent(/^Sets38\+8 vs prev 1 wk$/);
     expect(setsCard).not.toHaveTextContent('%');
   });
 
@@ -439,7 +437,7 @@ describe('StatsScreenShell', () => {
     // One ramp for families and muscles alike (DLM-T08-D3): the shade is the
     // row's ground, a band around the pressable row.
     expect(screen.getByTestId('stats-family-header-shoulders-shade')).toHaveStyle({
-      backgroundColor: uiRoles.viz2,
+      backgroundColor: uiRoles.viz1,
     });
     expect(screen.getByTestId('stats-muscle-row-front_delts-shade')).toHaveStyle({
       backgroundColor: uiRoles.viz2,
@@ -490,7 +488,7 @@ describe('StatsScreenShell', () => {
       '4 sets. up 1 sets'
     );
     expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      'strongest shade at 8 sets for the selected 7-day period'
+      'average attainment of 2 muscle targets over 1 weeks, capped per muscle at 100%'
     );
     expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
       '4 sets. up 1 sets'
@@ -814,9 +812,9 @@ describe('StatsScreenShell', () => {
 
 describe('Stats route parameters', () => {
   it('validates initial period and breakdown query values', () => {
-    expect(resolveStatsInitialPeriod('30')).toBe(30);
+    expect(resolveStatsInitialPeriod('30')).toBe(28);
     expect(resolveStatsInitialPeriod(['7'])).toBe(7);
-    expect(resolveStatsInitialPeriod('all')).toBe(7);
+    expect(resolveStatsInitialPeriod('all')).toBe(28);
     expect(resolveStatsInitialBreakdown('muscle')).toBe('muscle');
     expect(resolveStatsInitialBreakdown(['exercise'])).toBe('exercise');
     expect(resolveStatsInitialBreakdown('unknown')).toBe('exercise');
@@ -848,8 +846,8 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     expect(screen.getByTestId('stats-time-range-controls')).toHaveTextContent(/Time range/);
     expect(screen.getByTestId('stats-breakdown-controls')).toHaveTextContent(/Breakdown/);
-    expect(screen.getByTestId('stats-period-chip-7')).toHaveTextContent('Last 7 days');
-    expect(screen.getByTestId('stats-period-chip-30')).toHaveTextContent('Last 30 days');
+    expect(screen.getByTestId('stats-period-chip-7')).toHaveTextContent('This week');
+    expect(screen.getByTestId('stats-period-chip-28')).toHaveTextContent('4 weeks');
     expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveTextContent('By Exercise');
     expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveTextContent('By Muscle');
   });
@@ -916,7 +914,7 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     const sessions = within(screen.getByTestId('stats-card-sessions'));
     const sets = within(screen.getByTestId('stats-card-sets'));
-    for (const node of [sessions.getByText('+1 vs prev 7 days'), sets.getByText('+8 vs prev 7 days')]) {
+    for (const node of [sessions.getByText('+1 vs prev 1 wk'), sets.getByText('+8 vs prev 1 wk')]) {
       expect(StyleSheet.flatten(node.props.style).color).toBe(uiRoles.inkMuted);
     }
     // The Sessions card is a link to the list, marked by a chevron.

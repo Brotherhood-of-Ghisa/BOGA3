@@ -118,7 +118,7 @@ export function WeeklyHeatmap({
                     <Pressable
                       key={w.weekStartDateKey}
                       accessibilityRole="button"
-                      accessibilityLabel={`Week of ${w.weekStartDateKey}, ${w.unavailable ? 'metric unavailable or incomplete' : w.hasTraining || w.value > 0 ? `value ${formatValue(w.value)}` : 'Rest week'}`}
+                      accessibilityLabel={`Week of ${w.weekStartDateKey}, ${w.unavailable ? 'metric unavailable or incomplete' : w.hasTraining || w.value > 0 ? `value ${formatValue(w.value)}` : 'Rest week'}${w.targetAttainment === undefined ? '' : `, ${Math.round(w.targetAttainment * 100)}% of weekly muscle target${data.targetLegend?.includes('average') ? ', averaged across muscles' : ''}`}`}
                       accessibilityState={{ selected: on }}
                       onPress={() => onSelectWeek(on ? null : w.weekStartDateKey)}
                       testID={`${heatmapTestID}-cell-${w.weekStartDateKey}`}
@@ -192,6 +192,7 @@ export function WeeklyHeatmap({
       </View>
 
       <HeatmapLegend label={legendLabel} />
+      {data.targetLegend ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>{data.targetLegend}. Full colour at 100%.</Text> : null}
       {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
         ?: unavailable or incomplete load; excluded from the average
       </Text> : null}

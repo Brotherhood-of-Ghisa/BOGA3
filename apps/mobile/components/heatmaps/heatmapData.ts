@@ -6,6 +6,7 @@
 
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
+import { groupedTargetAttainment, type MuscleTargets } from '@/src/preferences/targets';
 
 import {
   getCalendarHeatmapBucket,
@@ -25,6 +26,8 @@ export interface DayCell {
   unavailable?: boolean;
   knownValue?: number | null;
   hasTraining?: boolean;
+  targetAttainment?: number;
+  workingSetCountsByMuscle?: Record<string, number>;
 }
 
 export interface WeekCell {
@@ -38,12 +41,14 @@ export interface WeekCell {
   unavailable?: boolean;
   knownValue?: number | null;
   hasTraining?: boolean;
+  targetAttainment?: number;
 }
 
 export interface HeatmapData {
   daily: DayCell[];
   weekly: WeekCell[];
   todayDateKey: string;
+  targetLegend?: string;
 }
 
 export interface BuildHeatmapDataOptions {
@@ -55,6 +60,7 @@ export interface BuildHeatmapDataOptions {
    * to the 52-week default when there is less data), so the grid grows with the data.
    */
   weeks?: number | 'all';
+  muscleTargets?: { muscleIds: readonly string[]; weeklyTargets: MuscleTargets };
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -158,6 +164,7 @@ const toDayCell = (
     value,
     unavailable,
     hasTraining: source !== undefined,
+    workingSetCountsByMuscle: source?.workingSetCountsByMuscle,
     // A volume day with some unknown load still reports the volume it does know.
     knownValue: unavailable && metric === 'totalVolume' ? source?.knownVolume : value,
   };
@@ -170,6 +177,7 @@ type WeekTotals = {
   knownValue: number | null;
   unavailable: boolean;
   hasKnown: boolean;
+  workingSetCountsByMuscle: Record<string, number>;
 };
 
 const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
@@ -179,9 +187,13 @@ const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
   knownValue: 0,
   unavailable: false,
   hasKnown: false,
+  workingSetCountsByMuscle: {},
 });
 
 const addDayToWeek = (week: WeekTotals, day: DayCell, metric: CalendarHeatmapMetric): void => {
+  for (const [id, count] of Object.entries(day.workingSetCountsByMuscle ?? {})) {
+    week.workingSetCountsByMuscle[id] = (week.workingSetCountsByMuscle[id] ?? 0) + count;
+  }
   const combine = isAdditiveMetric(metric) ? addFiniteVolume : bestOf;
   if (day.hasTraining) week.sessions++;
   if (day.hasTraining && !day.unavailable) week.hasKnown = true;
@@ -224,7 +236,7 @@ const toWeekCell = (weekStartDateKey: string, week: WeekTotals, todayWeekKey: st
 };
 
 /**
- * Build the daily grid (full Monday-aligned 52-week span, rest days included) and
+ * Build the daily grid (Monday-aligned selected week span, rest days included) and
  * the matching weekly series for one selected metric.
  */
 export function buildHeatmapData(
@@ -247,5 +259,16 @@ export function buildHeatmapData(
     [...accumulateWeeks(daily, metric)].map(([weekStartDateKey, week]) => toWeekCell(weekStartDateKey, week, todayWeekKey))
   );
 
-  return { daily, weekly, todayDateKey };
+  const target = metric === 'workingSetCount' ? options.muscleTargets : undefined;
+  if (!target) return { daily, weekly, todayDateKey };
+  const grade = (counts: Record<string, number> | undefined) =>
+    groupedTargetAttainment(target.muscleIds, counts ?? {}, target.weeklyTargets);
+  const targetDaily = daily.map(day => withTargetLevel(day, grade(day.workingSetCountsByMuscle)));
+  const totals = accumulateWeeks(daily, metric);
+  const targetWeekly = weekly.map(week => withTargetLevel(week, grade(totals.get(week.weekStartDateKey)?.workingSetCountsByMuscle)));
+  return { daily: targetDaily, weekly: targetWeekly, todayDateKey,
+    targetLegend: target.muscleIds.length === 1 ? 'Colour: share of weekly muscle target' : 'Colour: average share of muscle targets' };
 }
+
+const withTargetLevel = <T extends { level: CalendarHeatmapBucket }>(cell: T, targetAttainment: number) =>
+  ({ ...cell, targetAttainment, level: Math.min(4, Math.ceil(targetAttainment * 4)) as CalendarHeatmapBucket });

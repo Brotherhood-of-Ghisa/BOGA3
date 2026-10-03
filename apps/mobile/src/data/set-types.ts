@@ -38,14 +38,22 @@ export const SESSION_SET_TYPE_CYCLE: readonly SessionSetTypeValue[] = [
   'warm_up', null, ...[...RIR_SESSION_SET_TYPES].reverse(),
 ];
 
-export const nextSessionSetType = (value: SessionSetTypeValue): SessionSetTypeValue => {
-  const index = SESSION_SET_TYPE_CYCLE.indexOf(normalizeSessionSetType(value));
+export const getSessionSetTypeCycle = (grades: readonly number[] = RIR_SESSION_SET_TYPES.map(value => Number(value.slice(4)))): readonly SessionSetTypeValue[] =>
+  ['warm_up', null, ...[...grades].sort((left, right) => right - left).map((rir): RirSessionSetType => `rir_${rir}`)];
+
+export const nextSessionSetType = (value: SessionSetTypeValue, grades?: readonly number[]): SessionSetTypeValue => {
+  const cycle = getSessionSetTypeCycle(grades);
+  const index = cycle.indexOf(normalizeSessionSetType(value));
   // A historical effort outside the configured range re-enters at Warm-up.
-  return SESSION_SET_TYPE_CYCLE[(index + 1) % SESSION_SET_TYPE_CYCLE.length];
+  return cycle[(index + 1) % cycle.length];
 };
 
-/** Undefined means no previous set; any stored RIR is inherited losslessly. */
-export const defaultSessionSetType = (previous: SessionSetTypeValue | undefined): SessionSetTypeValue => {
+/** Hidden RIR advances toward harder visible effort; no successor keeps the inherited value. */
+export const defaultSessionSetType = (previous: SessionSetTypeValue | undefined, grades?: readonly number[]): SessionSetTypeValue => {
   if (previous === undefined) return 'warm_up';
-  return getSessionSetRir(previous) !== null ? previous : null;
+  const rir = getSessionSetRir(previous);
+  if (rir === null) return null;
+  if (!grades || grades.includes(rir)) return previous;
+  const next = [...grades].sort((left, right) => right - left).find(grade => grade < rir);
+  return next === undefined ? previous : `rir_${next}`;
 };

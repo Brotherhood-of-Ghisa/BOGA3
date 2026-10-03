@@ -236,9 +236,9 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 10. Entering profile edit mode reveals `username`, `new email`, and `new password` fields in place (not a sheet), plus `Cancel` (text) and a single `Update` submit action, the screen's one `accent`; update failures stay inline and successful updates return to view mode.
 11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
     - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
-    - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
+    - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; logging choices use the saved visible RIR grades (default 0–3) in descending order, and a stored hidden RIR stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
     - `W-Up` marks a set as warm-up effort. What counts toward a statistic — the working set and the counted session — is defined once in `tech/training-metrics-contract.md` (§1–§2, with the one predicate and the code that applies it); this section says what the screens show. A warm-up is never a record (no `record` highlight), never a PR, and never the baseline a later set must beat, and a session whose only sets of an exercise are warm-ups sets no record or `Last` for it. A warm-up row still shows its own 1RM and volume, which describe that set alone. Every statistic reads working sets: volume and its coverage note (`Known subtotal from X of Y working sets`), heatmaps, muscle volume, muscle load and failure intensity, the exercise and muscle comparisons with their medians and ranges, favourites, `Last:`, "done", and every session count. A set count with no qualifier is working sets too, labelled `Sets` (`<n> sets` inline), and no screen shows a second all-sets count beside it; only row counts that are not statistics (the session view card's `n of m sets done` and the remove-exercise alert's `its N sets`) count every row.
-    - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
+    - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits a visible previous RIR otherwise. A hidden inherited RIR advances to the next lower visible grade in the descending effort order; if there is no successor, it stays unchanged. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
 12. Session comparisons are shared across active sessions, completion and View Session Summary. An active session's live comparison body is its own screen, `Session vs history`, opened from the session view's ⋮ (§14b.3), not a section of the view; logging stays usable while history loads or fails.
@@ -404,8 +404,9 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    Progress-owned path rather than a second tab.
 3. `exercise-catalog` supports session-entry query semantics (`source=session`, `intent=manage`) for the exercise picker's `Manage` flow (back returns to the session view with the picker as it was left), while the picker's `Add new` uses the same exercise editor inside the session view route.
 4. Stats / History accepts validated initial `period=7|30` and
-   `breakdown=exercise|muscle` values. Absent or invalid values retain the
-   seven-day / By Exercise defaults; in-screen changes remain volatile state.
+   `breakdown=exercise|muscle` values. `period=7` selects This week; `30`, absent
+   or invalid values select the configured target window. By Exercise remains
+   the default; in-screen range/breakdown changes remain volatile state.
 
 ### 9. UI guardrail enforcement (current enforced rules)
 
@@ -621,10 +622,11 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    about three quarters of the screen over the `scrim`; modal to assistive tech.
    The backdrop, Android back and the VoiceOver escape dismiss it; there is no
    close button.
-3. Under the eyebrow and the name, a `Metric` and a `View` `SegmentedControl`,
-   each under a micro-label. Muscle history offers `Volume` and `Sets`;
-   exercise history adds `1RM` and `Top weight`. Both default to `Volume` and
-   `Weekly`, and the selected metric drives both views.
+3. Under the eyebrow and name, the `Metric` `SegmentedControl` offers `Volume`
+   and `Sets`; exercise history adds `1RM` and `Top weight`. Volume is the
+   default. A static label names the saved view and look-back. Settings owns
+   the sole Daily/Weekly choice, default Weekly; no view selector is offered
+   in Progress. Saving the preference refreshes mounted history sheets.
 4. Loading, error and no-history are inline `StatePanel`s in the sheet's scroll
    body, with their copy unchanged; under the no-history panel the empty heatmap
    still renders.
@@ -636,11 +638,16 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    1RM or top weight is `—`.
 7. Muscle volume is the per-side, role-weighted aggregate across the selected
    muscle IDs; 1RM and top weight are exercise-level and not offered for muscles.
-8. The sheet loads a capped one-year window of completed-session history for
-   its target.
+8. The saved history look-back H (1–156 whole weeks, default 52) controls both query and
+   grid bounds: the current local Monday-start week and preceding H−1 weeks,
+   through today, using calendar arithmetic across DST. A shorter choice
+   reduces the grid; longer choices load older available history. Dates beyond
+   today are unavailable. Saving H reloads open history, preserving selections
+   in range and resetting others to today/current week; superseded window or
+   account responses are ignored. Empty copy names the selected week count.
 9. Daily and weekly trees stay mounted while a sheet is open. The inactive tree
-   is transparent, non-interactive, and hidden from accessibility, so switching
-   views reuses the already-laid-out chart and preserves its local selection and
+   is transparent, non-interactive, and hidden from accessibility, so a saved view change
+   reuses the already-laid-out chart and preserves its local selection and
    scroll state instead of drawing it again.
 10. Dismissing clears only the transient target, week and loaded history; the
     screen's controls, sort and search stay as they were, and nothing is written.
@@ -648,16 +655,19 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 ### 13. Stats exercise/muscle history semantics
 
 1. The `Stats / History` screen separates its dimensions into two labelled
-   rows: `Time range` holds `Last 7 days` / `Last 30 days` and `Breakdown`
+   rows: `Time range` holds the configured `N weeks` / `This week` and `Breakdown`
    holds `By Exercise` / `By Muscle`. Both are the same joined, equal-width
    `SegmentedControl` (a `tablist`), each under its own micro-label; the labels,
    not two different shapes, separate the dimensions (DLM-T08-D1). Every choice
-   stays visible, exactly one per row exposes selected state, and `Last 7 days`
-   / `By Exercise` remain the defaults. The controls, the summary, the filter
+   stays visible, exactly one per row exposes selected state, and the configured
+   window / `By Exercise` are the defaults. N=1 shows one range choice. Local
+   weeks start Monday; N includes this week and preceding N−1 weeks through
+   now. “So far” labels the range; targets are not prorated. Deltas compare the
+   same elapsed calendar span in the preceding N-week window, across DST. The controls, the summary, the filter
    and the list share one scroll.
 2. The summary keeps the actionable `Sessions` card, the counted sessions (`tech/training-metrics-contract.md` §2), and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
 3. In per-exercise mode, exercises with at least one working set in the
-   selected 7-/30-day window render in one compact, viewport-fitting table with
+   selected calendar-week window render in one compact, viewport-fitting table with
    shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
    row shows its working sets, effective exercise volume and
    estimated 1RM (both from working sets only), and its session count counts the
@@ -674,7 +684,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    high-to-low then low-to-high. Pressing a different sortable header always
    starts that header's cycle at its first state. Recency comes from the
    latest valid performed set in completed, non-deleted all-time history and is
-   independent of the selected 7-/30-day metric window. Missing recency remains
+   independent of the selected calendar-week metric window. Missing recency remains
    last in either direction; ties use exercise name then stable exercise ID
    ascending.
 5. There is no separate sort-status label above the table. Each sortable header
@@ -690,7 +700,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    synchronously without data queries or mutation.
 6. Tapping an exercise row in per-exercise mode opens the exercise's history
    sheet (§12): the same `HistorySheet` as muscle history.
-7. The exercise sheet renders the daily and weekly heatmaps over a 365-day
+7. The exercise sheet renders heatmaps over the saved look-back
    window with all four metrics (`Volume` / `Sets` / `1RM` / `Top weight`) and
    the week banner.
 8. Both controls use the design-language `SegmentedControl` (selected segment
@@ -698,13 +708,21 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    literals. Summary deltas keep their sign (`+`, `−`, `±0`) in Plex Mono
    `ink-muted`, with `new` in `ink`; they carry no green or red (G3). The
    Sessions and Sets cards name what their delta is against: the adjacent
-   earlier period of the selected range (`−3 vs prev 7 days`). Figures take
+   window with the same elapsed calendar span (`−3 vs prev 1 wk`, with the full comparison in its accessibility label). Figures take
    the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`.
 9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
 10. Exercise analytics uses calculated load × reps of working sets (§5.11) under the current private policy, with invalid/overflow coverage and no muscle-role weighting. A day or week with only warm-ups makes no heatmap cell, for exercises and muscles alike. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
 11. In the per-muscle mode every family and visible nested-muscle row shows `Sets`, its working sets, plus `Volume`, the working sets' volume. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
 12. Per-muscle previous-period set comparisons use a signed absolute delta (`+4`, `−2`, `±0`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-13. Per-muscle family rows and visible nested-muscle rows share one failure-intensity ramp, the data-viz roles `viz1`–`viz4` (`design-language.md` §2); nesting and indentation, not colour, tell a family from a muscle. On a shaded row every text is `ink`, legends and deltas included. Each row receives one uniform shade selected from four levels using `clamp(workingSetCount / (8 × periodDays / 7), 0, 1)`; there is no partial-width band or gradient. Rows with no working sets keep the default surface. The background is decorative and supplements the readable working-set count. Its strongest-shade threshold is a display scale only—not a goal, recommendation, limit, or warning. Row accessibility copy states the exact working-set count and selected-period threshold.
+13. Muscle row colour grades working sets against the saved weekly muscle quota
+    (default eight) × selected weeks, capped at 100%, using `viz1`–`viz4`.
+    A family averages each constituent muscle’s capped attainment, including
+    muscles with zero sets; displayed count and metric aggregation retain their
+    existing rules. Muscle-history Sets use each day’s or week’s count against
+    its weekly quota, independent of look-back length. Group history averages
+    the constituent attainments. Legends and accessibility labels explain the
+    colour; Volume and exercise-only metrics retain their observed scaling.
+
 14. The `/exercise-history` route (opened from the exercise page's `History`)
     is one `ScreenScroll` on `paper` over the `MainTabs` strip (Progress
     selected), in the design language (DLM-T10): a `Last 7 days` / `Last 30
@@ -790,7 +808,7 @@ unchanged. What differs is presentation:
    the row whose body was tapped; one at a time. Typing is saved as it is typed
    (the autosave text debounce); the tick — the screen's one `accent` primary,
    disabled until the values are a valid set — performs it and moves the logger
-   on. Tapping effort cycles W-Up → blank → RIR 3 → RIR 2 → RIR 1 → RIR 0 → W-Up; long press opens the configured options in a scrolling sheet. The highest selectable RIR comes from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`). Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
+   on. Tapping effort cycles W-Up → blank → saved visible RIR grades descending → W-Up; long press opens those choices in a scrolling sheet. Settings defaults to visible RIR 0–3, permits custom non-negative whole grades and requires at least one. W-Up and unspecified stay available. Hiding grades refreshes mounted controls without rewriting recorded or prescribed efforts; those labels remain displayed. Explicitly cycling a hidden grade re-enters at W-Up. Visibility never changes W/set counting, Volume, 1RM, records or facts. Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
    The in-progress row also answers swipes (2026-10-01): right confirms it
    exactly like the tick and moves on — confirming the last set then adds one,
    the fresh row open in the logger with the copied values; left drops the

@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { Storage } from 'expo-sqlite/kv-store';
-import { normalizeLegacyPreferences, preferenceFields } from './model';
+import { normalizeLegacyPreferences, browsingPreferenceFields } from './model';
 import { type PreferenceProfile, readScopedPreferences, writeScopedPreference } from './storage';
 
 // Retain a failed claim for retries in this process, even if its native write
@@ -27,7 +27,7 @@ export async function migrateBrowsingPreferences(profile: PreferenceProfile): Pr
   // Re-read after the await. Valid scoped choices, including intervening edits
   // and fields saved by an interrupted migration, always win.
   const { valid } = readScopedPreferences(profile);
-  for (const field of preferenceFields) {
+  for (const field of browsingPreferenceFields) {
     if (valid[field] === undefined) writeScopedPreference(profile, field, legacy[field]);
   }
   // Keychain values may survive an iOS reinstall, unlike the SQLite claim.

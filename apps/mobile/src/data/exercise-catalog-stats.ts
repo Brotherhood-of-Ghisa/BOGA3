@@ -14,8 +14,9 @@ import {
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
+import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 
-export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays;
+export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays | { weeks: number };
 
 export type ExerciseAggregate = {
   exerciseDefinitionId: string;
@@ -156,7 +157,7 @@ const resolvePeriodWindow = (
   now: Date
 ): PeriodWindow => {
   if (period === 'all') return { start: null, end: null };
-  const bounds = computePeriodBounds(period, now);
+  const bounds = typeof period === 'object' ? calendarWeekBounds(period.weeks, now) : computePeriodBounds(period, now);
   return { start: bounds.start, end: bounds.end };
 };
 

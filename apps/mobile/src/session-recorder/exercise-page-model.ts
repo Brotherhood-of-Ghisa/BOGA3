@@ -313,7 +313,7 @@ export const createLocalSetId = () =>
  * `+ Add set`: copies the last row's values and applies effort defaults, not
  * performed until ticked (`ux-rules.md` §5.11).
  */
-export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId()): ExercisePageSet[] => {
+export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(), visibleGrades?: readonly number[]): ExercisePageSet[] => {
   const last = sets[sets.length - 1];
   const copied = last ? displayedValues(last) : { weightValue: '', repsValue: '', setType: null };
   return [
@@ -322,7 +322,7 @@ export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId())
       id,
       weightValue: copied.weightValue,
       repsValue: copied.repsValue,
-      setType: defaultSessionSetType(last ? copied.setType : undefined),
+      setType: defaultSessionSetType(last ? copied.setType : undefined, visibleGrades),
       plannedWeightValue: null,
       plannedRepsValue: null,
       plannedSetType: null,

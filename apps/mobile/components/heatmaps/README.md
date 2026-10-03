@@ -25,7 +25,7 @@ import { buildHeatmapData } from '@/components/heatmaps';
 const dailyMetrics = await computeSelectedMuscleDailyEffortMetrics({ muscleGroupIds, start, end });
 // or computeSelectedExerciseDailyEffort({ exerciseDefinitionId, start, end })
 
-const data = buildHeatmapData(dailyMetrics, metric, { weeks: 'all' });
+const data = buildHeatmapData(dailyMetrics, metric, { weeks: savedLookbackWeeks });
 // metric: 'totalVolume' | 'workingSetCount' | 'estimatedRM1' | 'highestWeight'
 ```
 
@@ -37,10 +37,15 @@ Muscle history offers per-side, role-weighted `totalVolume` and
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
 raw entered kg, and every exercise uses the same labels.
 
-**Buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
+**Exercise metrics and Volume buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
 smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
 `hasTraining` distinguishes a known zero from rest in details and accessibility;
 `unavailable` preserves missing or incomplete load instead of treating it as zero.
+Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
+against weekly quotas, capped before group averaging and including zero muscles.
+Daily and weekly cells use the same weekly quotas, independent of look-back;
+legends and accessible labels report the target share. Displayed metrics and
+eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). The weekly bar heights include known zero training in the observed band.
 Only known training weeks contribute to the 12-week average (including zeros);
@@ -78,6 +83,11 @@ The two views select differently:
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
 
+Settings is the sole Daily/Weekly selector. Progress renders the saved choice
+without an in-chart switch. Numeric `weeks` controls the exact query/grid span;
+short windows have no implicit 52-week minimum. Out-of-range selection returns
+to today/current week; in-range selection survives look-back edits.
+
 ## Look
 
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
@@ -89,7 +99,7 @@ determinism seam for tests.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history sheet keeps both views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
-  a one-year chart rebuild on every toggle while preserving view-local selection
+  a chart rebuild when the saved view changes while preserving view-local selection
   and scroll state.
 - **No new dependencies.** Pure RN primitives (`View`, `Text`, `Pressable`,
   `ScrollView`) and the `Icon` / `Card` primitives.

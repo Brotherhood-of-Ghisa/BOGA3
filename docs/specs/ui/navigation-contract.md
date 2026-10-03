@@ -146,11 +146,12 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - preserved Progress-owned route inside the `(tabs)` group; renders the merged
     Stats / History view
-    with separate labelled `Time range` (7-/30-day pills) and `Breakdown`
+    with separate labelled `Time range` (configured N weeks / This week) and `Breakdown`
     (joined `By Exercise` / `By Muscle`) rows; both breakdown choices remain
     visible and `By Exercise` is the default
   - query values select only the initial control state; invalid values fall
-    back to the same seven-day / By Exercise defaults
+    back to the configured window / By Exercise defaults; `period=7` means This
+    week, and the preserved `period=30` link selects the configured window
   - M16 muscle-history overlay opens and dismisses as in-route UI state on this route; no path, query param, redirect, or screen-to-screen transition is added for the overlay.
 
 4b. `/session/[sessionId]`

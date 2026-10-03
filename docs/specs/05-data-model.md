@@ -91,13 +91,28 @@ own synced raw rows; they never cross the wire.
 
 ### Device-local preferences
 
-`apps/mobile/src/preferences/` owns typed account-local browsing choices (exercise
-sort, Show never-done, detail date format and past-records gym filter). Ordinary
-scalar keys in the existing `expo-sqlite/kv-store` are scoped to the authenticated
+`apps/mobile/src/preferences/` owns typed account-local browsing and Progress choices:
+exercise sort, Show never-done, detail date format, past-records gym filter, weekly
+muscle-target overrides, visible RIR grades, target-window weeks, history-look-back
+weeks (1–156) and the Daily/Weekly history view. Ordinary scalar and JSON keys in the existing `expo-sqlite/kv-store` are scoped to the authenticated
 account ID; local-only builds have a distinct local profile. They are **out of
 sync scope**: device presentation choices, without dirty bits, sync nudges,
 `user_settings` columns or server counterparts. Types/defaults are import-free;
-browsing hooks adapt the store for screens.
+shared hooks adapt the same store for screens. Each field has a scoped key; adding
+Progress fields preserves the four browsing fields and their migration.
+
+Progress defaults are eight W/sets per muscle per week (overrides keyed by stable
+muscle ID), visible RIR 0–3, a four-week target window, a 52-week history look-back
+and Weekly view. Targets are positive safe integers; target windows are 1–52
+whole weeks; RIR grades are unique non-negative safe integers with at least one
+visible grade. Missing or malformed keys receive typed defaults. Failed writes
+preserve the last durable configuration and pending edits, retried by Settings’
+existing Data & Sync Refresh; validation errors share its Error row.
+
+These choices affect display, logging choices and target grading. Working-set
+counting, Volume, 1RM, records and counted-session rules remain defined by
+`tech/training-metrics-contract.md`. Preference edits never rewrite workouts or
+rebuild exercise session facts. Groups and coaching never read these keys.
 
 Auth selects the scope before its snapshot reaches consumers. Sign-out hides
 account values and clears failed input; saved keys survive sign-out, account
@@ -448,7 +463,7 @@ section states only the data-model-level invariants.
    (first sign-in or wiped-client reinstall). It must be coherent across all
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
-5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | null`, where `n` is a canonical non-negative safe integer) and remains nullable for legacy/unspecified sets. RIR values are in sync scope through the existing nullable text fields (`set_type` and `planned_set_type`); no migration or wire-envelope change is needed. Which sets and sessions count toward a statistic (only `warm_up` is excluded; null, any RIR and unrecognised stored values count) is defined in `tech/training-metrics-contract.md` §1–§2, not here. `apps/mobile/src/config/training.ts` sets `EFFORT_LOGGING_POLICY.maxSelectableRir` (default `3`) for generated picker/cycle choices. Reducing that range never clears stored or imported higher RIRs, their labels, or inherited effort; tapping a higher historical effort re-enters the current cycle at Warm-up. Working-set classification is independent of the selectable range; it is not a user preference or a synced field.
+5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | null`, where `n` is a canonical non-negative safe integer) and remains nullable for legacy/unspecified sets. RIR values are in sync scope through the existing nullable text fields (`set_type` and `planned_set_type`); no migration or wire-envelope change is needed. Which sets and sessions count toward a statistic (only `warm_up` is excluded; null, any RIR and unrecognised stored values count) is defined in `tech/training-metrics-contract.md` §1–§2, not here. `apps/mobile/src/config/training.ts` supplies the default RIR 0–3 range and import enrichment. Account-local visible grades shape logging choices and automatic new-set defaults: a hidden inherited RIR advances to the next lower visible grade, or remains unchanged when none exists. Hiding a grade never clears stored, prescribed or imported effort or its label; explicitly tapping a hidden historical effort re-enters the current cycle at Warm-up. Working-set classification is independent of the selectable range; it is not a user preference or a synced field.
 6. Planned workout execution targets and explicit performance state are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the existing push/pull wire envelope. `performance_status` is nullable unconstrained text; new writes use `planned` and `unperformed`, while a valid actual row with `null` is the confirmed/performed representation. The historical `skipped` value remains accepted for backward compatibility but hydrates as an untouched `planned` row and is never written by current session actions. This adds no column, server migration, or wire-envelope field.
    - New empty and copied/defaulted active rows use `unperformed`, even when copied values are already valid. For upgrade compatibility, a pre-existing valid row with legacy `null` remains confirmed; a blank or partial legacy draft row with `null` hydrates as `unperformed` so later entry cannot silently confirm it.
    - Active and completed-edit autosave preserve planned and unperformed rows losslessly. Completed-edit is the session view and exercise page editing a completed session (`/session/<id>`): their autosave writes the session back as `completed` through `persistCompletedSessionSnapshot`, never replaying completion. Legacy skipped rows normalize to planned on hydration. Final active-session submit and completed-edit save (the session view's `Done`) write completed workout history from valid confirmed actual rows only. Entered valid unconfirmed rows require a specific discard confirmation; they are never promoted or discarded implicitly.

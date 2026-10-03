@@ -26,8 +26,9 @@ import {
   userSettings,
 } from './schema';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
+import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
-export type StatsPeriodDays = 7 | 30 | 90 | 365;
+export type StatsPeriodDays = number;
 
 export type StatsPeriodBounds = {
   days: StatsPeriodDays;
@@ -74,6 +75,8 @@ export type StatsStore = {
 
 export type ComputeStatsSummaryOptions = {
   periodDays: StatsPeriodDays;
+  /** Progress uses Monday-aligned weeks; older day-based readers keep their bounds. */
+  periodWeeks?: number;
   now?: Date;
 };
 
@@ -349,8 +352,11 @@ export const createDrizzleStatsStore = (): StatsStore => ({
 export const createStatsRepository = (store: StatsStore = createDrizzleStatsStore()) => ({
   async computeSummary(options: ComputeStatsSummaryOptions): Promise<StatsSummary> {
     const now = options.now ?? new Date();
-    const currentPeriod = computePeriodBounds(options.periodDays, now);
-    const previousPeriod = computePreviousPeriodBounds(currentPeriod);
+    const currentPeriod = options.periodWeeks === undefined ? computePeriodBounds(options.periodDays, now)
+      : { days: options.periodWeeks * 7, ...calendarWeekBounds(options.periodWeeks, now) };
+    const previousPeriod = options.periodWeeks === undefined ? computePreviousPeriodBounds(currentPeriod)
+      : { days: currentPeriod.days, start: shiftCalendarWeeks(currentPeriod.start, -options.periodWeeks),
+        end: shiftCalendarWeeks(currentPeriod.end, -options.periodWeeks) };
 
     const [currentInput, previousInput] = await Promise.all([
       store.loadAggregationInput({ start: currentPeriod.start, end: currentPeriod.end }),

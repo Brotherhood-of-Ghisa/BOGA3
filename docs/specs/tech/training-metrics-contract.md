@@ -34,7 +34,9 @@ is a **confirmed performed set** whose `set_type` is not `warm_up`.
   call this parser, so a value is valid everywhere or nowhere.
 - **Effort**: untagged sets, every RIR and unrecognised stored values are
   working sets. Only `warm_up` is excluded. The rule is not configurable
-  (`apps/mobile/src/config/training.ts` only shapes the effort picker).
+  (Settings’ visible effort labels only shape the picker and tap cycle).
+  Weekly muscle targets grade the resulting counts; neither visibility nor targets
+  alter eligibility, Volume, 1RM, records or counted sessions.
 - A **warm-up** keeps its own per-set figures (1RM, volume) wherever sets are
   listed (`calculateSetMetrics`). It feeds no aggregate, count, record, best,
   PR or baseline.
