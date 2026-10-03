@@ -3,6 +3,7 @@
 // the evaluator resolves target-specific load mathematics.
 import { validateGroupExerciseRules, type GroupMetric, type GroupMetricValue } from './metric-contract.ts';
 import { scoreGroupPerformance } from './performance-score.ts';
+import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
 import type { GroupMetricRulesWire, GroupPerformanceSnapshotWire } from './metric-wire.ts';
 
 /** Service-only graph row. Private reading fields are consumed here and never
@@ -14,6 +15,8 @@ export type GroupMetricSourceSet = Omit<GroupPerformanceSnapshotWire, 'reps'> & 
   body_weight_measurement_id: string | null;
   body_weight_measured_at_ms: number | null;
   reps_value: string;
+  /** The synced effort (`warm_up`, `rir_<n>` or null), as stored. */
+  set_type: string | null;
   live: boolean;
   /** SQL-owned live membership, shared-session and current-link eligibility.
    * Unlinked sources remain in the graph for record/certification validation. */
@@ -43,6 +46,10 @@ export type EvaluatedGroupMetricSet = GroupMetricValue & {
   set_created_at_ms: number;
   fingerprint: string;
   counting: boolean;
+  /** The app's working-set rule over the set's effort. A score that is not
+   * working keeps its row (stored records are checked against it) but never
+   * counts on a board, so it can never become a record. */
+  working: boolean;
   performance: GroupPerformanceSnapshotWire;
 };
 export type GroupMetricEvaluation = {
@@ -66,6 +73,9 @@ export function evaluateGroupMetricGraph(graph: GroupMetricEvaluationGraph): Gro
   for (const row of graph.sets) {
     if (typeof row.live !== 'boolean' || typeof row.counting !== 'boolean') {
       throw new Error('Missing group source eligibility');
+    }
+    if (row.set_type !== null && typeof row.set_type !== 'string') {
+      throw new Error('Missing group source set type');
     }
     const key = JSON.stringify([row.member_user_id, row.set_id]);
     if (keys.has(key)) throw new Error('Duplicate group evaluation source set');
@@ -97,7 +107,8 @@ export function evaluateGroupMetricGraph(graph: GroupMetricEvaluationGraph): Gro
         session_id: row.session_id, session_exercise_id: row.session_exercise_id,
         exercise_definition_id: row.exercise_definition_id, achieved_at_ms: row.achieved_at_ms,
         exercise_order_index: row.exercise_order_index, set_order_index: row.set_order_index,
-        set_created_at_ms: row.set_created_at_ms, fingerprint, counting: row.counting, performance });
+        set_created_at_ms: row.set_created_at_ms, fingerprint, counting: row.counting,
+        working: isWorkingSetType(row.set_type), performance });
     }
   }
   return { group_id: graph.group_id, group_exercise_id: graph.group_exercise_id,

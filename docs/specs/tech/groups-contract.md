@@ -392,7 +392,7 @@ invisible.
 | `performed` | The session screens' rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
 | `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (M25-T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
-| `working` | The app's working-set rule (`isWorkingSessionSetType` over the synced `set_type`: every set but a warm-up), independent of `performed`. Null on a fact from before rules version 4. Read only by the week summary (§4.7). |
+| `working` | The app's working-set rule (`isWorkingSessionSetType` over the synced `set_type`: every set but a warm-up), independent of `performed`. Null on a fact from before rules version 4. Read by the contract-1 boards (§2.11), both certify RPCs (`group_set_is_warm_up`, §4.6, §11.3) and the week summary (§4.7). |
 | `achieved_at_ms` | `sessions.started_at` |
 | `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (M25-T06) can compare a live row without the evaluator. |
 | `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
@@ -523,7 +523,12 @@ app's working-set rule without a SQL copy of it; a change to
 `isWorkingSessionSetType` needs a version bump. Its migration queues every
 session with older facts, so the sweep re-normalizes them within its next
 rounds; until then a session's facts read `working` null and its sets count no
-working sets in §4.7.
+working sets in §4.7. The contract-1 boards and both certify RPCs read the
+same `working` (working sets only, §2.11) with no further bump: the rule did
+not change, so no fact is re-normalized. Only a known warm-up (`false`) is
+excluded; a fact not yet re-normalized still counts. Contract-2 comparisons
+apply the rule to the raw `set_type` on their next rebuild (§11.2), whatever
+this version.
 
 **One implementation of the set rules.** `set-facts.ts` holds
 `parseGroupPerformedSet`. The device's `toGroupPerformedSet` (§5) delegates
@@ -570,9 +575,11 @@ active certification ids at the last apply, for certification attribution.
 
 **Rules.**
 
-- **Counting set** of `(G, M, GX)`: a performed, live fact whose Sync v2
-  set row still exists, whose session is shared into G, and whose exercise
-  has a live link to `(G, GX)`. The Weight board needs `weight_kg > 0`;
+- **Counting set** of `(G, M, GX)`: a performed, **working** (not a
+  warm-up), live fact whose Sync v2 set row still exists, whose session is
+  shared into G, and whose exercise has a live link to `(G, GX)`. A warm-up
+  therefore never ranks, never makes a record (records are new bests among
+  counting sets) and is never a record set to certify (§4.6). The Weight board needs `weight_kg > 0`;
   the 1RM board needs a non-null `e1rm_kg`. A zero result never ranks.
 - **Conversion (D6).** The factor compares the member exercise's current
   `load_input_mode` with the group exercise's: the same mode gives 1, per side
@@ -584,6 +591,15 @@ active certification ids at the last apply, for certification attribution.
   1..n. Former members keep their entries, are ranked, and read `former`
   (P7); their targets are not live, so the entries freeze. Archived boards
   freeze the same way (D8).
+- **Working sets only, forward only.** Results stored while warm-ups still
+  counted (entries, records and their events, certifications) are not
+  re-evaluated, backfilled or voided because the rule changed, and nothing is
+  queued. A target follows the rule at its next apply: its entries are
+  recomputed from counting sets, and a best that was a warm-up falls silently
+  (step 5, `rules`). A stored warm-up record stands, since records void by
+  value and its value did not change; it can no longer be certified. A
+  provisional record (active session, step 3) is not settled: one on a
+  warm-up is retracted at the next apply, like any that no longer counts.
 
 **The apply** (`group_eval_apply`), per target, in order:
 
@@ -625,6 +641,11 @@ active certification ids at the last apply, for certification attribution.
    - N beats the baseline, or there is none (D1): **record**. The baseline
      is O's value, or the `previous_value_kg` of a provisional record
      retracted in step 3;
+   - O's set is now a warm-up (`group_set_is_warm_up`: a performed, live
+     fact that is not `working`) and its record is not voided in this apply:
+     **rules**, a silent move. No event is
+     written for that metric, and no Certified `lead_change` either when M's
+     old Certified best was a warm-up and no certification changed;
    - otherwise the entry fell or vanished: **void** fallback.
 6. Write the entries and the state, then the events:
    - the voids, with each voided board's current leader;
@@ -707,7 +728,13 @@ client surface.
 
 **Known limits.**
 
-- A silent rules recompute can move #1 without a history row.
+- A silent rules recompute can move #1 without a history row, and so can
+  the first apply that drops a warm-up best (`rules`).
+- While a stored warm-up best is the baseline, a new working set must beat
+  the warm-up's value to be a record; the apply that drops the warm-up best
+  writes no record for a lower new best.
+- A set changed to a warm-up after it made a record keeps that record (its
+  value did not change); its entry falls silently.
 - A soft-deleted exercise's link still counts on the boards. The T07 client
   never offers such an exercise for linking.
 - A retracted provisional lead change rolls "before" back only when it was
@@ -1210,7 +1237,9 @@ takes the board advisory lock.
   5. the lifter is not a current member: `NOT_FOUND: member not found`;
   6. **record set (D3):** a current All entry of the set, else a non-voided
      `record` event; otherwise `NOT_FOUND: record set not found` (a
-     non-record, unknown, or another member's set look the same);
+     non-record, unknown, or another member's set look the same). A warm-up
+     (§2.9 `working`) is never a record set and reads the same, even with a
+     record stored before working sets only (§2.11);
   7. **idempotent:** an active certification of the set on the target,
      whoever gave it, is returned with `created: false` (P10);
   8. the lifter's live set row must exist and carry the record set's
@@ -1262,8 +1291,8 @@ completed session.
   set and session-exercise rows still exist untombstoned (so a delete counts
   at once, before the evaluator re-drains), and `working` (every set but a
   warm-up), on any exercise, linked or not. `exercise_count` counts the
-  session exercises with at least one such performed fact, warm-ups included
-  (§5). The counts trail a push by the evaluator's lag.
+  session exercises with at least one such working fact; an exercise with
+  only warm-ups adds none. The counts trail a push by the evaluator's lag.
 - **Group records.** Non-voided `record` events (§2.11, either contract) in
   this group whose payload lists at least one board with `group_record = true`
   (the member took #1), one per event. They come from the same sessions as
@@ -2007,6 +2036,9 @@ group screen, and Today details above where they differ. No server change.
     unlink / retarget (no record cards), no certification → Certified boards empty, load-mode
     rescale, leave (former, still ranked), archive and unarchive catch-up,
     and the silent rules recompute.
+  - **Working sets only.** A warm-up heavier than every working set never
+    ranks, records or certifies; a stored warm-up record stands while its
+    board falls silently (`rules`).
   - **Rules.** The provisional rule (update in place, silent drop, void only
     once complete), D6 both directions with the entered value kept, P7 ties
     (earlier date, then exercise order, then set order), and rejoin catch-up.
@@ -2329,6 +2361,7 @@ the diff plus the cause (T7; rules in §2.11).
 | R8 | Member leaves | none (P7) | — |
 | R9 | Group exercise archived | entries frozen (D8) | — |
 | R10 | `rules_version` bump | recompute | none (silent) |
+| — | A best that was a warm-up, at the target's next apply | entry falls to the best working set | none (silent, `rules`); the stored record stands |
 
 ## 11. Optional bodyweight-aware group calculations
 
@@ -2384,7 +2417,13 @@ readings internally only for an enabled target with positive contribution;
 ordinary off/zero evaluation never calls the private-reading helper.
 `evaluateGroupMetricGraph` runs the shared TypeScript kernel with the strict
 `group` policy and the member/source exercise's `load_input_mode`; SQL performs
-no bodyweight/Wathan calculation. For 1RM, the kernel first derives the
+no bodyweight/Wathan calculation. The graph's sets carry the raw `set_type`,
+and each score carries `working` (`isWorkingSetType`). Publication stores a
+score that is not working with `counting = false`: it keeps its row, so a
+stored warm-up record is checked against an unchanged value and stands, but
+it never ranks or becomes a record (working sets only, forward only, as
+§2.11, including the silent `rules` move). An evaluation without `working`
+fails the job. For 1RM, the kernel first derives the
 displayed source-mode value, then the source→group-target distribution
 conversion is applied for board comparison and record detection. A Weight board always
 uses raw entered kg with neither D6 conversion nor bodyweight contribution.
@@ -2420,7 +2459,9 @@ change because of a private reading. Reading value, date, identifier, provenance
 and the digest itself never cross a public group RPC or enter a client
 cache/event.
 
-`group_metric_certify` identifies the record and expected rules revision. It
+`group_metric_certify` identifies the record and expected rules revision. A
+warm-up is never a record set: `NOT_FOUND: record set not found for this
+metric`, as §4.6. It
 refreshes the live source graph and computes dependencies server-side; clients
 neither submit nor receive private bodyweight facts. Stale rules/performance
 return `CONFLICT`. A current member may attest another current member's eligible

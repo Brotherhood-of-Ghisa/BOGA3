@@ -4,7 +4,7 @@ import { evaluateGroupMetricGraph, type GroupMetricEvaluationGraph,
 const set: GroupMetricSourceSet = {
   member_user_id: 'member-a', session_id: 'session', session_exercise_id: 'block',
   exercise_definition_id: 'personal-pull-up', set_id: 'set', weight_value: '20',
-  reps_value: '5', performance_status: null, live: true, counting: true,
+  reps_value: '5', set_type: 'rir_1', performance_status: null, live: true, counting: true,
   source_load_input_mode: 'total_load', body_weight_kg: 60, body_weight_source: 'reading',
   body_weight_measurement_id: 'r', body_weight_measured_at_ms: 1000,
   achieved_at_ms: 1000, exercise_order_index: 0, set_order_index: 0,
@@ -23,7 +23,7 @@ it('carries revision, raw performance and Weight/1RM dependency pins', () => {
     rules_revision: 3, source_token: 'source-hash' });
   expect(result.scores).toEqual([
     expect.objectContaining({ metric: 'weight', unit: 'kg', value: 20,
-      fingerprint: 'weight-pin', counting: true,
+      fingerprint: 'weight-pin', counting: true, working: true,
       performance: expect.objectContaining({ weight_value: '20', reps_value: '5' }) }),
     expect.objectContaining({ metric: 'e1rm', unit: 'kg', fingerprint: 'rm-pin', counting: true }),
   ]);
@@ -35,6 +35,17 @@ it('retains a valid unlinked observation without allowing it into the live board
   const after = evaluateGroupMetricGraph({ ...graph, sets: [{ ...set, counting: false }] }).scores;
   expect(after).toEqual(before.map(score => ({ ...score, counting: false })));
   expect(after.filter(score => score.counting)).toEqual([]);
+});
+
+it.each([null, 'rir_0', 'rir_3', 'unrecognised'])('counts a %p set as working', setType => {
+  const scores = evaluateGroupMetricGraph({ ...graph, sets: [{ ...set, set_type: setType }] }).scores;
+  expect(scores.map(score => score.working)).toEqual([true, true]);
+});
+
+it('scores a warm-up as an observation that is not working, so it never counts', () => {
+  const before = evaluateGroupMetricGraph(graph).scores;
+  const warmUp = evaluateGroupMetricGraph({ ...graph, sets: [{ ...set, set_type: 'warm_up' }] }).scores;
+  expect(warmUp).toEqual(before.map(score => ({ ...score, working: false })));
 });
 
 it('retains Weight while omitting 1RM without a valid reading', () => {
@@ -60,6 +71,8 @@ it.each([
 it('fails complete publication on missing pins, duplicate identities or invalid revision', () => {
   expect(() => evaluateGroupMetricGraph({ ...graph,
     sets: [{ ...set, counting: undefined } as unknown as GroupMetricSourceSet] })).toThrow('source eligibility');
+  expect(() => evaluateGroupMetricGraph({ ...graph,
+    sets: [{ ...set, set_type: undefined } as unknown as GroupMetricSourceSet] })).toThrow('set type');
   expect(() => evaluateGroupMetricGraph({ ...graph, sets: [{ ...set, fingerprints: {} }] })).toThrow('fingerprint');
   expect(() => evaluateGroupMetricGraph({ ...graph, sets: [set, set] })).toThrow('Duplicate');
   expect(() => evaluateGroupMetricGraph({ ...graph,
