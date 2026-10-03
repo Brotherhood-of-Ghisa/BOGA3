@@ -3,7 +3,7 @@
 // raw-data or policy write touches; every read drains that queue first, so a
 // read never returns facts built from older rows or older rules.
 
-import { and, eq, gte, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, isNull, lt, max, or } from 'drizzle-orm';
 
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
@@ -291,4 +291,48 @@ export const loadFlaggedExerciseSessionFacts = async (
       ),
     ))
     .all());
+};
+
+/**
+ * Each listed definition's best estimated 1RM over the sessions before
+ * `target` in PR-history order: the bar the target's 1RM PR flag is set
+ * against. A definition without an earlier 1RM is absent.
+ */
+export const loadEarlierBestE1rmByDefinition = async (
+  target: { sessionId: string; completedAt: Date },
+  exerciseDefinitionIds: readonly string[],
+): Promise<Map<string, number>> => {
+  const best = new Map<string, number>();
+  if (exerciseDefinitionIds.length === 0) return best;
+  const database = await bootstrapLocalDataLayer();
+  drainExerciseSessionFacts(database);
+  const raise = (definitionId: string, value: number) => {
+    if (value > (best.get(definitionId) ?? -Infinity)) best.set(definitionId, value);
+  };
+  for (const ids of chunks(exerciseDefinitionIds)) {
+    const scope = and(inArray(exerciseSessionFacts.exerciseDefinitionId, ids), isNotNull(exerciseSessionFacts.bestE1rmKg));
+    const earlier = database
+      .select({ exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId, best: max(exerciseSessionFacts.bestE1rmKg) })
+      .from(exerciseSessionFacts)
+      .innerJoin(sessions, liveSessionJoin)
+      .where(and(scope, lt(exerciseSessionFacts.achievedAt, target.completedAt)))
+      .groupBy(exerciseSessionFacts.exerciseDefinitionId)
+      .all();
+    for (const row of earlier) raise(row.exerciseDefinitionId, row.best as number);
+    const sameInstant = database
+      .select({
+        sessionId: exerciseSessionFacts.sessionId,
+        exerciseDefinitionId: exerciseSessionFacts.exerciseDefinitionId,
+        bestE1rmKg: exerciseSessionFacts.bestE1rmKg,
+      })
+      .from(exerciseSessionFacts)
+      .innerJoin(sessions, liveSessionJoin)
+      .where(and(scope, eq(exerciseSessionFacts.achievedAt, target.completedAt)))
+      .all();
+    // Same-instant sessions fall to the derivation's session-id order, not SQLite's.
+    for (const row of sameInstant) {
+      if (row.sessionId.localeCompare(target.sessionId) < 0) raise(row.exerciseDefinitionId, row.bestE1rmKg as number);
+    }
+  }
+  return best;
 };

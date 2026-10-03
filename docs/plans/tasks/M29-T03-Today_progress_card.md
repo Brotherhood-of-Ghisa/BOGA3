@@ -56,6 +56,12 @@ activity section stays as it is until T05.
   table synchronously inside this read (T01's numbers: 51 ms on the dev rich
   history in Node, 582 ms at 10×; a device is slower). Show the loading state,
   and add a warm-up hook only if a device measurement says it's needed.
+- Until Today reads the facts, the completion screen and completed-session
+  route (T06) are the only runtime readers. Their first open after install, a
+  wipe or a rules bump carries that rebuild: `loadCompletedSessionInsights`
+  takes 91 ms instead of 45 ms on the dev rich history, and 973 ms instead of
+  425 ms at 10× (Jest + better-sqlite3). Once this card ships, Today reads
+  the facts on launch and pays the rebuild instead.
 - Jest runs in `Europe/London` (pinned in `jest.config.js`); build test
   instants from local fields.
 

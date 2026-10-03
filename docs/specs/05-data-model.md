@@ -139,7 +139,10 @@ at least one eligible performed set: `session_id`, `exercise_definition_id`,
   Working sets follow `isWorkingSessionSetType` (*Sync v2 data-model
   contract* #5).
 - **Ties inside a session** go to the first set in session order (block, then
-  set). The completed-session PR badge uses the same order.
+  set). One rule picks the best-1RM set
+  (`apps/mobile/src/exercise-calculations/best-set.ts`). The facts derive with
+  it, and the session view and completed-session detail apply it to an
+  in-memory session.
 - **PR flags.** History is ordered by `completed_at`, then `session_id`. A
   metric is flagged when the session's value strictly beats the best of every
   earlier session for that definition; at most one set per metric per session
@@ -147,6 +150,11 @@ at least one eligible performed set: `session_id`, `exercise_definition_id`,
   a session with no value neither counts as the baseline nor raises the bar.
   An incomplete volume is never a volume PR and never raises the volume bar.
   The 1RM flag equals `deriveSessionPersonalRecords` on every session.
+- **Completed-session PRs** (completion screen, completed-session route, share
+  preview) read each definition's best `best_e1rm_kg` from the sessions before
+  the target, in the order above. The target's best set is a PR when it beats
+  that best, which is the same test as its `pr_e1rm` flag. Jest holds the list
+  equal to the replay `deriveSessionPersonalRecords`.
 - **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
   `exercise_sets`, `exercise_definitions` (load mode, contribution),
   `user_settings` (the bodyweight toggle) and `body_weight_measurements` queue

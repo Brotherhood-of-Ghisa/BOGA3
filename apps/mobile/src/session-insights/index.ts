@@ -6,8 +6,10 @@ export {
   deriveSessionExerciseVolumeComparisons,
   deriveSessionMuscleVolumeComparisons,
   deriveSessionPersonalRecords,
+  deriveSessionPersonalRecordsFromBests,
   summarizeCurrentSessionMuscleLoad,
   type CompletedSessionInsights,
+  type CompletedSessionInsightsInput,
   type CurrentSessionMuscleSummary,
   type CurrentSessionMuscleSummaryInput,
   type ExercisePersonalRecord,
@@ -24,6 +26,7 @@ export {
   type SessionMuscleLoadEntry,
   type SessionMuscleWorkingSetEntry,
   type SessionPersonalRecordsInput,
+  type SessionPersonalRecordsFromBestsInput,
   type SessionMuscleVolumeComparisonsInput,
 } from "./calculations";
 export {

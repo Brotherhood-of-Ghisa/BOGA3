@@ -18,7 +18,7 @@ session's graph). Read the earlier best from the facts table instead.
 
 - In: the historical-best read behind the live PR markers; Jest.
 - Out: the volume and muscle comparisons in the session view (they need the
-  history graph unless T06 moved the exercise comparison); the completion
+  history graph; T06 kept the exercise comparison on it too); the completion
   screen (T06); the exercise page (T08).
 
 ## Decided
@@ -43,9 +43,20 @@ session's graph). Read the earlier best from the facts table instead.
    session-view tests pass unchanged.
 2. Jest covers active and completed-edit sessions, and an exercise with no
    earlier facts (no marker).
-3. If T06 left the duplicated 1RM best-set rule in place (T06 Deliverable
-   4), finish it here: after this task no PR reader replays history, so one
-   copy must remain.
+3. Done in T06: the 1RM best-set rule is one helper,
+   `src/exercise-calculations/best-set.ts`. `deriveExercisePersonalRecord`
+   already uses it, so the live marker needs no rule change.
+
+## As-built notes from T06
+
+- `loadEarlierBestE1rmByDefinition(target, definitionIds)`
+  (`src/data/exercise-session-facts.ts`) returns each definition's best
+  `best_e1rm_kg` over the sessions *before* the target, with same-instant ties
+  in derivation order. That is the `loadSessionInsightHistory` meaning of
+  "earlier". If Open 1 picks it, reuse this reader. If it picks "every other
+  completed session", add a sibling reader rather than a flag.
+- `deriveSessionPersonalRecords` is now only the replay reference that Jest
+  holds the facts-backed completion list to. Nothing calls it at runtime.
 
 ## Specs to update
 
