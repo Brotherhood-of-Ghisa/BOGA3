@@ -84,7 +84,6 @@ export {
   aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
-  computeMuscleSetVolume,
   countMuscleAnalyticsWorkingSets,
   getMuscleContributionRoleWeight,
   type AggregateSelectedMuscleDailyEffortOptions,

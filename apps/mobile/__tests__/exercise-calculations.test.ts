@@ -1,22 +1,10 @@
 import {
-  computeExerciseVolume,
-  computeMaxRepsByWeight,
-  computeSetVolume,
-  estimateExerciseOneRepMax,
   estimateOneRepMax,
-  findBestEstimatedOneRepMaxSet,
   parseCalculationSet,
   parseSetReps,
   parseSetWeight,
-  type CalculationSetInput,
 } from '@/src/exercise-calculations';
 import { workingSetsOnly } from '@/src/exercise-calculations/analytics';
-
-const set = (
-  weightValue: string,
-  repsValue: string,
-  setType: CalculationSetInput['setType'] = null
-): CalculationSetInput => ({ weightValue, repsValue, setType });
 
 describe('exercise calculations: parsing', () => {
   describe('parseSetWeight', () => {
@@ -121,149 +109,6 @@ describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
     expect(estimateOneRepMax(100, Number.POSITIVE_INFINITY)).toBeNull();
     expect(estimateOneRepMax(Number.POSITIVE_INFINITY, 5)).toBeNull();
     expect(estimateOneRepMax(Number.NaN, 5)).toBeNull();
-  });
-});
-
-describe('exercise calculations: computeSetVolume', () => {
-  it('multiplies weight by reps', () => {
-    expect(computeSetVolume(100, 5)).toBe(500);
-    expect(computeSetVolume(42.5, 8)).toBe(340);
-  });
-
-  it('returns 0 for invalid or non-positive inputs', () => {
-    expect(computeSetVolume(0, 5)).toBe(0);
-    expect(computeSetVolume(100, 0)).toBe(0);
-    expect(computeSetVolume(-100, 5)).toBe(0);
-    expect(computeSetVolume(100, 1.5)).toBe(0);
-  });
-});
-
-describe('exercise calculations: estimateExerciseOneRepMax', () => {
-  it('returns the max per-set 1RM estimate across eligible sets', () => {
-    const sets = [set('100', '5'), set('110', '3'), set('90', '8')];
-    const expected = Math.max(
-      estimateOneRepMax(100, 5) as number,
-      estimateOneRepMax(110, 3) as number,
-      estimateOneRepMax(90, 8) as number
-    );
-    expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(expected, 5);
-  });
-
-  it('excludes a warm-up heavier than the working sets', () => {
-    const sets = [set('200', '1', 'warm_up'), set('100', '5')];
-    expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(
-      estimateOneRepMax(100, 5) as number,
-      5
-    );
-  });
-
-  it('counts untagged, RIR and unrecognised efforts as working sets', () => {
-    const sets = [set('200', '1', 'warm_up'), set('100', '5', 'rir_2'), set('110', '3', 'legacy'), set('90', '8', null)];
-    expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(
-      estimateOneRepMax(110, 3) as number,
-      5
-    );
-  });
-
-  it('ignores sets that fail to parse', () => {
-    const sets = [set('', '5'), set('abc', '3'), set('100', '5')];
-    expect(estimateExerciseOneRepMax(sets)).toBeCloseTo(
-      estimateOneRepMax(100, 5) as number,
-      5
-    );
-  });
-
-  it('returns null when no eligible set is present', () => {
-    expect(estimateExerciseOneRepMax([])).toBeNull();
-    expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up')])).toBeNull();
-    expect(estimateExerciseOneRepMax([set('100', '5', 'warm_up'), set('', '5')])).toBeNull();
-    expect(estimateExerciseOneRepMax([set('', '')])).toBeNull();
-  });
-});
-
-describe('exercise calculations: findBestEstimatedOneRepMaxSet', () => {
-  it('returns the source set for the highest eligible Wathan estimate', () => {
-    const result = findBestEstimatedOneRepMaxSet([
-      set('100', '5'),
-      set('110', '3'),
-      set('90', '8'),
-    ]);
-
-    expect(result).toEqual({
-      weight: 110,
-      reps: 3,
-      estimatedOneRepMax: estimateOneRepMax(110, 3),
-    });
-  });
-
-  it('ignores invalid sets and a heavier warm-up', () => {
-    const result = findBestEstimatedOneRepMaxSet(
-      [set('', '5'), set('200', '1', 'warm_up'), set('100', '5')]
-    );
-
-    expect(result).toEqual({
-      weight: 100,
-      reps: 5,
-      estimatedOneRepMax: estimateOneRepMax(100, 5),
-    });
-  });
-
-  it('keeps a valid zero-load set eligible', () => {
-    expect(findBestEstimatedOneRepMaxSet([set('', ''), set('0', '5')])).toEqual({
-      weight: 0,
-      reps: 5,
-      estimatedOneRepMax: 0,
-    });
-  });
-});
-
-describe('exercise calculations: computeExerciseVolume', () => {
-  it('sums working-set volumes', () => {
-    const sets = [set('100', '5'), set('110', '3'), set('90', '8')];
-    expect(computeExerciseVolume(sets)).toBe(100 * 5 + 110 * 3 + 90 * 8);
-  });
-
-  it('excludes warm-up sets', () => {
-    const sets = [set('40', '10', 'warm_up'), set('100', '5')];
-    expect(computeExerciseVolume(sets)).toBe(500);
-    expect(computeExerciseVolume([set('40', '10', 'warm_up')])).toBe(0);
-  });
-
-  it('returns 0 for empty or fully invalid input', () => {
-    expect(computeExerciseVolume([])).toBe(0);
-    expect(computeExerciseVolume([set('', ''), set('abc', '5')])).toBe(0);
-  });
-});
-
-describe('exercise calculations: computeMaxRepsByWeight', () => {
-  it('returns the max reps per distinct weight, sorted weight descending', () => {
-    const sets = [
-      set('100', '5'),
-      set('100', '8'),
-      set('100', '6'),
-      set('80', '10'),
-      set('120', '3'),
-    ];
-    expect(computeMaxRepsByWeight(sets)).toEqual([
-      { weight: 120, maxReps: 3 },
-      { weight: 100, maxReps: 8 },
-      { weight: 80, maxReps: 10 },
-    ]);
-  });
-
-  it('excludes a warm-up with more reps at the same weight', () => {
-    const sets = [set('100', '10', 'warm_up'), set('100', '5')];
-    expect(computeMaxRepsByWeight(sets)).toEqual([{ weight: 100, maxReps: 5 }]);
-  });
-
-  it('excludes a warm-up at a weight no working set used', () => {
-    const sets = [set('140', '2', 'warm_up'), set('100', '5')];
-    expect(computeMaxRepsByWeight(sets)).toEqual([{ weight: 100, maxReps: 5 }]);
-  });
-
-  it('ignores invalid sets and returns an empty list when nothing is eligible', () => {
-    expect(computeMaxRepsByWeight([set('', '5'), set('100', '')])).toEqual([]);
-    expect(computeMaxRepsByWeight([])).toEqual([]);
   });
 });
 

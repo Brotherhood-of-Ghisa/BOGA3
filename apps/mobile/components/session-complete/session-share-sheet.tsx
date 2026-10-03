@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 
@@ -13,7 +14,6 @@ import {
   type ExerciseVolumeComparison,
   type SessionShareCaptureDimensions,
 } from '@/src/session-insights';
-import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
 
 import { ExerciseVolumeCard } from './exercise-volume-card';
 
@@ -96,8 +96,8 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
                 {record.exerciseName}
               </Text>
               <Text allowFontScaling={false} style={styles.recordFact}>
-                {`${formatWeightFigure(record.weight)} × ${record.reps}`}
-                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  1RM ${formatOneRepMaxFigure(
+                {`${formatWeight(record.weight)} × ${record.reps}`}
+                <Text allowFontScaling={false} style={styles.recordOneRepMax}>{`  1RM ${formatOneRepMax(
                   record.estimatedOneRepMax
                 )}`}</Text>
               </Text>

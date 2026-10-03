@@ -38,9 +38,8 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
 - Date: `2026-09-28`
 - Decision: Ordinary exercise logging is the default for every exercise. Weight
   is optional, kg-only and interpreted with the exercise's total/per-side input
-  mode; a blank performed Weight canonicalizes to zero. Volume and 1RM render
-  numeric zero when the calculated load is zero, while zero results never create
-  a record or ranking entry.
+  mode. What counts, the records and the calculations (blank Weight, zero
+  results) are `tech/training-metrics-contract.md`.
 - Decision: Private users and groups independently opt into bodyweight-aware
   calculations. Each exercise then has one editable `Bodyweight contribution
   (%)`; zero keeps ordinary math. Disabling either capability hides and ignores
@@ -53,8 +52,8 @@ A Gym Tracking application with a delightful interface, advanced analytics, AI p
   while preserving raw shared activity. A group may use the reading internally
   but never disclose its value, date, identifier, history or dependency digest.
 - Decision: Current preferences, contributions and dated readings reinterpret
-  derived history without rewriting raw sets. `Top weight` is always the raw
-  entered Weight; 1RM and Volume are derived. User-facing calculation surfaces
+  derived history without rewriting raw sets (`Top weight` stays raw; contract
+  §4). User-facing calculation surfaces
   use only `Weight`, `Top weight`, `1RM` and `Volume` and do not expose the
   calculation breakdown. The complete boundary is owned by
   `tech/bodyweight-load-contract.md`.

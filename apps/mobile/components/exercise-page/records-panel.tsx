@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -9,9 +10,6 @@ import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { formatShortDate, type ExerciseDateFormat } from '@/src/exercise-catalog/list-model';
 import {
   formatEffort,
-  formatOneRepMax,
-  formatVolume,
-  formatWeight,
 } from '@/src/session-recorder/exercise-page-model';
 import {
   formatDaysAgo,

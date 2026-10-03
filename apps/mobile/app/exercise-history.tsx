@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
@@ -39,9 +40,7 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import {
   EMPTY_FIGURE,
-  formatOneRepMaxFigure,
   formatSetRow,
-  formatWeightFigure,
 } from '@/src/session-recorder/session-view-model';
 
 const PERIOD_OPTIONS: { value: ExerciseHistoryPeriod; label: string; accessibilityLabel: string }[] = [
@@ -79,10 +78,10 @@ const formatSessionDate = (value: Date): string => {
 
 // Figures read as they do on the session view (`design-language.md` §6).
 const formatTopSet = (set: { weight: number; reps: number } | null) =>
-  set ? `${formatWeightFigure(set.weight)} × ${set.reps}` : EMPTY_FIGURE;
+  set ? `${formatWeight(set.weight)} × ${set.reps}` : EMPTY_FIGURE;
 
-const formatOneRepMax = (value: number | null) =>
-  value === null ? EMPTY_FIGURE : formatOneRepMaxFigure(value);
+const formatOptionalOneRepMax = (value: number | null) =>
+  value === null ? EMPTY_FIGURE : formatOneRepMax(value);
 
 
 // `ux-rules` §10.2: a deleted tag still filters, and says so in words.
@@ -249,7 +248,7 @@ function BestCard({
         label="1RM"
         onPress={oneRm ? () => onPressSession(oneRm.sessionId) : undefined}
         testID="exercise-history-best-est-1rm"
-        value={formatOneRepMax(oneRm?.value ?? null)}
+        value={formatOptionalOneRepMax(oneRm?.value ?? null)}
       />
       <BestRow
         date={topWeight ? formatSessionDate(topWeight.completedAt) : null}
@@ -353,7 +352,7 @@ function SessionCard({
             </View>
           ) : null}
           <View style={styles.stats}>
-            <Stat label="1RM" rank="secondary" value={formatOneRepMax(entry.estimatedOneRepMax)} />
+            <Stat label="1RM" rank="secondary" value={formatOptionalOneRepMax(entry.estimatedOneRepMax)} />
             <Stat label="Top set" rank="secondary" value={formatTopSet(entry.topWeightSet)} />
             <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
               rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />

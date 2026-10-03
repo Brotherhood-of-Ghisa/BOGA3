@@ -173,7 +173,7 @@ it('shows the same raw Weight × reps detail and keeps bodyweight dependencies p
   const onChanged = jest.fn().mockResolvedValue(undefined);
   render(<GroupMetricRecordSheet exercise={exercise} groupId="group" userId="me" myRole="member"
     row={uncertifiedRow} onClose={jest.fn()} onChanged={onChanged} />);
-  expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20 kg × 5');
+  expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20.0 kg × 5');
   expect(screen.queryByText(/body weight reading|effective resistance|external adjustment|added weight/i)).toBeNull();
   expect(screen.getByText('Rules 2 · total Weight')).toBeTruthy();
   fireEvent.press(screen.getByTestId('group-metric-record-certify'));
@@ -237,7 +237,7 @@ it('renders and reopens a cached Weight/1RM record without private bodyweight co
   const first = render(<GroupsTabRoute />);
   expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/1RM.*112.5 kg/);
   fireEvent.press(screen.getByTestId('group-metric-stream-metric-record'));
-  expect(await screen.findByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20 kg × 5');
+  expect(await screen.findByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20.0 kg × 5');
   first.unmount();
 
   mockInitialOnline = false;

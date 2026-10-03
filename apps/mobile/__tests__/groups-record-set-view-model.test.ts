@@ -230,10 +230,10 @@ describe('the sheet (E2)', () => {
   });
 
   it('words the logged value for each load factor', () => {
-    expect(formatLoggedValue({ enteredWeightKg: 70, weightKg: 140, loadFactor: 2 })).toBe('Logged 70 kg per side · counted as 140 kg total');
-    expect(formatLoggedValue({ enteredWeightKg: 140, weightKg: 70, loadFactor: 0.5 })).toBe('Logged 140 kg total · counted as 70 kg per side');
+    expect(formatLoggedValue({ enteredWeightKg: 70, weightKg: 140, loadFactor: 2 })).toBe('Logged 70.0 kg per side · counted as 140.0 kg total');
+    expect(formatLoggedValue({ enteredWeightKg: 140, weightKg: 70, loadFactor: 0.5 })).toBe('Logged 140.0 kg total · counted as 70.0 kg per side');
     expect(formatLoggedValue({ enteredWeightKg: 140, weightKg: 140, loadFactor: 1 })).toBeNull();
-    expect(formatLoggedValue({ enteredWeightKg: 1, weightKg: 3, loadFactor: 3 })).toBe('Logged 1 kg · counted as 3 kg');
+    expect(formatLoggedValue({ enteredWeightKg: 1, weightKg: 3, loadFactor: 3 })).toBe('Logged 1.0 kg · counted as 3.0 kg');
   });
 });
 

@@ -307,9 +307,12 @@ additionally render faded (§6).
   `Volume`, never `e1RM`, `Added`, `External weight` or `Effective load`.
   Bodyweight contribution and dated readings may alter the calculation when the
   applicable capability is enabled, but normal data surfaces never expose the
-  arithmetic. All weights are kg. Valid zero renders `0`; `—` is reserved for
+  arithmetic. All weights are kg. Valid zero renders as a number (`0.0` for a
+  Weight or 1RM, `0` for Volume); `—` is reserved for
   invalid, failed or genuinely unavailable strict-group results. Long context
   wraps or gets a separate line instead of shrinking numeric figures.
+- **One format per figure** — Weight `60.0`, 1RM `104.7`, Volume `2560` — on
+  every screen (`tech/training-metrics-contract.md` §4, `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column (decided for Progress, DLM-T08-D2).

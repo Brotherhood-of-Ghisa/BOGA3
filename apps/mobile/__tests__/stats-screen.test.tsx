@@ -1270,5 +1270,5 @@ it('keeps partial volume readable and uses ordinary strength copy for bodyweight
   expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
   expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
-    .toBe('Open Pull-up heatmap. 2 sets. Volume 800 · incomplete. Estimated one rep max 128 kg');
+    .toBe('Open Pull-up heatmap. 2 sets. Volume 800 · incomplete. Estimated one rep max 127.7 kg');
 });

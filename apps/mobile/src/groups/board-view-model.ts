@@ -4,9 +4,8 @@
 // ordinal / date / value formatting they share. Values arrive converted to the
 // group exercise's weight entry (D6); nothing here re-ranks or re-sorts.
 
-import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
 
-import { formatKg, formatMemberName, formatSetFigure } from './stream-view-model';
+import { formatMemberName, formatMetricFigure, formatSetFigure } from './stream-view-model';
 import type {
   BoardHolder,
   BoardRow,
@@ -93,12 +92,11 @@ export const formatBoardDate = (epochMs: number, nowMs: number = Date.now()): st
   return date.getFullYear() === new Date(nowMs).getFullYear() ? label : `${label} ${date.getFullYear()}`;
 };
 
-/** "142.5 kg", for sentences (prose keeps its unit). */
-export const formatBoardKg = (valueKg: number): string => `${formatKg(valueKg)} kg`;
+/** "142.5 kg", for sentences (prose keeps its unit), in the metric's format. */
+export const formatBoardKg = (metric: GroupBoardMetric, valueKg: number): string => `${formatMetricFigure(metric, valueKg)} kg`;
 
 /** A board value in a figure slot, no unit (design-language §6): 1RM "142.5", Weight "140.0". */
-export const formatBoardFigure = (metric: GroupBoardMetric, valueKg: number): string =>
-  metric === 'e1rm' ? formatOneRepMaxFigure(valueKg) : formatWeightFigure(valueKg);
+export const formatBoardFigure = (metric: GroupBoardMetric, valueKg: number): string => formatMetricFigure(metric, valueKg);
 
 export const YOU_LABEL = 'You';
 
@@ -279,18 +277,18 @@ const linkExerciseNames = (item: GroupBoardHistoryItem): string => {
 };
 
 /** "L took #1 · v", "You took #1 · v". */
-const tookFirst = (leader: BoardHolder, myUserId: string | null): string =>
-  `${holderName(leader, myUserId)} took #1 · ${formatBoardKg(leader.value_kg)}`;
+const tookFirst = (leader: BoardHolder, myUserId: string | null, metric: GroupBoardMetric): string =>
+  `${holderName(leader, myUserId)} took #1 · ${formatBoardKg(metric, leader.value_kg)}`;
 
 /** "L now #1 · v", "You're now #1 · v". */
-const nowFirst = (leader: BoardHolder, myUserId: string | null): string =>
+const nowFirst = (leader: BoardHolder, myUserId: string | null, metric: GroupBoardMetric): string =>
   isMe(leader.member_user_id, myUserId)
-    ? `You're now #1 · ${formatBoardKg(leader.value_kg)}`
-    : `${holderName(leader, myUserId)} now #1 · ${formatBoardKg(leader.value_kg)}`;
+    ? `You're now #1 · ${formatBoardKg(metric, leader.value_kg)}`
+    : `${holderName(leader, myUserId)} now #1 · ${formatBoardKg(metric, leader.value_kg)}`;
 
 /** "Dave's 142.5 kg", "your 150 kg". */
-const holderValue = (holder: BoardHolder, myUserId: string | null): string =>
-  `${holderPossessive(holder, myUserId)} ${formatBoardKg(holder.value_kg)}`;
+const holderValue = (holder: BoardHolder, myUserId: string | null, metric: GroupBoardMetric): string =>
+  `${holderPossessive(holder, myUserId)} ${formatBoardKg(metric, holder.value_kg)}`;
 
 type CertificationEvent = Extract<GroupBoardHistoryRelated, { kind: 'certification' }>['event'];
 
@@ -300,37 +298,37 @@ const certificationEvent = (related: GroupBoardHistoryItem['related']): Certific
   related?.kind === 'certification' ? related.event : null;
 
 /** A void removes the record that held #1; the board may be left empty. */
-const voidSentence = ({ leader, previous, related }: GroupBoardHistoryItem, myUserId: string | null): string => {
+const voidSentence = ({ leader, previous, related }: GroupBoardHistoryItem, myUserId: string | null, metric: GroupBoardMetric): string => {
   const cause = related?.kind === 'record_voided' ? ` — set ${related.reason}` : '';
-  const removed = previous ? `${holderValue(previous, myUserId)} removed${cause}` : `a record removed${cause}`;
-  return leader ? `${nowFirst(leader, myUserId)} (${removed})` : `No one holds #1 (${removed})`;
+  const removed = previous ? `${holderValue(previous, myUserId, metric)} removed${cause}` : `a record removed${cause}`;
+  return leader ? `${nowFirst(leader, myUserId, metric)} (${removed})` : `No one holds #1 (${removed})`;
 };
 
 /** Any other reason with no leader left; only an ended certification says whose #1 went. */
-const emptyBoardSentence = ({ reason, previous, related }: GroupBoardHistoryItem, myUserId: string | null): string => {
+const emptyBoardSentence = ({ reason, previous, related }: GroupBoardHistoryItem, myUserId: string | null, metric: GroupBoardMetric): string => {
   const event = certificationEvent(related);
   if (reason === 'certification' && event !== null && event !== 'certified' && previous) {
-    return `No one holds #1 (${holderValue(previous, myUserId)} certification ${event})`;
+    return `No one holds #1 (${holderValue(previous, myUserId, metric)} certification ${event})`;
   }
   return 'No one holds #1';
 };
 
-const recordSentence = (leader: BoardHolder, previous: BoardHolder | null, myUserId: string | null): string =>
+const recordSentence = (leader: BoardHolder, previous: BoardHolder | null, myUserId: string | null, metric: GroupBoardMetric): string =>
   previous
-    ? `${tookFirst(leader, myUserId)} (from ${holderNameInline(previous, myUserId)}, ${formatBoardKg(previous.value_kg)})`
-    : `${holderName(leader, myUserId)} set the first record · ${formatBoardKg(leader.value_kg)}`;
+    ? `${tookFirst(leader, myUserId, metric)} (from ${holderNameInline(previous, myUserId)}, ${formatBoardKg(metric, previous.value_kg)})`
+    : `${holderName(leader, myUserId)} set the first record · ${formatBoardKg(metric, leader.value_kg)}`;
 
-const linkSentence = (item: GroupBoardHistoryItem, leader: BoardHolder, myUserId: string | null): string => {
+const linkSentence = (item: GroupBoardHistoryItem, leader: BoardHolder, myUserId: string | null, metric: GroupBoardMetric): string => {
   const { previous, related } = item;
   if (related?.kind !== 'link') {
-    return tookFirst(leader, myUserId);
+    return tookFirst(leader, myUserId, metric);
   }
   const names = linkExerciseNames(item);
   if (related.event !== 'unlink') {
-    return `${tookFirst(leader, myUserId)} (linked ${names})`;
+    return `${tookFirst(leader, myUserId, metric)} (linked ${names})`;
   }
   const who = previous ? `${holderNameInline(previous, myUserId)} unlinked` : 'unlinked';
-  return `${tookFirst(leader, myUserId)} (${who} ${names})`;
+  return `${tookFirst(leader, myUserId, metric)} (${who} ${names})`;
 };
 
 /** " by Kim", " by you", or nothing when the certifier is unknown. */
@@ -346,42 +344,48 @@ const certificationSentence = (
   { previous, related }: GroupBoardHistoryItem,
   leader: BoardHolder,
   myUserId: string | null,
+  metric: GroupBoardMetric,
 ): string => {
   const event = certificationEvent(related);
   if (event === null || !ENDED_CERTIFICATION_EVENTS.has(event)) {
-    return `${tookFirst(leader, myUserId)} (certified${certifierSuffix(related, myUserId)})`;
+    return `${tookFirst(leader, myUserId, metric)} (certified${certifierSuffix(related, myUserId)})`;
   }
-  const lost = previous ? `${holderValue(previous, myUserId)} certification ${event}` : `a certification ${event}`;
-  return `${nowFirst(leader, myUserId)} (${lost})`;
+  const lost = previous ? `${holderValue(previous, myUserId, metric)} certification ${event}` : `a certification ${event}`;
+  return `${nowFirst(leader, myUserId, metric)} (${lost})`;
 };
 
 /** The lead-change sentence per reason (E1.3). An unknown reason or missing `related` reads "L took #1 · v". */
-export const describeHistorySentence = (item: GroupBoardHistoryItem, myUserId: string | null): string => {
+export const describeHistorySentence = (
+  item: GroupBoardHistoryItem,
+  myUserId: string | null,
+  metric: GroupBoardMetric,
+): string => {
   if (item.reason === 'void') {
-    return voidSentence(item, myUserId);
+    return voidSentence(item, myUserId, metric);
   }
   const { leader } = item;
   if (!leader) {
-    return emptyBoardSentence(item, myUserId);
+    return emptyBoardSentence(item, myUserId, metric);
   }
   switch (item.reason) {
     case 'record':
-      return recordSentence(leader, item.previous, myUserId);
+      return recordSentence(leader, item.previous, myUserId, metric);
     case 'link':
-      return linkSentence(item, leader, myUserId);
+      return linkSentence(item, leader, myUserId, metric);
     case 'certification':
-      return certificationSentence(item, leader, myUserId);
+      return certificationSentence(item, leader, myUserId, metric);
     default:
-      return tookFirst(leader, myUserId);
+      return tookFirst(leader, myUserId, metric);
   }
 };
 
 export const buildHistoryItem = (
   item: GroupBoardHistoryItem,
   myUserId: string | null,
+  metric: GroupBoardMetric,
   nowMs: number = Date.now(),
 ): BoardHistoryItemViewModel => ({
   key: item.key,
   dateLabel: formatBoardDate(item.occurred_at_ms, nowMs),
-  sentence: describeHistorySentence(item, myUserId),
+  sentence: describeHistorySentence(item, myUserId, metric),
 });

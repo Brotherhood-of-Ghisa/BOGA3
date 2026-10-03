@@ -58,64 +58,11 @@ cannot accidentally enter strict group scoring:
   A positive contribution with no applicable valid member reading returns no
   bodyweight-dependent score. When disabled, behave as `ordinary`.
 
-Let:
-
-- `E` be entered Weight parsed as kg; blank performed Weight canonicalizes to 0;
-- `B` be the applicable bodyweight kg after the policy above;
-- `c` be the applicable contribution fraction;
-- `F = 1` for `total_load` and `F = 2` for `per_side_load`.
-
-Ordinary policy, a disabled applicable preference, or `c = 0` uses:
-
-```text
-calculated load = E
-Volume          = E × reps
-displayed 1RM   = estimateOneRepMax(E, reps)
-```
-
-The entered Weight is the complete ordinary calculation load; `loadInputMode`
-does not rescale ordinary Volume or 1RM. When the applicable preference is
-enabled and `c > 0`, use:
-
-```text
-calculated load = c × B + F × E
-Volume          = calculated load × reps
-total 1RM       = estimateOneRepMax(calculated load, reps)
-displayed 1RM   = (total 1RM - c × B) / F
-```
-
-Bodyweight is counted once. Per-side entry doubles only external Weight in the
-positive-contribution branch. The UI shows Weight, 1RM and Volume, never the
-calculated-load breakdown.
-
-The Wathan estimator remains:
-
-```text
-1RM = 100 × load / (48.8 + 53.8 × exp(-0.075 × reps))
-```
-
-Only positive integer reps are eligible. Reject negative/nonfinite Weight,
-contribution outside `[0,1]`, invalid distribution and nonfinite/overflow
-results. Malformed reading rows are not applicable readings; selection skips
-them and may use an older valid row. If none is valid, the reading is missing
-for policy purposes.
-
-A valid zero calculated load produces numeric Volume `0` and 1RM `0`. Reps,
-performed-set counts, working-set classification and effort remain usable. A
-zero result is never a record, ranking or achievement
-(`training-metrics-contract.md` §3). Invalid input never becomes zero
-implicitly.
-
-Top weight is always the highest raw entered Weight in kg. It never includes
-bodyweight contribution and never changes after a preference, contribution or
-reading edit. Which sets feed an aggregate is `training-metrics-contract.md`
-§1: a warm-up keeps its own per-set load metrics and feeds nothing else.
-
-For muscle analytics, ordinary total input contributes `E / 2` per side and
-ordinary per-side input contributes `E` per side. Positive-contribution math
-first resolves total `c × B + F × E`, then halves it. Apply the mapping role
-factor (`primary = 1`, `secondary = 0.5`) afterwards. No derived metric is
-written back to a set or session.
+The policy above decides the contribution `c` and the bodyweight `B`. The
+calculation that uses them, for calculated load, Volume, 1RM, top weight and
+muscle volume, is `training-metrics-contract.md` §4. Malformed reading rows are
+not applicable readings: selection skips them and may use an older valid row.
+If none is valid, the reading is missing for policy purposes.
 
 ## 3. Dated readings
 

@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -5,7 +6,6 @@ import { Icon } from '@/components/ui/icon';
 import { Stat } from '@/components/ui/stat';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExercisePersonalRecord } from '@/src/session-insights';
-import { formatOneRepMaxFigure, formatWeightFigure } from '@/src/session-recorder/session-view-model';
 
 type PersonalRecordCardProps = {
   personalRecord: ExercisePersonalRecord;
@@ -18,8 +18,8 @@ type PersonalRecordCardProps = {
  * its 1RM bold `record` (`design-language.md` §5).
  */
 export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCardProps) {
-  const oneRepMax = formatOneRepMaxFigure(personalRecord.estimatedOneRepMax);
-  const set = `${formatWeightFigure(personalRecord.weight)} × ${personalRecord.reps}`;
+  const oneRepMax = formatOneRepMax(personalRecord.estimatedOneRepMax);
+  const set = `${formatWeight(personalRecord.weight)} × ${personalRecord.reps}`;
 
   return (
     <Card testID={testID}>

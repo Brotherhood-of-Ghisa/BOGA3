@@ -20,6 +20,8 @@ interface Props {
   selectedWeekKey: string | null;
   onSelectWeek: (weekStartDateKey: string | null) => void;
   testIDPrefix: string;
+  // The metric's display format, as the daily grid takes it.
+  formatValue: (value: number) => string;
   legendLabel?: string;
 }
 
@@ -36,6 +38,7 @@ export function WeeklyHeatmap({
   selectedWeekKey,
   onSelectWeek,
   testIDPrefix,
+  formatValue,
   legendLabel = 'Intensity (per week)',
 }: Props) {
   const weeks = data.weekly;
@@ -115,7 +118,7 @@ export function WeeklyHeatmap({
                     <Pressable
                       key={w.weekStartDateKey}
                       accessibilityRole="button"
-                      accessibilityLabel={`Week of ${w.weekStartDateKey}, ${w.unavailable ? 'metric unavailable or incomplete' : w.hasTraining || w.value > 0 ? `value ${w.value}` : 'Rest week'}`}
+                      accessibilityLabel={`Week of ${w.weekStartDateKey}, ${w.unavailable ? 'metric unavailable or incomplete' : w.hasTraining || w.value > 0 ? `value ${formatValue(w.value)}` : 'Rest week'}`}
                       accessibilityState={{ selected: on }}
                       onPress={() => onSelectWeek(on ? null : w.weekStartDateKey)}
                       testID={`${heatmapTestID}-cell-${w.weekStartDateKey}`}
@@ -142,7 +145,7 @@ export function WeeklyHeatmap({
               {showAvg ? (
                 <>
                   <View style={[styles.baseline, { top: Math.round(avgY) }]}
-                    accessibilityLabel={`12-week average ${avg}`}
+                    accessibilityLabel={`12-week average ${formatValue(avg)}`}
                     testID={`${heatmapTestID}-average`}>
                     {Array.from({ length: dashCount }).map((_, i) => (
                       <View key={i} style={styles.dash} />

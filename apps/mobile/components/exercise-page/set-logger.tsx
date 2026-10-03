@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
 import { forwardRef } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -16,8 +17,6 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 import {
   canCommitLogger,
   formatEffort,
-  formatOneRepMax,
-  formatVolume,
   previewMetrics,
 } from '@/src/session-recorder/exercise-page-model';
 

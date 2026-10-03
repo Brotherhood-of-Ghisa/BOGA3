@@ -1,5 +1,6 @@
 import { sessionBodyWeightForCalculation, type SessionWeightContext } from '../bodyweight/as-of.ts';
 import { parseSetWeight } from './index.ts';
+import { formatVolume } from './format.ts';
 import { compareWeightRecord } from './records.ts';
 import { canonicalizeWeightForReps, isWorkingSet } from './set-semantics.ts';
 import {
@@ -83,8 +84,8 @@ export function summarizeExerciseLoad(
 }
 
 export function formatVolumeWithCoverage(total: number | null, known: number | null = 0): string {
-  if (total !== null && Number.isFinite(total)) return String(Math.round(total));
-  return known !== null && Number.isFinite(known) && known > 0 ? `${Math.round(known)} · incomplete` : '— · unavailable';
+  if (total !== null && Number.isFinite(total)) return formatVolume(total);
+  return known !== null && Number.isFinite(known) && known > 0 ? `${formatVolume(known)} · incomplete` : '— · unavailable';
 }
 
 /** Preserve unknown/overflow across rollups; omitted subtotals start at zero. */
@@ -96,18 +97,18 @@ export function addFiniteVolume(left: number | null | undefined, right: number |
 
 /** Compact session figures and a full-width coverage note travel together. */
 export function sessionVolumeSummary(coverage: VolumeCoverage): { volume: string; volumeNote?: string } {
-  if (coverage.totalVolumeKgReps !== null) return { volume: String(Math.round(coverage.totalVolumeKgReps)) };
+  if (coverage.totalVolumeKgReps !== null) return { volume: formatVolume(coverage.totalVolumeKgReps) };
   if (coverage.knownSetCount === 0 || coverage.knownVolumeKgReps === null) {
     return { volume: '—', volumeNote: coverage.overflow
       ? 'Volume unavailable. The combined load exceeds the supported numeric range.'
       : 'Volume unavailable. Some working sets have missing or invalid load information.' };
   }
-  return { volume: String(Math.round(coverage.knownVolumeKgReps)),
+  return { volume: formatVolume(coverage.knownVolumeKgReps),
     volumeNote: `Volume incomplete. Known subtotal from ${coverage.knownSetCount} of ${coverage.eligibleSetCount} working sets.` };
 }
 
 /** Numeric slot only: callers must render coverage alongside this figure. */
 export function compactVolumeFigure(total: number | null, known?: number | null): string {
-  if (total !== null && Number.isFinite(total)) return String(Math.round(total));
-  return known != null && Number.isFinite(known) && known > 0 ? String(Math.round(known)) : '—';
+  if (total !== null && Number.isFinite(total)) return formatVolume(total);
+  return known != null && Number.isFinite(known) && known > 0 ? formatVolume(known) : '—';
 }

@@ -1,8 +1,9 @@
 # Fix plan: one definition each for counted sets, counted sessions, records and calculations
 
 > Status: **decisions agreed** (2026-10-03; D4 changed by Dino, rest as recommended). Owner: Dino.
-> Progress: PR 2 merged (#487); PR 1 in its own session; PR 3 split into 3 (the
-> definition) and 3b (D5's Weight-record display, a UI change needing a design target).
+> Progress: PR 1 (#488), PR 2 (#487), PR 3 (#489) merged; PR 4 in review; PR 3b
+> (D5's Weight-record display) needs a design target and deletes this plan.
+> D8 corrected: Weight keeps one decimal on whole kg (`60.0`), per design-language §6.
 > Source: the metrics-definitions audit run in this worktree on 2026-10-03.
 > The decisions below need sign-off before PR 2 starts; PR 1 can start now.
 > Working note: each PR moves the rules it ships into the owning spec, and

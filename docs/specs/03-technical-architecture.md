@@ -81,7 +81,7 @@ Repository adapters batch current definitions, the synced private preference
 and as-of reading context with each graph read. The boundary feeds logging,
 history, Stats, session insights, records, completion/sharing and coaching.
 Current preference, contribution and reading values reinterpret those projections
-without rewriting raw sets. Top weight remains raw entered Weight; no derived
+without rewriting raw sets (`tech/training-metrics-contract.md` §4); no derived
 personal metric or achievement is synced or treated as source data. The one
 persisted projection, the device-local exercise session facts, is a rebuildable
 cache: a preference, contribution or reading change queues the affected

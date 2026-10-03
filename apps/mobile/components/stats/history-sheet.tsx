@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -65,8 +66,6 @@ const BODY_SHARE_OF_SCREEN = 0.7;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-// Progress figures are full integers, never `2.5k` (DLM-T08-D2).
-const formatFigure = (value: number): string => String(Math.round(value));
 
 const formatWeekDateRange = (weekStartDateKey: string): string => {
   const [y, m, d] = weekStartDateKey.split('-').map(Number);
@@ -85,15 +84,20 @@ const formatWeekValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatm
   switch (metric) {
     case 'totalVolume': return formatVolumeWithCoverage(week.totalVolume, week.knownVolume);
     case 'workingSetCount': return String(week.workingSetCount);
-    case 'estimatedRM1': return week.estimatedRM1 !== null ? formatFigure(week.estimatedRM1) : '—';
-    case 'highestWeight': return week.highestWeight !== null ? formatFigure(week.highestWeight) : '—';
+    case 'estimatedRM1': return week.estimatedRM1 !== null ? formatOneRepMax(week.estimatedRM1) : '—';
+    case 'highestWeight': return week.highestWeight !== null ? formatWeight(week.highestWeight) : '—';
   }
 };
 
-// One day's value for the daily heatmap's detail card: working sets are a raw
-// count, the rest are weights.
-const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string =>
-  metric === 'workingSetCount' ? String(value) : formatFigure(value);
+// One day's value for the daily heatmap's detail card, in its metric's format.
+const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string => {
+  switch (metric) {
+    case 'workingSetCount': return String(value);
+    case 'totalVolume': return formatVolume(value);
+    case 'estimatedRM1': return formatOneRepMax(value);
+    case 'highestWeight': return formatWeight(value);
+  }
+};
 
 function WeekSelectionBanner({
   weeklyEffort,
@@ -178,9 +182,10 @@ function HistoryHeatmap({
         selectedWeekKey={selectedWeekKey}
         onSelectWeek={onSelectWeek}
         testIDPrefix={testIDPrefix}
+        formatValue={formatDailyValue}
       />
     ),
-    [data, onSelectWeek, selectedWeekKey, testIDPrefix]
+    [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix]
   );
   const dailyVisible = view === 'daily';
 

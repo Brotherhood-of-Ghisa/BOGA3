@@ -166,12 +166,12 @@ describe('record card', () => {
       'Refresh to check certification',
       '1RM · group record',
       'Weight',
-      'As logged: Weight 20 kg × 5',
+      'As logged: Weight 20.0 kg × 5',
       '10 Sep · View rules history',
     ]);
     expect(label).toBe(
       'Dave — group record, Pull-up · Rules 2, 1RM 23.3 kg, Refresh to check certification, Weight 20.0 kg, ' +
-        'Refresh to check certification, As logged: Weight 20 kg × 5, 10 Sep',
+        'Refresh to check certification, As logged: Weight 20.0 kg × 5, 10 Sep',
     );
     fireEvent.press(card);
     expect(mockPush).toHaveBeenCalledWith('/group/group/leaderboards/pull/history?metric=e1rm&scope=all&revision=2');
@@ -217,13 +217,13 @@ describe('record card', () => {
       '20.0 kg',
       '1RM · group record',
       'Weight',
-      'As logged: Weight 20 kg × 5',
+      'As logged: Weight 20.0 kg × 5',
       'This performance no longer counts. Its original event remains in history.',
       '10 Sep · View rules history',
     ]);
     expect(label).toBe(
       'Record removed, Pull-up · Rules 2, 1RM 23.3 kg, Record removed, Weight 20.0 kg, Record removed, ' +
-        'As logged: Weight 20 kg × 5, This performance no longer counts. Its original event remains in history., 10 Sep',
+        'As logged: Weight 20.0 kg × 5, This performance no longer counts. Its original event remains in history., 10 Sep',
     );
   });
 

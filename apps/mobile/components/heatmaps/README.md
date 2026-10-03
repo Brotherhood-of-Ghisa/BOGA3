@@ -65,6 +65,7 @@ The two views select differently:
   selectedWeekKey={selectedWeekKey}     // string | null
   onSelectWeek={onSelectWeek}           // (weekStartDateKey | null) => void
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap-cell-<weekStartDateKey>", "-bar-<key>"
+  formatValue={formatValue}             // the metric's display format, for screen readers
 />
 ```
 

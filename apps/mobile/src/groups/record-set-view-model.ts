@@ -3,6 +3,7 @@
 // actions my relationship to the set allows, and the wording of every write
 // outcome. Pure: no React, no I/O.
 
+import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import {
   isCertificationNotFound,
   isGroupMemberNotFound,
@@ -10,7 +11,6 @@ import {
   isRecordSetNotFound,
   type GroupApiError,
 } from './api';
-import { formatOneRepMaxFigure } from '@/src/session-recorder/session-view-model';
 
 import { formatBoardDate } from './board-view-model';
 import {
@@ -18,7 +18,6 @@ import {
   RECORD_UNCERTIFIED_LABEL,
   type RecordCertificationStatus,
   formatCertifiedBy,
-  formatKg,
   formatSetFigure,
   formatSetValue,
   formatStreamPersonName,
@@ -180,8 +179,8 @@ export const formatRecordSetDate = (epochMs: number): string => {
 /** The as-logged value when the board converted it (D6); null when unconverted. */
 export const formatLoggedValue = (detail: Pick<RecordSetDetail, 'enteredWeightKg' | 'weightKg' | 'loadFactor'>): string | null => {
   if (detail.loadFactor === 1) return null;
-  const entered = `${formatKg(detail.enteredWeightKg)} kg`;
-  const counted = `${formatKg(detail.weightKg)} kg`;
+  const entered = `${formatWeight(detail.enteredWeightKg)} kg`;
+  const counted = `${formatWeight(detail.weightKg)} kg`;
   if (detail.loadFactor === 2) return `Logged ${entered} per side · counted as ${counted} total`;
   if (detail.loadFactor === 0.5) return `Logged ${entered} total · counted as ${counted} per side`;
   return `Logged ${entered} · counted as ${counted}`;
@@ -236,7 +235,7 @@ export const buildRecordSetSheet = (
   },
 ): RecordSetSheetViewModel => {
   const setFigure = formatSetFigure(detail.weightKg, detail.reps);
-  const oneRepMaxFigure = detail.e1rmKg === null ? null : formatOneRepMaxFigure(detail.e1rmKg);
+  const oneRepMaxFigure = detail.e1rmKg === null ? null : formatOneRepMax(detail.e1rmKg);
   const gym = session?.gym_name?.trim() || null;
   const loggedAs = detail.exerciseName ?? exerciseNameFromSession(session, detail.setId);
   let statusLabel = RECORD_UNCERTIFIED_LABEL;

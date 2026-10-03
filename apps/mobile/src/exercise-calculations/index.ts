@@ -8,7 +8,6 @@
  */
 
 import { parseSetReps, parseSetWeight } from './parse.ts';
-import { isWorkingSetType } from './set-semantics.ts';
 
 export { parseSetReps, parseSetWeight };
 
@@ -24,17 +23,6 @@ export type ParsedCalculationSet = {
   setType: string | null;
 };
 
-export type MaxRepsAtWeight = {
-  weight: number;
-  maxReps: number;
-};
-
-export type BestEstimatedOneRepMaxSet = {
-  weight: number;
-  reps: number;
-  estimatedOneRepMax: number;
-};
-
 export const parseCalculationSet = (set: CalculationSetInput): ParsedCalculationSet | null => {
   const weight = parseSetWeight(set.weightValue);
   const reps = parseSetReps(set.repsValue);
@@ -44,18 +32,6 @@ export const parseCalculationSet = (set: CalculationSetInput): ParsedCalculation
     reps,
     setType: set.setType ?? null,
   };
-};
-
-/** The parseable working sets: a warm-up counts toward none of these aggregates. */
-const collectParsedSets = (sets: CalculationSetInput[]): ParsedCalculationSet[] => {
-  const parsed: ParsedCalculationSet[] = [];
-  for (const raw of sets) {
-    if (!isWorkingSetType(raw.setType ?? null)) continue;
-    const parsedSet = parseCalculationSet(raw);
-    if (parsedSet === null) continue;
-    parsed.push(parsedSet);
-  }
-  return parsed;
 };
 
 /**
@@ -76,77 +52,4 @@ export const estimateOneRepMax = (weight: number, reps: number): number | null =
   if (weight === 0) return 0;
   const denominator = 48.8 + 53.8 * Math.exp(-0.075 * reps);
   return (100 * weight) / denominator;
-};
-
-export const computeSetVolume = (weight: number, reps: number): number => {
-  if (!Number.isFinite(weight) || weight < 0) return 0;
-  if (!Number.isInteger(reps) || reps <= 0) return 0;
-  return weight * reps;
-};
-
-/**
- * Returns the eligible set with the highest Wathan 1RM estimate. Ties keep the
- * first set in input order so callers get a stable source set for summaries.
- */
-export const findBestEstimatedOneRepMaxSet = (
-  sets: CalculationSetInput[]
-): BestEstimatedOneRepMaxSet | null => {
-  const parsed = collectParsedSets(sets);
-  let best: BestEstimatedOneRepMaxSet | null = null;
-  for (const set of parsed) {
-    const estimate = estimateOneRepMax(set.weight, set.reps);
-    if (estimate === null) continue;
-    if (best === null || estimate > best.estimatedOneRepMax) {
-      best = {
-        weight: set.weight,
-        reps: set.reps,
-        estimatedOneRepMax: estimate,
-      };
-    }
-  }
-  return best;
-};
-
-/**
- * Estimated 1RM for an exercise = the maximum per-set Wathan estimate
- * across the eligible sets. Returns `null` when no eligible set exists.
- */
-export const estimateExerciseOneRepMax = (
-  sets: CalculationSetInput[]
-): number | null =>
-  findBestEstimatedOneRepMaxSet(sets)?.estimatedOneRepMax ?? null;
-
-export const computeExerciseVolume = (
-  sets: CalculationSetInput[]
-): number => {
-  const parsed = collectParsedSets(sets);
-  let total = 0;
-  for (const set of parsed) {
-    total += computeSetVolume(set.weight, set.reps);
-  }
-  return total;
-};
-
-/**
- * For each distinct weight present in the eligible sets, the maximum
- * rep count observed at that weight. Returned sorted by weight descending
- * so callers can render a PR-style table without further sorting.
- *
- * Weight equality is the parsed numeric value, so text-distinct entries
- * like `'42.5'` and `'42.50'` collapse into a single row.
- */
-export const computeMaxRepsByWeight = (
-  sets: CalculationSetInput[]
-): MaxRepsAtWeight[] => {
-  const parsed = collectParsedSets(sets);
-  const maxByWeight = new Map<number, number>();
-  for (const set of parsed) {
-    const existing = maxByWeight.get(set.weight);
-    if (existing === undefined || set.reps > existing) {
-      maxByWeight.set(set.weight, set.reps);
-    }
-  }
-  return Array.from(maxByWeight, ([weight, maxReps]) => ({ weight, maxReps })).sort(
-    (left, right) => right.weight - left.weight
-  );
 };

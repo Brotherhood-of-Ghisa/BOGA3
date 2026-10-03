@@ -1,6 +1,9 @@
+import { formatWeight } from '@/src/exercise-calculations/format';
+import { parseSetWeight } from '@/src/exercise-calculations/parse';
+import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 // Presentation only: server order, score, metric and rule revision are preserved.
 import { buildPodiumCards, formatEmptyBoardLabel, type PodiumCardViewModel, formatBoardDate, formatBoardMemberLabel, formatOrdinal, type BoardRowViewModel, type GroupBoardScope } from './board-view-model';
-import { formatMemberName } from './stream-view-model';
+import { formatMemberName, formatMetricFigure } from './stream-view-model';
 import type { GroupMetric, GroupMetricValue } from './metric-contract';
 import type { GroupMetricBoardRowWire, GroupMetricPodiumWire, GroupMetricEventWire, GroupMetricExerciseWire, GroupPerformanceSnapshotWire } from './metric-wire';
 
@@ -15,11 +18,12 @@ export const GROUP_METRIC_SHORT_LABELS: Readonly<Record<GroupMetric, string>> = 
 };
 export function formatGroupMetricValue(score: GroupMetricValue): string {
   if (!Number.isFinite(score.value) || score.value <= 0) return 'Unavailable';
-  return `${score.value.toFixed(1)} kg`;
+  return `${formatMetricFigure(score.metric, score.value)} kg`;
 }
 export function formatGroupRawPerformance(performance: GroupPerformanceSnapshotWire): string {
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
-  return `Weight ${performance.weight_value} kg${distribution} × ${performance.reps}`;
+  const weight = parseSetWeight(canonicalizeWeightForReps(performance.weight_value, performance.reps_value));
+  return `Weight ${weight === null ? performance.weight_value : formatWeight(weight)} kg${distribution} × ${performance.reps}`;
 }
 export function describeGroupRules(exercise: Pick<GroupMetricExerciseWire,
   'rules_revision' | 'load_input_mode'>): string {
@@ -77,7 +81,7 @@ export function describeLegacyMetricHistory(event: import('./metric-wire').Group
   const row = holder as Record<string, unknown>;
   const member = row.member && typeof row.member === 'object' ? row.member as Record<string, unknown> : null;
   const name = row.member_user_id === userId ? 'You' : formatMemberName(typeof member?.username === 'string' ? member.username : null);
-  const value = typeof row.value_kg === 'number' && Number.isFinite(row.value_kg) ? ` · ${row.value_kg.toFixed(1)} kg` : '';
+  const value = typeof row.value_kg === 'number' && Number.isFinite(row.value_kg) ? ` · ${formatMetricFigure(event.metric, row.value_kg)} kg` : '';
   const reason = event.reason === 'link' ? 'after a link change' : event.reason === 'void' ? 'after a corrected or removed set'
     : event.reason === 'certification' ? 'after a certification change' : 'with a new record';
   return `${name} took #1${value} ${reason}. Original kg-only rules.`;

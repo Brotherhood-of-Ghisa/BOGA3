@@ -485,7 +485,7 @@ describe('History (E1.3)', () => {
     render(<GroupBoardHistoryRoute />);
 
     expect(await screen.findByTestId('group-board-history-item-12-sentence')).toHaveTextContent(
-      'Dave took #1 · 142.5 kg (from Sam, 138 kg)',
+      'Dave took #1 · 142.5 kg (from Sam, 138.0 kg)',
     );
     expect(screen.getByTestId('group-board-history-item-12-date')).toHaveTextContent('10 Sep');
     expect(screen.getByTestId('group-board-history-view')).toHaveTextContent('All · Weight');
@@ -502,7 +502,7 @@ describe('History (E1.3)', () => {
     });
     expect(api.getGroupBoardHistory).toHaveBeenLastCalledWith(expect.objectContaining({ before: { seq: 12 } }));
     expect(await screen.findByTestId('group-board-history-item-7-sentence')).toHaveTextContent(
-      'Sam took #1 · 138 kg (linked Bench Press)',
+      'Sam took #1 · 138.0 kg (linked Bench Press)',
     );
     expect(cacheKeys()).toEqual([groupCacheKeys.groupExercises(GROUP_ID)]);
   });

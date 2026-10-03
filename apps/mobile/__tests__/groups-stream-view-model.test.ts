@@ -13,7 +13,6 @@ import {
   buildStreamViewModel,
   formatClockTime,
   formatGroupDateTime,
-  formatKg,
   formatMemberCount,
   formatMyRole,
   formatOfflineMarker,
@@ -144,13 +143,11 @@ describe('group stream view model', () => {
   });
 
   describe('kg formatting', () => {
-    it('formats volume in kg with no thousands separators and at most two decimals', () => {
-      expect(formatVolumeKg(5230.5)).toBe('5230.5 kg');
+    it('formats volume in whole kg with no thousands separators', () => {
+      expect(formatVolumeKg(5230.4)).toBe('5230 kg');
       expect(formatVolumeKg(0)).toBe('0 kg');
-      expect(formatVolumeKg(1_234_567.891)).toBe('1234567.89 kg');
+      expect(formatVolumeKg(1_234_567.891)).toBe('1234568 kg');
       expect(formatVolumeKg(999)).toBe('999 kg');
-      expect(formatKg(62.25)).toBe('62.25');
-      expect(formatKg(Number.NaN)).toBe('-');
     });
   });
 
@@ -169,7 +166,7 @@ describe('group stream view model', () => {
         groupNames: ['Crew', 'Gym pals'],
         // The 60 × 10 warm-up adds no set and no volume.
         setsLabel: '2 sets',
-        volumeLabel: '1152.5 kg',
+        volumeLabel: '1153 kg',
         volumeNote: null,
         exercisesLabel: '2 exercises',
         recordsLabel: null,
@@ -335,7 +332,7 @@ describe('board stream items (M25-T10)', () => {
   describe('record-removed sentences (D15)', () => {
     it('names each board\'s new holder, Weight first, or nobody', () => {
       expect(sentence(voidedItem())).toBe(
-        "dave's Bench Press record removed (140 kg × 1) — set edited · Now #1 on Weight: sam 138 kg · No one holds #1 on 1RM",
+        "dave's Bench Press record removed (140.0 kg × 1) — set edited · Now #1 on Weight: sam 138.0 kg · No one holds #1 on 1RM",
       );
     });
 
@@ -348,7 +345,7 @@ describe('board stream items (M25-T10)', () => {
             leaders: [{ metric: 'e1rm', leader: holder('me', 'me', 120.25) }],
           }),
         ),
-      ).toBe('Your Bench Press record removed (140 kg × 1) — set deleted · Now #1 on 1RM: You 120.25 kg');
+      ).toBe('Your Bench Press record removed (140.0 kg × 1) — set deleted · Now #1 on 1RM: You 120.3 kg');
     });
   });
 

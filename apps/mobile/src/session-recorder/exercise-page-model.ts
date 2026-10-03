@@ -1,3 +1,4 @@
+import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import {
   pickSessionRecordSet, type RecordBaseline, type RecordSetCandidate,
 } from '@/src/exercise-calculations/records';
@@ -49,14 +50,6 @@ export const EFFORT_OPTIONS = SESSION_SET_TYPE_CYCLE;
 export const formatEffort = (setType: SessionSetTypeValue): string =>
   formatSessionSetType(setType) ?? '—';
 
-// `60.0`, `82.5`, `2.25`: one decimal unless the lifter entered more.
-export const formatWeight = (weight: number): string =>
-  Number.isInteger(weight * 10) ? weight.toFixed(1) : `${weight}`;
-
-export const formatOneRepMax = (value: number): string => value.toFixed(1);
-
-// No thousands separators (`design-language.md` §6).
-export const formatVolume = (value: number): string => `${Math.round(value)}`;
 
 const isBlank = (value: string | null | undefined) => (value ?? '').trim().length === 0;
 

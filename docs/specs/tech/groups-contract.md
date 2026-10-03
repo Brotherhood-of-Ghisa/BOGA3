@@ -1366,9 +1366,8 @@ device, in `apps/mobile/src/groups/session-metrics.ts`, through the canonical
 TS the session screens use. Nothing is mirrored in SQL.
 
 - **Performed.** Only null `performance_status` confirms a shared set. Planned,
-  skipped and unrecognized non-null statuses do not count. The shared parser
-  canonicalizes blank weight with valid reps to zero; invalid decimal amounts
-  (for example `1e3`) do not produce a performed row.
+  skipped and unrecognized non-null statuses do not count. Values parse with the
+  shared parser (`training-metrics-contract.md` §4).
 - **Sets** — the count of performed working sets (a warm-up adds nothing).
 - **Volume** — the ordinary kg calculation uses raw entered Weight and the
   source exercise's `load_input_mode`, over working sets only (warm-ups add no
@@ -1487,8 +1486,8 @@ RPC failure is caught in this module (C3.10.5, AC13).
 - **View model.** Completed status uses `formatCompactDuration` from the
   session list, so the example renders "Completed · 1h 5m" rather than
   "1h 05m". A completed item with a null `duration_sec` derives it from the
-  timestamps, else reads "Completed". Volume is `5230.5 kg`, with at most two
-  decimals and no thousands separators (design-language §6; DLM-T12).
+  timestamps, else reads "Completed". Volume is `5231 kg`, in the one display
+  format (`training-metrics-contract.md` §4) with its unit.
 
 ### 6.2 Local cache — `group_cache` (local-only SQLite)
 
@@ -2169,7 +2168,7 @@ group screen, and Today details above where they differ. No server change.
     back from the counterparty's own "joined" stream item, so host/VM clock
     skew cannot push it before the join. `push-complete-edit` completes it
     (45 min), then edits the first set to 102.5 kg in a later push. The card
-    then shows `Completed · 45m` and `1512.5 kg`, computed on the device (§5).
+    then shows `Completed · 45m` and `1513 kg`, computed on the device (§5).
     The flow also
     asserts that the history session has no card (§2.5) and that the card
     stays after removal (#4).
@@ -2404,7 +2403,9 @@ the diff plus the cause (T7; rules in §2.11).
 
 > **Status: current contract.**
 
-The calculation equation and personal/group policy distinction are owned by
+The calculation equation is owned by
+[`training-metrics-contract.md` §4](training-metrics-contract.md#4-calculations),
+and the personal/group policy distinction by
 [`bodyweight-load-contract.md` §2](bodyweight-load-contract.md#2-calculation-policies).
 This section owns group control, coherent publication, authorization, privacy
 and certification behavior.

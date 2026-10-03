@@ -1,10 +1,10 @@
+import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord, type SessionInsightExerciseInput } from '@/src/session-insights';
 
 import {
-  formatOneRepMaxFigure,
   formatSetRow,
   type SessionViewSetRow,
 } from './session-view-model';
@@ -137,7 +137,7 @@ export const buildCompletedSessionDetailModel = (
             oneRepMaxRecord: set.id === recordSetId,
           })
         ),
-        recordOneRepMax: record && recordSetId ? formatOneRepMaxFigure(record.estimatedOneRepMax) : null,
+        recordOneRepMax: record && recordSetId ? formatOneRepMax(record.estimatedOneRepMax) : null,
       },
     ];
   });
