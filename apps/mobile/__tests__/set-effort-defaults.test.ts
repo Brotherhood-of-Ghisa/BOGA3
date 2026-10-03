@@ -1,5 +1,6 @@
 import { appendSuggestedPlan, createExercise } from '@/src/session-recorder/session-model';
-import { isWorkingSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
+import { normalizeSessionSetType } from '@/src/data/set-types';
+import { isWorkingSetType } from '@/src/exercise-calculations/set-semantics';
 import { countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
 
 // The session view's set factories. Copying the previous set's effort when a
@@ -36,12 +37,12 @@ describe('new session set effort defaults', () => {
 describe('working-set rule', () => {
   it.each([null, undefined, 'rir_0', 'rir_3', 'rir_4', 'rir_12', 'drop_set', 'rir_-1'])(
     'counts %p as a working set', (value) => {
-      expect(isWorkingSessionSetType(value)).toBe(true);
+      expect(isWorkingSetType(value)).toBe(true);
     }
   );
 
   it('excludes only warm-ups', () => {
-    expect(isWorkingSessionSetType('warm_up')).toBe(false);
+    expect(isWorkingSetType('warm_up')).toBe(false);
   });
 
   it('counts every valid performed non-warm-up set in analytics', () => {
@@ -113,7 +114,7 @@ describe('file-configured selectable RIR range', () => {
       expect(types.formatSessionSetType('rir_4')).toBe('RIR 4');
       expect(types.formatSessionSetType('rir_4', 'compact')).toBe('R4');
       expect(types.defaultSessionSetType('rir_4')).toBe('rir_4');
-      expect(types.isWorkingSessionSetType('rir_4')).toBe(true);
+      expect(isWorkingSetType('rir_4')).toBe(true);
       expect(types.nextSessionSetType('rir_4')).toBe('warm_up');
     });
   });

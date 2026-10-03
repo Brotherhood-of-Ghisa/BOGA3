@@ -6,14 +6,13 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import type { LoadInputMode } from '@/src/exercise-calculations/load-metrics';
 import {
-  isConfirmedPerformedSet,
+  isWorkingSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
-import { isWorkingSessionSetType } from './set-types';
 import { computePeriodBounds, type StatsPeriodDays } from './stats';
 
 export type ExerciseCatalogStatsPeriod = 'all' | StatsPeriodDays;
@@ -243,28 +242,28 @@ export const aggregateExerciseCatalogStats = (
     const defId = link.exerciseDefinitionId;
     const session = sessionById.get(link.sessionId);
     if (!session) continue;
-    if (!isConfirmedPerformedSet({ reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus })) {
+    // Every figure here reads working sets only; the distinct sessions they
+    // come from are the counted sessions (`isCountedSession`) per exercise.
+    if (!isWorkingSet({
+      reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus, setType: set.setType,
+    })) {
       continue;
     }
     const metric = calculateAnalyticsSetMetrics({
       ...set,
       ...personalLoadContext(raw.bodyweightCalculationsEnabled ?? false, definitionById.get(defId), session),
     });
-    if (!metric.eligible) continue;
-    const working = isWorkingSessionSetType(set.setType);
     const { completedAt } = session;
 
-    if (working) {
-      everDoneIds.add(defId);
-      const previousUse = lastCompletedAtById.get(defId);
-      if (!previousUse || completedAt > previousUse) lastCompletedAtById.set(defId, completedAt);
-      // Favourite is independent of the Stats screen's selected metric period.
-      if (completedAt.getTime() >= favouriteStart && completedAt <= now) {
-        addRecency(recencyScoresById, defId, completedAt, now);
-      }
+    everDoneIds.add(defId);
+    const previousUse = lastCompletedAtById.get(defId);
+    if (!previousUse || completedAt > previousUse) lastCompletedAtById.set(defId, completedAt);
+    // Favourite is independent of the Stats screen's selected metric period.
+    if (completedAt.getTime() >= favouriteStart && completedAt <= now) {
+      addRecency(recencyScoresById, defId, completedAt, now);
     }
 
-    if (!working || !isInWindow(completedAt, window)) continue;
+    if (!isInWindow(completedAt, window)) continue;
     const aggregate = aggregatesById.get(defId) ?? emptyAggregate(defId);
     aggregatesById.set(defId, aggregate);
     addWorkingSetToAggregate(aggregate, metric);

@@ -463,7 +463,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v1"
+  .data.metric_revision == "working_sets_v2"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -489,7 +489,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v1"
+  .data.metric_revision == "working_sets_v2"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -521,7 +521,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v1"
+  .data.metric_revision == "working_sets_v2"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325

@@ -40,8 +40,14 @@ export type SessionExerciseDraftLoad =
       sessionStatus: SessionGraphSnapshot['status'];
       bodyWeight: ResolvedSessionWeight;
       gymId: string | null;
+      // Every block of the session as loaded, in session order: a record is
+      // the session's, not a block's (`sessionRecordBlocks` picks this
+      // exercise's blocks at render, so a swap regroups them).
+      sessionBlocks: SessionBlock[];
     }
   | { status: SessionExerciseDraftLoadError };
+
+export type SessionBlock = Pick<SessionDraftExerciseSnapshot, 'id' | 'exerciseDefinitionId' | 'sets'>;
 
 export class SessionExerciseDraftError extends Error {
   constructor(readonly reason: SessionExerciseDraftLoadError) {
@@ -62,7 +68,8 @@ export const loadSessionExerciseDraft = async (
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
-  return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, bodyWeight: {
+  const sessionBlocks = session.exercises.map(({ id, exerciseDefinitionId, sets }) => ({ id, exerciseDefinitionId, sets }));
+  return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, sessionBlocks, bodyWeight: {
     bodyWeightKg: session.bodyWeightKg, bodyWeightSource: session.bodyWeightSource,
     bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
 

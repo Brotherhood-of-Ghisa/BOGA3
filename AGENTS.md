@@ -134,6 +134,7 @@ commit boundaries.
 | Data model / schema / migrations / sync scope | `docs/specs/05-data-model.md` |
 | Sync (data model, server schema, push/pull RPC, drift) | `docs/specs/05-data-model.md`, `docs/specs/tech/sync-v2-server-contract.md` |
 | Auth / RLS / backend API | `docs/specs/10-api-authn-authz-guidelines.md`, `supabase/README.md` |
+| Stats, records, PRs, volume/1RM, set or session counts (`src/exercise-calculations`, `src/data/*stats*`, facts, progress) | `docs/specs/tech/training-metrics-contract.md` |
 | Groups (group tables/RPCs, share trigger, `src/groups`, group screens) | `docs/specs/tech/groups-contract.md`, `docs/specs/10-api-authn-authz-guidelines.md` |
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
 | Worktree lifecycle (open / release / repair), slot-lease errors, or isolation bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |

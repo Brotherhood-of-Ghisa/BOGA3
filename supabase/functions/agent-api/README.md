@@ -213,11 +213,11 @@ any internal safety cap explicit. `exercises` lists every block, while
 
 ## Working sets only
 
-A **working set** is a confirmed performed set (valid reps and Weight, no
-`performance_status`) whose `set_type` is not `"warm_up"`. Untagged sets, every
-RIR and unrecognised stored values are working sets. The rule is the app's
-(`isWorkingSet` in the shared calculation kernel), so coaching and app figures
-agree.
+The API reads the app's own rule for which sets and sessions count
+([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
+§1–§2), through the shared calculation modules, so coaching and app figures
+agree. In short, only `set_type: "warm_up"` and unconfirmed rows are left out.
+This section lists the fields that rule governs.
 
 - Every derived figure reads working sets only: `personal_records`
   (1RM, top weight, max session volume), each performance's `volume` and
@@ -233,7 +233,13 @@ agree.
   stat footprint: it is absent from `recent_performances` and `volume_series`,
   sets no `last_performed_at`, and is not an excluded-volume session.
 
-`metric_revision: "working_sets_v1"` marks this meaning. The previous
+`personal_records` follow the app's record rules
+([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
+§3): `top_weight` is the heaviest Weight and, at that weight, the most reps; a
+tie keeps the earliest session; a zero result is never a record.
+
+`metric_revision: "working_sets_v2"` marks this meaning. `"working_sets_v1"`
+let a zero 1RM, Weight or Volume stand as a record; the earlier
 `"bodyweight_optional_v1"` counted warm-ups in every figure.
 
 ## Optional bodyweight calculation response
@@ -241,7 +247,7 @@ agree.
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v1"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v2"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

@@ -866,7 +866,7 @@ the hosted database for this cutover.
    board/certification response for absence of reading value/date/id/provenance
    and dependency digest. Reading or contribution changes must invalidate the
    affected certification without claiming the witness verified bodyweight.
-   Confirm coaching uses the current `metric_revision` (`working_sets_v1`), emits ordinary/no-reading
+   Confirm coaching uses the current `metric_revision` (`working_sets_v2`), emits ordinary/no-reading
    output while private mode is off and authorized aware output while on. Re-run
    hosted OAuth/discovery/revocation checks.
 

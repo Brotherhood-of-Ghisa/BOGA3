@@ -179,7 +179,7 @@ describe('aggregateStats', () => {
     expect(chest).toMatchObject({ workingSetCount: 3, totalVolume: 100 });
   });
 
-  it('gives a muscle trained only by warm-ups no sets or volume, while the session still counts', () => {
+  it('gives a warm-up-only session no session, sets or volume', () => {
     const input = buildAggregationInput({
       sessions: [{ id: 'session-1', completedAt: new Date('2026-05-12T10:00:00.000Z') }],
       sessionExercises: [{ id: 'se-1', sessionId: 'session-1', exerciseDefinitionId: 'ex-bench' }],
@@ -188,7 +188,7 @@ describe('aggregateStats', () => {
 
     const totals = aggregateStats(input);
     const chest = flattenMuscles(totals).find((entry) => entry.muscleGroupId === 'chest_sternal');
-    expect(totals.sessionCount).toBe(1);
+    expect(totals.sessionCount).toBe(0);
     expect(totals.workingSetCount).toBe(0);
     expect(chest).toMatchObject({ workingSetCount: 0, totalVolume: 0, knownVolume: 0 });
     expect(chest).not.toHaveProperty('setCount');

@@ -13,6 +13,7 @@ import {
   loadSessionExerciseDraft,
   saveSessionExerciseDraft,
   type SessionExerciseDraftClient,
+  type SessionBlock,
   type SessionExerciseDraftLoadError,
 } from './session-exercise-draft';
 
@@ -33,6 +34,7 @@ export type SessionExerciseDraftState =
       sessionStatus: SessionGraphSnapshot['status'];
       bodyWeight: ResolvedSessionWeight;
       gymId: string | null;
+      sessionBlocks: SessionBlock[];
     };
 
 // `text`: typing, saved after the debounce. `structural`: a commit, toggle,
@@ -65,6 +67,7 @@ type ExerciseDraftLive = {
   sessionStatus: SessionGraphSnapshot['status'];
   bodyWeight: ResolvedSessionWeight;
   gymId: string | null;
+  sessionBlocks: SessionBlock[];
   saveFailed: boolean;
   mounted: boolean;
 };
@@ -85,6 +88,7 @@ const createExerciseDraftPersistence = ({
     sessionStatus: 'active',
     bodyWeight: { ...EMPTY_SESSION_WEIGHT },
     gymId: null,
+    sessionBlocks: [],
     saveFailed: false,
     mounted: true,
   };
@@ -171,7 +175,7 @@ export const useSessionExerciseDraft = ({
       const next = recipe(current);
       if (next === current) return;
       setLive({ exercise: next });
-      setState({ status: 'ready', exercise: next, sessionStatus: live.sessionStatus, bodyWeight: live.bodyWeight, gymId: live.gymId });
+      setState({ status: 'ready', exercise: next, sessionStatus: live.sessionStatus, bodyWeight: live.bodyWeight, gymId: live.gymId, sessionBlocks: live.sessionBlocks });
       if (kind === 'text') {
         autosave.markTextMutation();
       } else {
@@ -207,8 +211,8 @@ export const useSessionExerciseDraft = ({
     const result = await loadSessionExerciseDraft(sessionId, sessionExerciseId, client);
     if (!live.mounted || prior !== live.exercise) return false;
     if (result.status === 'ready') {
-      setLive({ exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId });
-      setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId });
+      setLive({ exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId, sessionBlocks: result.sessionBlocks });
+      setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId, sessionBlocks: result.sessionBlocks });
     } else setState({ status: 'error', reason: result.status });
     return result.status === 'ready';
     } catch (error) {

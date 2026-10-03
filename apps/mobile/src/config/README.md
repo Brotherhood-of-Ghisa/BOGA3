@@ -11,7 +11,9 @@ not stored as user preferences or exposed through Settings.
 The value accepts a non-negative safe integer; the default is `3`.
 
 Working-set classification is not configurable: every valid performed set that
-is not a warm-up counts (`isWorkingSessionSetType` in `src/data/set-types.ts`).
+is not a warm-up counts (`isWorkingSet` in
+`src/exercise-calculations/set-semantics.ts`;
+`docs/specs/tech/training-metrics-contract.md` §1).
 
 Persisted/imported effort accepts canonical `rir_<n>` values independently of the
 current picker range. Reducing the range preserves older values and their labels;

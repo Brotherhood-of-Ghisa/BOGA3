@@ -3,13 +3,9 @@
 // out, each with the session's bests and its personal-record flags. Only
 // working sets count: a session with none for the definition has no row.
 
-import { addFiniteVolume, enteredWeightKg } from '@/src/exercise-calculations/analytics';
-import {
-  eligibleSetsByBlockInSessionOrder,
-  pickBestEstimatedOneRepMaxSet,
-  type EligibleSessionSet,
-} from '@/src/exercise-calculations/best-set';
-import { summarizeVolume, type LoadContext } from '@/src/exercise-calculations/load-metrics';
+import { summarizeSessionBests } from '@/src/exercise-calculations/best-set';
+import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
+import { compareRecordOrder, createRecordBook } from '@/src/exercise-calculations/records';
 import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseSessionFact } from './schema';
@@ -18,7 +14,7 @@ import type { ExerciseSessionFact } from './schema';
  * Bump when a rule below changes what a row holds. Every device then rebuilds
  * the whole table once before its next facts read.
  */
-export const EXERCISE_SESSION_FACTS_RULES_VERSION = 3;
+export const EXERCISE_SESSION_FACTS_RULES_VERSION = 4;
 
 export type FactsSetInput = {
   id: string;
@@ -45,98 +41,55 @@ export type FactsSessionInput = {
 
 export type ExerciseSessionFactRow = ExerciseSessionFact;
 
-type SessionBests = Omit<ExerciseSessionFactRow, 'prE1rm' | 'prWeight' | 'prVolume'>;
+type SessionBests = Omit<ExerciseSessionFactRow, 'prE1rm' | 'prWeight' | 'prVolume'> & { topWeightReps: number | null };
 
-/** The order PR history uses: `completed_at`, then session id. */
-export const compareFactSessionOrder = (
-  left: { completedAt: Date; sessionId: string },
-  right: { completedAt: Date; sessionId: string },
-): number =>
-  left.completedAt.getTime() - right.completedAt.getTime() ||
-  left.sessionId.localeCompare(right.sessionId);
-
-type EligibleSet = EligibleSessionSet<FactsBlockInput, FactsSetInput>;
-
-type Best = { value: number; setId: string; reps: number };
-
-/** Raw entered kg; equal weight goes to more reps, then to session order. */
-const pickTopWeight = (best: Best | null, { set, metric }: EligibleSet): Best | null => {
-  const value = enteredWeightKg(set);
-  if (value === null) return best;
-  if (best !== null && (value < best.value || (value === best.value && metric.reps <= best.reps))) {
-    return best;
-  }
-  return { value, setId: set.id, reps: metric.reps };
-};
+/** The order PR history uses: the record order (`compareRecordOrder`). */
+export const compareFactSessionOrder = compareRecordOrder;
 
 /** The session's bests for one definition, or null when it has no working set. */
 export const summarizeFactSession = (
   exerciseDefinitionId: string,
   session: FactsSessionInput,
 ): SessionBests | null => {
-  const blocks = eligibleSetsByBlockInSessionOrder<FactsSetInput, FactsBlockInput>(session.blocks)
-    .filter((sets) => sets.length > 0);
-  if (blocks.length === 0) return null;
-
-  const bestE1rm = pickBestEstimatedOneRepMaxSet(blocks.flat());
-  let topWeight: Best | null = null;
-  let knownVolume: number | null = 0;
-  let totalVolume: number | null = 0;
-  let workingSets = 0;
-  for (const sets of blocks) {
-    const coverage = summarizeVolume(sets.map(({ metric }) => metric));
-    knownVolume = addFiniteVolume(knownVolume, coverage.knownVolumeKgReps);
-    totalVolume = addFiniteVolume(totalVolume, coverage.totalVolumeKgReps);
-    workingSets += sets.length;
-    for (const eligible of sets) topWeight = pickTopWeight(topWeight, eligible);
-  }
-
+  const bests = summarizeSessionBests<FactsSetInput, FactsBlockInput>(session.blocks);
+  if (!bests) return null;
   return {
     sessionId: session.sessionId,
     exerciseDefinitionId,
     achievedAt: session.completedAt,
-    bestE1rmKg: bestE1rm?.estimatedOneRepMaxKg ?? null,
-    bestE1rmSetId: bestE1rm?.set.id ?? null,
-    topWeightKg: topWeight?.value ?? null,
-    topWeightSetId: topWeight?.setId ?? null,
-    volumeKg: totalVolume ?? knownVolume,
-    volumeComplete: totalVolume !== null,
-    workingSets,
-  };
-};
-
-/** A value strictly above every earlier value is a PR; the first value is the baseline. */
-const createRecordTracker = () => {
-  let bar: number | null = null;
-  return (value: number | null): boolean => {
-    if (value === null) return false;
-    const isRecord = bar !== null && value > bar;
-    if (bar === null || value > bar) bar = value;
-    return isRecord;
+    bestE1rmKg: bests.oneRepMax?.estimatedOneRepMaxKg ?? null,
+    bestE1rmSetId: bests.oneRepMax?.set.id ?? null,
+    topWeightKg: bests.topWeight?.weight ?? null,
+    topWeightSetId: bests.topWeight?.set.id ?? null,
+    topWeightReps: bests.topWeight?.reps ?? null,
+    volumeKg: bests.volumeKg,
+    volumeComplete: bests.volumeComplete,
+    workingSets: bests.workingSets,
   };
 };
 
 /**
  * Facts for one definition across its completed history, in PR-history order.
- * An incomplete volume is never a volume PR and never raises the volume bar.
+ * The PR flags are the record book's (`records.ts`): an incomplete volume is
+ * never a volume PR and never raises the volume bar.
  */
 export const deriveExerciseSessionFacts = (
   exerciseDefinitionId: string,
   sessions: FactsSessionInput[],
 ): ExerciseSessionFactRow[] => {
-  const e1rmRecord = createRecordTracker();
-  const weightRecord = createRecordTracker();
-  const volumeRecord = createRecordTracker();
+  const book = createRecordBook();
   return [...sessions]
     .sort(compareFactSessionOrder)
     .flatMap((session) => {
-      const bests = summarizeFactSession(exerciseDefinitionId, session);
-      if (!bests) return [];
-      return [{
-        ...bests,
-        prE1rm: e1rmRecord(bests.bestE1rmKg),
-        prWeight: weightRecord(bests.topWeightKg),
-        prVolume: volumeRecord(bests.volumeComplete ? bests.volumeKg : null),
-      }];
+      const summary = summarizeFactSession(exerciseDefinitionId, session);
+      if (!summary) return [];
+      const { topWeightReps, ...bests } = summary;
+      const flags = book.add({
+        oneRepMax: bests.bestE1rmKg === null ? null : { value: bests.bestE1rmKg },
+        weight: bests.topWeightKg === null || topWeightReps === null
+          ? null : { weight: bests.topWeightKg, reps: topWeightReps },
+        volume: bests.volumeComplete && bests.volumeKg !== null ? { value: bests.volumeKg } : null,
+      });
+      return [{ ...bests, prE1rm: flags.oneRepMax, prWeight: flags.weight, prVolume: flags.volume }];
     });
 };

@@ -73,7 +73,6 @@ export {
 } from './session-drafts';
 export {
   formatSessionSetType,
-  isWorkingSessionSetType,
   normalizeSessionSetType,
   type SessionSetType,
   type SessionSetTypeValue,

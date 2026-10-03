@@ -391,8 +391,8 @@ invisible.
 | `exercise_order_index`, `set_order_index` | Tie-break order after `achieved_at_ms` (P7) |
 | `performed` | The session screens' rule (§5), run in TS by the evaluator |
 | `live` | Set, exercise, and session all untombstoned |
-| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; conversion to the group exercise's mode is SQL (M25-T05, D6). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg. `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
-| `working` | The app's working-set rule (`isWorkingSessionSetType` over the synced `set_type`: every set but a warm-up), independent of `performed`. Null on a fact from before rules version 4. Read by the contract-1 boards (§2.11), both certify RPCs (`group_set_is_warm_up`, §4.6, §11.3) and the week summary (§4.7). |
+| `weight_kg`, `reps`, `e1rm_kg` | Null unless performed. They are in the member's **entered** load mode; the boards convert only 1RM to the group exercise's mode, in SQL (D6, §2.11). `e1rm_kg` is Wathan (`estimateOneRepMax`), null at 0 kg (from rules version 5; the boards read a zero 1RM on an older fact as none too). `reps` is `numeric` so that any value the TS parser accepts can be stored; no client text can fail a job on every retry. |
+| `working` | The effort half of the app's working-set rule (`isWorkingSetType` over the synced `set_type`: every set but a warm-up; `training-metrics-contract.md` §1), independent of `performed`. Null on a fact from before rules version 4. Every reader uses one predicate, **working unless known not to be** (`working is not false`): the contract-1 boards (§2.11) and the week summary (§4.7) count a null fact as working, and `group_set_is_warm_up` (both certify RPCs, §4.6, §11.3; the `rules` attribution) reads only `false` as a warm-up. |
 | `achieved_at_ms` | `sessions.started_at` |
 | `fingerprint` | `group_set_fingerprint(weight_value, reps_value, performance_status, deleted_at)`: md5 over the raw values. It interprets nothing, so certification (M25-T06) can compare a live row without the evaluator. |
 | `rules_version` | `GROUP_EVAL_RULES_VERSION` of the TS that wrote it |
@@ -520,15 +520,18 @@ Archive and leave queue nothing: the board freezes.
 
 **Rules version 4** adds the facts' `working`, so the evaluator stores the
 app's working-set rule without a SQL copy of it; a change to
-`isWorkingSessionSetType` needs a version bump. Its migration queues every
+`isWorkingSetType` (`training-metrics-contract.md` §1) needs a version bump. Its migration queues every
 session with older facts, so the sweep re-normalizes them within its next
-rounds; until then a session's facts read `working` null and its sets count no
-working sets in §4.7. The contract-1 boards and both certify RPCs read the
-same `working` (working sets only, §2.11) with no further bump: the rule did
-not change, so no fact is re-normalized. Only a known warm-up (`false`) is
-excluded; a fact not yet re-normalized still counts. Contract-2 comparisons
-apply the rule to the raw `set_type` on their next rebuild (§11.2), whatever
-this version.
+rounds. The contract-1 boards and both certify RPCs read the same `working`
+(working sets only, §2.11). Contract-2 comparisons apply the rule to the raw
+`set_type` on their next rebuild (§11.2), whatever this version.
+
+**Rules version 5** stores no `e1rm_kg` at 0 kg (a zero 1RM is never a
+result). The drain's rules requeue (step 1 below) re-normalizes every older
+fact, so after it every fact has a non-null `working`. Until a fact is
+re-normalized it reads as working (§2.9, one predicate everywhere): a board
+does not drop a best only because its session waits in the queue, and a
+pre-version-4 warm-up may count in the week summary for that long.
 
 **One implementation of the set rules.** `set-facts.ts` holds
 `parseGroupPerformedSet`. The device's `toGroupPerformedSet` (§5) delegates
@@ -560,8 +563,9 @@ holds the member's best counting set for that board:
 
 - `value_kg`: the ranked value, a `numeric` rounded to 6 places with trailing
   zeros trimmed, so comparisons and cursors are exact;
-- `weight_kg`, `e1rm_kg` (converted), `reps`, `entered_weight_kg` (as
-  logged), `load_factor` (`0.5 | 1 | 2`);
+- `weight_kg` (the raw entered kg), `e1rm_kg` (converted, D6), `reps`,
+  `entered_weight_kg` (as logged), `load_factor` (`0.5 | 1 | 2`, the 1RM
+  factor);
 - the winning fact's `set_id`, `session_id`, `session_exercise_id`,
   `exercise_definition_id`, `achieved_at_ms`, orders, and `fingerprint`.
 
@@ -584,7 +588,24 @@ active certification ids at the last apply, for certification attribution.
 - **Conversion (D6).** The factor compares the member exercise's current
   `load_input_mode` with the group exercise's: the same mode gives 1, per side
   → total gives 2, total → per side gives 0.5. It applies to 1RM and its record
-  detection. Weight always remains the raw entered kg value.
+  detection. Weight always remains the raw entered kg value. The shared
+  vectors `apps/mobile/src/groups/load-factor-vectors.json` hold the TS
+  `groupEnteredWeightFactor` and the SQL `group_board_load_factor` to the same
+  factors.
+- **Raw Weight, forward only.** Until
+  `20261003180000_group_board_raw_weight.sql`, contract 1 stored Weight
+  converted like 1RM. That migration writes no stored result and queues
+  nothing; the rules-version-5 requeue recomputes each target silently. At an
+  apply that still finds a Weight entry stored converted
+  (`group_board_weight_as_raw`), the stored value reads as its raw value: a
+  set must beat the raw value to be a record, the entry falling to the raw
+  value of the same set is a silent `rules` move (no lead change, All or
+  Certified, no void, no record), a stored Weight record of a converted
+  value stands while its set's raw value is unchanged, and a replacement for
+  such a record voided by a reps edit keeps its Weight board. A provisional
+  record (step 3) from a session active at the change keeps the converted
+  `previous_value_kg` it was set against: its Weight board settles against
+  that value until the session completes.
 - **A member's best**: highest `value_kg`, then the earlier `achieved_at_ms`,
   `exercise_order_index`, `set_order_index`, `set_id` (P7).
 - **Rank**: `value_kg desc, achieved_at_ms asc, member_user_id asc`, strict
@@ -645,7 +666,9 @@ active certification ids at the last apply, for certification attribution.
      fact that is not `working`) and its record is not voided in this apply:
      **rules**, a silent move. No event is
      written for that metric, and no Certified `lead_change` either when M's
-     old Certified best was a warm-up and no certification changed;
+     old Certified best was a warm-up and no certification changed. A Weight
+     best stored converted that falls to its own set's raw value is the same
+     silent move (raw Weight, forward only, above);
    - otherwise the entry fell or vanished: **void** fallback.
 6. Write the entries and the state, then the events:
    - the voids, with each voided board's current leader;
@@ -777,7 +800,7 @@ P10–P13, D3–D5. It follows ground rules 1–5.
 | `certified_by` | → `auth.users` `on delete set null`. CHECK it is not the lifter. |
 | `pinned_fingerprint` | `group_set_fingerprint` of the live set row at certify time (§2.9) |
 | `pinned_weight_value`, `pinned_reps_value`, `pinned_performance_status` | The raw synced values it attested |
-| `weight_kg`, `reps`, `e1rm_kg` | The converted values the certifier was shown (the record set's entry or record payload) |
+| `weight_kg`, `reps`, `e1rm_kg` | The values the certifier was shown (the record set's entry or record payload): raw Weight, converted 1RM (D6) |
 | `certified_at` | |
 | `ended_at`, `end_reason`, `ended_by` | `end_reason in ('withdrawn','cancelled','voided')`; `ended_at` and `end_reason` null together; `ended_at >= certified_at`; `ended_by` (→ `auth.users on delete set null`) only on a withdrawn or cancelled row |
 
@@ -898,6 +921,8 @@ members, then by username case-insensitively with nulls last (C3.6.1).
 - `p_group_id` null means every group where the caller is currently active
   (All). A value means that group only, and the caller must be an active
   member, else `NOT_FOUND`.
+- All stays a supported server read for agents and other clients. The mobile
+  app never uses it: it reads one group's stream at a time (§6.1–§6.3).
 - A removed member therefore gets nothing on their next refresh (C3.6.8, AC11).
 - `p_limit` accepts `1..50` and defaults to `20`.
 
@@ -1034,7 +1059,7 @@ items (T6).
   { "kind": "record", "key", "sort_at_ms", "group": { "group_id", "name" },
     "member": { "user_id", "username" },
     "group_exercise": { "group_exercise_id", "name", "load_input_mode" },
-    "session_id", "set_id", "weight_kg", "reps", "e1rm_kg",   // converted (D6)
+    "session_id", "set_id", "weight_kg", "reps", "e1rm_kg",   // raw Weight; 1RM converted (D6)
     "entered_weight_kg", "load_factor", "achieved_at_ms",
     "boards": [{ "metric", "value_kg", "previous_value_kg", "group_record" }],
     "provisional",                                            // session active
@@ -1156,8 +1181,8 @@ Writes raise:
 ```jsonc
 // BoardRow
 { "rank": 1, "member": { "user_id", "username" }, "former": false,
-  "value_kg": 142.5, "weight_kg": 140, "reps": 1, "e1rm_kg": 142.5,   // converted (D6)
-  "entered_weight_kg": 70, "load_factor": 2,                           // as logged
+  "value_kg": 142.5, "weight_kg": 70, "reps": 1, "e1rm_kg": 142.5,    // raw Weight; 1RM converted (D6)
+  "entered_weight_kg": 70, "load_factor": 2,                           // as logged; the 1RM factor
   "achieved_at_ms": 0, "session_id": "…", "set_id": "…",
   "exercise_name": "Bench (comp grip)|null",                          // live session_exercises.name
   "certified": true,                                                   // M25-T06
@@ -1212,7 +1237,7 @@ podium's `entry_count` and `me` count only valid Certified entries (§2.11).
   "member": { "user_id", "username" }, "set_id", "session_id",
   "certified_by": { "user_id", "username" } | null, "certified_at_ms",
   "pinned": { "weight_value", "reps_value", "performance_status",   // raw, as synced
-              "weight_kg", "reps", "e1rm_kg" },                     // converted, as shown
+              "weight_kg", "reps", "e1rm_kg" },                     // as shown (1RM converted)
   "ended_at_ms": 0 | null, "end_reason": "withdrawn|cancelled|voided" | null,
   "ended_by": { "user_id", "username" } | null }
 ```
@@ -1290,7 +1315,8 @@ completed session.
 - **Working sets.** Facts (§2.9) that are `performed` and `live`, whose Sync v2
   set and session-exercise rows still exist untombstoned (so a delete counts
   at once, before the evaluator re-drains), and `working` (every set but a
-  warm-up), on any exercise, linked or not. `exercise_count` counts the
+  warm-up; a fact not yet re-normalized counts, §2.9), on any exercise,
+  linked or not. `exercise_count` counts the
   session exercises with at least one such working fact; an exercise with
   only warm-ups adds none. The counts trail a push by the evaluator's lag.
 - **Group records.** Non-voided `record` events (§2.11, either contract) in
@@ -1350,7 +1376,10 @@ TS the session screens use. Nothing is mirrored in SQL.
   session summary never reads a personal preference, contribution or weight
   reading; positive group contributions belong only to the server-authoritative
   ranked projection in §11.
-- **Exercises** — live session exercises with at least one performed set.
+- **Exercises** — live session exercises with at least one performed
+  working set, as `exercise_count` (§4.7) and the agent API count them; an
+  exercise with only warm-ups adds none (it still shows in the friend's
+  session view).
 - **Friend's session view** — the same performed sets; exercises with none are
   omitted.
 
@@ -1411,7 +1440,8 @@ RPC failure is caught in this module (C3.10.5, AC13).
     `createGroup`, `updateGroup`, `getGroupInviteCode`,
     `regenerateGroupInviteCode`, `joinGroup`, `leaveGroup`,
     `removeGroupMember`, `setGroupMemberRole`, `transferGroupOwnership`.
-  - `group_stream` always sends all three `p_*` args.
+  - `group_stream` always sends all three `p_*` args. `groupId` is required:
+    the app never reads the All stream.
   - **Stream kinds (M25-T05, M25-T10).** `getGroupStream` keeps `session`,
     `membership`, `record`, `record_voided`, and `link` items and drops any
     other kind before callers or the cache see it, keeping the server's
@@ -1467,7 +1497,7 @@ migration via `npm run db:generate`.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:all`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>`, `boards:v4:<groupId>` and `week:v4:<groupId>` (Today's week summary, stamped with its window start; a cached earlier week is never shown as the current one); full boards and history are never cached |
+| `cache_key` | `text` PK | Current payloads use `groups:v4:mine`, `group:v4:<id>`, `stream:v4:<groupId>`, `session:v4:<memberId>:<sessionId>`, `group-exercises:v4:<groupId>`, `boards:v4:<groupId>` and `week:v4:<groupId>` (Today's week summary, stamped with its window start; a cached earlier week is never shown as the current one); full boards and history are never cached |
 | `user_id` | `text not null` | The account the payload belongs to. Reads require a match with `useAuth().user.id`. |
 | `payload_json` | `text not null` | The last successful RPC result |
 | `fetched_at_ms` | `integer not null` | Drives "last updated" |
@@ -1481,8 +1511,7 @@ migration via `npm run db:generate`.
 - **Access loss (C3.6.8).** A `NOT_FOUND` on a group evicts `group:<id>`,
   `stream:<id>`, `group-exercises:<id>` (M25-T07), `boards:<id>` (M25-T09), `week:<id>`, and every `session:*`
   entry. The member's `exercise_group_links` rows are synced data and are never
-  evicted. A successful All refresh replaces
-  `stream:all`, which no longer contains that group. The group screen shows
+  evicted. The group screen shows
   "You're no longer a member of this group."
 
 **As-built (M22-T03).**
@@ -1530,7 +1559,7 @@ migration via `npm run db:generate`.
 | `/group/[groupId]/leaderboards/[exerciseId]?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/index.tsx` | (M25-T09) Full board with the Weight / 1RM × Certified / All toggles |
 | `/group/[groupId]/leaderboards/[exerciseId]/history?metric=&scope=` | `app/group/[groupId]/leaderboards/[exerciseId]/history.tsx` | (M25-T09) The board's lead-change history |
 
-- **Groups tab.** It shows the stream with **All** and per-group chips, header
+- **Groups tab.** It shows one group's stream at a time, picked with per-group chips, header
   actions My groups / Create group / Join group, and the empty, signed-out, and
   offline states.
 - **Group screen.** Its header shows name, description, member count, and my
@@ -1583,7 +1612,8 @@ join, edit, and invite routes, and every action, are M22-T05.
   - The header holds `My groups`, and M22-T05 adds Create / Join beside it.
   - Chips show once My groups has loaded at least one group. A selected
     group that leaves My groups, or whose stream returns `NOT_FOUND`, falls
-    back to All.
+    back to the first group in My groups (`resolveSelectedGroupId`). With no
+    group selected, `useGroupStream` reads nothing.
   - `group_list_mine` returning no groups shows the empty state
     (`groups-empty-state`, children slot for the T05 buttons).
 - **Group screen.** Members render in server order. Membership items there
@@ -2036,13 +2066,18 @@ group screen, and Today details above where they differ. No server change.
     table: new best (with first set and group-record flag), void on edit
     down / unperformed / delete, edit up, session delete and undelete, link /
     unlink / retarget (no record cards), no certification → Certified boards empty, load-mode
-    rescale, leave (former, still ranked), archive and unarchive catch-up,
+    change (1RM rescales, Weight stays raw), leave (former, still ranked), archive and unarchive catch-up,
     and the silent rules recompute.
   - **Working sets only.** A warm-up heavier than every working set never
     ranks, records or certifies; a stored warm-up record stands while its
     board falls silently (`rules`).
+  - **Zero kg.** A member whose only counting sets are 0 kg (typed or blank)
+    gets no entry and no record, and the apply does not fail.
+  - **Raw Weight, forward only.** A Weight best stored converted falls to its
+    raw value silently (no lead change, All or Certified), its record stands,
+    and the raw value is the record baseline.
   - **Rules.** The provisional rule (update in place, silent drop, void only
-    once complete), D6 both directions with the entered value kept, P7 ties
+    once complete), D6 (1RM) both directions with the entered value kept, P7 ties
     (earlier date, then exercise order, then set order), and rejoin catch-up.
   - **Serialization and isolation.** While the group's advisory lock is held
     from another session, an apply under `lock_timeout` fails with a lock

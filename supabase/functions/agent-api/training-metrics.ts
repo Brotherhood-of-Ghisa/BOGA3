@@ -1,18 +1,18 @@
 // Owner-filtered database rows enter here. This adapter contains no new maths:
 // mobile and coaching share the same eligibility, dated context and load boundary.
 import {
-  personalLoadContext, summarizeExerciseLoad,
+  personalLoadContext, summarizeExerciseLoad, workingSetsOnly,
 } from '../../../apps/mobile/src/exercise-calculations/analytics.ts';
 import type { VolumeCoverage } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import {
-  canonicalizeWeightForReps, isWorkingSetType, type SessionSetPerformanceStatus,
+  canonicalizeWeightForReps, type SessionSetPerformanceStatus,
 } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import {
   isValidSessionWeight, type ResolvedSessionWeight,
 } from '../../../apps/mobile/src/bodyweight/as-of.ts';
 
-export const METRIC_REVISION = 'working_sets_v1';
+export const METRIC_REVISION = 'working_sets_v2';
 
 export type ExerciseLoadRow = {
   bodyweight_contribution: number;
@@ -98,7 +98,7 @@ export function projectTrainingSets(
   // Every performed row keeps its own figures; only working sets feed the
   // aggregates and counts (a warm-up is listed but never a stat).
   const perSet = summarizeExerciseLoad(inputs, context);
-  const summary = summarizeExerciseLoad(inputs.filter(set => isWorkingSetType(set.setType)), context);
+  const summary = summarizeExerciseLoad(workingSetsOnly(inputs), context);
   return {
     volumeCoverage: summary.volumeCoverage,
     estimatedOneRepMax: summary.estimatedOneRepMax,

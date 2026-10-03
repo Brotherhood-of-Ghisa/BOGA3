@@ -37,7 +37,7 @@ When disabled, it hides the field and preserves its value. The in-place logger
 keeps one kg `Weight` field, reps, effort and confirmation; bodyweight arithmetic
 stays internal. Rows and analytics say `Weight`, `Top weight`, `1RM` and
 `Volume`; missing personal context never makes them unavailable. Valid zero
-renders as `0` and earns no record state.
+renders as `0` and earns no record state (`tech/training-metrics-contract.md` §3).
 
 Groups own an independent admin toggle and conditional group contribution.
 Strict group calculation may omit a dependent score, but group surfaces use
@@ -97,7 +97,9 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 7. Today is a bounded landing page, not a second full feed or history screen.
    It starts and resumes nothing: Train owns both.
    - Progress counts working sets (§5.11), never volume, and places every
-     session, working set and PR by the session's `completed_at`. A week is
+     session, working set and PR by the session's `completed_at`. Its
+     sessions are counted sessions (`tech/training-metrics-contract.md` §2):
+     a session with no working set is not one. A week is
      Monday 00:00 to Sunday 24:00 local; a month is the local calendar month.
    - The week shows this week's sessions, working sets and PRs so far, each
      with a bar against last week's whole total (full once reached), never a
@@ -108,9 +110,8 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
      elapsed day, today included, times the month's days; the chart draws it
      (and its spoken label states it). No summary line sits under the chart.
    - Each week figure's caption is `vs <n> last wk`.
-   - A PR is a working set whose estimated 1RM beats every earlier completed
-     session's working sets on that exercise, at most one per exercise per
-     session (the completed session's PR rule, §5.11).
+   - A PR is a 1RM record (`tech/training-metrics-contract.md` §3), at most
+     one per exercise per session.
    - The latest completed session is one row; full history is the Sessions
      list (`All sessions`). The row carries no group tags: which groups a
      session was shared to is decided on the server, and the device does not
@@ -233,7 +234,7 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
 11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
     - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
     - Effort (set quality) is `W-Up`, none (`null`), or `RIR n`; the selectable RIR range runs from `EFFORT_LOGGING_POLICY.maxSelectableRir` (`src/config/training.ts`, default `3`) down to `RIR 0`, and a stored RIR outside that range stays valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
-    - `W-Up` marks a set as warm-up effort. A working set is any valid confirmed set that is not `W-Up`: blank effort and every RIR count. Records, PRs, all-time bests and their baselines read working sets only: a warm-up is never a record (no `record` highlight), never a PR, and never the baseline a later set must beat, and a session whose only sets of an exercise are warm-ups sets no record or `Last` for it. A warm-up row still shows its own 1RM and volume, which describe that set alone. Every other statistic reads working sets too: volume and its coverage note (`Known subtotal from X of Y working sets`), heatmaps, muscle volume, muscle load and failure intensity, the exercise and muscle comparisons with their medians and ranges, favourites, `Last:`, "done" and per-exercise and per-muscle session counts. An exercise whose only sets in a session are warm-ups did not happen as far as statistics go: it is not done, adds no session, heatmap cell, muscle-load bar or comparison, and gives no baseline, while its rows still show wherever the session's sets are listed. A set count with no qualifier is working sets too, labelled `Sets` (`<n> sets` inline), and no screen shows a second all-sets count beside it; only row counts that are not statistics (the session view card's `n of m sets done` and the remove-exercise alert's `its N sets`) count every row. The rule lives in one predicate, `isWorkingSet` (`src/exercise-calculations/set-semantics.ts`; `isWorkingSessionSetType` in `src/data/set-types.ts` is the same rule over a set type); aggregates filter with it, and per-set maths (`calculateSetMetrics`) does not.
+    - `W-Up` marks a set as warm-up effort. What counts toward a statistic — the working set and the counted session — is defined once in `tech/training-metrics-contract.md` (§1–§2, with the one predicate and the code that applies it); this section says what the screens show. A warm-up is never a record (no `record` highlight), never a PR, and never the baseline a later set must beat, and a session whose only sets of an exercise are warm-ups sets no record or `Last` for it. A warm-up row still shows its own 1RM and volume, which describe that set alone. Every statistic reads working sets: volume and its coverage note (`Known subtotal from X of Y working sets`), heatmaps, muscle volume, muscle load and failure intensity, the exercise and muscle comparisons with their medians and ranges, favourites, `Last:`, "done", and every session count. A set count with no qualifier is working sets too, labelled `Sets` (`<n> sets` inline), and no screen shows a second all-sets count beside it; only row counts that are not statistics (the session view card's `n of m sets done` and the remove-exercise alert's `its N sets`) count every row.
     - The first new ad-hoc set of each exercise defaults to `W-Up`. Adding a set copies the previous set's `Weight` and `Reps`; effort defaults to blank after `W-Up` or blank, and inherits the previous RIR otherwise. Each new row gets its own identity and unconfirmed status. These defaults never rewrite existing sets or prescribed effort. Valid copied values remain unperformed until ticked. Adding after an untouched planned target does not perform it; the planned row remains until explicitly confirmed. The added set's `Weight` input takes focus and selects a copied value, so the next keystroke replaces it.
     - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
     - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
@@ -651,7 +652,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    stays visible, exactly one per row exposes selected state, and `Last 7 days`
    / `By Exercise` remain the defaults. The controls, the summary, the filter
    and the list share one scroll.
-2. The summary keeps the actionable `Sessions` card and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
+2. The summary keeps the actionable `Sessions` card, the counted sessions (`tech/training-metrics-contract.md` §2), and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
 3. In per-exercise mode, exercises with at least one working set in the
    selected 7-/30-day window render in one compact, viewport-fitting table with
    shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
@@ -660,8 +661,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    sessions with a working set of it; unavailable 1RM values render as `—`. Exercise names receive
    the remaining flexible width and wrap to their full value rather than being
    capped at an assumed line count.
-   A working set is every valid confirmed set except warm-ups (§5.11); a
-   warm-up counts toward no figure in the table. Whole data rows remain the only controls that
+   A warm-up counts toward no figure in the table (§5.11). Whole data rows remain the only controls that
    open exercise history; repeated per-row metric labels are omitted visually
    but all values and their meanings remain in each row's accessibility label.
 4. `Exercise`, `Sets`, and `Vol` are the only exercise-sort controls; `1RM` is
@@ -800,20 +800,18 @@ unchanged. What differs is presentation:
    volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
    like any set. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests, matching the session view
-   (§14b.4; aligned 2026-09-23). The one highlight is a performed working set's
-   weight or 1RM beating the all-time best before today, shown in `record`
-   (brass) — and only on the session's best such set: the highest beating 1RM,
-   else the heaviest beating weight, a tie keeping the set that reached the
-   value first (2026-10-01, one superlative per exercise; `design-language.md` §5);
-   a warm-up is never one (§5.11), and volume is never one, since its record is
-   a whole session's. That best set earns the set list the `record` band, in the
+   (§14b.4; aligned 2026-09-23). The one highlight, in `record` (brass), is the
+   session's record set (`tech/training-metrics-contract.md` §3: the highest
+   1RM beating the record, else the heaviest Weight, across every block of the
+   exercise in the session; one superlative per exercise, `design-language.md`
+   §5). A warm-up is never one (§5.11), and volume is never one, since its
+   record is a whole session's. That best set earns the set list the `record` band, in the
    session view's card words: `New 1RM record · <1RM>`, or `New top weight · <weight>`
    when only the weight beat the baseline. The records panel counts working
    sets only (§5.11): records, their baseline and the `Last` summary read working
    sets, `Last` is the newest session with a working set, and its set list still
    shows that session's warm-up lines. Records and `Last` read the exercise
-   session facts (spec 05): a record tied across sessions belongs to the
-   earliest session, and an equal top weight goes to more reps. The current-gym
+   session facts (spec 05) under the record rules (contract §3). The current-gym
    filter scopes both. A completed session being edited (§14b.7) counts only
    the sessions before it, the session view's live record rule (spec 05, "Live
    record markers"), so `Last` is the session before it. `Records` | `Last` chooses what the
@@ -861,8 +859,9 @@ unchanged. What differs is presentation:
    (values `inkFaint`, legends `inkGhost`), a planned row showing its
    prescription. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests (tried on device 2026-09-23:
-   too noisy). The one highlight is a done set whose 1RM beats the exercise's
-   completed sessions before this one (all of them while it is active): that
+   too noisy). The one highlight is a done set holding a 1RM record
+   (`tech/training-metrics-contract.md` §3) against the completed sessions
+   before this one (all of them while it is active): that
    1RM is shown in `record` and earns the card a `record` band
    (`New 1RM record · <1RM>`), from the same derivation
    (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
@@ -900,7 +899,7 @@ Personal figures use the same `Top weight`, `1RM` and `Volume` labels for every
 exercise. Set rows show only entered kg Weight/reps/effort; records never expose
 the contribution, reading or calculated-load breakdown. Missing personal
 reading uses the zero fallback and is not an unavailable/incomplete state.
-Valid zero is displayed numerically and excluded from records/rankings.
+Valid zero is displayed numerically and is never a record or rank (`tech/training-metrics-contract.md` §3).
 
 Reading, preference, contribution and session-time changes refresh History,
 Stats, heatmaps, records, completion and share projections. Raw logged rows and

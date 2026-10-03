@@ -87,7 +87,7 @@ describe('group session metrics', () => {
       exercise('empty', []),
     ];
 
-    it('counts and sums kg × reps of working sets, and counts exercises with a performed set', () => {
+    it('counts and sums kg × reps of working sets, and counts exercises with a working set', () => {
       // 102.5 × 5 + 80 × 8; the 60 × 10 warm-up is neither a set nor volume.
       expect(computeGroupSessionMetrics(exercises)).toMatchObject({
         workingSets: 2,
@@ -96,10 +96,14 @@ describe('group session metrics', () => {
       });
     });
 
-    it('adds no set, volume or coverage for a warm-up-only exercise', () => {
-      const metrics = computeGroupSessionMetrics([exercise('warm', [rawSet('w1', '60', '10', { set_type: 'warm_up' })])]);
-      expect(metrics).toMatchObject({ workingSets: 0, totalVolumeKg: 0, exerciseCount: 1 });
+    it('adds no set, volume, coverage or exercise for a warm-up-only exercise', () => {
+      const warmUpOnly = exercise('warm', [rawSet('w1', '60', '10', { set_type: 'warm_up' })]);
+      const metrics = computeGroupSessionMetrics([warmUpOnly]);
+      expect(metrics).toMatchObject({ workingSets: 0, totalVolumeKg: 0, exerciseCount: 0 });
       expect(metrics.coverage).toMatchObject({ eligibleSetCount: 0, complete: true });
+      // Still shown in the friend's session view: it has a performed set.
+      expect(selectGroupPerformedExercises([warmUpOnly]).map((selected) => selected.sessionExerciseId)).toEqual(['warm']);
+      expect(computeGroupSessionMetrics([...exercises, warmUpOnly])).toMatchObject({ workingSets: 2, exerciseCount: 2 });
     });
 
     it('is all zeros before anything is performed', () => {

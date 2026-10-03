@@ -102,14 +102,14 @@ for policy purposes.
 
 A valid zero calculated load produces numeric Volume `0` and 1RM `0`. Reps,
 performed-set counts, working-set classification and effort remain usable. A
-zero Weight/1RM/Volume result never creates a personal or group record, ranking
-or achievement. Invalid input never becomes zero implicitly.
+zero result is never a record, ranking or achievement
+(`training-metrics-contract.md` §3). Invalid input never becomes zero
+implicitly.
 
 Top weight is always the highest raw entered Weight in kg. It never includes
 bodyweight contribution and never changes after a preference, contribution or
-reading edit. A warm-up keeps its own per-set load metrics but is not a
-working set, and never feeds a record, PR or best (`ux-rules.md` §5.11);
-planned, unperformed, invalid, deleted and tombstoned rows remain ineligible.
+reading edit. Which sets feed an aggregate is `training-metrics-contract.md`
+§1: a warm-up keeps its own per-set load metrics and feeds nothing else.
 
 For muscle analytics, ordinary total input contributes `E / 2` per side and
 ordinary per-side input contributes `E` per side. Positive-contribution math

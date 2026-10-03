@@ -4,7 +4,7 @@
  * card rule (`toGroupPerformedSet`), which delegates to the same core.
  */
 
-import { isWorkingSessionSetType } from '@/src/data/set-types';
+import { isWorkingSetType } from '@/src/exercise-calculations/set-semantics';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import {
   GROUP_EVAL_RULES_VERSION,
@@ -90,13 +90,13 @@ describe('group evaluator set facts', () => {
       fingerprint: 'fp-s1',
       rules_version: GROUP_EVAL_RULES_VERSION,
     });
-    expect(GROUP_EVAL_RULES_VERSION).toBe(4);
+    expect(GROUP_EVAL_RULES_VERSION).toBe(5);
   });
 
   it("stores the app's working-set rule: every set but a warm-up", () => {
     const workingOf = (setType: string | null) => factOf(row('s1', '100', '5', { set_type: setType })).working;
     const setTypes = ['rir_0', 'rir_3', 'rir_12', null, 'working', 'RIR_1', 'warm_up'];
-    expect(setTypes.map(workingOf)).toEqual(setTypes.map(isWorkingSessionSetType));
+    expect(setTypes.map(workingOf)).toEqual(setTypes.map(isWorkingSetType));
     expect(setTypes.map(workingOf)).toEqual([true, true, true, true, true, true, false]);
     // Independent of performed: the summary filters on both.
     expect(factOf(row('s1', '100', '5', { set_type: 'rir_1', performance_status: 'planned' }))).toMatchObject({
@@ -109,8 +109,10 @@ describe('group evaluator set facts', () => {
     expect(factOf(row('s1', '30', '10'))).toMatchObject({ weight_kg: 30, e1rm_kg: estimateOneRepMax(30, 10) });
   });
 
-  it('counts a blank weight with valid reps as a performed 0 kg set with numeric zero e1RM', () => {
-    expect(factOf(row('s1', '', '8'))).toMatchObject({ performed: true, weight_kg: 0, reps: 8, e1rm_kg: 0 });
+  it('stores no e1RM at 0 kg: typed zero or blank weight with valid reps is performed, never a 1RM result', () => {
+    expect(factOf(row('s1', '', '8'))).toMatchObject({ performed: true, working: true, weight_kg: 0, reps: 8, e1rm_kg: null });
+    expect(factOf(row('s1', '0', '5'))).toMatchObject({ performed: true, working: true, weight_kg: 0, reps: 5, e1rm_kg: null });
+    expect(factOf(row('s1', '0.5', '1'))).toMatchObject({ weight_kg: 0.5, e1rm_kg: estimateOneRepMax(0.5, 1) });
   });
 
   it('nulls the numbers of a set that is not performed and passes live through', () => {

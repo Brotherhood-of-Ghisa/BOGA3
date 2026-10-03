@@ -1,5 +1,6 @@
 import { sessionBodyWeightForCalculation, type SessionWeightContext } from '../bodyweight/as-of.ts';
 import { parseSetWeight } from './index.ts';
+import { compareWeightRecord } from './records.ts';
 import { canonicalizeWeightForReps, isWorkingSet } from './set-semantics.ts';
 import {
   calculateSetMetrics, summarizeVolume,
@@ -73,8 +74,8 @@ export function summarizeExerciseLoad(
       estimatedOneRepMax = Math.max(estimatedOneRepMax ?? 0, metric.estimatedOneRepMaxKg);
     }
     const weight = enteredWeightKg(sets[index]);
-    if (weight !== null && (topWeightSet === null || weight > topWeightSet.weight ||
-      (weight === topWeightSet.weight && metric.reps > topWeightSet.reps))) {
+    // The Weight record's order (`records.ts`); the first set keeps a full tie.
+    if (weight !== null && (topWeightSet === null || compareWeightRecord({ weight, reps: metric.reps }, topWeightSet) > 0)) {
       topWeightSet = { weight, reps: metric.reps };
     }
   }

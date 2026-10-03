@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.98.0';
 
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
+import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
@@ -911,21 +912,21 @@ const getExerciseContext = async (
     // A session with only warm-ups for this exercise has no stat footprint.
     .filter(row => row.workingSetCount > 0);
 
-  const topWeight = performanceRows.reduce<{ weight: number; reps: number } | null>((best, row) => {
-    const candidate = row.topWeightSet;
-    if (candidate === null) return best;
-    return best === null || candidate.weight > best.weight ||
-      (candidate.weight === best.weight && candidate.reps > best.reps) ? candidate : best;
-  }, null);
-  const bestOneRepMax = performanceRows.reduce<number | null>((best, row) => {
-    if (row.estimatedOneRepMax === null) return best;
-    return best === null ? row.estimatedOneRepMax : Math.max(best, row.estimatedOneRepMax);
-  }, null);
-  const maxSessionVolume = performanceRows.reduce<number | null>((best, row) => {
+  // The app's record book (`records.ts`): ties keep the earliest session and a
+  // zero is never a record. A bounded history has no complete volume record.
+  const records = createRecordBook();
+  for (const row of [...performanceRows].sort((left, right) =>
+    left.session.completed_at - right.session.completed_at || left.session.id.localeCompare(right.session.id))) {
     const total = row.volumeCoverage.totalVolumeKgReps;
-    if (total === null || historyTruncated || setResult.truncated) return best;
-    return best === null ? total : Math.max(best, total);
-  }, null);
+    records.add({
+      oneRepMax: row.estimatedOneRepMax === null ? null : { value: row.estimatedOneRepMax },
+      weight: row.topWeightSet,
+      volume: total === null || historyTruncated || setResult.truncated ? null : { value: total },
+    });
+  }
+  const bestOneRepMax = records.holders.oneRepMax?.value ?? null;
+  const topWeight = records.holders.weight;
+  const maxSessionVolume = records.holders.volume?.value ?? null;
   const historyIncomplete = historyTruncated || setResult.truncated;
   return {
     metric_revision: METRIC_REVISION,

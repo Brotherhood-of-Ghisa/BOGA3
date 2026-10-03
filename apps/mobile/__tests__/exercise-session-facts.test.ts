@@ -216,11 +216,11 @@ describe('exercise session facts — rows and reads', () => {
     insertSession('c-same', 1, [{ definitionId: BENCH, sets: [['200', '5']] }]);
     insertSession('later', 2, [{ definitionId: BENCH, sets: [['300', '5']] }]);
     insertSession('gone', 0, [{ definitionId: SQUAT, sets: [['300', '5']] }], { deletedAt: day(5) });
-    insertSession('zero', 0, [{ definitionId: SQUAT, sets: [['0', '5']] }]); // a 0 kg 1RM is still a bar
+    insertSession('zero', 0, [{ definitionId: SQUAT, sets: [['0', '5']] }]); // a 0 kg 1RM is never a record (no bar)
 
     const best = await loadEarlierBestE1rmByDefinition({ sessionId: 'B-target', completedAt: day(1) }, [BENCH, SQUAT, DIP]);
 
-    expect(new Map(best)).toEqual(new Map([[BENCH, factFor('a-early', BENCH)!.bestE1rmKg], [SQUAT, 0]]));
+    expect(new Map(best)).toEqual(new Map([[BENCH, factFor('a-early', BENCH)!.bestE1rmKg]]));
     // A row with eligible sets but no 1RM (an unavailable load) sets no bar.
     db().insert(exerciseSessionFacts).values({
       sessionId: 'a-early', exerciseDefinitionId: DIP, achievedAt: day(1), bestE1rmKg: null,

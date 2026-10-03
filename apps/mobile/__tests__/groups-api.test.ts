@@ -103,7 +103,7 @@ describe('groups api client', () => {
       has_more: true,
     });
 
-    await expect(getGroupStream({ groupId: null })).resolves.toEqual({
+    await expect(getGroupStream({ groupId: 'g1' })).resolves.toEqual({
       items: [record, session, voided, membership, link],
       next_cursor: cursor,
       has_more: true,
@@ -128,8 +128,8 @@ describe('groups api client', () => {
       },
       {
         rpc: 'group_stream',
-        invoke: () => getGroupStream({ groupId: null }),
-        args: { p_group_id: null, p_before: null, p_limit: 20 },
+        invoke: () => getGroupStream({ groupId: 'g1' }),
+        args: { p_group_id: 'g1', p_before: null, p_limit: 20 },
         data: { items: [], next_cursor: null, has_more: false },
         expected: { items: [], next_cursor: null, has_more: false },
       },
@@ -356,7 +356,7 @@ describe('groups api client', () => {
       await expectRejectsWith(listMyGroups(), 'INTERNAL', 'group_list_mine returned an unexpected payload.');
 
       respond(null);
-      await expectRejectsWith(getGroupStream({ groupId: null }), 'INTERNAL');
+      await expectRejectsWith(getGroupStream({ groupId: 'g1' }), 'INTERNAL');
 
       respond({ group_id: 'g1' });
       await expectRejectsWith(joinGroup('ABCD2345'), 'INTERNAL');

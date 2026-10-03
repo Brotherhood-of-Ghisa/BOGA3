@@ -4,12 +4,8 @@ import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import {
-  parseCalculationSet,
-  parseSetReps,
-  parseSetWeight,
-} from '@/src/exercise-calculations';
-import { canonicalizeWeightForReps,
   isConfirmedPerformedSet,
+  isCountedSession,
   isWorkingSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
@@ -17,7 +13,7 @@ import { canonicalizeWeightForReps,
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
-import { isWorkingSessionSetType, normalizeSessionSetType } from './set-types';
+import { normalizeSessionSetType } from './set-types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -174,22 +170,12 @@ const computeDaysAgo = (completedAt: Date, now: Date): number => {
   return Math.max(0, Math.floor(diff / DAY_MS));
 };
 
-const countWorkingSets = (setRows: ExerciseBlockHistorySetRow[]): number => {
-  let count = 0;
-  for (const row of setRows) {
-    if (!isWorkingSessionSetType(row.setType)) continue;
-    if (parseCalculationSet({ ...row, weightValue: canonicalizeWeightForReps(row.weightValue, row.repsValue) }) === null) continue;
-    count += 1;
-  }
-  return count;
-};
-
 const isValidSuggestedPlanSet = (row: ExerciseBlockHistorySetRow): boolean =>
   isConfirmedPerformedSet({
     reps: row.repsValue,
     weight: row.weightValue,
     performanceStatus: row.performanceStatus,
-  }) && parseSetWeight(canonicalizeWeightForReps(row.weightValue, row.repsValue)) !== null && parseSetReps(row.repsValue) !== null;
+  });
 
 export const aggregateExerciseBlockHistory = (
   input: ExerciseBlockHistoryAggregationInput
@@ -198,10 +184,11 @@ export const aggregateExerciseBlockHistory = (
   const limit = normalizeLimit(input.limit);
   const sessionExercisesBySessionId = groupSessionExercisesBySessionId(input.sessionExercises);
   const orderedSessions = [...input.sessions].sort(compareCompletedDesc);
-  const sessionsForSummary = limit === null ? orderedSessions : orderedSessions.slice(0, limit);
 
+  // The limit counts blocks, so a session that does not count takes no slot.
   const blocks: ExerciseBlockHistoryBlock[] = [];
-  for (const session of sessionsForSummary) {
+  for (const session of orderedSessions) {
+    if (limit !== null && blocks.length >= limit) break;
     ensureValidDate(session.completedAt, 'completedAt');
     const matchingSessionExercises = [
       ...(sessionExercisesBySessionId[session.sessionId] ?? []),
@@ -221,11 +208,12 @@ export const aggregateExerciseBlockHistory = (
     if (setRows.length === 0) continue;
 
     // Every aggregate reads working sets (the 1RM and top weight are the PR
-    // baseline); a warm-up-only block has none and is no block.
-    const workingRows = setRows.filter((row) => isWorkingSet({
+    // baseline); a session that does not count for the exercise is no block.
+    const readSet = (row: ExerciseBlockHistorySetRow) => ({
       weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
-    }));
-    if (workingRows.length === 0) continue;
+    });
+    if (!isCountedSession(setRows, readSet)) continue;
+    const workingRows = setRows.filter((row) => isWorkingSet(readSet(row)));
     const summary = summarizeExerciseLoad(
       workingRows.map((row) => ({ weightValue: row.weightValue, repsValue: row.repsValue, setType: row.setType })),
       session.loadContext ?? ordinaryLoadContext(),
@@ -240,7 +228,7 @@ export const aggregateExerciseBlockHistory = (
       totalVolume: summary.volumeCoverage.totalVolumeKgReps,
       knownVolume: summary.volumeCoverage.knownVolumeKgReps,
       highestWeight: summary.topWeightSet?.weight ?? null,
-      workingSetCount: countWorkingSets(setRows),
+      workingSetCount: workingRows.length,
     });
   }
 
@@ -429,9 +417,10 @@ export const createExerciseBlockHistoryRepository = (
     const now = options.now ?? new Date();
     ensureValidDate(now, 'now');
 
+    // Unlimited here: the limit counts counted sessions, which only the sets decide.
     const recentSessions = await store.loadRecentCompletedSessionsForExercise({
       exerciseDefinitionId: options.exerciseDefinitionId,
-      limit: limit ?? undefined,
+      limit: undefined,
     });
     if (recentSessions.length === 0) {
       return aggregateExerciseBlockHistory({

@@ -354,5 +354,18 @@ expect_sql 'private settings table has one current preference field' \
   "select count(*) from information_schema.columns where table_schema='app_public' and table_name='user_settings' and column_name='bodyweight_calculations_enabled';" 1
 pass 'backend schema, settings, group policy and wire contract match the final model'
 
+# D6 load factor: the shared vectors the mobile groupEnteredWeightFactor runs
+# (apps/mobile/src/groups/load-factor-vectors.json), against the SQL.
+LOAD_FACTOR_VECTORS="${SUPABASE_DIR}/../apps/mobile/src/groups/load-factor-vectors.json"
+[[ -f "${LOAD_FACTOR_VECTORS}" ]] || fail "shared load-factor vectors missing: ${LOAD_FACTOR_VECTORS}"
+LOAD_FACTOR_COUNT=0
+while IFS=$'\t' read -r source target factor; do
+  expect_sql "group_board_load_factor ${source} → ${target}" \
+    "select app_public.group_board_load_factor('${source}', '${target}') = ${factor};" t
+  LOAD_FACTOR_COUNT=$(( LOAD_FACTOR_COUNT + 1 ))
+done < <(jq -r '.cases[] | [.source, .target, .factor] | @tsv' "${LOAD_FACTOR_VECTORS}")
+[[ ${LOAD_FACTOR_COUNT} -eq 4 ]] || fail "expected 4 load-factor vectors, ran ${LOAD_FACTOR_COUNT}"
+pass 'D6 load factor matches the shared TS vectors'
+
 COMPLETED=1
 pass 'optional bodyweight backend vectors passed'
