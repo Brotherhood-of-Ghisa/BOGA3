@@ -279,10 +279,11 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
         relativeVolume: 0.5,
       }),
     ]);
+    // A secondary set counts half; a stabilizer (biceps on bench) not at all.
     expect(summary.workingSetsByMuscle).toEqual([
-      expect.objectContaining({ id: "biceps", workingSetCount: 1 }),
-      expect.objectContaining({ id: "chest", workingSetCount: 1 }),
-      expect.objectContaining({ id: "triceps", workingSetCount: 1 }),
+      expect.objectContaining({ id: "biceps", primarySetCount: 1, secondarySetCount: 0, weightedSetCount: 1 }),
+      expect.objectContaining({ id: "chest", primarySetCount: 1, secondarySetCount: 0, weightedSetCount: 1 }),
+      expect.objectContaining({ id: "triceps", primarySetCount: 0, secondarySetCount: 1, weightedSetCount: 0.5 }),
     ]);
   });
 
@@ -317,7 +318,41 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(summary.muscles).toEqual([]);
     expect(summary.workingSetsByMuscle).toEqual([
-      expect.objectContaining({ id: "chest", workingSetCount: 1 }),
+      expect.objectContaining({ id: "chest", primarySetCount: 1, secondarySetCount: 0, weightedSetCount: 1 }),
+    ]);
+  });
+
+  it("counts a secondary working set as half a set for that muscle", () => {
+    const sets = (prefix: string, count: number) =>
+      Array.from({ length: count }, (_, index) =>
+        insightSet(`${prefix}-${index}`, { orderIndex: index, setType: "rir_1" }));
+    const summary = summarizeCurrentSessionMuscleLoad(
+      muscleInput({
+        exerciseDefinitions: [
+          { bodyweightContribution: 0, id: "bench", loadInputMode: "total_load" },
+          { bodyweightContribution: 0, id: "press", loadInputMode: "total_load" },
+          { bodyweightContribution: 0, id: "pushdown", loadInputMode: "total_load" },
+        ],
+        exercises: [
+          insightExercise({ id: "bench-row", exerciseDefinitionId: "bench", orderIndex: 1, sets: sets("bench", 4) }),
+          insightExercise({ id: "press-row", exerciseDefinitionId: "press", orderIndex: 2, sets: sets("press", 3) }),
+          insightExercise({ id: "pushdown-row", exerciseDefinitionId: "pushdown", orderIndex: 3, sets: sets("pushdown", 3) }),
+        ],
+        muscleMappings: [
+          { exerciseDefinitionId: "bench", muscleGroupId: "chest", role: "primary" },
+          { exerciseDefinitionId: "bench", muscleGroupId: "triceps", role: "secondary" },
+          { exerciseDefinitionId: "press", muscleGroupId: "triceps", role: "secondary" },
+          { exerciseDefinitionId: "pushdown", muscleGroupId: "triceps", role: "primary" },
+          // A muscle mapped twice to one exercise counts each set once, at its strongest role.
+          { exerciseDefinitionId: "pushdown", muscleGroupId: "triceps", role: "secondary" },
+        ],
+      }),
+    );
+
+    // Triceps: 3 direct + 7 indirect sets = 6.5, not the 10 sets it touched.
+    expect(summary.workingSetsByMuscle).toEqual([
+      expect.objectContaining({ id: "triceps", primarySetCount: 3, secondarySetCount: 7, weightedSetCount: 6.5 }),
+      expect.objectContaining({ id: "chest", primarySetCount: 4, secondarySetCount: 0, weightedSetCount: 4 }),
     ]);
   });
 

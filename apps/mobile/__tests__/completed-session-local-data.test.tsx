@@ -311,7 +311,7 @@ describe('completion presentation over real data', () => {
       /\d+% (above|below) median|At median/
     );
     // Neither set has an effort; untagged sets are working sets.
-    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set');
+    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set: 1 primary, 0 secondary');
     expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
@@ -594,7 +594,11 @@ describe('a session written through the app', () => {
     expect(screen.queryByTestId('session-completion-working-sets')).toBeNull();
     expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 sets');
+    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 sets: 3 primary, 0 secondary');
+    // Bench maps triceps as secondary: its 3 sets count half, with no primary sets.
+    expect(label('session-completion-muscle-triceps')).toBe('Triceps, 1.5 sets: 0 primary, 3 secondary');
+    expect(screen.getByTestId('session-completion-muscle-triceps')).toHaveTextContent('Triceps—31.5');
+    expect(screen.getByText('Sets = primary + ½ secondary')).toBeTruthy();
     // Each comparison card counts working sets only, with no second count.
     expect(screen.getByText('3 sets')).toBeTruthy();
     // The untagged pulldown set is a working set.

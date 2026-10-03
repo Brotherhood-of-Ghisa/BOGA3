@@ -81,7 +81,12 @@ export type SessionMuscleLoadEntry = SessionInsightMuscleGroup & {
 };
 
 export type SessionMuscleWorkingSetEntry = SessionInsightMuscleGroup & {
-  workingSetCount: number;
+  /** Physical working sets that map to the muscle as primary. */
+  primarySetCount: number;
+  /** Physical working sets that map to the muscle as secondary (and not primary). */
+  secondarySetCount: number;
+  /** `primarySetCount + secondarySetCount / 2`: the role factor applied to sets. */
+  weightedSetCount: number;
 };
 
 export type CurrentSessionMuscleSummary = {
@@ -278,6 +283,8 @@ export const summarizeCurrentSessionMuscleLoad = (
   );
   const weightedVolumeByMuscle = new Map<string, number | null>();
   const workingSetIdentitiesByMuscle = new Map<string, Set<string>>();
+  // The strongest role each set holds for each muscle: a set counts once per muscle.
+  const roleWeightBySetByMuscle = new Map<string, Map<string, number>>();
 
   for (const contribution of contributions) {
     if (!muscleGroupById.has(contribution.muscleGroupId)) continue;
@@ -293,6 +300,14 @@ export const summarizeCurrentSessionMuscleLoad = (
       contribution.muscleGroupId,
       workingSetIdentities,
     );
+    const roleWeightBySet =
+      roleWeightBySetByMuscle.get(contribution.muscleGroupId) ??
+      new Map<string, number>();
+    roleWeightBySet.set(
+      contribution.setIdentity,
+      Math.max(roleWeightBySet.get(contribution.setIdentity) ?? 0, contribution.roleWeight),
+    );
+    roleWeightBySetByMuscle.set(contribution.muscleGroupId, roleWeightBySet);
   }
 
   const positiveMuscles = Array.from(
@@ -329,27 +344,22 @@ export const summarizeCurrentSessionMuscleLoad = (
         : left.id.localeCompare(right.id);
     });
   const workingSetsByMuscle = Array.from(
-    workingSetIdentitiesByMuscle,
-    ([muscleGroupId, setIdentities]) => ({
-      muscleGroup: muscleGroupById.get(muscleGroupId),
-      workingSetCount: setIdentities.size,
-    }),
+    roleWeightBySetByMuscle,
+    ([muscleGroupId, roleWeightBySet]) => {
+      const roleWeights = Array.from(roleWeightBySet.values());
+      const primarySetCount = roleWeights.filter((weight) => weight === 1).length;
+      return {
+        muscleGroup: muscleGroupById.get(muscleGroupId) as SessionInsightMuscleGroup,
+        primarySetCount,
+        secondarySetCount: roleWeights.length - primarySetCount,
+        weightedSetCount: roleWeights.reduce((total, weight) => total + weight, 0),
+      };
+    },
   )
-    .filter(
-      (
-        entry,
-      ): entry is {
-        muscleGroup: SessionInsightMuscleGroup;
-        workingSetCount: number;
-      } => entry.muscleGroup !== undefined && entry.workingSetCount > 0,
-    )
-    .map(({ muscleGroup, workingSetCount }) => ({
-      ...muscleGroup,
-      workingSetCount,
-    }))
+    .map(({ muscleGroup, ...counts }) => ({ ...muscleGroup, ...counts }))
     .sort((left, right) => {
-      if (left.workingSetCount !== right.workingSetCount) {
-        return right.workingSetCount - left.workingSetCount;
+      if (left.weightedSetCount !== right.weightedSetCount) {
+        return right.weightedSetCount - left.weightedSetCount;
       }
       if (left.sortOrder !== right.sortOrder)
         return left.sortOrder - right.sortOrder;

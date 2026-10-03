@@ -45,7 +45,7 @@ Completion (PR B, pending acceptance), same lane and flow:
 
 | Screenshot | State |
 | --- | --- |
-| `session-completion-one-pr` (ad hoc) | top bar, summary card with muscle pills, one record card |
+| `session-completion-one-pr` (ad hoc) | top bar, summary card with the sets-by-muscle table, one record card |
 | `session-completion-multiple-prs-all` (ad hoc) | two record cards |
 | `session-completion-exercise-volume` (ad hoc) | volume cards: distribution and no-history |
 | `session-completion-catalog-error` (ad hoc) | muscle breakdown unavailable |

@@ -434,7 +434,8 @@ Brief entrypoint map of the current mobile screens.
   - `presentation=completion` (after Finish), in the design language
     (`components/session-complete/`): its own top bar `Session complete` ·
     `Done` (`accent`); a summary card (Duration / Exercises / Sets, then Gym)
-    with informational `Sets by muscle` pills; every record set (1RM,
+    with an informational `Sets by muscle` table (primary, secondary, and
+    sets = primary + ½ secondary); every record set (1RM,
     else Weight) as a `record`-band card; per-exercise working-set volume versus
     median with a descriptive P5/P95 range (a warm-up-only exercise is not
     compared); and `Share session` (outline), which opens a
