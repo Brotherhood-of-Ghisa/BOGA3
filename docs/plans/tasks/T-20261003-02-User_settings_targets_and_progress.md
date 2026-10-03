@@ -69,7 +69,7 @@ Use scoped preference keys for muscle-target overrides keyed by stable muscle
 ID, the two independent effort selections, target-window weeks,
 history-look-back weeks and heatmap view. Missing values receive the defaults
 above. Existing browsing preferences survive these additions and every update;
-do not repeat their legacy migration or add a versioned settings document.
+their migration is owned by the dependency task.
 
 The foundation task owns storage scopes and browsing migration. Bodyweight
 remains on its existing typed synced `user_settings` column, and the theme on

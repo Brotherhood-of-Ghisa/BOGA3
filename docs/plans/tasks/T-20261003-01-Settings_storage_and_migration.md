@@ -1,4 +1,4 @@
-# T-20261003-01 — Reuse existing settings storage and isolate local preferences
+# T-20261003-01 — Account-local preferences and browsing migration
 
 - Status: `planned`
 - Depends on: none
@@ -9,15 +9,13 @@
 
 ## Objective
 
-Reuse BOGA's existing persistence paths without replacing their storage formats.
-Move existing browsing preferences into account-scoped local storage without
-losing saved choices. Bodyweight calculations keep their typed synced column;
-the theme keeps its device-wide key and next-launch behaviour.
-This task adds no new Progress settings or effort controls.
+Persist browsing preferences per account in device-local storage and retain
+saved choices through upgrade and relaunch. Supply typed preference access for
+Settings and browsing consumers, ready for the following Progress task.
 
-## Decided storage scopes
+## Storage and ownership
 
-Keep each setting with the existing persistence path that matches its ownership:
+Settings use the following persistence paths:
 
 | Scope | Existing settings | Persistence |
 | --- | --- | --- |
@@ -37,21 +35,19 @@ bodyweight data/hook path in `apps/mobile/src/data/user-settings.ts` and
 
 ## Account-local preference access
 
-- Add only the typed reads, updates and subscriptions needed for account-local
+- Provide typed reads, updates and subscriptions for account-local
   preferences. Reuse the existing defaults, normalization and
   `useSyncExternalStore` pattern; callers do not manage account keys.
   Missing values receive defaults and updates preserve unrelated preferences.
-- Use ordinary scalar keys for scalar choices. Collection values may use the
-  serialization required by the key-value store, with typed validation; this
-  does not require a versioned aggregate settings document or a schema framework.
+- Use ordinary scalar keys for scalar choices. Collection values use the
+  serialization required by the key-value store, with typed validation.
   Prefer the store's synchronous operations when they remove async hydration
   and ordering machinery. Preserve correct ordering if writes remain async.
 - Report failed saves and retain the last durable values and recoverable input;
   do not report an in-memory change as a successful save. A failed read must not
   cause a write that overwrites the stored choice.
-- Keep types/defaults in a dependency-safe layer. Existing browsing hooks adapt
-  the account-local access; avoid persistence implementations in screens or a
-  common facade over unrelated theme, auth and sync stores.
+- Keep types/defaults in a dependency-safe layer. Existing browsing hooks consume
+  the account-local access; screens use those hooks.
   Preserve current public behaviour, including sort/date/filter defaults and
   the theme applying on the next launch.
 - Keep the existing synchronous theme loading before UI tokens evaluate,
@@ -63,7 +59,7 @@ bodyweight data/hook path in `apps/mobile/src/data/user-settings.ts` and
   A sync database rebuild preserves these keys; an explicit settings reset
   affects only its intended scope. Reinstallation starts with defaults.
 
-## Migration and compatibility
+## Browsing migration
 
 - Migrate the legacy SecureStore key `boga3.exerciseListPreferences.v1` into
   account-scoped local preference keys: preserve all four active fields, keep
@@ -74,14 +70,6 @@ bodyweight data/hook path in `apps/mobile/src/data/user-settings.ts` and
   preferences. Defer the claim while signed out; never copy one account's
   subsequent edits into another account. A local-only profile does not claim
   it for a user.
-- Keep the existing theme key, synchronous reader, save helper, diagnostics and
-  next-launch semantics. No theme migration is needed.
-- Keep bodyweight's existing data helper, preference hook, invalidation and
-  account-switch reset. The typed local/server column, sync serialization,
-  push/pull, drift checks, protocol and owner-only RLS require no changes.
-  Personal readers, derived facts, the agent API and group policy keep their
-  current behaviour. No `settings_json` column, backfill, compatibility
-  projection, dual writes or server deployment is needed for this task.
 - Browsing migration is idempotent and retryable. Existing valid scoped values win;
   do not overwrite later edits. Retain legacy source values until durable
   migration succeeds. Failed or interrupted conversion must not lose settings
@@ -99,8 +87,7 @@ bodyweight data/hook path in `apps/mobile/src/data/user-settings.ts` and
 3. Existing theme, browsing and bodyweight UI behaviour stays correct. Prove the
    startup theme and bodyweight-dependent calculations/facts retain their rules.
 4. Jest proves account-local edits do not dirty `user_settings` or nudge sync.
-   Existing bodyweight sync coverage remains the regression check; this task
-   adds no new server or wire behaviour to test.
+   Existing bodyweight sync coverage remains the regression check.
 5. Update the architecture, account-local ownership rules in the data model and
    relevant UI contracts. Delete this card in its implementation PR; the
    following card depends on this PR being merged. Evidence lives in the PR body.
