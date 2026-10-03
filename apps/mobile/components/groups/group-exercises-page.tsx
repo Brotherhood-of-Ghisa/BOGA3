@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, findNodeHandle, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Alert, findNodeHandle, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
 import {
   ExerciseEditorModal,
@@ -102,11 +102,11 @@ export function GroupExercisesPage({
   const [chooserVisible, setChooserVisible] = useState(false);
   const selectedUnlink = useRef<ExerciseUnlinkTarget | null>(null);
   const focusGroupExerciseId = useRef<string | null>(null);
-  const rowRefs = useRef(new Map<string, View>());
+  const rowRefs = useRef(new Map<string, ViewInstance>());
   const restoreRowFocus = () => {
     const row = rowRefs.current.get(focusGroupExerciseId.current ?? '');
     const handle = row ? findNodeHandle(row) : null;
-    if (handle !== null) AccessibilityInfo.setAccessibilityFocus(handle);
+    if (typeof handle === 'number') AccessibilityInfo.setAccessibilityFocus(handle);
   };
   const unlinkTarget = (exercise: GroupExercise, choice: PersonalExerciseLinkChoice): ExerciseUnlinkTarget => ({
     personalExerciseId: choice.exerciseDefinitionId, personalExerciseName: choice.label,

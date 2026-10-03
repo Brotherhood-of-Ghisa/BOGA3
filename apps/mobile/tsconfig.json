@@ -7,6 +7,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "react-native-view-shot": [
+        "./node_modules/react-native-view-shot/lib/index.d.ts"
       ]
     }
   },
@@ -15,5 +18,8 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules"
   ]
 }
