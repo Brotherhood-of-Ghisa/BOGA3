@@ -3,6 +3,7 @@ import {
   aggregateExerciseWeeklyEffort,
   type ExerciseRawSession,
 } from '@/src/data/exercise-analytics';
+import { estimateOneRepMax } from '@/src/exercise-calculations';
 
 const makeSession = (
   isoDate: string,
@@ -42,18 +43,27 @@ describe('aggregateExerciseWeeklyEffort', () => {
     expect(week.estimatedRM1).not.toBeNull();
   });
 
-  it('includes warm-up sets in all metrics except working sets', () => {
+  it('leaves warm-up sets out of every metric', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
-        { setType: 'warm_up', weight: 60, reps: 10 },
+        { setType: 'warm_up', weight: 140, reps: 10 },
         { setType: 'rir_2', weight: 100, reps: 5 },
       ]),
     ];
     const result = aggregateExerciseWeeklyEffort(sessions, TZ);
     expect(result).toHaveLength(1);
-    expect(result[0].totalVolume).toBe(60 * 10 + 500);
+    expect(result[0].totalVolume).toBe(500);
     expect(result[0].workingSetCount).toBe(1);
     expect(result[0].highestWeight).toBe(100);
+    expect(result[0].estimatedRM1).toBeCloseTo(estimateOneRepMax(100, 5) as number);
+  });
+
+  it('makes no week from warm-up-only sessions', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: 'warm_up', weight: 60, reps: 10 }]),
+      makeSession('2026-05-26T10:00:00Z', [{ setType: 'rir_1', weight: 80, reps: 5 }]),
+    ];
+    expect(aggregateExerciseWeeklyEffort(sessions, TZ).map((week) => week.weekStartDateKey)).toEqual(['2026-05-25']);
   });
 
   it('counts null setType sets as working sets and in volume', () => {
@@ -232,19 +242,27 @@ describe('aggregateExerciseDailyEffort', () => {
     expect(result.map((d) => d.dateKey)).toEqual(['2026-05-18', '2026-05-20']);
   });
 
-  it('rolls the four metrics per day and includes warm-ups outside working sets', () => {
+  it('rolls the four metrics per day from working sets only', () => {
     const sessions = [
       makeSession('2026-05-18T10:00:00Z', [
-        { setType: 'warm_up', weight: 60, reps: 10 },
+        { setType: 'warm_up', weight: 150, reps: 10 },
         { setType: 'rir_1', weight: 100, reps: 5 },
         { setType: null, weight: 120, reps: 3 },
       ]),
     ];
     const [day] = aggregateExerciseDailyEffort(sessions, TZ);
-    expect(day.totalVolume).toBe(60 * 10 + 100 * 5 + 120 * 3);
+    expect(day.totalVolume).toBe(100 * 5 + 120 * 3);
     expect(day.workingSetCount).toBe(2);
     expect(day.highestWeight).toBe(120);
-    expect(day.estimatedRM1).not.toBeNull();
+    expect(day.estimatedRM1).toBeCloseTo(Math.max(estimateOneRepMax(100, 5) as number, estimateOneRepMax(120, 3) as number));
+  });
+
+  it('makes no cell for a warm-up-only day', () => {
+    const sessions = [
+      makeSession('2026-05-18T10:00:00Z', [{ setType: 'warm_up', weight: 60, reps: 10 }]),
+      makeSession('2026-05-19T10:00:00Z', [{ setType: 'rir_1', weight: 80, reps: 5 }]),
+    ];
+    expect(aggregateExerciseDailyEffort(sessions, TZ).map((day) => day.dateKey)).toEqual(['2026-05-19']);
   });
 
   it('feeds the weekly aggregator (weekly volume = sum of daily volume)', () => {

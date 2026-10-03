@@ -231,9 +231,9 @@ const buildSessionEntry = (
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
   const loadContext = personalLoadContext(definition.bodyweightCalculationsEnabled, definition, sessionRow);
-  const { volumeCoverage } = summarizeExerciseLoad(orderedSets, loadContext);
-  // The session's 1RM and top set are bests (they feed `allTimeBest`): working sets only.
-  const { estimatedOneRepMax, topWeightSet } = summarizeExerciseLoad(
+  // The session's 1RM, top set and volume read working sets only (the 1RM and
+  // top set feed `allTimeBest`); every row keeps its own figures.
+  const { estimatedOneRepMax, topWeightSet, volumeCoverage } = summarizeExerciseLoad(
     orderedSets.filter((row) => isWorkingSet({
       weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
     })),

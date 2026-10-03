@@ -6,12 +6,14 @@ import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { deriveExercisePersonalRecord } from '@/src/session-insights';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
-import { canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet } from '@/src/exercise-calculations/set-semantics';
+import {
+  canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSetType,
+} from '@/src/exercise-calculations/set-semantics';
 
 /**
  * The read-only session view's presentation model (`ux-rules` §14b): one
  * card per exercise with its set rows, a done count and a
- * record, plus the summary totals. Pure — the route loads the
+ * record, plus the summary totals (Volume reads working sets only). Pure — the route loads the
  * draft and the history and renders what this returns.
  */
 
@@ -147,7 +149,7 @@ export const buildSessionViewModel = (
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
   let performedSetCount = 0;
-  const performedMetrics: SetMetrics[] = [];
+  const workingMetrics: SetMetrics[] = [];
 
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
     const context = exercise.loadContext ?? ordinaryLoadContext();
@@ -166,7 +168,7 @@ export const buildSessionViewModel = (
     const rows = figures.map((row): SessionViewSetRow => {
       if (row.done) {
         performedSetCount += 1;
-        performedMetrics.push(row.metric);
+        if (isWorkingSetType(row.set.setType)) workingMetrics.push(row.metric);
       }
       return formatSetRow({
         id: row.set.id,
@@ -187,7 +189,7 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, performedSetCount, ...sessionVolumeSummary(summarizeVolume(performedMetrics)) };
+  return { cards, performedSetCount, ...sessionVolumeSummary(summarizeVolume(workingMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */

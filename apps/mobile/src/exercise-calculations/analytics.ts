@@ -1,6 +1,6 @@
 import { sessionBodyWeightForCalculation, type SessionWeightContext } from '../bodyweight/as-of.ts';
 import { parseSetWeight } from './index.ts';
-import { canonicalizeWeightForReps } from './set-semantics.ts';
+import { canonicalizeWeightForReps, isWorkingSet } from './set-semantics.ts';
 import {
   calculateSetMetrics, summarizeVolume,
   type LoadContext, type LoadInputMode, type SetMetricInput, type VolumeCoverage,
@@ -37,6 +37,16 @@ export const groupLoadContext = (
 });
 
 export type AnalyticsSetInput = Omit<SetMetricInput, keyof LoadContext>;
+
+/**
+ * The sets a stat reads (`isWorkingSet`): filter before summarizing. Per-set
+ * figures still come from `calculateAnalyticsSetMetrics` on any row.
+ */
+export const workingSetsOnly = <T extends AnalyticsSetInput>(sets: readonly T[]): T[] =>
+  sets.filter(set => isWorkingSet({
+    weight: set.weightValue ?? '', reps: set.repsValue ?? '',
+    performanceStatus: set.performanceStatus, setType: set.setType,
+  }));
 
 /** Resolve derived metrics from the entered Weight and internal calculation context. */
 export function calculateAnalyticsSetMetrics(input: SetMetricInput) {
@@ -89,10 +99,10 @@ export function sessionVolumeSummary(coverage: VolumeCoverage): { volume: string
   if (coverage.knownSetCount === 0 || coverage.knownVolumeKgReps === null) {
     return { volume: '—', volumeNote: coverage.overflow
       ? 'Volume unavailable. The combined load exceeds the supported numeric range.'
-      : 'Volume unavailable. Some performed sets have missing or invalid load information.' };
+      : 'Volume unavailable. Some working sets have missing or invalid load information.' };
   }
   return { volume: String(Math.round(coverage.knownVolumeKgReps)),
-    volumeNote: `Volume incomplete. Known subtotal from ${coverage.knownSetCount} of ${coverage.eligibleSetCount} performed sets.` };
+    volumeNote: `Volume incomplete. Known subtotal from ${coverage.knownSetCount} of ${coverage.eligibleSetCount} working sets.` };
 }
 
 /** Numeric slot only: callers must render coverage alongside this figure. */

@@ -112,14 +112,15 @@ const buildInput = (
 };
 
 describe('aggregateExerciseHistory', () => {
-  it('orders sessions newest first; per-session volume still includes warm-ups', () => {
+  it('orders sessions newest first; per-session volume reads working sets only', () => {
     const summary = aggregateExerciseHistory(buildInput());
 
     expect(summary.sessions.map((entry) => entry.sessionId)).toEqual(['s2', 's1']);
 
     const benchFirst = summary.sessions.find((entry) => entry.sessionId === 's1');
     expect(benchFirst?.workingSetCount).toBe(2);
-    expect(benchFirst?.totalVolume).toBe(45 * 10 + 100 * 8 + 100 * 6);
+    // The 45 × 10 warm-up keeps its row but adds no volume.
+    expect(benchFirst?.totalVolume).toBe(100 * 8 + 100 * 6);
     expect(benchFirst?.topWeightSet).toEqual({ weight: 100, reps: 8 });
     expect(benchFirst?.estimatedOneRepMax).not.toBeNull();
     // Only the warm-up is flagged isWorking=false; an untagged set is working.
@@ -148,6 +149,22 @@ describe('aggregateExerciseHistory', () => {
     expect(withWarmUp?.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
     expect(summary.allTimeBest.topWeight).toMatchObject({ weight: 100, sessionId: 's1' });
     expect(summary.allTimeBest.estimatedOneRepMax?.value).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
+  });
+
+  it('keeps a warm-up-only session with its rows, but no 1RM, top set or volume', () => {
+    const summary = aggregateExerciseHistory(
+      buildInput({
+        setsBySessionExerciseId: groupBy([
+          setRow({ setId: 'st-1', sessionExerciseId: 'se1', orderIndex: 0, weightValue: '60', repsValue: '10', setType: 'warm_up' }),
+          setRow({ setId: 'st-2', sessionExerciseId: 'se2', orderIndex: 0, weightValue: '90', repsValue: '5' }),
+        ]),
+      })
+    );
+
+    const warmUpOnly = summary.sessions.find((entry) => entry.sessionId === 's1');
+    expect(warmUpOnly?.sets.map((set) => set.setId)).toEqual(['st-1']);
+    expect(warmUpOnly).toMatchObject({ workingSetCount: 0, totalVolume: 0, estimatedOneRepMax: null, topWeightSet: null });
+    expect(warmUpOnly?.volumeCoverage).toMatchObject({ eligibleSetCount: 0, complete: true });
   });
 
   it('tie-breaks top weight by max reps at that weight', () => {

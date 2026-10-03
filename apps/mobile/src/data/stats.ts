@@ -131,12 +131,12 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       knownVolume: 0,
     };
     accumulator.setIdentities.add(contribution.setIdentity);
-    if (isWorkingSessionSetType(contribution.setType)) {
-      accumulator.workingSetIdentities.add(contribution.setIdentity);
-    }
+    accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
+    // Volume reads working sets only.
+    if (!isWorkingSessionSetType(contribution.setType)) continue;
+    accumulator.workingSetIdentities.add(contribution.setIdentity);
     accumulator.knownVolume = addFiniteVolume(accumulator.knownVolume, contribution.weightedVolume ?? 0);
     accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume);
-    accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
   }
 
   const musclesByFamily = new Map<string, StatsMusclePerformance[]>();

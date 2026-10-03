@@ -167,8 +167,8 @@ Brief entrypoint map of the current mobile screens.
     the working-set count in parentheses, use `—` for unavailable 1RM, allow
     exercise names to wrap without truncation, retain complete accessibility
     wording, and open the exercise's history sheet as one whole-row
-    action. Only exercises with at least one valid performed set in the selected
-    7-/30-day window appear.
+    action. Only exercises with at least one working set in the selected
+    7-/30-day window appear; `Vol` and `1RM` read working sets only.
   - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
     Exercise cycles most/least recently completed across all-time valid history;
     Sets cycles all sets high/low then working sets high/low; and Vol cycles
@@ -178,7 +178,7 @@ Brief entrypoint map of the current mobile screens.
     (`Recent` plus arrow for Exercise, arrow only for Sets/Vol). Accessibility
     wording retains the complete sort mode and next action. Mounted sort choice
     survives time-range, search, and Breakdown changes.
-  - per-muscle family and nested rows show the same set/working-set count grammar plus per-side, role-weighted `Volume`; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
+  - per-muscle family and nested rows show the same set/working-set count grammar plus per-side, role-weighted `Volume` of working sets; set comparisons are signed absolute pairs while volume comparisons are percentage-only with explicit zero-baseline states
   - per-muscle family rows and visible nested-muscle rows use one failure-intensity ramp (`viz1`–`viz4`), selecting one uniform shade per row and scaling to eight working sets per seven days; exact counts remain readable/accessibly labelled and the threshold is not a training target
   - in By Muscle, a nested muscle row and a collapsed single-muscle family header open that muscle's history; a multi-muscle family header opens the whole family's (`Muscle Group History`)
   - in By Exercise, a table row opens the exercise's history
@@ -213,9 +213,9 @@ Brief entrypoint map of the current mobile screens.
     the cards work as for an active session, written back to the completed
     session; records compare against the completed sessions before it, never the session itself or later ones
   - shared live exercise/muscle comparisons after the exercise cards, using
-    confirmed sets and earlier completed history (loading/error is nonblocking)
+    working sets and earlier completed history (loading/error is nonblocking)
   - summary card: Time (elapsed, ticking) / Gym / Sets (confirmed performed) /
-    Volume (their entered-load volume, warm-ups included); the Gym stat opens
+    Volume (the working sets' entered-load volume, warm-ups left out); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
     lookup (1.5 s budget), and exactly one confident match shows first as
     `Nearby · <gym>` (never preselected, and not shown for the session's own
@@ -423,8 +423,9 @@ Brief entrypoint map of the current mobile screens.
     (`components/session-complete/`): its own top bar `Session complete` ·
     `Done` (`accent`); a summary card (Duration / Exercises / Sets / Working,
     then Gym) with informational per-muscle working-set pills; every new 1RM
-    record as a `record`-band card; per-exercise volume versus median with a
-    descriptive P5/P95 range; and `Share session` (outline), which opens a
+    record as a `record`-band card; per-exercise working-set volume versus
+    median with a descriptive P5/P95 range (a warm-up-only exercise is not
+    compared); and `Share session` (outline), which opens a
     `Sheet` previewing the PNG. It does not link to muscle analytics. Optional
     historical enrichment cannot block it, and share output excludes
     gym/location. Edit/delete/append actions are hidden.
@@ -439,7 +440,8 @@ Brief entrypoint map of the current mobile screens.
     off and Android system back replaces to Progress
   - detail: its own top bar, `back · View Session · ⋮ · Edit` (`Edit` the one
     `accent` action, no native header); a summary card with `Start` / `End`
-    (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume`; Sets has one card
+    (`YYYY-MM-DD HH:mm`) then `Duration` / `Gym` / `Sets` / `Volume` (working
+    sets only); Sets has one card
     per exercise with its confirmed sets as the session view's rows (`type ·
     weight × reps · 1RM · VOL`, `n sets`), a brass record 1RM and `New 1RM
     record` band where the session holds the exercise's best 1RM; no tags, no

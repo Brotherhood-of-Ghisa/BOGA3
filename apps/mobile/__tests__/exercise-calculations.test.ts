@@ -10,6 +10,7 @@ import {
   parseSetWeight,
   type CalculationSetInput,
 } from '@/src/exercise-calculations';
+import { workingSetsOnly } from '@/src/exercise-calculations/analytics';
 
 const set = (
   weightValue: string,
@@ -263,5 +264,20 @@ describe('exercise calculations: computeMaxRepsByWeight', () => {
   it('ignores invalid sets and returns an empty list when nothing is eligible', () => {
     expect(computeMaxRepsByWeight([set('', '5'), set('100', '')])).toEqual([]);
     expect(computeMaxRepsByWeight([])).toEqual([]);
+  });
+});
+
+describe('exercise calculations: workingSetsOnly', () => {
+  it('keeps the confirmed, valid sets that are not warm-ups, in order', () => {
+    const sets = [
+      { id: 'warm', weightValue: '60', repsValue: '10', setType: 'warm_up' },
+      { id: 'rir', weightValue: '100', repsValue: '5', setType: 'rir_1' },
+      { id: 'untagged', weightValue: '', repsValue: '8', setType: null },
+      { id: 'legacy', weightValue: '90', repsValue: '5' },
+      { id: 'planned', weightValue: '100', repsValue: '5', setType: 'rir_0', performanceStatus: 'planned' as const },
+      { id: 'invalid', weightValue: '100', repsValue: '0', setType: 'rir_0' },
+    ];
+    expect(workingSetsOnly(sets).map((set) => set.id)).toEqual(['rir', 'untagged', 'legacy']);
+    expect(workingSetsOnly([sets[0]])).toEqual([]);
   });
 });

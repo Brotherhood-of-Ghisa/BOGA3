@@ -57,7 +57,7 @@ export function SessionInsightPresentation({
           <Text allowFontScaling={false} style={styles.muted} testID="session-insight-empty">
             {state === 'loading' ? 'Loading comparisons…'
               : state === 'error' ? unavailableMessage
-                : mode === 'muscle' ? 'No mapped performed sets for this session.' : 'No performed sets to compare.'}
+                : mode === 'muscle' ? 'No mapped working sets for this session.' : 'No working sets to compare.'}
           </Text>
         )}
       </View>

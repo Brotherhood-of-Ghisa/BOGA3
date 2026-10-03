@@ -18,7 +18,7 @@ const rawHistory = (): ExerciseCatalogStatsRawHistory => ({
     { id: 'old', sessionId: 'old', exerciseDefinitionId: 'old' },
   ],
   exerciseSets: ['bench-1', 'bench-1', 'bench-2', 'old'].map((sessionExerciseId) => ({
-    sessionExerciseId, weightValue: '20', repsValue: '10', setType: 'warm_up',
+    sessionExerciseId, weightValue: '20', repsValue: '10', setType: 'rir_2',
   })),
 });
 const muscleGroups = [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10 }];

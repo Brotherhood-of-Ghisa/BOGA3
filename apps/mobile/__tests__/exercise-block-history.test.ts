@@ -89,7 +89,7 @@ describe('aggregateExerciseBlockHistory', () => {
     expect(recent.daysAgo).toBe(2);
   });
 
-  it('leaves warm-ups out of the bests and working-set counts, but not yet out of volume', () => {
+  it('leaves warm-ups out of the bests, working-set counts and volume', () => {
     const summary = aggregateExerciseBlockHistory({
       now: new Date('2026-05-20T12:00:00.000Z'),
       sessions: [
@@ -107,12 +107,33 @@ describe('aggregateExerciseBlockHistory', () => {
     });
 
     const block = summary.blocks[0];
-    expect(block.totalVolume).toBe(500 * 5 + 100 * 5 + 90 * 4);
+    expect(block.totalVolume).toBe(100 * 5 + 90 * 4);
     // The 500 kg warm-up is heavier than every working set, yet sets no best.
     expect(block.highestWeight).toBe(100);
     expect(block.estimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
     // rir-good and the untagged set; the warm-up and the invalid row are excluded.
     expect(block.workingSetCount).toBe(2);
+  });
+
+  it('makes no block from a warm-up-only session', () => {
+    const summary = aggregateExerciseBlockHistory({
+      now: new Date('2026-05-20T12:00:00.000Z'),
+      sessions: [
+        sessionRow({ sessionId: 'warm-up-only', completedAt: new Date('2026-05-19T12:00:00.000Z') }),
+        sessionRow({ sessionId: 'working', completedAt: new Date('2026-05-18T12:00:00.000Z') }),
+      ],
+      sessionExercises: [
+        sessionExerciseRow({ sessionId: 'warm-up-only', sessionExerciseId: 'se-warm' }),
+        sessionExerciseRow({ sessionId: 'working', sessionExerciseId: 'se-work' }),
+      ],
+      setsBySessionExerciseId: groupBySessionExerciseId([
+        setRow({ setId: 'warm', sessionExerciseId: 'se-warm', orderIndex: 0, weightValue: '60', repsValue: '10', setType: 'warm_up' }),
+        setRow({ setId: 'work', sessionExerciseId: 'se-work', orderIndex: 0, weightValue: '80', repsValue: '5', setType: 'rir_1' }),
+      ]),
+    });
+
+    expect(summary.blocks.map((block) => block.sessionId)).toEqual(['working']);
+    expect(summary.blocks[0].totalVolume).toBe(400);
   });
 
   it('excludes valid but unconfirmed sets from history metrics and plan suggestions', () => {

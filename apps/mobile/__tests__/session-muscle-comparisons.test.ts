@@ -26,7 +26,7 @@ const session = (sessionId: string, day: string, sets: SessionInsightSetInput[])
 });
 
 describe('muscle volume comparisons', () => {
-  it('counts unspecified but not warm-up performed sets as working sets', () => {
+  it('counts unspecified but not warm-up performed sets as working sets, and only their volume', () => {
     const rows = deriveSessionMuscleVolumeComparisons({
       ...catalog,
       targetSession: session('target', '25', [
@@ -38,10 +38,25 @@ describe('muscle volume comparisons', () => {
       ]),
       historicalSessions: [],
     });
+    // (100 + 50) × 10, halved per side; the 20 × 10 warm-up counts as a set only.
     expect(rows).toEqual([
-      expect.objectContaining({ exerciseDefinitionId: 'chest', setCount: 3, workingSetCount: 2, currentVolume: 850 }),
-      expect.objectContaining({ exerciseDefinitionId: 'triceps', setCount: 3, workingSetCount: 2, currentVolume: 425 }),
+      expect.objectContaining({ exerciseDefinitionId: 'chest', setCount: 3, workingSetCount: 2, currentVolume: 750 }),
+      expect.objectContaining({ exerciseDefinitionId: 'triceps', setCount: 3, workingSetCount: 2, currentVolume: 375 }),
     ]);
+  });
+
+  it('compares no muscle trained only by warm-ups and takes no baseline from one', () => {
+    const warmUpOnly = (sessionId: string, day: string) => session(sessionId, day, [set(`${sessionId}-warm`, '60', 'warm_up')]);
+    expect(deriveSessionMuscleVolumeComparisons({
+      ...catalog, targetSession: warmUpOnly('target', '25'), historicalSessions: [],
+    })).toEqual([]);
+
+    const rows = deriveSessionMuscleVolumeComparisons({
+      ...catalog,
+      targetSession: session('target', '25', [set('target-set', '100')]),
+      historicalSessions: [warmUpOnly('prior-warm-up', '23'), session('prior', '24', [set('prior-set', '50')])],
+    });
+    expect(rows[0]).toMatchObject({ exerciseDefinitionId: 'chest', historicalSessionCount: 1, medianVolume: 250 });
   });
 
   it('retains mapped zero-load targets and zero historical observations', () => {

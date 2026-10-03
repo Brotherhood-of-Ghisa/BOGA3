@@ -366,7 +366,7 @@ describe('completed-session detail over real data', () => {
     ).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(await screen.findByText('No mapped performed sets for this session.')).toBeTruthy();
+    expect(await screen.findByTestId('session-insight-empty')).toHaveTextContent('No mapped working sets for this session.');
   });
 
   it('renders the empty state, with a way back, when the session does not exist', async () => {
@@ -476,8 +476,14 @@ describe('a session written through the app', () => {
     expect(label('completed-session-detail-duration')).toBe('Duration 58m');
     expect(label('completed-session-detail-gym')).toBe('Gym Westside Barbell Club');
     expect(label('completed-session-detail-sets')).toBe('Sets 5');
-    // 135×8 + 185×8 + 185×6 + 185×5 + 120×12, no thousands separator.
-    expect(label('completed-session-detail-volume')).toBe('Volume 6035');
+    // Working sets only: 185×8 + 185×6 + 185×5 + 120×12, no thousands
+    // separator; the 135×8 warm-up counts as a set but adds no volume.
+    expect(label('completed-session-detail-volume')).toBe('Volume 4955');
+    // The bench comparison reads the same working sets: 185×8 + 185×6 + 185×5.
+    expect(
+      (await screen.findByTestId(`session-completion-exercise-${DESIGN.bench}`)).findByProps({ accessible: true })
+        .props.accessibilityLabel
+    ).toMatch(/Session volume 3515 kg/);
 
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
     const bench = within(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}`));
@@ -490,6 +496,8 @@ describe('a session written through the app', () => {
       bench.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-set-1-values`)
     ).toHaveTextContent('135.0 × 8');
     expect(label(`completed-session-detail-exercise-${DESIGN.bench}-set-2-vol`)).toBe('Vol 1480');
+    // The warm-up row keeps its own volume, though the summary leaves it out.
+    expect(label(`completed-session-detail-exercise-${DESIGN.bench}-set-1-vol`)).toBe('Vol 1080');
     const pulldown = within(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}`));
     expect(pulldown.getByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}-count`)).toHaveTextContent(
       '1 set'
@@ -589,7 +597,7 @@ describe('a session written through the app', () => {
     localDatabase()
       .update(exerciseSets)
       .set({ weightValue: '200', repsValue: '10' })
-      .where(eq(exerciseSets.id, `${DESIGN.bench}_set_1`))
+      .where(eq(exerciseSets.id, `${DESIGN.bench}_set_2`))
       .run();
     act(() => {
       triggerFocus();
@@ -598,10 +606,10 @@ describe('a session written through the app', () => {
     expect(await screen.findByText('Edited gym')).toBeTruthy();
     expect(screen.getByTestId('view-session-section-sets')).toHaveProp('accessibilityState', { selected: true });
     expect(
-      screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-set-1-values`)
+      screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-set-2-values`)
     ).toHaveTextContent('200.0 × 10');
-    // 200×10 + 185×8 + 185×6 + 185×5 + 120×12.
-    expect(label('completed-session-detail-volume')).toBe('Volume 6955');
+    // 200×10 + 185×6 + 185×5 + 120×12.
+    expect(label('completed-session-detail-volume')).toBe('Volume 5475');
     fireEvent.press(screen.getByTestId('view-session-section-summary'));
     expect(screen.getByTestId('session-insight-mode-muscle')).toHaveProp('accessibilityState', { selected: true });
     await waitFor(() =>
@@ -634,7 +642,7 @@ describe('a session written through the app', () => {
     screen.unmount();
     mockParams = { sessionId: DESIGN.sessionId };
     render(<CompletedSessionDetailRoute />);
-    expect(await screen.findByText('No performed sets to compare.')).toBeTruthy();
+    expect(await screen.findByText('No working sets to compare.')).toBeTruthy();
     expect(label('completed-session-detail-sets')).toBe('Sets 0');
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
     expect(screen.getByTestId('completed-session-detail-no-exercises')).toHaveTextContent(

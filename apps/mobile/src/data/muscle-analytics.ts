@@ -300,8 +300,11 @@ export const aggregateSelectedMuscleDailyEffort = (
     SelectedMuscleDailyEffort & { sessionIds: Set<string> }
   >();
   const muscleGroupIdSet = new Set(options.muscleGroupIds);
+  // Heatmap days read working sets only: a warm-up-only day makes no cell.
   const contributions = collectMuscleSetContributions(input).filter(
-    (contribution) => muscleGroupIdSet.has(contribution.muscleGroupId)
+    (contribution) =>
+      muscleGroupIdSet.has(contribution.muscleGroupId) &&
+      isWorkingSessionSetType(contribution.setType)
   );
 
   for (const contribution of contributions) {

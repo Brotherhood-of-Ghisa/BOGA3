@@ -434,7 +434,8 @@ section states only the data-model-level invariants.
    migration or wire-envelope change.
 8. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
 9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
-10. Muscle volume is recomputed per side from current exercise metadata and
+10. Muscle volume reads working sets only (a warm-up adds none) and is
+   recomputed per side from current exercise metadata and
    the applicable private calculation policy via
    `tech/bodyweight-load-contract.md` §2. Ordinary mode ignores contribution
    and readings: total input contributes `E / 2` per side and per-side input
@@ -452,10 +453,11 @@ section states only the data-model-level invariants.
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row.
    Completed-session exercise-volume comparisons remain a read-time projection,
-   not persisted data. They sum calculated load × reps across valid confirmed
-   sets (including warm-ups), combine repeated blocks by linked exercise
-   definition, and compare only complete totals from earlier completed,
-   nondeleted sessions for that definition. Missing/invalid load preserves
+   not persisted data. They sum calculated load × reps across working sets
+   (valid confirmed sets that are not warm-ups), combine repeated blocks by
+   linked exercise definition, and compare only complete totals from earlier
+   completed, nondeleted sessions for that definition. A definition with only
+   warm-ups in a session is neither compared nor a baseline. Missing/invalid load preserves
    independent rep/set counts and an explicitly incomplete known subtotal;
    overflow is unavailable, never Infinity or a complete zero. P5, median, and P95 use linear interpolation over the prior
    per-session totals; unlinked legacy rows stay isolated and report no history.
