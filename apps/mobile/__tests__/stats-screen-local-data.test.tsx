@@ -25,18 +25,18 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockPush = jest.fn();
-let mockSearchParams: Record<string, string> = {};
+let mockSearchParams: Record<string, string | string[]> = {};
 // Every mounted focus callback, so a test can play "the tab came back".
-const mockFocusCallbacks = new Set<() => void | (() => void)>();
+const mockFocusCallbacks = new Map<() => void | (() => void), void | (() => void)>();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, back: jest.fn(), replace: jest.fn() }),
   useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
-      mockFocusCallbacks.add(callback);
-      const cleanup = callback();
+      mockFocusCallbacks.set(callback, callback());
       return () => {
+        const cleanup = mockFocusCallbacks.get(callback);
         mockFocusCallbacks.delete(callback);
         if (typeof cleanup === 'function') cleanup();
       };
@@ -74,8 +74,18 @@ const renderSeededStats = async () => {
 
 const replayFocus = () =>
   act(async () => {
-    mockFocusCallbacks.forEach((callback) => callback());
+    mockFocusCallbacks.forEach((cleanup, callback) => {
+      if (typeof cleanup === 'function') cleanup();
+      mockFocusCallbacks.set(callback, callback());
+    });
   });
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
+};
 
 const exerciseOrder = () =>
   screen
@@ -122,6 +132,72 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
+  it.each([['7', 7], [['7'], 7], ['30', 28], ['all', 28]] as const)
+  ('opens the requested %s period using the saved window for legacy values', async (period, days) => {
+    mockSearchParams = { period: typeof period === 'string' ? period : [...period] };
+    await renderSeededStats();
+    expect(screen.getByTestId(`stats-period-chip-${days}`)).toHaveProp('accessibilityState', { selected: true });
+  });
+
+  it.each(['success', 'failure'])('keeps the previous summary visible during a focus refresh and its %s', async outcome => {
+    await renderSeededStats();
+    const previous = await statsRepository.computeStatsSummary({ periodWeeks: 1 });
+    await logPulldown(0.05);
+    const next = await statsRepository.computeStatsSummary({ periodWeeks: 1 });
+    const read = deferred<typeof next>();
+    jest.spyOn(statsRepository, 'computeStatsSummary').mockReturnValueOnce(read.promise);
+    await replayFocus();
+    expect(within(screen.getByTestId('stats-card-sessions')).getByText(String(previous.current.totals.sessionCount))).toBeTruthy();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    expect(screen.queryByTestId('stats-loading-state')).toBeNull();
+    await act(async () => {
+      if (outcome === 'success') read.resolve(next); else read.reject(Error('Refresh failed'));
+    });
+    if (outcome === 'success') expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*7/);
+    else {
+      expect(screen.getByTestId('stats-error-state')).toHaveTextContent(/Refresh failed/);
+      expect(within(screen.getByTestId('stats-card-sessions')).getByText(String(previous.current.totals.sessionCount))).toBeTruthy();
+    }
+  });
+
+  it('hides the old summary during a period switch and ignores a superseded focus read', async () => {
+    await renderSeededStats();
+    const old = await statsRepository.computeStatsSummary({ periodWeeks: 1 });
+    const next = await statsRepository.computeStatsSummary({ periodWeeks: 4 });
+    const focusRead = deferred<typeof old>();
+    const periodRead = deferred<typeof next>();
+    jest.spyOn(statsRepository, 'computeStatsSummary')
+      .mockReturnValueOnce(focusRead.promise).mockReturnValueOnce(periodRead.promise);
+    await replayFocus();
+    fireEvent.press(screen.getByTestId('stats-period-chip-28'));
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    expect(screen.queryByTestId('stats-card-sessions')).toBeNull();
+    expect(screen.getByTestId('stats-loading-state')).toBeTruthy();
+    await act(async () => periodRead.resolve(next));
+    expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*11/);
+    await act(async () => focusRead.resolve(old));
+    expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/Sessions\s*11/);
+  });
+
+  it('shows no empty-history panel while the initial read or look-back reload is pending', async () => {
+    await renderSeededStats();
+    const initial = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseWeeklyEffort>>>();
+    const reload = deferred<Awaited<ReturnType<typeof exerciseAnalytics.computeSelectedExerciseWeeklyEffort>>>();
+    jest.spyOn(exerciseAnalytics, 'computeSelectedExerciseWeeklyEffort')
+      .mockReturnValueOnce(initial.promise).mockReturnValueOnce(reload.promise);
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
+    await act(async () => initial.resolve([]));
+    expect(await screen.findByTestId('stats-exercise-history-empty')).toBeTruthy();
+    act(() => updatePreferences({ historyLookbackWeeks: 4 }));
+    expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
+    await act(async () => reload.resolve([]));
+    expect(await screen.findByTestId('stats-exercise-history-empty')).toHaveTextContent(/4-week/);
+  });
+
   it('defaults to the configured window, collapses a one-week choice, and refreshes it while mounted', async () => {
     mockSearchParams = {};
     await renderSeededStats();

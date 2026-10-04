@@ -3,17 +3,16 @@ import { useCallback, useState } from 'react';
 import { computeStatsSummary, type StatsSummary } from '@/src/data';
 
 export function useStatsSummary(weeks: number, revision: number, reloadExercises: () => void) {
-  const [summary, setSummary] = useState<StatsSummary | null>(null);
+  const [loaded, setLoaded] = useState<{ weeks: number; summary: StatsSummary } | null>(null);
   const [isLoading, setLoading] = useState(true);
   const [errorMessage, setError] = useState<string | null>(null);
   useFocusEffect(useCallback(() => {
     let active = true;
     setLoading(true);
-    setSummary(null);
     setError(null);
     reloadExercises();
-    void computeStatsSummary({ periodDays: weeks * 7, periodWeeks: weeks }).then(next => {
-      if (active) setSummary(next);
+    void computeStatsSummary({ periodWeeks: weeks }).then(next => {
+      if (active) setLoaded({ weeks, summary: next });
     }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : 'Unknown error');
     }).finally(() => {
@@ -22,5 +21,7 @@ export function useStatsSummary(weeks: number, revision: number, reloadExercises
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed bodyweight timeline change invalidates this read.
   }, [weeks, revision, reloadExercises]));
+  // Keep the current window visible during refocus; never label another window's data as this one.
+  const summary = loaded?.weeks === weeks ? loaded.summary : null;
   return { summary, isLoading, errorMessage };
 }

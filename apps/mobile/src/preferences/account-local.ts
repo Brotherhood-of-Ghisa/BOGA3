@@ -103,13 +103,19 @@ export async function ensureAccountLocalPreferencesLoaded(): Promise<void> {
   if (capturedGeneration === generation) loading = null;
 }
 
+/** Field drafts can report validation without submitting an invalid preference patch. */
+export function setAccountLocalPreferenceValidationError(message: string): void {
+  if (currentProfile() === null) return;
+  validationError = message;
+  publish({ error: currentError() });
+}
+
 export function setAccountLocalPreferences(patch: Partial<AccountLocalPreferences>): void {
   const activeProfile = currentProfile();
   if (activeProfile === null) return;
   const invalid = preferenceFields.find(field => Object.hasOwn(patch, field) && !isPreferenceValue(field, patch[field]));
   if (invalid) {
-    validationError = preferenceValidationMessages[invalid];
-    publish({ error: currentError() });
+    setAccountLocalPreferenceValidationError(preferenceValidationMessages[invalid]);
     return;
   }
   validationError = null;

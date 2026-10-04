@@ -16,7 +16,6 @@ import {
   EXERCISE_HISTORY_METRIC_OPTIONS,
   HistorySheet,
   MUSCLE_HISTORY_METRIC_OPTIONS,
-  type HeatmapView,
   type MuscleHistoryMetric,
 } from '@/components/stats/history-sheet';
 import {
@@ -42,11 +41,11 @@ import {
   type SelectedMuscleWeeklyEffort,
   type StatsMuscleFamilyPerformance,
   type StatsMusclePerformance,
-  type StatsPeriodDays,
   type StatsSummary,
 } from '@/src/data';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import type { HeatmapView } from '@/src/preferences/model';
 import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
 import { useHistory } from '@/components/stats/use-history';
 import { useStatsSummary } from '@/components/stats/use-summary';
@@ -114,10 +113,6 @@ const VIEW_MODE_OPTIONS = [
 const firstRouteParam = (value: string | string[] | undefined): string | undefined =>
   Array.isArray(value) ? value[0] : value;
 
-export const resolveStatsInitialPeriod = (
-  value: string | string[] | undefined
-): StatsPeriodDays => (firstRouteParam(value) === '7' ? 7 : 28);
-
 export const resolveStatsInitialBreakdown = (
   value: string | string[] | undefined
 ): StatsViewMode => (firstRouteParam(value) === 'muscle' ? 'muscle' : 'exercise');
@@ -141,7 +136,7 @@ export const formatCountDelta = (current: number, previous: number): DeltaDispla
 };
 
 /** What the summary cards' deltas compare against: the adjacent earlier period. */
-export const formatPeriodComparison = (periodDays: StatsPeriodDays): string => `vs prev ${periodDays / 7} ${periodDays === 7 ? 'wk' : 'wks'}`;
+export const formatPeriodComparison = (periodDays: number): string => `vs prev ${periodDays / 7} ${periodDays === 7 ? 'wk' : 'wks'}`;
 
 export const formatVolumeDelta = (current: number | null, previous: number | null): DeltaDisplay => {
   if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) return { text: 'Incomplete', tone: 'neutral' };
@@ -300,11 +295,11 @@ const formatTotalWeight = (value: number | null): string => value === null ? 'â€
 
 export type StatsScreenShellProps = {
   summary: StatsSummary | null;
-  periodDays: StatsPeriodDays;
+  periodDays: number;
   targetWindowWeeks?: number;
   historyLookbackWeeks?: number;
   weeklyWorkingSetTarget?: number;
-  onSelectPeriod: (period: StatsPeriodDays) => void;
+  onSelectPeriod: (period: number) => void;
   onPressSessionsCard: () => void;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
   onDismissMuscleHistory: () => void;
@@ -626,7 +621,7 @@ function Delta({
 }: {
   delta: DeltaDisplay;
   onViz?: boolean;
-  /** Names what the delta is against (`vs prev 7 days`), after the figure. */
+  /** Names what the delta is against (`vs prev 1 wk`), after the figure. */
   comparison?: string;
 }) {
   // The sign carries the direction (G3); "new" is the one delta set in `ink`.
@@ -634,7 +629,7 @@ function Delta({
   return (
     <Text
       allowFontScaling={false}
-      accessibilityLabel={comparison ? `${delta.text} ${comparison.replace('vs prev', 'versus previous').replace(/wks?$/, 'weeks')}, same elapsed calendar span` : undefined}
+      accessibilityLabel={comparison ? `${delta.text} ${comparison.replace('vs prev', 'versus previous').replace(/wks$/, 'weeks').replace(/wk$/, 'week')}, same elapsed calendar span` : undefined}
       numberOfLines={1}
       style={[styles.delta, (delta.tone === 'new' || onViz) && styles.deltaInk]}>
       {comparison ? `${delta.text} ${comparison}` : delta.text}
@@ -740,7 +735,7 @@ function MuscleFamilyList({
 }: {
   families: DisplayMuscleFamily[];
   previousFamilies: StatsMuscleFamilyPerformance[];
-  periodDays: StatsPeriodDays;
+  periodDays: number;
   weeklyWorkingSetTarget: number;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {
@@ -788,7 +783,7 @@ function MuscleFamilyCard({
   visibleMuscles: StatsMusclePerformance[];
   previousFamily: StatsMuscleFamilyPerformance | null;
   previousMusclesById: Map<string, StatsMusclePerformance>;
-  periodDays: StatsPeriodDays;
+  periodDays: number;
   weeklyWorkingSetTarget: number;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
 }) {

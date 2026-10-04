@@ -56,12 +56,27 @@ it.each([0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])('rejects inval
 it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('targetWindowWeeks', 52)).toBe(true);
   expect(isPreferenceValue('targetWindowWeeks', 53)).toBe(false);
+  expect(isPreferenceValue('historyLookbackWeeks', 520)).toBe(true);
+  expect(isPreferenceValue('historyLookbackWeeks', 521)).toBe(false);
   expect(isPreferenceValue('weeklyWorkingSetTarget', { quads: 8 })).toBe(false);
   expect(isPreferenceValue('heatmapView', 'monthly')).toBe(false);
   for (const invalid of [[], [0, 0], [-1], [1.5], [NaN], [Infinity], [Number.MAX_SAFE_INTEGER + 1]]) {
     expect(isPreferenceValue('visibleEffortGrades', invalid)).toBe(false);
   }
   expect(isPreferenceValue('visibleEffortGrades', [0, 12])).toBe(true);
+});
+
+it('persists the 520-week limit and rejects 521 without changing the saved value', async () => {
+  await account();
+  setAccountLocalPreferences({ historyLookbackWeeks: 520 });
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values().historyLookbackWeeks).toBe(520);
+  const write = jest.spyOn(Storage, 'setItemSync');
+  setAccountLocalPreferences({ historyLookbackWeeks: 521 });
+  expect(values().historyLookbackWeeks).toBe(520);
+  expect(getAccountLocalPreferenceState().error).toMatch(/up to 520/);
+  expect(write).not.toHaveBeenCalled();
 });
 
 it('retains failed input and durable values, retries partial saves and clears errors on a valid edit', async () => {

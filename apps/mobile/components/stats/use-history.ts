@@ -53,6 +53,7 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
     return () => { active = false; };
   }, [selected, weeks, revision]);
   const select = (target: T) => {
+    setLoading(true);
     setDaily([]);
     setWeekly([]);
     setWeekKey(null);

@@ -6,6 +6,7 @@ import {
   initializeAccountLocalPreferences,
   retryAccountLocalPreferences,
   setAccountLocalPreferences,
+  setAccountLocalPreferenceValidationError,
   subscribeToAccountLocalPreferences,
 } from './account-local';
 
@@ -17,6 +18,11 @@ export const ensurePreferencesLoaded = () => {
 export const updatePreferences: typeof setAccountLocalPreferences = patch => {
   initializeAccountLocalPreferences(getMobileAuthRuntimeConfig().isConfigured);
   setAccountLocalPreferences(patch);
+};
+
+export const reportPreferenceValidationError = (message: string) => {
+  initializeAccountLocalPreferences(getMobileAuthRuntimeConfig().isConfigured);
+  setAccountLocalPreferenceValidationError(message);
 };
 
 export function useAccountLocalPreferenceState() {

@@ -28,10 +28,10 @@ import {
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
-export type StatsPeriodDays = number;
+export type StatsPeriodDays = 7 | 30 | 90 | 365;
 
 export type StatsPeriodBounds = {
-  days: StatsPeriodDays;
+  days: number;
   start: Date;
   end: Date;
 };
@@ -73,10 +73,9 @@ export type StatsStore = {
   loadMuscleGroupTaxonomy(): Promise<StatsAggregationInput['muscleGroups']>;
 };
 
-export type ComputeStatsSummaryOptions = {
-  periodDays: StatsPeriodDays;
-  /** Progress uses Monday-aligned weeks; older day-based readers keep their bounds. */
-  periodWeeks?: number;
+/** Progress uses calendar weeks; day-based readers retain their fixed period domain. */
+export type ComputeStatsSummaryOptions = ({ periodDays: StatsPeriodDays; periodWeeks?: never }
+  | { periodWeeks: number; periodDays?: never }) & {
   now?: Date;
 };
 

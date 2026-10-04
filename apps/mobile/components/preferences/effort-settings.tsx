@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActionButton, FormField, Icon, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { isNonNegativeSafeInteger } from '@/src/preferences/model';
-import { updatePreferences } from '@/src/preferences/hooks';
+import { reportPreferenceValidationError, updatePreferences } from '@/src/preferences/hooks';
 import { getAccountLocalPreferenceState } from '@/src/preferences/account-local';
 import type { AccountLocalPreferences } from '@/src/preferences/model';
 import { parseIntegerDraft } from './number-field';
@@ -29,25 +29,30 @@ function EffortRow({ name, id, visible, locked = false, onPress }: {
   </View>;
 }
 
-export function EffortSettings({ values }: { values: AccountLocalPreferences }) {
+export function EffortSettings({ values, savedGrades }: { values: AccountLocalPreferences; savedGrades: number[] }) {
   const [newGrade, setNewGrade] = useState('');
+  const [submittedGrade, setSubmittedGrade] = useState<number | null>(null);
   const [addedGrades, setAddedGrades] = useState<number[]>([]);
+  // A successful Refresh publishes the durable grade; typing cancels this draft's submission.
+  if (submittedGrade !== null && savedGrades.includes(submittedGrade)) {
+    setNewGrade('');
+    setSubmittedGrade(null);
+  }
   const grades = [...new Set([0, 1, 2, 3, ...values.visibleEffortGrades, ...addedGrades])].sort((a, b) => a - b);
   const toggleVisible = (grade: number) => updatePreferences({ visibleEffortGrades:
     values.visibleEffortGrades.includes(grade) ? values.visibleEffortGrades.filter(value => value !== grade)
       : [...values.visibleEffortGrades, grade].sort((a, b) => a - b) });
   const addGrade = () => {
+    if (!newGrade.trim()) return;
     const grade = parseIntegerDraft(newGrade);
     if (!isNonNegativeSafeInteger(grade)) {
-      updatePreferences({ visibleEffortGrades: [NaN] });
+      reportPreferenceValidationError('RIR value must be a non-negative whole number.');
       return;
     }
+    setSubmittedGrade(grade);
     updatePreferences({ visibleEffortGrades: [...new Set([...values.visibleEffortGrades, grade])].sort((a, b) => a - b) });
     setAddedGrades(previous => [...new Set([...previous, grade])]);
-    if (getAccountLocalPreferenceState().values.visibleEffortGrades.includes(grade)) {
-      setNewGrade('');
-      Keyboard.dismiss();
-    }
+    if (getAccountLocalPreferenceState().values.visibleEffortGrades.includes(grade)) Keyboard.dismiss();
   };
   return <View testID="settings-effort-selections">
     <Text allowFontScaling={false} style={styles.description}>Choose the effort labels offered when logging sets.</Text>
@@ -61,9 +66,10 @@ export function EffortSettings({ values }: { values: AccountLocalPreferences }) 
       visible={values.visibleEffortGrades.includes(grade)} onPress={() => toggleVisible(grade)} />)}
     <View style={styles.addRow}>
       <FormField label="Add RIR value" accessibilityLabel="Add RIR value" keyboardType="number-pad"
-        onChangeText={setNewGrade} containerStyle={styles.addField} testID="settings-add-rir-input" value={newGrade} />
+        onChangeText={text => { setSubmittedGrade(null); setNewGrade(text); }}
+        containerStyle={styles.addField} testID="settings-add-rir-input" value={newGrade} />
       <ActionButton label="Add" accessibilityLabel="Add RIR grade" onPress={addGrade} variant="outline"
-        testID="settings-add-rir-button" />
+        disabled={!newGrade.trim()} testID="settings-add-rir-button" />
     </View>
   </View>;
 }

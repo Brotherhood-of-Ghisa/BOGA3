@@ -628,8 +628,9 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    the sole Daily/Weekly choice, default Weekly; no view selector is offered
    in Progress. Saving the preference refreshes mounted history sheets.
 4. Loading, error and no-history are inline `StatePanel`s in the sheet's scroll
-   body, with their copy unchanged; under the no-history panel the empty heatmap
-   still renders.
+   body. No-history appears only after a successful empty read, never while
+   loading. Heatmaps stay mounted during reloads to preserve selection and
+   scroll; under the no-history panel the empty heatmap still renders.
 5. In `Weekly` a `rule-soft` band sits above the chart: `Tap a week to see
    details`, or the selected week's range (Source Sans `ink-muted`) and
    `<metric>: <value>` with the value in Plex Mono `ink`. `Daily` has no band;
@@ -665,7 +666,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    now. “So far” labels the range; targets are not prorated. Deltas compare the
    same elapsed calendar span in the preceding N-week window, across DST. The controls, the summary, the filter
    and the list share one scroll.
-2. The summary keeps the actionable `Sessions` card, the counted sessions (`tech/training-metrics-contract.md` §2), and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons.
+2. The summary keeps the actionable `Sessions` card, the counted sessions (`tech/training-metrics-contract.md` §2), and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons. Refocus refreshes silently with the previous summary visible; changing the selected week window hides that summary until the new read succeeds. A failed refresh retains the previous figures beside the read error.
 3. In per-exercise mode, exercises with at least one working set in the
    selected calendar-week window render in one compact, viewport-fitting table with
    shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data

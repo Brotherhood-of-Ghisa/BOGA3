@@ -24,7 +24,6 @@ import {
   nextExerciseSortMode,
   sortExerciseListItems,
   resolveStatsInitialBreakdown,
-  resolveStatsInitialPeriod,
 } from '../app/(tabs)/stats-history';
 import ProgressRoute from '../app/(tabs)/progress';
 import { uiGeometry, uiRoles } from '@/components/ui';
@@ -255,6 +254,12 @@ describe('formatPeriodComparison', () => {
     expect(formatPeriodComparison(7)).toBe('vs prev 1 wk');
     expect(formatPeriodComparison(28)).toBe('vs prev 4 wks');
   });
+});
+
+it.each([[7, '1 week'], [28, '4 weeks']])('announces the %i-day comparison with correct week grammar', (periodDays, wording) => {
+  renderStatsScreenShell({ periodDays });
+  expect(within(screen.getByTestId('stats-card-sets')).getByText('+8 vs prev ' + (periodDays === 7 ? '1 wk' : '4 wks')))
+    .toHaveProp('accessibilityLabel', `+8 versus previous ${wording}, same elapsed calendar span`);
 });
 
 describe('formatCountDelta', () => {
@@ -561,6 +566,7 @@ describe('StatsScreenShell', () => {
       /Front Delts/
     );
     expect(screen.getByTestId('stats-muscle-history-loading')).toHaveTextContent(/Loading/);
+    expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
     captureUiEvidence('stats-muscle-history-loading', toJSON());
 
     rerender(
@@ -652,6 +658,11 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
       'May 13, 2026'
     );
+
+    rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
+    expect(screen.getByTestId('stats-muscle-history-loading')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent('May 13, 2026');
 
     rerender(
       <StatsScreenShell
@@ -790,10 +801,7 @@ describe('StatsScreenShell', () => {
 });
 
 describe('Stats route parameters', () => {
-  it('validates initial period and breakdown query values', () => {
-    expect(resolveStatsInitialPeriod('30')).toBe(28);
-    expect(resolveStatsInitialPeriod(['7'])).toBe(7);
-    expect(resolveStatsInitialPeriod('all')).toBe(28);
+  it('validates initial breakdown query values', () => {
     expect(resolveStatsInitialBreakdown('muscle')).toBe('muscle');
     expect(resolveStatsInitialBreakdown(['exercise'])).toBe('exercise');
     expect(resolveStatsInitialBreakdown('unknown')).toBe('exercise');
@@ -1075,6 +1083,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       isExerciseHistoryLoading: true,
     });
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
   });
 
   it('shows error state in exercise overlay', () => {

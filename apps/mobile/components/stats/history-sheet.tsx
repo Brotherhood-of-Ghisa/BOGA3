@@ -1,4 +1,5 @@
 import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
+import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo } from 'react';
@@ -27,7 +28,6 @@ import type {
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
 export type HistoryKind = 'muscle' | 'exercise';
-export type HeatmapView = 'weekly' | 'daily';
 export type MuscleHistoryMetric = Extract<CalendarHeatmapMetric, 'totalVolume' | 'workingSetCount'>;
 
 export type HistoryMetricOption<TMetric extends CalendarHeatmapMetric> = {
@@ -333,7 +333,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 
           {!errorMessage ? (
             <>
-              {weeklyEffort.length === 0 ? (
+              {!isLoading && weeklyEffort.length === 0 ? (
                 <StatePanel
                   body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
                   fill={false}

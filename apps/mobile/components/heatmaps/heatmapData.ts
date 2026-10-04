@@ -255,8 +255,9 @@ export function buildHeatmapData(
   );
 
   const todayWeekKey = formatUtcDateKey(startOfMondayWeek(today));
+  const totals = accumulateWeeks(daily, metric);
   const weekly = withLevels(
-    [...accumulateWeeks(daily, metric)].map(([weekStartDateKey, week]) => toWeekCell(weekStartDateKey, week, todayWeekKey))
+    [...totals].map(([weekStartDateKey, week]) => toWeekCell(weekStartDateKey, week, todayWeekKey))
   );
 
   const target = metric === 'workingSetCount' ? options.muscleTargets : undefined;
@@ -264,7 +265,6 @@ export function buildHeatmapData(
   const grade = (counts: Record<string, number> | undefined) =>
     groupedTargetAttainment(target.muscleIds, counts ?? {}, target.weeklyTarget);
   const targetDaily = daily.map(day => withTargetLevel(day, grade(day.workingSetCountsByMuscle)));
-  const totals = accumulateWeeks(daily, metric);
   const targetWeekly = weekly.map(week => withTargetLevel(week, grade(totals.get(week.weekStartDateKey)?.workingSetCountsByMuscle)));
   return { daily: targetDaily, weekly: targetWeekly, todayDateKey,
     targetLegend: target.muscleIds.length === 1 ? 'Colour: share of weekly muscle target' : 'Colour: average share of muscle targets' };
