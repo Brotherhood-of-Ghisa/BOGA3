@@ -14,6 +14,12 @@ const PRIVATE_CALCULATION_FIELDS = new Set([
   'body_weight_measured_at',
   'body_weight_measured_at_ms',
   'body_weight_dependency_digest',
+  'observed_set_pin',
+  'reading_pin',
+  'current_fingerprint',
+  'legacy_certification_id',
+  'rule_rescore_baseline',
+  'source_rules_only',
 ]);
 const hasPrivateCalculationField = (value: Record<string, unknown>): boolean =>
   Object.keys(value).some(key => PRIVATE_CALCULATION_FIELDS.has(key));
@@ -153,6 +159,7 @@ const isRecordContext = (value: unknown, event: Record<string, unknown>): boolea
     seen.add(context.metric);
     const board = (event.boards as unknown[]).find(item => isMetricRecord(item) && item.metric === context.metric);
     return isMetricRecord(board) && board.fingerprint === context.fingerprint && typeof context.eligible === 'boolean' &&
+      (context.write_fingerprint === undefined || (typeof context.write_fingerprint === 'string' && context.write_fingerprint.length > 0)) &&
       (!context.eligible || (isGroupMetricExerciseWire(value.exercise) && !value.former && !event.voided &&
         value.exercise.archived_at_ms === null && !value.exercise.rebuilding && value.exercise.rules_revision === event.rules_revision)) &&
       (context.certification === null || (isGroupMetricCertificationWire(context.certification) &&
@@ -164,7 +171,7 @@ const isRecordContext = (value: unknown, event: Record<string, unknown>): boolea
 type WireRecord = Record<string, unknown>;
 
 const hasStreamEnvelope = (value: unknown): value is WireRecord =>
-  isMetricRecord(value) && typeof value.key === 'string' && integer(value.sort_at_ms);
+  isMetricRecord(value) && !hasPrivateCalculationField(value) && typeof value.key === 'string' && integer(value.sort_at_ms);
 const hasGroupRef = (value: WireRecord) =>
   isMetricRecord(value.group) && typeof value.group.group_id === 'string' && typeof value.group.name === 'string';
 const hasGroupExerciseRef = (value: WireRecord) =>

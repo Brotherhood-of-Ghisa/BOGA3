@@ -22,7 +22,10 @@ export type GroupMetricSourceSet = Omit<GroupPerformanceSnapshotWire, 'reps'> & 
    * Unlinked sources remain in the graph for record/certification validation. */
   counting: boolean;
   set_created_at_ms: number;
-  // A pin is computed from only the dependencies of its metric. Weight excludes
+  /** SQL-only witness pins. Never copied to scores or public snapshots. */
+  observed_set_pin?: string;
+  reading_pin?: string | null;
+  // A scoring fingerprint includes the dependencies of its metric. Weight excludes
   // bodyweight context; 1RM includes it only when the group policy uses it.
   fingerprints: Partial<Record<GroupMetric, string>>;
 };

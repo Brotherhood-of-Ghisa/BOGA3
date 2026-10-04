@@ -8,7 +8,7 @@ const set: GroupMetricSourceSet = {
   source_load_input_mode: 'total_load', body_weight_kg: 60, body_weight_source: 'reading',
   body_weight_measurement_id: 'r', body_weight_measured_at_ms: 1000,
   achieved_at_ms: 1000, exercise_order_index: 0, set_order_index: 0,
-  set_created_at_ms: 2000, fingerprints: { weight: 'weight-pin', e1rm: 'rm-pin' },
+  set_created_at_ms: 2000, observed_set_pin: 'private-witness-pin', reading_pin: 'private-reading-pin', fingerprints: { weight: 'weight-pin', e1rm: 'rm-pin' },
 };
 const graph: GroupMetricEvaluationGraph = {
   group_id: 'group', group_exercise_id: 'comparison', name: 'Pull-up', source_token: 'source-hash',
@@ -28,6 +28,7 @@ it('carries revision, raw performance and Weight/1RM dependency pins', () => {
     expect.objectContaining({ metric: 'e1rm', unit: 'kg', fingerprint: 'rm-pin', counting: true }),
   ]);
   expect(result.scores[0].performance).not.toHaveProperty('body_weight_kg');
+  expect(JSON.stringify(result)).not.toMatch(/private-witness-pin|private-reading-pin|observed_set_pin|reading_pin/);
 });
 
 it('retains a valid unlinked observation without allowing it into the live board', () => {

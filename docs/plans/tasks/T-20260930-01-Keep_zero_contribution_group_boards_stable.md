@@ -1,12 +1,12 @@
 # T-20260930-01 — Keep zero-contribution group boards stable
 
 - Status: `planned`
-- Depends on: [M27-T13](M27-T13-Preserve_certifications_across_rule_changes.md)
+- Depends on: M27-T13 (completed)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Areas: backend; UI impact: yes (existing leaderboard states)
 - Issue: [#411 — Group bodyweight toggle resets zero-contribution leaderboards](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/411)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
-- Related task: [M27-T13 — Preserve certifications across rule changes](M27-T13-Preserve_certifications_across_rule_changes.md), implementing [#419](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/419).
+- Related task: M27-T13 — Preserve certifications across rule changes (completed), implementing [#419](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/419).
 
 ## Objective
 

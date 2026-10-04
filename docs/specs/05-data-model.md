@@ -427,7 +427,13 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 - **Group calculation model:** `groups` stores
   `bodyweight_calculations_enabled` and `group_exercises` stores
   `bodyweight_contribution`. Rules/revision, evaluation queue, scores, board
-  state and certifications retain the server-only group posture. Sync impact
+  state and certifications retain the server-only group posture. Metric
+  certifications separate immutable observed audit from internal observed-set,
+  reading and current-score pins. Optional legacy witness references preserve
+  the original public ID across per-metric projections; rules rescore without
+  ending witnesses, while actual set edits retain invalidation. Events retain
+  private rule-rescore baselines so later evaluation preserves historic public
+  scores without treating a rule change as a delayed performance correction. Sync impact
   decision: `out of sync scope`; these are multi-reader, server-authoritative
   rows and never become owner-LWW entities. The evaluator may read an applicable
   owner-private measurement internally, but no group table or public payload

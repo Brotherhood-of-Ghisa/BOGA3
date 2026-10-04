@@ -10,6 +10,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { Alert, type AlertButton } from 'react-native';
 
 import { GroupMetricRecordSheet } from '@/components/groups/group-metric-record-sheet';
+import { GroupMetricStreamRecordSheet } from '@/components/groups/group-metric-stream-record-sheet';
 import { GroupApiError } from '@/src/groups/api';
 import type { GroupMetricBoardRowWire, GroupMetricCertificationWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
 
@@ -156,12 +157,30 @@ const confirmAlert = async (buttonText: string) => {
 };
 
 describe('what the sheet shows', () => {
+  it('keeps the historic stream score visible while certifying with its current rule token', async () => {
+    mockCertify.mockResolvedValue({ contract_version: 3, certification: certification({ value: 46.6 }) });
+    render(<GroupMetricStreamRecordSheet record={{
+      kind: 'record', metric_event: true, key: 'event', event_id: 'event', sequence: 1,
+      sort_at_ms: SEP_10, group: { group_id: 'group', name: 'Lifters' }, group_exercise: EXERCISE,
+      group_exercise_id: 'pull', rules_revision: 2, member: ROW.member, session_id: 'session', set_id: 'set',
+      provisional: false, voided: false, performance: PERFORMANCE,
+      boards: [{ metric: 'e1rm', value: 23.3, unit: 'kg', previous_value: null, group_record: true, fingerprint: 'historic-pin' }],
+      record_context: { exercise: EXERCISE, former: false, metrics: [{
+        metric: 'e1rm', fingerprint: 'historic-pin', write_fingerprint: 'current-pin', eligible: true, certification: null,
+      }] },
+    }} userId={ME} myRole="member" onClose={onClose} onChanged={onChanged} />);
+    expect(text('23.3 kg')).toBeTruthy();
+    await act(async () => fireEvent.press(screen.getByTestId('group-metric-record-certify')));
+    expect(mockCertify).toHaveBeenCalledWith(expect.objectContaining({ expectedFingerprint: 'current-pin', setId: 'set' }));
+    expect(text('23.3 kg')).toBeTruthy();
+  });
   it('shows the score, who and when, the raw set, the rules and the strength note for 1RM', () => {
     renderSheet();
     expect(text('23.3 kg')).toBeTruthy();
     expect(text('Dave · 10 Sep')).toBeTruthy();
     expect(screen.getByTestId('group-metric-record-raw')).toHaveTextContent('As logged: Weight 20.0 kg × 5');
     expect(text('Rules 2 · total Weight')).toBeTruthy();
+    expect(text('Certification attests this logged performance. Rule changes preserve it; corrections can invalidate it.')).toBeTruthy();
     expect(text('Strength values are estimates. Scores use the group’s rules, independently of personal exercise settings.')).toBeTruthy();
     expect(status()).toHaveTextContent('Uncertified');
     expect(screen.queryByTestId('group-metric-record-metric-e1rm')).toBeNull();
@@ -177,7 +196,7 @@ describe('what the sheet shows', () => {
     mockRead.mockReturnValue(new Promise(() => {}));
     renderSheet({ row: certifiedRow() });
     expect(status()).toHaveTextContent('Certified');
-    expect(mockRead).toHaveBeenCalledWith('group', 'cert-1');
+    expect(mockRead).toHaveBeenCalledWith('group', 'cert-1', 'e1rm');
   });
 
   it.each<[string, GroupMetricCertificationWire, string]>([
@@ -252,7 +271,7 @@ describe('certifying', () => {
     });
     expect(screen.getByTestId('group-metric-record-notice')).toHaveTextContent('Performance certified.');
     expect(onChanged).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(mockRead).toHaveBeenCalledWith('group', 'cert-1'));
+    await waitFor(() => expect(mockRead).toHaveBeenCalledWith('group', 'cert-1', 'e1rm'));
     expect(status()).toHaveTextContent('Certified by me · 11 Sep');
     expect(screen.queryByTestId('group-metric-record-certify')).toBeNull();
   });

@@ -640,10 +640,11 @@ export const certifyGroupMetric = async (input: GroupMetricView & {
     p_expected_revision: input.expectedRevision, p_expected_fingerprint: input.expectedFingerprint }),
   value => isMetricCertificationResult(value) && isGroupMetricCertificationWire(value.certification) &&
     value.certification.metric === input.metric && value.certification.performance.set_id === input.setId);
-export const getGroupMetricCertification = async (groupId: string, certificationId: string): Promise<GroupMetricCertificationResultWire> =>
+export const getGroupMetricCertification = async (groupId: string, certificationId: string, metric?: GroupMetric): Promise<GroupMetricCertificationResultWire> =>
   expectShape('group_metric_certification_get', await callGroupRpc('group_metric_certification_get', {
-    p_group_id: groupId, p_certification_id: certificationId }), value => isMetricCertificationResult(value) &&
-    isGroupMetricCertificationWire(value.certification) && value.certification.certification_id === certificationId);
+    p_group_id: groupId, p_certification_id: certificationId, ...(metric ? { p_metric: metric } : {}) }), value => isMetricCertificationResult(value) &&
+    isGroupMetricCertificationWire(value.certification) && value.certification.certification_id === certificationId &&
+    (metric === undefined || value.certification.metric === metric));
 export const endGroupMetricCertification = async (
   groupId: string, certificationId: string, action: 'withdraw' | 'cancel',
 ): Promise<GroupMetricCertificationResultWire> => expectShape('group_metric_certification_end',

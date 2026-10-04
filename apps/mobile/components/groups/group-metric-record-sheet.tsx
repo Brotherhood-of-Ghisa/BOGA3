@@ -47,7 +47,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</Text>
       <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules(exercise)}</Text>
-      <Text allowFontScaling={false} style={textStyles.muted}>Certification pins this performance and its applicable group rules. Corrections can invalidate it.</Text>
+      <Text allowFontScaling={false} style={textStyles.muted}>Certification attests this logged performance. Rule changes preserve it; corrections can invalidate it.</Text>
       <Text allowFontScaling={false} style={textStyles.muted}>{row.metric === 'e1rm' ? 'Strength values are estimates. ' : ''}Scores use the group’s rules, independently of personal exercise settings.</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-status">{model.statusText}</Text>
       <MutedLine text={model.observedRulesNote} />

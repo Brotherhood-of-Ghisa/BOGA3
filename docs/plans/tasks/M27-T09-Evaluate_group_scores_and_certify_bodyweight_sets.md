@@ -1,7 +1,7 @@
 # M27-T09 — Evaluate private percentage group scores
 
 - Status: `planned` (re-scoped 2026-10-04)
-- Depends on: [M27-T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [M27-T13](M27-T13-Preserve_certifications_across_rule_changes.md), [existing #411 task](T-20260930-01-Keep_zero_contribution_group_boards_stable.md)
+- Depends on: [M27-T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), M27-T13 (completed), [existing #411 task](T-20260930-01-Keep_zero_contribution_group_boards_stable.md)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: cross-stack; UI impact: yes (server-projected scores and omissions)

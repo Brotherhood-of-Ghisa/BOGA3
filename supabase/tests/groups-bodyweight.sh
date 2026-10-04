@@ -224,6 +224,122 @@ check 'missing reading omits only 1RM' '[.entries[]|select(.member.user_id==$r)]
 
 WEIGHT_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-athlete" weight)"
 E1RM_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-athlete" e1rm)"
+# A rules-only change projects the SAME witnessed observation at a new score.
+# Exact audit equality catches accidental replacement or silent audit rewriting.
+cert_audit() {
+  run_psql "select (to_jsonb(c)-'observed_set_pin'-'reading_pin'-'current_fingerprint')::text
+    from app_public.group_metric_certifications c where id='$1';"
+}
+drain 'publish original Certified entries'
+OBSERVED_REVISION="$(run_psql "select rules_revision from app_public.group_exercises where id='${GX}';")"
+WEIGHT_AUDIT="$(cert_audit "${WEIGHT_CERT}")"
+E1RM_AUDIT="$(cert_audit "${E1RM_CERT}")"
+assert_retained() {
+  [[ "$(cert_audit "${WEIGHT_CERT}")" == "${WEIGHT_AUDIT}" ]] || fail "$1: Weight audit changed"
+  [[ "$(cert_audit "${E1RM_CERT}")" == "${E1RM_AUDIT}" ]] || fail "$1: 1RM audit changed"
+  for metric in weight e1rm; do
+    metric_board "${metric}" true
+    check "$1: same set remains Certified at its CURRENT score" '
+      [.entries[]|select(.member.user_id==$u and .set_id==$s and .certification_id==$id
+        and .value==$value)]|length==1' --arg u "${ATHLETE_UID}" --arg s "${T}-athlete-set" \
+      --arg id "$(if [[ "${metric}" == weight ]]; then echo "${WEIGHT_CERT}"; else echo "${E1RM_CERT}"; fi)" \
+      --argjson value "$(run_psql "select value from app_public.group_metric_set_scores
+        where group_exercise_id='${GX}' and member_user_id='${ATHLETE_UID}' and set_id='${T}-athlete-set'
+          and metric='${metric}' and rules_revision=(select rules_revision from app_public.group_exercises where id='${GX}');")"
+  done
+}
+update_comparison() {
+  local revision
+  revision="$(run_psql "select rules_revision from app_public.group_exercises where id='${GX}';")"
+  rpc "${OWNER_TOKEN}" group_exercise_update_v2 "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+    --argjson r "${revision}" --argjson c "$1" --arg mode "$2" '
+    {p_group_id:$g,p_exercise_id:$x,p_expected_revision:$r,p_name:"Pull-up",
+      p_load_input_mode:$mode,p_bodyweight_contribution:$c,p_default_metric:"e1rm"}')"
+  expect_ok 'update comparison rules'
+}
+for enabled in false true false true; do
+  set_group_policy "${enabled}"; drain 'repeat policy rule change'
+  assert_retained "policy ${enabled}"
+done
+for contribution in 0 0.5 1; do
+  update_comparison "${contribution}" total_load; drain 'contribution rule change'
+  assert_retained "contribution ${contribution}"
+done
+for mode in per_side_load total_load; do
+  update_comparison 1 "${mode}"; drain 'target distribution rule change'
+  assert_retained "target ${mode}"
+done
+SOURCE_EVENT_COUNT="$(run_psql "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');")"
+for mode in per_side_load total_load; do
+  next_cuam
+  push "${ATHLETE_TOKEN}" 'source distribution rule change' \
+    "$(e_def "${DA}" 'Pull-up' "${CUAM}" "${mode}" | jq '.fields.bodyweight_contribution=0.25')"
+  drain 'source distribution rule change'; assert_retained "source ${mode}"
+  expect_sql 'source rules are not a newly performed record or correction' \
+    "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${SOURCE_EVENT_COUNT}"
+done
+expect_sql 'record baseline reconstruction matches current ordinary and private-dependent scoring pins' \
+  "with g as (select app_public.group_metric_eval_source_graph('${GID}','${GX}') graph)
+   select bool_and(app_public.group_metric_graph_fingerprint(r,graph->'rules',m,r->>'source_load_input_mode')=r->'fingerprints'->>m)
+   from g cross join lateral jsonb_array_elements(graph->'sets') r
+   cross join lateral unnest(array['weight','e1rm']) m where (r->>'live')::boolean;" t
+# Retry with today's revision/fingerprint returns the original certificate.
+[[ "$(certify_metric "${ATHLETE_UID}" "${T}-athlete" e1rm)" == "${E1RM_CERT}" ]] || fail 'rules rescore must not recertify'
+assert_retained 'idempotent witness retry'
+for scope in false true; do
+  rpc "${OWNER_TOKEN}" group_metric_board "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+    --argjson r "${OBSERVED_REVISION}" --argjson c "${scope}" '
+    {p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:$c,p_revision:$r}')"
+  expect_ok 'historical board after rescoring'
+  check 'historical All and Certified keep original score and witness' '
+    [.entries[]|select(.member.user_id==$u and .certification_id==$id and .value==$value)]|length==1' \
+    --arg u "${ATHLETE_UID}" --arg id "${E1RM_CERT}" --argjson value "${ON_E1RM}"
+done
+# A later/no-op reading leaves the same as-of dependency and both audits intact.
+next_cuam
+push "${ATHLETE_TOKEN}" 'irrelevant future reading' "$(e_reading "${T}-later" "$((START+60000))" 85)"
+drain 'later reading'; assert_retained 'irrelevant reading'
+set_body_weight "${ATHLETE_TOKEN}" "${T}-athlete" 80
+drain 'no-op reading'; assert_retained 'unchanged reading'
+pass 'rule changes retain exact witness audits and recalculate Certified entries'
+# Exercise the ACTUAL forward data migration on populated active rows after
+# rules have moved. A pending reading correction must not be blessed at cutover.
+MIGRATION_SQL="$(sed -n '/^-- Establish/,/^-- One legacy witness/p' "${SUPABASE_DIR}"/migrations/*_group_certification_observations.sql)"
+expect_sql 'active legacy pins migrate under observed rules, with their audit intact' "begin;
+  update app_public.group_metric_certifications set observed_set_pin=null,reading_pin=null,current_fingerprint=null
+    where id in ('${WEIGHT_CERT}','${E1RM_CERT}');
+  ${MIGRATION_SQL}
+  select observed_set_pin is not null and reading_pin<>'pending-correction'
+    and current_fingerprint=pinned_fingerprint from app_public.group_metric_certifications where id='${E1RM_CERT}';
+  rollback;" t
+expect_sql 'migration preserves a pending relevant reading correction for invalidation' "begin;
+  set local request.jwt.claims='{\"sub\":\"${ATHLETE_UID}\",\"role\":\"authenticated\"}';
+  update app_public.body_weight_measurements set weight_kg=81
+    where owner_user_id='${ATHLETE_UID}' and id='${T}-athlete-reading';
+  update app_public.group_metric_certifications set observed_set_pin=null,reading_pin=null,current_fingerprint=null
+    where id='${E1RM_CERT}';
+  ${MIGRATION_SQL}
+  select reading_pin='pending-correction' from app_public.group_metric_certifications where id='${E1RM_CERT}';
+  rollback;" t
+assert_retained 'forward migration audit preservation'
+
+
+# A certificate with no reading dependency can become temporarily ineligible
+# because of a RULE change; returning to ordinary rules restores its entry.
+set_group_policy false; drain 'ordinary rival certification'
+RIVAL_CERT="$(certify_metric "${RIVAL_UID}" "${T}-rival" e1rm)"
+RIVAL_AUDIT="$(cert_audit "${RIVAL_CERT}")"
+set_group_policy true; drain 'ineligible rival under bodyweight rules'
+[[ "$(cert_audit "${RIVAL_CERT}")" == "${RIVAL_AUDIT}" ]] || fail 'ineligible observation lost its certification'
+metric_board e1rm true
+check 'missing reading omits Certified entry without ending its witness' '[.entries[]|select(.member.user_id==$u)]|length==0' --arg u "${RIVAL_UID}"
+update_comparison 0 total_load; drain 'rival eligible again through rules'
+metric_board e1rm true
+check 'eligible again uses the same witness' '[.entries[]|select(.member.user_id==$u and .certification_id==$id)]|length==1' \
+  --arg u "${RIVAL_UID}" --arg id "${RIVAL_CERT}"
+update_comparison 1 total_load; drain 'restore bodyweight contribution'
+assert_retained 'after temporary ineligibility'
+
 set_body_weight "${ATHLETE_TOKEN}" "${T}-athlete" 90
 drain 'reading correction'
 expect_sql 'Weight certification ignores private reading changes' \
@@ -366,6 +482,171 @@ while IFS=$'\t' read -r source target factor; do
 done < <(jq -r '.cases[] | [.source, .target, .factor] | @tsv' "${LOAD_FACTOR_VECTORS}")
 [[ ${LOAD_FACTOR_COUNT} -eq 4 ]] || fail "expected 4 load-factor vectors, ran ${LOAD_FACTOR_COUNT}"
 pass 'D6 load factor matches the shared TS vectors'
+
+# Old clients certified one raw witness covering both ordinary kg metrics.
+# Rule activation retains that PUBLIC ID and original audit for both projections.
+rpc "${OWNER_TOKEN}" group_exercise_create "$(jq -nc --arg g "${GID}" '
+  {p_group_id:$g,p_name:"Legacy witnessed lift",p_load_input_mode:"total_load",p_source_exercise_id:null}')"
+expect_ok 'legacy exercise'; GX="$(jq -er '.exercise.group_exercise_id' <<<"${BODY}")"
+LEGACY_DEF="${T}-legacy-def"
+next_cuam
+push "${ATHLETE_TOKEN}" 'legacy link' "$(e_def "${LEGACY_DEF}" 'Legacy lift' "${CUAM}" total_load)" \
+  "$(e_link "${LEGACY_DEF}" "${GID}" "${GX}" "${CUAM}")"
+performance "${ATHLETE_TOKEN}" "${T}-legacy" "${LEGACY_DEF}" 80 35 5
+drain 'legacy board'
+rpc "${OWNER_TOKEN}" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" --arg s "${T}-legacy-set" '
+  {p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s}')"
+expect_ok 'legacy certify'; LEGACY_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
+LEGACY_AUDIT="$(run_psql "select to_jsonb(c)::text from app_public.group_certifications c where id='${LEGACY_CERT}';")"
+drain 'legacy Certified board'
+# A distribution edit activates the current engine, independent of the switch.
+update_comparison 0 per_side_load; drain 'legacy witness activated'
+for metric in weight e1rm; do
+  metric_board "${metric}" true
+  check 'legacy witness ID remains public on both metrics' '[.entries[]|select(.certification_id==$id)]|length==1' --arg id "${LEGACY_CERT}"
+  rpc "${OWNER_TOKEN}" group_metric_certification_get "$(jq -nc --arg g "${GID}" --arg id "${LEGACY_CERT}" --arg m "${metric}" '
+    {p_group_id:$g,p_certification_id:$id,p_metric:$m}')"
+  expect_ok 'read legacy witness projection'; assert_wire certification
+  check 'legacy witness preserves metric context and identity' '.certification.metric==$m and .certification.certification_id==$id' \
+    --arg m "${metric}" --arg id "${LEGACY_CERT}"
+done
+[[ "$(run_psql "select to_jsonb(c)::text from app_public.group_certifications c where id='${LEGACY_CERT}';")" == "${LEGACY_AUDIT}" ]] || fail 'legacy rule migration rewrote its audit'
+set_group_policy true; drain 'legacy dependency activation'
+update_comparison 1 per_side_load; drain 'legacy bodyweight dependency'
+set_body_weight "${ATHLETE_TOKEN}" "${T}-legacy" 90; drain 'legacy 1RM reading correction'
+expect_sql 'legacy reading correction ends only 1RM projection' \
+  "select end_reason from app_public.group_metric_certifications where legacy_certification_id='${LEGACY_CERT}' and metric='e1rm';" voided
+expect_sql 'legacy raw witness remains active after reading correction' \
+  "select ended_at is null from app_public.group_certifications where id='${LEGACY_CERT}';" t
+rpc "${OWNER_TOKEN}" group_metric_certification_end "$(jq -nc --arg g "${GID}" --arg id "${LEGACY_CERT}" '
+  {p_group_id:$g,p_certification_id:$id,p_action:"withdraw"}')"
+expect_ok 'withdraw original legacy witness'
+check 'withdrawal returns the remaining active Weight projection' '.certification.metric=="weight" and .certification.end_reason=="withdrawn"'
+expect_sql 'original witness and both projections end together' \
+  "select count(*) from app_public.group_metric_certifications where legacy_certification_id='${LEGACY_CERT}' and ended_at is not null;" 2
+expect_sql 'original legacy end state is preserved' \
+  "select end_reason from app_public.group_certifications where id='${LEGACY_CERT}';" withdrawn
+drain 'legacy withdrawal publication'
+rpc "${OWNER_TOKEN}" group_metric_history "$(jq -nc --arg g "${GID}" --arg x "${GX}" '
+  {p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:true}')"
+expect_ok 'legacy history'
+check 'legacy history exposes original witness IDs, including end events' '
+  [.events[]|.certification_id?|select(.!=null)]|length>0 and all(.==$id)' --arg id "${LEGACY_CERT}"
+pass 'legacy activation preserves public witness IDs/audits and end routing'
+
+# An equal numeric score cannot conceal a changed logged observation.
+NEW_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-legacy" e1rm)"
+drain 'new metric witness'
+next_cuam
+push "${ATHLETE_TOKEN}" 'equal-value raw edit' "$(e_set "${T}-legacy-set" "${T}-legacy-se" 0 35.0 5 '' "${CUAM}")"
+drain 'equal-value raw edit'
+expect_sql 'raw spelling edit voids the observed set despite equal score' \
+  "select end_reason from app_public.group_metric_certifications where id='${NEW_CERT}';" voided
+NEW_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-legacy" e1rm)"
+next_cuam
+push "${ATHLETE_TOKEN}" 'observed set tombstone' "$(e_set "${T}-legacy-set" "${T}-legacy-se" 0 35.0 5 '' "${CUAM}" "${CUAM}")"
+drain 'observed set deleted'
+expect_sql 'set tombstone voids its witness' \
+  "select end_reason from app_public.group_metric_certifications where id='${NEW_CERT}';" voided
+next_cuam
+push "${ATHLETE_TOKEN}" 'observed set restored' "$(e_set "${T}-legacy-set" "${T}-legacy-se" 0 35.0 5 '' "${CUAM}")"
+drain 'observed set restored'
+expect_sql 'restoration never revives ended witnesses' \
+  "select count(*) from app_public.group_metric_certifications where group_exercise_id='${GX}' and ended_at is null;" 0
+pass 'metric observation edits/deletes remain terminal across restoration'
+
+# A tombstone waiting for evaluation at retirement must end the original
+# witness now; a later undelete and rule edit cannot import it again.
+rpc "${OWNER_TOKEN}" group_exercise_create "$(jq -nc --arg g "${GID}" '
+  {p_group_id:$g,p_name:"Pending deletion",p_load_input_mode:"total_load",p_source_exercise_id:null}')"
+expect_ok 'pending-deletion legacy exercise'; GX="$(jq -er '.exercise.group_exercise_id' <<<"${BODY}")"
+next_cuam
+push "${ATHLETE_TOKEN}" 'pending-deletion link' "$(e_link "${LEGACY_DEF}" "${GID}" "${GX}" "${CUAM}")"
+performance "${ATHLETE_TOKEN}" "${T}-pending" "${LEGACY_DEF}" null 40 5
+drain 'pending-deletion legacy board'
+rpc "${OWNER_TOKEN}" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" --arg s "${T}-pending-set" '
+  {p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s}')"
+expect_ok 'pending-deletion legacy certify'; STALE_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
+next_cuam
+push "${ATHLETE_TOKEN}" 'tombstone before retirement' "$(e_set "${T}-pending-set" "${T}-pending-se" 0 40 5 '' "${CUAM}" "${CUAM}")"
+update_comparison 0 per_side_load
+expect_sql 'retirement ends stale original before the evaluator runs' \
+  "select end_reason from app_public.group_certifications where id='${STALE_CERT}';" voided
+drain 'retired tombstoned observation'
+next_cuam
+push "${ATHLETE_TOKEN}" 'restore after retirement' "$(e_set "${T}-pending-set" "${T}-pending-se" 0 40 5 '' "${CUAM}")"
+update_comparison 0 total_load; drain 'later rule after restore'
+expect_sql 'ended legacy observation is never imported after restoration' \
+  "select count(*) from app_public.group_metric_certifications where legacy_certification_id='${STALE_CERT}';" 0
+pass 'legacy retirement cannot strand or resurrect stale witnesses'
+
+# A silent source-mode rescore also preserves the original record's witness
+# annotation, even though that historic event keeps its original score pin.
+GX="$(create_comparison "${OWNER_TOKEN}" "${GID}" 0)"
+next_cuam
+push "${ATHLETE_TOKEN}" 'stream witness link' "$(e_link "${LEGACY_DEF}" "${GID}" "${GX}" "${CUAM}")"
+performance "${ATHLETE_TOKEN}" "${T}-stream" "${LEGACY_DEF}" null 50 5
+drain 'new witnessed stream record'
+STREAM_AUDIT="$(run_psql "select payload::text from app_public.group_events where group_exercise_id='${GX}' and kind='record' and set_id='${T}-stream-set';")"
+STREAM_EVENT_COUNT="$(run_psql "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');")"
+STREAM_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-stream" e1rm)"
+# Leave certification queued so the same publication handles both changes.
+next_cuam
+push "${ATHLETE_TOKEN}" 'stream source-mode edit' "$(e_def "${LEGACY_DEF}" 'Legacy lift' "${CUAM}" per_side_load)"
+drain 'stream source-rule rescore'
+expect_sql 'coalesced certification and source rules emit no performed record or correction' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${STREAM_EVENT_COUNT}"
+expect_sql 'coalesced source rules still publish the certification lead change' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind='lead_change' and certified and reason='certification' and payload->>'certification_id'='${STREAM_CERT}';" 1
+rpc "${OWNER_TOKEN}" group_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'stream after source-mode rescore'; assert_wire stream
+check 'old record context keeps its unchanged performance witness' '
+  [.items[]|select(.kind=="record" and .set_id==$s)|.record_context.metrics[]|
+    select(.metric=="e1rm" and .certification.certification_id==$id)]|length==1' \
+  --arg s "${T}-stream-set" --arg id "${STREAM_CERT}"
+expect_sql 'source rescore keeps original record audit and a private current baseline' \
+  "select payload::text='${STREAM_AUDIT}' and rule_rescore_baseline->'e1rm'->>'fingerprint' is not null from app_public.group_events where group_exercise_id='${GX}' and kind='record' and set_id='${T}-stream-set';" t
+rpc "${OWNER_TOKEN}" group_metric_certification_end "$(jq -nc --arg g "${GID}" --arg id "${STREAM_CERT}" '
+  {p_group_id:$g,p_certification_id:$id,p_action:"withdraw"}')"
+expect_ok 'withdraw after source rules'; drain 'certification-only publication after source rules'
+expect_sql 'later certification job cannot defer a false record correction' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${STREAM_EVENT_COUNT}"
+expect_sql 'later publication preserves original public record audit' \
+  "select payload::text from app_public.group_events where group_exercise_id='${GX}' and kind='record' and set_id='${T}-stream-set';" "${STREAM_AUDIT}"
+next_cuam
+push "${ATHLETE_TOKEN}" 'equal numeric spelling after source rescore' "$(e_set "${T}-stream-set" "${T}-stream-se" 0 50.0 5 '' "${CUAM}")"
+drain 'equivalent raw correction after source rules'
+expect_sql 'equivalent numeric correction still preserves the standing record' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind in ('record','record_voided');" "${STREAM_EVENT_COUNT}"
+performance "${ATHLETE_TOKEN}" "${T}-stream-newer" "${LEGACY_DEF}" null 60 5
+drain 'newer stronger record'
+metric_board e1rm
+check 'historic record is no longer the All-board best' '.entries[]|select(.member.user_id==$u)|.set_id==$s' \
+  --arg u "${ATHLETE_UID}" --arg s "${T}-stream-newer-set"
+rpc "${OWNER_TOKEN}" group_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'historic context below newer best'; assert_wire stream
+STREAM_PIN="$(jq -er --arg s "${T}-stream-set" '.items[]|select(.kind=="record" and .set_id==$s)|.record_context.metrics[]|select(.metric=="e1rm")|.write_fingerprint' <<<"${BODY}")"
+STREAM_REVISION="$(jq -er --arg s "${T}-stream-set" '.items[]|select(.kind=="record" and .set_id==$s)|.rules_revision' <<<"${BODY}")"
+rpc "${OWNER_TOKEN}" group_metric_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${ATHLETE_UID}" \
+  --arg s "${T}-stream-set" --arg f "${STREAM_PIN}" --argjson r "${STREAM_REVISION}" '
+  {p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:"e1rm",p_expected_revision:$r,p_expected_fingerprint:$f}')"
+expect_ok 'certify historic record with current context token'; assert_wire certification
+STREAM_CERT_2="$(jq -er '.certification.certification_id' <<<"${BODY}")"
+drain 'new witness of historic equivalent corrected raw facts'
+rpc "${OWNER_TOKEN}" group_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'stream after equivalent correction'; assert_wire stream
+check 'private baseline permits current witness context without rewriting historic score' '
+  [.items[]|select(.kind=="record" and .set_id==$s)|.record_context.metrics[]|
+    select(.metric=="e1rm" and .eligible and .certification.certification_id==$id)]|length==1' \
+  --arg s "${T}-stream-set" --arg id "${STREAM_CERT_2}"
+next_cuam
+push "${ATHLETE_TOKEN}" 'real performance correction after source rescore' "$(e_set "${T}-stream-set" "${T}-stream-se" 0 45 5 '' "${CUAM}")"
+drain 'real correction after source rules'
+expect_sql 'real performance correction still voids its historic record' \
+  "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind='record_voided';" 1
+expect_sql 'real performance correction still voids the new witness' \
+  "select end_reason from app_public.group_metric_certifications where id='${STREAM_CERT_2}';" voided
+pass 'source-rule rescore preserves records and witnesses across later certification/performance jobs'
 
 COMPLETED=1
 pass 'optional bodyweight backend vectors passed'
