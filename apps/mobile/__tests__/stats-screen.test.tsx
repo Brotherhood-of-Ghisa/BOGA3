@@ -1005,7 +1005,11 @@ describe('StatsScreenShell — view mode toggle', () => {
 
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
     expect(sortedExerciseIds()).toEqual(['beta', 'gamma', 'alpha']);
+    const exerciseHeader = screen.getByTestId('stats-exercise-sort-exercise');
+    expect(exerciseHeader.props.accessibilityState).toEqual({ selected: true });
+    expect(within(exerciseHeader).getByText('Exercise')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).toHaveTextContent('Recent');
+    expect(screen.getByTestId('stats-exercise-sort-exercise-indicator')).not.toHaveStyle({ opacity: 0 });
     expect(sortArrow('exercise')).toBe('down');
     fireEvent.press(screen.getByTestId('stats-exercise-sort-exercise'));
     expect(sortedExerciseIds()).toEqual(['alpha', 'gamma', 'beta']);

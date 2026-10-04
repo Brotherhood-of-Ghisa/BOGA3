@@ -1245,6 +1245,9 @@ const styles = StyleSheet.create({
   nameColumn: {
     flex: 1,
     minWidth: 0,
+    // Let Recent wrap below the label when both cannot fit beside Sets.
+    flexWrap: 'wrap',
+    alignContent: 'center',
   },
   setsColumn: {
     width: 60,
