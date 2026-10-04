@@ -12,7 +12,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
-import { Alert, StyleSheet, type AlertButton } from 'react-native';
+import { Alert, Keyboard, StyleSheet, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -201,6 +201,8 @@ describe('ExercisePageScreen', () => {
 
   it('keeps both swipe symbols inside the exposed edge of the opaque logger', async () => {
     await openPage();
+    // A typed entry makes the drop available, so both sides are offered.
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
 
     const row = screen.getByTestId('exercise-set-swipe-3');
     const [confirm, discard] = within(row).UNSAFE_getAllByType(Icon);
@@ -216,6 +218,28 @@ describe('ExercisePageScreen', () => {
     }
     expect(confirm.props.name).toBe('check');
     expect(discard.props.name).toBe('x');
+  });
+
+  it('offers each swipe side, and its accessibility action, only when it would change the row', async () => {
+    await openPage();
+    // The underlay symbols are the shell's non-interactive icons, not the logger's.
+    const swipeSymbols = () =>
+      within(screen.getByTestId('exercise-set-swipe-3'))
+        .UNSAFE_queryAllByType(Icon)
+        .filter((icon) => icon.parent?.props.pointerEvents === 'none')
+        .map((icon) => icon.props.name);
+    const actions = () =>
+      (screen.getByTestId('exercise-set-logger-header').props.accessibilityActions as { name: string }[])
+        .map((action) => action.name);
+
+    // Untouched planned set: its plan confirms, but there is nothing to drop.
+    expect(swipeSymbols()).toEqual(['check']);
+    expect(actions()).toEqual(['confirm']);
+
+    // Invalid reps: droppable, not confirmable.
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '0');
+    await waitFor(() => expect(swipeSymbols()).toEqual(['x']));
+    expect(actions()).toEqual(['discard']);
   });
 
   it('confirms the in-progress set from the swipe action, advancing like the tick', async () => {
@@ -267,8 +291,9 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-swipe-6')).toBeTruthy();
   });
 
-  it('drops the in-progress entry from the swipe action and navigates nowhere', async () => {
+  it('drops a planned set back to its plan, dismissing the keyboard and navigating nowhere', async () => {
     await openPage();
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
 
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
     fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
@@ -278,57 +303,55 @@ describe('ExercisePageScreen', () => {
     // The typed entry is gone from the draft; the logger reads the set's plan
     // again, the shell stays on the same set, and nothing navigated — dropping
     // never goes to the previous set or screen.
+    expect(dismiss).toHaveBeenCalled();
     await waitFor(async () => expect((await benchSets())[2]?.weightValue).toBe(''));
     await waitFor(() =>
       expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('82.5')
     );
+    expect(await benchSets()).toHaveLength(5);
     expect(screen.getByTestId('exercise-set-swipe-3')).toBeTruthy();
     expect(mockRouter.back).not.toHaveBeenCalled();
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 
-  it('binds swipe and accessibility actions to the row being targeted when cursor and open rows differ', async () => {
+  it('drops an ad-hoc set by removing it, the logger falling back to the cursor', async () => {
     await openPage();
 
-    // Set 3 is cursor (unperformed); tapping Add set opens Set 6 in the logger.
+    // Add set opens Set 6, ad hoc, with the copied values.
     fireEvent.press(screen.getByTestId('exercise-add-set'));
-    await waitFor(() => expect(screen.getByTestId('exercise-set-logger-header')).toBeTruthy());
+    await waitFor(async () => expect(await benchSets()).toHaveLength(6));
     expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 6')).toBeTruthy();
 
-    // Type into Set 6's logger.
-    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '95');
-
-    // Both Set 3 (cursor) and Set 6 (open) have swipe shells.
-    expect(screen.getByTestId('exercise-set-swipe-3')).toBeTruthy();
-    expect(screen.getByTestId('exercise-set-swipe-6')).toBeTruthy();
-
-    // Discarding on Set 3's collapsed row drops Set 3, leaving Set 6's entry intact in the logger.
-    fireEvent(screen.getByTestId('exercise-set-3-open'), 'accessibilityAction', {
+    fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'discard' },
     });
-    expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('95');
 
-    // Confirming Set 3 commits Set 3, leaving Set 6 open in the logger without prematurely adding Set 7.
-    fireEvent(screen.getByTestId('exercise-set-3-open'), 'accessibilityAction', {
-      nativeEvent: { actionName: 'confirm' },
-    });
-    await waitFor(async () =>
-      expect((await benchSets())[2]).toMatchObject({ performanceStatus: null })
+    await waitFor(async () => expect(await benchSets()).toHaveLength(5));
+    expect(screen.queryByTestId('exercise-set-6')).toBeNull();
+    expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 3')).toBeTruthy();
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('carries the swipes on the open row only, not on the cursor row as well', async () => {
+    await openPage();
+
+    // Set 3 is the cursor; tapping Set 4's body opens it in the logger.
+    fireEvent.press(screen.getByTestId('exercise-set-4-open'));
+    await waitFor(() =>
+      expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 4')).toBeTruthy()
     );
-    expect(await benchSets()).toHaveLength(6);
-    expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 6')).toBeTruthy();
-    expect(screen.getByTestId('exercise-set-logger-weight').props.value).toBe('95');
+    expect(screen.getByTestId('exercise-set-swipe-4')).toBeTruthy();
+    expect(screen.queryByTestId('exercise-set-swipe-3')).toBeNull();
+    // The collapsed cursor row offers no swipe equivalents either.
+    expect(screen.getByTestId('exercise-set-3-open').props.accessibilityActions).toBeUndefined();
 
-    // Now confirming Set 6 (the last set) commits Set 6 and adds Set 7.
+    // Confirming the open row commits Set 4, leaving Set 3 as it was.
     fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'confirm' },
     });
-    await waitFor(async () => expect(await benchSets()).toHaveLength(7));
-    expect((await benchSets())[5]).toMatchObject({
-      weightValue: '95',
-      performanceStatus: null,
-    });
-    expect(within(screen.getByTestId('exercise-set-logger-header')).getByText('Set 7')).toBeTruthy();
+    await waitFor(async () => expect((await benchSets())[3]?.performanceStatus).toBeNull());
+    expect((await benchSets())[2]?.performanceStatus).toBe('planned');
+    expect(await benchSets()).toHaveLength(5);
   });
 
   it('measures a completed session being edited against the sessions before it only', async () => {

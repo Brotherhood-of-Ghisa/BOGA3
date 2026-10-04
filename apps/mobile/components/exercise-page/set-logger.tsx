@@ -35,9 +35,10 @@ type SetLoggerProps = {
   onCommit: () => void;
   // The swipe-right equivalent, as the logger's `confirm` accessibility
   // action (`ux-rules.md` §14a.3): the tick confirms without the swipe's
-  // last-set add-set continuation.
-  onConfirm: () => void;
+  // last-set add-set continuation. Absent when the values are not a valid set.
+  onConfirm?: () => void;
   // The swipe-left equivalent, as the logger's `discard` accessibility action.
+  // Absent when dropping would change nothing.
   onDrop?: () => void;
 };
 
@@ -46,6 +47,12 @@ const isWeightInput = (text: string) => /^\d*\.?\d*$/.test(text) && text.replace
 const REPS_PATTERN = /^\d{0,2}$/;
 
 const DASH = '—';
+
+const actionsHint = (canConfirm: boolean, canDrop: boolean): string | undefined => {
+  if (canConfirm && canDrop) return 'Confirm or drop the set from the actions menu';
+  if (canConfirm) return 'Confirm the set from the actions menu';
+  return canDrop ? 'Drop the set from the actions menu' : undefined;
+};
 
 /**
  * The open set, expanded in place into the logger (`ux-rules` §14a.3):
@@ -66,14 +73,14 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
     <View style={styles.logger} testID="exercise-set-logger">
       <View
         accessibilityActions={[
-          { name: 'confirm', label: `Confirm set ${number}` },
-          ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}'s entry` }] : []),
+          ...(onConfirm ? [{ name: 'confirm', label: `Confirm set ${number}` }] : []),
+          ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}` }] : []),
         ]}
-        accessibilityHint="Confirm or drop the set from the actions menu"
+        accessibilityHint={actionsHint(onConfirm !== undefined, onDrop !== undefined)}
         accessibilityLabel={`Set ${number}, in progress`}
         accessible
         onAccessibilityAction={(event) => {
-          if (event.nativeEvent.actionName === 'confirm') onConfirm();
+          if (event.nativeEvent.actionName === 'confirm') onConfirm?.();
           if (event.nativeEvent.actionName === 'discard') onDrop?.();
         }}
         style={styles.header}

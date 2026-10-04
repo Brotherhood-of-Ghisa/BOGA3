@@ -31,10 +31,12 @@ import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
   addSet,
   buildSetRows,
+  canConfirmSet,
+  canDropSet,
   sessionRecordBlocks,
   commitSet,
   describeCompleteExercisePlan,
-  discardSetEntry,
+  dropSet,
   findCursorIndex,
   loggerValuesFor,
   planCompleteExercise,
@@ -228,9 +230,18 @@ export function ExercisePageScreen({
     requestAnimationFrame(() => weightInputRef.current?.focus());
   };
 
-  /** Swipe left: drop the in-progress entry; the row keeps its place (`discardSetEntry`). */
+  /**
+   * Swipe left on the open set (`ux-rules.md` §14a.3): drop it (`dropSet`) —
+   * an ad-hoc row is removed and the logger falls back to the cursor; a
+   * touched planned row reads as its plan again and stays open. Never
+   * navigates.
+   */
   const onSwipeLeft = (setId: string) => {
-    updateSets((current) => discardSetEntry(current, setId), 'structural');
+    Keyboard.dismiss();
+    const next = dropSet(sets, setId);
+    if (next === sets) return;
+    updateSets(() => next, 'structural');
+    if (!next.some((set) => set.id === setId)) setOpenSetId(null);
   };
 
   const finishComplete = async (nextSets: typeof sets) => {
@@ -333,43 +344,33 @@ export function ExercisePageScreen({
             {rows.map((row, index) => {
               const isOpen = row.id === openSet?.id;
               const followsLogger = index > 0 && rows[index - 1]?.id === openSet?.id;
-              if (isOpen || row.isCursor) {
-                // The in-progress row carries the swipes; the accessibility
+              if (isOpen && loggerValues) {
+                // Only the open row carries the swipes, and each side only
+                // when its move would change the row; the accessibility
                 // actions are the non-gesture path for the same two moves.
-                const rowContent = isOpen && loggerValues ? (
-                  <SetLogger
-                    loadContext={loadContext}
-                    number={row.number}
-                    onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
-                    onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
-                    onCommit={onCommit}
-                    onConfirm={() => onSwipeRight(row.id)}
-                    onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType, trainingPreferences.displayEfforts))}
-                    onDrop={() => onSwipeLeft(row.id)}
-                    onOpenEffort={() => setOpenSheet('effort')}
-                    ref={weightInputRef}
-                    repsValue={loggerValues.repsValue}
-                    setType={loggerValues.setType}
-                    weightValue={loggerValues.weightValue}
-                  />
-                ) : (
-                  <SetRow
-                    divider={index > 0 && !followsLogger}
-                    key={row.id}
-                    onConfirm={() => onSwipeRight(row.id)}
-                    onDrop={() => onSwipeLeft(row.id)}
-                    onOpen={setOpenSetId}
-                    onToggle={onToggle}
-                    row={row}
-                  />
-                );
+                const onConfirm = canConfirmSet(sets, row.id) ? () => onSwipeRight(row.id) : undefined;
+                const onDrop = canDropSet(sets, row.id) ? () => onSwipeLeft(row.id) : undefined;
                 return (
                   <SwipeSetRow
                     key={row.id}
-                    onSwipeLeft={() => onSwipeLeft(row.id)}
-                    onSwipeRight={() => onSwipeRight(row.id)}
+                    onSwipeLeft={onDrop}
+                    onSwipeRight={onConfirm}
                     testID={`exercise-set-swipe-${row.number}`}>
-                    {rowContent}
+                    <SetLogger
+                      loadContext={loadContext}
+                      number={row.number}
+                      onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
+                      onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
+                      onCommit={onCommit}
+                      onConfirm={onConfirm}
+                      onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType, trainingPreferences.displayEfforts))}
+                      onDrop={onDrop}
+                      onOpenEffort={() => setOpenSheet('effort')}
+                      ref={weightInputRef}
+                      repsValue={loggerValues.repsValue}
+                      setType={loggerValues.setType}
+                      weightValue={loggerValues.weightValue}
+                    />
                   </SwipeSetRow>
                 );
               }

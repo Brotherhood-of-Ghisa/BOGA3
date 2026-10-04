@@ -819,14 +819,20 @@ unchanged. What differs is presentation:
    (the autosave text debounce); the tick — the screen's one `accent` primary,
    disabled until the values are a valid set — performs it and moves the logger
    on. Tapping effort cycles the Display choices in fixed order: Warm-up → Unspecified → RIR-4–0 → Technique → Cooldown; long press opens the same choices in a scrolling sheet. Settings offers three independent columns: Display, Working set (personal counts, sessions and strength records), and Volume (personal volume totals and records). All labels default displayed; only Unspecified/RIR default included in both calculations. There is no Add control. At least one Display choice is required; calculation columns may be empty. Display changes preserve recorded and prescribed effort and its figures; explicitly cycling a hidden label starts at the first displayed choice. Calculation edits recalculate personal history without rewriting workouts. Groups retain the shared default rule and show no effort settings. Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
-   The in-progress row also answers swipes (2026-10-01): right confirms it
-   exactly like the tick and moves on — confirming the last set then adds one,
-   the fresh row open in the logger with the copied values; left drops the
-   entry, the typed weight and reps clearing while the row keeps its place and
-   the cursor stays (a planned row reads as its plan again, effort included; an
-   ad-hoc row keeps its effort). Swipes never navigate — they cannot go to the
-   previous set or screen — and the row's accessibility actions
-   (`Confirm set` / `Drop set`) are the non-gesture path for the same two moves.
+   The open row — the logger, and only it — also answers swipes (2026-10-01;
+   revised 2026-10-04): right confirms it exactly like the tick and moves on —
+   confirming the last set then adds one, the fresh row open in the logger with
+   the copied values; left drops it. Dropping an ad-hoc row removes it and the
+   logger falls back to the cursor; dropping a planned row the lifter has
+   touched clears the typed weight and reps and its effort, so it reads as its
+   plan again, and it stays open (a plan is never deleted by a swipe). Each
+   side is offered only when its move would change the row: an untouched
+   planned row cannot be swiped left, a row whose values are not a valid set
+   cannot be swiped right, and a side not offered neither drags nor shows its
+   symbol. Both swipes dismiss the keyboard. Swipes never navigate — they
+   cannot go to the previous set or screen — and the logger's accessibility
+   actions (`Confirm set` / `Drop set`), offered under the same conditions, are
+   the non-gesture path for the same two moves.
 4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
    volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
    like any set. Every figure in a row shares the row's colour and weight —
