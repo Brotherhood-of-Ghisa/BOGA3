@@ -452,17 +452,6 @@ export function StatsScreenShell({
             testIDPrefix="stats-period-chip"
           />
         </View>
-        <Text allowFontScaling={false} style={styles.microLabel} testID="stats-so-far">So far</Text>
-        <View style={styles.controlGroup} testID="stats-breakdown-controls">
-          <Text allowFontScaling={false} style={styles.microLabel}>Breakdown</Text>
-          <SegmentedControl
-            accessibilityLabel="Select stats breakdown"
-            options={VIEW_MODE_OPTIONS}
-            value={viewMode}
-            onChange={onSelectViewMode}
-            testIDPrefix="stats-view-mode-chip"
-          />
-        </View>
 
         {summary ? (
           <View style={styles.summaryGrid}>
@@ -493,6 +482,17 @@ export function StatsScreenShell({
             </Card>
           </View>
         ) : null}
+
+        <View style={styles.controlGroup} testID="stats-breakdown-controls">
+          <Text allowFontScaling={false} style={styles.microLabel}>Breakdown</Text>
+          <SegmentedControl
+            accessibilityLabel="Select stats breakdown"
+            options={VIEW_MODE_OPTIONS}
+            value={viewMode}
+            onChange={onSelectViewMode}
+            testIDPrefix="stats-view-mode-chip"
+          />
+        </View>
 
         <SearchField
           accessibilityLabel={viewMode === 'exercise' ? 'Exercise filter input' : 'Muscle filter input'}

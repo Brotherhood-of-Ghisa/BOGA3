@@ -839,6 +839,22 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveTextContent('By Muscle');
   });
 
+  it('orders Time range, the summary cards, then Breakdown above the filter, with no bare range label', () => {
+    renderStatsScreenShell({ viewMode: 'exercise' });
+
+    const tree = JSON.stringify(screen.toJSON());
+    const order = [
+      'stats-time-range-controls',
+      'stats-card-sessions',
+      'stats-card-sets',
+      'stats-breakdown-controls',
+      'stats-search-input',
+    ].map((testID) => tree.indexOf(`"testID":"${testID}"`));
+    expect(order.every((index) => index >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(screen.queryByText(/so far/i)).toBeNull();
+  });
+
   it('exposes exactly one selected breakdown option and invokes each explicit choice once', () => {
     const onSelectViewMode = jest.fn();
     const view = render(

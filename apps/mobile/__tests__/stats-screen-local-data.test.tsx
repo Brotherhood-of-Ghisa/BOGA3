@@ -215,7 +215,6 @@ describe('Stats over real data', () => {
     mockSearchParams = {};
     await renderSeededStats();
     expect(screen.getByTestId('stats-period-chip-28')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId('stats-so-far')).toHaveTextContent('So far');
     act(() => updatePreferences({ targetWindowWeeks: 1 }));
     expect(screen.queryByTestId('stats-period-chip-28')).toBeNull();
     expect(screen.getByTestId('stats-period-chip-7')).toHaveProp('accessibilityState', { selected: true });

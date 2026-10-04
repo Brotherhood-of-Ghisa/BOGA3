@@ -28,10 +28,10 @@ rule that comes with it: text on a `viz` ground is `ink`.
 
 ## Brief
 
-- One `ScreenScroll` on `paper`: `Time range` and `Breakdown` micro-labels
-  (rendered uppercase), each over a `SegmentedControl` (T08-D1); then two
-  summary `Card`s with stacked `Stat`s, Sessions a link `Card` with a
-  `chevron-right`; then a `SearchField`.
+- One `ScreenScroll` on `paper`: the `Time range` micro-label (rendered
+  uppercase) over a `SegmentedControl` (T08-D1); then two summary `Card`s with
+  stacked `Stat`s, Sessions a link `Card` with a `chevron-right`; then the
+  `Breakdown` micro-label over its `SegmentedControl`; then a `SearchField`.
 - Deltas are Plex Mono `ink-muted` with their sign; `new` is `ink` (G3,
   T08-D4). Figures take the one display format (`tech/training-metrics-contract.md`
   §4) in Plex Mono, never `2.5k` (T08-D2).
@@ -95,8 +95,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
 One shared weekly working-set target grades each muscle against quota × selected weeks. Group
 colour averages the individually capped attainment of all constituent muscles,
 including untrained ones. The configured N-week window and This week start at
-local Monday and run through now; the default is the configured window, labelled
-“So far”, with no quota proration. A one-week configuration has one range choice.
+local Monday and run through now; the default is the configured window, with
+no quota proration and no separate “So far” label. A one-week configuration has one range choice.
 History uses the saved look-back in both views. Muscle Sets cells compare daily
 or weekly counts against that same weekly target; other metric scaling stays unchanged.
 Legends and accessibility labels explain target colouring.
