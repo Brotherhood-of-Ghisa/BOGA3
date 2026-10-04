@@ -77,12 +77,12 @@ describe('working-set rule', () => {
 describe('fixed selectable efforts', () => {
   it('offers the nine fixed choices, while retaining canonical historical RIR labels', () => {
     const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
-    const cycle = ['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_1', 'rir_0', 'cooldown', 'technique'];
+    const cycle = ['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_1', 'rir_0', 'technique', 'cooldown'];
     expect(types.SESSION_SET_TYPE_CYCLE).toEqual(cycle);
     const visited = [types.SESSION_SET_TYPE_CYCLE[0]];
     for (let i = 1; i < cycle.length; i += 1) visited.push(types.nextSessionSetType(visited[i - 1]));
     expect(visited).toEqual(cycle);
-    expect(types.nextSessionSetType('technique')).toBe('warm_up');
+    expect(types.nextSessionSetType('cooldown')).toBe('warm_up');
     expect(types.normalizeSessionSetType('rir_12')).toBe('rir_12');
     expect(types.formatSessionSetType('rir_12')).toBe('RIR 12');
     expect(types.SESSION_SET_TYPES).not.toContain('rir_12');

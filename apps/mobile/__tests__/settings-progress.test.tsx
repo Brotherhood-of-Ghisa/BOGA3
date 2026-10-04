@@ -88,6 +88,10 @@ it('offers nine fixed labels and independent Display, Working set and Volume con
   expect(screen.queryByTestId('settings-add-rir-input')).toBeNull();
   expect(screen.queryByText('Add')).toBeNull();
   expect(screen.getAllByRole('checkbox')).toHaveLength(27);
+  expect(screen.getAllByRole('checkbox').slice(-6).map(checkbox => checkbox.props.accessibilityLabel)).toEqual([
+    'Technique, Display', 'Technique, Working set', 'Technique, Volume',
+    'Cooldown, Display', 'Cooldown, Working set', 'Cooldown, Volume',
+  ]);
   expect(screen.getByLabelText('Technique, Display')).toHaveProp('accessibilityState', { checked: true });
   expect(screen.getByLabelText('Technique, Working set')).toHaveProp('accessibilityState', { checked: false });
   fireEvent.press(screen.getByLabelText('RIR-2, Display'));

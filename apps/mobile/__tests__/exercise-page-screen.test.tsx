@@ -470,7 +470,7 @@ describe('ExercisePageScreen', () => {
 
   it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
     await openPage();
-    for (const label of ['RIR 0', 'Cooldown', 'Technique', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
+    for (const label of ['RIR 0', 'Technique', 'Cooldown', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
       fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
       expect(screen.getByLabelText(`Change effort, currently ${label}`)).toBeTruthy();
     }

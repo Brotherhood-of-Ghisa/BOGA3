@@ -35,10 +35,10 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
   target to every muscle group, “Progress period (weeks)” and “History look-back
   (weeks)” fields, the sole Daily/Weekly selector labelled “Heatmap view”, and
   the operator's fixed effort table (2026-10-04): Warm-up, Unspecified, RIR-4–0,
-  Cooldown and Technique, with Display, Working set and Volume columns. No Add
+  Technique and Cooldown, with Display, Working set and Volume columns. No Add
   control. Every checkbox has a 44pt target and a label naming its row and column.
   All Display defaults are on; the two calculation columns default on for
-  Unspecified/RIR and off for Warm-up/Cooldown/Technique. Keep at least one
+  Unspecified/RIR and off for Warm-up/Technique/Cooldown. Keep at least one
   Display choice; calculation columns may be empty. The columns are independent
   and account-local on this device. Groups keep their shared rule and show no
   effort settings. This operator brief supersedes the earlier visibility-only

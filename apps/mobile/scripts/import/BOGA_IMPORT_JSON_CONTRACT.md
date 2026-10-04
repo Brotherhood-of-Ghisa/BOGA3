@@ -120,7 +120,7 @@ Sets use BOGA-ready string values:
 - `repsValue`: source reps as a string.
 - `weightValue`: kg numeric text with the unit stripped. GymBook sets with no
   source weight, including bodyweight/reps-only sets, are imported as `0`.
-- `setType`: `null`, `warm_up`, `cooldown`, `technique`, or canonical `rir_<n>` for a non-negative safe
+- `setType`: `null`, `warm_up`, `technique`, `cooldown`, or canonical `rir_<n>` for a non-negative safe
   integer (for example `rir_0`, `rir_4`). Stored/imported RIRs remain valid even
   outside the fixed RIR-4–0 picker. Imported
   packages may leave this as `null`, or may classify historical effort when the

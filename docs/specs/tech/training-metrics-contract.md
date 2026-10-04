@@ -36,9 +36,9 @@ except `warm_up` contributes to every aggregate.
   The input fields' validation, the performed check and every calculation all
   call this parser, so a value is valid everywhere or nowhere.
 - **Personal effort policy**: Settings has fixed Warm-up, Unspecified, RIR-4
-  through RIR-0, Cooldown and Technique rows, with independent Display,
+  through RIR-0, Technique and Cooldown rows, with independent Display,
   Working set and Volume columns. All labels default displayed. Unspecified/RIR
-  rows default on for both calculation columns; Warm-up/Cooldown/Technique
+  rows default on for both calculation columns; Warm-up/Technique/Cooldown
   default off. At least one Display choice is required; either calculation
   column may be empty. Hidden labels can contribute, and visible labels can
   be excluded. Historical canonical RIR above four follows the RIR-4 checkboxes; unknown

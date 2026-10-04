@@ -105,12 +105,12 @@ explicitly to the pure kernel. Groups and coaching never read these keys.
 
 Progress defaults are eight W/sets per muscle per week, a four-week Progress
 period, a 52-week history look-back and Weekly heatmaps. The fixed effort rows
-are Warm-up, Unspecified, RIR-4 through RIR-0, Cooldown and Technique. All are
+are Warm-up, Unspecified, RIR-4 through RIR-0, Technique and Cooldown. All are
 shown by default. Unspecified/RIR rows default on for both calculation columns;
-Warm-up/Cooldown/Technique default off. The columns are independent: hidden
+Warm-up/Technique/Cooldown default off. The columns are independent: hidden
 labels may contribute, and visible labels may be excluded. At least one Display
 choice is required; either calculation column may be empty. Legacy visible-RIR
-keys retain their selected fixed grades, with RIR-4/Cooldown/Technique added;
+keys retain their selected fixed grades, with RIR-4/Technique/Cooldown added;
 historical custom RIR values keep their labels and follow RIR-4 for calculations;
 unrecognised stored effort follows Unspecified.
 
@@ -474,7 +474,7 @@ section states only the data-model-level invariants.
    (first sign-in or wiped-client reinstall). It must be coherent across all
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
-5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | cooldown | technique | null`, with canonical non-negative safe-integer RIR values). Actual and prescribed efforts remain nullable text in sync scope; the added labels need no wire or server migration. The fixed picker uses the account-local Display selection, in Warm-up → Unspecified → RIR-4–0 → Cooldown → Technique order. Hidden historical and prescribed labels remain readable. New rows use a visible inherited effort, the next harder visible RIR, or Unspecified/first visible choice; a hidden effort's explicit tap re-enters at the first visible choice. Personal Working set and Volume choices are independent, device-local policies (§ Device-local preferences); groups and coaching keep their shared rule. The owning eligibility contract is `tech/training-metrics-contract.md` §1–§2.
+5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | technique | cooldown | null`, with canonical non-negative safe-integer RIR values). Actual and prescribed efforts remain nullable text in sync scope; the added labels need no wire or server migration. The fixed picker uses the account-local Display selection, in Warm-up → Unspecified → RIR-4–0 → Technique → Cooldown order. Hidden historical and prescribed labels remain readable. New rows use a visible inherited effort, the next harder visible RIR, or Unspecified/first visible choice; a hidden effort's explicit tap re-enters at the first visible choice. Personal Working set and Volume choices are independent, device-local policies (§ Device-local preferences); groups and coaching keep their shared rule. The owning eligibility contract is `tech/training-metrics-contract.md` §1–§2.
 6. Planned workout execution targets and explicit performance state are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the existing push/pull wire envelope. `performance_status` is nullable unconstrained text; new writes use `planned` and `unperformed`, while a valid actual row with `null` is the confirmed/performed representation. The historical `skipped` value remains accepted for backward compatibility but hydrates as an untouched `planned` row and is never written by current session actions. This adds no column, server migration, or wire-envelope field.
    - New empty and copied/defaulted active rows use `unperformed`, even when copied values are already valid. For upgrade compatibility, a pre-existing valid row with legacy `null` remains confirmed; a blank or partial legacy draft row with `null` hydrates as `unperformed` so later entry cannot silently confirm it.
    - Active and completed-edit autosave preserve planned and unperformed rows losslessly. Completed-edit is the session view and exercise page editing a completed session (`/session/<id>`): their autosave writes the session back as `completed` through `persistCompletedSessionSnapshot`, never replaying completion. Legacy skipped rows normalize to planned on hydration. Final active-session submit and completed-edit save (the session view's `Done`) write completed workout history from valid confirmed actual rows only. Entered valid unconfirmed rows require a specific discard confirmation; they are never promoted or discarded implicitly.
