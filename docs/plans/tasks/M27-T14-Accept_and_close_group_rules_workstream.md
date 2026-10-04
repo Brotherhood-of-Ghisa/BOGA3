@@ -1,7 +1,7 @@
 # M27-T14 — Human acceptance and group workstream closeout
 
 - Status: `planned`
-- Depends on: existing #411 task (completed), T13 (completed), [T15](M27-T15-Decide_percentage_reading_correction_policy.md), [T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [T09](M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md), [T10](M27-T10-Expose_group_standards_and_bodyweight_rankings.md)
+- Depends on: existing #411 task (completed), T13 (completed), T15 (completed; milestone D4), [T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [T09](M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md), [T10](M27-T10-Expose_group_standards_and_bodyweight_rankings.md)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: cross-stack; UI impact: yes
@@ -27,8 +27,9 @@ acceptance and captures against T10's accepted target for:
    same certificate witness/time and eligible Certified score; no fake PR.
 4. Missing/ineligible score: no private-reading disclosure, active certificate
    retained after rules-only ineligibility, correct return when eligible.
-5. Set edit/delete, witness withdrawal, owner/admin cancellation and T15's
-   reading-correction decision: exact chosen certificate/board transitions.
+5. Set edit/delete, witness withdrawal, owner/admin cancellation and D4's
+   correction decision: dependent projection ends, raw legacy witness remains,
+   restore does not reopen ended rows, and public copy hides private causes.
 6. Offline, old cache, old client, failed/stale write, archived/former member
    and account-switch paths: safe units/privacy and no misleading success.
 

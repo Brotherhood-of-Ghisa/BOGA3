@@ -29,8 +29,12 @@ The old snapshot/three-board/public-bodyweight implementation is not this task.
    lease locks. Recompute Certified entries without changing original certificate
    IDs/witness/time/audit metadata or ending them solely on rules changes.
    Ineligible scores can leave a board without ending their witness certificate.
-4. Apply T15's explicitly chosen reading-correction outcomes; retain performance
-   edits/deletes, manual withdraw/cancel and archived/former-member boundaries.
+4. Apply milestone D4: changed selected private dependency ends each bound
+   dependent projection; raw Weight legacy witnesses remain active. Retain pins
+   while Off; detect intervening corrections on dependent reactivation. First
+   binding after rules-only missing context preserves the active witness; restore
+   after a terminal correction never reopens it. Retain performance edits/deletes,
+   manual withdraw/cancel and archived/former-member boundaries.
    Later readings irrelevant to a session never change its selected dependency.
    Personal preference/contribution edits never rescore a group performance.
 5. Enforce D5 in actual current and legacy board/podium/record/history/event/
@@ -54,7 +58,12 @@ relative-rank results, ordinary and chosen bodyweight Volume, c=0/positive and
 switch transitions, unweighted sets, distribution
 conversions, no/invalid readings, later/relevant reading edits, rules-only
 changes, edits/deletions, migration, history, archive/rejoin and legacy readers.
-Assert exact active certificate identity/metadata and normalized values.
+Assert exact active certificate identity/metadata and normalized values. D4
+inventories the existing assertions to retain and the new correction matrix to
+prove: value/date/delete/fallback/restore/backdated/tie/equal-score/no-op cases,
+initial binding, coalesced unchanged tuples, inactive pins and cutover corrections.
+Use effective estimated total-load 1RM in the numerator, not the current personal
+displayed added-load 1RM; recalculate numerator and denominator from the same B.
 
 Privacy checks inspect every enabled-group RPC payload and paired responses
 for disallowed absolute/relative values, including full session and aggregate

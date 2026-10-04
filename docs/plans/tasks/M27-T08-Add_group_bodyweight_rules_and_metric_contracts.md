@@ -1,7 +1,7 @@
 # M27-T08 — Define group percentage rules and wire contracts
 
 - Status: `planned` (re-scoped 2026-10-04; old checkpoints are historical)
-- Depends on: [M27-T15](M27-T15-Decide_percentage_reading_correction_policy.md)
+- Depends on: M27-T15 (completed; milestone D4)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: cross-stack; UI impact: yes (public metric semantics; presentation in T10)
@@ -24,7 +24,9 @@ sharing. Never publish the private reading itself in either mode.
 Record the operator's Volume answer from milestone D8 before implementation:
 best single-set volume in both modes is proposed (kg·reps ordinary, %BW·reps
 bodyweight-aware). A session aggregate requires explicit source window and
-Certified-set eligibility. T15 settles private-reading correction behavior.
+Certified-set eligibility. D4 records the delegated correction decision: relevant
+private dependency changes end bound dependent projections; raw Weight legacy
+witnesses stay active. Rules-only missing context preserves an active witness.
 
 ## Deliverables and acceptance
 
@@ -55,8 +57,11 @@ Certified-set eligibility. T15 settles private-reading correction behavior.
    redact disallowed kg fields while On and preserve server audit. Explicitly
    document that previously seen/other-group kg can still support inference.
 7. Keep reading resolution server-only and as-of session start, with no new
-   session snapshots or normal-sync group entities. Document T15's correction
-   policy and the distinction between current score and immutable observed audit.
+   session snapshots or normal-sync group entities. Document D4's selected
+   correction policy, initial binding, retained pins while Off, terminal restore
+   behavior, pending-correction migration and generic public copy. Distinguish
+   current score from immutable observed audit; percentage behavior stays planned
+   until T09 ships it.
 8. Graduate the delivered representation/compatibility contracts into owning
    specs; make activation truthfully planned until the scorer/readers/UI ship.
 
