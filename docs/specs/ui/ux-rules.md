@@ -665,13 +665,14 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 
 1. The `Stats / History` screen separates its dimensions into two labelled
    rows: `Time range` holds the configured `N weeks` / `This week` and `Breakdown`
-   holds `By Exercise` / `By Muscle`. Both are the same joined, equal-width
+   holds `By Exercise` / `By Muscle`. The order is `Time range`, the summary
+   cards it scopes, then `Breakdown` over the filter and the list it switches. Both are the same joined, equal-width
    `SegmentedControl` (a `tablist`), each under its own micro-label; the labels,
    not two different shapes, separate the dimensions (DLM-T08-D1). Every choice
    stays visible, exactly one per row exposes selected state, and the configured
    window / `By Exercise` are the defaults. N=1 shows one range choice. Local
    weeks start Monday; N includes this week and preceding N−1 weeks through
-   now. “So far” labels the range; targets are not prorated. Deltas compare the
+   now; no separate label repeats that, and targets are not prorated. Deltas compare the
    same elapsed calendar span in the preceding N-week window, across DST. The controls, the summary, the filter
    and the list share one scroll.
 2. The summary keeps the actionable `Sessions` card, the counted sessions (`tech/training-metrics-contract.md` §2), and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons. Refocus refreshes silently with the previous summary visible; changing the selected week window hides that summary until the new read succeeds. A failed refresh retains the previous figures beside the read error.
