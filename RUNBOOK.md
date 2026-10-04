@@ -871,8 +871,9 @@ the hosted database for this cutover.
    strict-group calculations and coherent publication. A missing group reading
    omits only dependent scores. Inspect every public group payload/cache/event/
    board/certification response for absence of reading value/date/id/provenance
-   and dependency digest. Reading or contribution changes must invalidate the
-   affected certification without claiming the witness verified bodyweight.
+   and dependency digest. Applicable reading corrections must end the dependent certification; rule-only
+   contribution changes retain the witnessed set and its original audit. Neither
+   behavior claims the witness verified bodyweight.
    Confirm coaching uses the current `metric_revision` (`working_sets_v2`), emits ordinary/no-reading
    output while private mode is off and authorized aware output while on. Re-run
    hosted OAuth/discovery/revocation checks.

@@ -4,6 +4,7 @@
  * The account-wipe integration is covered in account-switch-local-wipe.test.ts.
  */
 
+import { competitionCacheKeys, evictCompetitionCache } from '@/src/groups/cache';
 import { groupCache } from '@/src/data/schema';
 import {
   deleteGroupCacheEntry,
@@ -125,6 +126,20 @@ describe('group cache', () => {
     deleteGroupCacheEntry(db(), groupCacheKeys.group('g1'));
 
     expect(allKeys()).toEqual(['group:v4:g2']);
+  });
+
+  it('competition keys bind sessions to a group and activation evicts every owning-account generation', () => {
+    expect(competitionCacheKeys.session('g1','u2','s1')).toBe('session:v5:g1:u2:s1');
+    expect(competitionCacheKeys.session('g2','u2','s1')).not.toBe(competitionCacheKeys.session('g1','u2','s1'));
+    put(groupCacheKeys.boards('g1'));
+    put(groupCacheKeys.session('u2','s1'));
+    put('stream:g1');
+    put(competitionCacheKeys.stream('g1'));
+    put(groupCacheKeys.stream('g2'),'user-2');
+    expect(readGroupCache(db(),competitionCacheKeys.boards('g1'),'user-1')).toBeNull();
+    evictCompetitionCache(db(),'user-1');
+    expect(allKeys()).toEqual([groupCacheKeys.stream('g2')]);
+    expect(readGroupCache(db(),groupCacheKeys.session('u2','s1'),'user-1')).toBeNull();
   });
 
   it('wipeGroupCache clears every row for every user', () => {

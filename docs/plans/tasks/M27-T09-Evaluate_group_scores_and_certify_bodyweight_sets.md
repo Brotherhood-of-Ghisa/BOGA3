@@ -1,16 +1,17 @@
 # M27-T09 — Evaluate private percentage group scores
 
 - Status: `planned` (re-scoped 2026-10-04)
-- Depends on: [M27-T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), M27-T13 (completed), existing #411 task (completed)
+- Depends on: M27-T08 (completed), M27-T13 (completed), existing #411 task (completed)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: cross-stack; UI impact: yes (server-projected scores and omissions)
 
 ## Objective and scope
 
-Implement T08's accepted percentage representation throughout evaluation,
-publication and every group reader. Preserve T13's witness certificates while
-scores change and enforce milestone D5 privacy before data reaches a client.
+Implement the accepted `docs/specs/tech/group-competition-contract.md`
+representation throughout evaluation, publication and every group reader. Reuse the delivered pure scorer and strict
+board decoder; negotiation currently reports pending, not active. Preserve
+T13's witness certificates while scores change and enforce milestone D5 privacy before data reaches a client.
 The old snapshot/three-board/public-bodyweight implementation is not this task.
 
 ## Deliverables and acceptance
@@ -46,7 +47,12 @@ The old snapshot/three-board/public-bodyweight implementation is not this task.
    caches per T08. Preserve history meaning and source clocks; do not silently
    relabel kg records or rewrite observed certificate values. Old readers must
    fail safely or receive an explicitly supported safe response.
-7. Keep source enqueue/apply failures isolated from personal sync and from
+7. Retain full kernel precision through ranking, materialize server-generated
+   random write tokens rather than private dependency hashes, and apply the
+   owning contract’s single-set Volume/legacy witness alias policy. Block unsafe
+   old RPCs before publishing normalized values; only then may negotiation
+   report active server capability. UI/client activation remains T10/T14 work.
+8. Keep source enqueue/apply failures isolated from personal sync and from
    certification commits. Retain retries, stale-result fences and honest
    rebuilding/archived states. No new private-reading disclosure in logs/events.
 

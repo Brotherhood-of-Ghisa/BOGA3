@@ -203,6 +203,37 @@ set_kick_url ''; set_sweep_active false
 
 rpc "${OWNER_TOKEN}" group_create "$(jq -nc --arg n "Bodyweight ${RUN_TAG}" '{p_name:$n,p_description:null}')"
 expect_ok 'group create'; GID="$(jq -er .group_id <<<"${BODY}")"
+# Additive protocol-4 negotiation stays pending until scorer/readers/UI cut over.
+competition_contract() {
+  local token="$1" protocol="$2" group="${3:-${GID}}" out
+  out="$(mktemp)"
+  STATUS="$(curl --silent --show-error -X POST -H "apikey: ${ANON_KEY}" \
+    -H "Authorization: Bearer ${token}" -H 'Content-Profile: app_public' \
+    -H 'Content-Type: application/json' -H "x-boga-group-contract: ${protocol}" \
+    --data "$(jq -nc --arg g "${group}" '{p_group_id:$g}')" -o "${out}" -w '%{http_code}' \
+    "${API_URL}/rest/v1/rpc/group_competition_contract")"
+  BODY="$(cat "${out}")"; rm -f "${out}"
+}
+competition_contract "${OWNER_TOKEN}" 4; expect_ok 'competition negotiation'
+node --input-type=module -e '
+  import fs from "node:fs";
+  import { pathToFileURL } from "node:url";
+  const {isCompetitionContractWire}=await import(pathToFileURL(process.argv[1]).href);
+  const body=JSON.parse(fs.readFileSync(0,"utf8"));
+  if (!isCompetitionContractWire(body) || body.activation_state!=="pending")
+    throw new Error("Actual negotiation must decode and remain pending");
+' "${SUPABASE_DIR}/../apps/mobile/src/groups/competition-wire-guards.ts" <<<"${BODY}"
+for protocol in '' 3 04 4.0 invalid; do
+  competition_contract "${OWNER_TOKEN}" "${protocol}"; expect_error UPDATE_REQUIRED 'unsupported competition protocol'
+done
+competition_contract "${OUTSIDER_TOKEN}" 4; expect_error NOT_FOUND 'competition outsider'
+OUTSIDER_ERROR="$(jq -er .message <<<"${BODY}")"
+competition_contract "${OWNER_TOKEN}" 4 "$(run_psql "select gen_random_uuid();")"; expect_error NOT_FOUND 'competition nonexistent group'
+[[ "$(jq -er .message <<<"${BODY}")" == "${OUTSIDER_ERROR}" ]] || fail 'competition existence disclosure'
+competition_contract "$(mint_token "${OWNER_TOKEN}" competition-agent)" 4; expect_error AGENT_FORBIDDEN 'competition OAuth denial'
+competition_contract "${ANON_KEY}" 4
+[[ ! "${STATUS}" =~ ^2 ]] || fail 'anonymous competition negotiation allowed'
+pass 'competition negotiation: exact version/units, pending activation, membership/OAuth/anonymous denial'
 rpc "${OWNER_TOKEN}" group_invite_get "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
 expect_ok 'invite'; INVITE="$(jq -er .code <<<"${BODY}")"
 for token in "${ATHLETE_TOKEN}" "${RIVAL_TOKEN}"; do

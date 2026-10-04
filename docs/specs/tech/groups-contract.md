@@ -2638,3 +2638,14 @@ Only the evaluator receives its result. The clean calculation revision is
 rules revision, never the selected reading or its internal digest. The migration
 enqueues all active comparisons and clears disposable caches; archived/former
 member and unarchive/rejoin reconciliation remain unchanged.
+
+## 12. Pending Volume/percentage competition transition
+
+[group-competition-contract.md](group-competition-contract.md) owns the accepted
+protocol-4 representation, delegated single-set Volume/correction decisions,
+private/public split, witness aliases, reader inventory and activation order.
+Its negotiation RPC, pure scorer, allowlist decoder and cache eviction are
+implemented; existing group publication/readers/UI still use §11's protocol-3
+kg Weight/1RM behavior. Schema/public-reader cutover and UI activation are pending.
+Never treat pending negotiation as permission to serve percentages through kg
+fields or disclose private/absolute counterparts from legacy endpoints.

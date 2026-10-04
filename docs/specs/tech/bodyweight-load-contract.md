@@ -186,8 +186,11 @@ covering the set, source and group-target load modes, and applicable group
 preference/contribution/revision. Only an enabled positive contribution adds the
 selected private reading or an explicit `missing` sentinel; off/zero digests do
 not query or include reading facts. The digest never crosses the group boundary.
-A change to any included dependency voids the certification before a
-recalculated result can inherit it. Certification RPCs identify the
+Scoring fingerprints fence stale results, separately from immutable observed-set
+and private-reading pins. Rule-only changes preserve an unchanged performance
+witness; a changed applicable private-reading dependency ends the dependent 1RM
+projection while raw Weight remains active. The groups contract §11.3 owns the
+complete current lifecycle. Certification RPCs identify the
 record/revision and re-read dependencies server-side; the client never supplies
 or receives private reading facts.
 
@@ -226,3 +229,13 @@ Component/native evidence covers the Settings row, repeated toggle persistence,
 kg history, conditional contribution fields, ordinary/bodyweight-aware logging,
 numeric zero, historical refresh and group administration. The UI target
 is [the bodyweight design target](../ui/design-targets/bodyweight.md).
+
+## 10. Pending public competition units
+
+The accepted [competition contract](group-competition-contract.md) adds best
+single-set Volume and effective total-load 1RM percentages for enabled positive
+group contributions. Internal workout/readings/coaching arithmetic stays kg and
+uses the same dated B for numerator and denominator. Its additive negotiation
+reports pending activation; current group publication remains protocol-3 kg.
+The future public-reader cutover suppresses raw/absolute counterparts and keeps
+immutable audit server-side; it changes no personal missing-reading fallback.
