@@ -139,7 +139,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     loading, error and empty states (DLM-T08) and the history sheets' (inline,
     DLM-T09); every group state panel, wrapped by `GroupStateView` and friends
     (DLM-T11)
-  - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body with the page
+  - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body (accepting the native scroll ref for feature focus/scroll restoration) with the page
     gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
     other `ScrollView` props through (refresh, keyboard insets). Used by the
     session view, exercise page, View Session, Gyms and the group session view;
@@ -161,9 +161,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs the retired `SegmentedChips` used. The records panel's `Records` | `Last`,
     Settings' date format (DLM-T04), the exercise list's Favourite/Name A–Z
-    (`exercise-list-sort-*`), Progress's Time range and
-    Breakdown (DLM-T08) and its history sheets' Metric and View
-    (`stats-<kind>-history-metric-chip-*` / `-view-chip-*`, DLM-T09), and
+    (`exercise-list-sort-*`), Progress's period and table Metric, retained browsing Breakdown, and history Metric
+    (`stats-<kind>-history-metric-chip-*`); Settings owns the history View, and
     `ExerciseCoreFields`' weight entry
     (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
     exercise form's pending state), and the Groups tab's `Stream` |

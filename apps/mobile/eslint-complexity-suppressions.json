@@ -9,14 +9,6 @@
       "count": 1
     }
   },
-  "app/(tabs)/stats-history.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    },
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "app/completed-session/[sessionId].tsx": {
     "max-lines-per-function": {
       "count": 1

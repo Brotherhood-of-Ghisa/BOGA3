@@ -1,10 +1,11 @@
 # Accepted replacement target — Progress tables
 
-**Accepted direction; awaiting implementation.** On 2026-10-04 the user chose
-the first chevron proposal and asked to remove unnecessary subtitles. This
-brief records that choice; it makes no claim about the current application.
-Current behavior remains documented in `../screen-map.md`, `../ux-rules.md`
-and `../navigation-contract.md` until the corresponding change ships.
+**Implemented landing direction.** On 2026-10-04 the user chose the first
+chevron proposal and asked to remove unnecessary subtitles. `/progress` now
+owns the table implementation and `/stats-history` re-exports it. The shipping
+PR carries real-data Jest and native capture evidence; final milestone-wide
+acceptance is a separate follow-up. Current rules live in `../ux-rules.md`
+§13, `../screen-map.md` and `../navigation-contract.md`.
 
 ## Target
 
@@ -87,8 +88,12 @@ thousands separators or reduced text size to force a fit. At 320pt and 430pt
 phone widths, rows may grow. If full figures cannot fit beside the name and
 chevron, put the name/actions on the first line and all three aligned numeric
 cells on a full-width second line, with matching shared headers. Never split a
-figure's digits across lines. Coverage copy may occupy a separate line. No
-horizontal table scrolling, clipped controls or content hidden under the tabs.
+figure's digits across lines. If extreme figures/percentages exceed even that
+three-cell budget, labelled Now/Previous/Change lines each use the full row
+width. This additional fallback preserves figures and units; it deliberately
+extends the reference's second-line layout. Coverage copy may occupy a separate
+line. No horizontal table scrolling, clipped controls or content hidden under
+the tabs.
 
 Signed deltas use the existing ink roles, never red/green. Preserve the landed
 muscle target grading and `viz` ramp: a row's working sets are graded against
@@ -125,7 +130,7 @@ family history targets never silently open a multi-muscle heatmap.
 
 ## Target states and acceptance evidence
 
-These are targets awaiting implementation, not runtime screenshots. The selected
+These states are governed by the brief; the selected image is a design reference, not a runtime screenshot. The selected
 image illustrates the contribution state; the remaining states use this brief
 and the retained [history target](progress.md#history-sheets-and-heatmaps-dlm-t09).
 

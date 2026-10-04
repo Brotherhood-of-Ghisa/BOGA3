@@ -666,75 +666,81 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 
 ### 13. Stats exercise/muscle history semantics
 
-1. The `Stats / History` screen separates its dimensions into two labelled
-   rows: `Time range` holds the configured `N weeks` / `This week` and `Breakdown`
-   holds `By Exercise` / `By Muscle`. The order is `Time range`, the summary
-   cards it scopes, then `Breakdown` over the filter and the list it switches. Both are the same joined, equal-width
-   `SegmentedControl` (a `tablist`), each under its own micro-label; the labels,
-   not two different shapes, separate the dimensions (DLM-T08-D1). Every choice
-   stays visible, exactly one per row exposes selected state, and the configured
-   window / `By Exercise` are the defaults. N=1 shows one range choice. Local
-   weeks start Monday; N includes this week and preceding N−1 weeks through
-   now; no separate label repeats that, and targets are not prorated. Deltas compare the
-   same elapsed calendar span in the preceding N-week window, across DST. The controls, the summary, the filter
-   and the list share one scroll.
-2. The summary keeps the actionable `Sessions` card, the counted sessions (`tech/training-metrics-contract.md` §2), and shows a second `Sets` card: the working sets (§5.11). Both use a signed absolute delta; neither count card shows percentage change. Percentages are reserved for Volume comparisons. Refocus refreshes silently with the previous summary visible; changing the selected week window hides that summary until the new read succeeds. A failed refresh retains the previous figures beside the read error.
-3. In per-exercise mode, exercises with at least one working set in the
-   selected calendar-week window render in one compact, viewport-fitting table with
-   shared, single-line `Exercise`, `Sets`, `Vol`, and `1RM` headers. Each data
-   row shows its working sets, effective exercise volume and
-   estimated 1RM (Volume from volume-included sets; 1RM from working sets), and its session count counts the
-   sessions with a working set of it; unavailable 1RM values render as `—`. Exercise names receive
-   the remaining flexible width and wrap to their full value rather than being
-   capped at an assumed line count.
-   A warm-up counts toward no figure in the table (§5.11). Whole data rows remain the only controls that
-   open exercise history; repeated per-row metric labels are omitted visually
-   but all values and their meanings remain in each row's accessibility label.
-4. `Exercise`, `Sets`, and `Vol` are the only exercise-sort controls; `1RM` is
-   a static column header. Initial order is `Sets — high to low`. Repeated
-   presses cycle `Exercise` through most then
-   least recent; `Sets` through high-to-low then low-to-high; and `Vol` through
-   high-to-low then low-to-high. Pressing a different sortable header always
-   starts that header's cycle at its first state. Recency comes from the
-   latest valid performed set in completed, non-deleted all-time history and is
-   independent of the selected calendar-week metric window. Missing recency remains
-   last in either direction; ties use exercise name then stable exercise ID
-   ascending.
-5. There is no separate sort-status label above the table. Each sortable header
-   reserves a fixed inline indicator slot so its label never moves when another
-   header becomes active. Only the active slot is visible, on the same line,
-   with the active label in `ink`: `Recent` plus an arrow for Exercise, or an arrow alone for Sets and Vol.
-   Each sortable header exposes button semantics, a mobile-sized touch target,
-   selected state when active, the complete current sort wording, and the
-   next activation's outcome to assistive
-   technology; the interaction never relies on color or arrow direction alone.
-   Sort choice is volatile but survives time-range, search, and Breakdown
-   changes for the mounted screen, while each new metric result is sorted again
-   synchronously without data queries or mutation.
-6. Tapping an exercise row in per-exercise mode opens the exercise's history
-   sheet (§12): the same `HistorySheet` as muscle history.
-7. The exercise sheet renders heatmaps over the saved look-back
-   window with all four metrics (`Volume` / `Sets` / `1RM` / `Top weight`) and
-   the week banner.
-8. Both controls use the design-language `SegmentedControl` (selected segment
-   solid `ink`); neither is styled locally, and there are no raw colour
-   literals. Summary deltas keep their sign (`+`, `−`, `±0`) in Plex Mono
-   `ink-muted`, with `new` in `ink`; they carry no green or red (G3). The
-   Sessions and Sets cards name what their delta is against: the adjacent
-   window with the same elapsed calendar span (`−3 vs prev 1 wk`, with the full comparison in its accessibility label). Figures take
-   the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`.
-9. Dismissing the exercise sheet returns to the exercise list in per-exercise mode (§12.10).
-10. Exercise analytics uses calculated load × reps of volume-included sets (§5.11) under the current private policy, with invalid/overflow coverage and no muscle-role weighting. A day or week with volume-included sets may have volume cells and zero working-set counts; a day with neither contribution makes no cell. Missing personal reading uses zero. Muscle history applies the shared per-side and role factors afterwards.
-11. In the per-muscle mode every family and visible nested-muscle row shows `Sets`, its working sets, plus `Volume`, the independently included volume. Family set counts union physical source-set identities across contributing primary/secondary muscles, so one set mapped to two muscles in one family counts once. Family volume still sums member-muscle contributions.
-12. Per-muscle previous-period set comparisons use a signed absolute delta (`+4`, `−2`, `±0`) and never percentages. Volume comparisons use percentage only (`+17%`, `−100%`, `±0%`), with `—` for zero-to-zero and `new` for positive volume over a zero baseline. Muscle/family volume remains the shared per-side, role-weighted calculation.
-13. Muscle row colour grades working sets against one saved weekly quota shared by all muscles
-    (default eight) × selected weeks, capped at 100%, using `viz1`–`viz4`.
-    A family averages each constituent muscle’s capped attainment, including
-    muscles with zero sets; displayed count and metric aggregation retain their
-    existing rules. Muscle-history Sets use each day’s or week’s count against
-    the shared weekly quota, independent of look-back length. Legends and
-    accessibility labels explain the
-    colour; Volume and exercise-only metrics retain their observed scaling.
+1. Progress defaults to `Work by muscle`, on one `ScreenScroll` over the fixed
+   tabs. Joined controls offer the configured `N weeks` / `This week` (N=1 has
+   one choice) and `Working sets` / `Volume` (initially Working sets). Use one
+   `vs previous week` / `vs previous N weeks` label; accessible wording states
+   the same elapsed calendar span. Monday-start windows include this week
+   through now and compare the corresponding span in the preceding window,
+   across DST. Targets are not prorated. No Time range/Breakdown subtitles,
+   landing heatmaps, family totals or large summary cards.
+2. Both periods, individual muscle rows and exercise contributions derive from
+   one local graph and durable account-policy snapshot. Refocus refreshes them
+   and an open history sheet. A failed same-context refresh may retain prior
+   table figures beside an inline error and Retry. A changed window, policy or
+   account hides older figures; superseded responses cannot publish. Retry keeps
+   the controls and muscle selection. Account changes reset transient state.
+3. `Muscle | Now | Previous | Change` includes every taxonomy muscle, including
+   zero-current and previous-only rows. Family headings are static, in taxonomy
+   order, with heading semantics. Names are underlined history links; separate
+   sibling chevron buttons select contributions (right unselected, down selected,
+   with an ink left rule). Each target is at least 44pt in both dimensions.
+   Numbers and families have no press action; no row encloses both in a pressable.
+4. Selecting a chevron brings `<muscle> contributions` into view, focusing its
+   heading for a screen reader. Selecting it again keeps the selection. Its
+   `Exercise | Now | Previous | Change` table combines repeated blocks by
+   definition ID and retains contributors from either period. Primary/Secondary
+   captions explain involvement. An exercise name opens whole-exercise history.
+   The inert `Total` reconciles to the muscle for each period; percentages are
+   calculated independently, never added. Opening/dismissing either history
+   preserves the selected muscle, table metric, period and scroll, and returns
+   accessible focus to the launching name. History metric/day/week is separate.
+5. Working set comparisons count physical eligible sets once per muscle at
+   primary/secondary involvement, with signed absolute changes. Volume uses its
+   independent eligibility and existing per-side/bodyweight/role arithmetic;
+   its change is a percentage, `new` over zero, `—` for zero-to-zero, or
+   `Incomplete` for an unknown baseline. Volume headers identify kg·reps;
+   accessible labels identify per-side allocation. Counts overlap across muscles
+   and must never be summed into an overall workout total.
+6. Contribution emptiness follows the selected metric only after a successful
+   read: `No working sets for <muscle> in either period` or `No volume-included
+   sets for <muscle> in either period`. Volume-only and included zero-load sets
+   remain explainable; unavailable Volume retains a known subtotal and coverage,
+   never a fabricated total or percentage. Calculation choices live in Settings;
+   avoid unconditional warm-up-exclusion copy and instructional subtitles.
+7. Full figures use Plex Mono and ink, neutral signed deltas, no `k`, thousands
+   separators, reduced font sizes or split digits. Names wrap. If figures cannot
+   fit beside name/actions, put three aligned numeric cells on a full-width
+   second line with matching headers; if extreme figures exceed that budget too,
+   use labelled full-width Now/Previous/Change lines. Coverage can occupy another line. No
+   horizontal table scroll. Selection differs from target shading: working
+   counts use the saved quota × selected weeks, capped at 100%, in `viz1`–`viz4`.
+   Text on a viz ground is ink; accessible values explain the quota and count.
+8. Quiet `Browse exercises` and `Sessions` rows follow the content. Browse
+   exercises opens the retained table in place; `By Muscle` returns to the
+   landing. Search and sort survive that switch. Sessions opens `/sessions`.
+9. Retained browsing shows exercises with eligible Working set or Volume
+   contributions in the selected window, including Volume-only rows. Its shared
+   `Exercise | Sets | Vol | 1RM` headers retain their existing sort controls:
+   Exercise cycles most/least recent, Sets and Vol high/low, initially Sets
+   high-to-low. Recency uses all-time completed performance; missing dates sort
+   last, ties use name then ID. Active headers reserve an indicator slot;
+   `1RM` is static. Sort and search remain volatile mounted-screen state.
+10. Exercise browsing rows open the shared `HistorySheet`, with the saved
+    look-back and Settings-owned Daily/Weekly choice (§12). The sheet retains
+    four exercise metrics, or only Volume/Sets for exactly one muscle ID;
+    family targets are rejected. No in-sheet view toggle or new route is added.
+11. Both canonical `/progress` and legacy `/stats-history` render one
+    implementation. `period=7` chooses This week; missing/other/invalid values
+    use the configured window. `breakdown=exercise` opens browsing; all other
+    values, including missing, open the muscle table. Initial query choices do
+    not rewrite the URL when controls change.
+12. Muscle history Sets grade day/week counts against the shared weekly quota,
+    independent of look-back length; Volume and exercise metrics retain their
+    observed scaling. Exercise history is whole-exercise Volume, with no
+    muscle-role weighting, under the current private calculation policy.
+13. The accepted landing target is `design-targets/progress-tables.md`; retained
+    history sheets and the exercise-history route use `design-targets/progress.md`.
 
 14. The `/exercise-history` route (opened from the exercise page's `History`)
     is one `ScreenScroll` on `paper` over the `MainTabs` strip (Progress

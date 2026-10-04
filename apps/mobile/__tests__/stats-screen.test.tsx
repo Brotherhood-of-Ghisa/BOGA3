@@ -9,7 +9,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import * as ReactNative from 'react-native';
 import { StyleSheet } from 'react-native';
 
 import {
@@ -27,10 +28,11 @@ import {
   resolveStatsInitialBreakdown,
 } from '../app/(tabs)/stats-history';
 import ProgressRoute from '../app/(tabs)/progress';
-import { uiGeometry, uiRoles } from '@/components/ui';
-import type { SelectedMuscleWeeklyEffort, StatsSummary } from '@/src/data';
+import { ListRow, uiGeometry, uiRoles } from '@/components/ui';
+import { compareProgressVolume } from '@/src/data/progress-comparisons';
+import type { SelectedMuscleWeeklyEffort, StatsSummary, ProgressComparisons } from '@/src/data';
 
-const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
+const buildLegacySummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
   current: {
     period: {
       days: 7,
@@ -172,6 +174,18 @@ const buildSummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
   ...overrides,
 });
 
+const buildSummary = (): ProgressComparisons => {
+  const summary = buildLegacySummary();
+  const previous = new Map(summary.previous.totals.muscleFamilies.flatMap(family => family.muscles).map(row => [row.muscleGroupId, row]));
+  return { ...summary, muscles: summary.current.totals.muscleFamilies.flatMap(family => family.muscles).map(row => {
+    const old = previous.get(row.muscleGroupId);
+    return { muscleGroupId: row.muscleGroupId, displayName: row.displayName, familyName: row.familyName, sortOrder: row.sortOrder,
+      current: { workingSetCount: row.workingSetCount, totalVolume: row.totalVolume, knownVolume: row.totalVolume, volumeSetCount: row.totalVolume ? 1 : 0, knownVolumeSetCount: row.totalVolume ? 1 : 0 },
+      previous: { workingSetCount: old?.workingSetCount ?? 0, totalVolume: old?.totalVolume ?? 0, knownVolume: old?.totalVolume ?? 0, volumeSetCount: old?.totalVolume ? 1 : 0, knownVolumeSetCount: old?.totalVolume ? 1 : 0 },
+      workingSetChange: row.workingSetCount - (old?.workingSetCount ?? 0), volumeChange: compareProgressVolume(row.totalVolume, old?.totalVolume ?? 0), exercises: [] };
+  }) };
+};
+
 const buildShellProps = (
   overrides: Partial<StatsScreenShellProps> = {}
 ): StatsScreenShellProps => ({
@@ -252,15 +266,14 @@ describe('Progress route parity', () => {
 
 describe('formatPeriodComparison', () => {
   it('names the adjacent earlier period of the selected range', () => {
-    expect(formatPeriodComparison(7)).toBe('vs prev 1 wk');
-    expect(formatPeriodComparison(28)).toBe('vs prev 4 wks');
+    expect(formatPeriodComparison(7)).toBe('vs previous week');
+    expect(formatPeriodComparison(28)).toBe('vs previous 4 weeks');
   });
 });
 
-it.each([[7, '1 week'], [28, '4 weeks']])('announces the %i-day comparison with correct week grammar', (periodDays, wording) => {
+it.each([[7, 'week'], [28, '4 weeks']])('announces the %i-day comparison once', (periodDays, wording) => {
   renderStatsScreenShell({ periodDays });
-  expect(within(screen.getByTestId('stats-card-sets')).getByText('+8 vs prev ' + (periodDays === 7 ? '1 wk' : '4 wks')))
-    .toHaveProp('accessibilityLabel', `+8 versus previous ${wording}, same elapsed calendar span`);
+  expect(screen.getByTestId('stats-comparison-label')).toHaveProp('accessibilityLabel', `vs previous ${wording}, same elapsed calendar span`);
 });
 
 describe('formatCountDelta', () => {
@@ -378,172 +391,34 @@ describe('sortExerciseListItems', () => {
 });
 
 describe('StatsScreenShell', () => {
-  it('renders summary cards with absolute count deltas only', () => {
-    renderStatsScreenShell();
-
-    const sessionsCard = screen.getByTestId('stats-card-sessions');
-    expect(sessionsCard).toHaveTextContent(/Sessions/);
-    expect(sessionsCard).toHaveTextContent(/4/);
-    expect(sessionsCard).toHaveTextContent(/\+1/);
-    expect(sessionsCard).not.toHaveTextContent('%');
-
-    const setsCard = screen.getByTestId('stats-card-sets');
-    // One figure: the working sets, with a single absolute delta.
-    expect(setsCard).toHaveTextContent(/^Sets38\+8 vs prev 1 wk$/);
-    expect(setsCard).not.toHaveTextContent('%');
-  });
-
-  it('renders family and muscle rows with set/failure counts and percentage-only volume deltas', () => {
-    renderStatsScreenShell();
-
-    const shouldersSets = screen.getByTestId('stats-family-sets-shoulders');
-    expect(shouldersSets).toHaveTextContent(/^Sets4\+1$/);
-    expect(shouldersSets).not.toHaveTextContent('%');
-
-    const shouldersVolume = screen.getByTestId('stats-family-volume-shoulders');
-    expect(shouldersVolume).toHaveTextContent(/900/);
-    expect(shouldersVolume).toHaveTextContent(/\+50%/);
-    expect(shouldersVolume).not.toHaveTextContent('+300');
-
-    // Nested muscle row also carries its own delta.
-    const frontDeltsSets = screen.getByTestId('stats-muscle-sets-front_delts');
-    expect(frontDeltsSets).toHaveTextContent(/^Sets4\+1$/);
-
-    expect(screen.queryByText('Total weight')).toBeNull();
-    expect(screen.queryByTestId('stats-family-sessions-shoulders')).toBeNull();
-    expect(screen.queryByTestId('stats-muscle-sessions-front_delts')).toBeNull();
-  });
-
-  it('colours each trained family and muscle row with one uniform failure shade', () => {
-    const { rerender } = render(
-      <StatsScreenShell {...buildShellProps({ periodDays: 7, viewMode: 'muscle' })} />
-    );
-
-    // One ramp for families and muscles alike (DLM-T08-D3): the shade is the
-    // row's ground, a band around the pressable row.
-    expect(screen.getByTestId('stats-family-header-shoulders-shade')).toHaveStyle({
-      backgroundColor: uiRoles.viz1,
-    });
-    expect(screen.getByTestId('stats-muscle-row-front_delts-shade')).toHaveStyle({
-      backgroundColor: uiRoles.viz2,
-    });
-    // On a `viz` ground the legends and deltas turn `ink`: `ink-faint` and
-    // `ink-muted` are illegible there.
-    const shadedSets = within(screen.getByTestId('stats-family-sets-shoulders'));
-    expect(StyleSheet.flatten(shadedSets.getByText('Sets').props.style).color).toBe(uiRoles.ink);
-    expect(StyleSheet.flatten(shadedSets.getByText('+1').props.style).color).toBe(uiRoles.ink);
-    expect(
-      screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
-    ).toBeNull();
-
-    rerender(
-      <StatsScreenShell {...buildShellProps({ periodDays: 30, viewMode: 'muscle' })} />
-    );
-    expect(screen.getByTestId('stats-family-header-shoulders-shade')).toHaveStyle({
-      backgroundColor: uiRoles.viz1,
-    });
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          periodDays: 7,
-          viewMode: 'exercise',
-          exerciseListItems: [
-            {
-              id: 'bench',
-              name: 'Bench Press',
-              workingSetCount: 4,
-              totalVolume: 1000,
-              estimatedOneRepMax: 100,
-              lastCompletedAt: null,
-            },
-          ],
-        })}
-      />
-    );
-    expect(
-      screen.queryByTestId(/failure-bar/, { includeHiddenElements: true })
-    ).toBeNull();
-  });
-
-  it('exposes set counts, deltas, and background intensity scale in row accessibility labels', () => {
-    renderStatsScreenShell();
-
-    expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      '4 sets. up 1 sets'
-    );
-    expect(screen.getByTestId('stats-family-header-shoulders').props.accessibilityLabel).toContain(
-      'average attainment of 2 muscle targets over 1 weeks, capped per muscle at 100%'
-    );
-    expect(screen.getByTestId('stats-muscle-row-front_delts').props.accessibilityLabel).toContain(
-      '4 sets. up 1 sets'
-    );
-  });
-
-  it('keeps every family inert and renders its individual muscles, including a matching only muscle', () => {
-    renderStatsScreenShell();
-
-    expect(screen.getByTestId('stats-family-card-chest')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-row-chest')).toBeTruthy();
-    expect(screen.getByTestId('stats-family-header-chest').props.onPress).toBeUndefined();
-    expect(screen.getByTestId('stats-family-name-chest')).toHaveProp('accessibilityRole', 'header');
-
-    // Shoulders has multiple muscles → nested rows still render.
-    expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-row-rear_delts')).toBeTruthy();
-
-    // Untrained family with a single non-matching muscle still expands.
-    expect(screen.getByTestId('stats-family-card-legs')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-row-calves')).toHaveTextContent(/Calves/);
-  });
-
-  it('opens exactly one muscle from each individual row', () => {
+  it('separates names, numbers and selected chevrons, keeping families inert', () => {
     const onPressMuscleHistory = jest.fn();
     renderStatsScreenShell({ onPressMuscleHistory });
-
-    fireEvent.press(screen.getByTestId('stats-muscle-row-front_delts'));
-    expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupIds: ['front_delts'] as [string],
-      displayName: 'Front Delts',
-      familyName: 'Shoulders',
-    });
-
-    fireEvent.press(screen.getByTestId('stats-muscle-row-chest'));
-    expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupIds: ['chest'],
-      displayName: 'Chest',
-      familyName: 'Chest',
-    });
-  });
-
-  it('does not open history from any family header', () => {
-    const onPressMuscleHistory = jest.fn();
-    renderStatsScreenShell({ onPressMuscleHistory });
-
-    fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
+    expect(screen.queryByTestId('stats-contributions')).toBeNull();
+    expect(screen.queryByTestId('stats-card-sets')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-family-header-chest'));
+    fireEvent.press(screen.getByTestId('stats-muscle-row-chest-now'));
     expect(onPressMuscleHistory).not.toHaveBeenCalled();
-    expect(screen.getByTestId('stats-family-header-shoulders').props.onPress).toBeUndefined();
+    fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-contributions-title')).toHaveTextContent('Chest contributions');
+    fireEvent.press(screen.getByTestId('stats-contributions-total'));
+    expect(onPressMuscleHistory).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
+    expect(screen.getByTestId('stats-contributions-title')).toHaveTextContent('Chest contributions');
+    fireEvent.press(screen.getByTestId('stats-muscle-history-chest'));
+    expect(onPressMuscleHistory).toHaveBeenCalledWith({ muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' });
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveStyle({ width: 44, minHeight: 44 });
+    expect(screen.getByTestId('stats-muscle-history-chest')).toHaveStyle({ minWidth: 44, minHeight: 44 });
   });
 
-  it('keeps a filtered family inert while its matching muscle opens individual history', () => {
-    const onPressMuscleHistory = jest.fn();
-    renderStatsScreenShell({
-      searchQuery: 'front',
-      onPressMuscleHistory,
-    });
-
-    expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-row-rear_delts')).toBeNull();
-
-    fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
-    expect(onPressMuscleHistory).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('stats-muscle-row-front_delts'));
-    expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupIds: ['front_delts'] as [string],
-      displayName: 'Front Delts',
-      familyName: 'Shoulders',
-    });
+  it('grades counts against the saved quota and selected weeks in either metric', () => {
+    renderStatsScreenShell();
+    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+20%');
+    expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveStyle({ color: uiRoles.ink });
   });
 
   it('does not render a sheet handed a legacy multi-muscle target', () => {
@@ -825,7 +700,8 @@ describe('Stats route parameters', () => {
   it('validates initial breakdown query values', () => {
     expect(resolveStatsInitialBreakdown('muscle')).toBe('muscle');
     expect(resolveStatsInitialBreakdown(['exercise'])).toBe('exercise');
-    expect(resolveStatsInitialBreakdown('unknown')).toBe('exercise');
+    expect(resolveStatsInitialBreakdown('unknown')).toBe('muscle');
+    expect(resolveStatsInitialBreakdown(undefined)).toBe('muscle');
   });
 });
 
@@ -849,100 +725,13 @@ describe('StatsScreenShell — view mode toggle', () => {
       .getAllByTestId(/^stats-exercise-name-/)
       .map((node) => String(node.props.testID).replace('stats-exercise-name-', ''));
 
-  it('renders separate labelled Time range and Breakdown control rows', () => {
+  it('retains period and explicit browse controls with minimal copy', () => {
     renderStatsScreenShell({ viewMode: 'exercise' });
-
-    expect(screen.getByTestId('stats-time-range-controls')).toHaveTextContent(/Time range/);
-    expect(screen.getByTestId('stats-breakdown-controls')).toHaveTextContent(/Breakdown/);
     expect(screen.getByTestId('stats-period-chip-7')).toHaveTextContent('This week');
-    expect(screen.getByTestId('stats-period-chip-28')).toHaveTextContent('4 weeks');
-    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toHaveTextContent('By Exercise');
     expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveTextContent('By Muscle');
-  });
-
-  it('orders Time range, the summary cards, then Breakdown above the filter, with no bare range label', () => {
-    renderStatsScreenShell({ viewMode: 'exercise' });
-
-    const tree = JSON.stringify(screen.toJSON());
-    const order = [
-      'stats-time-range-controls',
-      'stats-card-sessions',
-      'stats-card-sets',
-      'stats-breakdown-controls',
-      'stats-search-input',
-    ].map((testID) => tree.indexOf(`"testID":"${testID}"`));
-    expect(order.every((index) => index >= 0)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(screen.queryByText(/so far/i)).toBeNull();
-  });
-
-  it('exposes exactly one selected breakdown option and invokes each explicit choice once', () => {
-    const onSelectViewMode = jest.fn();
-    const view = render(
-      <StatsScreenShell
-        {...buildShellProps({ viewMode: 'exercise', onSelectViewMode })}
-      />
-    );
-
-    expect(screen.getByTestId('stats-view-mode-chip-exercise').props.accessibilityState).toEqual({
-      selected: true,
-    });
-    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState).toEqual({
-      selected: false,
-    });
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
-    expect(onSelectViewMode).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    expect(onSelectViewMode).toHaveBeenCalledTimes(1);
-    expect(onSelectViewMode).toHaveBeenLastCalledWith('muscle');
-
-    view.rerender(
-      <StatsScreenShell
-        {...buildShellProps({ viewMode: 'muscle', onSelectViewMode })}
-      />
-    );
-    expect(screen.getByTestId('stats-view-mode-chip-exercise').props.accessibilityState).toEqual({
-      selected: false,
-    });
-    expect(screen.getByTestId('stats-view-mode-chip-muscle').props.accessibilityState).toEqual({
-      selected: true,
-    });
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    expect(onSelectViewMode).toHaveBeenCalledTimes(1);
-    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
-    expect(onSelectViewMode).toHaveBeenCalledTimes(2);
-    expect(onSelectViewMode).toHaveBeenLastCalledWith('exercise');
-  });
-
-  it('makes each control a tab list under its own label (DLM-T08-D1)', () => {
-    renderStatsScreenShell({ viewMode: 'exercise' });
-
-    // Both are the same joined control now; the labels, not two shapes, tell
-    // Time range from Breakdown (`ux-rules.md` §13.1, §13.8).
-    for (const [group, row, label] of [
-      ['stats-time-range-controls', 'stats-period-chip-row', 'Select stats time range'],
-      ['stats-breakdown-controls', 'stats-view-mode-chip-row', 'Select stats breakdown'],
-    ] as const) {
-      const control = within(screen.getByTestId(group)).getByTestId(row);
-      expect(control.props.accessibilityRole).toBe('tablist');
-      expect(control.props.accessibilityLabel).toBe(label);
-    }
-    for (const segment of ['stats-period-chip-7', 'stats-view-mode-chip-exercise']) {
-      expect(screen.getByTestId(segment).props.accessibilityRole).toBe('tab');
-      expect(screen.getByTestId(segment)).toHaveStyle({ flex: 1 });
-    }
-  });
-
-  it('keeps delta signs and drops their green and red (G3, DLM-T08-D4)', () => {
-    renderStatsScreenShell({ viewMode: 'exercise' });
-
-    const sessions = within(screen.getByTestId('stats-card-sessions'));
-    const sets = within(screen.getByTestId('stats-card-sets'));
-    for (const node of [sessions.getByText('+1 vs prev 1 wk'), sets.getByText('+8 vs prev 1 wk')]) {
-      expect(StyleSheet.flatten(node.props.style).color).toBe(uiRoles.inkMuted);
-    }
-    // The Sessions card is a link to the list, marked by a chevron.
-    expect(screen.getByTestId('stats-card-sessions').props.accessibilityRole).toBe('link');
+    expect(screen.queryByText('Time range')).toBeNull();
+    expect(screen.queryByText('Breakdown')).toBeNull();
+    expect(screen.getByTestId('stats-sessions-link')).toBeTruthy();
   });
 
   it('renders one compact four-column header with the default Sets sort clearly active', () => {
@@ -1168,23 +957,13 @@ describe('StatsScreenShell — search & filtering', () => {
     lastCompletedAt: null,
   });
 
-  it('renders search input with dynamic placeholder depending on viewMode', () => {
-    const { rerender } = render(
-      <StatsScreenShell {...buildShellProps({ viewMode: 'exercise' })} />
-    );
-    expect(screen.getByPlaceholderText('Filter by exercise...')).toBeTruthy();
-
-    rerender(<StatsScreenShell {...buildShellProps({ viewMode: 'muscle' })} />);
-    expect(screen.getByPlaceholderText('Filter by muscle...')).toBeTruthy();
-  });
-
   it('calls onSearchQueryChange when typing and shows clear button', () => {
     const onSearchQueryChange = jest.fn();
     const { rerender } = render(
       <StatsScreenShell
         {...buildShellProps({
           searchQuery: '',
-          onSearchQueryChange,
+          viewMode: 'exercise', onSearchQueryChange,
         })}
       />
     );
@@ -1198,8 +977,7 @@ describe('StatsScreenShell — search & filtering', () => {
     rerender(
       <StatsScreenShell
         {...buildShellProps({
-          searchQuery: 'Bench',
-          onSearchQueryChange,
+          viewMode: 'exercise', searchQuery: 'Bench', onSearchQueryChange,
         })}
       />
     );
@@ -1247,45 +1025,6 @@ describe('StatsScreenShell — search & filtering', () => {
     );
   });
 
-  it('filters muscle families and groups based on searchQuery', () => {
-    render(
-      <StatsScreenShell
-        {...buildShellProps({
-          viewMode: 'muscle',
-          searchQuery: 'front',
-          summary: buildSummary(),
-        })}
-      />
-    );
-
-    // Shoulders has "Front Delts" which matches, so Shoulders family should render
-    expect(screen.getByTestId('stats-family-card-shoulders')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
-
-    // Rear Delts doesn't match "front", so it should be hidden
-    expect(screen.queryByTestId('stats-muscle-row-rear_delts')).toBeNull();
-
-    // Chest has "Chest" muscle, which doesn't match "front", so Chest family should be hidden
-    expect(screen.queryByTestId('stats-family-card-chest')).toBeNull();
-  });
-
-  it('shows correct empty state when no muscles match query', () => {
-    render(
-      <StatsScreenShell
-        {...buildShellProps({
-          viewMode: 'muscle',
-          searchQuery: 'biceps',
-          summary: buildSummary(),
-        })}
-      />
-    );
-
-    expect(screen.queryByTestId('stats-family-card-shoulders')).toBeNull();
-    expect(screen.queryByTestId('stats-family-card-chest')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-empty')).toHaveTextContent(
-      'No muscle groups match the search query.'
-    );
-  });
 });
 
 it('keeps partial volume readable and uses ordinary strength copy for bodyweight arithmetic', () => {
@@ -1298,4 +1037,59 @@ it('keeps partial volume readable and uses ordinary strength copy for bodyweight
   expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
     .toBe('Open Pull-up heatmap. 2 sets. Volume 800 · incomplete. Estimated one rep max 127.7 kg');
+});
+
+
+it.each([320, 430])('keeps full figures at %ipt, using another line only when needed', width => {
+  const dimensions = ReactNative.Dimensions.get('window');
+  act(() => ReactNative.Dimensions.set({ window: { width, height: 900, scale: 1, fontScale: 1 } }));
+  const summary = buildSummary();
+  summary.muscles[0].displayName = 'A very long individual muscle name';
+  summary.muscles[0].current.totalVolume = 123456789;
+  summary.muscles[0].previous.totalVolume = 987654321;
+  renderStatsScreenShell({ summary });
+  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: width === 320 ? 'column' : 'row' });
+  expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('123456789');
+  expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveTextContent('987654321');
+  expect(screen.getByTestId('stats-muscle-history-chest')).toHaveStyle({ minWidth: 44, minHeight: 44 });
+  expect(screen.getByTestId('stats-muscle-select-chest')).toHaveStyle({ width: 44, minHeight: 44 });
+  expect(screen.getByText('A very long individual muscle name').props.numberOfLines).toBeUndefined();
+  expect(screen.getByTestId('stats-muscle-row-chest-now').props.numberOfLines).toBe(1);
+  act(() => ReactNative.Dimensions.set({ window: dimensions }));
+});
+
+
+it('keeps a twelve-digit Volume baseline and long percent readable on a small phone', () => {
+  const dimensions = ReactNative.Dimensions.get('window');
+  act(() => ReactNative.Dimensions.set({ window: { width: 320, height: 900, scale: 1, fontScale: 1 } }));
+  const summary = buildSummary();
+  summary.muscles[0].current.totalVolume = 100000000000;
+  summary.muscles[0].previous.totalVolume = 1;
+  renderStatsScreenShell({ summary });
+  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  expect(screen.getByTestId('stats-muscle-row-chest-values')).toHaveStyle({ flexDirection: 'column' });
+  expect(screen.getByTestId('stats-muscle-row-chest-now')).toHaveTextContent('100000000000');
+  expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+9999999999900%');
+  expect(within(screen.getByTestId('stats-muscle-row-chest')).getByText('Change')).toBeTruthy();
+  act(() => ReactNative.Dimensions.set({ window: dimensions }));
+});
+
+it('returns screen-reader focus to the retained exercise row that launched history', async () => {
+  const enabled = jest.spyOn(ReactNative.AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
+  const focused = jest.spyOn(ReactNative.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+  const launch = { canonical: { nativeTag: 77 } };
+  const props = buildShellProps({ viewMode: 'exercise', exerciseListItems: [{ id: 'lift', name: 'Lift', workingSetCount: 1,
+    totalVolume: 100, estimatedOneRepMax: null, lastCompletedAt: null }] });
+  const view = render(<StatsScreenShell {...props} />);
+  // The native Pressable mock has no host instance; supply its ref callback
+  // so this check exercises the screen's launch/dismiss focus wiring.
+  const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
+  act(() => row.props.ref(launch));
+  fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
+  view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
+  fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+  await act(async () => {});
+  expect(focused).toHaveBeenLastCalledWith(77);
+  enabled.mockRestore(); focused.mockRestore();
 });

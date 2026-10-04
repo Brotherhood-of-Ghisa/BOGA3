@@ -83,15 +83,17 @@ Brief entrypoint map of the current mobile screens.
 1d. `/progress` (canonical tab)
 - File: `apps/mobile/app/(tabs)/progress.tsx`
 - Purpose:
-  - canonical entry to the current Stats / History dashboard without
-    adding or changing any analytics
-- Key states (high level):
-  - exactly the existing `/stats-history` loading, error, empty, dashboard,
-    exercise/muscle breakdown, and daily/weekly heat-map states
-- Key exits:
-  - existing Sessions drill-down and the exercise/muscle history sheets
-  - `/stats-history` remains available as the preserved legacy path and selects
-    Progress in the shared navigation
+  - canonical muscle comparisons and inline contributing exercises
+- Key states:
+  - configured calendar window; Working sets initially, Volume alternative;
+    complete taxonomy grouped by inert families; separate muscle history links
+    and contribution chevrons; matched Now/Previous/Change columns and inert Total
+  - first loading, inline error/Retry, previous-only and metric-specific empty
+    contributions, Volume coverage; Settings-driven individual history sheets
+  - quiet Browse exercises and Sessions links; retained exercise search and sort
+- Notes:
+  - `stats-history.tsx` re-exports this implementation; the compatibility path
+    selects Progress in shared navigation. Target: `design-targets/progress-tables.md`.
 
 1e. `/more` (canonical tab)
 - File: `apps/mobile/app/(tabs)/more.tsx`
@@ -150,49 +152,18 @@ Brief entrypoint map of the current mobile screens.
 
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
-- Purpose:
-  - preserved Progress-owned path whose merged Stats / History surface switches
-    between per-exercise and per-muscle summaries while preserving the Sessions
-    drill-down and the history sheets
+- Purpose: compatibility entry to `/progress`, with one implementation.
 - Query params:
-  - `period` (optional; `7` for This week, `30` for the configured window; absent/invalid values use the configured window)
-  - `breakdown` (optional; `exercise` or `muscle`; absent/invalid values default to `exercise`)
-- Key states (high level):
-  - one `ScreenScroll` on `paper`: two micro-labelled `SegmentedControl` rows
-    (`Time range` configured N weeks / This week, `Breakdown` `By Exercise` / `By Muscle`), the two
-    summary `Card`s, the `SearchField` filter, then the table or the family
-    cards; loading, error and empty states are `StatePanel`s in a `Card`
-  - valid query values set the initial controls, including the completion
-    handoff at `?period=7&breakdown=muscle`; later control changes remain
-    in-route state and do not rewrite the query string
-  - top summary cards show `Sessions` (counted sessions, `tech/training-metrics-contract.md` §2; a link `Card` with a chevron) and `Sets` (working sets) as stacked `Stat`s; their previous-period deltas are signed, in `ink-muted`, and never include percentages
-  - per-exercise history is a viewport-fitting table with compact, single-line
-    `Exercise`, `Sets`, `Vol`, and `1RM` headers; rows show aligned values
-    (`Sets` is working sets), use `—` for unavailable 1RM, allow
-    exercise names to wrap without truncation, retain complete accessibility
-    wording, and open the exercise's history sheet as one whole-row
-    action. Only exercises with at least one working set in the selected
-    calendar-week window appear; `Vol` reads volume-included sets and `1RM` reads working sets (the independent personal effort policy).
-  - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
-    Exercise cycles most/least recently completed across all-time working-set history;
-    Sets and Vol each cycle high/low. The 1RM header is static. Missing recency stays last, and ties use
-    name then ID. Each sortable header reserves its inline indicator width so
-    labels do not move when selection changes; the active slot alone is visible
-    (`Recent` plus arrow for Exercise, arrow only for Sets/Vol). Accessibility
-    wording retains the complete sort mode and next action. Mounted sort choice
-    survives time-range, search, and Breakdown changes.
-  - per-muscle family and nested rows show `Sets` (working sets) plus per-side, role-weighted independently included `Volume`; set comparisons are signed absolute deltas while volume comparisons are percentage-only with explicit zero-baseline states
-  - per-muscle family rows and visible nested-muscle rows use the target-attainment ramp (`viz1`–`viz4`): one shared weekly muscle quota × selected weeks, capped at 100%; families average all constituent muscles, including untrained ones. Exact counts remain readable/accessibly labelled
-  - in By Muscle, an individual muscle row opens exactly one muscle ID; all family headings are inert, including single-muscle families, which retain their own muscle row; legacy empty or multi-muscle history targets are ignored
-  - in By Exercise, a table row opens the exercise's history
-  - the history is one `HistorySheet` (`components/stats/history-sheet.tsx`, DLM-T09): a design-language `Sheet` over about three quarters of the screen, dismissed by the backdrop, Android back or the VoiceOver escape (no close button). It holds `Metric` (`Volume` / `Sets`, plus `1RM` / `Top weight` for an exercise) `SegmentedControl`, a static saved view/window label, the week banner in Weekly, and the saved look-back heatmap; the only Daily/Weekly selector is in Settings, defaulting to Daily for missing or invalid choices and preserving valid saved Weekly; loading, error (with Retry for the same entity/window) and no-history are inline `StatePanel`s, and the heatmap still renders under the no-history panel. Both chart views stay mounted, so preference changes reuse each view’s selection and scroll
-- Notes:
-  - preserved tab-group route with `headerShown: false`; its exact existing UI
-    is also exposed canonically at `/progress`. `BottomTray` composes
-    `MainTabs`, maps this route to Progress, and is supplied via the `tabBar`
-    prop in `(tabs)/_layout.tsx`.
-  - the screen body (DLM-T08) and the history sheets and heatmaps (DLM-T09)
-    are in the design language. Design target: `design-targets/progress.md`
+  - `period=7`: This week; all other/missing/invalid values: configured window
+  - `breakdown=exercise`: retained exercise browsing; all other values: muscle table
+- Key states and exits: identical to Progress above. Individual muscle names
+  open exactly one muscle ID; exercise names open definition history. Each
+  `HistorySheet` uses the saved look-back and Settings-owned Daily/Weekly view,
+  with Daily for unset/invalid choices and valid Weekly retained. Both views
+  remain mounted; Retry retains history selection. No family heatmap action.
+- Notes: one `ScreenScroll` on paper over `MainTabs`, with Progress selected;
+  the new landing is governed by `design-targets/progress-tables.md`, retained
+  history by `design-targets/progress.md` and `ux-rules.md` §12–§13.
 
 4b. `/session/[sessionId]` (session view)
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in

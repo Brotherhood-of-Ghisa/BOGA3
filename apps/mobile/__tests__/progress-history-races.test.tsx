@@ -26,7 +26,7 @@ it.each([{ ids: [] }, { ids: ['quads', 'chest'] }, { ids: [' '] }])('rejects a n
   expect(read).not.toHaveBeenCalled();
 });
 
-it('retries the same individual and window while preserving the selected week', async () => {
+it('retries the same individual after a policy change without retaining old values, preserving its selected week', async () => {
   const read = jest.spyOn(stats, 'computeSelectedMuscleWeeklyEffort')
     .mockResolvedValueOnce(weekly(4)).mockRejectedValueOnce(Error('read failed')).mockResolvedValueOnce(weekly(8));
   jest.spyOn(stats, 'computeSelectedMuscleDailyEffortMetrics').mockResolvedValue([]);
@@ -37,7 +37,7 @@ it('retries the same individual and window while preserving the selected week', 
   act(() => result.current.selectWeek(selected));
   rerender({ revision: 1 });
   await waitFor(() => expect(result.current.error).toBe('read failed'));
-  expect(result.current.weekly).toEqual(weekly(4));
+  expect(result.current.weekly).toEqual([]);
   act(() => result.current.retry());
   await waitFor(() => expect(result.current.weekly).toEqual(weekly(8)));
   expect(result.current.error).toBeNull();
