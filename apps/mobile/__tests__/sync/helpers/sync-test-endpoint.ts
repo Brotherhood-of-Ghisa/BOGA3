@@ -77,10 +77,23 @@ export const readSyncTestEndpoint = (): SyncTestEndpointConfig => {
   return { url: url!, anonKey: anonKey! };
 };
 
+/** Credentials of a deterministic local auth fixture (`auth-fixture-constants.sh`). */
+export interface FixtureCredentials {
+  email: string;
+  password: string;
+}
+
 // The deterministic local auth fixture the round-trip authenticates as. These
 // are the same credentials the repo's backend contract suites provision.
-const FIXTURE_EMAIL = 'user_a.local@example.test';
-const FIXTURE_PASSWORD = 'ScaffoldingUserA!234';
+const USER_A: FixtureCredentials = { email: 'user_a.local@example.test', password: 'ScaffoldingUserA!234' };
+
+/**
+ * The fresh-device / account-switch suite's dedicated fixtures (`user_e`,
+ * `user_f` in `supabase/scripts/auth-fixture-constants.sh`). No other suite or
+ * flow signs in as them, so the suite may reset their server rows.
+ */
+export const USER_E: FixtureCredentials = { email: 'user_e.local@example.test', password: 'ScaffoldingUserE!234' };
+export const USER_F: FixtureCredentials = { email: 'user_f.local@example.test', password: 'ScaffoldingUserF!234' };
 
 // The Postgres schema the sync RPCs live in.
 export const SYNC_RPC_SCHEMA = 'app_public';
@@ -88,12 +101,17 @@ export const SYNC_RPC_SCHEMA = 'app_public';
 type AnySupabaseClient = {
   auth: {
     signInWithPassword: (creds: { email: string; password: string }) => Promise<{
-      data: { session: { access_token: string } | null };
+      data: { session: { access_token: string; user: { id: string } } | null };
       error: { message: string } | null;
     }>;
     signOut: () => Promise<unknown>;
   };
-  schema: (name: string) => { rpc: (fn: string, args?: unknown) => Promise<unknown> };
+  schema: (name: string) => {
+    rpc: (fn: string, args?: unknown) => Promise<unknown>;
+    from: (table: string) => {
+      delete: () => { eq: (column: string, value: string) => Promise<{ error: { message: string } | null }> };
+    };
+  };
   rpc: (fn: string, args?: unknown) => Promise<unknown>;
 };
 
@@ -111,6 +129,8 @@ export interface AuthedTestClient {
   client: AnySupabaseClient;
   /** The minted test-user access token. */
   jwt: string;
+  /** The signed-in fixture's auth user id. */
+  userId: string;
   /** Signs out and releases the client so no handle leaks. */
   teardown: () => Promise<void>;
 }
@@ -123,6 +143,7 @@ export interface AuthedTestClient {
  */
 export const createAuthedTestClient = async (
   config: SyncTestEndpointConfig,
+  credentials: FixtureCredentials = USER_A,
 ): Promise<AuthedTestClient> => {
   if (process.env.EXPO_PUBLIC_USE_RN_FETCH !== '1') {
     throw new Error(
@@ -133,14 +154,14 @@ export const createAuthedTestClient = async (
   const createClient = loadCreateClient();
 
   const authClient = createClient(config.url, config.anonKey, { auth: NO_TIMER_AUTH });
-  const { data, error } = await authClient.auth.signInWithPassword({
-    email: FIXTURE_EMAIL,
-    password: FIXTURE_PASSWORD,
-  });
+  const { data, error } = await authClient.auth.signInWithPassword(credentials);
   if (error || !data.session) {
-    throw new Error(`could not sign in the test auth fixture: ${error?.message ?? 'no session'}`);
+    throw new Error(
+      `could not sign in the test auth fixture ${credentials.email}: ${error?.message ?? 'no session'}`,
+    );
   }
   const jwt = data.session.access_token;
+  const userId = data.session.user.id;
 
   const client = createClient(config.url, config.anonKey, {
     auth: NO_TIMER_AUTH,
@@ -150,6 +171,7 @@ export const createAuthedTestClient = async (
   return {
     client,
     jwt,
+    userId,
     teardown: async () => {
       await authClient.auth.signOut().catch(() => undefined);
       await client.auth.signOut().catch(() => undefined);
@@ -172,4 +194,55 @@ export const createAnonTestClient = (config: SyncTestEndpointConfig): AnonTestCl
       await client.auth.signOut().catch(() => undefined);
     },
   };
+};
+
+/**
+ * The Sync v2 tables, children before the rows they reference — the same list
+ * and order as `supabase/scripts/sync-e2e-fixture-reset.sh` (each REST delete is
+ * its own transaction).
+ */
+const SYNC_TABLES_CHILD_FIRST = [
+  'session_exercise_tags',
+  'exercise_sets',
+  'session_exercises',
+  'exercise_muscle_mappings',
+  'exercise_tag_definitions',
+  'sessions',
+  'exercise_group_links',
+  'exercise_definitions',
+  'muscle_groups',
+  'gyms',
+  'body_weight_measurements',
+  'user_settings',
+] as const;
+
+/**
+ * Hard-deletes every Sync v2 row a fixture user owns, with the service role, so
+ * a test starts from an empty server account. `dev_wipe_my_data` cannot do this
+ * locally (it refuses unless `app.env` is set, which the local REST path does
+ * not set). Needs `SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY` (exported by
+ * `supabase/scripts/test-sync-infra.sh`); only ever pass a dedicated fixture.
+ */
+export const resetFixtureServerRows = async (
+  config: SyncTestEndpointConfig,
+  userId: string,
+): Promise<void> => {
+  const serviceRoleKey = process.env.SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    throw new Error(
+      'SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY is unset: run the lane through ' +
+        '`./boga test sync-infra`, which exports it for this worktree\'s local stack.',
+    );
+  }
+  const { hostname } = new URL(config.url);
+  if (hostname !== '127.0.0.1' && hostname !== 'localhost') {
+    throw new Error(`refusing to hard-delete fixture rows on a non-local endpoint: ${config.url}`);
+  }
+  const admin = loadCreateClient()(config.url, serviceRoleKey, { auth: NO_TIMER_AUTH });
+  for (const table of SYNC_TABLES_CHILD_FIRST) {
+    const { error } = await admin.schema(SYNC_RPC_SCHEMA).from(table).delete().eq('owner_user_id', userId);
+    if (error) {
+      throw new Error(`could not reset ${table} for fixture ${userId}: ${error.message}`);
+    }
+  }
 };

@@ -5,8 +5,10 @@ export {
   resetLocalAppData,
   type LocalDatabase,
 } from './bootstrap';
+// `resetLocalDataAndReseed` is deliberately not re-exported: app code reaches it
+// only through `resetAndReseedLocalData` (src/sync/dev-affordances.ts), which
+// runs it under the sync lock.
 export {
-  resetLocalDataAndReseed,
   type ResetLocalDataAndReseedOptions,
   type ResetLocalDataAndReseedResult,
 } from './dev-reset';

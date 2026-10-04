@@ -145,6 +145,17 @@ jest.mock('react-native-safe-area-context', () => {
 // that need richer behaviour still override this with their own `jest.mock`
 // (e.g. auth-service mocks `@supabase/supabase-js` directly; a test-file mock
 // takes precedence over this setup-file one).
+// The sync cycle asks which account the Supabase session belongs to before it
+// syncs, and wipes the local store when that differs from the account the data
+// belongs to (`src/sync/account-wipe.ts`). Most sync suites stub the Supabase
+// client without an `auth` surface, so the default is "no session known", which
+// leaves the ownership guard a no-op. Suites that exercise the guard set it
+// (`jest.mocked(getSignedInUserId).mockResolvedValue(...)`); the module's own
+// test reaches the real implementation with `jest.requireActual`.
+jest.mock('@/src/auth/session-user', () => ({
+  getSignedInUserId: jest.fn(async () => null),
+}));
+
 jest.mock('@supabase/supabase-js', () => {
   const resolved = (data: unknown = null) => Promise.resolve({ data, error: null });
 

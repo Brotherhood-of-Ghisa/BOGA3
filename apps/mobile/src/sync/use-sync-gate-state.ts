@@ -29,6 +29,10 @@ export interface SyncGateSnapshot {
   bootstrapCompletedAt: Date | null;
   /** The most recent failed cycle's error code, or null when the last cycle was clean. */
   lastCycleErrorCode: LastCycleErrorCode | null;
+  /** The sanitized technical detail of that failure, or null. */
+  lastCycleErrorDetail: string | null;
+  /** The account the local store belongs to, or null when unowned. */
+  localDataOwnerId: string | null;
   /** Phase + advancing counters + offline boolean from the shared scheduler-status accessor. */
   progress: SyncProgress;
 }
@@ -56,6 +60,8 @@ export const useSyncGateState = (): SyncGateSnapshot => {
     return {
       bootstrapCompletedAt: null,
       lastCycleErrorCode: null,
+      lastCycleErrorDetail: null,
+      localDataOwnerId: null,
       progress: gateState.forcedProgress,
     };
   }
@@ -63,6 +69,8 @@ export const useSyncGateState = (): SyncGateSnapshot => {
   return {
     bootstrapCompletedAt: gateState.bootstrapCompletedAt,
     lastCycleErrorCode: gateState.lastCycleErrorCode,
+    lastCycleErrorDetail: gateState.lastCycleErrorDetail ?? null,
+    localDataOwnerId: gateState.localDataOwnerId ?? null,
     progress: getSchedulerStatus().progress,
   };
 };

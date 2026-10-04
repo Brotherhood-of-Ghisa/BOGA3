@@ -420,13 +420,14 @@ describe('auth service bootstrap', () => {
     expect(mockWipeLocalForAccountSwitch).not.toHaveBeenCalled();
   });
 
-  it('wipes local data when the active account changes to a different user', async () => {
+  it('leaves an account change to the sync cycle: no auth-layer wipe, one sync request', async () => {
     mockGetSession.mockResolvedValue({
       data: { session: createMockSession({ userId: 'user-1' }) },
       error: null,
     });
 
     await bootstrapAuthState();
+    mockRequestSync.mockClear();
 
     // The captured onAuthStateChange handler is what Supabase invokes when the
     // signed-in account changes. Drive it with a session for a different user.
@@ -438,7 +439,11 @@ describe('auth service bootstrap', () => {
     handler('SIGNED_IN', createMockSession({ userId: 'user-2', email: 'other@example.test' }));
     await Promise.resolve();
 
-    expect(mockWipeLocalForAccountSwitch).toHaveBeenCalledTimes(1);
+    // The wipe for a different account is the cycle's ownership guard, under the
+    // sync lock (sync-account-ownership.test.ts); an unawaited wipe here raced
+    // the in-flight cycle and missed switches the process never saw.
+    expect(mockWipeLocalForAccountSwitch).not.toHaveBeenCalled();
+    expect(mockRequestSync).toHaveBeenCalledTimes(1);
     expect(getAuthSnapshot().user?.id).toBe('user-2');
   });
 

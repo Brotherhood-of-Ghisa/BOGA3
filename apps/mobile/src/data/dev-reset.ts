@@ -1,23 +1,8 @@
 import { isDevMode } from '@/src/utils/isDevMode';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
-import {
-  __clearSeedsAppliedMarkerForReset,
-  seedSystemExerciseCatalog,
-} from './exercise-catalog-seeds';
-import {
-  bodyWeightMeasurements,
-  exerciseDefinitions,
-  exerciseGroupLinks,
-  exerciseMuscleMappings,
-  exerciseSets,
-  exerciseTagDefinitions,
-  gyms,
-  muscleGroups,
-  sessionExerciseTags,
-  sessionExercises,
-  sessions,
-} from './schema';
+import { seedSystemExerciseCatalog } from './exercise-catalog-seeds';
+import { readLocalDataOwner, wipeLocalDatabaseRows } from './local-wipe';
 
 export type ResetLocalDataAndReseedOptions = {
   /** Override the dev-mode check for tests. Production callers must not pass this. */
@@ -34,23 +19,24 @@ export type ResetLocalDataAndReseedResult = {
 };
 
 /**
- * Wipes every user-mutable table in the local SQLite database, clears the
- * `appliedSeedMigrationAppVersion` marker on `sync_runtime_state` (resetting
- * it to `0`), and re-runs the exercise-catalog seeder so the catalog is
- * repopulated from the canonical seed bundle.
+ * Empties the local store with the same complete wipe sign-out uses (every
+ * account table, the derived facts, the quarantine, the group cache, and the
+ * sync accounting: bootstrap flag, pull cursors, catalog-bundle marker), keeps
+ * the store's owning account, and re-runs the exercise-catalog seeder so the
+ * catalog is repopulated from the canonical seed bundle.
  *
  * This is the dev-only escape hatch for the "seed once, never overwrite"
- * model: in production the seeder runs exactly
- * once per install (per catalog bundle version), so any developer who
- * needs a fresh catalog (e.g. after editing seed data) must invoke this
- * helper explicitly.
+ * model: in production the seeder runs exactly once per install (per catalog
+ * bundle version), so a developer who needs a fresh catalog (e.g. after editing
+ * seed data) must invoke this helper explicitly.
  *
- * The helper deliberately leaves the singleton `sync_runtime_state` row in
- * place — only its `appliedSeedMigrationAppVersion` field is reset — so any
- * remaining v2 sync accounting (`pull_cursor`, `last_emitted_ms`,
- * `bootstrap_completed_at`) on that row survives the wipe. The v1 sync
- * engine has been removed, so there is no
- * `stopSyncRuntime()` follow-up to issue from callers any more.
+ * Resetting the sync accounting is what keeps the reset recoverable: the next
+ * sync cycle runs the first-sign-in bootstrapper, re-pulling the account's
+ * sessions and history from scratch (the freshly seeded catalog rows are newer,
+ * so they win last-write-wins and push). Keeping the old pull cursors over an
+ * emptied store would instead skip every server row older than them — the rows
+ * would never come back, and a later child row whose parent was skipped would
+ * fail the local FK check on every pull.
  *
  * Throws synchronously when invoked outside dev mode (see `isDevMode`).
  */
@@ -68,28 +54,7 @@ export const resetLocalDataAndReseed = async (
   const bootstrap = options.bootstrap ?? bootstrapLocalDataLayer;
   const database = await bootstrap();
 
-  database.transaction((tx) => {
-    // Order matters: child rows first, parents after. Foreign keys cascade
-    // in most cases but we list every table explicitly so the wipe is
-    // exhaustive even if a future schema change drops a cascade.
-    tx.delete(sessionExerciseTags).run();
-    tx.delete(exerciseSets).run();
-    tx.delete(sessionExercises).run();
-    tx.delete(sessions).run();
-    tx.delete(bodyWeightMeasurements).run();
-    tx.delete(gyms).run();
-    tx.delete(exerciseTagDefinitions).run();
-    tx.delete(exerciseMuscleMappings).run();
-    tx.delete(exerciseGroupLinks).run();
-    tx.delete(exerciseDefinitions).run();
-    tx.delete(muscleGroups).run();
-  });
-
-  // Clear the marker AFTER the wipe so a partial failure above leaves the
-  // marker intact (avoids losing track of a previously-seeded catalog).
-  __clearSeedsAppliedMarkerForReset(database, now);
-
-  // Re-run the seeder. The marker is now null so the inserts will execute.
+  wipeLocalDatabaseRows(database, { accountUserId: readLocalDataOwner(database) });
   seedSystemExerciseCatalog(database, now);
 
   return {

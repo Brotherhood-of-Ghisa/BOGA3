@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # Runs the mobile sync-infra jest lane (drift-check + cycle-round-trip +
-# cycle-multidevice-lww + auth-required-envelope) against THIS worktree's
+# cycle-multidevice-lww + auth-required-envelope + the fresh-device /
+# account-switch restore, among others) against THIS worktree's
 # slot-isolated local Supabase, with zero manual environment setup. It:
 #   1. ensures the local stack + baseline fixtures are up (idempotent; reuses a
 #      running stack),
@@ -26,8 +27,13 @@ echo "[test-sync-infra] loading local stack env"
 load_supabase_status_env
 : "${API_URL:?[test-sync-infra] supabase status did not yield API_URL — is the local stack running?}"
 : "${ANON_KEY:?[test-sync-infra] supabase status did not yield ANON_KEY — is the local stack running?}"
+: "${SERVICE_ROLE_KEY:?[test-sync-infra] supabase status did not yield SERVICE_ROLE_KEY — is the local stack running?}"
 export SYNC_TEST_SUPABASE_URL="${API_URL}"
 export SYNC_TEST_SUPABASE_ANON_KEY="${ANON_KEY}"
+# The fresh-device / account-switch suite resets its dedicated fixture users'
+# server rows with the service role (local stack only), so each test starts from
+# the same server state.
+export SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY}"
 
 # test:sync:infra sets EXPO_PUBLIC_USE_RN_FETCH=1: under Jest, `expo/fetch` (the
 # app's runtime fetch since SDK 56) runs over jest-expo's stubbed native module and

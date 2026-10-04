@@ -54,6 +54,7 @@ jest.mock('@/src/data', () => ({
 }));
 
 jest.mock('@/src/sync/dev-affordances', () => ({
+  resetAndReseedLocalData: jest.fn(() => Promise.resolve()),
   wipeLocalAndReBootstrap: jest.fn(() => Promise.resolve()),
   wipeRemoteForCurrentUser: jest.fn(() => Promise.resolve({ rowsDeleted: 0 })),
 }));

@@ -90,6 +90,8 @@ const renderGate = () => render(<SyncSetupScreen />);
 const publish = (overrides: {
   bootstrapCompletedAt?: Date | null;
   lastCycleErrorCode?: LastCycleErrorCode | null;
+  lastCycleErrorDetail?: string | null;
+  localDataOwnerId?: string | null;
   progress?: SyncProgress;
 }) => {
   if (overrides.progress) {
@@ -99,6 +101,8 @@ const publish = (overrides: {
     publishSyncGateState({
       bootstrapCompletedAt: overrides.bootstrapCompletedAt ?? null,
       lastCycleErrorCode: overrides.lastCycleErrorCode ?? null,
+      lastCycleErrorDetail: overrides.lastCycleErrorDetail ?? null,
+      localDataOwnerId: overrides.localDataOwnerId ?? null,
     });
   });
 };
@@ -211,6 +215,33 @@ describe('SyncSetupScreen', () => {
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style).color).toBe(
       uiRoles.danger
     );
+  });
+
+  it('says what failed: the error code and the sanitized detail under the message', () => {
+    renderGate();
+
+    publish({
+      lastCycleErrorCode: 'LOCAL_FK_VIOLATION',
+      lastCycleErrorDetail:
+        'local pull apply failed for session_exercises (layer 3 of 5): FOREIGN KEY constraint failed',
+    });
+
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.children).toBe(
+      'LOCAL_FK_VIOLATION: local pull apply failed for session_exercises (layer 3 of 5): FOREIGN KEY constraint failed',
+    );
+  });
+
+  it('keeps showing progress while the store still holds another account (its flag is not this account\'s)', () => {
+    renderGate();
+
+    publish({
+      bootstrapCompletedAt: new Date(1_700_000_000_000),
+      localDataOwnerId: 'previous-account',
+      progress: { phase: 'pull', layersCompleted: 2, rowsApplied: 400, offline: false },
+    });
+
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.phaseLabel)).toBeTruthy();
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityDetail).props.children).toBe('Layer 3 of 5 · 400 items');
   });
 
   it('fires exactly one cycle when Retry is pressed', () => {

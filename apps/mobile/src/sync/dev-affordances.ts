@@ -7,6 +7,9 @@
 //     re-enters the first-sign-in bootstrapper, which re-pulls the user's server
 //     state into the fresh local store (and re-seeds the starter catalog only
 //     when the server holds nothing for the user).
+//   - resetAndReseedLocalData: empty the local store with the complete wipe
+//     (sync accounting included) and re-seed the starter catalog; the next sync
+//     cycle re-pulls the account's data from scratch.
 //   - wipeRemoteForCurrentUser: ask a server-side helper to delete every row
 //     owned by the signed-in user, then wipe local so the freshly-cleaned
 //     server is not immediately re-populated by a push of the local rows.
@@ -17,9 +20,16 @@
 // there. The guards throw synchronously (before any I/O) so a release build
 // can never reach the destructive code path even if a caller forgets to gate
 // the call site.
+//
+// The local resets run under the local-data lock, after any in-flight sync
+// cycle, so a pull page can never land in a store that was just emptied; each
+// announces the reset so the first-sync gate comes back up for the restore.
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data/bootstrap';
+import { resetLocalDataAndReseed } from '@/src/data/dev-reset';
+import { notifyLocalDataReset, withLocalDataLock } from '@/src/sync/account-wipe';
+import { requestSync } from '@/src/sync/scheduler';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 /** The server-side helper that deletes every row owned by the caller. */
@@ -65,8 +75,29 @@ export const wipeLocalAndReBootstrap = (): Promise<void> => {
 };
 
 const runWipeLocalAndReBootstrap = async (): Promise<void> => {
-  await resetLocalAppData();
-  await bootstrapLocalDataLayer();
+  await withLocalDataLock(async () => {
+    await resetLocalAppData();
+    await bootstrapLocalDataLayer();
+    notifyLocalDataReset();
+  });
+  // The gate is back up for the restore: start it now, not at the backstop.
+  requestSync();
+};
+
+/**
+ * Empties the local store (the same complete wipe as sign-out, keeping the
+ * owning account) and re-seeds the starter catalog — see
+ * `resetLocalDataAndReseed`. The dev-mode guard runs synchronously on the
+ * caller's stack, like the other affordances.
+ */
+export const resetAndReseedLocalData = (): Promise<void> => {
+  assertDevModeSync();
+  return withLocalDataLock(async () => {
+    await resetLocalDataAndReseed();
+    notifyLocalDataReset();
+  }).then(() => {
+    requestSync();
+  });
 };
 
 /** The shape the server helper returns: how many rows it removed. */

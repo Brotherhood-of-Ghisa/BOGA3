@@ -1,31 +1,36 @@
-// Feeds the first-sync gate's reactive holder from the two observable sources
-// the shared scheduler-status accessor does not surface on its own snapshot:
+// Feeds the first-sync gate's reactive holder from the observable sources the
+// shared scheduler-status accessor does not surface on its own snapshot:
 //
-//   - `bootstrapCompletedAt`: read from the `sync_runtime_state` singleton row.
-//     The row is re-read on a short interval while the flag is still null (the
-//     only window the gate is up), so the block dismisses promptly once the
-//     first cycle sets it. Polling stops as soon as the flag is non-null.
-//   - `lastCycleErrorCode`: 'AUTH_REQUIRED' is mirrored from the cycle's
-//     observable "no signed-in user" signal; the non-auth failure codes
-//     ('FK_VIOLATION' / 'LOCAL_FK_VIOLATION' / 'INTERNAL') are mirrored from
-//     the cycle's classified error signal. The cycle owns raising them; this
-//     bridge only projects them onto the holder the gate reads.
+//   - `bootstrapCompletedAt` and `localDataOwnerId`: read from the
+//     `sync_runtime_state` singleton row. The row is re-read on a short interval
+//     while the flag is still null (the window the gate is up), so the block
+//     dismisses promptly once the first cycle sets it. Polling pauses once the
+//     flag is set and resumes whenever the local store is wiped or reset (sign-
+//     out, a sync for a different account, a developer reset), because the flag
+//     is null again and the gate comes back up for the restore.
+//   - `lastCycleErrorCode` / `lastCycleErrorDetail`: 'AUTH_REQUIRED' is mirrored
+//     from the cycle's observable "no signed-in user" signal; the non-auth
+//     failure codes ('FK_VIOLATION' / 'LOCAL_FK_VIOLATION' / 'INTERNAL') and
+//     their technical detail from the cycle's classified error signal. The cycle
+//     owns raising them; this bridge only projects them onto the holder.
 //
 // The phase / progress / offline snapshot is NOT republished here — the gate
-// reads it straight from the shared scheduler-status accessor, so this bridge
-// stays scoped to the two signals that holder carries.
+// reads it straight from the shared scheduler-status accessor. Each publish
+// re-renders the gate, which is what keeps that progress read live.
 
 import { eq } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
+import { subscribeToLocalDataReset } from '@/src/sync/account-wipe';
 import {
   getAuthRequiredSignal,
   subscribeToAuthRequiredSignal,
 } from '@/src/sync/auth-required-signal';
 import {
   getCycleErrorCode,
+  getCycleErrorDetail,
   subscribeToCycleErrorCode,
 } from '@/src/sync/cycle-error-signal';
 import {
@@ -34,33 +39,45 @@ import {
   type LastCycleErrorCode,
 } from '@/src/sync/sync-gate-state';
 
-/** How often the bootstrap flag is re-read while the gate is still up. */
+/** How often the runtime-state row is re-read while the gate is still up. */
 export const BOOTSTRAP_FLAG_POLL_INTERVAL_MS = 1000;
 
 let pollHandle: ReturnType<typeof setInterval> | null = null;
 let authRequiredUnsubscribe: (() => void) | null = null;
 let cycleErrorUnsubscribe: (() => void) | null = null;
+let localDataResetUnsubscribe: (() => void) | null = null;
 let database: LocalDatabase | null = null;
 // Set once the persisted flag has been read, or the data layer failed to come up.
 let bootstrapFlagKnown = false;
 
+interface RuntimeRowRead {
+  bootstrapCompletedAt: Date | null;
+  localDataOwnerId: string | null;
+}
+
 /**
- * Reads the persisted `bootstrap_completed_at` value from the runtime-state
- * singleton row. Returns null when the row is missing or the column is null
- * (the first-sync-not-yet-drained state), and swallows read errors as null so a
- * transient SQLite hiccup never crashes the gate — it just keeps the block up
- * until the next read succeeds.
+ * Reads the bootstrap flag and the store's owning account from the runtime-state
+ * singleton row. A missing row reads as not-bootstrapped and unowned; a read
+ * error (a transient SQLite hiccup, or a handle closed by a developer reset that
+ * dropped the database file) also reads as not-bootstrapped, so the gate keeps
+ * the block up until the next read succeeds rather than crashing.
  */
-const readBootstrapCompletedAt = (db: LocalDatabase): Date | null => {
+const readRuntimeRow = (db: LocalDatabase): RuntimeRowRead => {
   try {
     const row = db
-      .select({ bootstrapCompletedAt: syncRuntimeState.bootstrapCompletedAt })
+      .select({
+        bootstrapCompletedAt: syncRuntimeState.bootstrapCompletedAt,
+        localDataOwnerId: syncRuntimeState.accountUserId,
+      })
       .from(syncRuntimeState)
       .where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID))
       .get();
-    return row?.bootstrapCompletedAt ?? null;
+    return {
+      bootstrapCompletedAt: row?.bootstrapCompletedAt ?? null,
+      localDataOwnerId: row?.localDataOwnerId ?? null,
+    };
   } catch {
-    return null;
+    return { bootstrapCompletedAt: null, localDataOwnerId: null };
   }
 };
 
@@ -76,39 +93,47 @@ const readLastCycleErrorCode = (): LastCycleErrorCode | null => {
 };
 
 /**
- * Recomputes the bootstrap flag and last-cycle error from their live sources and
- * publishes a fresh snapshot, which also re-renders the gate so it re-reads the
- * live progress / offline snapshot from the shared scheduler-status accessor (see
- * the body comment). Stops the poll once the bootstrap flag is set, since the gate
- * dismisses and never re-blocks for this session.
+ * Recomputes the runtime-row fields and the last-cycle error from their live
+ * sources and publishes a fresh snapshot, which also re-renders the gate so it
+ * re-reads the live progress / offline snapshot from the shared scheduler-status
+ * accessor. Pauses the poll once the bootstrap flag is set.
  */
 const refresh = (): void => {
   const current = getSyncGateStateSnapshot();
-  const bootstrapCompletedAt = database ? readBootstrapCompletedAt(database) : current.bootstrapCompletedAt;
+  const runtime = database
+    ? readRuntimeRow(database)
+    : {
+        bootstrapCompletedAt: current.bootstrapCompletedAt,
+        localDataOwnerId: current.localDataOwnerId ?? null,
+      };
   const lastCycleErrorCode = readLastCycleErrorCode();
 
   // Publish a fresh snapshot on every refresh (each signal change AND each poll
   // tick) so the gate re-renders and re-reads the live progress / offline / phase
   // snapshot from the shared scheduler-status accessor while the block is up. The
-  // gate's reactive holder is its ONLY re-render trigger; the progress snapshot is
-  // NOT part of this holder, so without re-publishing here the gate would freeze at
-  // its mount-time snapshot and never reflect the scheduler going online
-  // (offline -> online) or the cycle's advancing counters. A new object reference
-  // each tick is intentional — that is what drives the re-render. The block is up
-  // only briefly (the first sync) and the poll is 1s, so the churn is bounded to
-  // that window and stops the moment the bootstrap flag is set (below).
+  // gate's reactive holder is its ONLY re-render trigger; without re-publishing
+  // here the gate would freeze at its mount-time snapshot and never show the
+  // cycle's advancing counters. A new object reference each tick is intentional.
+  // The churn is bounded to the window the flag is null.
   publishSyncGateState({
-    bootstrapCompletedAt,
+    bootstrapCompletedAt: runtime.bootstrapCompletedAt,
+    localDataOwnerId: runtime.localDataOwnerId,
     lastCycleErrorCode,
+    lastCycleErrorDetail: lastCycleErrorCode === 'AUTH_REQUIRED' ? null : getCycleErrorDetail(),
     // Preserve a harness-pinned in-progress override across the poll; the bridge
-    // owns only the bootstrap flag + error code, never the pin (the harness sets
-    // and clears it). Dropping it here would let the 1s poll erase the pin.
+    // never owns the pin (the harness sets and clears it).
     forcedProgress: current.forcedProgress,
     bootstrapFlagKnown,
   });
 
-  if (bootstrapCompletedAt !== null) {
+  if (runtime.bootstrapCompletedAt !== null) {
     stopBootstrapFlagPoll();
+  }
+};
+
+const startBootstrapFlagPoll = (): void => {
+  if (pollHandle === null) {
+    pollHandle = setInterval(refresh, BOOTSTRAP_FLAG_POLL_INTERVAL_MS);
   }
 };
 
@@ -120,24 +145,11 @@ const stopBootstrapFlagPoll = (): void => {
 };
 
 /**
- * Starts the bridge: mirrors the cycle's auth-required and error signals into the
- * gate holder and polls the bootstrap flag until it is set. Idempotent — a second
- * call while already running is a no-op. Safe to call at boot; the data-layer
- * handle is acquired asynchronously and the signal mirrors work immediately.
+ * (Re-)acquires the data-layer handle and refreshes. Called at start and after
+ * every local reset: a developer reset may have dropped and reopened the
+ * database file, leaving the previous handle closed.
  */
-export const startSyncGateStateBridge = (): void => {
-  if (authRequiredUnsubscribe !== null) {
-    return;
-  }
-
-  authRequiredUnsubscribe = subscribeToAuthRequiredSignal(refresh);
-  cycleErrorUnsubscribe = subscribeToCycleErrorCode(refresh);
-  refresh();
-
-  if (pollHandle === null) {
-    pollHandle = setInterval(refresh, BOOTSTRAP_FLAG_POLL_INTERVAL_MS);
-  }
-
+const acquireDatabase = (): void => {
   void bootstrapLocalDataLayer()
     .then((db) => {
       database = db;
@@ -154,6 +166,33 @@ export const startSyncGateStateBridge = (): void => {
     });
 };
 
+/** The local store was emptied: the flag is null again, so follow the restore. */
+const handleLocalDataReset = (): void => {
+  refresh();
+  startBootstrapFlagPoll();
+  acquireDatabase();
+};
+
+/**
+ * Starts the bridge: mirrors the cycle's auth-required and error signals into the
+ * gate holder, polls the runtime row until the bootstrap flag is set, and resumes
+ * polling after every local reset. Idempotent — a second call while already
+ * running is a no-op. Safe to call at boot; the data-layer handle is acquired
+ * asynchronously and the signal mirrors work immediately.
+ */
+export const startSyncGateStateBridge = (): void => {
+  if (authRequiredUnsubscribe !== null) {
+    return;
+  }
+
+  authRequiredUnsubscribe = subscribeToAuthRequiredSignal(refresh);
+  cycleErrorUnsubscribe = subscribeToCycleErrorCode(refresh);
+  localDataResetUnsubscribe = subscribeToLocalDataReset(handleLocalDataReset);
+  refresh();
+  startBootstrapFlagPoll();
+  acquireDatabase();
+};
+
 /** Tears down the bridge so a subsequent start begins clean. */
 export const stopSyncGateStateBridge = (): void => {
   stopBootstrapFlagPoll();
@@ -166,6 +205,11 @@ export const stopSyncGateStateBridge = (): void => {
   if (cycleErrorUnsubscribe !== null) {
     cycleErrorUnsubscribe();
     cycleErrorUnsubscribe = null;
+  }
+
+  if (localDataResetUnsubscribe !== null) {
+    localDataResetUnsubscribe();
+    localDataResetUnsubscribe = null;
   }
 
   database = null;

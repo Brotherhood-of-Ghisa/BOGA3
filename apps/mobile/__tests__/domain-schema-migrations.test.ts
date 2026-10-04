@@ -129,8 +129,9 @@ describe('domain schema and runtime migrations', () => {
     // quarantine table; planned set targets append after that; the local
     // group cache is m0004, m0005 empties it for the raw-set payload shape,
     // exercise_group_links is m0006, the kg-only cutover is m0010, and the
-    // derived exercise session facts are m0011 (tables) and m0012 (triggers).
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(15);
+    // derived exercise session facts are m0011 (tables) and m0012 (triggers),
+    // and the local store's owning account (`account_user_id`) is m0015.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(16);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -175,7 +176,14 @@ describe('domain schema and runtime migrations', () => {
       'm0012',
       'm0013',
       'm0014',
+      'm0015',
     ]);
+  });
+
+  it('records the owning account of the local store in m0015', () => {
+    expect(localRuntimeMigrations.migrations.m0015).toBe(
+      'ALTER TABLE `sync_runtime_state` ADD `account_user_id` text;',
+    );
   });
 
   it('creates the local-only, FK-free exercise session facts tables in m0011', () => {
