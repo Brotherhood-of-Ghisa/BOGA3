@@ -244,12 +244,43 @@ at least one working or volume-included set: `session_id`, `exercise_definition_
 
 ### Sign-out / account-switch wipe
 
-`wipeLocalTables` (`apps/mobile/src/sync/account-wipe.ts`) deletes, in one
-transaction, the twelve user-owned entity tables (child before parent),
-`group_cache`, and the three exercise-session-facts tables (last, after the raw
-deletes have fired the facts triggers), then resets `bootstrap_completed_at`, `pull_cursor`, and
-`applied_seed_migration_app_version` on the `sync_runtime_state` row. It keeps
-`last_emitted_ms` and issues no server delete.
+The local store holds one account's data; `sync_runtime_state.account_user_id`
+records which (null on a fresh or signed-out store). One complete wipe,
+`wipeLocalDatabaseRows` (`apps/mobile/src/data/local-wipe.ts`), empties it in
+one transaction: the twelve user-owned entity tables (child before parent),
+`group_cache`, `sync_quarantine`, and the three exercise-session-facts tables
+(last, after the raw deletes have fired the facts triggers); then it resets
+`bootstrap_completed_at`, `pull_cursor` and `applied_seed_migration_app_version`
+and sets `account_user_id` on the `sync_runtime_state` row. It keeps
+`last_emitted_ms` and issues no server delete. Jest fails if a table is neither
+wiped nor listed as preserved.
+
+Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
+`apps/mobile/src/data/dev-reset.ts`):
+
+- **Sign-out** wipes and leaves the store unowned.
+- **The sync cycle's ownership guard** runs first in every cycle with a
+  session: a store owned by a different account is wiped and stamped with the
+  signed-in account, so the bootstrapper restores that account from scratch. It
+  keys off the session the cycle syncs with, not an in-memory record of the
+  previous user, so it catches a switch the app never saw (a session that expired
+  or could not be read back, then a sign-in as someone else). The wipe is logged
+  (`sync.local_store_owner_mismatch_wipe`, with the unpushed rows discarded). An
+  unowned store that never synced is stamped with the signed-in account. An
+  unowned store that has synced (written before the owner was recorded) is wiped
+  when nothing waits to push, and otherwise kept with every pull cursor reset
+  (`sync.local_store_unowned_wipe` / `sync.local_store_unowned_repull`). While
+  the store belongs to a different account the first-sync gate is up, whatever
+  the bootstrap flag says.
+- **The developer reset** ("Reset local data and re-seed") wipes, keeps the
+  owner, and re-seeds the starter catalog; the next cycle re-pulls the rest.
+
+Pull cursors are reset with the rows because they are positions in the server's
+change stream: kept over an emptied (or another account's) store, they skip
+every older server row, and a child layer can then return rows whose parents
+the parent layer skipped — a local FK failure on every retry. Every wipe runs
+under the same lock as the sync cycle, so a wipe never lands between two pages
+of a pull.
 
 ### Local sync bookkeeping (Sync v2)
 
@@ -260,7 +291,8 @@ monotonic client timestamp, sent as `client_updated_at_ms`). Neither crosses the
 wire.
 Device-global sync state lives on the `sync_runtime_state` singleton row:
 `pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
-high-water mark), and `bootstrap_completed_at`. Deep detail:
+high-water mark), `bootstrap_completed_at`, and `account_user_id` (the account
+whose data the store holds). Deep detail:
 `docs/specs/tech/sync-v2-server-contract.md` §B.9.
 
 `sync_quarantine` stores one row per quarantined dirty entity, keyed by

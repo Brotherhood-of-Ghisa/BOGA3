@@ -21,7 +21,9 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 
 import { and, asc, eq, notInArray } from 'drizzle-orm';
 
+import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
+import { ensureLocalDataOwnedBy, withLocalDataLock } from '@/src/sync/account-wipe';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import { clearCycleError, markCycleError } from '@/src/sync/cycle-error-signal';
 import { runBootstrapper } from '@/src/sync/bootstrapper';
@@ -960,9 +962,11 @@ const runPullLeg = async (
       } catch (error) {
         if (isLocalSqliteForeignKeyError(error)) {
           logPullLocalFkViolation(error, layer, page.entities);
+          const types = Array.from(new Set(page.entities.map((entity) => entity.type))).sort();
           throw new SyncCycleError(
             LOCAL_FK_ERROR_CODE,
-            `local pull apply failed: ${sanitizeExceptionMessage(error)}`,
+            `local pull apply failed for ${types.join(', ')} (layer ${layer + 1} of ${TOPO_LAYERS.length}): ` +
+              sanitizeExceptionMessage(error),
           );
         }
         throw error;
@@ -1168,11 +1172,27 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
  * non-auth error code) before returning, so the gate and the scheduler read one
  * consistent view of the same cycle. On any non-converged outcome the dirty bits
  * and cursors are left untouched, so the next scheduled tick re-runs cleanly.
+ *
+ * The whole cycle holds the local-data lock (`withLocalDataLock`), so a
+ * sign-out or developer wipe waits for it rather than emptying the store
+ * between two pages of a pull.
  */
-export const runSyncCycle = async (): Promise<SyncCycleOutcome> => {
+export const runSyncCycle = (): Promise<SyncCycleOutcome> => withLocalDataLock(runSyncCycleLocked);
+
+const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
   const database = await bootstrapLocalDataLayer();
 
   try {
+    // The local store must belong to the account this cycle syncs as. A store
+    // that holds another account's rows and pull cursors is wiped first, so the
+    // bootstrapper below restores this account from scratch instead of pulling
+    // incrementally from the previous account's positions. No session (null) is
+    // left to the RPCs, which report AUTH_REQUIRED without mutating anything.
+    const userId = await getSignedInUserId();
+    if (userId) {
+      await ensureLocalDataOwnedBy(database, userId);
+    }
+
     // First-sign-in bootstrap: seed the starter catalog iff the server holds
     // nothing for this user, then mark the first cycle as drained. A no-op once
     // it has completed for this device-account. Runs before the convergence
@@ -1224,6 +1244,15 @@ const markConverged = (): SyncCycleOutcome => {
 };
 
 /**
+ * The technical detail the first-sync gate shows under a failure: the same
+ * sanitized, length-capped exception message the cycle-result log carries
+ * (e.g. entity types, layer and the SQLite error for a local FK failure). The
+ * local SQLite path carries no row values; a server or transport message is
+ * passed through as-is and may quote an id — the signed-in user's own data.
+ */
+const describeErrorDetail = (error: unknown): string => sanitizeExceptionMessage(error);
+
+/**
  * Classifies a throw escaping the cycle body into a single outcome and raises
  * the matching observable signal. A recognised {@link SyncCycleError} maps to
  * its code; ANY other throw — a Drizzle/SQLite write failure, the seed
@@ -1236,7 +1265,7 @@ const markConverged = (): SyncCycleOutcome => {
  */
 const classifyThrow = (error: unknown): SyncCycleOutcome => {
   if (error instanceof SyncCycleError && error.code === 'UPDATE_REQUIRED') {
-    markCycleError('UPDATE_REQUIRED');
+    markCycleError('UPDATE_REQUIRED', describeErrorDetail(error));
     logCycleOutcome('update-required', 'UPDATE_REQUIRED', error);
     return 'update-required';
   }
@@ -1260,7 +1289,7 @@ const classifyThrow = (error: unknown): SyncCycleOutcome => {
     // cursors are left untouched so nothing is silently dropped. Record the code
     // so a watching gate shows the error and a single Retry rather than trapping
     // the user behind a silent block.
-    markCycleError(error.code);
+    markCycleError(error.code, describeErrorDetail(error));
     logCycleOutcome('fk-violation', error.code, error);
     return 'fk-violation';
   }
@@ -1270,7 +1299,7 @@ const classifyThrow = (error: unknown): SyncCycleOutcome => {
   // cursors are unchanged, so the next scheduled tick starts a fresh cycle that
   // re-pushes and re-pulls the same state. Record the code so a watching gate
   // shows the error and a single Retry.
-  markCycleError('INTERNAL');
+  markCycleError('INTERNAL', describeErrorDetail(error));
   logCycleOutcome('internal', 'INTERNAL', error);
   return 'internal';
 };

@@ -97,6 +97,12 @@ export const generatedMigrationBundle = {
     tag: "0014_parallel_the_hand",
     breakpoints: true,
   },
+  {
+    idx: 15,
+    when: 1791133028890,
+    tag: "0015_local_data_owner",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -647,6 +653,7 @@ END;
 `,
   m0013: `ALTER TABLE \`exercise_session_facts_state\` ADD \`effort_policy_key\` text DEFAULT '' NOT NULL;`,
   m0014: `ALTER TABLE \`exercise_session_facts\` ADD \`volume_sets\` integer DEFAULT 0 NOT NULL;`,
+  m0015: `ALTER TABLE \`sync_runtime_state\` ADD \`account_user_id\` text;`,
   },
 } as const;
 

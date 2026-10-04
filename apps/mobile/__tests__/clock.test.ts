@@ -45,7 +45,8 @@ const SYNC_RUNTIME_STATE_DDL = `
     pull_cursor text DEFAULT '{}' NOT NULL,
     last_emitted_ms integer DEFAULT 0 NOT NULL,
     bootstrap_completed_at integer,
-    applied_seed_migration_app_version integer DEFAULT 0 NOT NULL
+    applied_seed_migration_app_version integer DEFAULT 0 NOT NULL,
+    account_user_id text
   );
 `;
 

@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { syncRuntimeState } from '@/src/data/schema';
+import { __resetAccountWipeForTests, notifyLocalDataReset } from '@/src/sync/account-wipe';
 import {
   __resetAuthRequiredSignalForTests,
   clearAuthRequired,
@@ -64,6 +65,7 @@ describe('sync-gate state bridge', () => {
     __resetAuthRequiredSignalForTests();
     __resetCycleErrorSignalForTests();
     __resetSyncGateStateBridgeForTests();
+    __resetAccountWipeForTests();
   });
 
   afterEach(() => {
@@ -167,5 +169,47 @@ describe('sync-gate state bridge', () => {
     expect(seen.length).toBe(countAfterFlagSet);
 
     unsubscribe();
+  });
+
+  it('comes back up after a local wipe: re-reads the flag and owner and resumes polling for the restore', async () => {
+    setBootstrapCompletedAt(new Date(1_700_000_000_000));
+    startSyncGateStateBridge();
+    await flushMicrotasks();
+    expect(getSyncGateStateSnapshot().bootstrapCompletedAt).not.toBeNull();
+
+    // The poll has stopped (flag set). A sync for a different account wipes the
+    // store and stamps the new owner: the bridge must notice without a poll.
+    mockFixture.database
+      .update(syncRuntimeState)
+      .set({ bootstrapCompletedAt: null, accountUserId: 'user-b' })
+      .run();
+    notifyLocalDataReset();
+    await flushMicrotasks();
+
+    expect(getSyncGateStateSnapshot().bootstrapCompletedAt).toBeNull();
+    expect(getSyncGateStateSnapshot().localDataOwnerId).toBe('user-b');
+
+    // Polling resumed, so the gate follows the restore to completion.
+    const seen: SyncGateStateSnapshot[] = [];
+    const unsubscribe = subscribeToSyncGateState(() => {
+      seen.push(getSyncGateStateSnapshot());
+    });
+    setBootstrapCompletedAt(new Date(1_700_000_333_000));
+    jest.advanceTimersByTime(BOOTSTRAP_FLAG_POLL_INTERVAL_MS);
+    await flushMicrotasks();
+    expect(seen.at(-1)?.bootstrapCompletedAt).toEqual(new Date(1_700_000_333_000));
+    unsubscribe();
+  });
+
+  it('carries the failure detail with a non-auth error code', async () => {
+    startSyncGateStateBridge();
+    await flushMicrotasks();
+
+    markCycleError('LOCAL_FK_VIOLATION', 'local pull apply failed for session_exercises (layer 3 of 5)');
+
+    expect(getSyncGateStateSnapshot().lastCycleErrorCode).toBe('LOCAL_FK_VIOLATION');
+    expect(getSyncGateStateSnapshot().lastCycleErrorDetail).toBe(
+      'local pull apply failed for session_exercises (layer 3 of 5)',
+    );
   });
 });

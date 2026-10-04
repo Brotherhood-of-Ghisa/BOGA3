@@ -4711,10 +4711,9 @@ export const seedSystemExerciseCatalog = (database: LocalDatabase, now: Date = n
 /**
  * Test/dev-only helper: clears the `appliedSeedMigrationAppVersion` marker
  * (resetting it to `0`) so the next call to
- * {@link seedSystemExerciseCatalog} performs a full re-seed. Used by
- * `resetLocalDataAndReseed` and by tests that need to exercise the
- * first-seed code path against a database whose marker has already been
- * set. The `now` parameter is retained for callsite signature stability
+ * {@link seedSystemExerciseCatalog} performs a full re-seed. Used by tests
+ * that need to exercise the first-seed code path against a database whose
+ * marker has already been set. The `now` parameter is retained for callsite signature stability
  * with the v1 timestamp-based marker; it is unused.
  */
 export const __clearSeedsAppliedMarkerForReset = (database: LocalDatabase, _now: Date = new Date()) => {

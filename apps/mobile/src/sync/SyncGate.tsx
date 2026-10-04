@@ -24,6 +24,7 @@ export const SYNC_GATE_TEST_IDS = {
   activityDetail: 'sync-gate-activity-detail',
   offlineMessage: 'sync-gate-offline-message',
   errorMessage: 'sync-gate-error-message',
+  errorDetail: 'sync-gate-error-detail',
   retryButton: 'sync-gate-retry-button',
 } as const;
 
@@ -76,7 +77,7 @@ export function SyncSetupScreen() {
         </Text>
 
         {mode.kind === 'error' ? (
-          <GateError errorCode={mode.errorCode} />
+          <GateError detail={snapshot.lastCycleErrorDetail} errorCode={mode.errorCode} />
         ) : (
           <GateProgress progress={snapshot.progress} />
         )}
@@ -120,12 +121,25 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
   );
 }
 
-/** The error body: a human message plus a single Retry that fires one cycle. */
-function GateError({ errorCode }: { errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL' }) {
+/**
+ * The error body: a human message, the failure's technical detail (error code
+ * plus the sanitized exception text the cycle-result log carries) so a failed
+ * setup says what failed, and a single Retry that fires one cycle.
+ */
+function GateError({
+  errorCode,
+  detail,
+}: {
+  errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
+  detail: string | null;
+}) {
   return (
     <View style={styles.body}>
       <Text allowFontScaling={false} accessibilityRole="alert" style={styles.errorMessage} testID={SYNC_GATE_TEST_IDS.errorMessage}>
         {ERROR_MESSAGES[errorCode]}
+      </Text>
+      <Text allowFontScaling={false} selectable style={styles.errorDetail} testID={SYNC_GATE_TEST_IDS.errorDetail}>
+        {detail ? `${errorCode}: ${detail}` : errorCode}
       </Text>
       {errorCode !== 'UPDATE_REQUIRED' ? <ActionButton
         accessibilityLabel="Retry"
@@ -205,6 +219,16 @@ const styles = StyleSheet.create({
   },
   // `Layer K of N · M items`: counters, so Plex Mono.
   activityDetail: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+    textAlign: 'center',
+  },
+  // The failure's code + sanitized exception text: diagnostic, so Plex Mono and
+  // muted like the activity counters; selectable so it can be copied.
+  errorDetail: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '500',
     fontSize: uiTypography.size.sm,

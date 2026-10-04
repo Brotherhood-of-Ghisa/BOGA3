@@ -44,6 +44,18 @@ describe('selectFirstSyncDrained', () => {
     expect(selectFirstSyncDrained({ bootstrapCompletedAt: null, lastCycleErrorCode: 'AUTH_REQUIRED' })).toBe(false);
   });
 
+  it('is not drained while the store holds another account, whatever its flag says', () => {
+    const otherAccountsStore = {
+      bootstrapCompletedAt: drainedAt,
+      lastCycleErrorCode: null,
+      localDataOwnerId: 'previous-account',
+    };
+    expect(selectFirstSyncDrained(otherAccountsStore, 'user-1')).toBe(false);
+    expect(selectFirstSyncDrained({ ...otherAccountsStore, localDataOwnerId: 'user-1' }, 'user-1')).toBe(true);
+    // A store from before the owner was recorded is judged by its flag.
+    expect(selectFirstSyncDrained({ ...otherAccountsStore, localDataOwnerId: null }, 'user-1')).toBe(true);
+  });
+
   it("treats the harness's pinned in-progress state as not drained", () => {
     expect(
       selectFirstSyncDrained({

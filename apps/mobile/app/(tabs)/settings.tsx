@@ -24,8 +24,8 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import { resetLocalDataAndReseed } from '@/src/data';
 import {
+  resetAndReseedLocalData,
   wipeLocalAndReBootstrap,
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
@@ -80,7 +80,7 @@ export default function SettingsScreen() {
     setIsResetting(true);
     setResetFeedback(null);
     try {
-      await resetLocalDataAndReseed();
+      await resetAndReseedLocalData();
       setResetFeedback({
         tone: 'success',
         message: 'Local data wiped and the exercise catalog re-seeded.',
@@ -96,7 +96,7 @@ export default function SettingsScreen() {
   const confirmDevReset = () => {
     Alert.alert(
       'Reset local data?',
-      'Wipes every local table and re-seeds the exercise catalog. Server data is untouched. Dev builds only.',
+      'Wipes every local table and re-seeds the exercise catalog; the next sync restores the rest from the server. Server data is untouched. Dev builds only.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

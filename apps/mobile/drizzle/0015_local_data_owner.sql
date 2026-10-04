@@ -1,0 +1,1 @@
+ALTER TABLE `sync_runtime_state` ADD `account_user_id` text;

@@ -60,12 +60,6 @@ let authSnapshot: AuthSnapshot = {
 let authBootstrapPromise: Promise<AuthSnapshot> | null = null;
 let authSubscription: { unsubscribe: () => void } | null = null;
 
-// The user id of the account currently reflected in the local store, tracked
-// across auth-state-change callbacks so a switch from one concrete account to a
-// different one can be detected. `null` means no account is currently mapped to
-// local data (signed out, or not yet signed in).
-let lastKnownUserId: string | null = null;
-
 const emitAuthSnapshot = () => {
   setAccountLocalPreferenceAccount(authSnapshot.user?.id ?? null, authSnapshot.isConfigured);
   for (const listener of listeners) {
@@ -84,12 +78,7 @@ const setAuthSnapshot = (nextSnapshot: Partial<AuthSnapshot>) => {
 const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot => {
   const runtimeConfig = getMobileAuthRuntimeConfig();
 
-  // Keep the tracked account id in step with every ready snapshot so the
-  // account-switch detection in `handleAuthStateChange` always compares
-  // against the account currently mapped to local data, regardless of which
-  // entry point (restore, sign-in, sign-out, state-change) produced it.
   const userId = session?.user?.id ?? null;
-  lastKnownUserId = userId;
 
   // Mirror the signed-in user into the logging module so it can stamp `user_id`
   // and gate its Supabase flush without importing auth (the one allowed
@@ -113,7 +102,6 @@ const createReadySnapshotFromSession = (session: Session | null): AuthSnapshot =
 
 const handleAuthStateChange = (_event: AuthChangeEvent, session: Session | null) => {
   const nextUserId = session?.user?.id ?? null;
-  const previousUserId = lastKnownUserId;
 
   // A live session definitively resolves any earlier "no signed-in user" signal a
   // pre-sign-in cycle raised. Clear it here — synchronously with the session
@@ -135,29 +123,15 @@ const handleAuthStateChange = (_event: AuthChangeEvent, session: Session | null)
     requestSync();
   }
 
-  // Account switch: a different concrete account is now signed in than the one
-  // whose data is in the local store. Clear the previous account's local rows
-  // and reset the sync accounting so the bootstrapper restores the new
-  // account's data on the next cycle. (Sign-out — next id null — is handled by
-  // `signOut`, which wipes before tearing down the session; we skip it here to
-  // avoid wiping twice and to keep the wipe on the awaited sign-out path.)
-  const isAccountSwitch =
-    previousUserId !== null && nextUserId !== null && previousUserId !== nextUserId;
+  // A different account than the one whose data is on the device needs no
+  // handling here: the sync cycle requested above checks which account the local
+  // store belongs to before it syncs, and wipes and restores it when that is not
+  // the signed-in account (`ensureLocalDataOwnedBy`). That check runs under the
+  // sync lock and does not depend on this process having seen the previous
+  // account — a session that expired or could not be read back leaves the app
+  // signed out without a sign-out, and an in-memory "last user" would miss the
+  // switch.
 
-  if (isAccountSwitch) {
-    void wipeLocalForAccountSwitch().catch((error: unknown) => {
-      void logEvent({
-        level: 'error',
-        source: 'auth',
-        event: 'auth.account_switch_wipe_failed',
-        message: error instanceof Error ? error.message : 'Local data wipe failed on account switch.',
-        userId: nextUserId,
-      });
-    });
-  }
-
-  // `createReadySnapshotFromSession` advances the tracked account id to
-  // `nextUserId`.
   authSnapshot = createReadySnapshotFromSession(session);
   emitAuthSnapshot();
 };
@@ -387,7 +361,6 @@ export const __resetAuthForTests = () => {
   authSubscription?.unsubscribe();
   authSubscription = null;
   authBootstrapPromise = null;
-  lastKnownUserId = null;
   __resetSupabaseMobileClientForTests();
   __resetAuthStorageAdapterForTests();
 

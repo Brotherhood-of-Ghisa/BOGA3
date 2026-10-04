@@ -35,6 +35,18 @@ export interface SyncGateStateSnapshot {
   /** The most recent failed cycle's error code, or null when the last cycle was clean. */
   lastCycleErrorCode: LastCycleErrorCode | null;
   /**
+   * The sanitized technical detail of that failure (see `getCycleErrorDetail`),
+   * or null. Omitted means none.
+   */
+  lastCycleErrorDetail?: string | null;
+  /**
+   * The account the local store holds data for (`sync_runtime_state.
+   * account_user_id`), or null when unowned. A signed-in account that does not
+   * own the store has not had its first sync yet, whatever the bootstrap flag
+   * (which then belongs to the previous account) says. Omitted means unowned.
+   */
+  localDataOwnerId?: string | null;
+  /**
    * Test/harness-only: when non-null, the gate renders this in-progress block
    * (online, the given phase) and stays up regardless of the live scheduler and
    * the persisted bootstrap flag. The iOS simulator's NetInfo cannot confirm
@@ -57,6 +69,8 @@ export interface SyncGateStateSnapshot {
 const INITIAL_SNAPSHOT: SyncGateStateSnapshot = {
   bootstrapCompletedAt: null,
   lastCycleErrorCode: null,
+  lastCycleErrorDetail: null,
+  localDataOwnerId: null,
   forcedProgress: null,
   bootstrapFlagKnown: false,
 };

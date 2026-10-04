@@ -1186,7 +1186,11 @@ protocol does not branch on it.
 currently-signed-in user. Residue from a previous account would push to the new
 account (RLS sets `owner_user_id = auth.uid()`) and break B.3.4.3's
 "clean ⇒ server has the row" invariant. Wiping local entity tables on sign-out
-(or `auth.uid()` change) is the auth layer's responsibility.
+(or `auth.uid()` change) is the client's responsibility: sign-out wipes, and
+every cycle with a session first compares the signed-in account with the
+store's recorded owner (`sync_runtime_state.account_user_id`) and wipes on a
+mismatch, cursors included, before it pulls (`05-data-model.md`, "Sign-out /
+account-switch wipe").
 
 ## B.6 The cycle interface
 

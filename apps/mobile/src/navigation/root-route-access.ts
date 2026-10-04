@@ -28,16 +28,20 @@ import {
   subscribeToSyncGateState,
   type SyncGateStateSnapshot,
 } from '@/src/sync/sync-gate-state';
+import { isFirstSyncDrained, readSessionUserId } from '@/src/sync/sync-gate-decision';
 import { selectShouldRouteToSignIn, type AuthGateSnapshot } from '@/src/sync/use-auth-required-redirect';
 
 export type RootRouteAccess = 'sign-in' | 'sync-setup' | 'app';
 
 /**
- * Whether the first sync has drained, as the first-sync block sees it: the
- * harness's pinned in-progress state counts as not drained.
+ * Whether the first sync has drained for the signed-in account, as the
+ * first-sync block sees it: the harness's pinned in-progress state counts as not
+ * drained, and so does a store that still holds another account's data.
  */
-export const selectFirstSyncDrained = (gate: SyncGateStateSnapshot): boolean =>
-  !gate.forcedProgress && gate.bootstrapCompletedAt !== null;
+export const selectFirstSyncDrained = (
+  gate: SyncGateStateSnapshot,
+  sessionUserId: string | null = null,
+): boolean => !gate.forcedProgress && isFirstSyncDrained(gate, sessionUserId);
 
 export const selectRootRouteAccess = (
   auth: AuthGateSnapshot,
@@ -53,10 +57,9 @@ export const selectRootRouteAccess = (
   return 'sync-setup';
 };
 
-const getFirstSyncDrained = (): boolean => selectFirstSyncDrained(getSyncGateStateSnapshot());
-
 export const useRootRouteAccess = (): RootRouteAccess => {
   const { isConfigured, session } = useAuth();
+  const sessionUserId = readSessionUserId(session);
   const authRequiredSignal = useSyncExternalStore(
     subscribeToAuthRequiredSignal,
     getAuthRequiredSignal,
@@ -65,6 +68,8 @@ export const useRootRouteAccess = (): RootRouteAccess => {
   // A boolean, not the snapshot: the bridge republishes the snapshot every poll
   // tick while the flag is null, and the root stack should re-render only when
   // access changes.
+  const getFirstSyncDrained = (): boolean =>
+    selectFirstSyncDrained(getSyncGateStateSnapshot(), sessionUserId);
   const firstSyncDrained = useSyncExternalStore(subscribeToSyncGateState, getFirstSyncDrained, getFirstSyncDrained);
   return selectRootRouteAccess({ isConfigured, session }, authRequiredSignal, firstSyncDrained);
 };

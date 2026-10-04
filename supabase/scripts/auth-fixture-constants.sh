@@ -21,3 +21,14 @@ export USER_C_USERNAME="maestro-user-c"
 export USER_D_EMAIL="user_d.local@example.test"
 export USER_D_PASSWORD="ScaffoldingUserD!234"
 export USER_D_USERNAME="maestro-user-d"
+
+# sync-infra jest suite (apps/mobile/__tests__/sync/cycle-fresh-device-and-
+# account-switch.test.ts): user_e is the account a fresh device restores and the
+# one a device switches to; user_f the account the device held before the
+# switch. Dedicated to that suite, which hard-resets both users' Sync v2 rows
+# with the service role at the start of each test. No fixture key.
+export USER_E_EMAIL="user_e.local@example.test"
+export USER_E_PASSWORD="ScaffoldingUserE!234"
+
+export USER_F_EMAIL="user_f.local@example.test"
+export USER_F_PASSWORD="ScaffoldingUserF!234"

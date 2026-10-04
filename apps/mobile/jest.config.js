@@ -25,6 +25,7 @@ module.exports = {
     '<rootDir>/__tests__/sync/drift-check.test.ts',
     '<rootDir>/__tests__/sync/update-softdelete-roundtrip.test.ts',
     '<rootDir>/__tests__/sync/future-clock-clamp.test.ts',
+    '<rootDir>/__tests__/sync/cycle-fresh-device-and-account-switch.test.ts',
     // The groups client against a live endpoint: lane groups-api-live.
     '<rootDir>/__tests__/groups-api-live.test.ts',
   ],

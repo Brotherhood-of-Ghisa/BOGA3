@@ -13,7 +13,8 @@
 //
 // It is module-scoped on purpose: the cycle runs with no React context, so the
 // cycle and the UI tree must observe the same source of truth. It carries no
-// user data — just the latest code, or null when the last cycle was clean.
+// user data — just the latest code and its sanitized technical detail, or null
+// when the last cycle was clean.
 
 /** The non-auth failure classifications a cycle can report. */
 export type CycleErrorCode = 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
@@ -23,6 +24,7 @@ type CycleErrorListener = () => void;
 const listeners = new Set<CycleErrorListener>();
 
 let lastErrorCode: CycleErrorCode | null = null;
+let lastErrorDetail: string | null = null;
 
 const emit = (): void => {
   for (const listener of listeners) {
@@ -32,6 +34,14 @@ const emit = (): void => {
 
 /** The most recent cycle's non-auth error code, or null when it was clean. */
 export const getCycleErrorCode = (): CycleErrorCode | null => lastErrorCode;
+
+/**
+ * A short technical description of the most recent failure (the sanitized,
+ * length-capped exception message the cycle-result log also carries — see
+ * `describeErrorDetail` in cycle.ts), or null. The first-sync gate shows it under its message so
+ * a failed setup says what failed.
+ */
+export const getCycleErrorDetail = (): string | null => lastErrorDetail;
 
 /**
  * Subscribe to changes in the code. Returns an unsubscribe function; the
@@ -44,12 +54,13 @@ export const subscribeToCycleErrorCode = (listener: CycleErrorListener): (() => 
   };
 };
 
-/** Records a non-auth failure code from the latest cycle (idempotent). */
-export const markCycleError = (code: CycleErrorCode): void => {
-  if (lastErrorCode === code) {
+/** Records a non-auth failure code (and its detail) from the latest cycle (idempotent). */
+export const markCycleError = (code: CycleErrorCode, detail: string | null = null): void => {
+  if (lastErrorCode === code && lastErrorDetail === detail) {
     return;
   }
   lastErrorCode = code;
+  lastErrorDetail = detail;
   emit();
 };
 
@@ -59,11 +70,13 @@ export const clearCycleError = (): void => {
     return;
   }
   lastErrorCode = null;
+  lastErrorDetail = null;
   emit();
 };
 
 /** Test-only reset so suites start from a known clean code. */
 export const __resetCycleErrorSignalForTests = (): void => {
   lastErrorCode = null;
+  lastErrorDetail = null;
   listeners.clear();
 };

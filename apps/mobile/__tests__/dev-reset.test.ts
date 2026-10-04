@@ -1,4 +1,6 @@
 import { resetLocalDataAndReseed } from '@/src/data/dev-reset';
+
+import { createInMemoryDatabase } from './helpers/in-memory-db';
 import {
   SEED_CATALOG_BUNDLE_VERSION,
   SYSTEM_EXERCISE_DEFINITION_SEEDS,
@@ -187,65 +189,59 @@ describe('resetLocalDataAndReseed (dev reset path)', () => {
     expect(fake.state.muscleGroups.length).toBe(0);
   });
 
-  it('wipes user data, clears the marker, and re-seeds the catalog', async () => {
-    const fake = createFakeDatabase();
+  it('wipes user data and the sync accounting, keeps the owner, and re-seeds the catalog', async () => {
+    const fixture = createInMemoryDatabase();
+    const { database, client } = fixture;
+    try {
+      seedSystemExerciseCatalog(database as never, new Date('2026-03-01T00:00:00.000Z'));
+      client.exec(`
+        INSERT INTO gyms (id, name) VALUES ('gym-1', 'Local Gym');
+        INSERT INTO sessions (id, gym_id, started_at) VALUES ('session-1', 'gym-1', 1);
+        INSERT INTO session_exercises (id, session_id, order_index, name) VALUES ('sx-1', 'session-1', 0, 'Press');
+        INSERT INTO exercise_sets (id, session_exercise_id, order_index) VALUES ('set-1', 'sx-1', 0);
+        INSERT INTO body_weight_measurements (id, measured_at, weight_kg) VALUES ('reading-1', 1, 80);
+      `);
+      database
+        .update(syncRuntimeState)
+        .set({
+          bootstrapCompletedAt: new Date(1_700_000_000_000),
+          pullCursor: { '1': { id: 'stale' } } as never,
+          accountUserId: 'user-a',
+        })
+        .run();
 
-    // Seed the catalog and pre-populate user data so we can verify the wipe.
-    seedSystemExerciseCatalog(fake.database, new Date('2026-03-01T00:00:00.000Z'));
-    fake.state.gyms.push({ id: 'gym-1', name: 'Local Gym' });
-    fake.state.sessions.push({ id: 'session-1', gymId: 'gym-1' });
-    fake.state.bodyWeightMeasurements.push({ id: 'reading-1', weightKg: 80 });
-    fake.state.sessionExercises.push({ id: 'sx-1', sessionId: 'session-1' });
-    fake.state.exerciseSets.push({ id: 'set-1', sessionExerciseId: 'sx-1' });
-    fake.state.exerciseGroupLinks.push({ id: 'grp-1:def-1', exerciseDefinitionId: 'def-1' });
+      const resetAt = new Date('2026-05-14T15:30:00.000Z');
+      const result = await resetLocalDataAndReseed({
+        isDev: true,
+        bootstrap: async () => database as never,
+        now: resetAt,
+      });
 
-    expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
-    expect(fake.state.gyms.length).toBe(1);
+      expect(result.resetAt).toBe(resetAt);
+      const count = (table: string) =>
+        (client.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+      for (const table of ['gyms', 'sessions', 'session_exercises', 'exercise_sets', 'body_weight_measurements']) {
+        expect({ table, rows: count(table) }).toEqual({ table, rows: 0 });
+      }
 
-    const resetAt = new Date('2026-05-14T15:30:00.000Z');
-    const result = await resetLocalDataAndReseed({
-      isDev: true,
-      bootstrap: async () => fake.database,
-      now: resetAt,
-    });
+      // Catalog is repopulated from the canonical seed bundle.
+      expect(count('muscle_groups')).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
+      expect(count('exercise_definitions')).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
+      expect(count('exercise_muscle_mappings')).toBe(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.length);
 
-    expect(result.resetAt).toBe(resetAt);
-
-    // User-mutable tables are empty after the wipe.
-    expect(fake.state.gyms.length).toBe(0);
-    expect(fake.state.sessions.length).toBe(0);
-    expect(fake.state.bodyWeightMeasurements.length).toBe(0);
-    expect(fake.state.sessionExercises.length).toBe(0);
-    expect(fake.state.exerciseSets.length).toBe(0);
-    expect(fake.state.sessionExerciseTags.length).toBe(0);
-    expect(fake.state.exerciseTagDefinitions.length).toBe(0);
-    expect(fake.state.exerciseGroupLinks.length).toBe(0);
-
-    // Catalog is repopulated from the canonical seed bundle.
-    expect(fake.state.muscleGroups.length).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.length);
-    expect(fake.state.exerciseDefinitions.length).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
-    expect(fake.state.exerciseMuscleMappings.length).toBe(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.length);
-    expect(fake.state.exerciseDefinitions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'seed_incline_barbell_bench_presses',
-          name: 'Incline Barbell Bench Press',
-        }),
-      ])
-    );
-    expect(fake.state.exerciseDefinitions).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: 'seed_barbell_bench_presses' }),
-      ])
-    );
-    expect(fake.state.exerciseMuscleMappings).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ exerciseDefinitionId: 'seed_barbell_bench_presses' }),
-      ])
-    );
-
-    // The marker reflects the current catalog bundle version so a follow-up
-    // seeder call is a no-op (the seed-once invariant survives the reset).
-    expect(fake.state.syncRuntimeState[0]?.appliedSeedMigrationAppVersion).toBe(SEED_CATALOG_BUNDLE_VERSION);
+      // The next sync restores the rest from scratch: no bootstrap flag, no
+      // cursors that would skip the account's older server rows. The store still
+      // belongs to the same account, and the seed marker is current so a later
+      // seeder call is a no-op.
+      const runtime = database.select().from(syncRuntimeState).get();
+      expect(runtime).toMatchObject({
+        bootstrapCompletedAt: null,
+        pullCursor: {},
+        accountUserId: 'user-a',
+        appliedSeedMigrationAppVersion: SEED_CATALOG_BUNDLE_VERSION,
+      });
+    } finally {
+      fixture.close();
+    }
   });
 });

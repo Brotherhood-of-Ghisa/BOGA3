@@ -40,7 +40,12 @@
   - response contract semantics and RLS cross-owner isolation,
   - projection/read-model correctness after ingest/replay,
   - wiped-client reinstall re-pull restoring every layer with FK integrity and
-    advancing cursors.
+    advancing cursors,
+  - account ownership of the local store: a fresh device restores a multi-page
+    account exactly, and a device that holds another account's rows and cursors
+    re-syncs as a new account (with no sign-out between) by wiping and restoring
+    from scratch — never by pulling incrementally from the old account's cursors;
+    sign-out and developer wipes wait for an in-flight cycle.
 - Use mocks/fakes for broad scenario coverage in the fast lane, then prove at
   least one real cross-stack path:
   - mobile side: `npm run test:sync:infra` (real round trip, AUTH_REQUIRED no-op,
@@ -65,9 +70,11 @@
   `apps/mobile/__tests__/sync-cycle-*.test.ts` family
   (`-convergence`, `-pull`, `-push`, `-race`, `-wire`),
   `sync-cycle-push-preflight.test.ts`, `sync-cycle-quarantine.test.ts`,
-  `sync-bootstrapper.test.ts`, `sync-status-composer.test.ts`,
+  `sync-bootstrapper.test.ts`, `sync-account-ownership.test.ts`,
+  `local-wipe.test.ts`, `sync-status-composer.test.ts`,
   `sync-gate-decision.test.ts`, `settings-profile-navigation.test.tsx`, and the
   `__tests__/sync/**` directory (cycle-round-trip, cycle-multidevice-lww,
+  cycle-fresh-device-and-account-switch,
   drift-check,
   auth-required-envelope, dirty-bit-per-entity, scheduler-state-table,
   topo-order-imported, now-monotonic-cross-restart,
