@@ -21,7 +21,7 @@ it('extends existing scoped browsing choices and restores all five settings afte
   Storage.setItemSync(preferenceKey('account:A', 'dateFormat'), 'MM-DD-YYYY');
   await account();
   expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY' });
-  const choices = { weeklyWorkingSetTarget: 12, visibleEffortGrades: [0, 2, 12],
+  const choices = { weeklyWorkingSetTarget: 12, displayEfforts: ['warm_up', 'unspecified', 'rir_2', 'rir_0'] as import('@/src/exercise-calculations/effort-policy').EffortChoice[],
     targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'daily' as const };
   setAccountLocalPreferences(choices);
   __resetAccountLocalPreferencesForTests();
@@ -61,9 +61,11 @@ it('validates window limits, RIR zero and the last visible grade', () => {
   expect(isPreferenceValue('weeklyWorkingSetTarget', { quads: 8 })).toBe(false);
   expect(isPreferenceValue('heatmapView', 'monthly')).toBe(false);
   for (const invalid of [[], [0, 0], [-1], [1.5], [NaN], [Infinity], [Number.MAX_SAFE_INTEGER + 1]]) {
-    expect(isPreferenceValue('visibleEffortGrades', invalid)).toBe(false);
+    expect(isPreferenceValue('displayEfforts', invalid)).toBe(false);
   }
-  expect(isPreferenceValue('visibleEffortGrades', [0, 12])).toBe(true);
+  expect(isPreferenceValue('displayEfforts', ['rir_0', 'technique'])).toBe(true);
+  expect(isPreferenceValue('workingSetEfforts', [])).toBe(true);
+  expect(isPreferenceValue('volumeEfforts', ['rir_12'])).toBe(false);
 });
 
 it('persists the 520-week limit and rejects 521 without changing the saved value', async () => {
@@ -95,25 +97,31 @@ it('retains failed input and durable values, retries partial saves and clears er
   expect(values().historyLookbackWeeks).toBe(104);
   expect(values().heatmapView).toBe('daily');
   expect(getAccountLocalPreferenceState().error).toBeNull();
-  setAccountLocalPreferences({ visibleEffortGrades: [] });
+  setAccountLocalPreferences({ displayEfforts: [] });
   expect(getAccountLocalPreferenceState().error).toMatch(/at least one/);
-  setAccountLocalPreferences({ visibleEffortGrades: [0] });
+  setAccountLocalPreferences({ displayEfforts: ['rir_0'] });
   expect(getAccountLocalPreferenceState().error).toBeNull();
 });
 
-it('uses saved grades for cycling and rolls hidden inherited effort to the next harder visible grade', () => {
-  expect(getSessionSetTypeCycle([0, 12, 2])).toEqual(['warm_up', null, 'rir_12', 'rir_2', 'rir_0']);
-  expect(nextSessionSetType(null, [0, 12])).toBe('rir_12');
-  expect(nextSessionSetType('rir_2', [0, 12])).toBe('warm_up');
-  expect(defaultSessionSetType('rir_2')).toBe('rir_2');
-  expect(defaultSessionSetType('rir_12', [0, 3])).toBe('rir_3');
-  expect(defaultSessionSetType('rir_3', [0, 2])).toBe('rir_2');
-  expect(defaultSessionSetType('rir_2', [0, 12])).toBe('rir_0');
-  expect(defaultSessionSetType('rir_0', [2, 12])).toBe('rir_0');
-  expect(defaultSessionSetType('rir_2', [0, 2, 12])).toBe('rir_2');
-  expect(defaultSessionSetType('warm_up', [12])).toBeNull();
-  expect(defaultSessionSetType(null, [12])).toBeNull();
-  expect(defaultSessionSetType(undefined, [12])).toBe('warm_up');
+it('cycles fixed visible choices and gives new rows a visible effort without editing history', () => {
+  const display = ['warm_up', 'unspecified', 'rir_2', 'rir_0', 'technique'] as const;
+  expect(getSessionSetTypeCycle(display)).toEqual(['warm_up', null, 'rir_2', 'rir_0', 'technique']);
+  expect(nextSessionSetType(null, display)).toBe('rir_2');
+  expect(nextSessionSetType('rir_12', display)).toBe('warm_up');
+  expect(nextSessionSetType('technique', display)).toBe('warm_up');
+  expect(defaultSessionSetType('rir_12', display)).toBe('rir_2');
+  expect(defaultSessionSetType('rir_3', display)).toBe('rir_2');
+  expect(defaultSessionSetType('rir_0', ['rir_2'])).toBe('rir_2');
+  expect(defaultSessionSetType('warm_up', display)).toBeNull();
+  expect(defaultSessionSetType(undefined, ['technique'])).toBe('technique');
+});
+
+it('migrates the former visible grades to fixed choices while leaving legacy storage intact', async () => {
+  const key = 'boga3.accountPreferences.v1.account%3AA.visibleEffortGrades';
+  Storage.setItemSync(key, '[0,2,12]');
+  await account();
+  expect(values().displayEfforts).toEqual(['warm_up', 'unspecified', 'rir_4', 'rir_2', 'rir_0', 'cooldown', 'technique']);
+  expect(Storage.getItemSync(key)).toBe('[0,2,12]');
 });
 
 it('caps constituent muscle attainment before averaging, including untrained muscles', () => {

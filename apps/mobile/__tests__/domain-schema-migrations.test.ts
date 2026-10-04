@@ -130,7 +130,7 @@ describe('domain schema and runtime migrations', () => {
     // group cache is m0004, m0005 empties it for the raw-set payload shape,
     // exercise_group_links is m0006, the kg-only cutover is m0010, and the
     // derived exercise session facts are m0011 (tables) and m0012 (triggers).
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(13);
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(15);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -173,6 +173,8 @@ describe('domain schema and runtime migrations', () => {
       'm0010',
       'm0011',
       'm0012',
+      'm0013',
+      'm0014',
     ]);
   });
 

@@ -28,6 +28,7 @@ export const exerciseSessionFacts = sqliteTable(
     volumeKg: real('volume_kg'),
     volumeComplete: integer('volume_complete', { mode: 'boolean' }).notNull(),
     workingSets: integer('working_sets').notNull(),
+    volumeSets: integer('volume_sets').notNull().default(0),
     prE1rm: integer('pr_e1rm', { mode: 'boolean' }).notNull(),
     prWeight: integer('pr_weight', { mode: 'boolean' }).notNull(),
     prVolume: integer('pr_volume', { mode: 'boolean' }).notNull(),
@@ -49,12 +50,13 @@ export const exerciseSessionFactsStale = sqliteTable('exercise_session_facts_sta
 
 /**
  * Singleton: the rules version the whole facts table was last fully built
- * under. A missing row (fresh install, wipe) or an older version forces a full
- * rebuild before the next read.
+ * under, with a canonical personal effort-policy key. A missing row (fresh install, wipe) or an older version forces a full
+ * rebuild before the next read; a different effort-policy key does the same.
  */
 export const exerciseSessionFactsState = sqliteTable('exercise_session_facts_state', {
   id: text('id').primaryKey().notNull().default('facts'),
   rulesVersion: integer('rules_version').notNull(),
+  effortPolicyKey: text('effort_policy_key').notNull().default(''),
 });
 
 export type ExerciseSessionFact = typeof exerciseSessionFacts.$inferSelect;

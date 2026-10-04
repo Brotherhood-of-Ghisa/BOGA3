@@ -1,5 +1,5 @@
+import { personalCalculationContext } from '@/src/config/personal-effort';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
-import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
@@ -477,7 +477,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
-        loadContext: personalLoadContext(
+        loadContext: personalCalculationContext(
           bodyweightCalculationsEnabled,
           definitionById.get(exercise.exerciseDefinitionId),
           weight,

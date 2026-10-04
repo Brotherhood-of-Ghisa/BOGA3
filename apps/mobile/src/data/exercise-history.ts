@@ -1,3 +1,5 @@
+import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
+import type { EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
 import { loadAsOfWeightResolver } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
@@ -123,6 +125,7 @@ export type ExerciseHistoryTagRow = {
 };
 
 export type ExerciseHistoryDefinitionRow = {
+  effortPolicy?: EffortCalculationPolicy;
   id: string;
   name: string;
   deletedAt: Date | null;
@@ -228,6 +231,7 @@ const buildSessionEntry = (
       })
     )
     .sort(compareSetOrder);
+  const loadContext = personalLoadContext(definition.bodyweightCalculationsEnabled, definition, sessionRow, definition.effortPolicy);
   const sets: ExerciseHistorySetEntry[] = orderedSets.map((row) => ({
     setId: row.setId,
     orderIndex: row.orderIndex,
@@ -236,17 +240,14 @@ const buildSessionEntry = (
     setType: normalizeSessionSetType(row.setType),
     isWorking: isWorkingSet({
       weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
-    }),
+    }, loadContext.effortPolicy),
   }));
 
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
-  const loadContext = personalLoadContext(definition.bodyweightCalculationsEnabled, definition, sessionRow);
-  // The session's 1RM, top set and volume read working sets only (the 1RM and
-  // top set feed `allTimeBest`); every row keeps its own figures.
+  // Strength reads working sets; volume uses its independent policy. Every
+  // performed row retains its own figures.
   const { estimatedOneRepMax, topWeightSet, volumeCoverage } = summarizeExerciseLoad(
-    orderedSets.filter((row) => isWorkingSet({
-      weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
-    })),
+    orderedSets,
     loadContext,
   );
   const totalVolume = volumeCoverage.totalVolumeKgReps;
@@ -401,7 +402,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .from(userSettings)
       .where(eq(userSettings.id, 'settings'))
       .get()?.enabled ?? false;
-    return { ...row, bodyweightCalculationsEnabled, deletedAt: row.deletedAt ?? null };
+    return { ...row, bodyweightCalculationsEnabled, effortPolicy: getPersonalEffortPolicy(), deletedAt: row.deletedAt ?? null };
   },
   async loadSessionsForExercise({ exerciseDefinitionId, start, end, sessionId }) {
     const database = await bootstrapLocalDataLayer();

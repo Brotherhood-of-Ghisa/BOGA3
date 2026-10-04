@@ -1,4 +1,5 @@
 import { __resetPreferenceMigrationForTests, migrateBrowsingPreferences } from './migration';
+import { configureDisplayEfforts, configurePersonalEffortPolicy } from '../config/personal-effort';
 import {
   type AccountLocalPreferences,
   DEFAULT_ACCOUNT_LOCAL_PREFERENCES,
@@ -33,6 +34,8 @@ const publish = (next: Partial<AccountLocalPreferenceState>) => {
   const updated = { ...state, ...next, values };
   if (updated.values === state.values && updated.pending === state.pending && updated.error === state.error) return;
   state = updated;
+  configureDisplayEfforts(updated.values.displayEfforts);
+  configurePersonalEffortPolicy(updated.values);
   for (const listener of listeners) listener();
 };
 export function initializeAccountLocalPreferences(isConfigured: boolean): void {
@@ -156,6 +159,8 @@ export function __resetAccountLocalPreferencesForTests(): void {
   __resetPreferenceMigrationForTests();
   generation += 1;
   state = emptyState();
+  configureDisplayEfforts(state.values.displayEfforts);
+  configurePersonalEffortPolicy(state.values);
   loadError = null;
   saveError = null;
   validationError = null;

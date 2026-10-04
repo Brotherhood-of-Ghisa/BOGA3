@@ -1,4 +1,5 @@
 // Device-local account choices. Keep this module free of data, auth and UI imports.
+import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelection, type EffortChoice } from '../exercise-calculations/effort-policy';
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
 export type ExerciseListSort = 'favourite' | 'name';
 export type PastRecordsGymScope = 'all' | 'current-gym';
@@ -10,7 +11,9 @@ export type AccountLocalPreferences = {
   dateFormat: ExerciseDateFormat;
   pastRecordsGymScope: PastRecordsGymScope;
   weeklyWorkingSetTarget: number;
-  visibleEffortGrades: number[];
+  displayEfforts: EffortChoice[];
+  workingSetEfforts: EffortChoice[];
+  volumeEfforts: EffortChoice[];
   targetWindowWeeks: number;
   historyLookbackWeeks: number;
   heatmapView: HeatmapView;
@@ -27,7 +30,9 @@ export const DEFAULT_EXERCISE_LIST_PREFERENCES: ExerciseListPreferences = {
 export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   ...DEFAULT_EXERCISE_LIST_PREFERENCES,
   weeklyWorkingSetTarget: 8,
-  visibleEffortGrades: [0, 1, 2, 3],
+  displayEfforts: [...DEFAULT_DISPLAY_EFFORTS],
+  workingSetEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.workingSetEfforts],
+  volumeEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.volumeEfforts],
   targetWindowWeeks: 4,
   historyLookbackWeeks: 52,
   heatmapView: 'weekly',
@@ -44,7 +49,9 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   dateFormat: 'Choose a valid date format.',
   pastRecordsGymScope: 'Choose a valid gym filter.',
   weeklyWorkingSetTarget: 'Weekly working-set target must be a positive whole number.',
-  visibleEffortGrades: 'Choose at least one RIR grade. RIR values must be non-negative whole numbers.',
+  displayEfforts: 'Choose at least one effort label to display.',
+  workingSetEfforts: 'Choose valid working-set effort labels.',
+  volumeEfforts: 'Choose valid volume effort labels.',
   targetWindowWeeks: 'Progress period must be a whole number of weeks from 1 to 52.',
   historyLookbackWeeks: `History look-back must be a positive whole number of weeks up to ${MAX_HISTORY_LOOKBACK_WEEKS}.`,
   heatmapView: 'Choose Daily or Weekly for heatmaps.',
@@ -59,8 +66,9 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';
     case 'pastRecordsGymScope': return value === 'all' || value === 'current-gym';
     case 'weeklyWorkingSetTarget': return isPositiveSafeInteger(value);
-    case 'visibleEffortGrades': return Array.isArray(value) && value.length > 0 &&
-      value.every(isNonNegativeSafeInteger) && new Set(value).size === value.length;
+    case 'displayEfforts': return isEffortSelection(value) && value.length > 0;
+    case 'workingSetEfforts':
+    case 'volumeEfforts': return isEffortSelection(value);
     case 'targetWindowWeeks': return isPositiveSafeInteger(value) && value <= 52;
     case 'historyLookbackWeeks': return isPositiveSafeInteger(value) && value <= MAX_HISTORY_LOOKBACK_WEEKS;
     case 'heatmapView': return value === 'daily' || value === 'weekly';

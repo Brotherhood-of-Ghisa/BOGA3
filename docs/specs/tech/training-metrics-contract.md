@@ -18,8 +18,11 @@ sites, and the Wathan constants outside the 1RM estimate.
 
 ## 1. Counted set
 
-A set counts toward a statistic when it is a **working set**. A working set
-is a **confirmed performed set** whose `set_type` is not `warm_up`.
+Personal statistics have two independent eligibility rules. A **working set**
+controls set/session counts, 1RM and Weight records. A **volume-included set**
+controls aggregate volume and Volume records. Both must be **confirmed performed**.
+Groups and coaching retain the shared default: every confirmed performed set
+except `warm_up` contributes to every aggregate.
 
 - **Confirmed performed** means valid reps and Weight, and no
   `performance_status`. Planned, unperformed and legacy-skipped rows are not
@@ -32,33 +35,44 @@ is a **confirmed performed set** whose `set_type` is not `warm_up`.
 
   The input fields' validation, the performed check and every calculation all
   call this parser, so a value is valid everywhere or nowhere.
-- **Effort**: untagged sets, every RIR and unrecognised stored values are
-  working sets. Only `warm_up` is excluded. The rule is not configurable
-  (Settings’ visible effort labels only shape the picker and tap cycle).
-  One shared weekly working-set target grades each muscle’s resulting count; neither visibility nor targets
-  alter eligibility, Volume, 1RM, records or counted sessions.
-- A **warm-up** keeps its own per-set figures (1RM, volume) wherever sets are
-  listed (`calculateSetMetrics`). It feeds no aggregate, count, record, best,
-  PR or baseline.
+- **Personal effort policy**: Settings has fixed Warm-up, Unspecified, RIR-4
+  through RIR-0, Cooldown and Technique rows, with independent Display,
+  Working set and Volume columns. All labels default displayed. Unspecified/RIR
+  rows default on for both calculation columns; Warm-up/Cooldown/Technique
+  default off. At least one Display choice is required; either calculation
+  column may be empty. Hidden labels can contribute, and visible labels can
+  be excluded. Historical canonical RIR above four follows the RIR-4 checkboxes; unknown
+  stored labels follow Unspecified. Their recorded labels stay intact and do
+  not become selectable options.
+- **Scope**: these choices are account-local on this device. Personal adapters
+  pass the durable active policy explicitly to the kernel. Groups and coaching
+  receive no device policy and continue excluding only `warm_up`; no group
+  settings are displayed. The weekly muscle target grades working-set counts
+  and never changes eligibility.
+- Every performed row keeps its own per-set 1RM and volume, regardless of
+  either calculation checkbox (`calculateSetMetrics`). Changing the policy
+  recalculates personal history and records without rewriting workouts.
 
-**Code.** The predicate is `isWorkingSet`. Its effort half, `isWorkingSetType`,
+**Code.** The predicates are `isWorkingSet` and `isVolumeSet`, taking an optional
+explicit effort policy. Its working-set effort half, `isWorkingSetType`,
 is read alone only where performance is already settled:
 
 - the group evaluator's stored `working` flag on each set fact;
 - projections of performed sets.
 
-Aggregations filter at the source, so their consumers never re-check:
+Aggregations apply the two policies at the source:
 
 - `workingSetsOnly` (`exercise-calculations/analytics.ts`);
-- `collectMuscleSetContributions` (`data/muscle-analytics.ts`), which emits
-  working sets only;
+- `collectMuscleSetContributions` (`data/muscle-analytics.ts`), which carries
+  independent working and volume eligibility;
 - `eligibleSetsByBlockInSessionOrder` (`exercise-calculations/best-set.ts`).
 
-The agent API imports the same modules. SQL never re-implements the rule: the
-group functions read the evaluator's `working` flag
-(`tech/groups-contract.md`, §2.9). Changing the rule needs a
-`GROUP_EVAL_RULES_VERSION` bump and an `EXERCISE_SESSION_FACTS_RULES_VERSION`
-bump.
+The agent API imports the same modules with the shared default. SQL never
+re-implements the rule: group functions read the evaluator's `working` flag
+(`tech/groups-contract.md`, §2.9). Changing the shared group rule needs a
+`GROUP_EVAL_RULES_VERSION` bump. Changing personal derivation bumps
+`EXERCISE_SESSION_FACTS_RULES_VERSION`; each facts read also compares its stored
+canonical policy key, rebuilding all definitions when the active choices differ.
 
 ## 2. Counted session
 
@@ -67,9 +81,10 @@ least one working set** (§1).
 
 Scoped to one exercise, or to one muscle, the session counts for that scope
 when it holds a working set of that exercise, or a working set mapped to that
-muscle. A session, exercise or muscle with only warm-ups (or with no confirmed
-set) did not happen as far as statistics go. It adds no session, cell,
-baseline, comparison observation or `Last` date.
+muscle. A scope with no working set adds no counted session, working-set cell,
+strength record, comparison baseline or `Last` date. It may still contribute to
+volume totals, volume heatmap cells and Volume records when it has a
+volume-included set. A scope with neither kind contributes nothing.
 
 **Code.**
 
@@ -91,7 +106,7 @@ Nothing counts sessions from `sessions.length` or from session status alone.
 | Today week and month `Sessions` | whole session |
 | Exercise row `Last:` and `<n> sessions`, favourites, Stats exercise table session count | per exercise |
 | Exercise and muscle heatmap cells, exercise block history (and its `limit`), session-comparison baselines | per exercise / per muscle |
-| Exercise session facts rows | per exercise |
+| Exercise session facts rows | per exercise, with either working or volume-included sets; rows with zero working sets do not imply a counted session |
 | Agent API exercise context, `exercise_count` | per exercise |
 | Group week summary and board counts | the group functions over facts with `working` (`tech/groups-contract.md`, §4.7) |
 
@@ -108,14 +123,15 @@ and gym chips count rows with a performed set.
 
 ## 3. Records
 
-A record is a lifter's all-time best for one exercise definition, over its
-counted sessions (§2) and their working sets (§1). There are three kinds:
+A record is a lifter's all-time best for one exercise definition. Strength
+records use working sets; Volume records independently use volume-included
+sets (§1), including sessions with zero working sets. There are three kinds:
 
 | Record | A session's value | Beats the record when |
 | --- | --- | --- |
 | 1RM | its best estimated 1RM (§4 formula), over every block | strictly higher |
 | Weight | its top Weight: the highest raw entered kg, and at that kg the most reps | heavier, or as heavy with more reps |
-| Volume | its total working-set volume, every block summed; only when complete | strictly higher |
+| Volume | its total volume-included volume, every block summed; only when complete | strictly higher |
 
 - **Order.** Sessions are folded by `completed_at`, then session id. Within a
   session, a tie between sets goes to the first set in session order (block,
@@ -155,8 +171,8 @@ read the rule:
 - the exercise page, session view and completion markers;
 - the agent API's `personal_records`.
 
-Changing the rule bumps `EXERCISE_SESSION_FACTS_RULES_VERSION` and the agent
-API's `metric_revision`.
+Changing personal derivation bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`.
+Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 
 **What each screen shows.**
 
@@ -226,15 +242,16 @@ the calculated-load breakdown.
   records (§3).
 
 **Top weight** is the highest raw entered Weight in kg, and at that weight the
-most reps (§3). It never includes the bodyweight contribution and never changes
-after a preference, contribution or reading edit.
+most reps among working sets (§3). It never includes the bodyweight contribution.
+Bodyweight contribution and reading edits do not change it; Working set effort
+choices may change which recorded set qualifies.
 
 **Totals.**
 
-- A session's or exercise's Volume is the sum over its working sets (§1)
+- A session's or exercise's Volume is the sum over its volume-included sets (§1)
   (`summarizeVolume`).
 - When a set's load is unknown, the total is a known subtotal, with coverage
-  shown as `Known subtotal from X of Y working sets`.
+  shown as `Known subtotal from X of Y included sets`.
 
 **Muscle volume.**
 

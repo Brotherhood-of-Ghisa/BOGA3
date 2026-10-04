@@ -1,6 +1,7 @@
 // Pure calculation boundary shared by mobile and Deno consumers. It knows
 // nothing about persistence, UI labels, or data provenance.
 import { estimateOneRepMax, parseSetReps, parseSetWeight } from './index.ts';
+import type { EffortCalculationPolicy } from './effort-policy.ts';
 import {
   canonicalizeWeightForReps,
   isConfirmedPerformedSet,
@@ -11,6 +12,7 @@ export type CalculationPolicy = 'ordinary' | 'personal' | 'group';
 export type LoadInputMode = 'total_load' | 'per_side_load';
 
 export type LoadContext = {
+  effortPolicy?: EffortCalculationPolicy;
   policy: CalculationPolicy;
   bodyweightContribution: number;
   bodyWeightKg?: number | null;

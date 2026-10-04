@@ -1,7 +1,7 @@
+import { personalCalculationContext } from '@/src/config/personal-effort';
 import { loadAsOfWeightResolver, resolveSessionWeights } from '@/src/data/bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { sessionBodyWeightForCalculation } from '@/src/bodyweight/as-of';
-import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
@@ -205,7 +205,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       .map(({ capturedExerciseName, currentExerciseName, bodyweightContribution, loadInputMode, startedAt, ...row }) => ({
         ...row,
         exerciseName: currentExerciseName ?? capturedExerciseName,
-        loadContext: personalLoadContext(bodyweightCalculationsEnabled, {
+        loadContext: personalCalculationContext(bodyweightCalculationsEnabled, {
           bodyweightContribution: bodyweightContribution ?? 0,
           loadInputMode: loadInputMode ?? 'total_load',
         }, resolveWeight(startedAt)),

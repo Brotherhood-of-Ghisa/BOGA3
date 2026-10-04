@@ -374,11 +374,11 @@ describe('exercise page model', () => {
 
   it('skips hidden efforts for new rows without rewriting the prescribed source', () => {
     const source = plannedSet('p', '80', '6', 'rir_3');
-    expect(addSet([source], 'next', [0, 2])[1]).toMatchObject({
+    expect(addSet([source], 'next', ['rir_2', 'rir_0'])[1]).toMatchObject({
       setType: 'rir_2', plannedSetType: null, performanceStatus: 'unperformed',
     });
     expect(source.plannedSetType).toBe('rir_3');
-    expect(addSet([source], 'next', [4])[1].setType).toBe('rir_3');
+    expect(addSet([source], 'next', ['rir_4'])[1].setType).toBe('rir_4');
   });
 
   it('keeps an explicitly cleared planned effort blank through edits and confirmation', () => {

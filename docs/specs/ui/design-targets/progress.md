@@ -101,6 +101,12 @@ History uses the saved look-back in both views. Muscle Sets cells compare daily
 or weekly counts against that same weekly target; other metric scaling stays unchanged.
 Legends and accessibility labels explain target colouring.
 
+Personal metrics use the operator's independent Working set and Volume effort
+columns (2026-10-04; `tech/training-metrics-contract.md`). Volume-only exercise
+rows remain visible with zero Sets and unavailable 1RM; heatmaps retain their
+volume cells without creating working-set counts or strength values. Per-set
+figures and recorded effort labels stay visible regardless of the two choices.
+
 ## States
 
 Device: iPhone simulator at 390pt width, light.

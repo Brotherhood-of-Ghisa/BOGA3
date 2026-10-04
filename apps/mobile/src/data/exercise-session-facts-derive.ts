@@ -1,7 +1,7 @@
 // Pure derivation of exercise session facts (spec 05, "Exercise session
 // facts"): one exercise definition's completed history in, one row per session
-// out, each with the session's bests and its personal-record flags. Only
-// working sets count: a session with none for the definition has no row.
+// out, each with the session's bests and personal-record flags. A row can
+// carry volume with zero working sets when the two policies differ.
 
 import { summarizeSessionBests } from '@/src/exercise-calculations/best-set';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
@@ -14,7 +14,7 @@ import type { ExerciseSessionFact } from './schema';
  * Bump when a rule below changes what a row holds. Every device then rebuilds
  * the whole table once before its next facts read.
  */
-export const EXERCISE_SESSION_FACTS_RULES_VERSION = 4;
+export const EXERCISE_SESSION_FACTS_RULES_VERSION = 5;
 
 export type FactsSetInput = {
   id: string;
@@ -46,7 +46,7 @@ type SessionBests = Omit<ExerciseSessionFactRow, 'prE1rm' | 'prWeight' | 'prVolu
 /** The order PR history uses: the record order (`compareRecordOrder`). */
 export const compareFactSessionOrder = compareRecordOrder;
 
-/** The session's bests for one definition, or null when it has no working set. */
+/** The session's bests, or null when it has neither working nor volume-included sets. */
 export const summarizeFactSession = (
   exerciseDefinitionId: string,
   session: FactsSessionInput,
@@ -65,6 +65,7 @@ export const summarizeFactSession = (
     volumeKg: bests.volumeKg,
     volumeComplete: bests.volumeComplete,
     workingSets: bests.workingSets,
+    volumeSets: bests.volumeSets,
   };
 };
 

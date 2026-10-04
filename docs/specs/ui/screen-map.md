@@ -172,7 +172,7 @@ Brief entrypoint map of the current mobile screens.
     exercise names to wrap without truncation, retain complete accessibility
     wording, and open the exercise's history sheet as one whole-row
     action. Only exercises with at least one working set in the selected
-    calendar-week window appear; `Vol` and `1RM` read working sets only.
+    calendar-week window appear; `Vol` reads volume-included sets and `1RM` reads working sets (the independent personal effort policy).
   - Exercise, Sets, and Vol are the only sort controls: default Sets high-to-low;
     Exercise cycles most/least recently completed across all-time working-set history;
     Sets and Vol each cycle high/low. The 1RM header is static. Missing recency stays last, and ties use

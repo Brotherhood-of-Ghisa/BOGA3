@@ -83,66 +83,49 @@ it('edits one shared weekly target inline and retains invalid drafts in the cent
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('offers visibility alone, locks W-Up and unspecified, adds RIR zero/custom grades and rejects the last removal', async () => {
+it('offers nine fixed labels and independent Display, Working set and Volume controls with no Add', async () => {
   await openSettings();
-  for (const id of ['warm-up', 'unspecified']) {
-    expect(screen.getByTestId(`settings-effort-${id}-visible`)).toHaveProp('accessibilityState', { checked: true, disabled: true });
-  }
-  expect(screen.getByLabelText('RIR 2, Visible')).toHaveProp('accessibilityRole', 'checkbox');
-  expect(screen.queryByText('Counts as W/set')).toBeNull();
-  for (const grade of [1, 2, 3, 0]) fireEvent.press(screen.getByTestId(`settings-effort-rir-${grade}-visible`));
-  expect(values().visibleEffortGrades).toEqual([0]);
+  expect(screen.queryByTestId('settings-add-rir-input')).toBeNull();
+  expect(screen.queryByText('Add')).toBeNull();
+  expect(screen.getAllByRole('checkbox')).toHaveLength(27);
+  expect(screen.getByLabelText('Technique, Display')).toHaveProp('accessibilityState', { checked: true });
+  expect(screen.getByLabelText('Technique, Working set')).toHaveProp('accessibilityState', { checked: false });
+  fireEvent.press(screen.getByLabelText('RIR-2, Display'));
+  expect(values().displayEfforts).not.toContain('rir_2');
+  expect(values().workingSetEfforts).toContain('rir_2');
+  expect(values().volumeEfforts).toContain('rir_2');
+  fireEvent.press(screen.getByLabelText('Technique, Volume'));
+  expect(values().volumeEfforts).toContain('technique');
+  expect(values().workingSetEfforts).not.toContain('technique');
+  for (const id of [...values().displayEfforts]) fireEvent.press(screen.getByTestId(`settings-effort-${id}-displayEfforts`));
+  expect(values().displayEfforts).toHaveLength(1);
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/at least one/);
-  fireEvent.changeText(screen.getByTestId('settings-add-rir-input'), '-1');
-  fireEvent.press(screen.getByTestId('settings-add-rir-button'));
-  expect(screen.getByTestId('settings-add-rir-input')).toHaveProp('value', '-1');
-  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('RIR value must be a non-negative whole number.');
-  fireEvent.changeText(screen.getByTestId('settings-add-rir-input'), '12');
-  fireEvent.press(screen.getByTestId('settings-add-rir-button'));
-  expect(values().visibleEffortGrades).toEqual([0, 12]);
-  expect(screen.getByLabelText('RIR 12, Visible')).toBeTruthy();
-  expect(screen.getByTestId('settings-add-rir-input')).toHaveProp('value', '');
 });
 
-it('disables Add for an empty RIR draft without creating a validation error', async () => {
-  await openSettings();
-  const write = jest.spyOn(Storage, 'setItemSync');
-  for (const draft of ['', '  ']) {
-    fireEvent.changeText(screen.getByTestId('settings-add-rir-input'), draft);
-    expect(screen.getByTestId('settings-add-rir-button')).toBeDisabled();
-    fireEvent.press(screen.getByTestId('settings-add-rir-button'));
-  }
-  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
-  expect(write).not.toHaveBeenCalled();
-});
-
-it.each([false, true])('clears a retried RIR addition while retaining a newer draft (edited: %s)', async edited => {
+it('retains a failed calculation checkbox edit and retries through the centralized Refresh', async () => {
   await openSettings();
   const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
-  fireEvent.changeText(screen.getByTestId('settings-add-rir-input'), '12');
-  fireEvent.press(screen.getByTestId('settings-add-rir-button'));
-  expect(values().visibleEffortGrades).toEqual([0, 1, 2, 3]);
-  expect(screen.getByTestId('settings-add-rir-input')).toHaveProp('value', '12');
+  fireEvent.press(screen.getByLabelText('Technique, Working set'));
+  expect(values().workingSetEfforts).not.toContain('technique');
+  expect(screen.getByLabelText('Technique, Working set')).toHaveProp('accessibilityState', { checked: true });
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
-  if (edited) fireEvent.changeText(screen.getByTestId('settings-add-rir-input'), '15');
   write.mockRestore();
   fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
-  await waitFor(() => expect(values().visibleEffortGrades).toContain(12));
-  expect(screen.getByTestId('settings-add-rir-input')).toHaveProp('value', edited ? '15' : '');
+  await waitFor(() => expect(values().workingSetEfforts).toContain('technique'));
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('updates an already mounted effort picker without rewriting its hidden selected grade', async () => {
+it('updates a mounted picker while keeping its hidden selected effort intact', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
   const select = jest.fn();
   render(<EffortSheet visible selected="rir_2" onSelect={select} onDismiss={jest.fn()} />);
   expect(screen.getByTestId('exercise-effort-option-rir_2')).toHaveProp('accessibilityState', { selected: true, disabled: false });
-  act(() => updatePreferences({ visibleEffortGrades: [0, 12] }));
+  act(() => updatePreferences({ displayEfforts: ['rir_0', 'technique'] }));
   expect(screen.queryByTestId('exercise-effort-option-rir_2')).toBeNull();
-  expect(screen.getByTestId('exercise-effort-option-rir_12')).toBeTruthy();
-  expect(screen.getByTestId('exercise-effort-option-none')).toBeTruthy();
-  expect(screen.getByTestId('exercise-effort-option-warm_up')).toBeTruthy();
+  expect(screen.getByTestId('exercise-effort-option-technique')).toBeTruthy();
+  expect(screen.queryByTestId('exercise-effort-option-none')).toBeNull();
+  expect(screen.queryByTestId('exercise-effort-option-warm_up')).toBeNull();
   expect(select).not.toHaveBeenCalled();
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });

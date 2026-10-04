@@ -8,13 +8,13 @@ import { deriveExercisePersonalRecord } from '@/src/session-insights';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import {
-  canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet,
+  canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet, isVolumeSet,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
  * The read-only session view's presentation model (`ux-rules` §14b): one
  * card per exercise with its set rows, a done count and a
- * record, plus the summary totals (Volume reads working sets only). Pure — the route loads the
+ * record, plus the independent working-set and Volume totals. Pure — the route loads the
  * draft and the history and renders what this returns.
  */
 
@@ -141,7 +141,8 @@ export const buildSessionViewModel = (
   historicalBestByDefinitionId: ReadonlyMap<string, number>
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
-  const workingMetrics: SetMetrics[] = [];
+  const volumeMetrics: SetMetrics[] = [];
+  let workingSetCount = 0;
 
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
     const context = exercise.loadContext ?? ordinaryLoadContext();
@@ -158,7 +159,8 @@ export const buildSessionViewModel = (
     const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
 
     const rows = figures.map((row): SessionViewSetRow => {
-      if (isWorkingSet(row.set)) workingMetrics.push(row.metric);
+      if (isWorkingSet(row.set, context.effortPolicy)) workingSetCount += 1;
+      if (isVolumeSet(row.set, context.effortPolicy)) volumeMetrics.push(row.metric);
       return formatSetRow({
         id: row.set.id,
         ...row.shown,
@@ -178,7 +180,7 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, workingSetCount: workingMetrics.length, ...sessionVolumeSummary(summarizeVolume(workingMetrics)) };
+  return { cards, workingSetCount, ...sessionVolumeSummary(summarizeVolume(volumeMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */

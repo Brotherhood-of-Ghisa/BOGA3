@@ -449,28 +449,28 @@ describe('ExercisePageScreen', () => {
     await openPage();
     const saved = await benchSets();
     expect(saved[2].plannedSetType).toBe('rir_1');
-    act(() => updatePreferences({ visibleEffortGrades: [0, 12] }));
+    act(() => updatePreferences({ displayEfforts: ['warm_up', 'unspecified', 'rir_4', 'rir_0'] }));
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 1');
     expect((await benchSets())[2]).toMatchObject(saved[2]);
     fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
     expect(screen.queryByTestId('exercise-effort-option-rir_1')).toBeNull();
-    expect(screen.getByTestId('exercise-effort-option-rir_12')).toBeTruthy();
+    expect(screen.getByTestId('exercise-effort-option-rir_4')).toBeTruthy();
     fireEvent.press(screen.getByTestId('exercise-effort-sheet-backdrop', { includeHiddenElements: true }));
     fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
     expect(screen.getByLabelText('Change effort, currently W-Up')).toBeTruthy();
     fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
     fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
-    expect(screen.getByLabelText('Change effort, currently RIR 12')).toBeTruthy();
+    expect(screen.getByLabelText('Change effort, currently RIR 4')).toBeTruthy();
     // Historical records remain based on every confirmed non-warm-up set.
     fireEvent.press(screen.getByTestId('exercise-records-toggle'));
     expect(screen.getByTestId('exercise-record-vol')).toHaveTextContent(/Vol2080.*4 sets/);
     expect(screen.getByTestId('exercise-record-1rm')).toHaveTextContent(/^1RM102\.1/);
-    await waitFor(async () => expect((await benchSets())[2].setType).toBe('rir_12'));
+    await waitFor(async () => expect((await benchSets())[2].setType).toBe('rir_4'));
   });
 
   it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
     await openPage();
-    for (const label of ['RIR 0', 'W-Up', 'none', 'RIR 3', 'RIR 2', 'RIR 1']) {
+    for (const label of ['RIR 0', 'Cooldown', 'Technique', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
       fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
       expect(screen.getByLabelText(`Change effort, currently ${label}`)).toBeTruthy();
     }
@@ -574,7 +574,7 @@ describe('ExercisePageScreen', () => {
     fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
     fireEvent.press(await screen.findByTestId('exercise-effort-option-rir_3'));
     await waitFor(async () => expect((await benchSets())[5].setType).toBe('rir_3'));
-    act(() => updatePreferences({ visibleEffortGrades: [0, 2, 12] }));
+    act(() => updatePreferences({ displayEfforts: ['warm_up', 'unspecified', 'rir_4', 'rir_2', 'rir_0'] }));
     if (action === 'add') fireEvent.press(screen.getByTestId('exercise-add-set'));
     else fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
       nativeEvent: { actionName: 'confirm' },
@@ -586,13 +586,13 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByLabelText('Change effort, currently RIR 2')).toBeTruthy();
   });
 
-  it('keeps inherited hidden effort when there is no next visible RIR', async () => {
+  it('uses the first visible choice when inherited effort has no harder visible RIR', async () => {
     await openPage();
-    act(() => updatePreferences({ visibleEffortGrades: [2, 12] }));
+    act(() => updatePreferences({ displayEfforts: ['rir_4', 'rir_2'] }));
     fireEvent.press(screen.getByTestId('exercise-add-set'));
     await waitFor(async () => expect(await benchSets()).toHaveLength(6));
-    expect((await benchSets())[5].setType).toBe('rir_0');
-    expect(screen.getByLabelText('Change effort, currently RIR 0')).toBeTruthy();
+    expect((await benchSets())[5].setType).toBe('rir_4');
+    expect(screen.getByLabelText('Change effort, currently RIR 4')).toBeTruthy();
   });
 
   it('warns before Complete discards planned sets, keeps them as not performed, then goes back', async () => {

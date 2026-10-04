@@ -1,4 +1,5 @@
 import { parseSetReps, parseSetWeight } from './parse.ts';
+import { includesEffort, type EffortCalculationPolicy } from './effort-policy.ts';
 
 export type SetValueInput = {
   reps: string;
@@ -35,23 +36,29 @@ export const isConfirmedPerformedSet = (set: SetPerformanceInput): boolean =>
   (set.performanceStatus === null || set.performanceStatus === undefined);
 
 /**
- * The effort half of the counted-set rule: every set type but a warm-up.
- * Untagged, any RIR and unrecognised stored values all count. Read it alone
+ * The effort half of the counted-set rule. Without a personal policy, the
+ * shared group/coaching rule excludes only warm-up. Read it alone
  * only where performance is already settled (a stored flag, a projection of
  * performed sets); otherwise use `isWorkingSet`. The group evaluator stores it
  * on every set fact: changing it needs a `GROUP_EVAL_RULES_VERSION` bump.
  */
-export const isWorkingSetType = (setType: unknown): boolean => setType !== 'warm_up';
+export const isWorkingSetType = (setType: unknown, policy?: EffortCalculationPolicy): boolean =>
+  policy ? includesEffort(policy.workingSetEfforts, setType) : setType !== 'warm_up';
 
 export type WorkingSetInput = SetPerformanceInput & { setType?: unknown };
 
 /**
  * The counted-set rule (`training-metrics-contract.md` §1): a confirmed
- * performed set that is not a warm-up. A warm-up row keeps its own per-set
- * figures, but feeds no statistic, record, best, PR or baseline.
+ * performed set selected by the personal working-set policy, or by the
+ * shared default. Per-set figures are independent of aggregate eligibility.
  */
-export const isWorkingSet = (set: WorkingSetInput): boolean =>
-  isConfirmedPerformedSet(set) && isWorkingSetType(set.setType);
+export const isWorkingSet = (set: WorkingSetInput, policy?: EffortCalculationPolicy): boolean =>
+  isConfirmedPerformedSet(set) && isWorkingSetType(set.setType, policy);
+
+/** Volume eligibility is independent of working-set eligibility in personal calculations. */
+export const isVolumeSet = (set: WorkingSetInput, policy?: EffortCalculationPolicy): boolean =>
+  isConfirmedPerformedSet(set) && (policy
+    ? includesEffort(policy.volumeEfforts, set.setType) : isWorkingSetType(set.setType));
 
 /**
  * The counted-session rule (`training-metrics-contract.md` §2): a session —
@@ -61,8 +68,9 @@ export const isWorkingSet = (set: WorkingSetInput): boolean =>
 export const isCountedSession = <T>(
   sets: Iterable<T>,
   read: (set: T) => WorkingSetInput,
+  policy?: EffortCalculationPolicy,
 ): boolean => {
-  for (const set of sets) if (isWorkingSet(read(set))) return true;
+  for (const set of sets) if (isWorkingSet(read(set), policy)) return true;
   return false;
 };
 
@@ -70,11 +78,12 @@ export const isCountedSession = <T>(
 export const countedSessionIds = <T>(
   rows: Iterable<T>,
   read: (row: T) => WorkingSetInput & { sessionId: string | null | undefined },
+  policy?: EffortCalculationPolicy,
 ): Set<string> => {
   const ids = new Set<string>();
   for (const row of rows) {
     const set = read(row);
-    if (set.sessionId != null && isWorkingSet(set)) ids.add(set.sessionId);
+    if (set.sessionId != null && isWorkingSet(set, policy)) ids.add(set.sessionId);
   }
   return ids;
 };

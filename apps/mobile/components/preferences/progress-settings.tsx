@@ -26,7 +26,7 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
         value={pending.heatmapView ?? values.heatmapView} onChange={heatmapView => updatePreferences({ heatmapView })}
         testIDPrefix="settings-heatmap-view" />
     </Card>
-    <Card style={styles.card}><EffortSettings values={{ ...values, ...pending }} savedGrades={values.visibleEffortGrades} /></Card>
+    <Card style={styles.card}><EffortSettings values={{ ...values, ...pending }} /></Card>
   </View>;
 }
 

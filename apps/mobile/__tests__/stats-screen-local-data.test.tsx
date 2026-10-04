@@ -132,6 +132,19 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
+  it('recalculates mounted counts and strength independently while retaining volume-only exercise rows', async () => {
+    await renderSeededStats();
+    const previousVolume = screen.getByTestId(`stats-exercise-volume-${SQUAT}`).props.children;
+    expect(Number(previousVolume)).toBeGreaterThan(0);
+    await act(async () => { updatePreferences({ workingSetEfforts: [] }); });
+    await waitFor(() => expect(screen.getByTestId('stats-card-sessions')).toHaveTextContent(/^Sessions0/));
+    await waitFor(() => expect(screen.getByTestId(`stats-exercise-sets-${SQUAT}`)).toHaveTextContent('0'));
+    expect(screen.getByTestId(`stats-exercise-1rm-${SQUAT}`)).toHaveTextContent('—');
+    expect(screen.getByTestId(`stats-exercise-volume-${SQUAT}`)).toHaveTextContent(String(previousVolume));
+    await act(async () => { updatePreferences({ volumeEfforts: [] }); });
+    await waitFor(() => expect(screen.queryByTestId(SQUAT_ROW)).toBeNull());
+  });
+
   it.each([['7', 7], [['7'], 7], ['30', 28], ['all', 28]] as const)
   ('opens the requested %s period using the saved window for legacy values', async (period, days) => {
     mockSearchParams = { period: typeof period === 'string' ? period : [...period] };

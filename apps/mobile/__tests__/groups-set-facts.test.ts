@@ -95,9 +95,9 @@ describe('group evaluator set facts', () => {
 
   it("stores the app's working-set rule: every set but a warm-up", () => {
     const workingOf = (setType: string | null) => factOf(row('s1', '100', '5', { set_type: setType })).working;
-    const setTypes = ['rir_0', 'rir_3', 'rir_12', null, 'working', 'RIR_1', 'warm_up'];
-    expect(setTypes.map(workingOf)).toEqual(setTypes.map(isWorkingSetType));
-    expect(setTypes.map(workingOf)).toEqual([true, true, true, true, true, true, false]);
+    const setTypes = ['rir_0', 'rir_3', 'rir_12', null, 'working', 'RIR_1', 'cooldown', 'technique', 'warm_up'];
+    expect(setTypes.map(workingOf)).toEqual(setTypes.map(value => isWorkingSetType(value)));
+    expect(setTypes.map(workingOf)).toEqual([true, true, true, true, true, true, true, true, false]);
     // Independent of performed: the summary filters on both.
     expect(factOf(row('s1', '100', '5', { set_type: 'rir_1', performance_status: 'planned' }))).toMatchObject({
       performed: false,

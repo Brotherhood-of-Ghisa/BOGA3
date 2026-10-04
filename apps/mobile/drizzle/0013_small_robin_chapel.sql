@@ -1,0 +1,1 @@
+ALTER TABLE `exercise_session_facts_state` ADD `effort_policy_key` text DEFAULT '' NOT NULL;

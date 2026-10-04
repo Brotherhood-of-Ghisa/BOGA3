@@ -1,5 +1,7 @@
 import { loadAsOfWeightResolver } from './bodyweight';
 import type { SessionWeightContext } from '@/src/bodyweight/as-of';
+import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
+import type { EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 
@@ -7,6 +9,7 @@ import { addFiniteVolume, calculateAnalyticsSetMetrics, personalLoadContext } fr
 import type { LoadInputMode } from '@/src/exercise-calculations/load-metrics';
 import {
   isWorkingSet,
+  isVolumeSet,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
@@ -42,6 +45,7 @@ export type ExerciseCatalogStats = {
 };
 
 export type ExerciseCatalogStatsRawHistory = {
+  effortPolicy?: EffortCalculationPolicy;
   sessions: ({ id: string; completedAt: Date } & SessionWeightContext)[];
   bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: { id: string; bodyweightContribution: number; loadInputMode: LoadInputMode }[];
@@ -132,6 +136,7 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       .where(inArray(exerciseDefinitions.id, definitionIds)).all() : [];
     return {
       bodyweightCalculationsEnabled,
+      effortPolicy: getPersonalEffortPolicy(),
       exerciseDefinitions: definitions,
       sessions: sessionsCompleted,
       sessionExercises: sessionExerciseRows,
@@ -206,8 +211,6 @@ const addWorkingSetToAggregate = (
   metric: ReturnType<typeof calculateAnalyticsSetMetrics>
 ): void => {
   aggregate.workingSetCount += 1;
-  aggregate.knownVolume = addFiniteVolume(aggregate.knownVolume, metric.volumeKgReps ?? 0);
-  aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps);
   const oneRm = metric.estimatedOneRepMaxKg;
   if (oneRm !== null && (aggregate.estimatedOneRepMax === null || oneRm > aggregate.estimatedOneRepMax)) {
     aggregate.estimatedOneRepMax = oneRm;
@@ -215,9 +218,9 @@ const addWorkingSetToAggregate = (
 };
 
 /**
- * Every figure reads working sets (`ux-rules.md` §5.11): "done", `Last:`,
- * favourite recency, session count, volume and 1RM. A warm-up-only exercise
- * did not happen as far as these go and gets no aggregate.
+ * Working sets settle (`ux-rules.md` §5.11) "done", `Last:`,
+ * favourite recency, session count and 1RM. Volume independently includes
+ * selected performed efforts, even when there are no working sets.
  */
 export const aggregateExerciseCatalogStats = (
   raw: ExerciseCatalogStatsRawHistory,
@@ -243,30 +246,37 @@ export const aggregateExerciseCatalogStats = (
     const defId = link.exerciseDefinitionId;
     const session = sessionById.get(link.sessionId);
     if (!session) continue;
-    // Every figure here reads working sets only; the distinct sessions they
-    // come from are the counted sessions (`isCountedSession`) per exercise.
-    if (!isWorkingSet({
+    // Working sets settle recency/counts/strength; volume is independent.
+    const values = {
       reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus, setType: set.setType,
-    })) {
-      continue;
-    }
+    };
+    const working = isWorkingSet(values, raw.effortPolicy);
+    const volumeIncluded = isVolumeSet(values, raw.effortPolicy);
+    if (!working && !volumeIncluded) continue;
     const metric = calculateAnalyticsSetMetrics({
       ...set,
-      ...personalLoadContext(raw.bodyweightCalculationsEnabled ?? false, definitionById.get(defId), session),
+      ...personalLoadContext(raw.bodyweightCalculationsEnabled ?? false, definitionById.get(defId), session, raw.effortPolicy),
     });
     const { completedAt } = session;
 
-    everDoneIds.add(defId);
-    const previousUse = lastCompletedAtById.get(defId);
-    if (!previousUse || completedAt > previousUse) lastCompletedAtById.set(defId, completedAt);
-    // Favourite is independent of the Stats screen's selected metric period.
-    if (completedAt.getTime() >= favouriteStart && completedAt <= now) {
-      addRecency(recencyScoresById, defId, completedAt, now);
+    if (working) {
+      everDoneIds.add(defId);
+      const previousUse = lastCompletedAtById.get(defId);
+      if (!previousUse || completedAt > previousUse) lastCompletedAtById.set(defId, completedAt);
+      // Favourite is independent of the Stats screen's selected metric period.
+      if (completedAt.getTime() >= favouriteStart && completedAt <= now) {
+        addRecency(recencyScoresById, defId, completedAt, now);
+      }
     }
 
     if (!isInWindow(completedAt, window)) continue;
     const aggregate = aggregatesById.get(defId) ?? emptyAggregate(defId);
     aggregatesById.set(defId, aggregate);
+    if (volumeIncluded) {
+      aggregate.knownVolume = addFiniteVolume(aggregate.knownVolume, metric.volumeKgReps ?? 0);
+      aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps);
+    }
+    if (!working) continue;
     addWorkingSetToAggregate(aggregate, metric);
     const sessionsSeen = sessionsSeenByDef.get(defId) ?? new Set<string>();
     sessionsSeenByDef.set(defId, sessionsSeen);

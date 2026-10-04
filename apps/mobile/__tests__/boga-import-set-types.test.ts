@@ -109,9 +109,10 @@ const makePackage = (
 
 describe('BOGA import set type enrichment', () => {
   it('applies the import effort ladder by set rank', () => {
-    expect([0, 1, 2, 3, 4, 5].map((rank) => setTypeForRank(rank, 6))).toEqual([
+    expect([0, 1, 2, 3, 4, 5, 6].map((rank) => setTypeForRank(rank, 7))).toEqual([
       'warm_up',
       null,
+      'rir_4',
       'rir_3',
       'rir_2',
       'rir_1',
@@ -131,7 +132,7 @@ describe('BOGA import set type enrichment', () => {
     );
     const sets = enriched.sessions[0].exercises[0].sets;
     expect(sets.map((set) => set.orderIndex)).toEqual([2, 0, 1]);
-    expect(sets.map((set) => set.setType)).toEqual(['rir_3', 'warm_up', null]);
+    expect(sets.map((set) => set.setType)).toEqual(['rir_4', 'warm_up', null]);
   });
 
   it('leaves kettlebell swings without registered effort', () => {

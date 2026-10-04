@@ -34,10 +34,15 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
   vocabulary: one inline “Weekly working sets per muscle” field applying the same
   target to every muscle group, “Progress period (weeks)” and “History look-back
   (weeks)” fields, the sole Daily/Weekly selector labelled “Heatmap view”, and
-  effort visibility checkboxes. W-Up and unspecified are
-  locked visible; RIR 0–3 can be hidden individually and custom grades added.
-  Checkbox labels include the grade and “Visible”, with 44pt targets. There is
-  no working-set counting control. Numeric drafts commit on editing completion;
+  the operator's fixed effort table (2026-10-04): Warm-up, Unspecified, RIR-4–0,
+  Cooldown and Technique, with Display, Working set and Volume columns. No Add
+  control. Every checkbox has a 44pt target and a label naming its row and column.
+  All Display defaults are on; the two calculation columns default on for
+  Unspecified/RIR and off for Warm-up/Cooldown/Technique. Keep at least one
+  Display choice; calculation columns may be empty. The columns are independent
+  and account-local on this device. Groups keep their shared rule and show no
+  effort settings. This operator brief supersedes the earlier visibility-only
+  controls. Numeric drafts commit on editing completion;
   invalid and unsaved drafts remain recoverable, with errors in Data & Sync.
 - Neither screen has an `accent` button.
 - Developer tools (dev builds only) is one `Card` headed by the `warning` glyph

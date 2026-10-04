@@ -1,8 +1,9 @@
+import { personalCalculationContext } from '@/src/config/personal-effort';
 import { loadAsOfWeightResolver } from './bodyweight';
 import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import {
-  addFiniteVolume, ordinaryLoadContext, personalLoadContext, summarizeExerciseLoad, workingSetsOnly,
+  addFiniteVolume, ordinaryLoadContext, summarizeExerciseLoad, workingSetsOnly,
 } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
@@ -94,12 +95,14 @@ export const aggregateExerciseDailyEffort = (
       bestRM1: null,
       highestWeight: null,
     };
-    // Every cell reads working sets: a warm-up-only day makes no cell.
-    const summary = summarizeExerciseLoad(workingSetsOnly(session.sets), session.loadContext ?? ordinaryLoadContext());
-    if (summary.volumeCoverage.eligibleSetCount === 0) continue;
+    // Volume and working-set cells independently include selected performed sets.
+    const context = session.loadContext ?? ordinaryLoadContext();
+    const working = workingSetsOnly(session.sets, context.effortPolicy);
+    const summary = summarizeExerciseLoad(session.sets, context);
+    if (summary.volumeCoverage.eligibleSetCount === 0 && working.length === 0) continue;
     day.knownVolume = addFiniteVolume(day.knownVolume, summary.volumeCoverage.knownVolumeKgReps);
     day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeCoverage.totalVolumeKgReps);
-    day.workingSetCount += summary.volumeCoverage.eligibleSetCount;
+    day.workingSetCount += working.length;
     if (summary.topWeightSet !== null) day.highestWeight = Math.max(day.highestWeight ?? 0, summary.topWeightSet.weight);
     if (summary.estimatedOneRepMax !== null) day.bestRM1 = Math.max(day.bestRM1 ?? 0, summary.estimatedOneRepMax);
     dayMap.set(dateKey, day);
@@ -289,7 +292,7 @@ const loadExerciseRawSessions = async (
     if (!session) continue;
     rawSessions.push({
       completedAt: session.completedAt,
-      loadContext: personalLoadContext(bodyweightCalculationsEnabled, definition, session),
+      loadContext: personalCalculationContext(bodyweightCalculationsEnabled, definition, session),
       sets: setsByExerciseId.get(seRow.id) ?? [],
     });
   }

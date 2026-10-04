@@ -537,7 +537,7 @@ pre-version-4 warm-up may count in the week summary for that long.
 `parseGroupPerformedSet`. The device's `toGroupPerformedSet` (§5) delegates
 to it, so card metrics and facts cannot diverge. It and the files it loads
 (`src/exercise-calculations/**`, `src/data/set-types.ts`,
-`src/config/training.ts`) import nothing through `@/`, and their imports name
+`src/exercise-calculations/effort-policy.ts`) import nothing through `@/`, and their imports name
 their `.ts` files. The mobile tsconfig
 sets `allowImportingTsExtensions` so Deno loads it by relative path, as
 `agent-api` loads `exercise-calculations`.

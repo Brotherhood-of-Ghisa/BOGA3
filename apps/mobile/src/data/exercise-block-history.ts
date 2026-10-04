@@ -1,5 +1,6 @@
+import { personalCalculationContext } from '@/src/config/personal-effort';
 import { loadAsOfWeightResolver } from './bodyweight';
-import { ordinaryLoadContext, personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
+import { ordinaryLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
@@ -212,10 +213,10 @@ export const aggregateExerciseBlockHistory = (
     const readSet = (row: ExerciseBlockHistorySetRow) => ({
       weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
     });
-    if (!isCountedSession(setRows, readSet)) continue;
-    const workingRows = setRows.filter((row) => isWorkingSet(readSet(row)));
+    if (!isCountedSession(setRows, readSet, session.loadContext?.effortPolicy)) continue;
+    const workingRows = setRows.filter((row) => isWorkingSet(readSet(row), session.loadContext?.effortPolicy));
     const summary = summarizeExerciseLoad(
-      workingRows.map((row) => ({ weightValue: row.weightValue, repsValue: row.repsValue, setType: row.setType })),
+      setRows.map((row) => ({ weightValue: row.weightValue, repsValue: row.repsValue, setType: row.setType })),
       session.loadContext ?? ordinaryLoadContext(),
     );
 
@@ -338,7 +339,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       .map((row) => ({
         sessionId: row.sessionId,
         completedAt: row.completedAt,
-        loadContext: personalLoadContext(bodyweightCalculationsEnabled, {
+        loadContext: personalCalculationContext(bodyweightCalculationsEnabled, {
           bodyweightContribution: row.bodyweightContribution ?? 0,
           loadInputMode: row.loadInputMode ?? 'total_load',
         }, resolveWeight(row.startedAt)),

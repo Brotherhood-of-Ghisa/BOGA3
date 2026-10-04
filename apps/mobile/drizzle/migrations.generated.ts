@@ -85,6 +85,18 @@ export const generatedMigrationBundle = {
     tag: "0012_exercise_session_facts_triggers",
     breakpoints: true,
   },
+  {
+    idx: 13,
+    when: 1791115798746,
+    tag: "0013_small_robin_chapel",
+    breakpoints: true,
+  },
+  {
+    idx: 14,
+    when: 1791116167557,
+    tag: "0014_parallel_the_hand",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -633,6 +645,8 @@ BEGIN
   SELECT \`id\` FROM \`exercise_definitions\` WHERE \`bodyweight_contribution\` > 0;
 END;
 `,
+  m0013: `ALTER TABLE \`exercise_session_facts_state\` ADD \`effort_policy_key\` text DEFAULT '' NOT NULL;`,
+  m0014: `ALTER TABLE \`exercise_session_facts\` ADD \`volume_sets\` integer DEFAULT 0 NOT NULL;`,
   },
 } as const;
 

@@ -7,6 +7,7 @@ import { uiRoles } from '@/components/ui/tokens';
 import { getSessionSetTypeCycle, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
+import { EFFORT_CHOICES } from '@/src/exercise-calculations/effort-policy';
 
 type EffortSheetProps = {
   visible: boolean;
@@ -19,7 +20,7 @@ type EffortSheetProps = {
 export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSheetProps) {
   const { height } = useWindowDimensions();
   const { values } = useAccountLocalPreferenceState();
-  const options = getSessionSetTypeCycle(values.visibleEffortGrades);
+  const options = getSessionSetTypeCycle(values.displayEfforts);
   return (
     <Sheet
       dismissLabel="Dismiss effort picker"
@@ -33,7 +34,7 @@ export function EffortSheet({ visible, selected, onSelect, onDismiss }: EffortSh
           return (
             <ListRow
               key={option ?? 'none'}
-              label={option === null ? 'None' : formatEffort(option)}
+              label={EFFORT_CHOICES.find(choice => choice.id === (option ?? 'unspecified'))?.label ?? formatEffort(option)}
               onPress={() => onSelect(option)}
               selected={isSelected}
               testID={`exercise-effort-option-${option ?? 'none'}`}

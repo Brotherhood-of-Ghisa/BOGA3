@@ -1099,7 +1099,7 @@ function StatsContent() {
   const [viewMode, setViewMode] = useState<StatsViewMode>(() => resolveStatsInitialBreakdown(params.breakdown));
   const [searchQuery, setSearchQuery] = useState('');
   const exerciseListItems = useMemo<ExerciseListItem[]>(() => catalog.exercises
-    .filter(item => (stats.aggregatesById.get(item.id)?.workingSetCount ?? 0) > 0)
+    .filter(item => stats.aggregatesById.has(item.id))
     .map(item => {
       const aggregate = stats.aggregatesById.get(item.id)!;
       return { id: item.id, name: item.name, workingSetCount: aggregate.workingSetCount,

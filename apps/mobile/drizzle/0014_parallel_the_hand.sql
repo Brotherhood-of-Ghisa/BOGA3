@@ -1,0 +1,1 @@
+ALTER TABLE `exercise_session_facts` ADD `volume_sets` integer DEFAULT 0 NOT NULL;

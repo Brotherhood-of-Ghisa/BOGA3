@@ -1,3 +1,5 @@
+import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
+import type { EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
@@ -139,7 +141,8 @@ export type SessionListSetCountRow = {
 /** Each session's `Sets`: its working sets (`ux-rules.md` §5.11). */
 export const countWorkingSessionSets = (
   setRows: SessionListSetCountRow[],
-  sessionIdByExerciseId: ReadonlyMap<string, string>
+  sessionIdByExerciseId: ReadonlyMap<string, string>,
+  policy?: EffortCalculationPolicy,
 ): Map<string, number> => {
   const setCountBySessionId = new Map<string, number>();
   for (const setRow of setRows) {
@@ -149,7 +152,7 @@ export const countWorkingSessionSets = (
         weight: setRow.weightValue,
         performanceStatus: normalizeSessionSetPerformanceStatus(setRow.performanceStatus),
         setType: setRow.setType,
-      })
+      }, policy)
     ) {
       continue;
     }
@@ -228,7 +231,7 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
             .all()
         : [];
 
-    const setCountBySessionId = countWorkingSessionSets(setRows, sessionIdByExerciseId);
+    const setCountBySessionId = countWorkingSessionSets(setRows, sessionIdByExerciseId, getPersonalEffortPolicy());
 
     return sessionRows.map((row) => {
       const mapped = mapStoreSessionRow(row.session, row.gymName ?? null);
