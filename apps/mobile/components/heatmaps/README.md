@@ -83,7 +83,10 @@ The two views select differently:
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
 
-Settings is the sole Daily/Weekly selector. Progress renders the saved choice
+Settings is the sole Daily/Weekly selector. Missing or invalid choices use
+Daily; valid saved Daily or Weekly choices survive restart and account
+switching. Progress history targets one muscle ID or one exercise definition,
+never a family. Progress renders the saved choice
 without an in-chart switch. Numeric `weeks` controls the exact query/grid span;
 short windows have no implicit 52-week minimum. Out-of-range selection returns
 to today/current week; in-range selection survives look-back edits.

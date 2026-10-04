@@ -367,16 +367,17 @@ Brief entrypoint inventory of the current reusable UI component set.
     `ink-faint` micro-labels. testIDs `<prefix>-heatmap`,
     `-heatmap-cell-<dateKey | weekStartDateKey>`, `-heatmap-bar-<weekStartDateKey>`,
     `-heatmap-day-detail` (`-date`, `-value`). Semantics: `ux-rules.md` §11
-  - `HistorySheet` — the Progress history of one exercise, muscle or muscle
-    family (DLM-T09-D2, which merged the two legacy overlays): a `Sheet` at
+  - `HistorySheet` — the Progress history of one exercise definition or one muscle ID (DLM-T09-D2, which merged the two legacy overlays): a `Sheet` at
     about three quarters of the screen, no close button (G5); eyebrow and name;
-    `Metric` and `View` `SegmentedControl`s under micro-labels; a `rule-soft`
-    week banner in Weekly; inline `StatePanel`s for loading, error and no
-    history; both heatmap views kept mounted, the inactive one transparent,
+    `Metric` `SegmentedControl` and a static saved view/window label;
+    Settings owns Daily/Weekly, with Daily for unset/invalid choices and valid
+    saved Weekly retained; a `rule-soft`
+    week banner in Weekly; inline `StatePanel`s for loading, error (Retry
+    for the same entity/window) and no history; both heatmap views kept mounted, the inactive one transparent,
     inert and hidden from accessibility. `kind` (`muscle` | `exercise`) names
     the testIDs: `stats-<kind>-history` (the `Sheet`; `-backdrop`, labelled
     `Dismiss <kind> history`), `-overlay` (the body), `-title`,
-    `-metric-chip-<metric>`, `-view-chip-<view>`, `-week-banner` (`-range`,
+    `-metric-chip-<metric>`, `-retry`, `-week-banner` (`-range`,
     `-value`, `-placeholder`), `-loading`, `-error`, `-empty`, `-scroll`,
     `-heatmap-panel-<view>`. Semantics: `ux-rules.md` §12. Target:
     `design-targets/progress.md`

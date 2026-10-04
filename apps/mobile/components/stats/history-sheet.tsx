@@ -22,8 +22,8 @@ import type {
   SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 
-// The history of one exercise, one muscle or one muscle family on Progress: a
-// `Sheet` holding the metric and view controls, the week banner and the daily
+// The history of one exercise or one muscle on Progress: a
+// `Sheet` holding the metric control, saved view/window, week banner and daily
 // or weekly heatmap (DLM-T09). One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
@@ -216,9 +216,9 @@ function HistoryHeatmap({
 
 export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   kind: HistoryKind;
-  // Above the title: "Exercise History", "Muscle History", "Muscle Group History".
+  // Above the title: "Exercise History" or "Muscle History".
   eyebrow: string;
-  // The exercise, muscle or family name.
+  // The exercise or muscle name.
   title: string;
   metricOptions: readonly HistoryMetricOption<TMetric>[];
   metric: TMetric;
@@ -236,6 +236,7 @@ export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   // The backdrop, Android back and the VoiceOver escape; there is no close
   // button (`design-language.md` §4).
   onDismiss: () => void;
+  onRetry?: () => void;
   todayDateKey?: string;
 };
 
@@ -256,6 +257,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   selectedWeekKey,
   onSelectWeek,
   onDismiss,
+  onRetry,
   todayDateKey,
 }: HistorySheetProps<TMetric>) {
   const { height } = useWindowDimensions();
@@ -323,6 +325,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 
           {!isLoading && errorMessage ? (
             <StatePanel
+              action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${prefix}-retry` } : undefined}
               body={errorMessage}
               fill={false}
               kind="error"
@@ -331,31 +334,33 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
             />
           ) : null}
 
-          {!errorMessage ? (
-            <>
-              {!isLoading && weeklyEffort.length === 0 ? (
-                <StatePanel
-                  body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
-                  fill={false}
-                  testID={`${prefix}-empty`}
-                  title="No history yet"
-                />
-              ) : null}
-
-              <HistoryHeatmap
-                dailyMetrics={dailyMetrics}
-                lookbackWeeks={lookbackWeeks}
-                muscleTargets={muscleTargets}
-                metric={metric}
-                metricLabel={metricLabel}
-                onSelectWeek={onSelectWeek}
-                selectedWeekKey={selectedWeekKey}
-                testIDPrefix={prefix}
-                todayDateKey={todayDateKey}
-                view={view}
-              />
-            </>
+          {!isLoading && !errorMessage && weeklyEffort.length === 0 ? (
+            <StatePanel
+              body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
+              fill={false}
+              testID={`${prefix}-empty`}
+              title="No history yet"
+            />
           ) : null}
+
+          <View
+            accessibilityElementsHidden={!!errorMessage}
+            importantForAccessibility={errorMessage ? 'no-hide-descendants' : 'auto'}
+            pointerEvents={errorMessage ? 'none' : 'auto'}
+            style={errorMessage ? [styles.heatmapLayer, styles.heatmapLayerInactive] : undefined}>
+            <HistoryHeatmap
+              dailyMetrics={dailyMetrics}
+              lookbackWeeks={lookbackWeeks}
+              muscleTargets={muscleTargets}
+              metric={metric}
+              metricLabel={metricLabel}
+              onSelectWeek={onSelectWeek}
+              selectedWeekKey={selectedWeekKey}
+              testIDPrefix={prefix}
+              todayDateKey={todayDateKey}
+              view={view}
+            />
+          </View>
         </ScrollView>
       </View>
     </Sheet>

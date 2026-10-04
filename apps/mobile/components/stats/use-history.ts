@@ -9,6 +9,9 @@ import { calendarWeekBounds, keepHistorySelection } from '@/src/utils/calendar-w
 type MuscleTarget = { muscleGroupIds: string[] };
 type ExerciseTarget = { exerciseDefinitionId: string };
 
+export const isIndividualMuscleHistoryTarget = (target: MuscleTarget): boolean =>
+  target.muscleGroupIds.length === 1 && target.muscleGroupIds[0].trim().length > 0;
+
 const loadHistory = async (target: MuscleTarget | ExerciseTarget, weeks: number) => {
   const bounds = calendarWeekBounds(weeks);
   const [weekly, daily] = 'muscleGroupIds' in target ? await Promise.all([
@@ -29,6 +32,7 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [weekKey, setWeekKey] = useState<string | null>(null);
+  const [retryRevision, setRetryRevision] = useState(0);
   const currentWeekKey = weekKey === null ? null : keepHistorySelection(weekKey, weeks);
   if (weekKey !== null && weekKey !== currentWeekKey) setWeekKey(currentWeekKey);
   useEffect(() => {
@@ -51,15 +55,17 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
     };
     void read();
     return () => { active = false; };
-  }, [selected, weeks, revision]);
+  }, [selected, weeks, revision, retryRevision]);
   const select = (target: T) => {
-    setLoading(true);
+    const valid = !('muscleGroupIds' in target) || isIndividualMuscleHistoryTarget(target);
+    setLoading(valid);
     setDaily([]);
     setWeekly([]);
     setWeekKey(null);
     setError(null);
-    setSelected(target);
+    setSelected(valid ? target : null);
   };
   const dismiss = () => setSelected(null);
-  return { selected, daily, weekly, loading, error, weekKey: currentWeekKey, select, dismiss, selectWeek: setWeekKey };
+  const retry = () => setRetryRevision(value => value + 1);
+  return { selected, daily, weekly, loading, error, weekKey: currentWeekKey, select, dismiss, retry, selectWeek: setWeekKey };
 }

@@ -152,7 +152,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - query values select only the initial control state; invalid values fall
     back to the configured window / By Exercise defaults; `period=7` means This
     week, and the preserved `period=30` link selects the configured window
-  - M16 muscle-history overlay opens and dismisses as in-route UI state on this route; no path, query param, redirect, or screen-to-screen transition is added for the overlay.
+  - Individual muscle and exercise history opens and dismisses as in-route UI state, preserving the page controls, search, sort and scroll. Muscle targets contain exactly one ID; family headings are inert. Settings owns the heatmap view (Daily for unset/invalid choices, with valid saved Weekly retained). No path, query param, redirect, or screen-to-screen transition is added for the overlay.
 
 4b. `/session/[sessionId]`
 - File: `apps/mobile/app/session/[sessionId]/index.tsx`

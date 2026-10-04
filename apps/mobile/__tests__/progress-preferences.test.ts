@@ -22,7 +22,7 @@ it('extends existing scoped browsing choices and restores all five settings afte
   await account();
   expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY' });
   const choices = { weeklyWorkingSetTarget: 12, displayEfforts: ['warm_up', 'unspecified', 'rir_2', 'rir_0'] as import('@/src/exercise-calculations/effort-policy').EffortChoice[],
-    targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'daily' as const };
+    targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'weekly' as const };
   setAccountLocalPreferences(choices);
   __resetAccountLocalPreferencesForTests();
   await account();
@@ -34,6 +34,29 @@ it('extends existing scoped browsing choices and restores all five settings afte
   setAccountLocalPreferences({ heatmapView: 'daily' });
   await account('A'); expect(values().historyLookbackWeeks).toBe(104);
   await account(null, false); expect(values().heatmapView).toBe('daily');
+});
+
+it.each([null, 'monthly', '"weekly"', 'null', ''])('uses Daily for missing or invalid heatmap storage %s', async raw => {
+  const key = preferenceKey('account:A', 'heatmapView');
+  if (raw !== null) Storage.setItemSync(key, raw);
+  await account();
+  expect(values().heatmapView).toBe('daily');
+  expect(Storage.getItemSync(key)).toBe(raw);
+});
+
+it.each(['daily', 'weekly'] as const)('preserves the saved %s view across relaunch and account switches', async view => {
+  const key = preferenceKey('account:A', 'heatmapView');
+  Storage.setItemSync(key, view);
+  await account();
+  expect(values().heatmapView).toBe(view);
+  await account('B');
+  expect(values().heatmapView).toBe('daily');
+  await account(null);
+  expect(values().heatmapView).toBe('daily');
+  __resetAccountLocalPreferencesForTests();
+  await account('A');
+  expect(values().heatmapView).toBe(view);
+  expect(Storage.getItemSync(key)).toBe(view);
 });
 
 it.each(['invalid JSON', 'null', '[]', '{}', '0', '-1', '1.5', '9007199254740992'])
@@ -88,14 +111,14 @@ it('retains failed input and durable values, retries partial saves and clears er
     if (key.endsWith('.historyLookbackWeeks')) throw Error('disk full');
     native(key, value);
   });
-  setAccountLocalPreferences({ targetWindowWeeks: 4, historyLookbackWeeks: 104, heatmapView: 'daily' });
+  setAccountLocalPreferences({ targetWindowWeeks: 4, historyLookbackWeeks: 104, heatmapView: 'weekly' });
   expect(values().historyLookbackWeeks).toBe(52);
-  expect(values().heatmapView).toBe('weekly');
-  expect(getAccountLocalPreferenceState().pending).toEqual({ historyLookbackWeeks: 104, heatmapView: 'daily' });
+  expect(values().heatmapView).toBe('daily');
+  expect(getAccountLocalPreferenceState().pending).toEqual({ historyLookbackWeeks: 104, heatmapView: 'weekly' });
   write.mockRestore();
   await retryAccountLocalPreferences();
   expect(values().historyLookbackWeeks).toBe(104);
-  expect(values().heatmapView).toBe('daily');
+  expect(values().heatmapView).toBe('weekly');
   expect(getAccountLocalPreferenceState().error).toBeNull();
   setAccountLocalPreferences({ displayEfforts: [] });
   expect(getAccountLocalPreferenceState().error).toMatch(/at least one/);

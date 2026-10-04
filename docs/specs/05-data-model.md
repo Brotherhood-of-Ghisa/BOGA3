@@ -104,7 +104,8 @@ publishes the active account's calculation policy; persistence adapters pass it
 explicitly to the pure kernel. Groups and coaching never read these keys.
 
 Progress defaults are eight W/sets per muscle per week, a four-week Progress
-period, a 52-week history look-back and Weekly heatmaps. The fixed effort rows
+period, a 52-week history look-back and Daily heatmaps. Missing or invalid view
+choices use Daily; a valid saved Weekly choice remains unchanged. The fixed effort rows
 are Warm-up, Unspecified, RIR-4 through RIR-0, Technique and Cooldown. All are
 shown by default. Unspecified/RIR rows default on for both calculation columns;
 Warm-up/Technique/Cooldown default off. The columns are independent: hidden

@@ -146,7 +146,7 @@ milestone; durable rules belong in their owning specs, and evidence belongs in P
 | --- | --- | --- | --- |
 | M32-T01 | Pin the table target and distinct selection/history actions | planning PR merged; PR #497 landed | completed |
 | M32-T02 | Derive reconciled muscle and exercise comparisons | T01; PR #497 landed | completed |
-| [M32-T03](../tasks/M32-T03-Default_daily_and_preserve_preference_driven_history.md) | Daily default and individual, preference-driven heatmaps | T01; PR #497 landed | planned |
+| M32-T03 | Daily default and individual, preference-driven heatmaps | T01; PR #497 landed | completed |
 | [M32-T04](../tasks/M32-T04-Replace_progress_landing_with_tables.md) | Integrate the landing and inline contributions | T02, T03 | planned |
 | [M32-T05](../tasks/M32-T05-Accept_and_close_progress_tables.md) | Native acceptance, regressions and closeout | T04 | planned |
 

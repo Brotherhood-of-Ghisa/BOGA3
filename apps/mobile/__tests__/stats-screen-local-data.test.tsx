@@ -394,7 +394,8 @@ describe('Stats over real data', () => {
     expect(await screen.findByTestId('stats-family-header-legs')).toBeTruthy();
     expect(screen.getByTestId('stats-family-sets-legs')).toBeTruthy();
     expect(screen.getByTestId('stats-family-volume-legs')).toBeTruthy();
-    expect(screen.getByTestId('stats-family-header-button-chest')).toBeTruthy();
+    expect(screen.getByTestId('stats-family-header-chest')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-row-chest')).toBeTruthy();
     // Squat's 7 working sets (all but the warm-up) land on each muscle it maps
     // to; the warm-up adds neither a set nor volume.
     expect(screen.getByTestId('stats-muscle-sets-quads')).toHaveTextContent(/^Sets7/);
@@ -426,22 +427,28 @@ describe('Stats over real data', () => {
 
     const title = await screen.findByTestId('stats-exercise-history-title');
     expect(title).toHaveTextContent(/Squat/);
-    await screen.findByText('Weekly training load');
+    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
+    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
+    expect(screen.getByTestId('stats-exercise-history-heatmap-day-detail-date')).toBeTruthy();
+    expect(screen.queryByText('Weekly training load')).toBeNull();
     for (const metric of ['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight']) {
       expect(screen.getByTestId(`stats-exercise-history-metric-chip-${metric}`)).toBeTruthy();
     }
 
     await act(async () => {
-      updatePreferences({ heatmapView: 'daily' });
+      updatePreferences({ heatmapView: 'weekly' });
     });
-    expect(await screen.findByText('52-week history')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 52 weeks');
+    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
+    expect(screen.getByText('Weekly training load')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
 
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
   });
 
-  it('shows an overlay error when the exercise history read fails (a failed read)', async () => {
+  it('retries a failed exercise history read for the same definition without closing the sheet', async () => {
     jest
       .spyOn(exerciseAnalytics, 'computeSelectedExerciseWeeklyEffort')
       .mockRejectedValueOnce(new Error('DB error'));
@@ -450,16 +457,40 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
 
     expect(await screen.findByTestId('stats-exercise-history-error')).toHaveTextContent(/DB error/);
+    fireEvent.press(screen.getByTestId('stats-exercise-history-retry'));
+    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-error')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
+    expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent(/Squat/);
+    expect(screen.getByTestId('stats-exercise-history-heatmap-day-detail-date')).toBeTruthy();
   });
 
-  it("opens a muscle family's history from the seeded breakdown", async () => {
+  it('opens a saved Weekly choice with its banner and retains it on reopening', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 104 }));
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(await screen.findByText('Weekly training load')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
+    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
+    expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    expect(await screen.findByText('Weekly training load')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
+  });
+
+  it('keeps seeded families inert and opens only an individual muscle', async () => {
     await renderSeededStats();
 
     fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
     fireEvent.press(await screen.findByTestId('stats-family-header-legs'));
+    fireEvent.press(screen.getByTestId('stats-family-header-chest'));
+    expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
+    fireEvent.press(screen.getByTestId('stats-muscle-row-quads'));
 
     const title = await screen.findByTestId('stats-muscle-history-title');
-    expect(title).toHaveTextContent('Legs');
+    expect(title).toHaveTextContent('Quads');
     expect(screen.getByTestId('stats-muscle-history-metric-chip-totalVolume')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-metric-chip-estimatedRM1')).toBeNull();
@@ -488,24 +519,31 @@ describe('Stats over real data', () => {
     });
 
     await act(async () => {
-      updatePreferences({ heatmapView: 'daily' });
+      updatePreferences({ heatmapView: 'weekly' });
     });
-    expect(screen.getByTestId('stats-muscle-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
+    expect(screen.getByTestId('stats-muscle-history-metric-chip-workingSetCount')).toHaveProp('accessibilityState', { selected: true });
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
   });
 
-  it('shows an overlay error when the muscle history read fails, and dismisses it (a failed read)', async () => {
+  it('retries a failed muscle history read and dismisses it back to the same breakdown', async () => {
     jest
       .spyOn(statsRepository, 'computeSelectedMuscleWeeklyEffort')
       .mockRejectedValueOnce(new Error('Weekly boom'));
     await renderSeededStats();
 
     fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    fireEvent.press(await screen.findByTestId('stats-family-header-button-chest'));
+    fireEvent.press(await screen.findByTestId('stats-muscle-row-chest'));
 
     expect(await screen.findByTestId('stats-muscle-history-error')).toHaveTextContent(/Weekly boom/);
+    fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
+    await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-error')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
+    expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent('Chest');
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
+    expect(screen.getByTestId('stats-view-mode-chip-muscle')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-muscle-row-chest')).toBeTruthy();
   });
 });
