@@ -272,6 +272,33 @@ working sets: a muscle's sets are its primary sets plus half its secondary
 sets. A set counts once per muscle, at its strongest role; a stabilizer adds
 nothing (`summarizeCurrentSessionMuscleLoad`).
 
+**Progress muscle comparisons** count physical working sets: each source set
+adds one to each mapped primary/secondary muscle, regardless of role. The role
+factor applies only to Volume. Duplicate mappings use the strongest role for
+that exercise/muscle pair. Family counts deduplicate physical sets; overlapping
+individual muscle counts must never be summed into a global total.
+
+`computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
+durable active effort-policy snapshot in one read transaction for both calendar periods, using the
+same bounds as `computeStatsSummary`. `aggregateProgressComparisons`
+(`src/data/progress-comparisons.ts`) derives individual muscles and their
+exercise contributions together. It retains the whole taxonomy, joins repeated
+blocks by definition ID, and keeps the union of contributing exercises in
+either period. Current definition names label those IDs; a recorded name is a
+fallback, never an identity join. Current mappings reinterpret both periods.
+Unlinked sets contribute no muscle/exercise row, as in the existing muscle
+analytics. A volume-only exercise remains a contributor even at zero load.
+
+Every period exposes working-set count, complete Volume or `null`, known
+subtotal, and known/included Volume-set counts. Counts, Volume and coverage
+reconcile with the contribution rows; unknown Volume stays incomplete rather
+than becoming zero. Working-set changes are signed absolute differences.
+Volume changes use each row's own baseline: `empty` for two zeros, `new` for
+positive Volume after zero, rounded percentage otherwise, `incomplete` when
+either total is unknown, and `increased` if the percentage overflows. Row
+percentages are never summed. Calculation-column eligibility is independent
+of Display (§1); zero working sets alone cannot establish Volume emptiness.
+
 No derived figure is written back to a set or session.
 
 **Display** (`format.ts`). Every figure has one format on every screen, the

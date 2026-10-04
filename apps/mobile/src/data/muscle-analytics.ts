@@ -16,6 +16,7 @@ export type MuscleAnalyticsInput = {
   bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: {
     id: string;
+    name?: string;
     loadInputMode: 'total_load' | 'per_side_load';
     bodyweightContribution: number;
   }[];
@@ -150,13 +151,16 @@ export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): S
 };
 
 const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
-  const mappingsByExerciseDefinitionId = new Map<string, MuscleAnalyticsInput['muscleMappings']>();
+  const mappingsByExerciseDefinitionId = new Map<string, Map<string, MuscleAnalyticsInput['muscleMappings'][number]>>();
   for (const mapping of input.muscleMappings) {
-    const bucket = mappingsByExerciseDefinitionId.get(mapping.exerciseDefinitionId) ?? [];
-    bucket.push(mapping);
+    const bucket = mappingsByExerciseDefinitionId.get(mapping.exerciseDefinitionId) ?? new Map();
+    const existing = bucket.get(mapping.muscleGroupId);
+    if (!existing || getMuscleContributionRoleWeight(mapping.role) > getMuscleContributionRoleWeight(existing.role)) {
+      bucket.set(mapping.muscleGroupId, mapping);
+    }
     mappingsByExerciseDefinitionId.set(mapping.exerciseDefinitionId, bucket);
   }
-  return mappingsByExerciseDefinitionId;
+  return new Map([...mappingsByExerciseDefinitionId].map(([id, bucket]) => [id, [...bucket.values()]]));
 };
 
 const compareContribution = (left: MuscleSetContribution, right: MuscleSetContribution) => {
