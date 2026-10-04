@@ -17,9 +17,10 @@ The user confirmed two product decisions on 2026-10-04: rule changes do not
 invalidate certifications; a positive **group exercise contribution** identifies
 a bodyweight exercise whose competitive strength results use bodyweight
 percentages when the group switch is On. Off uses ordinary Volume and 1RM
-rankings, as the user clarified in the same session. The current kg-only group wire contract and rule-sensitive
-certification pins do not yet satisfy this target. This is an implementation
-plan, not a claim that the target is shipped.
+rankings, as the user clarified in the same session. The current kg-only group
+wire contract does not yet satisfy the percentage target; certification
+persistence and zero-contribution no-op behavior are complete. This is an
+implementation plan, not a claim that the target is shipped.
 
 This consolidation replaces the old group requirements in this milestone and
 T08–T10. Their revised scope is planned, regardless of historical implementation
@@ -121,9 +122,9 @@ is a rules event, not a newly performed PR. Retain history; historic events keep
 their original metric, unit and revision. Do not relabel old kg values as %BW.
 
 Zero-contribution comparisons must stay ready across legacy group preference
-toggles, preserving scores, revision, history and certificates. The [existing
-#411 task](../tasks/T-20260930-01-Keep_zero_contribution_group_boards_stable.md)
-owns this no-op behavior. A contribution change between zero and positive is
+toggles, preserving scores, revision, history and certificates. The completed
+#411 task implements this no-op behavior. A contribution change between zero
+and positive is
 an effective rule/representation change and needs coherent publication.
 
 ### D8. Competition modes and percentage formula
@@ -201,7 +202,7 @@ and compatible clients in the documented order with explicit hosted authority.
 
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| [Existing #411 task — Keep zero-contribution group boards stable](../tasks/T-20260930-01-Keep_zero_contribution_group_boards_stable.md) | No-op legacy preference changes; reconcile rule metadata/history | T13 | planned |
+| Existing #411 task — Keep zero-contribution group boards stable | No-op legacy preference changes; reconcile rule metadata/history; closes #411 | T13 | completed |
 | M27-T13 — Preserve certifications across rule changes | Observed-set pins, migration and rule-only retention; closes #419 | — | completed |
 | [M27-T15 — Decide percentage reading-correction policy](../tasks/M27-T15-Decide_percentage_reading_correction_policy.md) | Explicit private-data correction outcome for the new metric | — | planned |
 | [M27-T08 — Group percentage contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Volume definition, versioned units, privacy and activation contracts | T15 | planned |
@@ -210,7 +211,7 @@ and compatible clients in the documented order with explicit hosted authority.
 | [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T15 and the existing #411 task; T13 is complete. The formula and
+Ready now: T15; T13 and the existing #411 task are complete. The formula and
 switch policy are settled. T08 must record the Volume decision before building.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.

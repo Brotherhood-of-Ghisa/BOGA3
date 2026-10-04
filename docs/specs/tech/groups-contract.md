@@ -2441,8 +2441,17 @@ group exercises always start at zero; personal seed presets do not apply.
 Owners/admins may edit the preference and contributions. Members may read the
 published state needed to understand board availability but cannot write it.
 Updates require the expected rules revision; stale writes return `CONFLICT` and
-retain form input. Preference/contribution changes increment the calculation
-revision and enqueue a whole-comparison rebuild. Name, `load_input_mode`,
+retain form input. Contribution changes increment the calculation
+revision and enqueue a whole-comparison rebuild. A group preference toggle does
+so only for active comparisons with positive **group** contribution. At zero,
+repeated Off/On writes leave the comparison ready with the same revision,
+publication, scores, All/Certified entries, witness audit and history; they queue
+no evaluation and emit no rules event. The group summary reports the global
+preference. Comparison rule JSON reports effective bodyweight use (false at
+zero), including retired zero-contribution revisions. Canonicalizing old zero
+metadata changes no revision identity, publication clock or audit event.
+History/stream rules events project the same effective zero flag while preserving
+the original stored event payload. Name, `load_input_mode`,
 `bodyweight_contribution` and `default_metric` are the complete exercise rule.
 
 The migration preserves exercises, links, events, memberships and contribution

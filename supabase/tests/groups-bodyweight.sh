@@ -139,12 +139,12 @@ set_body_weight() {
   next_cuam; push "$1" 'edit dated reading' "$(e_reading "$2-reading" "${at}" "$3")"
 }
 certify_metric() {
-  local uid="$1" sid="$2" metric="$3" pin revision
+  local uid="$1" sid="$2" metric="$3" set_id="${4:-$2-set}" pin revision
   metric_board "${metric}"
-  pin="$(jq -er --arg u "${uid}" --arg s "${sid}-set" '.entries[]|select(.member.user_id==$u and .set_id==$s)|.fingerprint' <<<"${BODY}")"
+  pin="$(jq -er --arg u "${uid}" --arg s "${set_id}" '.entries[]|select(.member.user_id==$u and .set_id==$s)|.fingerprint' <<<"${BODY}")"
   revision="$(jq -er '.rules_revision' <<<"${BODY}")"
   rpc "${OWNER_TOKEN}" group_metric_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --arg u "${uid}" \
-    --arg s "${sid}-set" --arg m "${metric}" --arg f "${pin}" --argjson r "${revision}" '
+    --arg s "${set_id}" --arg m "${metric}" --arg f "${pin}" --argjson r "${revision}" '
     {p_group_id:$g,p_group_exercise_id:$x,p_member_user_id:$u,p_set_id:$s,p_metric:$m,
       p_expected_revision:$r,p_expected_fingerprint:$f}')"
   expect_ok "certify ${metric}"; assert_wire certification
@@ -155,6 +155,40 @@ set_group_policy() {
     {p_group_id:$g,p_name:$n,p_description:null,p_bodyweight_calculations_enabled:$enabled}')"
   expect_ok 'update group calculation policy'
   check 'group policy response' '.group.bodyweight_calculations_enabled==$enabled' --argjson enabled "$1"
+}
+
+# Capture every comparison projection and public history row, not just its
+# current best. A no-op must leave both metric and retained legacy stores alone.
+comparison_snapshot() {
+  run_psql "select md5(jsonb_build_object(
+    'exercise',(select to_jsonb(e) from app_public.group_exercises e where id='${GX}'),
+    'revisions',(select jsonb_agg(to_jsonb(r) order by revision) from app_public.group_rule_revisions r where group_exercise_id='${GX}'),
+    'scores',(select jsonb_agg(to_jsonb(s) order by rules_revision,member_user_id,set_id,metric) from app_public.group_metric_set_scores s where group_exercise_id='${GX}'),
+    'entries',(select jsonb_agg(to_jsonb(b) order by rules_revision,member_user_id,metric,certified) from app_public.group_metric_board_entries b where group_exercise_id='${GX}'),
+    'state',(select jsonb_agg(to_jsonb(b) order by rules_revision,member_user_id) from app_public.group_metric_board_state b where group_exercise_id='${GX}'),
+    'certifications',(select jsonb_agg(to_jsonb(c) order by id) from app_public.group_metric_certifications c where group_exercise_id='${GX}'),
+    'legacy_entries',(select jsonb_agg(to_jsonb(b) order by member_user_id,metric,certified) from app_public.group_board_entries b where group_exercise_id='${GX}'),
+    'legacy_state',(select jsonb_agg(to_jsonb(b) order by member_user_id) from app_public.group_board_state b where group_exercise_id='${GX}'),
+    'legacy_certifications',(select jsonb_agg(to_jsonb(c) order by id) from app_public.group_certifications c where group_exercise_id='${GX}'),
+    'events',(select jsonb_agg(to_jsonb(e) order by seq) from app_public.group_events e where group_exercise_id='${GX}')
+  )::text);"
+}
+assert_zero_toggles() {
+  local before
+  before="$(comparison_snapshot)"
+  for enabled in true false true true false false; do
+    set_group_policy "${enabled}"
+    expect_sql 'zero contribution never queues a rules rebuild' \
+      "select count(*) from app_public.group_metric_eval_queue where group_exercise_id='${GX}';" 0
+    [[ "$(comparison_snapshot)" == "${before}" ]] || fail 'zero toggle changed revision, publication, board, certificate or history'
+    expect_sql 'live and stored zero rules have the same effective flag' \
+      "select app_public.group_exercise_rules_json(e)->>'bodyweight_calculations_enabled'='false'
+        and not exists(select 1 from app_public.group_rule_revisions r where r.group_exercise_id=e.id
+          and r.rules->>'bodyweight_calculations_enabled'<>'false')
+        from app_public.group_exercises e where id='${GX}';" t
+    drain 'only positive-contribution comparisons rebuild'
+    [[ "$(comparison_snapshot)" == "${before}" ]] || fail 'positive comparison publication affected zero comparison'
+  done
 }
 
 provision OWNER owner
@@ -434,6 +468,32 @@ certify_warm_up() {
   expect_error NOT_FOUND "$2"
   check "$2: not a record set" '.message=="NOT_FOUND: record set not found for this metric"'
 }
+# With no readings for these sessions and independent personal contributions,
+# ordinary 1RM still ranks. Witness both metrics before repeated policy writes.
+lifts "${RIVAL_TOKEN}" "${T}-row-r2" "${DRW}" czero:35:5:rir_1
+drain 'zero contribution performed record'
+ZERO_WEIGHT_CERT="$(certify_metric "${RIVAL_UID}" "${T}-row-r2" weight "${T}-czero")"
+ZERO_E1RM_CERT="$(certify_metric "${RIVAL_UID}" "${T}-row-r2" e1rm "${T}-czero")"
+drain 'zero contribution Certified baseline'
+metric_board e1rm
+check 'zero contribution retains ordinary 1RM without a reading' '[.entries[]|select(.member.user_id==$r)]|length==1' --arg r "${RIVAL_UID}"
+ZERO_BOARD="${BODY}"
+assert_zero_toggles
+metric_board e1rm
+[[ "${BODY}" == "${ZERO_BOARD}" ]] || fail 'zero contribution public board changed across toggles'
+for metric in weight e1rm; do
+  metric_board "${metric}" true
+  check 'unchanged zero score keeps its original witness' '[.entries[]|select(.certification_id==$id)]|length==1' \
+    --arg id "$(if [[ "${metric}" == weight ]]; then echo "${ZERO_WEIGHT_CERT}"; else echo "${ZERO_E1RM_CERT}"; fi)"
+done
+# Later reading edits cannot schedule the zero comparison even with the switch On.
+set_group_policy true; drain 'positive comparison policy-on'
+next_cuam; push "${RIVAL_TOKEN}" 'reading for a zero-contribution session' "$(e_reading "${T}-zero-reading" 0 100)"
+expect_sql 'zero reading edit never queues a comparison' \
+  "select count(*) from app_public.group_metric_eval_queue where group_exercise_id='${GX}';" 0
+set_group_policy false; drain 'positive comparison policy-off'
+pass 'repeated zero contribution toggles preserve ready boards, witnesses, complete audit and history'
+
 certify_warm_up "${RIVAL_TOKEN}" 'a warm-up cannot be certified'
 
 # A result stored before the rule: the same apply with the warm-up counted.
@@ -499,6 +559,11 @@ rpc "${OWNER_TOKEN}" group_certify "$(jq -nc --arg g "${GID}" --arg x "${GX}" --
 expect_ok 'legacy certify'; LEGACY_CERT="$(jq -er '.certification.certification_id' <<<"${BODY}")"
 LEGACY_AUDIT="$(run_psql "select to_jsonb(c)::text from app_public.group_certifications c where id='${LEGACY_CERT}';")"
 drain 'legacy Certified board'
+assert_zero_toggles
+expect_sql 'zero toggles never activate a legacy revision' \
+  "select legacy from app_public.group_rule_revisions where group_exercise_id='${GX}' and revision=1;" t
+pass 'legacy zero-contribution witnesses and boards stay in their original revision across toggles'
+
 # A distribution edit activates the current engine, independent of the switch.
 update_comparison 0 per_side_load; drain 'legacy witness activated'
 for metric in weight e1rm; do
@@ -511,6 +576,48 @@ for metric in weight e1rm; do
     --arg m "${metric}" --arg id "${LEGACY_CERT}"
 done
 [[ "$(run_psql "select to_jsonb(c)::text from app_public.group_certifications c where id='${LEGACY_CERT}';")" == "${LEGACY_AUDIT}" ]] || fail 'legacy rule migration rewrote its audit'
+ZERO_METADATA_SQL="$(sed -n '1,/^-- Live rule/p' "${SUPABASE_DIR}"/migrations/*_zero_contribution_group_toggle.sql)"
+expect_sql 'metadata upgrade canonicalizes current and retired zero rules without altering clocks' "begin;
+  update app_public.group_rule_revisions set rules=jsonb_set(rules,'{bodyweight_calculations_enabled}','true')
+    where group_exercise_id='${GX}';
+  create temporary table prior_zero_revision_clocks as select revision,created_at,published_at,retired_at
+    from app_public.group_rule_revisions where group_exercise_id='${GX}';
+  ${ZERO_METADATA_SQL}
+  select bool_and(r.rules->>'bodyweight_calculations_enabled'='false'
+    and row(r.created_at,r.published_at,r.retired_at) is not distinct from row(p.created_at,p.published_at,p.retired_at))
+    from app_public.group_rule_revisions r join prior_zero_revision_clocks p using(revision)
+    where r.group_exercise_id='${GX}'; rollback;" t
+
+# Simulate an old event whose audit captured the global On preference at zero.
+# Its stored audit stays intact while both public readers report effective Off.
+run_psql "update app_public.group_events set payload=jsonb_set(payload,'{rules,bodyweight_calculations_enabled}','true')
+  where group_exercise_id='${GX}' and kind='rules_change';" >/dev/null
+rpc "${OWNER_TOKEN}" group_metric_history "$(jq -nc --arg g "${GID}" --arg x "${GX}" '
+  {p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false,p_limit:100}')"
+expect_ok 'upgraded zero history'
+check 'history exercise, revision and old rule event agree on effective zero use' '
+  .exercise.bodyweight_calculations_enabled==false and .revision.rules.bodyweight_calculations_enabled==false
+  and ([.events[]|select(.kind=="rules_change")]|length==1)
+  and all(.events[]|select(.kind=="rules_change"); .rules.bodyweight_calculations_enabled==false)'
+ZERO_STREAM_CURSOR=null
+ZERO_STREAM_FOUND=false
+for page in {1..5}; do
+  rpc "${OWNER_TOKEN}" group_stream_v2 "$(jq -nc --arg g "${GID}" --argjson cursor "${ZERO_STREAM_CURSOR}" '
+    {p_group_id:$g,p_before:$cursor,p_limit:50}')"
+  expect_ok 'upgraded zero stream'; assert_wire stream
+  if jq -e --arg x "${GX}" 'any(.items[]; .kind=="rules_change" and .group_exercise_id==$x)' <<<"${BODY}" >/dev/null; then
+    check 'stream canonicalizes the old zero rule event' '
+      all(.items[]|select(.kind=="rules_change" and .group_exercise_id==$x); .rules.bodyweight_calculations_enabled==false)' --arg x "${GX}"
+    ZERO_STREAM_FOUND=true; break
+  fi
+  ZERO_STREAM_CURSOR="$(jq -c '.next_cursor' <<<"${BODY}")"
+  [[ "${ZERO_STREAM_CURSOR}" != null ]] || break
+done
+[[ "${ZERO_STREAM_FOUND}" == true ]] || fail 'old zero rule event missing from stream'
+expect_sql 'public event normalization preserves the old stored rule audit' \
+  "select bool_and(payload->'rules'->>'bodyweight_calculations_enabled'='true')
+    from app_public.group_events where group_exercise_id='${GX}' and kind='rules_change';" t
+
 set_group_policy true; drain 'legacy dependency activation'
 update_comparison 1 per_side_load; drain 'legacy bodyweight dependency'
 set_body_weight "${ATHLETE_TOKEN}" "${T}-legacy" 90; drain 'legacy 1RM reading correction'

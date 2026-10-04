@@ -52,6 +52,25 @@ describe('group comparison rule editor', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Pull-ups', defaultMetric: 'weight' }), 2);
     expect(screen.queryByTestId('group-rules-preview')).toBeNull();
   });
+  it.each([false, true])('saves zero-contribution edits without a rule review when the group switch is %s', enabled => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} bodyweightCalculationsEnabled={enabled}
+      existing={{ ...existing, bodyweight_calculations_enabled: false, bodyweight_contribution: 0 }} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Conventional lift');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Conventional lift',
+      bodyweightCalculationsEnabled: enabled, bodyweightContribution: 0 }), 2);
+    expect(screen.queryByTestId('group-rules-preview')).toBeNull();
+  });
+  it('still reviews changing zero contribution to positive under an enabled group switch', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props}
+      existing={{ ...existing, bodyweight_calculations_enabled: false, bodyweight_contribution: 0 }} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '100');
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByTestId('group-rules-preview')).toHaveTextContent(/0% → 100%/);
+  });
   it('keeps dirty inputs when a fresher revision arrives until explicit Reload', () => {
     const onSubmit = jest.fn();
     const { rerender } = render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
