@@ -1,7 +1,7 @@
 # M32-T01 — Pin the table design and interaction contract
 
 - Status: `planned`
-- Depends on: planning PR merged; PR #497 landed (or equivalent on `origin/main`)
+- Depends on: planning PR #502 and PR #497 merged (satisfied)
 - Milestone: `docs/plans/milestones/M32-progress-tables-and-individual-history.md`
 - Areas: docs, frontend design; UI impact: yes
 
@@ -32,6 +32,9 @@ governs tap behaviour, Daily default, existing period settings and metric rules.
   exercise browsing/Sessions access without expanding the hero table.
 - Resolve colours in the references against existing signed-delta token roles.
   Do not silently introduce a new data palette or destructive-red deltas.
+- Adapt metric explanations to #497's independent saved Working set/Volume
+  choices. The reference's "Warm-ups excluded" footnote cannot be unconditional;
+  a muscle with zero working sets may still have Volume and contributing exercises.
 
 ## Deliverables and acceptance
 

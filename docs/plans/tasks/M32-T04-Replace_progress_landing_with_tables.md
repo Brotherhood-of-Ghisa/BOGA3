@@ -32,6 +32,8 @@ Sessions/exercise browsing access through the accepted design.
    taxonomy headings. Names wrap, numbers align without compaction, every
    interactive target is >=44pt, and long content scrolls above the fixed tabs.
    Working sets initially; Volume retains correct units, baseline/coverage copy.
+   Metric explanations respect saved eligibility rather than unconditionally
+   excluding warm-ups or implying Volume is limited to working sets.
 2. Selecting a muscle renders one contribution table below, by exercise, with
    both periods, change and a non-interactive Total. Previous-only and zero rows
    work; an all-zero selected muscle shows a specific empty explanation.
@@ -42,13 +44,18 @@ Sessions/exercise browsing access through the accepted design.
    preserves selection, period, metric and list position. Table selection is
    independent from the sheet's transient metric/day/week selection.
 5. Keep landed period choices/comparison bounds, look-back and unrelated
-   Settings values. No stale contribution/history data under a newly selected
-   name or account, no premature empty state during loading, and a retry does
-   not erase the user's selection. Return after edits refreshes derived values.
+   Settings values, including independent Working set/Volume eligibility.
+   Refocus after eligibility changes refreshes table, contributions and history
+   under the same durable active policy; volume-only rows remain available.
+   No stale contribution/history data under a newly selected name or account,
+   no premature empty state during loading, and a retry does not erase the
+   user's selection. Return after edits refreshes derived values.
 6. Real-data Jest screen tests prove one happy path and error/empty paths,
    selection vs name taps, family inertness, contribution reconciliation,
    previous-only exercises, Working sets/Volume, valid legacy entry parameters,
    sheet restoration, rapid switches and individual Daily/saved Weekly history.
+   Include saved custom eligibility, volume-only rows and Settings/refocus
+   recalculation with reconciled muscle/contribution totals in both periods.
    Remove obsolete UI assertions instead of retaining two landing variants.
 
 ## UX contract

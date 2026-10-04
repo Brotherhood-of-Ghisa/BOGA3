@@ -1,7 +1,7 @@
 # M32-T03 — Default to Daily and preserve preference-driven history
 
 - Status: `planned`
-- Depends on: `M32-T01`; PR #497 landed (or equivalent confirmed on main)
+- Depends on: `M32-T01`; landed PR #497 baseline
 - Milestone: `docs/plans/milestones/M32-progress-tables-and-individual-history.md`
 - Areas: frontend preferences, heatmap integration; UI impact: yes
 
@@ -21,9 +21,10 @@ preference-driven, retain Weekly, and eliminate family history from Progress.
 ## Decided
 
 Milestone D4–D7 govern. Reuse the landed `heatmapView` model and Settings UI,
-`HistorySheet`, `use-history`, DailyHeatmap and WeeklyHeatmap. If PR #497 already
-removed the view toggle, keep that behaviour and test it rather than recreating
-it. History metric choice is separate and remains available.
+`HistorySheet`, `use-history`, DailyHeatmap and WeeklyHeatmap. PR #497 removed
+the view toggle; keep that behaviour and test it. History metric choice remains
+available. Preserve the same independent saved Working set/Volume eligibility
+in both heatmap views; changing the view/default never changes calculation policy.
 
 ## Deliverables and acceptance
 

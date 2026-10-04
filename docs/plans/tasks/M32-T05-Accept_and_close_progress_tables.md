@@ -33,8 +33,11 @@ earlier task's passing checks and screenshots.
    preference, a valid saved Weekly view, and retained Weekly interaction. Name
    presses do not also select the muscle. Dismissing restores table context.
 3. Confirm period/settings persistence, account isolation and edit/refocus
-   recalculation, with no change to set eligibility, Volume kernel, sync or
-   backend. Long names, numeric columns, scroll and accessibility remain usable.
+   recalculation under #497's saved independent Working set/Volume choices:
+   included warm-ups, excluded RIR, volume-only contributions and either
+   calculation column empty. Table, contributions and history must agree after
+   policy changes without changing eligibility rules, the Volume kernel, sync
+   or backend. Long names, numeric columns, scroll and accessibility remain usable.
 4. Obtain human acceptance of material target differences; record native
    captures, gate results and deviations in the PR, not in ephemeral cards.
    Carry unresolved material differences forward rather than claiming closeout.
