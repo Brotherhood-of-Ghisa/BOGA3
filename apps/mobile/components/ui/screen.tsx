@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import {
   ScrollView,
   StyleSheet,
   View,
   type ScrollViewProps,
+  type ScrollViewInstance,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -31,6 +32,7 @@ export type ScreenGutter = 'md' | 'lg';
 
 type ScreenScrollProps = Omit<ScrollViewProps, 'style' | 'contentContainerStyle'> & {
   children: ReactNode;
+  ref?: Ref<ScrollViewInstance>;
   gutter?: ScreenGutter;
   // Extra content-container style, e.g. room at the bottom for a footer.
   contentContainerStyle?: StyleProp<ViewStyle>;

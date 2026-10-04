@@ -1,27 +1,33 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { computeStatsSummary, type StatsSummary } from '@/src/data';
+import { computeProgressComparisons, type ProgressComparisons } from '@/src/data';
 
+/** Refocus may keep the same snapshot; another window or policy may not. */
 export function useStatsSummary(weeks: number, revision: number, reloadExercises: () => void) {
-  const [loaded, setLoaded] = useState<{ weeks: number; summary: StatsSummary } | null>(null);
+  const context = `${weeks}:${revision}`;
+  const [loaded, setLoaded] = useState<{ context: string; summary: ProgressComparisons } | null>(null);
   const [isLoading, setLoading] = useState(true);
-  const [errorMessage, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
+  const [retryRevision, setRetryRevision] = useState(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
   useFocusEffect(useCallback(() => {
     let active = true;
     setLoading(true);
-    setError(null);
+    setFailure(null);
+    setRefreshRevision(value => value + 1);
     reloadExercises();
-    void computeStatsSummary({ periodWeeks: weeks }).then(next => {
-      if (active) setLoaded({ weeks, summary: next });
+    void computeProgressComparisons({ periodWeeks: weeks }).then(summary => {
+      if (active) setLoaded({ context, summary });
     }).catch((cause: unknown) => {
-      if (active) setError(cause instanceof Error ? cause.message : 'Unknown error');
+      if (active) setFailure({ context, message: cause instanceof Error ? cause.message : 'Unknown error' });
     }).finally(() => {
       if (active) setLoading(false);
     });
     return () => { active = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed bodyweight timeline change invalidates this read.
-  }, [weeks, revision, reloadExercises]));
-  // Keep the current window visible during refocus; never label another window's data as this one.
-  const summary = loaded?.weeks === weeks ? loaded.summary : null;
-  return { summary, isLoading, errorMessage };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same context read.
+  }, [weeks, context, reloadExercises, retryRevision]));
+  const summary = loaded?.context === context ? loaded.summary : null;
+  return { summary, isLoading: isLoading || (!summary && failure?.context !== context),
+    errorMessage: failure?.context === context ? failure.message : null,
+    onRetry: () => setRetryRevision(value => value + 1), refreshRevision };
 }

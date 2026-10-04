@@ -30,7 +30,8 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
   const [daily, setDaily] = useState<DailyEffortMetrics[]>([]);
   const [weekly, setWeekly] = useState<SelectedMuscleWeeklyEffort[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{ selected: T; weeks: number; revision: number; message: string } | null>(null);
+  const [snapshot, setSnapshot] = useState<{ selected: T; weeks: number; revision: number } | null>(null);
   const [weekKey, setWeekKey] = useState<string | null>(null);
   const [retryRevision, setRetryRevision] = useState(0);
   const currentWeekKey = weekKey === null ? null : keepHistorySelection(weekKey, weeks);
@@ -40,15 +41,16 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
     let active = true;
     const read = async () => {
       setLoading(true);
-      setError(null);
+      setFailure(null);
       try {
         const next = await loadHistory(selected, weeks);
         if (!active) return;
+        setSnapshot({ selected, weeks, revision });
         setDaily(next.daily);
         setWeekly(next.weekly);
         setWeekKey(previous => keepHistorySelection(previous, weeks));
       } catch (cause) {
-        if (active) setError(cause instanceof Error ? cause.message : 'Unknown error');
+        if (active) setFailure({ selected, weeks, revision, message: cause instanceof Error ? cause.message : 'Unknown error' });
       } finally {
         if (active) setLoading(false);
       }
@@ -62,10 +64,12 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
     setDaily([]);
     setWeekly([]);
     setWeekKey(null);
-    setError(null);
+    setFailure(null);
     setSelected(valid ? target : null);
   };
   const dismiss = () => setSelected(null);
   const retry = () => setRetryRevision(value => value + 1);
-  return { selected, daily, weekly, loading, error, weekKey: currentWeekKey, select, dismiss, retry, selectWeek: setWeekKey };
+  const current = snapshot?.selected === selected && snapshot?.weeks === weeks && snapshot?.revision === revision;
+  const error = failure?.selected === selected && failure?.weeks === weeks && failure?.revision === revision ? failure.message : null;
+  return { selected, daily: current ? daily : [], weekly: current ? weekly : [], loading: !!selected && (loading || (!current && !error)), error, weekKey: currentWeekKey, select, dismiss, retry, selectWeek: setWeekKey };
 }

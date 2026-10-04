@@ -38,8 +38,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   `/train` now renders its real session-entry hub, through one coordinator that
   rechecks for an active draft and serializes empty/planned launch requests
   before persistence or materialization.
-  `/progress` now renders the exact existing Stats / History implementation;
-  `/stats-history` remains available with unchanged behavior as its legacy path.
+  `/progress` renders muscle comparison tables and inline exercise contributions;
+  `/stats-history` re-exports that implementation as its compatibility path.
   `/more` renders the secondary-feature hub.
   The model maps legacy roots to their current owner; every recognized root
   route keeps one selected canonical destination mounted.
@@ -96,10 +96,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Query params:
   - the same optional `period` and `breakdown` values as `/stats-history`
 - Behavior:
-  - re-exports the current `/stats-history` route implementation rather than
-    redirecting or copying it, so all controls, metrics, loading/error/empty
-    states, session drill-downs, and exercise/muscle heat maps are identical
-  - `/stats-history` stays available as the unchanged legacy path
+  - owns the shared Progress implementation: complete muscle comparisons,
+    separate name-history links and selection chevrons, inline contributions
+    and inert Total. Quiet Browse exercises / Sessions rows retain those exits.
+  - `/stats-history` re-exports it. No redirect or second analytics surface.
 
 1e. `/more` (canonical tab)
 - File: `apps/mobile/app/(tabs)/more.tsx`
@@ -141,18 +141,18 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 3. `/stats-history`
 - File: `apps/mobile/app/(tabs)/stats-history.tsx`
 - Query params:
-  - `period` (optional; validated `7 | 30`, default `7`)
-  - `breakdown` (optional; validated `exercise | muscle`, default `exercise`)
+  - `period=7` selects This week; missing/other/invalid values select the configured window
+  - `breakdown=exercise` opens retained exercise browsing; all other values open muscles
 - Behavior:
-  - preserved Progress-owned route inside the `(tabs)` group; renders the merged
-    Stats / History view
-    with separate labelled `Time range` (configured N weeks / This week) and `Breakdown`
-    (joined `By Exercise` / `By Muscle`) rows; both breakdown choices remain
-    visible and `By Exercise` is the default
-  - query values select only the initial control state; invalid values fall
-    back to the configured window / By Exercise defaults; `period=7` means This
-    week, and the preserved `period=30` link selects the configured window
-  - Individual muscle and exercise history opens and dismisses as in-route UI state, preserving the page controls, search, sort and scroll. Muscle targets contain exactly one ID; family headings are inert. Settings owns the heatmap view (Daily for unset/invalid choices, with valid saved Weekly retained). No path, query param, redirect, or screen-to-screen transition is added for the overlay.
+  - re-exports `/progress`; query values select initial state and controls do
+    not rewrite them. Browse exercises stays in-route; By Muscle returns to tables.
+  - Muscle names open one muscle ID, chevrons select its inline contributions;
+    family headings, figures and Total are inert. Exercise names open definition
+    history. No new path/query/redirect for selection or history sheets.
+  - Dismissal preserves muscle selection, table metric, period, search, sort and
+    scroll, returning accessible focus to the launching name. Settings owns the
+    saved look-back and view: unset/invalid Daily, valid saved Weekly retained.
+    History metric/day/week is separate from table selection.
 
 4b. `/session/[sessionId]`
 - File: `apps/mobile/app/session/[sessionId]/index.tsx`
@@ -231,7 +231,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - opened from the Stats Sessions summary card
+  - opened from the Progress Sessions link row
   - uses the root stack's minimal back-button display mode (below): the
     platform back arrow remains, while `(tabs)` and other previous-route labels
     are hidden
@@ -415,13 +415,13 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 1. `/` -> `/today`
    - root redirect (renders `<Redirect />`)
 2. `/progress` or `/stats-history` -> `/exercise-history?exerciseDefinitionId=<id>`
-   - Stats sub-view per-exercise picker opens the per-exercise history view
+   - Exercise page History opens the per-exercise history route; Progress exercise names open in-route history sheets
 3. `/sessions` -> `/session/<sessionId>`
    - completed Session History row overflow Edit action: the session view,
      editing; `Done` returns by `router.back()`. The row tap opens
      `/completed-session/<sessionId>`.
 4. `/progress` or `/stats-history` -> `/sessions`
-   - Stats Sessions summary card
+   - Progress Sessions link row
 5. (removed: Sessions' active Resume to the recorder; see 46)
 6. `/today` <-> `/train` <-> `/progress` <-> `/more`
    - canonical switching via the shared bottom tray (`BottomTray` ->

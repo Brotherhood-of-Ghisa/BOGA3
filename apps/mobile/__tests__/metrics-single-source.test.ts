@@ -84,7 +84,6 @@ describe('training-metric rules have one implementation', () => {
       'apps/mobile/src/groups/link-view-model.ts',
       'apps/mobile/components/bodyweight/body-weight-screen.tsx',
       'apps/mobile/components/today/progress-format.ts',
-      'apps/mobile/app/(tabs)/stats-history.tsx',
     ])).toEqual([]);
   });
 
