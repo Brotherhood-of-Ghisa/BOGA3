@@ -40,13 +40,25 @@ signed-delta ink roles unless a palette extension is explicitly accepted.
 
 ### D2. Working sets means physical working sets
 
-Reuse the canonical confirmed-performed, non-warm-up predicate. For one muscle,
-count each contributing physical set once, whether its mapping is primary or
-secondary; stabilizer-only mappings contribute nothing. Do not multiply set
-counts by role factors or redefine the session-summary calculation.
+Reuse `isWorkingSet(set, effortPolicy)` with the active account's durable
+`workingSetEfforts` choices from PR #497. For one muscle, count each eligible
+physical set once, whether its mapping is primary or secondary; stabilizer-only
+mappings contribute nothing. Do not multiply set counts by role factors or
+redefine the session-summary calculation.
+
+Volume independently uses `isVolumeSet(set, effortPolicy)` and `volumeEfforts`;
+it is not restricted to working sets. Both predicates require confirmed
+performance. Warm-up, RIR, Technique and Cooldown inclusion follows the saved
+calculation choices; Display choices do not determine eligibility. Either
+calculation column may be empty. Follow the existing legacy-label handling in
+`docs/specs/tech/training-metrics-contract.md` rather than copying the rules.
+The reference's "Warm-ups excluded" footnote is illustrative; production copy
+must reflect the active policy instead of asserting unconditional exclusion.
+
 Muscle Volume retains the existing per-side, role-weighted calculation and
 bodyweight policy. Exercise contribution Volume is that exercise's allocation
-to the selected muscle, not its entire exercise volume.
+to the selected muscle, not its entire exercise volume. Use the same account
+and policy snapshot for both periods, muscle rows and exercise contributions.
 
 The selected muscle's exercise rows and Total must reconcile with its summary
 row for both periods. Multiple blocks of one exercise definition combine into
@@ -60,7 +72,9 @@ Keep previous-only and zero-current muscles discoverable as ordinary rows,
 including a real `0` and its change. Load the union of exercises contributing
 in either comparison period so a decrease to zero remains explainable.
 An all-zero muscle has a valid empty contribution state and still opens its
-individual history. There is no separate "Outside the map" section.
+individual history. Zero working sets can coexist with nonzero Volume; retain
+volume-only contributors and decide emptiness using the selected metric.
+There is no separate "Outside the map" section.
 
 ### D4. Selection and history are separate actions
 
@@ -95,14 +109,16 @@ future use and for a saved Weekly choice. Do not delete it or force all users to
 Daily independently of the preference. Preference errors retain the existing
 durable-save/retry and account-isolation behaviour.
 
-### D6. Reuse the incoming Progress settings work
+### D6. Reuse the landed Progress settings work
 
 [PR #497](https://github.com/Brotherhood-of-Ghisa/BOGA3/pull/497),
-`Add Progress preferences and independent effort calculation choices`, is open
-at the planning baseline. It supplies the preference store, Settings surface,
-calendar-week period logic, history look-back and view-controlled sheets.
-T01–T04 execute only after that PR has landed, or its equivalent implementation
-is confirmed on `origin/main`; they do not recreate those features.
+`Add Progress preferences and independent effort calculation choices`, has
+landed as `0296545b`. It supplies the preference store, Settings surface,
+independent Working set/Volume eligibility, calendar-week period logic,
+history look-back and view-controlled sheets. T01–T04 build on that baseline;
+they do not recreate those features or change its eligibility rules. Personal
+table/history reads consume the durable active policy; groups and coaching
+retain their existing shared default and receive no device-local choices.
 
 The mockups' 7-/30-day controls are illustrative. Preserve the landed configured
 calendar-week period choices, comparison bounds, look-back, shared targets and
@@ -121,11 +137,11 @@ analytics cache is required; projections read the existing local data.
 
 ## Task breakdown
 
-One card = one local worktree = one session = one PR. Land this planning PR
-first. Use the task protocol in `docs/plans/README.md`: design, build, review,
-PR, user review, merge and owner cleanup. Each shipping PR deletes its card and
-marks the row completed. The last task deletes this milestone; durable rules
-belong in their owning specs, and evidence belongs in PRs.
+One card = one local worktree = one session = one PR. The planning PR #502 and
+dependency #497 have landed. Use the task protocol in `docs/plans/README.md`:
+design, build, review, PR, user review, merge and owner cleanup. Each shipping
+PR deletes its card and marks the row completed. The last task deletes this
+milestone; durable rules belong in their owning specs, and evidence belongs in PRs.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
@@ -153,13 +169,19 @@ Do not estimate timings; use `./boga timings` when reporting them.
 Closeout proves table/Total parity, zero-current and previous-only contributions,
 one-muscle history scope, exercise history, Daily by default, a saved Weekly
 choice, absent in-sheet view toggles, state restoration, small-screen usability,
-and preference/account isolation. Preserve all existing heatmap tests and the
-weekly component. No target, threshold or suppression is weakened.
+and preference/account isolation. Table, contributions and history must agree
+after changing Working set/Volume choices, including volume-only contributions
+and either calculation column empty. Preserve all existing heatmap tests and
+the weekly component. No target, threshold or suppression is weakened.
 
 ## Risks / dependencies
 
-- Recheck the merged PR #497 baseline; its current proposed default is
+- Recheck the merged PR #497 baseline; its landed heatmap default is
   Weekly, which this milestone deliberately changes to Daily for unset choices.
+- Eligibility is account-local and independent for Working sets and Volume;
+  never fall back to the shared non-warm-up rule or filter Volume through
+  Working sets. Settings changes/refocus and account switches must refresh
+  comparisons and history together without rewriting recorded workouts.
 - Name-to-history and selection are different actions from the generated
   chevrons. T01 must make their targets understandable before building.
 - History sheets and their reusable lifecycle are shared; verify both muscle
