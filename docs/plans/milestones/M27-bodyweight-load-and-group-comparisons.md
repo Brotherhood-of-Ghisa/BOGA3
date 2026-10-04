@@ -70,15 +70,96 @@ is introduced. Missing/invalid private input never becomes zero for a
 bodyweight-dependent group score. Public copy must not expose why a private
 input was unavailable.
 
-### D4. Reading corrections remain separate
+### D4. Reading-correction decision (planned percentage behavior)
 
-Reading value/date/delete/restore changes are calculation-data corrections,
-not rule edits. Preserve existing test outcomes until a separate decision is
-made: a relevant correction voids the existing e1RM certificate, while the raw
-Weight certificate remains active; irrelevant/later readings have no effect.
-T15 must settle the new percentage metric's correction policy before its
-implementation. The user has not yet extended the rule-only guarantee to
-reading corrections.
+On 2026-10-04 the executing agent selected the existing conservative policy
+under the user's instruction to manage all subtasks autonomously and merge in
+confidence. This is a delegated agent decision, not a new human answer or an
+extension of the human's rule-only retention guarantee. T15's planning decision
+is complete; T09 implements and graduates the percentage lifecycle into specs.
+Current production still uses kg Weight/1RM projections.
+
+**Chosen:** an authoritative change to the applicable private dependency ends
+an already bound dependent certificate projection (`voided`). Keep the original
+certificate ID, witness, timestamp, observed revision/value and raw observation
+immutable; append the existing terminal end metadata. Never overwrite audit
+values or resurrect an ended row. Recompute All scores when eligible, remove
+that projection from Certified, and require a new witness for a new certificate.
+Raw Weight legacy certificates have no reading dependency and remain active;
+they are not automatically new Volume witnesses. T08 defines that mapping.
+Both future normalized metrics follow this lifecycle if they depend on B.
+
+The private dependency is the selected valid reading's ID, exact measured-at
+instant and kg value, resolved at session start under D3. Compare that tuple,
+not just the resulting rounded score or a reading's bookkeeping clock.
+
+| Correction / transition | Chosen lifecycle for a bound dependent projection |
+| --- | --- |
+| Selected reading's kg or date changes, even if it still wins selection | End the projection when the resolved dependency differs |
+| Delete/invalid selected reading; fall back to an earlier valid reading | End, recalculate All using that earlier context |
+| Delete/invalid selected reading; no valid context remains | End, omit dependent All and Certified scores |
+| Restore a reading or insert a backdated one that changes selection (including deterministic equal-time ID ties) | End any still-active bound projection whose dependency changes; never reopen previously ended rows |
+| Later, nonselected or invalid candidate leaves the selected tuple unchanged; no-op/bookkeeping update | Preserve exact active certificate and audit |
+| Pure rule change makes a score unavailable | Keep certificate active, omit entry; restore same ID when eligible again |
+| Never-bound ordinary certificate becomes dependent through rules, but context is missing | Keep active without a dependency/entry; first valid context binds it and restores the same witness |
+| Group Off or c=0 | Do not resolve readings or enqueue for reading edits; keep an existing private pin internally and compare it on next dependent activation |
+
+Restoring an input after a correction that ended a bound certificate only
+restores All eligibility. Restoring eligibility after rules-only ineligibility
+preserves the same active witness. Coalesced updates whose authoritative as-of
+tuple is unchanged are harmless; a correction observed during an authoritative
+re-evaluation remains terminal even if a later edit restores the old tuple.
+The distinction is dependency observation, not whether the numeric score moved.
+
+**Alternatives considered, using private planning context only:** a performed
+set of 20 kg added load × 5 reps, c=1 and total-load input, changes from B=80 to
+B=90 kg. Applying the existing Wathan kernel to effective loads 100 and 110 kg
+then dividing by the same B gives 145.7281316 → 142.4897287 %BW. Under the chosen
+policy the old dependent certificate ends, All shows the new score and Certified
+needs a new witness. Under the unchosen retention policy the same active witness
+would remain Certified at the recalculated score. If its only applicable reading
+is deleted, the chosen policy ends it and restoration does not reopen it; the
+retention alternative would keep it active but omit its score until restoration.
+Neither option publishes these private example inputs to group members. Numerator
+and denominator change together; do not divide today's displayed added-load 1RM
+by B in place of the accepted effective-load formula.
+
+**Migration and copy:** kg→percentage is a rule/representation change and must
+preserve eligible existing 1RM witness IDs and observed kg audit server-side.
+Retain existing private pins across inactive rules; do not bless a pending
+correction with today's reading at cutover. Missing or ended projections cannot
+be made active by migration. Any new metric's witness mapping must be justified
+from the same observed set in T08, without relabeling raw Weight as Volume.
+Group payloads use generic existing state/copy such as “Certification ended”
+and “Score unavailable”; omit private correction reason, reading ID/date/value,
+pin/digest and absolute audit counterparts under D5. Owner-private reading UI
+retains its normal access. Public generic `voided` does not explain the cause.
+
+**Evidence inventory and T09 test obligations:**
+
+- Retain `apps/mobile/__tests__/bodyweight-as-of.test.ts`: exact UTC/binary-ID
+  ordering, DST future rejection, malformed-row fallback and bounded intervals
+  after value/date/delete/restore/backdated edits. These test selection, not
+  certificate transitions.
+- Retain `supabase/tests/bodyweight-as-of-parity.mjs`: SQL/device tuple parity,
+  exact/prior/future readings, binary/Unicode ties, tombstones, malformed and
+  nonfinite readings, and DST instants.
+- Retain `supabase/tests/groups-bodyweight.sh` assertions “irrelevant reading”,
+  “unchanged reading”, “1RM certification pins applicable private reading
+  changes”, “Weight certification ignores private reading changes”, the two
+  legacy reading-correction assertions, pending-correction forward migration,
+  rules-only missing-reading retention/return, Off/c=0 no-reading enqueue,
+  raw-set correction/tombstone and no-resurrection cases. Add normalized
+  assertions rather than reversing their lifecycle expectations.
+- T09 adds actual certificate/publication vectors for every table row: date
+  shifts inside/outside a session interval, deletion with fallback/without
+  context, restore, winning/losing backdated and equal-time inserts, equal-score
+  dependency changes, no-ops, delayed Off→On correction detection, initial
+  binding after rules-only missing context, coalesced unchanged tuples, pending
+  corrections at metric cutover, both dependent metrics and raw legacy witness
+  independence. Assert exact audit/ID preservation for retained rows, terminal
+  end metadata for ended rows, All/Certified transitions and every reader's
+  generic, redacted public state. No executable assertions change in T15.
 
 ### D5. Privacy across every group surface
 
@@ -204,15 +285,16 @@ and compatible clients in the documented order with explicit hosted authority.
 | --- | --- | --- | --- |
 | Existing #411 task — Keep zero-contribution group boards stable | No-op legacy preference changes; reconcile rule metadata/history; closes #411 | T13 | completed |
 | M27-T13 — Preserve certifications across rule changes | Observed-set pins, migration and rule-only retention; closes #419 | — | completed |
-| [M27-T15 — Decide percentage reading-correction policy](../tasks/M27-T15-Decide_percentage_reading_correction_policy.md) | Explicit private-data correction outcome for the new metric | — | planned |
+| M27-T15 — Decide percentage reading-correction policy | D4: relevant private corrections end bound dependent projections; delegated decision | — | completed |
 | [M27-T08 — Group percentage contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Volume definition, versioned units, privacy and activation contracts | T15 | planned |
 | [M27-T09 — Evaluate private percentage scores](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Normalized worker/SQL publication and all group reader privacy | T08, T13, existing #411 task | planned |
 | [M27-T10 — Group percentage UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Group rules, %BW boards, details, certification copy and safe caches | T09 | planned |
 | [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T15; T13 and the existing #411 task are complete. The formula and
-switch policy are settled. T08 must record the Volume decision before building.
+Ready now: T08; T15, T13 and the existing #411 task are complete. The formula,
+switch and reading-correction policies are settled. T08 must record the Volume
+decision before building.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
 
@@ -239,8 +321,9 @@ marks the historical personal cards shipped or authorizes hosted deployment.
 4. Every group-facing route, RPC, old protocol, cache and public historical
    payload obeys D5. Conventional kg boards and private workout/coaching views
    regress cleanly. Privacy is proven from responses, not just screenshots.
-5. T15's reading-correction decision is explicit and implemented/tested without
-   silently weakening unrelated legacy invalidation cases.
+5. Implement/test D4's delegated reading-correction decision, including terminal
+   dependent projections and preserved raw Weight legacy witnesses, without
+   weakening unrelated legacy invalidation cases.
 6. A human exercises and accepts the group rule-change, %BW, certification,
    privacy, missing-data and offline/error flows before the combined aggregate
    closeout pass. Automated checks do not replace this review.

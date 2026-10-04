@@ -1,80 +1,66 @@
-# M27-T09 — Evaluate private percentage group scores
+# M27-T10 — Expose group percentage rules and rankings
 
 - Status: `planned` (re-scoped 2026-10-04)
-- Depends on: [M27-T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), M27-T13 (completed), existing #411 task (completed)
+- Depends on: [M27-T09](M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
-- Areas: cross-stack; UI impact: yes (server-projected scores and omissions)
+- Areas: frontend; UI impact: yes
 
 ## Objective and scope
 
-Implement T08's accepted percentage representation throughout evaluation,
-publication and every group reader. Preserve T13's witness certificates while
-scores change and enforce milestone D5 privacy before data reaches a client.
-The old snapshot/three-board/public-bodyweight implementation is not this task.
+Present T08/T09's Volume/1RM units, group standards and certification lifecycle
+across existing group flows. This restores the UI task scope: the consolidated
+card accidentally duplicated T09. Milestone D2–D10 govern; do not restore the
+obsolete three-board, public-B/provenance or absolute bodyweight alternative.
 
 ## Deliverables and acceptance
 
-1. Resolve the same private dated reading for effective-load computation and
-   normalization. Use the shared TypeScript kernel, current source/target
-   distribution rules and accepted T08 formula; never duplicate Wathan in SQL
-   or normalize a target-mode value with an incompatible denominator.
-2. Materialize T08's chosen Volume and 1RM results in Certified/All scopes.
-   Off and c=0 use ordinary Volume (kg·reps)/1RM (kg) without querying readings.
-   On with c>0 uses %BW 1RM and the chosen Volume policy. Unavailable private
-   input omits dependent enabled scores; never substitute zero, fall back to kg
-   while On, or reveal why the dependency failed. Rank before display rounding.
-3. Re-evaluate affected comparisons after effective rules/contribution/mode
-   changes and publish one coherent revision using existing generation/claim/
-   lease locks. Recompute Certified entries without changing original certificate
-   IDs/witness/time/audit metadata or ending them solely on rules changes.
-   Ineligible scores can leave a board without ending their witness certificate.
-4. Apply T15's explicitly chosen reading-correction outcomes; retain performance
-   edits/deletes, manual withdraw/cancel and archived/former-member boundaries.
-   Later readings irrelevant to a session never change its selected dependency.
-   Personal preference/contribution edits never rescore a group performance.
-5. Enforce D5 in actual current and legacy board/podium/record/history/event/
-   stream/session/summary/certification RPC responses. Retain safe raw public
-   context such as reps, but suppress enabled bodyweight absolute kg/load/volume
-   counterparts, including session totals and same-group cross-endpoint joins.
-   Ordinary Off sharing follows D5's explicitly limited privacy claim. Keep old absolute audit data server-side.
-6. Migrate public history representation/visibility and invalidate incompatible
-   caches per T08. Preserve history meaning and source clocks; do not silently
-   relabel kg records or rewrite observed certificate values. Old readers must
-   fail safely or receive an explicitly supported safe response.
-7. Keep source enqueue/apply failures isolated from personal sync and from
-   certification commits. Retain retries, stale-result fences and honest
-   rebuilding/archived states. No new private-reading disclosure in logs/events.
+1. Owners/admins edit group contribution, load mode, default metric and the
+   retained group On/Off switch. Members read the same standard. Explain coherent
+   recalculation and unchanged witness retention before effective rule changes;
+   c=0 preference toggles do not promise a rebuild. Linking preserves personal
+   configuration, movement compatibility and current offline-link behavior.
+2. Boards/podiums offer Volume and 1RM with Certified/All and T08's explicit
+   units/defaults. Off and c=0 show ordinary kg·reps/kg; On with c>0 shows the
+   accepted normalized results. Apply units to rows, accessibility, detail,
+   history, events and caches; never relabel historic kg or fall back to kg On.
+3. Record detail, certification actions and View full session consume T09's safe
+   projections. Hide enabled bodyweight raw/absolute load, volume and audit
+   counterparts, all private reading identity/date/value/provenance and digests.
+   Keep permitted public set context such as reps/date/identity.
+4. Apply D4: dependent correction ends that projection, while raw legacy witness
+   remains active; restore never reopens ended rows. Rules-only ineligibility
+   retains the active witness and restores its entry on eligibility. Use generic
+   “Certification ended”/“Score unavailable” copy without exposing private cause.
+   Preserve witness/time and original audit server-side through unit migration.
+5. Retire incompatible old caches and fail safely for unsupported versions/units.
+   Cover stale writes, offline/error, rebuilding, archived/former-member and
+   account-switch states using existing group recipes and role boundaries.
+   Rules recalculation is not a newly performed PR or a celebration.
 
-## Verification
+## UX contract and target
 
-Read test-directory READMEs. Reuse existing backend lanes, actual pushes and
-Edge drains. Cover two members with different B at equal reps/external load,
-relative-rank results, ordinary and chosen bodyweight Volume, c=0/positive and
-switch transitions, unweighted sets, distribution
-conversions, no/invalid readings, later/relevant reading edits, rules-only
-changes, edits/deletions, migration, history, archive/rejoin and legacy readers.
-Assert exact active certificate identity/metadata and normalized values.
+Before implementation, pin a repo-native brief plus reference screenshots under
+`docs/specs/ui/ai-design-policy.md`, using the current group design target and
+existing UI tokens/recipes. State any material target change explicitly.
 
-Privacy checks inspect every enabled-group RPC payload and paired responses
-for disallowed absolute/relative values, including full session and aggregate
-subtraction. Verify ordinary Volume/1RM while Off without reading access, On
-cache/history redaction, and the documented cross-mode/cross-group limit. Anonymous/OAuth/outsider tests remain. Add Jest scorer/decoder/cache
-coverage for the shared behavior; use failure injection for queue/publication.
+| Flow | Trigger and steps | Success | Failure/edge |
+| --- | --- | --- | --- |
+| Change group rules | Admin opens settings/comparison → edits → reviews impact → saves | Coherent recalculation preserves witnessed set | Offline/role/stale failure retains input and says nothing changed; c=0 toggle stays ready |
+| Link movement | Member compares group/personal standards → links compatible movement | Group evaluates raw sets without changing personal settings | Incompatible movement needs separate comparison; existing offline path remains |
+| Compare members | Open podium → choose Volume/1RM and scope → inspect record/full session | Correct units and safe public context everywhere | Missing score is generic; rebuilding/history/offline never mixes units or leaks cached kg |
+| Witness performance | Inspect safe set detail → certify or authorized removal | Exact active witness/state and score refreshed | Correction ends dependent projection; restore never reopens; failed write has no success |
 
-## Specs to update
+Render relevant states in the running app at target sizes and compare with the
+pinned brief/screenshots. Record intentional differences, accessibility and happy/
+error path evidence in the PR. Automated captures are not T14 human acceptance.
 
-- `docs/specs/tech/groups-contract.md` — shipped scoring, privacy, lifecycle,
-  publication and readers.
-- `docs/specs/tech/bodyweight-load-contract.md`, `training-metrics-contract.md`
-  — public normalization over private dated context.
-- `docs/specs/05-data-model.md`, `03-technical-architecture.md` — changed projections.
+## Verification and closeout
 
-## Gates and closeout
-
-Use `./boga test for`; propose `fast`, `backend` (group leaderboards and API-live)
-plus `ios-groups-e2e`, with sync e2e only for a real sync-path change. Obtain the
-operator's lane agreement and run to green, plus required quality targets.
-Do not add Maestro scenarios without justification and approval. Delete this
-card and mark its M27 row completed in the implementing PR; T10 owns UI and T14
-owns human acceptance/combined closeout and authorized hosted smoke.
+Read test-directory READMEs. Add component/view-model/decoder/cache Jest coverage
+for mode/category units, safe detail/full-session, lifecycle copy and offline/
+error/permission states. Run `./boga test for`; expected lanes are fast,
+frontend-ui and ios-groups-e2e, plus required quality gates. Reuse existing flows;
+new Maestro scenarios require justification and approval. Graduate shipped
+UI/group contracts, delete this card and complete its milestone row in the PR.
+T14 owns human acceptance, combined gates and activation/closeout.
