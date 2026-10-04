@@ -43,7 +43,7 @@ export function SessionMuscleBreakdown({
     <>
       {workingSetCount > 0 ? (
         <View style={[styles.muscles, standalone && styles.standaloneMuscles]} testID="session-completion-muscle-breakdown">
-          <Text allowFontScaling={false} style={styles.microLabel}>Sets by muscle</Text>
+          <Text allowFontScaling={false} accessibilityRole="header" style={styles.cardTitle}>Sets by muscle</Text>
           {workingSetsByMuscle.length > 0 ? (
             <View testID="session-completion-muscle-table">
               <View style={styles.tableRow}>
@@ -77,9 +77,6 @@ export function SessionMuscleBreakdown({
                   : 'No mapped working sets for this session.'}
             </Text>
           )}
-          {workingSetsByMuscle.length > 0 ? (
-            <Text allowFontScaling={false} style={styles.footnote}>Sets = primary + ½ secondary</Text>
-          ) : null}
         </View>
       ) : null}
     </>
@@ -167,6 +164,15 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.lg,
     color: uiRoles.ink,
   },
+  // A card's own title: Archivo 700 at `md` in `ink`, a step below the
+  // page's `lg` section headings and clear of the micro-label column heads.
+  cardTitle: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.md,
+    lineHeight: uiTypography.lineHeight.md,
+    color: uiRoles.ink,
+  },
   microLabel: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
@@ -225,13 +231,6 @@ const styles = StyleSheet.create({
   },
   absent: {
     color: uiRoles.inkGhost,
-  },
-  footnote: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkFaint,
   },
   muted: {
     fontFamily: uiFonts.body.family,
