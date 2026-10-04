@@ -291,7 +291,10 @@ describe('Stats over real data', () => {
 
     // The summary feeds the muscle breakdown.
     fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    expect(await screen.findByTestId('stats-error-state')).toHaveTextContent(/Summary boom/);
+    const error = await screen.findByTestId('stats-error-state');
+    expect(error).toHaveTextContent(/Could not load progress/);
+    expect(error).not.toHaveTextContent(/Summary boom/);
+    expect(screen.getByTestId('stats-retry')).toBeTruthy();
   });
 
   it("opens a seeded exercise's history with all four metrics and both views, and dismisses it", async () => {
@@ -511,7 +514,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId('stats-contributions-empty')).toBeNull();
     expect(screen.getByTestId('stats-loading-state')).toBeTruthy();
     await act(async () => nextRead.reject(Error('New window failed')));
-    expect(screen.getByTestId('stats-error-state')).toHaveTextContent(/New window failed/);
+    expect(screen.getByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
     await act(async () => oldRead.resolve(old));
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-retry'));
@@ -524,7 +527,7 @@ describe('Stats over real data', () => {
     select('quads');
     jest.spyOn(statsRepository, 'computeProgressComparisons').mockRejectedValueOnce(Error('Refresh failed'));
     await replayFocus();
-    expect(await screen.findByTestId('stats-error-state')).toHaveTextContent(/Refresh failed/);
+    expect(await screen.findByTestId('stats-error-state')).toHaveTextContent(/Could not load progress/);
     expect(total('now')).toHaveTextContent('7');
     fireEvent.press(screen.getByTestId('stats-retry'));
     await waitFor(() => expect(screen.queryByTestId('stats-error-state')).toBeNull());
@@ -587,6 +590,15 @@ describe('Stats over real data', () => {
     expect(total('change')).toHaveTextContent('Incomplete');
     expect(within(screen.getByTestId('stats-contributions-total')).getAllByText(/Volume incomplete. Known subtotal from 0 of/)).toHaveLength(2);
     expect(within(screen.getByTestId(`stats-contribution-${SQUAT}`)).getAllByText(/Volume incomplete. Known subtotal from 0 of/)).toHaveLength(2);
+    // Coverage must use the row width, not the narrow numeric column that
+    // broke words and made the native contribution row excessively tall.
+    for (const prefix of ['stats-muscle-row-quads', `stats-contribution-${SQUAT}`, 'stats-contributions-total']) {
+      const coverage = screen.getByTestId(`${prefix}-coverage`);
+      expect(coverage).toHaveStyle({ width: '100%', alignSelf: 'stretch' });
+      expect(within(coverage).getByText(/^Now: Volume incomplete/)).toBeTruthy();
+      expect(within(coverage).getByText(/^Previous: Volume incomplete/)).toBeTruthy();
+      expect(within(screen.getByTestId(`${prefix}-values`)).queryByText(/Volume incomplete/)).toBeNull();
+    }
   });
 
 });

@@ -46,9 +46,9 @@ drifted from the code and predated several UI milestones. Git history has them.)
     bodyweight calculations; integrated rendering and human acceptance remain
     required before closeout
 - `design-targets/progress-tables.md`
-  - accepted replacement target awaiting implementation: grouped muscle
+  - implemented and verified replacement target: grouped muscle
     comparisons, separate chevron selection/name history, inline contributions
-    and minimal copy; current route contracts remain unchanged until shipped
+    and minimal copy; `/progress` owns the shared `/stats-history` surface
 
 ## Maintenance rules (for future tasks)
 

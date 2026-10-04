@@ -61,9 +61,10 @@ export function ProgressTables(props: Props) {
         body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${selected.displayName} in either period`} /> : exercises.map(row =>
         <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} columns={columns}
           stacked={stacked} vertical={vertical} onHistory={onExerciseHistory} />)}
-      <View style={[styles.row, styles.total, stacked && styles.stacked]} testID="stats-contributions-total">
+      <View style={[styles.row, styles.dataRow, styles.total, stacked && styles.stacked]} testID="stats-contributions-total">
         <Text allowFontScaling={false} style={[styles.name, styles.nameCell]}>Total</Text>
         <Values row={selected} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix="stats-contributions-total" />
+        <RowCoverage row={selected} metric={metric} prefix="stats-contributions-total" />
       </View>
     </View> : null}
   </>;
@@ -87,10 +88,19 @@ function Values({ row, metric, columns, stacked, vertical, prefix }: { row: Prog
       {vertical ? <Text allowFontScaling={false} style={[styles.label, styles.nameCell]}>{['Now', 'Previous', 'Change'][index]}{metric === 'totalVolume' && index < 2 ? ' (kg·reps)' : ''}</Text> : null}
       <View style={vertical ? { width: columns[index] } : undefined}>
       <Text allowFontScaling={false} numberOfLines={1} style={[styles.figure, styles.numeric]} testID={`${prefix}-${['now', 'previous', 'change'][index]}`}>{value}</Text>
-      {metric === 'totalVolume' && index < 2 && coverage(index === 0 ? row.current : row.previous) ?
-        <Text allowFontScaling={false} style={styles.coverage}>{coverage(index === 0 ? row.current : row.previous)}</Text> : null}
       </View>
     </View>)}
+  </View>;
+}
+
+function RowCoverage({ row, metric, prefix }: { row: ProgressComparison; metric: ProgressTableMetric; prefix: string }) {
+  if (metric !== 'totalVolume') return null;
+  const current = coverage(row.current);
+  const previous = coverage(row.previous);
+  if (!current && !previous) return null;
+  return <View style={styles.coverageRow} testID={`${prefix}-coverage`}>
+    {current ? <Text allowFontScaling={false} style={styles.coverage}>Now: {current}</Text> : null}
+    {previous ? <Text allowFontScaling={false} style={styles.coverage}>Previous: {previous}</Text> : null}
   </View>;
 }
 
@@ -102,7 +112,7 @@ function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, w
   const attainment = muscleTargetAttainment(row.current.workingSetCount, weeklyTarget, weeks);
   const shade = attainment <= 0 ? undefined : shades[Math.ceil(attainment * shades.length) - 1];
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
-  return <View style={[styles.row, stacked && styles.stacked, { backgroundColor: shade }, selected && styles.selected]}
+  return <View style={[styles.row, styles.dataRow, stacked && styles.stacked, { backgroundColor: shade }, selected && styles.selected]}
     testID={prefix}>
     <View style={[styles.nameActions, !stacked && styles.nameCell]}>
       <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
@@ -116,6 +126,7 @@ function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, w
       <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={prefix} />
     </View>
     {!stacked ? <Selection row={row} selected={selected} onSelect={onSelect} /> : null}
+    <RowCoverage row={row} metric={metric} prefix={prefix} />
   </View>;
 }
 
@@ -131,13 +142,14 @@ function ExerciseRow({ row, metric, columns, stacked, vertical, onHistory }: {
   row: ProgressExerciseComparison; metric: ProgressTableMetric; columns: number[]; stacked: boolean; vertical: boolean; onHistory: Props['onExerciseHistory'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
-  return <View style={[styles.row, stacked && styles.stacked]} testID={`stats-contribution-${row.exerciseDefinitionId}`}>
+  return <View style={[styles.row, styles.dataRow, stacked && styles.stacked]} testID={`stats-contribution-${row.exerciseDefinitionId}`}>
     <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
       onPress={() => onHistory(row, name.current)} style={[styles.nameLink, styles.nameCell]}>
       <Text allowFontScaling={false} style={[styles.name, styles.link]}>{row.displayName}</Text>
       <Text allowFontScaling={false} style={styles.role}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>
     </Pressable>
     <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={`stats-contribution-${row.exerciseDefinitionId}`} />
+    <RowCoverage row={row} metric={metric} prefix={`stats-contribution-${row.exerciseDefinitionId}`} />
   </View>;
 }
 
@@ -150,6 +162,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', color: uiRoles.inkMuted, paddingTop: uiSpace.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, borderBottomWidth: uiBorder.width,
     borderColor: uiRoles.rule, paddingHorizontal: uiSpace.xs },
+  dataRow: { flexWrap: 'wrap' },
   stacked: { flexDirection: 'column', alignItems: 'stretch', paddingBottom: uiSpace.sm },
   selected: { borderLeftWidth: uiBorder.width * 3, borderLeftColor: uiRoles.ink },
   headers: { borderBottomWidth: uiBorder.width, paddingVertical: uiSpace.sm },
@@ -170,8 +183,9 @@ const styles = StyleSheet.create({
   numeric: { textAlign: 'right' },
   figure: { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md, color: uiRoles.ink },
+  coverageRow: { width: '100%', alignSelf: 'stretch', paddingBottom: uiSpace.sm },
   coverage: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs, color: uiRoles.ink, textAlign: 'right' },
+    lineHeight: uiTypography.lineHeight.xs, color: uiRoles.ink },
   role: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.xs,
     lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
   total: { backgroundColor: uiRoles.surface },

@@ -9,6 +9,10 @@ palette picked from on-device renders. **Palette accepted** by the user on
 on 2026-09-26; exercise history and Sessions **accepted** in the DLM-T10
 gallery on 2026-09-26.
 
+The landing portion is superseded by [Progress tables](progress-tables.md).
+This record continues to own the palette and retained exercise browsing,
+individual history sheets, exercise-history route and Sessions presentation.
+
 ## Target
 
 - Vocabulary: `../design-language.md` (the `viz` roles are §2 "Data
@@ -28,10 +32,9 @@ rule that comes with it: text on a `viz` ground is `ink`.
 
 ## Brief
 
-- One `ScreenScroll` on `paper`: the `Time range` micro-label (rendered
-  uppercase) over a `SegmentedControl` (T08-D1); then two summary `Card`s with
-  stacked `Stat`s, Sessions a link `Card` with a `chevron-right`; then the
-  `Breakdown` micro-label over its `SegmentedControl`; then a `SearchField`.
+- The landing's controls, muscle/contribution tables and quiet links follow
+  [Progress tables](progress-tables.md). Browse exercises retains the
+  `Breakdown` control, `SearchField` and sortable exercise table on `paper`.
 - Deltas are Plex Mono `ink-muted` with their sign; `new` is `ink` (G3,
   T08-D4). Figures take the one display format (`tech/training-metrics-contract.md`
   §4) in Plex Mono, never `2.5k` (T08-D2).
@@ -40,13 +43,11 @@ rule that comes with it: text on a `viz` ground is `ink`.
   no wash; inactive indicators keep their width, transparent), then
   `ListRow density="list"` rows with the name wrapping and the figures in
   right-aligned Plex Mono columns.
-- Each muscle family is a `Card`: the family row, then its nested muscles
-  indented one step, each a `ListRow` with two stacked `Stat`s (`Sets`,
-  `Volume`) and their deltas. A row with working sets takes one uniform
-  target-attainment shade, `viz1`–`viz4`, the same ramp for families and muscles
-  (T08-D3); on it every text is `ink`.
-- Loading, error and empty states are `StatePanel`s inside a `Card`; the copy
-  is unchanged.
+- Family headers are static, individual names open history, and a separate
+  chevron selects contributions. A muscle with working sets takes a uniform
+  target-attainment shade, `viz1`–`viz4`; on it every text is `ink`.
+- Loading, error and empty states use inline `StatePanel`s; the table's Retry
+  and metric-specific contribution emptiness follow the replacement brief.
 
 ### History sheets and heatmaps (DLM-T09)
 
@@ -92,9 +93,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - Loading, error (`Retry` on Sessions, T10-D6) and empty states are
   `StatePanel`s in a `Card`, with `…` for the ellipsis.
 
-One shared weekly working-set target grades each muscle against quota × selected weeks. Group
-colour averages the individually capped attainment of all constituent muscles,
-including untrained ones. The configured N-week window and This week start at
+One shared weekly working-set target grades each muscle against quota × selected
+weeks. The configured N-week window and This week start at
 local Monday and run through now; the default is the configured window, with
 no quota proration and no separate “So far” label. A one-week configuration has one range choice.
 History uses the saved look-back in both views. Muscle Sets cells compare daily
@@ -113,20 +113,15 @@ Device: iPhone simulator at 390pt width, light.
 
 | Screenshot (lane) | State |
 | --- | --- |
-| `00-stats-empty-state` (ad hoc) | no history: the empty table |
-| `01-exercise-view-default` (ad hoc) | By Exercise, 7 days, sorted by Sets |
+| `01-exercise-view-default` (ad hoc) | retained By Exercise table, sorted by Sets |
 | `01a-exercise-table-working-sets`, `01b-exercise-table-most-recent`, `01c-exercise-table-volume-ascending` (ad hoc) | the sort header states |
-| `02-exercise-view-30-days` (ad hoc) | 30 days |
-| `03-muscle-breakdown-7-days` (ad hoc) | By Muscle: the family cards and failure shades |
 | `04-back-to-exercise-view` (ad hoc) | back to By Exercise |
 | `05-exercise-heatmap-daily` (ad hoc) | exercise history sheet, Daily, today selected |
 | `05a-heatmap-today-and-selected` (ad hoc) | Daily with yesterday selected: today's ring beside the selected border |
-| `05b-exercise-heatmap-weekly` (ad hoc) | exercise history sheet as it opens: Weekly, Volume |
+| `05b-exercise-heatmap-weekly` (ad hoc) | exercise history sheet with a valid saved Weekly choice, Volume |
 | `05c-exercise-heatmap-1rm` (ad hoc) | Weekly, 1RM |
 | `06-muscle-heatmap-weekly`, `06b-muscle-heatmap-daily` (ad hoc) | a single muscle's history (Chest), Weekly then Daily |
-| `06c-muscle-family-history` (ad hoc) | a multi-muscle family's history (Legs, `Muscle Group History`) |
 | `07-overlay-dismissed` (ad hoc) | the sheet dismissed from its backdrop, back on By Muscle |
-| `03-m26-progress` (`ios-smoke`) | Progress from the tab bar, no data |
 | `05-data-runtime-smoke-exercise-list` (`ios-data-smoke`) | a workout just logged through the session screens |
 | `exercise-history-default` (`ios-exercise-page`) | exercise history from the exercise page's `History`: last 30 days, the bests and one session card with a warm-up |
 | `exercise-history-all-time` (ad hoc) | All time: both fixture sessions |
@@ -140,14 +135,17 @@ proves the rest. When the screen changes, capture them with a one-off flow
 run (`apps/mobile/scripts/maestro-ios-run-flow.sh --flow …`); git history
 holds the flow steps that reached them.
 
-Jest only (no flow reaches them): the loading and error states (the screen's
-and the history sheets'), a filtered list with no match, the shade and delta
+Absent from committed regression flows: the loading and error states (the
+screen's and the history sheets'), a filtered list with no match, the shade and delta
 colours (`__tests__/stats-screen.test.tsx`), and the today and selected
 marks on every cell kind (`__tests__/heatmap-marks.test.tsx`). For
 DLM-T10: the bests in `record`, the tag chips, the deleted-exercise notice and
 exercise history's states (`__tests__/exercise-history-screen.test.tsx`);
 the active session, the `Deleted` tag, the discard confirm and the `Retry`
 (`__tests__/sessions-screen.test.tsx`).
+
+Jest owns these assertions; ad hoc native captures in shipping PRs supplement
+the layout evidence without adding regression flows.
 
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
