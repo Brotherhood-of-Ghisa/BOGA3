@@ -279,7 +279,7 @@ var steps = {
       }),
     ]);
 
-    // The pg_net kick normally applies within seconds; the pg_cron sweep (30 s)
+    // The pg_net kick normally applies within seconds; the pg_cron sweep (5 min)
     // backs it up. Polls every POLL_INTERVAL_MS until a row or the deadline.
     // push() stamps groupsPushedAtMs, so the latency below is from the link push.
     var deadline = Date.now() + POLL_DEADLINE_MS;
