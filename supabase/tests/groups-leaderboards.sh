@@ -291,7 +291,7 @@ expect_sql "enqueue triggers on the five Sync v2 tables" \
   "app_public.exercise_definitions.exercise_definitions_group_eval_enqueue,app_public.exercise_group_links.exercise_group_links_group_eval_enqueue,app_public.exercise_sets.exercise_sets_group_eval_enqueue,app_public.session_exercises.session_exercises_group_eval_enqueue,app_public.sessions.sessions_group_z_eval_enqueue"
 expect_sql "the sweep cron job" \
   "select schedule || '|' || command from cron.job where jobname = 'group-eval-sweep';" \
-  "30 seconds|select app_public.group_eval_sweep()"
+  "*/5 * * * *|select app_public.group_eval_sweep()"
 expect_sql "no server function writes exercise_group_links beyond sync_push and dev_wipe_my_data" \
   "select string_agg(distinct p.proname, ',' order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname in ('app_public', 'public')
@@ -757,7 +757,7 @@ echo "[${LANE_LABEL}] sweep and pg_net"
 push_b1 118
 [[ "$(queue_of)" == "session:${S1}:set" ]] || fail "a missed kick leaves the job pending: got '$(queue_of)'"
 set_kick_url "${LOCAL_KICK_URL}"
-# The cron job is paused for the run; this is the call it makes every 30 s.
+# The cron job is paused for the run; this is the call it makes every 5 minutes.
 expect_sql "the sweep kicks when claimable work exists" "select app_public.group_eval_sweep();" "t"
 wait_until "the sweep drains the missed kick" \
   "select not exists (select 1 from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}')
