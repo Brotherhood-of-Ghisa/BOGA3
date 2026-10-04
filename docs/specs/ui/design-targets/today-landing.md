@@ -48,9 +48,9 @@ runtime gallery of every state below on 2026-10-03.
 - **Progress card, bottom: latest session.** A `Latest session` micro-label
   with `All sessions` (caps text button → the Sessions list), then the most
   recent completed session as one link row: the session summary line (stamp ·
-  duration @ gym), `<n> sets · <n> exercises`, the leading exercise names
-  (one line, ellipsised), its PR count in `record` and a `Tag` per group it was
-  shared to. Opens the completed session. No in-progress state: an active
+  duration @ gym), `<n> sets · <n> exercises`, its PR count in `record` and a
+  `Tag` per group it was shared to. No exercise names, as on the group stream
+  session card. Opens the completed session. No in-progress state: an active
   workout is reached from Train.
 - **Group card, top: this week's board.** A `ChipGroup` switcher only when the
   user belongs to more than one group; with one group the board's micro-label

@@ -598,7 +598,9 @@ describe('a session written through the app', () => {
     // Bench maps triceps as secondary: its 3 sets count half, with no primary sets.
     expect(label('session-completion-muscle-triceps')).toBe('Triceps, 1.5 sets: 0 primary, 3 secondary');
     expect(screen.getByTestId('session-completion-muscle-triceps')).toHaveTextContent('Triceps—31.5');
-    expect(screen.getByText('Sets = primary + ½ secondary')).toBeTruthy();
+    // The card's title is a header; the table carries no formula footnote.
+    expect(screen.getByRole('header', { name: 'Sets by muscle' })).toBeTruthy();
+    expect(screen.queryByText('Sets = primary + ½ secondary')).toBeNull();
     // Each comparison card counts working sets only, with no second count.
     expect(screen.getByText('3 sets')).toBeTruthy();
     // The untagged pulldown set is a working set.

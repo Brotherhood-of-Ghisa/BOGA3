@@ -26,7 +26,6 @@ const LATEST: LatestSessionSummary = {
   gymName: 'Home',
   workingSets: 12,
   exerciseCount: 3,
-  exerciseNames: ['Squat', 'Bench Press', 'Row'],
   prs: 1,
 };
 
