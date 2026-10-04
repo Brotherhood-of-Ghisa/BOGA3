@@ -45,6 +45,10 @@ drifted from the code and predated several UI milestones. Git history has them.)
   - accepted repo-native replacement target for optional private/group
     bodyweight calculations; integrated rendering and human acceptance remain
     required before closeout
+- `design-targets/progress-tables.md`
+  - accepted replacement target awaiting implementation: grouped muscle
+    comparisons, separate chevron selection/name history, inline contributions
+    and minimal copy; current route contracts remain unchanged until shipped
 
 ## Maintenance rules (for future tasks)
 

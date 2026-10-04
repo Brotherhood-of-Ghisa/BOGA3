@@ -1,6 +1,6 @@
 # M32 — Progress tables and individual history
 
-- Status: `planned`
+- Status: `in progress`
 - Created: 2026-10-04; planning baseline `a50615579636e700146d6acde4c490534f15240e` on `origin/main`
 
 ## Objective
@@ -22,21 +22,20 @@ with Daily/Weekly controlled by the user's setting and Daily the default.
 
 ### D1. A table, with muscle families as headings
 
-The user chose the table alternative on 2026-10-04:
-[landing](../assets/M32-progress-tables/landing.png) and
-[selected muscle, scrolled](../assets/M32-progress-tables/contributions.png).
+The user chose the table alternative on 2026-10-04 and subsequently selected
+the first proposal's separate chevron, with unnecessary subtitles removed.
+The final brief and selected reference now live in the
+[accepted replacement target](../../specs/ui/design-targets/progress-tables.md).
 Use `Muscle | Now | Previous | Change`, aligned numeric columns, taxonomy-ordered
 family headings and quiet dividers. Working sets is the initial metric; Volume
 is the alternative. Families are labels, never aggregate heatmap targets.
 No large graphical summary or heatmap appears on the landing page itself.
 
-These are accepted layout references plus this written brief, not generated
-production code. The user's later name-to-heatmap instruction governs the tap
-behaviour. T01 pins the final target before implementation. The generated
-chevron on the contributions **Total** row is an artifact: that row is not an
-action. Figures, chevrons and spacing must meet the repository's accessibility,
-formatting and token rules. Mock teal/rose deltas are illustrative; use existing
-signed-delta ink roles unless a palette extension is explicitly accepted.
+The target pins layout and interactions, not generated production code.
+Names open history; separate >=44pt chevrons select inline contributions.
+Total is not an action. Figures, chevrons and spacing follow the repository's
+accessibility, formatting and token rules, including neutral signed-delta ink
+and the landed target grading. Instructional/repetitive subtitles are omitted.
 
 ### D2. Working sets means physical working sets
 
@@ -52,8 +51,8 @@ performance. Warm-up, RIR, Technique and Cooldown inclusion follows the saved
 calculation choices; Display choices do not determine eligibility. Either
 calculation column may be empty. Follow the existing legacy-label handling in
 `docs/specs/tech/training-metrics-contract.md` rather than copying the rules.
-The reference's "Warm-ups excluded" footnote is illustrative; production copy
-must reflect the active policy instead of asserting unconditional exclusion.
+Production copy must reflect the active policy instead of asserting
+unconditional warm-up exclusion; the accepted target omits a generic footnote.
 
 Muscle Volume retains the existing per-side, role-weighted calculation and
 bodyweight policy. Exercise contribution Volume is that exercise's allocation
@@ -120,11 +119,11 @@ they do not recreate those features or change its eligibility rules. Personal
 table/history reads consume the durable active policy; groups and coaching
 retain their existing shared default and receive no device-local choices.
 
-The mockups' 7-/30-day controls are illustrative. Preserve the landed configured
-calendar-week period choices, comparison bounds, look-back, shared targets and
+Preserve the landed configured calendar-week period choices, comparison bounds,
+look-back, shared targets and
 effort settings. Do not silently restore rolling day windows, hard-code a
-one-year history window or replace quota-based heatmap semantics. T01 records
-the final control wording and target treatment after checking that baseline.
+one-year history window or replace quota-based heatmap semantics. The accepted
+target records the final control wording and retained target treatment.
 
 ### D7. Preserve paths and existing history capabilities
 
@@ -145,7 +144,7 @@ milestone; durable rules belong in their owning specs, and evidence belongs in P
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M32-T01](../tasks/M32-T01-Pin_table_design_and_interaction_contract.md) | Pin the table target and distinct selection/history actions | planning PR merged; PR #497 landed | planned |
+| M32-T01 | Pin the table target and distinct selection/history actions | planning PR merged; PR #497 landed | completed |
 | [M32-T02](../tasks/M32-T02-Derive_muscle_and_exercise_comparisons.md) | Derive reconciled muscle and exercise comparisons | T01; PR #497 landed | planned |
 | [M32-T03](../tasks/M32-T03-Default_daily_and_preserve_preference_driven_history.md) | Daily default and individual, preference-driven heatmaps | T01; PR #497 landed | planned |
 | [M32-T04](../tasks/M32-T04-Replace_progress_landing_with_tables.md) | Integrate the landing and inline contributions | T02, T03 | planned |
