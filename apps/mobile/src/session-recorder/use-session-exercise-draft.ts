@@ -158,7 +158,7 @@ export const useSessionExerciseDraft = ({
   useEffect(() => {
     if (!navigation || typeof navigation.addListener !== 'function') return;
     let replaying = false;
-    return navigation.addListener('beforeRemove', (event) => {
+    return (navigation as any).addListener('beforeRemove', (event: any) => {
       if (replaying || !autosave.isDirty()) return;
       event.preventDefault();
       void autosave.flushNow().finally(() => {

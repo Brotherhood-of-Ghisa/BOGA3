@@ -121,7 +121,7 @@ export function GroupStreamList({
     [reset],
   );
 
-  let footer: ReactElement | null = null;
+  let footer: ReactElement | undefined = undefined;
   if (loadingMore) {
     footer = <StatePanel fill={false} kind="loading" testID={`${testID}-loading-more`} />;
   } else if (loadMoreError) {

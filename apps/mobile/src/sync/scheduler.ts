@@ -118,7 +118,7 @@ let lastSuccessAtMs: number | null = null;
 let netInfoUnsubscribe: (() => void) | null = null;
 let appStateSubscription: { remove: () => void } | null = null;
 let localWriteUnsubscribe: (() => void) | null = null;
-let previousAppState: AppStateStatus = AppState.currentState;
+let previousAppState: AppStateStatus | string | null | undefined = AppState.currentState;
 
 // -----------------------------------------------------------------------------
 // Logging

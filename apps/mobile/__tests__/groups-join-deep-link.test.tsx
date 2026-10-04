@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 it('opens /group/join?code=ABCD2345 on the Join screen with the code prefilled and previewed', async () => {
-  const router = renderRouter(
+  const router = await renderRouter(
     { 'group/join': JoinGroupRoute, 'group/[groupId]/index': GroupScreenRoute },
     { initialUrl: '/group/join?code=ABCD2345' },
   );

@@ -48,10 +48,10 @@ export default function TabsLayout() {
           <Tabs.Screen name="more" options={{ title: 'More' }} />
           {/* Preserved compatibility roots remain directly addressable but are
               owned by the four canonical destinations rather than visible. */}
-          <Tabs.Screen name="stats-history" options={{ title: 'History', href: null }} />
-          <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog', href: null }} />
-          <Tabs.Screen name="groups" options={{ title: 'Groups', href: null }} />
-          <Tabs.Screen name="settings" options={{ title: 'Settings', href: null }} />
+          <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
+          <Tabs.Screen name="exercise-catalog" options={{ title: 'Exercise Catalog' }} />
+          <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
+          <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
         </Tabs>
       </TrayVisibilityProvider>
     </SafeAreaView>
