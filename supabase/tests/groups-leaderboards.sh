@@ -18,7 +18,9 @@
 #     no server function writes exercise_group_links beyond sync_push/dev_wipe;
 #   - coalescing, the claim generation guard, lease expiry, the rules requeue;
 #   - failure isolation: a forced enqueue failure, an unreachable kick URL, and a
-#     failing evaluator job never break sync_push; the job is kept and retried;
+#     failing evaluator job never break sync_push; the job is kept and retried,
+#     parks at the attempt cap (session and comparison queues alike), and
+#     group_eval_retry_parked revives it;
 #   - the sweep drains a missed kick; the pg_net smoke (one kick per push).
 #
 # Direct-drain mode: the lane unsets the kick URL for the run and POSTs to
@@ -82,8 +84,10 @@ cleanup() {
     begin;
       delete from public.app_logs
        where event in ('group.share_failed', 'group.event_failed', 'group.eval_enqueue_failed',
-                       'group.eval_kick_failed', 'group.eval_failed')
-         and user_id in (${ids});
+                       'group.eval_kick_failed', 'group.eval_failed', 'group.eval_parked')
+         and (user_id in (${ids})
+              -- Comparison-job rows carry no user; they name the group.
+              or context ->> 'group_id' in (select id::text from app_public.groups where created_by in (${ids})));
       delete from app_public.groups
        where created_by in (${ids})
           or id in (select group_id from app_public.group_memberships where user_id in (${ids}));
@@ -651,14 +655,67 @@ expect_sql "exactly one sanitized job failure row" \
   "select count(*) || '|' || min((select string_agg(k, ',' order by k) from jsonb_object_keys(context) k))
           || '|' || min(context ->> 'kind') || '|' || min(context ->> 'sqlstate')
      from public.app_logs where user_id = '${ATHLETE_UID}' and event = 'group.eval_failed';" "1|job_id,kind,sqlstate|session|23514"
-run_psql "alter table app_public.group_set_facts drop constraint ${FORCE_EVAL_CONSTRAINT};" >/dev/null
-# Skip the 2 s backoff so the retry is deterministic.
-run_psql "update app_public.group_eval_queue set available_at = now()
+# Jump to the last allowed attempt (skipping the backoff) with the fault still on.
+run_psql "update app_public.group_eval_queue set attempts = app_public.group_eval_max_attempts() - 1, available_at = now()
            where member_user_id = '${ATHLETE_UID}' and session_id = '${S2}';" >/dev/null
+drain_ok "evaluator fault at the attempt cap"
+expect_mine "the capped attempt fails" "[{key: \"${S2}\", kind: \"session\", outcome: \"failed\", causes: [\"set\"], targets: []}]"
+S2_JOB="$(run_psql "select id from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}' and session_id = '${S2}';")"
+expect_sql "the failure at the cap parks the job, kept with its sqlstate" \
+  "select (attempts = app_public.group_eval_max_attempts()) || '|' || (available_at = 'infinity') || '|' || last_sqlstate
+          || '|' || (claimed_until is null)
+     from app_public.group_eval_queue where id = ${S2_JOB};" "true|true|23514|true"
+expect_sql "exactly one sanitized parked row, carrying the attempt count" \
+  "select count(*) || '|' || min(message) || '|' || min((select string_agg(k, ',' order by k) from jsonb_object_keys(context) k))
+          || '|' || min(context ->> 'kind') || '|' || min(context ->> 'sqlstate')
+          || '|' || (min(context ->> 'attempts') = app_public.group_eval_max_attempts()::text)
+     from public.app_logs where user_id = '${ATHLETE_UID}' and event = 'group.eval_parked';" \
+  "1|group evaluator job failed too often and is parked; it waits for a re-enqueue or group_eval_retry_parked()|attempts,job_id,kind,sqlstate|session|23514|true"
+[[ "$(logs_count group.eval_failed)" == "1" ]] || fail "the parking failure must log group.eval_parked, not group.eval_failed"
+expect_sql "a parked job is never claimed" \
+  "select app_public.group_eval_claim(200) -> 'jobs' @> jsonb_build_array(jsonb_build_object('job_id', ${S2_JOB}));" "f"
+expect_sql "the sweep does not kick for a parked job" "select app_public.group_eval_sweep();" "f"
+run_psql "alter table app_public.group_set_facts drop constraint ${FORCE_EVAL_CONSTRAINT};" >/dev/null
+expect_sql "group_eval_retry_parked revives the parked job with a fresh budget" \
+  "select app_public.group_eval_retry_parked() >= 1;
+   select attempts || '|' || (available_at <= now()) from app_public.group_eval_queue where id = ${S2_JOB};" "t
+0|true"
 drain_ok "retry after the fault"
 expect_mine "the retried job completes" "[{key: \"${S2}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: []}]"
 expect_fact p1 "true:true:70:8:$(e1rm 70 8)"
-pass "a failing evaluator job is kept, logged once, retried; the rest of the drain completes"
+pass "a failing evaluator job is kept, logged once, parked at the cap, revived, retried; the rest of the drain completes"
+
+# The comparison queue parks the same way. Lease the job directly (a claim
+# would lease every claimable job) and fail it at the cap.
+expect_sql "enqueue a comparison job for GX" "select app_public.group_metric_eval_enqueue('${GID}', '${GX}', 'set');" "t"
+LEASE="$(run_psql "update app_public.group_metric_eval_queue
+                      set attempts = app_public.group_eval_max_attempts() - 1,
+                          claim_id = gen_random_uuid(), claimed_until = now() + interval '2 minutes'
+                    where group_exercise_id = '${GX}'
+                    returning id || ',' || generation || ',''' || claim_id || '''';")"
+MJOB="${LEASE%%,*}"
+expect_sql "the comparison failure at the cap is accepted and parks" \
+  "select app_public.group_metric_eval_fail(${LEASE}, 'P0001') ->> 'parked';" "true"
+expect_sql "the parked comparison job: attempts at the cap, unclaimable, lease cleared" \
+  "select (attempts = app_public.group_eval_max_attempts()) || '|' || (available_at = 'infinity') || '|' || last_sqlstate
+          || '|' || (claim_id is null)
+     from app_public.group_metric_eval_queue where id = ${MJOB};" "true|true|P0001|true"
+expect_sql "exactly one sanitized comparison parked row" \
+  "select count(*) || '|' || min((select string_agg(k, ',' order by k) from jsonb_object_keys(context) k))
+          || '|' || min(context ->> 'kind') || '|' || bool_and(user_id is null)
+     from public.app_logs where event = 'group.eval_parked' and context ->> 'group_exercise_id' = '${GX}';" \
+  "1|attempts,group_exercise_id,group_id,job_id,kind,sqlstate|exercise|true"
+expect_sql "a parked comparison job is never claimed" \
+  "select count(*) from jsonb_array_elements(app_public.group_metric_eval_claim(20) -> 'jobs') j
+    where (j ->> 'job_id')::bigint = ${MJOB};" "0"
+expect_sql "group_eval_retry_parked revives the parked comparison job" \
+  "select app_public.group_eval_retry_parked() >= 1;
+   select attempts || '|' || (available_at <= now()) from app_public.group_metric_eval_queue where id = ${MJOB};" "t
+0|true"
+drain_ok "revived comparison job"
+check "the revived comparison job completes" \
+  "[.metric_jobs[] | select(.group_exercise_id == \"${GX}\") | .outcome] == [\"completed\"]"
+pass "a comparison job parks at the cap, is never claimed, and is revived by group_eval_retry_parked"
 
 set_kick_url "http://127.0.0.1:9/unreachable"
 push_b1 116
