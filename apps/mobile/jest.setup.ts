@@ -1,7 +1,11 @@
-import { cleanup } from '@testing-library/react-native';
+import { cleanup, configure } from '@testing-library/react-native';
 import {
   __resetAccountLocalPreferencesForTests,
 } from '@/src/preferences/account-local';
+
+// Under multi-core parallel Jest runs across 200+ suites, 1s async timeout
+// causes flaky timeouts under CPU scheduling contention; raise default to 5s.
+configure({ asyncUtilTimeout: 5000 });
 
 beforeEach(() => {
   __resetAccountLocalPreferencesForTests();
@@ -14,9 +18,72 @@ afterEach(() => {
   cleanup();
 });
 
-// Worklets 0.10 installs its native runtime on import; Jest has none, so any suite
+// Worklets installs its native runtime on import; Jest has none, so any suite
 // that loads reanimated (the root layout does) uses the library's own mock.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
+
+// react-native-gesture-handler's native runtime and dev-only RootView assertions
+// are not needed in unit tests; provide lightweight stubs.
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  const chainable = () => {
+    const obj: Record<string, unknown> = {};
+    const methods = [
+      'activeOffsetX', 'activeOffsetY', 'failOffsetX', 'failOffsetY',
+      'onBegin', 'onStart', 'onUpdate', 'onChange', 'onEnd', 'onFinalize',
+      'minDistance', 'maxPointers', 'minPointers', 'enabled', 'shouldCancelWhenOutside',
+    ];
+    for (const m of methods) {
+      obj[m] = () => obj;
+    }
+    return obj;
+  };
+
+  return {
+    GestureHandlerRootView: ({ children, ...props }: { children?: unknown }) =>
+      React.createElement(View, props, children),
+    GestureDetector: ({ children }: { children?: unknown }) => children ?? null,
+    Gesture: {
+      Pan: () => chainable(),
+      Tap: () => chainable(),
+      Pinch: () => chainable(),
+      Rotation: () => chainable(),
+      Fling: () => chainable(),
+      LongPress: () => chainable(),
+      Manual: () => chainable(),
+      Native: () => chainable(),
+      Race: () => chainable(),
+      Simultaneous: () => chainable(),
+      Exclusive: () => chainable(),
+    },
+  };
+});
+
+jest.mock('react-native-reanimated', () => {
+  const { View, Text, Image, ScrollView } = require('react-native');
+  return {
+    __esModule: true,
+    default: {
+      View,
+      Text,
+      Image,
+      ScrollView,
+      createAnimatedComponent: (c: unknown) => c,
+    },
+    View,
+    Text,
+    Image,
+    ScrollView,
+    createAnimatedComponent: (c: unknown) => c,
+    useSharedValue: (init: unknown) => ({ value: init }),
+    useAnimatedStyle: (fn: () => unknown) => fn(),
+    withTiming: (toValue: unknown) => toValue,
+    withSpring: (toValue: unknown) => toValue,
+    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+  };
+});
 
 // expo-sqlite's key-value store needs the native SQLite module, which Jest does
 // not have. An in-memory store per test file: the chosen theme preset

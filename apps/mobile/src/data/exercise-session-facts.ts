@@ -10,7 +10,9 @@ import { effortPolicyKey } from '@/src/exercise-calculations/effort-policy';
 
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
-import { createRecordBook, type RecordEntry, type WeightRecordValue } from '@/src/exercise-calculations/records';
+import {
+  createRecordBook, type RecordBaseline, type RecordEntry, type WeightRecordValue,
+} from '@/src/exercise-calculations/records';
 import {
   canonicalizeWeightForReps,
   normalizeSessionSetPerformanceStatus,
@@ -476,14 +478,14 @@ export const loadEarlierBestsByDefinition = async (
   return bests;
 };
 
-/** Each listed definition's 1RM record before `target` (`loadEarlierBestsByDefinition`). */
-export const loadEarlierBestE1rmByDefinition = async (
-  target: { sessionId: string; completedAt: Date },
-  exerciseDefinitionIds: readonly string[],
-): Promise<Map<string, number>> => {
-  const best = new Map<string, number>();
-  for (const [definitionId, bests] of await loadEarlierBestsByDefinition(target, exerciseDefinitionIds)) {
-    if (bests.oneRepMax) best.set(definitionId, bests.oneRepMax.value);
-  }
-  return best;
-};
+/**
+ * The records a session's sets are compared with (`pickSessionRecordSet`),
+ * per definition, from `loadEarlierBestsByDefinition`.
+ */
+export const recordBaselinesOf = (
+  bestsByDefinition: ReadonlyMap<string, ExerciseBests>,
+): Map<string, RecordBaseline> =>
+  new Map(Array.from(bestsByDefinition, ([definitionId, { oneRepMax, topWeight }]) => [definitionId, {
+    oneRepMax: oneRepMax?.value ?? null,
+    weight: topWeight ? { weight: topWeight.weight, reps: topWeight.reps } : null,
+  }]));

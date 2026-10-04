@@ -5,7 +5,7 @@ import { sessionBodyWeightForCalculation } from '@/src/bodyweight/as-of';
 import { and, asc, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
-import { loadEarlierBestE1rmByDefinition } from "@/src/data/exercise-session-facts";
+import { loadEarlierBestsByDefinition, recordBaselinesOf } from "@/src/data/exercise-session-facts";
 import {
   exerciseDefinitions,
   exerciseMuscleMappings,
@@ -15,6 +15,7 @@ import {
   muscleGroups,
   userSettings,
 } from "@/src/data/schema";
+import type { RecordBaseline } from "@/src/exercise-calculations/records";
 import { normalizeSessionSetPerformanceStatus } from "@/src/exercise-calculations/set-semantics";
 
 import {
@@ -53,11 +54,11 @@ export type SessionInsightsStore = {
   loadExerciseSets(
     sessionExerciseIds: string[],
   ): Promise<SessionInsightSetRow[]>;
-  /** Each definition's best 1RM before the target, from the exercise session facts. */
-  loadEarlierBestEstimatedOneRepMax(input: {
+  /** Each definition's records before the target, from the exercise session facts. */
+  loadEarlierRecordBaselines(input: {
     target: { sessionId: string; completedAt: Date };
     exerciseDefinitionIds: string[];
-  }): Promise<ReadonlyMap<string, number>>;
+  }): Promise<ReadonlyMap<string, RecordBaseline>>;
   loadMuscleCatalog?(): Promise<{
     definitions: {
       id: string;
@@ -212,8 +213,8 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
       }));
   },
 
-  loadEarlierBestEstimatedOneRepMax: ({ target, exerciseDefinitionIds }) =>
-    loadEarlierBestE1rmByDefinition(target, exerciseDefinitionIds),
+  loadEarlierRecordBaselines: async ({ target, exerciseDefinitionIds }) =>
+    recordBaselinesOf(await loadEarlierBestsByDefinition(target, exerciseDefinitionIds)),
 
   async loadExerciseSets(sessionExerciseIds) {
     if (sessionExerciseIds.length === 0) return [];
@@ -315,14 +316,14 @@ export const createCompletedSessionInsightsRepository = (
     );
     if (!targetGraph) return null;
     const catalog = await store.loadMuscleCatalog?.();
-    const historicalBestByDefinitionId = await store.loadEarlierBestEstimatedOneRepMax({
+    const recordBaselineByDefinitionId = await store.loadEarlierRecordBaselines({
       target: { sessionId: target.sessionId, completedAt: target.completedAt },
       exerciseDefinitionIds: [...new Set(targetGraph.exercises.flatMap((exercise) =>
         exercise.exerciseDefinitionId === null ? [] : [exercise.exerciseDefinitionId]))],
     });
 
     return deriveCompletedSessionInsights({
-      historicalBestByDefinitionId,
+      recordBaselineByDefinitionId,
       targetSession: targetGraph,
       historicalSessions: graphs.filter(
         (session) => session.sessionId !== target.sessionId,

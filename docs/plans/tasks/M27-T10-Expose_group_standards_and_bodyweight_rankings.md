@@ -1,96 +1,80 @@
----
-task_id: M27-T10-Expose_group_standards_and_bodyweight_rankings
-milestone_id: M27
-status: in_progress
-ui_impact: "yes"
-areas: "frontend|cross-stack"
-runtimes: "node|expo|maestro|supabase"
-gates_fast: "./boga test fast"
-gates_slow: "./boga test backend; ./boga test frontend"
-docs_touched: "docs/specs/tech/groups-contract.md, docs/specs/ui/ux-rules.md, docs/specs/ui/screen-map.md, docs/specs/ui/navigation-contract.md, docs/specs/ui/components-catalog.md"
----
+# M27-T09 — Evaluate private percentage group scores
 
-# M27-T10 — Expose group standards and bodyweight rankings
-
-- Status: `in_progress`
-- Depends on: M27-T07, M27-T09.
-- Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
-- Governing decisions: D7–D9.
+- Status: `planned` (re-scoped 2026-10-04)
+- Depends on: [M27-T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [M27-T13](M27-T13-Preserve_certifications_across_rule_changes.md), [existing #411 task](T-20260930-01-Keep_zero_contribution_group_boards_stable.md)
+- Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
+- Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
+- Areas: cross-stack; UI impact: yes (server-projected scores and omissions)
 
 ## Objective and scope
 
-Make group comparison rules, score meaning and input provenance visible across
-group exercise setup, linking, podiums, boards and certification. Read AGENTS.md,
-specs 02/03/08/09, groups/bodyweight contracts, UI index/policy and T01's target.
-Refresh routes/components and HEAD; read test-directory READMEs before edits.
+Implement T08's accepted percentage representation throughout evaluation,
+publication and every group reader. Preserve T13's witness certificates while
+scores change and enforce milestone D5 privacy before data reaches a client.
+The old snapshot/three-board/public-bodyweight implementation is not this task.
 
 ## Deliverables and acceptance
 
-1. Owners/admins edit coefficient, movement/loading standard and default metric
-   on the group exercise. Everyone can read the standard. Explain history-wide
-   recalculation before a rules edit; a different movement is a new exercise.
-   Respect existing online-only group writes and role permissions.
-2. Linking shows personal versus group semantics and warns/refuses incompatible
-   movements as defined by T08. Never overwrite personal configuration merely
-   because it links. Offline member linking remains supported as today.
-3. Bodyweight podiums/boards offer Reps, Relative strength and Absolute strength
-   with explicit reps/×BW/kg units and Certified/All. Defaults: unweighted
-   standard push-ups → Reps; weighted pull-ups/dips → Relative strength.
-   Conventional Weight/1RM boards retain their behaviour.
-4. Record detail shows raw added/assisted amount, kg and %BW when available,
-   session B/source/provenance, group coefficient/rule revision and score basis.
-   Certification reveals what is being attested, including estimated B.
-5. Update record/void/link cards, history, cached/offline displays, friend session
-   metrics and accessibility text for all metrics. Rules recalculation has its
-   own explanation, not a spurious new-performance celebration.
-6. Missing B offers eligible reps results and explains unavailable strength;
-   rebuilding/archived/former-version states follow T08 without mixed rankings.
+1. Resolve the same private dated reading for effective-load computation and
+   normalization. Use the shared TypeScript kernel, current source/target
+   distribution rules and accepted T08 formula; never duplicate Wathan in SQL
+   or normalize a target-mode value with an incompatible denominator.
+2. Materialize T08's chosen Volume and 1RM results in Certified/All scopes.
+   Off and c=0 use ordinary Volume (kg·reps)/1RM (kg) without querying readings.
+   On with c>0 uses %BW 1RM and the chosen Volume policy. Unavailable private
+   input omits dependent enabled scores; never substitute zero, fall back to kg
+   while On, or reveal why the dependency failed. Rank before display rounding.
+3. Re-evaluate affected comparisons after effective rules/contribution/mode
+   changes and publish one coherent revision using existing generation/claim/
+   lease locks. Recompute Certified entries without changing original certificate
+   IDs/witness/time/audit metadata or ending them solely on rules changes.
+   Ineligible scores can leave a board without ending their witness certificate.
+4. Apply T15's explicitly chosen reading-correction outcomes; retain performance
+   edits/deletes, manual withdraw/cancel and archived/former-member boundaries.
+   Later readings irrelevant to a session never change its selected dependency.
+   Personal preference/contribution edits never rescore a group performance.
+5. Enforce D5 in actual current and legacy board/podium/record/history/event/
+   stream/session/summary/certification RPC responses. Retain safe raw public
+   context such as reps, but suppress enabled bodyweight absolute kg/load/volume
+   counterparts, including session totals and same-group cross-endpoint joins.
+   Ordinary Off sharing follows D5's explicitly limited privacy claim. Keep old absolute audit data server-side.
+6. Migrate public history representation/visibility and invalidate incompatible
+   caches per T08. Preserve history meaning and source clocks; do not silently
+   relabel kg records or rewrite observed certificate values. Old readers must
+   fail safely or receive an explicitly supported safe response.
+7. Keep source enqueue/apply failures isolated from personal sync and from
+   certification commits. Retain retries, stale-result fences and honest
+   rebuilding/archived states. No new private-reading disclosure in logs/events.
 
-## UX Contract
+## Verification
 
-Target: T01's bodyweight brief, using existing group forms, boards and record sheet.
+Read test-directory READMEs. Reuse existing backend lanes, actual pushes and
+Edge drains. Cover two members with different B at equal reps/external load,
+relative-rank results, ordinary and chosen bodyweight Volume, c=0/positive and
+switch transitions, unweighted sets, distribution
+conversions, no/invalid readings, later/relevant reading edits, rules-only
+changes, edits/deletions, migration, history, archive/rejoin and legacy readers.
+Assert exact active certificate identity/metadata and normalized values.
 
-| Flow | Trigger and steps | Success | Failure/edge |
-| --- | --- | --- | --- |
-| Set group standard | Admin opens exercise → edits rule/default → reviews impact → saves | Members see the same version and updated scores | Offline/role failure preserves form and states nothing changed |
-| Link exercise | Member opens link flow → compares standards → links compatible movement | Group evaluates their raw sets without changing personal settings | Incompatible variant explains required separate exercise |
-| Compare members | Open podium → switch board and Certified/All → inspect row | Metric/units/default and reason for score are clear | Missing B, empty certified board and rebuilding are actionable |
-| Certify performance | Open record sheet → inspect saved B/provenance and load → certify | Attested inputs match score and updated scope | Estimated B is explicit; edited/voided data cannot retain certification |
+Privacy checks inspect every enabled-group RPC payload and paired responses
+for disallowed absolute/relative values, including full session and aggregate
+subtraction. Verify ordinary Volume/1RM while Off without reading access, On
+cache/history redaction, and the documented cross-mode/cross-group limit. Anonymous/OAuth/outsider tests remain. Add Jest scorer/decoder/cache
+coverage for the shared behavior; use failure injection for queue/publication.
 
-Reuse existing group recipes and UI tokens; no raw styling exceptions proposed.
-Capture each board, relative/absolute reversal, missing/estimated B, offline,
-permission/error, rules change and certification states at target sizes. Attach
-render comparisons plus happy/error path interaction evidence to the PR.
+## Specs to update
 
-## Verification and closeout
+- `docs/specs/tech/groups-contract.md` — shipped scoring, privacy, lifecycle,
+  publication and readers.
+- `docs/specs/tech/bodyweight-load-contract.md`, `training-metrics-contract.md`
+  — public normalization over private dated context.
+- `docs/specs/05-data-model.md`, `03-technical-architecture.md` — changed projections.
 
-Run component/view-model tests and two-user flows covering different weights,
-group coefficient authority, backfill and correction invalidation. Run
-`./boga test fast`, `./boga test backend`, `./boga test frontend`; confirm
-`ios-groups-e2e` is included and resolve additional diff requirements with
-`./boga test for`. Graduate UX/group contracts, attach evidence, mark the
-milestone entry complete and delete this card when shipped.
+## Gates and closeout
 
-
-## Current execution checkpoint (2026-09-27)
-
-Implementation is integrated with `origin/main` at `8b5c47c1`; app/server source
-is `b636f234`. The milestone's [current acceptance table](../milestones/M27-bodyweight-load-and-group-comparisons.md#current-execution-checkpoint-2026-09-27)
-owns the latest gate results and remaining work, replacing earlier partial-run
-checkpoints here. Full fast (183 suites / 2,243 tests), backend and handles are
-green. Every required baseline frontend constituent lane is now green on this
-integrated source; failed aggregates are not counted as passes. No assertion
-has been waived.
-
-Baseline two-user proof covers ranking reversal, estimated/missing weight,
-100%→70% rules publication, preserved attestation, correction invalidation,
-legacy unlink/relink, former-member read-only details and removed-member denial.
-Group layouts passed at 375×667pt, 402×874pt and 440×956pt.
-Actual local API-gateway outages at all three sizes verify cached boards,
-retained failed-publication input and unchanged server rules revisions. The sync
-flow now checks two frozen weights across a local wipe and real bootstrap; its fresh native run passed, including restored readings
-and both original snapshot values/provenance.
-
-`RUNBOOK.md` contains the exact server-first migration/function order, hosted
-acceptance and forward-repair boundaries. Hosted deployment and client
-activation remain pending; do not retire this card until its work ships.
+Use `./boga test for`; propose `fast`, `backend` (group leaderboards and API-live)
+plus `ios-groups-e2e`, with sync e2e only for a real sync-path change. Obtain the
+operator's lane agreement and run to green, plus required quality targets.
+Do not add Maestro scenarios without justification and approval. Delete this
+card and mark its M27 row completed in the implementing PR; T10 owns UI and T14
+owns human acceptance/combined closeout and authorized hosted smoke.

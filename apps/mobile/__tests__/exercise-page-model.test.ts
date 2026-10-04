@@ -163,7 +163,9 @@ describe('exercise page model', () => {
     );
     expect(heavy[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
     expect(heavy[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
-    expect(recordBandFor(heavy)).toEqual({ kind: 'weight', label: 'New top weight · 95.0' });
+    expect(recordBandFor(heavy)).toEqual({
+      kind: 'weight', label: 'New top weight · 95.0 × 1', spoken: 'new top weight 95.0 × 1',
+    });
   });
 
   it('makes a Weight record of more reps at the record weight, never of a zero', () => {
@@ -176,6 +178,22 @@ describe('exercise page model', () => {
       .toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
     expect(rowsFor([performedSet('b', '', '12', 'rir_0')], { oneRepMax: 0, weight: { weight: 0, reps: 10 } })[0])
       .toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+  });
+
+  it('uses Working set for Weight records independently of Volume, retaining every row figure', () => {
+    const sets = [performedSet('technique', '100', '6', 'technique')];
+    const baseline = { oneRepMax: 200, weight: { weight: 100, reps: 5 } };
+    const volumeOnly = buildSetRows(sets, baseline, {
+      ...ordinaryLoadContext(), effortPolicy: { workingSetEfforts: [], volumeEfforts: ['technique'] },
+    });
+    expect(volumeOnly[0]).toMatchObject({ weight: 100, reps: 6, volume: 600, weightRecord: false, oneRepMaxRecord: false });
+    expect(recordBandFor(volumeOnly)).toBeNull();
+
+    const workingOnly = buildSetRows(sets, baseline, {
+      ...ordinaryLoadContext(), effortPolicy: { workingSetEfforts: ['technique'], volumeEfforts: [] },
+    });
+    expect(workingOnly[0]).toMatchObject({ volume: 600, weightRecord: true, oneRepMaxRecord: false });
+    expect(recordBandFor(workingOnly)?.kind).toBe('weight');
   });
 
   it('picks the session\'s record set across every block of the exercise', () => {
@@ -208,7 +226,9 @@ describe('exercise page model', () => {
     expect(recordBandFor(rowsFor(quietSets()))).toBeNull();
 
     const oneRepMax = rowsFor([performedSet('a', '100', '3', 'rir_0')], { oneRepMax: 100, weight: { weight: 200, reps: 5 } });
-    expect(recordBandFor(oneRepMax)).toEqual({ kind: 'oneRepMax', label: 'New 1RM record · 109.0' });
+    expect(recordBandFor(oneRepMax)).toEqual({
+      kind: 'oneRepMax', label: 'New 1RM record · 109.0', spoken: 'new 1RM record 109.0',
+    });
 
     expect(recordBandFor([])).toBeNull();
   });

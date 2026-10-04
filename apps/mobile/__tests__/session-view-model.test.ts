@@ -1,4 +1,5 @@
 import type { Session, SessionSet } from '@/components/session-recorder/types';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { sessionExerciseHref, sessionViewHref } from '@/src/navigation/active-session-entry';
 import {
   appendSuggestedPlan,
@@ -44,6 +45,11 @@ const blankSet = (id: string): SessionSet => ({
   performanceStatus: 'unperformed',
 });
 
+const baseline = (oneRepMax: number, weight: number, reps: number): RecordBaseline => ({
+  oneRepMax,
+  weight: { weight, reps },
+});
+
 const session = (exercises: Session['exercises']): Session => ({
   dateTime: '2026-09-23 09:00',
   locationId: null,
@@ -81,36 +87,70 @@ describe('session view model', () => {
 
   it('highlights nothing without a record', () => {
     const [card] = buildSessionViewModel(session([bench]), new Map()).cards;
-    expect(card.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
-    expect(card.recordOneRepMax).toBeNull();
+    expect(card.rows.some((row) => row.oneRepMaxRecord || row.weightRecord)).toBe(false);
+    expect(card.record).toBeNull();
   });
 
-  it('marks a record only when today beats the loaded history, and not before it loads', () => {
-    const beaten = buildSessionViewModel(session([bench]), new Map([['def_bench', 197.9]])).cards[0];
-    expect(beaten.recordOneRepMax).toBe('204.3');
-    expect(beaten.rows.filter((row) => row.oneRepMaxRecord).map((row) => row.id)).toEqual(['b2']);
+  const flags = (card: { rows: { id: string; oneRepMaxRecord: boolean; weightRecord: boolean }[] }) =>
+    card.rows.flatMap(({ id, oneRepMaxRecord, weightRecord }) =>
+      oneRepMaxRecord || weightRecord ? [{ id, oneRepMaxRecord, weightRecord }] : []);
 
-    const notBeaten = buildSessionViewModel(session([bench]), new Map([['def_bench', 210]])).cards[0];
-    expect(notBeaten.recordOneRepMax).toBeNull();
+  it('marks the 1RM record set only when today beats the loaded records, and not before they load', () => {
+    const beaten = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(197.9, 165, 5)]])).cards[0];
+    expect(beaten.record).toEqual({ kind: 'oneRepMax', label: 'New 1RM record · 204.3', spoken: 'new 1RM record 204.3' });
+    expect(flags(beaten)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
 
-    // No earlier 1RM for the exercise (first time, or not loaded yet): no record.
-    const firstTime = buildSessionViewModel(session([bench]), new Map([['def_other', 100]])).cards[0];
-    expect(firstTime.recordOneRepMax).toBeNull();
+    const notBeaten = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(210, 165, 5)]])).cards[0];
+    expect(notBeaten.record).toBeNull();
+
+    // No earlier record for the exercise (first time, or not loaded yet): no record.
+    const firstTime = buildSessionViewModel(session([bench]), new Map([['def_other', baseline(100, 100, 1)]])).cards[0];
+    expect(firstTime.record).toBeNull();
+  });
+
+  it('marks a 1RM record set that also sets the Weight record on both figures, under one 1RM band', () => {
+    const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(197.9, 150, 5)]])).cards;
+    expect(flags(card)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: true }]);
+    expect(card.record?.kind).toBe('oneRepMax');
+  });
+
+  it('falls back to the heaviest Weight record when no 1RM beats the record', () => {
+    // 160 × 8 beats 160 × 6 on reps, but 162.5 × 6 is heavier: it is the record set.
+    const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(210, 160, 6)]])).cards;
+    expect(flags(card)).toEqual([{ id: 'b3', oneRepMaxRecord: false, weightRecord: true }]);
+    expect(card.record).toEqual({
+      kind: 'weight', label: 'New top weight · 162.5 × 6', spoken: 'new top weight 162.5 × 6',
+    });
+  });
+
+  it('picks one record set across the blocks of an exercise, and bands only its block', () => {
+    const later = { ...bench, id: 'bench-2', sets: [doneSet('c1', '150', '8', 'rir_2')] };
+    const cards = buildSessionViewModel(session([bench, later]), new Map([['def_bench', baseline(197.9, 165, 5)]])).cards;
+    expect(flags(cards[0])).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
+    expect(cards[0].record?.label).toBe('New 1RM record · 204.3');
+    expect(flags(cards[1])).toEqual([]);
+    expect(cards[1].record).toBeNull();
+  });
+
+  it('shows no record against a zero baseline', () => {
+    const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(0, 0, 10)]])).cards;
+    expect(flags(card)).toEqual([]);
+    expect(card.record).toBeNull();
   });
 
   it('never marks a warm-up heavier than the working sets as the record', () => {
     const heavyWarmUp = { ...bench, sets: [doneSet('w', '250', '5', 'warm_up'), ...bench.sets.slice(1)] };
-    const [card] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', 197.9]])).cards;
+    const [card] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', baseline(197.9, 165, 5)]])).cards;
 
     // The warm-up keeps its own figures, but the record is the best working set.
-    expect(card.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '250.0 × 5', volume: '1250', oneRepMaxRecord: false });
-    expect(card.rows.filter((row) => row.oneRepMaxRecord).map((row) => row.id)).toEqual(['b2']);
-    expect(card.recordOneRepMax).toBe('204.3');
+    expect(card.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '250.0 × 5', volume: '1250', oneRepMaxRecord: false, weightRecord: false });
+    expect(flags(card)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
+    expect(card.record?.label).toBe('New 1RM record · 204.3');
 
-    // Only the warm-up beats the history: no record at all.
-    const [onlyWarmUpBeats] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', 210]])).cards;
-    expect(onlyWarmUpBeats.recordOneRepMax).toBeNull();
-    expect(onlyWarmUpBeats.rows.some((row) => row.oneRepMaxRecord)).toBe(false);
+    // Only the warm-up beats the records: no record at all.
+    const [onlyWarmUpBeats] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', baseline(210, 200, 1)]])).cards;
+    expect(onlyWarmUpBeats.record).toBeNull();
+    expect(flags(onlyWarmUpBeats)).toEqual([]);
   });
 
   it('counts the done working sets and totals their volume', () => {

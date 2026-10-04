@@ -45,7 +45,7 @@ Completion (PR B, pending acceptance), same lane and flow:
 
 | Screenshot | State |
 | --- | --- |
-| `session-completion-one-pr` (ad hoc) | top bar, summary card with muscle pills, one record card |
+| `session-completion-one-pr` (ad hoc) | top bar, summary card with the sets-by-muscle table, one record card |
 | `session-completion-multiple-prs-all` (ad hoc) | two record cards |
 | `session-completion-exercise-volume` (ad hoc) | volume cards: distribution and no-history |
 | `session-completion-catalog-error` (ad hoc) | muscle breakdown unavailable |
@@ -105,3 +105,28 @@ Runtime comparison states (ad hoc): `completed-edit-session-view`,
 `view-session-deleted-summary`, `view-session-deleted` and `view-session-not-found`.
 Reference/after captures stay under `apps/mobile/artifacts/maestro/`; the PR
 records viewport and comparison.
+
+## Weight records (accepted 2026-10-03)
+
+The session view, View Session and completion show the exercise's record set,
+1RM else Weight (`../../tech/training-metrics-contract.md` §3), the same way
+the exercise page does. The user accepted a repo-native mockup of states A–E
+on 2026-10-03, with one change: the Weight band names the set.
+
+- **A. Weight-only record on a session view card.** The record set's
+  `weight × reps` is bold `record`. Its 1RM and Vol keep the row's colour. The
+  band reads `New top weight · <weight> × <reps>`.
+- **B. A 1RM record that also beats the Weight record.** Both figures are
+  `record`, under one band, `New 1RM record · <1RM>`.
+- **C. View Session (Sets).** The card is A's, with View Session's header.
+- **D. Completion.** The Weight card has A's band and the set in `record`; its
+  1RM stays in `ink`. A 1RM card whose set also beat the Weight record shows
+  the set in `record` too.
+- **E. Share image.** The list is headed `<n> new records`. Each line names its
+  kind on the right (`1RM` or `Top weight`), in `record`, and its beaten
+  figures are `record`.
+
+The accessibility labels use the band words: `…, new top weight 100.0 × 3`,
+and `New top weight for <exercise>: <set>, 1RM <1RM>`. No new role or token.
+The integrated states were captured ad hoc on the simulator; the PR links
+them.

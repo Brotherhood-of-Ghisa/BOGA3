@@ -29,7 +29,7 @@ type SessionCompletionScreenProps = {
 
 /**
  * The completion screen after Finish, in the design language: `Session
- * complete` · Done (where Finish sat), the summary card with sets by muscle, every new 1RM record, each exercise's volume against its history,
+ * complete` · Done (where Finish sat), the summary card with sets by muscle, every record set (1RM, else Weight), each exercise's volume against its history,
  * and `Share session`. Stored context only; history is optional enrichment.
  */
 export function SessionCompletionScreen({

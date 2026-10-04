@@ -14,6 +14,7 @@ export {
   type CurrentSessionMuscleSummaryInput,
   type ExercisePersonalRecord,
   type ExercisePersonalRecordInput,
+  type PersonalRecordKind,
   type ExerciseVolumeComparison,
   type ExerciseVolumeComparisonState,
   type PersonalRecordSessionInput,

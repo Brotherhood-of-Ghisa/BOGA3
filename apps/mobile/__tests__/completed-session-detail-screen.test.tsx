@@ -445,16 +445,31 @@ describe('CompletedSessionDetailScreenShell', () => {
   };
 
   it('asks for the bests before this session and bands the set that beats them', async () => {
-    const loadHistoricalBests = jest.fn().mockResolvedValue(new Map([['bench-press', 200]]));
+    const loadHistoricalBests = jest.fn().mockResolvedValue(
+      new Map([['bench-press', { oneRepMax: 200, weight: { weight: 200, reps: 1 } }]])
+    );
     await renderDetail(detailClient({ loadHistoricalBests }));
 
-    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record')).toBeTruthy();
+    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record'))
+      .toHaveTextContent('New 1RM record · 236.2');
     expect(loadHistoricalBests).toHaveBeenCalledWith(
       { sessionId: 'completed-under-test', completedAt: new Date('2026-02-20T16:58:00.000Z') },
       ['bench-press', 'lat-pulldown']
     );
     // No earlier best for the pulldown: no band.
     expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2-record')).toBeNull();
+  });
+
+  it('bands a Weight record, and says it, when no 1RM beats the record', async () => {
+    // 185 × 8 is as heavy as the record with more reps, but below the 1RM record.
+    const loadHistoricalBests = jest.fn().mockResolvedValue(
+      new Map([['bench-press', { oneRepMax: 300, weight: { weight: 185, reps: 7 } }]])
+    );
+    await renderDetail(detailClient({ loadHistoricalBests }));
+
+    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record'))
+      .toHaveTextContent('New top weight · 185.0 × 8');
+    expect(screen.getByLabelText('Bench Press, 3 sets, new top weight 185.0 × 8')).toBeTruthy();
   });
 
   it('shows no record while history is unavailable, and still renders the session', async () => {

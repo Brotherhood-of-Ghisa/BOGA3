@@ -163,7 +163,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   const model = useMemo(
     () =>
       state.status === 'ready'
-        ? buildSessionViewModel(state.data.session, state.data.historicalBestByDefinitionId)
+        ? buildSessionViewModel(state.data.session, state.data.recordBaselineByDefinitionId)
         : null,
     [state]
   );

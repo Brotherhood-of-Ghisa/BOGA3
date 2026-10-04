@@ -279,10 +279,11 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
         relativeVolume: 0.5,
       }),
     ]);
+    // A secondary set counts half; a stabilizer (biceps on bench) not at all.
     expect(summary.workingSetsByMuscle).toEqual([
-      expect.objectContaining({ id: "biceps", workingSetCount: 1 }),
-      expect.objectContaining({ id: "chest", workingSetCount: 1 }),
-      expect.objectContaining({ id: "triceps", workingSetCount: 1 }),
+      expect.objectContaining({ id: "biceps", primarySetCount: 1, secondarySetCount: 0, weightedSetCount: 1 }),
+      expect.objectContaining({ id: "chest", primarySetCount: 1, secondarySetCount: 0, weightedSetCount: 1 }),
+      expect.objectContaining({ id: "triceps", primarySetCount: 0, secondarySetCount: 1, weightedSetCount: 0.5 }),
     ]);
   });
 
@@ -317,7 +318,41 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(summary.muscles).toEqual([]);
     expect(summary.workingSetsByMuscle).toEqual([
-      expect.objectContaining({ id: "chest", workingSetCount: 1 }),
+      expect.objectContaining({ id: "chest", primarySetCount: 1, secondarySetCount: 0, weightedSetCount: 1 }),
+    ]);
+  });
+
+  it("counts a secondary working set as half a set for that muscle", () => {
+    const sets = (prefix: string, count: number) =>
+      Array.from({ length: count }, (_, index) =>
+        insightSet(`${prefix}-${index}`, { orderIndex: index, setType: "rir_1" }));
+    const summary = summarizeCurrentSessionMuscleLoad(
+      muscleInput({
+        exerciseDefinitions: [
+          { bodyweightContribution: 0, id: "bench", loadInputMode: "total_load" },
+          { bodyweightContribution: 0, id: "press", loadInputMode: "total_load" },
+          { bodyweightContribution: 0, id: "pushdown", loadInputMode: "total_load" },
+        ],
+        exercises: [
+          insightExercise({ id: "bench-row", exerciseDefinitionId: "bench", orderIndex: 1, sets: sets("bench", 4) }),
+          insightExercise({ id: "press-row", exerciseDefinitionId: "press", orderIndex: 2, sets: sets("press", 3) }),
+          insightExercise({ id: "pushdown-row", exerciseDefinitionId: "pushdown", orderIndex: 3, sets: sets("pushdown", 3) }),
+        ],
+        muscleMappings: [
+          { exerciseDefinitionId: "bench", muscleGroupId: "chest", role: "primary" },
+          { exerciseDefinitionId: "bench", muscleGroupId: "triceps", role: "secondary" },
+          { exerciseDefinitionId: "press", muscleGroupId: "triceps", role: "secondary" },
+          { exerciseDefinitionId: "pushdown", muscleGroupId: "triceps", role: "primary" },
+          // A muscle mapped twice to one exercise counts each set once, at its strongest role.
+          { exerciseDefinitionId: "pushdown", muscleGroupId: "triceps", role: "secondary" },
+        ],
+      }),
+    );
+
+    // Triceps: 3 direct + 7 indirect sets = 6.5, not the 10 sets it touched.
+    expect(summary.workingSetsByMuscle).toEqual([
+      expect.objectContaining({ id: "triceps", primarySetCount: 3, secondarySetCount: 7, weightedSetCount: 6.5 }),
+      expect.objectContaining({ id: "chest", primarySetCount: 4, secondarySetCount: 0, weightedSetCount: 4 }),
     ]);
   });
 
@@ -719,23 +754,30 @@ describe("deriveExercisePersonalRecord", () => {
     sets: [insightSet("set-b", { weightValue: "110", repsValue: "5" })],
   });
 
+  const baselineOf = (oneRepMax: number, weight: number, reps: number) => ({
+    oneRepMax,
+    weight: { weight, reps },
+  });
+
   it("returns the best entered set only for a strict improvement over an existing baseline", () => {
     const historicalBest = estimateOneRepMax(100, 5) as number;
     const record = deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [exercise],
-      historicalBestEstimatedOneRepMax: historicalBest,
+      baseline: baselineOf(historicalBest, 120, 1),
     });
 
     expect(record).toEqual(
       expect.objectContaining({
+        kind: "oneRepMax",
+        weightRecord: false,
         exerciseDefinitionId: "bench",
         exerciseName: "Bench Press",
         sessionExerciseId: "bench-row",
         setId: "set-b",
         weight: 110,
         reps: 5,
-        historicalBestEstimatedOneRepMax: historicalBest,
+        baseline: baselineOf(historicalBest, 120, 1),
       }),
     );
     expect(record?.estimatedOneRepMax).toBeCloseTo(
@@ -744,21 +786,45 @@ describe("deriveExercisePersonalRecord", () => {
   });
 
   it.each([
-    ["equal", estimateOneRepMax(110, 5) as number],
-    ["above current", (estimateOneRepMax(110, 5) as number) + 1],
+    ["an equal 1RM and Weight", baselineOf(estimateOneRepMax(110, 5) as number, 110, 5)],
+    ["a 1RM and Weight above current", baselineOf((estimateOneRepMax(110, 5) as number) + 1, 110, 6)],
     ["no baseline", null],
+    ["a zero baseline", baselineOf(0, 0, 10)],
   ])(
     "does not label %s as a PR",
-    (_label, historicalBestEstimatedOneRepMax) => {
+    (_label, baseline) => {
       expect(
         deriveExercisePersonalRecord({
           exerciseDefinitionId: "bench",
           exercises: [exercise],
-          historicalBestEstimatedOneRepMax,
+          baseline,
         }),
       ).toBeNull();
     },
   );
+
+  it("falls back to a Weight record when no 1RM beats the record, comparing weight then reps", () => {
+    const above1rm = (estimateOneRepMax(110, 5) as number) + 1;
+    expect(deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [exercise],
+      baseline: baselineOf(above1rm, 110, 4),
+    })).toMatchObject({ kind: "weight", weightRecord: true, setId: "set-b", weight: 110, reps: 5 });
+    // A 1RM-only baseline (no earlier Weight) has nothing for a Weight to beat.
+    expect(deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [exercise],
+      baseline: { oneRepMax: above1rm, weight: null },
+    })).toBeNull();
+  });
+
+  it("marks a 1RM record set that is also heavier than the Weight record", () => {
+    expect(deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [exercise],
+      baseline: baselineOf(estimateOneRepMax(100, 5) as number, 100, 5),
+    })).toMatchObject({ kind: "oneRepMax", weightRecord: true, setId: "set-b" });
+  });
 
   it("ignores unconfirmed work and resolves ties by set order then stable set id", () => {
     const tiedExercise = insightExercise({
@@ -790,7 +856,7 @@ describe("deriveExercisePersonalRecord", () => {
     const record = deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [tiedExercise],
-      historicalBestEstimatedOneRepMax: 1,
+      baseline: baselineOf(1, 1, 1),
     });
 
     expect(record?.setId).toBe("set-a");
@@ -809,13 +875,13 @@ describe("deriveExercisePersonalRecord", () => {
     expect(deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [warmUpHeavier],
-      historicalBestEstimatedOneRepMax: historicalBest,
+      baseline: baselineOf(historicalBest, 100, 5),
     })).toMatchObject({ setId: "working", weight: 110 });
     // Only a warm-up beats the baseline: no PR.
     expect(deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [warmUpHeavier],
-      historicalBestEstimatedOneRepMax: estimateOneRepMax(150, 5) as number,
+      baseline: baselineOf(estimateOneRepMax(150, 5) as number, 150, 5),
     })).toBeNull();
   });
 });
@@ -858,7 +924,8 @@ describe("deriveSessionPersonalRecords", () => {
     });
 
     expect(records).toEqual([expect.objectContaining({ setId: "target-set", weight: 110 })]);
-    expect(records[0].historicalBestEstimatedOneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number);
+    expect(records[0].baseline.oneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number);
+    expect(records[0].baseline.weight).toEqual({ weight: 100, reps: 5 });
   });
 
   it("uses only earlier completed, non-deleted history in (completedAt, sessionId) order", () => {
@@ -911,9 +978,34 @@ describe("deriveSessionPersonalRecords", () => {
     });
 
     expect(records).toHaveLength(1);
-    expect(records[0].historicalBestEstimatedOneRepMax).toBeCloseTo(
+    expect(records[0].baseline.oneRepMax).toBeCloseTo(
       estimateOneRepMax(105, 5) as number,
     );
+  });
+
+  it("replays the Weight record too: a heavier set below the 1RM record is a Weight PR", () => {
+    const records = deriveSessionPersonalRecords({
+      targetSession: completedSession({
+        sessionId: "target",
+        exercises: [insightExercise({
+          id: "target-row",
+          exerciseDefinitionId: "bench",
+          sets: [insightSet("target-set", { weightValue: "105", repsValue: "3" })],
+        })],
+      }),
+      historicalSessions: [completedSession({
+        sessionId: "earlier",
+        completedAt: new Date("2026-09-11T10:00:00.000Z"),
+        exercises: [insightExercise({
+          id: "earlier-row",
+          exerciseDefinitionId: "bench",
+          sets: [insightSet("earlier-set", { weightValue: "100", repsValue: "10" })],
+        })],
+      })],
+    });
+
+    expect(records).toEqual([expect.objectContaining({ kind: "weight", weightRecord: true, setId: "target-set" })]);
+    expect(records[0].baseline.weight).toEqual({ weight: 100, reps: 10 });
   });
 
   it("deduplicates repeated definition blocks and follows first exercise order", () => {
@@ -1078,7 +1170,7 @@ describe("createCompletedSessionInsightsRepository", () => {
     loadEarlierCompletedSessions: jest.fn().mockResolvedValue([]),
     loadSessionExercises: jest.fn().mockResolvedValue([]),
     loadExerciseSets: jest.fn().mockResolvedValue([]),
-    loadEarlierBestEstimatedOneRepMax: jest.fn().mockResolvedValue(new Map()),
+    loadEarlierRecordBaselines: jest.fn().mockResolvedValue(new Map()),
     ...overrides,
   });
 
@@ -1128,7 +1220,9 @@ describe("createCompletedSessionInsightsRepository", () => {
           sessionExerciseId: "history-row",
         },
       ]),
-      loadEarlierBestEstimatedOneRepMax: jest.fn().mockResolvedValue(new Map([["bench", 100]])),
+      loadEarlierRecordBaselines: jest.fn().mockResolvedValue(
+        new Map([["bench", { oneRepMax: 100, weight: { weight: 100, reps: 5 } }]]),
+      ),
     });
     const repository = createCompletedSessionInsightsRepository(store);
 
@@ -1138,7 +1232,7 @@ describe("createCompletedSessionInsightsRepository", () => {
       completedAt: AT,
       targetSessionId: "target",
     });
-    expect(store.loadEarlierBestEstimatedOneRepMax).toHaveBeenCalledWith({
+    expect(store.loadEarlierRecordBaselines).toHaveBeenCalledWith({
       target: { sessionId: "target", completedAt: AT },
       exerciseDefinitionIds: ["bench"],
     });
@@ -1148,7 +1242,7 @@ describe("createCompletedSessionInsightsRepository", () => {
         expect.objectContaining({
           exerciseDefinitionId: "bench",
           setId: "target-set",
-          historicalBestEstimatedOneRepMax: 100,
+          baseline: { oneRepMax: 100, weight: { weight: 100, reps: 5 } },
         }),
       ],
       exerciseVolumeComparisons: [

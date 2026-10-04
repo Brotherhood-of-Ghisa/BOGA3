@@ -112,7 +112,7 @@ export function ViewSessionScreen({
               accessibilityLabel={[
                 card.name,
                 formatSetCount(card.setCount),
-                card.recordOneRepMax ? `new 1RM record ${card.recordOneRepMax}` : null,
+                card.record?.spoken,
               ]
                 .filter(Boolean)
                 .join(', ')}
@@ -129,7 +129,7 @@ export function ViewSessionScreen({
               count={formatSetCount(card.setCount)}
               key={card.id}
               name={card.name}
-              recordOneRepMax={card.recordOneRepMax}
+              record={card.record}
               rows={card.rows}
               testID={`completed-session-detail-exercise-${card.id}`}
             />

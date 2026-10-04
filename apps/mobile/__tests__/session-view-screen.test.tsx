@@ -77,6 +77,7 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
 import { SessionCompareScreen } from '../app/session/[sessionId]/compare';
 import { SessionViewScreen } from '../app/session/[sessionId]/index';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
+import { uiRoles } from '@/components/ui/tokens';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
 import { gyms, sessions } from '@/src/data/schema';
 import * as sessionFacts from '@/src/data/exercise-session-facts';
@@ -131,8 +132,9 @@ const sessionRow = (sessionId: string) =>
 const answerAlerts = (answer: (title: string) => string) => {
   const titles: string[] = [];
   jest.spyOn(Alert, 'alert').mockImplementation((title, _message, buttons) => {
-    titles.push(title);
-    const choice = answer(title);
+    const safeTitle = title ?? '';
+    titles.push(safeTitle);
+    const choice = answer(safeTitle);
     buttons?.find((button) => button.text === choice)?.onPress?.();
   });
   return titles;
@@ -222,7 +224,7 @@ describe('Session view', () => {
 
   it('shows no record, and keeps the cards, when the earlier-bests read fails', async () => {
     const failedRead = jest
-      .spyOn(sessionFacts, 'loadEarlierBestE1rmByDefinition')
+      .spyOn(sessionFacts, 'loadEarlierBestsByDefinition')
       .mockRejectedValueOnce(new Error('Facts read failed'));
     await seed();
     render(<SessionViewScreen sessionId={SESSION} />);
@@ -916,13 +918,13 @@ describe('Session view: editing a completed session', () => {
   });
 
   // Another completed session with one Bench set, written through the same path.
-  const completeBenchSession = async (id: string, completedAt: Date, weightValue: string) => {
+  const completeBenchSession = async (id: string, completedAt: Date, weightValue: string, repsValue = '8') => {
     await sessionDrafts.persistSessionDraftSnapshot(
       {
         sessionId: id,
         gymId: 'gym-iron',
         startedAt: new Date(completedAt.getTime() - 30 * 60_000),
-        exercises: [{ ...benchWith([performed(`${id}-set`, weightValue, '8', 'rir_1')]), id: `${id}-bench` }] as never,
+        exercises: [{ ...benchWith([performed(`${id}-set`, weightValue, repsValue, 'rir_1')]), id: `${id}-bench` }] as never,
       },
       { now: completedAt }
     );
@@ -938,6 +940,18 @@ describe('Session view: editing a completed session', () => {
 
     // Its 160 × 8 (1RM 204.3) beats the earlier 190; counted against itself it would only tie.
     expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new 1RM record 204.3')).toBeTruthy();
+  });
+
+  it('bands a Weight record when the set is heavier than every earlier one but no 1RM beats the record', async () => {
+    await openCompleted(undefined, async () => {
+      // 155 × 12 (1RM 219.3) the week before: a higher 1RM, a lighter Weight.
+      await completeBenchSession('bench_before', new Date(2026, 1, 18, 10, 0), '155', '12');
+    });
+
+    expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new top weight 160.0 × 8')).toBeTruthy();
+    expect(screen.getByTestId('session-view-exercise-done_bench-record')).toHaveTextContent('New top weight · 160.0 × 8');
+    expect(screen.getByTestId('session-view-exercise-done_bench-set-1-values')).toHaveStyle({ color: uiRoles.record });
+    expect(screen.getByLabelText('1RM 204.3')).toBeTruthy();
   });
 
   it('re-reads its records when a saved End moves it past a heavier session', async () => {
@@ -960,7 +974,7 @@ describe('Session view: editing a completed session', () => {
   });
 
   it('shows no record when no session before it has the exercise', async () => {
-    const earlierBests = jest.spyOn(sessionFacts, 'loadEarlierBestE1rmByDefinition');
+    const earlierBests = jest.spyOn(sessionFacts, 'loadEarlierBestsByDefinition');
     // The fixture's Bench history is all later than this session.
     await renderCompleted();
 

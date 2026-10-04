@@ -339,9 +339,10 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    VOL` (`W-Up`, `RIR n` for any valid stored RIR, `—` for none). An exercise
    with no such set is left out. There are no tags, no collapse and no set
    numbers.
-6. A card whose set has the exercise's best 1RM against every completed
-   session before this one shows that 1RM in `record` and a `New 1RM record` band — the same
-   derivation, and the same card, as the session view's completed edit
+6. A card holding the exercise's record set against every completed session
+   before this one (`tech/training-metrics-contract.md` §3: 1RM, else Weight)
+   shows the figures it beat in `record` and earns a `record` band. This is
+   the same derivation, and the same card, as the session view's completed edit
    (§14b.4, §14b.7), so the `Edit`/`Done` loop shows one card on both sides.
    History is optional enrichment: while it loads, or if it fails, no record
    shows.
@@ -349,17 +350,24 @@ calculation contract is `../tech/bodyweight-load-contract.md`.
    completed session, not durable celebration state, in the design language
    (`components/session-complete/`). Its own top bar reads `Session complete` ·
    `Done` (`accent`, where the session view's Finish sat); then the summary
-   card, every `Personal records` card when present, one `Exercise volume` card
+   card, every `Personal records` card when present (one per exercise holding
+   a record set, contract §3), one `Exercise volume` card
    per performed exercise, and `Share session` (an outline). The summary card
    shows `Duration`, `Exercises`, `Sets` (working sets, §5.11) and `Gym` as
-   stacked figures, then `Sets by muscle`: non-interactive per-muscle pills
-   (name and the number of physical working sets mapped to that muscle). It never links to muscle
+   stacked figures, then `Sets by muscle` (a header, Archivo 700 at `md` in
+   `ink`): a non-interactive table, one row per muscle — `Muscle`,
+   `Pri` and `Sec` (physical working sets mapping to it as primary /
+   secondary; none is `—` in `ink-ghost`) and `Sets`, primary + ½ secondary,
+   the sort key — with no formula footnote. It never links to muscle
    analytics. Personal-record/comparison history is optional enrichment: its
    loading or failure never blocks stored context or exits, and current
    exercise rows still render with an explicit no-history state.
 8. A personal record is shown in the language's one superlative: a `record`
-   band (`New 1RM record · <1RM>`), the exercise and its set (`185.0 × 8`), the
-   1RM bold `record` — no `kg`, no "est.". Exercise-volume cards show the
+   band (`New 1RM record · <1RM>`, or `New top weight · <weight> × <reps>`),
+   the exercise and its set (`185.0 × 8`), and the figures it beat in bold
+   `record`. A Weight record's 1RM stays in `ink`, and there is no `kg` and no
+   "est.". The share image heads its list `<n> new records`, and each line names
+   its kind in words (`1RM` or `Top weight`). Exercise-volume cards show the
    exercise name with its smaller working-set count (`3 sets`), the session's `Vol`
    figure (no separator, no unit) versus the historical median, and a
    horizontal P5–P95 range with median/current markers when a distribution
@@ -828,8 +836,8 @@ unchanged. What differs is presentation:
    exercise in the session; one superlative per exercise, `design-language.md`
    §5). Only the selected working sets compete (§5.11); Volume has no record set, since its
    record is a whole session's. That best set earns the set list the `record` band, in the
-   session view's card words: `New 1RM record · <1RM>`, or `New top weight · <weight>`
-   when only the weight beat the baseline. The records panel counts working
+   session view's card words: `New 1RM record · <1RM>`, or
+   `New top weight · <weight> × <reps>` when only the Weight beat the baseline. The records panel counts working
    sets only (§5.11): records, their baseline and the `Last` summary read working
    sets, `Last` is the newest session with a working set, and its set list still
    shows that session's warm-up lines. Records and `Last` read the exercise
@@ -881,13 +889,13 @@ unchanged. What differs is presentation:
    (values `inkFaint`, legends `inkGhost`), a planned row showing its
    prescription. Every figure in a row shares the row's colour and weight —
    there is no per-column bold for today's bests (tried on device 2026-09-23:
-   too noisy). The one highlight is a done set holding a 1RM record
-   (`tech/training-metrics-contract.md` §3) against the completed sessions
-   before this one (all of them while it is active): that
-   1RM is shown in `record` and earns the card a `record` band
-   (`New 1RM record · <1RM>`), from the same derivation
-   (`deriveExercisePersonalRecord`) as the completion screen's `New PR` cards
-   (§7.7).
+   too noisy). The one highlight is the exercise's record set
+   (`tech/training-metrics-contract.md` §3: 1RM, else Weight, across every
+   block of the exercise) against the completed sessions before this one (all
+   of them while it is active). The figures it beat are shown in `record`, and
+   its card earns the exercise page's `record` band (§14a.4). It comes from the
+   same derivation (`deriveExercisePersonalRecord`) as the completion screen's
+   record cards (§7.7).
 5. The summary's `Sets` counts the performed working sets (§5.11; a
    performed warm-up adds nothing); its `Volume` is their calculated volume under the
    current private policy (§5.11), and an incomplete Volume's note reads

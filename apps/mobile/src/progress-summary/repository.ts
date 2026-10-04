@@ -2,7 +2,7 @@
 // the exercise session facts for 1RM PRs, and one small query for the latest
 // completed session. Nothing here replays history.
 
-import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 import { loadFlaggedExerciseSessionFacts } from '@/src/data/exercise-session-facts';
@@ -23,8 +23,8 @@ export type LatestCompletedSessionRow = {
   completedAt: Date;
   durationSec: number | null;
   gymName: string | null;
-  /** Live exercises in session order. */
-  exerciseNames: string[];
+  /** Live exercises. */
+  exerciseCount: number;
 };
 
 export type PrE1rmFact = { sessionId: string; achievedAt: Date };
@@ -64,15 +64,13 @@ export const createDrizzleProgressSummaryStore = (
       .limit(1)
       .get();
     if (!row || row.completedAt === null) return null;
-    const exerciseNames = database
-      .select({ name: sessionExercises.name })
+    const exercises = database
+      .select({ value: count() })
       .from(sessionExercises)
       // Removed exercises stay as tombstones.
       .where(and(eq(sessionExercises.sessionId, row.id), isNull(sessionExercises.deletedAt)))
-      .orderBy(asc(sessionExercises.orderIndex))
-      .all()
-      .map((exercise) => exercise.name);
-    return { ...row, completedAt: row.completedAt, exerciseNames };
+      .get();
+    return { ...row, completedAt: row.completedAt, exerciseCount: exercises?.value ?? 0 };
   },
 });
 
@@ -102,17 +100,13 @@ export const createTodayProgressRepository = (
           store.loadAggregationInput(instantWindow(latest.completedAt)).then(workingSetsBySession),
           store.loadPrE1rmFacts(instantWindow(latest.completedAt)),
         ]);
-    const { exerciseNames, ...latestSession } = latest;
-
     return deriveTodayProgress({
       now,
       sessions: sessionsInRange,
       prAchievedAt: prFacts.map((fact) => fact.achievedAt),
       latest: {
-        ...latestSession,
+        ...latest,
         workingSets: latestSessions.find((session) => session.id === latest.id)?.workingSets ?? 0,
-        exerciseCount: exerciseNames.length,
-        exerciseNames,
         prs: latestPrFacts.filter((fact) => fact.sessionId === latest.id).length,
       },
     });

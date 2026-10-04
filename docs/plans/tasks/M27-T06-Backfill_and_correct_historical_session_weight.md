@@ -12,6 +12,12 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/bodyweight-load-cont
 
 # M27-T06 — Backfill and correct historical session weight
 
+> Historical scope: the [reconciled M27 milestone](../milestones/M27-bodyweight-load-and-group-comparisons.md)
+> supersedes this card for workstream #420. Its old snapshot, public bodyweight,
+> absolute-board and closeout requirements are historical context rather than part
+> of that workstream. Current personal behavior is owned by the accepted specs;
+> active group delivery is T08–T10/T13–T15 and the existing #411 card.
+
 - Status: `in_progress`
 - Depends on: M27-T04, M27-T05.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`

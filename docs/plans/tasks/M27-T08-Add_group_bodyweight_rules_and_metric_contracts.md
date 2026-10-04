@@ -1,100 +1,87 @@
----
-task_id: M27-T08-Add_group_bodyweight_rules_and_metric_contracts
-milestone_id: M27
-status: in_progress
-ui_impact: "no"
-areas: "cross-stack"
-runtimes: "node|deno|supabase|sql"
-gates_fast: "./boga test fast"
-gates_slow: "./boga test backend; ./boga test ios-groups-e2e"
-docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/05-data-model.md, docs/specs/tech/groups-contract.md, docs/specs/tech/bodyweight-load-contract.md, docs/specs/10-api-authn-authz-guidelines.md"
----
+# M27-T08 — Define group percentage rules and wire contracts
 
-# M27-T08 — Add group bodyweight rules and metric contracts
-
-- Status: `in_progress`
-- Depends on: M27-T02, M27-T03, M27-T05.
-- Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
-- Governing decisions: D7–D10.
+- Status: `planned` (re-scoped 2026-10-04; old checkpoints are historical)
+- Depends on: [M27-T15](M27-T15-Decide_percentage_reading_correction_policy.md)
+- Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
+- Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
+- Areas: cross-stack; UI impact: yes (public metric semantics; presentation in T10)
 
 ## Objective and scope
 
-Extend group comparison identities and board contracts so each group controls
-its calculation standard and metrics carry correct units. Read AGENTS.md,
-specs 02/03/05/09/10, groups/bodyweight contracts and `supabase/README.md`.
-Refresh schema/RPC/validator inventory and HEAD; read test-directory READMEs.
+Define a public percentage metric for bodyweight exercises and migrate its
+server/client contracts without misleading old readers or exposing private
+bodyweight. Milestone D2–D10 replace this card's old three-board, snapshot and
+public-B/provenance requirements. No personal/sync schema redesign is requested.
+
+## Decided and open definitions
+
+The operator accepted `100 × effective estimated 1RM / B` (%BW) and retained
+the group switch. Off ranks ordinary Volume/1RM; On with zero contribution
+stays ordinary; On with positive contribution uses bodyweight-aware %BW 1RM.
+Milestone D5 states the cross-mode/cross-group inference limit of ordinary Off
+sharing. Never publish the private reading itself in either mode.
+
+Record the operator's Volume answer from milestone D8 before implementation:
+best single-set volume in both modes is proposed (kg·reps ordinary, %BW·reps
+bodyweight-aware). A session aggregate requires explicit source window and
+Certified-set eligibility. T15 settles private-reading correction behavior.
 
 ## Deliverables and acceptance
 
-1. Add group coefficient, movement/loading standard, default metric and rules
-   revision to server-owned group exercise configuration. Personal metadata is
-   independent; link/create-from-group flows carry explicit semantics without
-   overwriting an existing personal exercise. Validate compatible movement and
-   distribution modes. Owners/admins retain sole rule-write permissions.
-2. Add typed metric identities/units for bodyweight reps, relative 1RM (×BW)
-   and absolute total 1RM (kg). Keep conventional Weight/1RM behaviour and both
-   Certified/All scopes. A reps or ratio score must never masquerade as kg.
-3. Update board-entry, podium, detail, event/history, pagination and cache wire
-   contracts; specify numeric precision and deterministic ties. Keep values
-   additive/backward-compatible where practical; document activation/version
-   controls wherever old readers would mislabel scores.
-4. Provide raw session B/provenance and actual load mode to authorised group
-   readers/evaluator, without exposing unrelated weigh-ins. Group tables remain
-   outside Sync v2; member links remain the existing synced relationship.
-5. Define rule-rebuild publication so a board never compares different rule
-   revisions. Version changes label a recalculation, not a performed PR.
-   Preserve historic events and specify how legacy bodyweight Weight/e1RM
-   entries transition; no silent deletion or relabelling of historical scores.
-6. Resolve archived/former-member policy explicitly: preserve their frozen
-   historical entries with their original version, and do not mix them into a
-   newly recalculated live ranking under incompatible rules. Keep the archived
-   history accessible. Update the existing freeze contract accordingly.
-7. Define certification payload/fingerprint dependencies and migration from old
-   attestations. A prior attestation that never pinned B cannot automatically
-   certify a new B-dependent score. T09 implements the resulting evaluation.
-
-## Implementation boundaries
-
-Own group schema/RPC migrations, shared exercise-core validation where
-appropriate, group wire types/API and compatibility vectors. No leaderboard
-screen work here; T10 owns presentation. Migration rollout and deployed smoke
-belong to T12. Supply an explicit old-reader/writer compatibility plan.
+1. Inventory current `metric-contract.ts`, `metric-wire.ts`, wire guards, group
+   RPCs, SQL tables/readers, evaluator and caches against current main. Positive
+   group contribution, not a personal setting, identifies the bodyweight exercise.
+2. Specify the accepted percentage metric identity, public unit, precision,
+   deterministic ties, eligible sets and default. Add ordinary Volume (kg·reps)
+   and retain ordinary 1RM (kg); implement the chosen normalized Volume policy. Never put percentages in a kg field or relabel persisted history.
+   No absolute kg bodyweight alternative while On; no new reps board. Define
+   legacy Weight/1RM certificate mapping without relabeling Weight as Volume
+   or granting an aggregate a witness it never had.
+3. Define the group switch's accepted interaction, including zero ↔ positive
+   transitions and legacy writes. Preserve zero-contribution ready boards and
+   no-op history. Rule changes can rescore, never cancel an unchanged witness.
+4. Define a versioned additive/forward schema/RPC/decoder/cache transition.
+   Preserve internal source facts and audit fields, but prevent public old/new
+   RPCs from revealing private readings or enabled bodyweight absolute/relative
+   counterparts in the same group. Ordinary Off results remain permitted. List every affected stream/session/detail/summary/history
+   endpoint; T09 implements server projections/redaction.
+5. Specify activation/minimum-client behavior so old clients neither display
+   %BW as kg nor obtain disallowed data from legacy endpoints. Retire incompatible
+   caches, including already-stored absolute/relative pairs. Fail closed for
+   unsupported units without downgrading to an unsafe payload.
+6. Preserve authorized member/role boundaries, OAuth/anonymous/outsider denial,
+   coherent revision publication, immutable history and archived/former-member
+   semantics. Historic kg payloads are not exempt from the new privacy boundary;
+   redact disallowed kg fields while On and preserve server audit. Explicitly
+   document that previously seen/other-group kg can still support inference.
+7. Keep reading resolution server-only and as-of session start, with no new
+   session snapshots or normal-sync group entities. Document T15's correction
+   policy and the distinction between current score and immutable observed audit.
+8. Graduate the delivered representation/compatibility contracts into owning
+   specs; make activation truthfully planned until the scorer/readers/UI ship.
 
 ## Verification and closeout
 
-Contract tests cover rule permissions, non-member/OAuth denial, owner history
-privacy, metric units, defaults, links to different groups, revisions,
-archived/former data and legacy migration. Run `./boga test fast`,
-`./boga test backend`, `./boga test ios-groups-e2e`; include `ios-sync-e2e`
-if sync paths change and all requirements from `./boga test for`.
-Graduate group/data/auth decisions, attach evidence, mark the milestone entry
-complete and delete this card when shipped.
+Read test-directory READMEs. Add Jest unit/decoder vectors for category, metric
+units, Volume aggregation, both switch modes, rounding, invalid payloads,
+old/new versions and cache migration. Backend
+contract tests prove actual SQL responses agree with decoders, permissions and
+history/legacy non-disclosure. No UI redesign or new Maestro flow here.
 
-## Execution checkpoint (2026-09-27)
+## Specs to update
 
-Pure metric/rule validation, explicit link compatibility and the proposed v2 unit/revision-aware wire types are integrated. Server schema/RPC compatibility, versioned publication, history and cache integration remain pending.
+- `docs/specs/tech/groups-contract.md` — public units, reader privacy, revisions,
+  certification metadata and version compatibility.
+- `docs/specs/05-data-model.md`, `03-technical-architecture.md` — server-owned
+  percentage projection and internal/public representation split.
+- `docs/specs/tech/bodyweight-load-contract.md`, `training-metrics-contract.md`
+  — private kg arithmetic versus public %BW group metrics.
+- `docs/specs/10-api-authn-authz-guidelines.md` — changed group disclosure boundary.
 
-Full fast and backend gates passed at `19fc54d`: 181 mobile suites / 2,150
-mobile tests, all backend contracts, 6 real-sync suites / 15 tests and real
-OAuth/MCP smoke. Logs: `/tmp/boga-m27-group-score-verified-fast.log` and
-`/tmp/boga-m27-group-score-verified-backend.log`. `./boga timings` and
-`./boga test for` ran. Device gates remain in progress. No new server RPC,
-publisher, certification behavior or group UI is claimed shipped.
+## Gates
 
-
-### Integrated backend checkpoint (2026-09-27)
-
-The migration, Deno evaluator, atomic versioned publication, legacy compatibility,
-metric-specific certification, readers and client decoders are integrated.
-`./boga test backend` passed in full with the expanded `groups-bodyweight.sh`
-body, including actual SQL responses decoded by the mobile guards, paged mixed
-streams, UTF-16 validation, role/privacy checks, generation/lease fencing,
-rollback/retry, legacy activation, archived/former entries and correction pins.
-Evidence: `/tmp/boga-m27-group-integration-backend-3.log`.
-The earlier fast run passed before UI integration; the later full fast gate
-passed with 184 mobile suites / 2,214 tests at this working checkpoint:
-`/tmp/boga-m27-comparison-ui-fast-2.log`. Timings and trigger rules ran.
-
-T10 rendering, metric stream certification controls and new two-user device
-proof remain in progress. Hosted rollout and final frontend acceptance are
-pending; neither task is shipped.
+Run `./boga test for`, propose `fast`, `backend` and `ios-groups-e2e`, then run
+what the operator agrees. Include `ios-sync-e2e` only if actual sync/auth paths
+change; no such change is planned. Run required quality targets before PR.
+Delete this card and mark the M27 row completed in the delivering PR; T14 owns
+combined human acceptance, activation and final closeout.

@@ -54,16 +54,6 @@ function LatestSessionRow({ latest, onPress }: { latest: LatestSessionSummary; o
         <Text allowFontScaling={false} style={todayText.detailFigure} testID="today-latest-session-figures">
           {formatLatestFigures(latest)}
         </Text>
-        {latest.exerciseNames.length > 0 ? (
-          <Text
-            allowFontScaling={false}
-            ellipsizeMode="tail"
-            numberOfLines={1}
-            style={todayText.mutedLine}
-            testID="today-latest-session-exercises">
-            {latest.exerciseNames.join(', ')}
-          </Text>
-        ) : null}
         {latest.prs > 0 ? (
           <View style={styles.prRow} testID="today-latest-session-prs">
             <Icon color={uiRoles.record} name="arrow-up" size="xs" />

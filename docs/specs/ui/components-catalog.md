@@ -289,12 +289,12 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `SessionCompletionScreen` — the post-submit composition on `paper`:
     `SessionTopBar mode="complete"` (`Session complete` · Done), a
     `SessionFactsCard` (Duration / Exercises / Sets / Working, then Gym) with
-    the working-sets-by-muscle pills under a `rule-soft` divider, every
+    the sets-by-muscle table (primary / secondary / weighted sets) under a `rule-soft` divider, every
     `PersonalRecordCard`, shared exercise/muscle comparisons and the
-    `Share session` outline `ActionButton`. Muscle pills are informational,
+    `Share session` outline `ActionButton`. The muscle table is informational,
     never analytics links; all PRs stay visible together
   - `SessionMuscleBreakdown` / `SessionSummaryContent` (`session-summary-content.tsx`)
-    share muscle pills, records, comparisons and Share between completion and
+    share the muscle table, records, comparisons and Share between completion and
     historical review. Hosts own their facts/top bar; completion keeps its
     post-Finish composition and share-image content.
   - `SessionInsightPresentation` (`components/session-recorder/`) — shared by
@@ -305,8 +305,9 @@ Brief entrypoint inventory of the current reusable UI component set.
     uses its shared top-bar Edit action. Separate history/catalog states isolate
     optional enrichment failures; active sessions keep uncontrolled grouping.
   - `PersonalRecordCard` — a `Card` with a `record` band (`New 1RM record ·
-    <1RM>`), the exercise and its set (`185.0 × 8`), the 1RM bold `record`;
-    read as one accessibility element
+    <1RM>` or `New top weight · <weight> × <reps>`), the exercise and its set
+    (`185.0 × 8`), the figures the record set beat bold `record`; read as one
+    accessibility element
   - `ExerciseVolumeCard` — name, set counts, the `Vol` figure (no separator,
     no unit) and its delta from the median, and the P5–P95 range (`rule`
     track, `ink-muted` median tick, `ink` current dot) or the single/equal
@@ -488,10 +489,11 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - `SetSummaryRow` — one read-only set: effort label, weight × reps
     (`-values`), inline `Stat` 1RM / VOL with legends, all at the row's colour
-    and weight; only a record 1RM in `record`; planned rows faded
+    and weight; only the record set's beaten figures (1RM, Weight) in
+    `record`; planned rows faded
   - `ExerciseSetsCard` — `Card` per exercise: name, a count, an inline
     `accessory` (the session view's chevron) or a 44pt `control` (View Session's
-    ⋮), the set rows and the `record` band (`New 1RM record · <1RM>`). Given
+    ⋮), the set rows and the `record` band (`record`, a `RecordBand`). Given
     `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`
     (or the caller's `rowTestID`), `-record`. DLM-T10 added `nameFace="figure"`
     (a date as the name, in Plex Mono) and a `summary` slot under the header
@@ -499,7 +501,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `SessionFactsCard` — `Card` with an optional header slot, a finished
     session's `Start` / `End` read-only (the completed edit's field layout),
     one or more rows of stacked `Stat`s (a `text` fact takes the spare width)
-    and an optional footer (the completion's muscle pills)
+    and an optional footer (the completion's sets-by-muscle table)
   - covered by `completed-session-detail-screen.test.tsx`,
     `session-view-screen.test.tsx`, `completed-session-detail-model.test.ts`
     and `exercise-history-screen.test.tsx`
@@ -558,9 +560,9 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `TodayProgressCard` — one `Card`: `WeekFigures`, a `rule-soft` hairline,
     `MonthPace`, a hairline, then `Latest session` with its `All sessions`
     text button and the latest-session link row (summary line, `sets ·
-    exercises`, the exercise names on one ellipsised line, a `record` PR count
-    when it has one). testIDs `today-progress-card`, `today-all-sessions-button`,
-    `today-latest-session` (`-start`, `-figures`, `-exercises`, `-prs`)
+    exercises`, a `record` PR count when it has one; no exercise names).
+    testIDs `today-progress-card`, `today-all-sessions-button`,
+    `today-latest-session` (`-start`, `-figures`, `-prs`)
   - `WeekFigures` — `This week` with the Mon–Sun range in `ink-faint`, then
     `Sessions`, `Sets` and `PRs` (Plex Mono 700; a non-zero PR count in
     `record` with its `arrow-up`), each over a `ShareBar` and `vs <n> last wk`.

@@ -76,6 +76,7 @@ import {
 } from '@/src/bodyweight/calculation-preference';
 import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { upsertLocalGym } from '@/src/data/local-gyms';
+import { uiRoles } from '@/components/ui/tokens';
 import { exerciseDefinitions, exerciseSets, sessions } from '@/src/data/schema';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
@@ -226,6 +227,24 @@ const seedDesignSession = async ({
   await completeSessionDraft(DESIGN.sessionId, { completedAt, now: completedAt });
 };
 
+// A completed session the day before the design session, with its exercises.
+const seedEarlierDesignSession = async ({ benchSets, pulldownSets }: { benchSets: SeedSet[]; pulldownSets: SeedSet[] }) => {
+  const completedAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+  await persistSessionDraftSnapshot(
+    {
+      sessionId: 'design_earlier',
+      gymId: DESIGN.gymId,
+      startedAt: new Date(completedAt.getTime() - 45 * 60 * 1000),
+      exercises: [
+        { id: 'earlier_bench', exerciseDefinitionId: 'seed_barbell_bench_press', name: 'Barbell Bench Press', sets: toDraftSets('earlier_bench', benchSets) },
+        { id: 'earlier_pulldown', exerciseDefinitionId: DESIGN.pulldownExerciseId, name: 'Lat Pulldown', sets: toDraftSets('earlier_pulldown', pulldownSets) },
+      ],
+    },
+    { now: completedAt }
+  );
+  await completeSessionDraft('design_earlier', { completedAt, now: completedAt });
+};
+
 const openDesignSession = async (
   params: Record<string, string> = {},
   seed?: Parameters<typeof seedDesignSession>[0]
@@ -292,7 +311,7 @@ describe('completion presentation over real data', () => {
       /\d+% (above|below) median|At median/
     );
     // Neither set has an effort; untagged sets are working sets.
-    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set');
+    expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set: 1 primary, 0 secondary');
     expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
@@ -575,7 +594,13 @@ describe('a session written through the app', () => {
     expect(screen.queryByTestId('session-completion-working-sets')).toBeNull();
     expect(label('session-completion-gym')).toBe('Gym Westside Barbell Club');
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
-    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 sets');
+    expect(label('session-completion-muscle-chest')).toBe('Chest, 3 sets: 3 primary, 0 secondary');
+    // Bench maps triceps as secondary: its 3 sets count half, with no primary sets.
+    expect(label('session-completion-muscle-triceps')).toBe('Triceps, 1.5 sets: 0 primary, 3 secondary');
+    expect(screen.getByTestId('session-completion-muscle-triceps')).toHaveTextContent('Triceps—31.5');
+    // The card's title is a header; the table carries no formula footnote.
+    expect(screen.getByRole('header', { name: 'Sets by muscle' })).toBeTruthy();
+    expect(screen.queryByText('Sets = primary + ½ secondary')).toBeNull();
     // Each comparison card counts working sets only, with no second count.
     expect(screen.getByText('3 sets')).toBeTruthy();
     // The untagged pulldown set is a working set.
@@ -709,6 +734,46 @@ describe('records, sharing and deleted sessions over real data', () => {
     expect(label(`completed-session-detail-exercise-${ONE_PR_SQUAT}`)).toMatch(
       /^Barbell Back Squat, 1 set, new 1RM record \d+\.\d$/
     );
+  });
+
+  it('shows a Weight record beside a 1RM record on completion, the share image and the set cards', async () => {
+    await seedDesignSession();
+    // The day before: Bench 180 × 12 (a higher 1RM, a lighter Weight), Pulldown 100 × 12.
+    await seedEarlierDesignSession({
+      benchSets: [{ weight: '180', reps: '12', type: 'rir_0' }],
+      pulldownSets: [{ weight: '100', reps: '12', type: null }],
+    });
+    await bootLocalApp();
+    mockParams = { sessionId: DESIGN.sessionId, presentation: 'completion' };
+    render(<CompletedSessionDetailRoute />);
+
+    const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
+    const pulldown = screen.getByTestId(`session-completion-pr-${DESIGN.pulldownExerciseId}`);
+    // Its 185 × 8 is heavier than 180 × 12 but its 1RM 236.2 is below 254.7: a Weight record.
+    expect(within(bench).getByLabelText('New top weight for Barbell Bench Press: 185.0 × 8, 1RM 236.2')).toBeTruthy();
+    expect(within(bench).getByText('New top weight · 185.0 × 8')).toBeTruthy();
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-set')).toHaveStyle({ color: uiRoles.record });
+    expect(within(pulldown).getByLabelText(/^New 1RM record for Lat Pulldown: 120\.0 × 12, 1RM \d+\.\d$/)).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('session-completion-share-session'));
+    expect(within(screen.getByTestId('session-share-card-personal-records')).getByText('2 new records')).toBeTruthy();
+    expect(screen.getByTestId('session-share-card-pr-seed_barbell_bench_press')).toHaveTextContent(
+      'Barbell Bench PressTop weight185.0 × 8  1RM 236.2'
+    );
+    expect(screen.getByTestId(`session-share-card-pr-${DESIGN.pulldownExerciseId}-kind`)).toHaveTextContent('1RM');
+
+    // The detail's set cards band the same record sets.
+    screen.unmount();
+    mockParams = { sessionId: DESIGN.sessionId };
+    render(<CompletedSessionDetailRoute />);
+    await openSets();
+    expect(await screen.findByTestId(`completed-session-detail-exercise-${DESIGN.bench}-record`))
+      .toHaveTextContent('New top weight · 185.0 × 8');
+    expect(label(`completed-session-detail-exercise-${DESIGN.bench}`)).toBe(
+      'Barbell Bench Press, 3 sets, new top weight 185.0 × 8'
+    );
+    expect(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}-record`))
+      .toHaveTextContent(/^New 1RM record · \d+\.\d$/);
   });
 
   it('opens a deleted session with its band, in Summary, and restores Edit and comparisons on undelete', async () => {

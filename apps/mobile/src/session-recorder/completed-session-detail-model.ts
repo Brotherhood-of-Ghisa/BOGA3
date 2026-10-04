@@ -1,11 +1,14 @@
-import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { deriveExercisePersonalRecord, type SessionInsightExerciseInput } from '@/src/session-insights';
+import type { RecordBand } from '@/src/session-insights/record-band';
 
 import {
+  cardRecordBand,
   formatSetRow,
+  recordFlagsFor,
   type SessionViewSetRow,
 } from './session-view-model';
 import {
@@ -15,8 +18,8 @@ import {
 /**
  * View Session's presentation model: what a finished session did, set by set.
  * Only confirmed sets with valid values are shown, and an exercise with none is
- * left out. A record is the session view's (`session-view-model.ts`): a set
- * whose 1RM beats every completed session of that exercise before this one. Pure — the
+ * left out. A record is the session view's (`session-view-model.ts`): the
+ * exercise's record set against every completed session before this one. Pure — the
  * route loads the session and the history and renders what this returns.
  */
 
@@ -42,8 +45,8 @@ export type CompletedSessionDetailCard = {
   // The card's `<n> sets`: its working sets (`ux-rules.md` §5.11).
   setCount: number;
   rows: SessionViewSetRow[];
-  // The record 1RM, formatted, when a set in this exercise is an all-time best.
-  recordOneRepMax: string | null;
+  // The card's `record` band when the exercise's record set is in it.
+  record: RecordBand | null;
 };
 
 export type CompletedSessionDetailModel = {
@@ -82,10 +85,10 @@ const toInsightExercises = (exercises: CompletedSessionDetailExerciseInput[]): S
 
 export const buildCompletedSessionDetailModel = (
   exercises: CompletedSessionDetailExerciseInput[],
-  // The best 1RM of each exercise definition in the sessions before this one;
-  // absent without an earlier 1RM, while history loads or when it failed,
+  // Each exercise definition's records in the sessions before this one;
+  // absent without an earlier record, while history loads or when it failed,
   // which shows no record rather than a wrong one.
-  historicalBestByDefinitionId: ReadonlyMap<string, number>
+  recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>
 ): CompletedSessionDetailModel => {
   const insightExercises = toInsightExercises(exercises);
   const metrics: SetMetrics[] = [];
@@ -99,16 +102,13 @@ export const buildCompletedSessionDetailModel = (
     if (performed.length === 0) return [];
 
     const definitionId = exercise.exerciseDefinitionId ?? null;
-    const historicalBest = definitionId === null ? undefined : historicalBestByDefinitionId.get(definitionId);
-    const record =
-      definitionId === null || historicalBest === undefined
-        ? null
-        : deriveExercisePersonalRecord({
-            exerciseDefinitionId: definitionId,
-            exercises: insightExercises,
-            historicalBestEstimatedOneRepMax: historicalBest,
-          });
-    const recordSetId = record && record.sessionExerciseId === exercise.id ? record.setId : null;
+    const record = definitionId === null
+      ? null
+      : deriveExercisePersonalRecord({
+          exerciseDefinitionId: definitionId,
+          exercises: insightExercises,
+          baseline: recordBaselineByDefinitionId.get(definitionId) ?? null,
+        });
 
     // Count working sets and sum independently included volume; each row
     // retains its own figures.
@@ -136,10 +136,10 @@ export const buildCompletedSessionDetailModel = (
             loadContext: exercise.loadContext,
             setType: set.setType,
             done: true,
-            oneRepMaxRecord: set.id === recordSetId,
+            ...recordFlagsFor(record, set.id),
           })
         ),
-        recordOneRepMax: record && recordSetId ? formatOneRepMax(record.estimatedOneRepMax) : null,
+        record: cardRecordBand(record, exercise.id),
       },
     ];
   });
