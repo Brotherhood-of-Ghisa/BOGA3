@@ -54,7 +54,7 @@ export function groupEnteredWeightFactor(source: LoadInputMode, target: LoadInpu
 }
 
 /** Existing conventional links retain their explicit user-reviewed identity. */
-export function checkGroupLinkCompatibility(source: GroupLinkSource, target: GroupExerciseRules): GroupLinkCompatibility {
+export function checkGroupLinkCompatibility<T extends Pick<GroupExerciseRules, 'loadInputMode'>>(source: GroupLinkSource, target: T): GroupLinkCompatibility {
   if (!isLoadInputMode(source.loadInputMode) || !isLoadInputMode(target.loadInputMode)) {
     return { compatible: false, reason: 'load_input_mode_invalid' };
   }

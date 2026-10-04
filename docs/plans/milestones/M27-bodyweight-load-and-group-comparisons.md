@@ -229,11 +229,11 @@ mapping/compatibility policy in T08; do not relabel a Weight value as Volume or
 silently treat its certificate as a different witnessed aggregate.
 
 Volume is new ranking work, not a claim that today's Weight board already means
-Volume. Proposed Volume contract, pending the operator's answer: best qualifying
-single-set volume, kg·reps in ordinary mode and `100 × effective set volume / B`
-(%BW·reps) in enabled bodyweight mode. This fits the current set-based certificate
-model. A session-total choice instead needs explicit aggregation, window and
-Certified-set eligibility rules before implementation. There is no new reps
+Volume. On 2026-10-05 the agent selected best qualifying single-set volume under
+the standing autonomous instruction: target-mode kg·reps ordinary and
+`100 × effective physical total-load set volume / B` (%BW·reps) enabled. This is
+a delegated choice, not a new human answer. It fits the set-based certificate
+model; session-total ranking would require a different window/witness contract. There is no new reps
 board; ordinary reps remain permitted public performance context.
 
 ### D9. A certification survives a rule change
@@ -286,15 +286,15 @@ and compatible clients in the documented order with explicit hosted authority.
 | Existing #411 task — Keep zero-contribution group boards stable | No-op legacy preference changes; reconcile rule metadata/history; closes #411 | T13 | completed |
 | M27-T13 — Preserve certifications across rule changes | Observed-set pins, migration and rule-only retention; closes #419 | — | completed |
 | M27-T15 — Decide percentage reading-correction policy | D4: relevant private corrections end bound dependent projections; delegated decision | — | completed |
-| [M27-T08 — Group percentage contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Volume definition, versioned units, privacy and activation contracts | T15 | planned |
+| M27-T08 — Group percentage contracts | Single-set Volume, versioned units, allowlists and pending negotiation; owning representation contract | T15 | completed |
 | [M27-T09 — Evaluate private percentage scores](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Normalized worker/SQL publication and all group reader privacy | T08, T13, existing #411 task | planned |
 | [M27-T10 — Group percentage UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Group rules, %BW boards, details, certification copy and safe caches | T09 | planned |
 | [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T08; T15, T13 and the existing #411 task are complete. The formula,
-switch and reading-correction policies are settled. T08 must record the Volume
-decision before building.
+Ready now: T09; T08, T15, T13 and the existing #411 task are complete. Formula,
+switch, Volume and reading-correction decisions are recorded. Runtime percentage
+publication/privacy and UI activation remain pending.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
 

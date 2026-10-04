@@ -314,3 +314,14 @@ adds ` kg` itself.
 The agent API, the group evaluator and the SQL group functions call this
 kernel rather than copying it; the SQL load factor matches
 `metric-contract.ts` (`groups-bodyweight.sh` vector).
+
+## 5. Pending group competition representation
+
+[The competition contract](group-competition-contract.md) specifies best
+**single-set** Volume rankings, distinct from personal session-total Volume
+records in §3. It uses this kernel's effective total-load Volume/estimated 1RM
+and the same private dated B for public percentages; ordinary group scores
+convert source entered units to the declared group target. Display rounding does
+not determine competitive rank. Pure scoring is implemented, but protocol-4
+publication/readers/UI activation remain pending. Personal/coaching calculations,
+raw kg storage and existing records retain their current semantics.

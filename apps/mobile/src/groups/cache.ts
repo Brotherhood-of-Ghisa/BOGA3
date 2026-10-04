@@ -111,3 +111,21 @@ export const evictGroup = (database: GroupCacheDatabase, groupId: string): void 
 export const wipeGroupCache = (database: GroupCacheDatabase): void => {
   database.delete(groupCache).run();
 };
+
+/** Competition activation/mode changes evict ALL of this account's disposable
+ * group projections, including unscoped session joins and previous generations.
+ * Existing protocol-3 consumers do not call this until the safe reader cutover. */
+export const evictCompetitionCache = (database: GroupCacheDatabase, userId: string): void => {
+  database.delete(groupCache).where(eq(groupCache.userId, userId)).run();
+};
+
+export const competitionCacheKeys = {
+  mine: 'groups:v5:mine',
+  group: (id: string) => `group:v5:${id}`,
+  stream: (id: string) => `stream:v5:${id}`,
+  groupExercises: (id: string) => `group-exercises:v5:${id}`,
+  boards: (id: string) => `boards:v5:${id}`,
+  weekSummary: (id: string) => `week:v5:${id}`,
+  // Full-session responses must bind their disclosure to a group.
+  session: (groupId: string, memberId: string, sessionId: string) => `session:v5:${groupId}:${memberId}:${sessionId}`,
+} as const;

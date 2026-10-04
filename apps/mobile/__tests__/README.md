@@ -168,3 +168,17 @@ derived score.
 and stale edits. Screen tests must cover Weight/1RM scope switching, rebuilding,
 generic absent-score copy, certification invalidation and offline reopen without
 private context. These do not replace three-size rendering or two-user device proof.
+
+## Pending protocol-4 group competition coverage
+
+`groups-competition-contract.test.ts` fixes Volume/1RM mode-specific units,
+single-set Volume, effective total-load 1RM normalization with the same dated B,
+physical source distribution, ordinary target conversion, missing/invalid/zero
+omission, full-precision scores and exact public allowlists. Nested kg/private
+fields, dependency digests and unsupported units/versions must fail decoding.
+`groups-cache.test.ts` proves group-scoped version-5 session keys and account-only
+whole-group-cache eviction across generations. The backend bodyweight fixture
+runs the actual negotiation response through the mobile decoder and proves
+pending activation plus anonymous/OAuth/outsider/unsupported-protocol denial.
+These do not replace the current protocol-3 assertions above; publication and
+public-reader activation remain pending the competition reader cutover.

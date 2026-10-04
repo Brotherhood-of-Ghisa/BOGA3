@@ -60,6 +60,16 @@ Volume/1RM columns are stored. The derived exercise session facts (see *Local
 schema inventory*) are a device-only table that each device rebuilds from its
 own synced raw rows; they never cross the wire.
 
+## Pending group competition projections
+
+The [competition contract](tech/group-competition-contract.md) defines
+server-authoritative Volume/1RM projections with explicit ordinary/percentage
+units and immutable server-only witness audit. It adds no Sync v2 entity or
+session snapshot and never rewrites source kg/readings. Negotiation is implemented
+with pending activation; forward projection/public-reader changes remain
+pending. Its disposable generation-5 group cache binds full sessions to a group
+and clears every account group projection at upgrade/normalized mode cutover.
+
 ## Local schema inventory
 
 ### User-owned domain data (sync/backups expected)
