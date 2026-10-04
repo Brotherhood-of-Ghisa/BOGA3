@@ -17,6 +17,7 @@ import {
   StatsScreenShell,
   type StatsScreenShellProps,
   type ExerciseListItem,
+  type MuscleHistoryTarget,
   describeExerciseSortMode,
   formatCountDelta,
   formatPeriodComparison,
@@ -479,12 +480,13 @@ describe('StatsScreenShell', () => {
     );
   });
 
-  it('collapses a family whose only muscle matches the family name', () => {
+  it('keeps every family inert and renders its individual muscles, including a matching only muscle', () => {
     renderStatsScreenShell();
 
-    // Chest contains only one muscle named "Chest" — the nested row must be hidden.
     expect(screen.getByTestId('stats-family-card-chest')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-row-chest')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-row-chest')).toBeTruthy();
+    expect(screen.getByTestId('stats-family-header-chest').props.onPress).toBeUndefined();
+    expect(screen.getByTestId('stats-family-name-chest')).toHaveProp('accessibilityRole', 'header');
 
     // Shoulders has multiple muscles → nested rows still render.
     expect(screen.getByTestId('stats-muscle-row-front_delts')).toBeTruthy();
@@ -495,18 +497,18 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-row-calves')).toHaveTextContent(/Calves/);
   });
 
-  it('opens muscle history from expanded muscle rows and collapsed single-muscle headers', () => {
+  it('opens exactly one muscle from each individual row', () => {
     const onPressMuscleHistory = jest.fn();
     renderStatsScreenShell({ onPressMuscleHistory });
 
     fireEvent.press(screen.getByTestId('stats-muscle-row-front_delts'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupIds: ['front_delts'],
+      muscleGroupIds: ['front_delts'] as [string],
       displayName: 'Front Delts',
       familyName: 'Shoulders',
     });
 
-    fireEvent.press(screen.getByTestId('stats-family-header-button-chest'));
+    fireEvent.press(screen.getByTestId('stats-muscle-row-chest'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({
       muscleGroupIds: ['chest'],
       displayName: 'Chest',
@@ -514,19 +516,17 @@ describe('StatsScreenShell', () => {
     });
   });
 
-  it('opens family-level muscle history from a multi-muscle family header', () => {
+  it('does not open history from any family header', () => {
     const onPressMuscleHistory = jest.fn();
     renderStatsScreenShell({ onPressMuscleHistory });
 
     fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
-    expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupIds: ['front_delts', 'rear_delts'],
-      displayName: 'Shoulders',
-      familyName: 'Shoulders',
-    });
+    fireEvent.press(screen.getByTestId('stats-family-header-chest'));
+    expect(onPressMuscleHistory).not.toHaveBeenCalled();
+    expect(screen.getByTestId('stats-family-header-shoulders').props.onPress).toBeUndefined();
   });
 
-  it('keeps family header history targets complete when muscle search hides non-matching rows', () => {
+  it('keeps a filtered family inert while its matching muscle opens individual history', () => {
     const onPressMuscleHistory = jest.fn();
     renderStatsScreenShell({
       searchQuery: 'front',
@@ -537,21 +537,31 @@ describe('StatsScreenShell', () => {
     expect(screen.queryByTestId('stats-muscle-row-rear_delts')).toBeNull();
 
     fireEvent.press(screen.getByTestId('stats-family-header-shoulders'));
+    expect(onPressMuscleHistory).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('stats-muscle-row-front_delts'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({
-      muscleGroupIds: ['front_delts', 'rear_delts'],
-      displayName: 'Shoulders',
+      muscleGroupIds: ['front_delts'] as [string],
+      displayName: 'Front Delts',
       familyName: 'Shoulders',
     });
   });
 
+  it('does not render a sheet handed a legacy multi-muscle target', () => {
+    renderStatsScreenShell({ selectedMuscle: {
+      muscleGroupIds: ['front_delts', 'rear_delts'], displayName: 'Shoulders', familyName: 'Shoulders',
+    } as unknown as MuscleHistoryTarget });
+    expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
+  });
+
   it('renders muscle-history overlay states: loading, error, empty, populated, and dismiss', () => {
     const onDismissMuscleHistory = jest.fn();
+    const onRetryMuscleHistory = jest.fn();
     const onSelectMuscleHistoryWeek = jest.fn();
     const { rerender, toJSON } = render(
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupIds: ['front_delts'],
+            muscleGroupIds: ['front_delts'] as [string],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
@@ -573,24 +583,27 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupIds: ['front_delts'],
+            muscleGroupIds: ['front_delts'] as [string],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
           muscleHistoryErrorMessage: 'Nope',
+          onRetryMuscleHistory,
           onDismissMuscleHistory,
           onSelectMuscleHistoryWeek,
         })}
       />
     );
     expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Nope/);
+    fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
+    expect(onRetryMuscleHistory).toHaveBeenCalledTimes(1);
     captureUiEvidence('stats-muscle-history-error', toJSON());
 
     rerender(
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupIds: ['front_delts'],
+            muscleGroupIds: ['front_delts'] as [string],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
@@ -608,7 +621,7 @@ describe('StatsScreenShell', () => {
       <StatsScreenShell
         {...buildShellProps({
           selectedMuscle: {
-            muscleGroupIds: ['front_delts'],
+            muscleGroupIds: ['front_delts'] as [string],
             displayName: 'Front Delts',
             familyName: 'Shoulders',
           },
@@ -641,7 +654,7 @@ describe('StatsScreenShell', () => {
     ];
     const sharedProps = {
       selectedMuscle: {
-        muscleGroupIds: ['front_delts'],
+        muscleGroupIds: ['front_delts'] as [string],
         displayName: 'Front Delts',
         familyName: 'Shoulders',
       },
@@ -662,6 +675,14 @@ describe('StatsScreenShell', () => {
     rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
     expect(screen.getByTestId('stats-muscle-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent('May 13, 2026');
+
+    rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', muscleHistoryErrorMessage: 'Read failed', onRetryMuscleHistory: jest.fn() })} />);
+    expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Read failed/);
+    expect(screen.queryByTestId('stats-muscle-history-heatmap-day-detail-date')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date', { includeHiddenElements: true })).toHaveTextContent('May 13, 2026');
+    fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
+    rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
     expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent('May 13, 2026');
 
     rerender(
@@ -692,7 +713,7 @@ describe('StatsScreenShell', () => {
   it('selects a single day and shows the selected muscle metric in daily view', () => {
     const props = {
       selectedMuscle: {
-        muscleGroupIds: ['front_delts'],
+        muscleGroupIds: ['front_delts'] as [string],
         displayName: 'Front Delts',
         familyName: 'Shoulders',
       },
@@ -748,7 +769,7 @@ describe('StatsScreenShell', () => {
   it('shows the selected metric in the week selection banner', () => {
     const props = {
       selectedMuscle: {
-        muscleGroupIds: ['front_delts'],
+        muscleGroupIds: ['front_delts'] as [string],
         displayName: 'Front Delts',
         familyName: 'Shoulders',
       },
@@ -787,7 +808,7 @@ describe('StatsScreenShell', () => {
   it('shows a placeholder in the banner when no week is selected', () => {
     renderStatsScreenShell({
       selectedMuscle: {
-        muscleGroupIds: ['front_delts'],
+        muscleGroupIds: ['front_delts'] as [string],
         displayName: 'Front Delts',
         familyName: 'Shoulders',
       },

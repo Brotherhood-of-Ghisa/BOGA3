@@ -17,6 +17,55 @@ const deferred = () => {
 };
 afterEach(() => jest.restoreAllMocks());
 
+it.each([{ ids: [] }, { ids: ['quads', 'chest'] }, { ids: [' '] }])('rejects a non-individual muscle target %j before reading', ({ ids }) => {
+  const read = jest.spyOn(stats, 'computeSelectedMuscleWeeklyEffort');
+  const { result } = renderHook(() => useHistory(52, 0));
+  act(() => result.current.select({ muscleGroupIds: ids }));
+  expect(result.current.selected).toBeNull();
+  expect(result.current.loading).toBe(false);
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('retries the same individual and window while preserving the selected week', async () => {
+  const read = jest.spyOn(stats, 'computeSelectedMuscleWeeklyEffort')
+    .mockResolvedValueOnce(weekly(4)).mockRejectedValueOnce(Error('read failed')).mockResolvedValueOnce(weekly(8));
+  jest.spyOn(stats, 'computeSelectedMuscleDailyEffortMetrics').mockResolvedValue([]);
+  const { result, rerender } = renderHook(({ revision }: { revision: number }) => useHistory(52, revision), { initialProps: { revision: 0 } });
+  act(() => result.current.select({ muscleGroupIds: ['quads'] }));
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
+  const selected = localDateKey(calendarWeekBounds(52).start);
+  act(() => result.current.selectWeek(selected));
+  rerender({ revision: 1 });
+  await waitFor(() => expect(result.current.error).toBe('read failed'));
+  expect(result.current.weekly).toEqual(weekly(4));
+  act(() => result.current.retry());
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(8)));
+  expect(result.current.error).toBeNull();
+  expect(result.current.weekKey).toBe(selected);
+  expect(result.current.selected).toEqual({ muscleGroupIds: ['quads'] });
+  expect(read).toHaveBeenCalledTimes(3);
+  for (const [options] of read.mock.calls) {
+    expect(options).toMatchObject({ muscleGroupIds: ['quads'], start: calendarWeekBounds(52).start });
+  }
+});
+
+it.each(['success', 'failure'])('ignores a dismissed target’s late %s after opening another muscle', async outcome => {
+  const old = deferred();
+  jest.spyOn(stats, 'computeSelectedMuscleWeeklyEffort').mockReturnValueOnce(old.promise).mockResolvedValue(weekly(8));
+  jest.spyOn(stats, 'computeSelectedMuscleDailyEffortMetrics').mockResolvedValue([]);
+  const { result } = renderHook(() => useHistory(52, 0));
+  act(() => result.current.select({ muscleGroupIds: ['quads'] }));
+  act(() => result.current.dismiss());
+  act(() => result.current.select({ muscleGroupIds: ['chest'] }));
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(8)));
+  await act(async () => {
+    if (outcome === 'success') old.resolve(weekly(100)); else old.reject(Error('old muscle'));
+  });
+  expect(result.current.selected).toEqual({ muscleGroupIds: ['chest'] });
+  expect(result.current.weekly).toEqual(weekly(8));
+  expect(result.current.error).toBeNull();
+});
+
 it.each(['success', 'failure'])('ignores a superseded window’s late %s', async outcome => {
   const old = deferred();
   jest.spyOn(stats, 'computeSelectedMuscleWeeklyEffort').mockReturnValueOnce(old.promise).mockResolvedValue(weekly(8));

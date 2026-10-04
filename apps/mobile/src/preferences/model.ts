@@ -35,7 +35,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   volumeEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.volumeEfforts],
   targetWindowWeeks: 4,
   historyLookbackWeeks: 52,
-  heatmapView: 'weekly',
+  heatmapView: 'daily',
 };
 
 export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFERENCES) as (keyof ExerciseListPreferences)[];

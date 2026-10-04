@@ -620,11 +620,11 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 
 ### 12. Stats history sheet semantics
 
-1. In `Stats / History`, By Muscle: a nested muscle row and a collapsed
-   single-muscle family header open that muscle's history (`Muscle History`); a
-   multi-muscle family header opens the history of all its muscles together
-   (`Muscle Group History`). By Exercise: a table row opens the exercise's
-   history (`Exercise History`).
+1. In `Stats / History`, By Muscle: each individual muscle row opens exactly
+   one muscle ID (`Muscle History`). Every family heading is inert, including
+   families with only one muscle; that muscle retains its own row. Legacy
+   empty or multi-muscle targets cannot open a sheet. By Exercise: a table row
+   opens the exercise definition's history (`Exercise History`).
 2. The history is one `HistorySheet` (`components/stats/history-sheet.tsx`,
    DLM-T09-D2), a design-language `Sheet` (G5): in-route state, not navigation;
    about three quarters of the screen over the `scrim`; modal to assistive tech.
@@ -633,11 +633,13 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 3. Under the eyebrow and name, the `Metric` `SegmentedControl` offers `Volume`
    and `Sets`; exercise history adds `1RM` and `Top weight`. Volume is the
    default. A static label names the saved view and look-back. Settings owns
-   the sole Daily/Weekly choice, default Weekly; no view selector is offered
+   the sole Daily/Weekly choice, default Daily for missing or invalid choices;
+   a valid saved Weekly choice is retained. No view selector is offered
    in Progress. Saving the preference refreshes mounted history sheets.
 4. Loading, error and no-history are inline `StatePanel`s in the sheet's scroll
    body. No-history appears only after a successful empty read, never while
-   loading. Heatmaps stay mounted during reloads to preserve selection and
+   loading. An error offers Retry for the same entity and saved look-back.
+   Heatmaps stay mounted during reloads to preserve selection and
    scroll; under the no-history panel the empty heatmap still renders.
 5. In `Weekly` a `rule-soft` band sits above the chart: `Tap a week to see
    details`, or the selected week's range (Source Sans `ink-muted`) and
@@ -646,7 +648,7 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 6. Values follow the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`; a missing
    1RM or top weight is `—`.
 7. Muscle volume is the per-side, role-weighted aggregate across the selected
-   muscle IDs; 1RM and top weight are exercise-level and not offered for muscles.
+   muscle ID; 1RM and top weight are exercise-level and not offered for muscles.
 8. The saved history look-back H (1–520 whole weeks, default 52) controls both query and
    grid bounds: the current local Monday-start week and preceding H−1 weeks,
    through today, using calendar arithmetic across DST. A shorter choice
@@ -658,8 +660,9 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    is transparent, non-interactive, and hidden from accessibility, so a saved view change
    reuses the already-laid-out chart and preserves its local selection and
    scroll state instead of drawing it again.
-10. Dismissing clears only the transient target, week and loaded history; the
-    screen's controls, sort and search stay as they were, and nothing is written.
+10. Dismissing closes the transient target; the screen's controls, sort, search
+    and scroll stay as they were, and nothing is written. Opening another
+    individual resets its history selection and ignores the previous read.
 
 ### 13. Stats exercise/muscle history semantics
 
@@ -729,8 +732,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
     A family averages each constituent muscle’s capped attainment, including
     muscles with zero sets; displayed count and metric aggregation retain their
     existing rules. Muscle-history Sets use each day’s or week’s count against
-    the shared weekly quota, independent of look-back length. Group history averages
-    the constituent attainments. Legends and accessibility labels explain the
+    the shared weekly quota, independent of look-back length. Legends and
+    accessibility labels explain the
     colour; Volume and exercise-only metrics retain their observed scaling.
 
 14. The `/exercise-history` route (opened from the exercise page's `History`)

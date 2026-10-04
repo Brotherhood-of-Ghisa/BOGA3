@@ -47,7 +47,7 @@ import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { HeatmapView } from '@/src/preferences/model';
 import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
-import { useHistory } from '@/components/stats/use-history';
+import { isIndividualMuscleHistoryTarget, useHistory } from '@/components/stats/use-history';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
@@ -58,7 +58,7 @@ type DeltaDisplay = {
 };
 
 export type MuscleHistoryTarget = {
-  muscleGroupIds: string[];
+  muscleGroupIds: [string];
   displayName: string;
   familyName: string;
 };
@@ -303,6 +303,7 @@ export type StatsScreenShellProps = {
   onPressSessionsCard: () => void;
   onPressMuscleHistory: (muscle: MuscleHistoryTarget) => void;
   onDismissMuscleHistory: () => void;
+  onRetryMuscleHistory?: () => void;
   onSelectMuscleHistoryWeek: (weekKey: string | null) => void;
   isLoading: boolean;
   errorMessage: string | null;
@@ -328,6 +329,7 @@ export type StatsScreenShellProps = {
   exerciseHistoryView: HeatmapView;
   onPressExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
   onDismissExerciseHistory: () => void;
+  onRetryExerciseHistory?: () => void;
   onSelectExerciseHistoryWeek: (weekKey: string | null) => void;
   onSelectExerciseHistoryMetric: (metric: CalendarHeatmapMetric) => void;
   /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
@@ -346,6 +348,7 @@ export function StatsScreenShell({
   onPressSessionsCard,
   onPressMuscleHistory,
   onDismissMuscleHistory,
+  onRetryMuscleHistory,
   onSelectMuscleHistoryWeek,
   isLoading,
   errorMessage,
@@ -371,6 +374,7 @@ export function StatsScreenShell({
   exerciseHistoryView,
   onPressExerciseHistory,
   onDismissExerciseHistory,
+  onRetryExerciseHistory,
   onSelectExerciseHistoryWeek,
   onSelectExerciseHistoryMetric,
   historyTodayDateKey,
@@ -559,16 +563,17 @@ export function StatsScreenShell({
         )}
       </ScreenScroll>
 
-      {selectedMuscle ? (
+      {selectedMuscle && isIndividualMuscleHistoryTarget(selectedMuscle) ? (
         <HistorySheet
           dailyMetrics={muscleHistoryDailyMetrics}
           errorMessage={muscleHistoryErrorMessage}
-          eyebrow={selectedMuscle.muscleGroupIds.length > 1 ? 'Muscle Group History' : 'Muscle History'}
+          eyebrow="Muscle History"
           isLoading={isMuscleHistoryLoading}
           kind="muscle"
           metric={muscleHistoryMetric}
           metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissMuscleHistory}
+          onRetry={onRetryMuscleHistory}
           onSelectMetric={onSelectMuscleHistoryMetric}
           onSelectWeek={onSelectMuscleHistoryWeek}
           selectedWeekKey={selectedMuscleHistoryWeekKey}
@@ -590,6 +595,7 @@ export function StatsScreenShell({
           metric={exerciseHistoryMetric}
           metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
           onDismiss={onDismissExerciseHistory}
+          onRetry={onRetryExerciseHistory}
           onSelectMetric={onSelectExerciseHistoryMetric}
           onSelectWeek={onSelectExerciseHistoryWeek}
           selectedWeekKey={selectedExerciseHistoryWeekKey}
@@ -689,14 +695,13 @@ function MuscleRow({
   volumeDelta: DeltaDisplay;
   volumeTestID: string;
   accessibilityLabel: string;
-  onPress: () => void;
+  onPress?: () => void;
   divider: boolean;
   testID: string;
 }) {
   const onViz = shade !== null;
   return (
-    // The shade is one uniform ground for the whole row; the row itself stays
-    // the pressable, so its testID and accessibility are unchanged.
+    // Family rows are static; individual muscle rows open their history.
     <View style={shade !== null ? { backgroundColor: shade } : null} testID={`${testID}-shade`}>
       <ListRow
         accessibilityLabel={accessibilityLabel}
@@ -712,6 +717,7 @@ function MuscleRow({
         onPress={onPress}
         testID={testID}>
         <Text
+          accessibilityRole={level === 'family' ? 'header' : undefined}
           allowFontScaling={false}
           adjustsFontSizeToFit
           ellipsizeMode="clip"
@@ -765,11 +771,6 @@ function MuscleFamilyList({
   );
 }
 
-function isFamilyCollapsible(family: StatsMuscleFamilyPerformance): boolean {
-  if (family.muscles.length !== 1) return false;
-  return family.muscles[0].displayName.trim().toLowerCase() === family.familyName.trim().toLowerCase();
-}
-
 function MuscleFamilyCard({
   family,
   visibleMuscles,
@@ -789,14 +790,12 @@ function MuscleFamilyCard({
 }) {
   const testIdSlug = family.familyName.toLowerCase().replace(/\s+/g, '-');
   const volumeDelta = formatVolumeDelta(family.totalVolume, previousFamily ? previousFamily.totalVolume : 0);
-  const collapsed = isFamilyCollapsible(family);
-  const collapsedMuscle = collapsed ? family.muscles[0] : null;
 
   return (
     <Card testID={`stats-family-card-${testIdSlug}`}>
       <MuscleRow
         accessibilityLabel={buildMuscleRowAccessibilityLabel({
-          actionLabel: `Open ${family.familyName} history`,
+          actionLabel: `${family.familyName} family`,
           workingSetCount: family.workingSetCount,
           previousWorkingSetCount: previousFamily?.workingSetCount ?? 0,
           volume: family.totalVolume,
@@ -807,65 +806,54 @@ function MuscleFamilyCard({
         level="family"
         name={family.familyName}
         nameTestID={`stats-family-name-${testIdSlug}`}
-        onPress={() =>
-          onPressMuscleHistory(
-            collapsedMuscle ? toMuscleHistoryTarget(collapsedMuscle) : toFamilyHistoryTarget(family)
-          )
-        }
         sets={formatNumber(family.workingSetCount)}
         setsDelta={formatCountDelta(family.workingSetCount, previousFamily?.workingSetCount ?? 0)}
         setsTestID={`stats-family-sets-${testIdSlug}`}
         shade={selectFailureShade(groupedTargetAttainment(family.muscles.map(muscle => muscle.muscleGroupId),
           Object.fromEntries(family.muscles.map(muscle => [muscle.muscleGroupId, muscle.workingSetCount])), weeklyWorkingSetTarget, periodDays / 7))}
-        testID={
-          collapsedMuscle
-            ? `stats-family-header-button-${collapsedMuscle.muscleGroupId}`
-            : `stats-family-header-${testIdSlug}`
-        }
+        testID={`stats-family-header-${testIdSlug}`}
         untrained={family.workingSetCount === 0 && family.totalVolume === 0}
         volume={compactVolumeFigure(family.totalVolume, family.knownVolume)}
         volumeIncomplete={family.totalVolume === null}
         volumeDelta={volumeDelta}
         volumeTestID={`stats-family-volume-${testIdSlug}`}
       />
-      {collapsed
-        ? null
-        : visibleMuscles.map((muscle) => {
-            const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
-            const muscleVolumeDelta = formatVolumeDelta(
-              muscle.totalVolume,
-              previousMuscle ? previousMuscle.totalVolume : 0
-            );
-            return (
-              <MuscleRow
-                accessibilityLabel={buildMuscleRowAccessibilityLabel({
-                  actionLabel: `Open ${muscle.displayName} history`,
-                  workingSetCount: muscle.workingSetCount,
-                  previousWorkingSetCount: previousMuscle?.workingSetCount ?? 0,
-                  volume: muscle.totalVolume,
-                  volumeDelta: muscleVolumeDelta,
-                  targetDescription: `Colour: ${weeklyWorkingSetTarget} W/sets per week × ${periodDays / 7} weeks`,
-                })}
-                divider
-                key={muscle.muscleGroupId}
-                level="muscle"
-                name={muscle.displayName}
-                onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
-                sets={formatNumber(muscle.workingSetCount)}
-                setsDelta={formatCountDelta(muscle.workingSetCount, previousMuscle?.workingSetCount ?? 0)}
-                setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
-                shade={selectFailureShade(
-                  muscleTargetAttainment(muscle.workingSetCount, weeklyWorkingSetTarget, periodDays / 7)
-                )}
-                testID={`stats-muscle-row-${muscle.muscleGroupId}`}
-                untrained={muscle.workingSetCount === 0 && muscle.totalVolume === 0}
-                volume={compactVolumeFigure(muscle.totalVolume, muscle.knownVolume)}
-                volumeIncomplete={muscle.totalVolume === null}
-                volumeDelta={muscleVolumeDelta}
-                volumeTestID={`stats-muscle-volume-${muscle.muscleGroupId}`}
-              />
-            );
-          })}
+      {visibleMuscles.map((muscle) => {
+        const previousMuscle = previousMusclesById.get(muscle.muscleGroupId) ?? null;
+        const muscleVolumeDelta = formatVolumeDelta(
+          muscle.totalVolume,
+          previousMuscle ? previousMuscle.totalVolume : 0
+        );
+        return (
+          <MuscleRow
+            accessibilityLabel={buildMuscleRowAccessibilityLabel({
+              actionLabel: `Open ${muscle.displayName} history`,
+              workingSetCount: muscle.workingSetCount,
+              previousWorkingSetCount: previousMuscle?.workingSetCount ?? 0,
+              volume: muscle.totalVolume,
+              volumeDelta: muscleVolumeDelta,
+              targetDescription: `Colour: ${weeklyWorkingSetTarget} W/sets per week × ${periodDays / 7} weeks`,
+            })}
+            divider
+            key={muscle.muscleGroupId}
+            level="muscle"
+            name={muscle.displayName}
+            onPress={() => onPressMuscleHistory(toMuscleHistoryTarget(muscle))}
+            sets={formatNumber(muscle.workingSetCount)}
+            setsDelta={formatCountDelta(muscle.workingSetCount, previousMuscle?.workingSetCount ?? 0)}
+            setsTestID={`stats-muscle-sets-${muscle.muscleGroupId}`}
+            shade={selectFailureShade(
+              muscleTargetAttainment(muscle.workingSetCount, weeklyWorkingSetTarget, periodDays / 7)
+            )}
+            testID={`stats-muscle-row-${muscle.muscleGroupId}`}
+            untrained={muscle.workingSetCount === 0 && muscle.totalVolume === 0}
+            volume={compactVolumeFigure(muscle.totalVolume, muscle.knownVolume)}
+            volumeIncomplete={muscle.totalVolume === null}
+            volumeDelta={muscleVolumeDelta}
+            volumeTestID={`stats-muscle-volume-${muscle.muscleGroupId}`}
+          />
+        );
+      })}
     </Card>
   );
 }
@@ -874,12 +862,6 @@ const toMuscleHistoryTarget = (muscle: StatsMusclePerformance): MuscleHistoryTar
   muscleGroupIds: [muscle.muscleGroupId],
   displayName: muscle.displayName,
   familyName: muscle.familyName,
-});
-
-const toFamilyHistoryTarget = (family: StatsMuscleFamilyPerformance): MuscleHistoryTarget => ({
-  muscleGroupIds: family.muscles.map((m) => m.muscleGroupId),
-  displayName: family.familyName,
-  familyName: family.familyName,
 });
 
 function ExerciseListView({
@@ -1109,7 +1091,7 @@ function StatsContent() {
   return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
     historyLookbackWeeks={values.historyLookbackWeeks} weeklyWorkingSetTarget={values.weeklyWorkingSetTarget}
     onSelectPeriod={days => setThisWeek(days === 7)} onPressSessionsCard={() => router.push('/sessions')}
-    onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onSelectMuscleHistoryWeek={muscle.selectWeek}
+    onPressMuscleHistory={muscle.select} onDismissMuscleHistory={muscle.dismiss} onRetryMuscleHistory={muscle.retry} onSelectMuscleHistoryWeek={muscle.selectWeek}
     selectedMuscle={muscle.selected} muscleHistoryWeeklyEffort={muscle.weekly} muscleHistoryDailyMetrics={muscle.daily}
     isMuscleHistoryLoading={muscle.loading} muscleHistoryErrorMessage={muscle.error} selectedMuscleHistoryWeekKey={muscle.weekKey}
     muscleHistoryMetric={muscleMetric} muscleHistoryView={values.heatmapView} onSelectMuscleHistoryMetric={setMuscleMetric}
@@ -1117,7 +1099,7 @@ function StatsContent() {
     exerciseListItems={exerciseListItems} selectedExercise={exercise.selected} exerciseHistoryWeeklyEffort={exercise.weekly}
     exerciseHistoryDailyMetrics={exercise.daily} isExerciseHistoryLoading={exercise.loading} exerciseHistoryErrorMessage={exercise.error}
     selectedExerciseHistoryWeekKey={exercise.weekKey} exerciseHistoryMetric={exerciseMetric} exerciseHistoryView={values.heatmapView}
-    onPressExerciseHistory={exercise.select} onDismissExerciseHistory={exercise.dismiss} onSelectExerciseHistoryWeek={exercise.selectWeek}
+    onPressExerciseHistory={exercise.select} onDismissExerciseHistory={exercise.dismiss} onRetryExerciseHistory={exercise.retry} onSelectExerciseHistoryWeek={exercise.selectWeek}
     onSelectExerciseHistoryMetric={setExerciseMetric} searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />;
 }
 
