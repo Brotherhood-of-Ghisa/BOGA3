@@ -28,6 +28,7 @@ import {
 } from './schema';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { aggregateProgressComparisons, type ProgressMuscleComparison } from './progress-comparisons';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
 
@@ -66,6 +67,8 @@ export type StatsSummary = {
   current: { period: StatsPeriodBounds; totals: StatsTotals };
   previous: { period: StatsPeriodBounds; totals: StatsTotals };
 };
+
+export type ProgressComparisons = StatsSummary & { muscles: ProgressMuscleComparison[] };
 
 export type StatsAggregationInput = MuscleAnalyticsInput;
 
@@ -112,6 +115,20 @@ const computePreviousPeriodBounds = (current: StatsPeriodBounds): StatsPeriodBou
   const start = new Date(end.getTime() - current.days * MS_PER_DAY);
   return { days: current.days, start, end };
 };
+
+const comparisonPeriods = (options: ComputeStatsSummaryOptions) => {
+  const now = options.now ?? new Date();
+  const current = options.periodWeeks === undefined ? computePeriodBounds(options.periodDays, now)
+    : { days: options.periodWeeks * 7, ...calendarWeekBounds(options.periodWeeks, now) };
+  const previous = options.periodWeeks === undefined ? computePreviousPeriodBounds(current)
+    : { days: current.days, start: shiftCalendarWeeks(current.start, -options.periodWeeks),
+      end: shiftCalendarWeeks(current.end, -options.periodWeeks) };
+  return { current, previous };
+};
+
+const inputInPeriod = (input: StatsAggregationInput, period: StatsPeriodBounds): StatsAggregationInput => ({
+  ...input, sessions: input.sessions.filter(session => session.completedAt >= period.start && session.completedAt < period.end),
+});
 
 export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   type MuscleAccumulator = {
@@ -195,145 +212,149 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
 export const createDrizzleStatsStore = (): StatsStore => ({
   async loadAggregationInput({ start, end }) {
     const database = await bootstrapLocalDataLayer();
-    const bodyweightCalculationsEnabled = database
-      .select({ enabled: userSettings.bodyweightCalculationsEnabled })
-      .from(userSettings)
-      .where(eq(userSettings.id, 'settings'))
-      .get()?.enabled ?? false;
-    const resolveWeight = loadAsOfWeightResolver(database);
+    return database.transaction((transaction) => {
+      const database = transaction;
+      const bodyweightCalculationsEnabled = database
+        .select({ enabled: userSettings.bodyweightCalculationsEnabled })
+        .from(userSettings)
+        .where(eq(userSettings.id, 'settings'))
+        .get()?.enabled ?? false;
+      const resolveWeight = loadAsOfWeightResolver(database);
 
-    const storedSessionRows = database
-      .select({
-        id: sessions.id,
-        completedAt: sessions.completedAt,
-        startedAt: sessions.startedAt,
-      })
-      .from(sessions)
-      .where(
-        and(
-          eq(sessions.status, 'completed'),
-          isNull(sessions.deletedAt),
-          gte(sessions.completedAt, start),
-          lt(sessions.completedAt, end)
+      const storedSessionRows = database
+        .select({
+          id: sessions.id,
+          completedAt: sessions.completedAt,
+          startedAt: sessions.startedAt,
+        })
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.status, 'completed'),
+            isNull(sessions.deletedAt),
+            gte(sessions.completedAt, start),
+            lt(sessions.completedAt, end)
+          )
         )
-      )
-      .all();
+        .all();
 
-    const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
+      const sessionRows = storedSessionRows.map(row => ({ ...row, ...resolveWeight(row.startedAt) }));
 
-    const sessionsInPeriod = sessionRows
-      .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)
-      .map((row) => ({ ...row, completedAt: row.completedAt }));
+      const sessionsInPeriod = sessionRows
+        .filter((row): row is typeof row & { completedAt: Date } => row.completedAt !== null)
+        .map((row) => ({ ...row, completedAt: row.completedAt }));
 
-    const sessionIds = sessionsInPeriod.map((session) => session.id);
-    const sessionExerciseRows =
-      sessionIds.length > 0
-        ? database
-            .select({
-              id: sessionExercises.id,
-              sessionId: sessionExercises.sessionId,
-              exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
-              exerciseName: sessionExercises.name,
-            })
-            .from(sessionExercises)
-            .where(
-              and(
-                inArray(sessionExercises.sessionId, sessionIds),
-                // Exclude exercises the user removed (kept as tombstones).
-                isNull(sessionExercises.deletedAt)
+      const sessionIds = sessionsInPeriod.map((session) => session.id);
+      const sessionExerciseRows =
+        sessionIds.length > 0
+          ? database
+              .select({
+                id: sessionExercises.id,
+                sessionId: sessionExercises.sessionId,
+                exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
+                exerciseName: sessionExercises.name,
+              })
+              .from(sessionExercises)
+              .where(
+                and(
+                  inArray(sessionExercises.sessionId, sessionIds),
+                  // Exclude exercises the user removed (kept as tombstones).
+                  isNull(sessionExercises.deletedAt)
+                )
               )
-            )
-            .all()
-        : [];
+              .all()
+          : [];
 
-    const exerciseDefinitionIds = Array.from(
-      new Set(
-        sessionExerciseRows
-          .map((row) => row.exerciseDefinitionId)
-          .filter((id): id is string => id !== null)
-      )
-    );
+      const exerciseDefinitionIds = Array.from(
+        new Set(
+          sessionExerciseRows
+            .map((row) => row.exerciseDefinitionId)
+            .filter((id): id is string => id !== null)
+        )
+      );
 
-    const sessionExerciseIds = sessionExerciseRows.map((row) => row.id);
-    const exerciseSetRows =
-      sessionExerciseIds.length > 0
-        ? database
-            .select({
-              id: exerciseSets.id,
-              sessionExerciseId: exerciseSets.sessionExerciseId,
-              orderIndex: exerciseSets.orderIndex,
-              setType: exerciseSets.setType,
-              weightValue: exerciseSets.weightValue,
-              repsValue: exerciseSets.repsValue,
-              performanceStatus: exerciseSets.performanceStatus,
-            })
-            .from(exerciseSets)
-            .where(
-              and(
-                inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
-                // Exclude sets the user removed (kept as tombstones).
-                isNull(exerciseSets.deletedAt)
+      const sessionExerciseIds = sessionExerciseRows.map((row) => row.id);
+      const exerciseSetRows =
+        sessionExerciseIds.length > 0
+          ? database
+              .select({
+                id: exerciseSets.id,
+                sessionExerciseId: exerciseSets.sessionExerciseId,
+                orderIndex: exerciseSets.orderIndex,
+                setType: exerciseSets.setType,
+                weightValue: exerciseSets.weightValue,
+                repsValue: exerciseSets.repsValue,
+                performanceStatus: exerciseSets.performanceStatus,
+              })
+              .from(exerciseSets)
+              .where(
+                and(
+                  inArray(exerciseSets.sessionExerciseId, sessionExerciseIds),
+                  // Exclude sets the user removed (kept as tombstones).
+                  isNull(exerciseSets.deletedAt)
+                )
               )
-            )
-            .all()
-        : [];
+              .all()
+          : [];
 
-    const muscleMappingRows =
-      exerciseDefinitionIds.length > 0
-        ? database
-            .select({
-              exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
-              muscleGroupId: exerciseMuscleMappings.muscleGroupId,
-              role: exerciseMuscleMappings.role,
-            })
-            .from(exerciseMuscleMappings)
-            .where(
-              and(
-                inArray(exerciseMuscleMappings.exerciseDefinitionId, exerciseDefinitionIds),
-                // Exclude muscle links the user removed (kept as tombstones).
-                isNull(exerciseMuscleMappings.deletedAt)
+      const muscleMappingRows =
+        exerciseDefinitionIds.length > 0
+          ? database
+              .select({
+                exerciseDefinitionId: exerciseMuscleMappings.exerciseDefinitionId,
+                muscleGroupId: exerciseMuscleMappings.muscleGroupId,
+                role: exerciseMuscleMappings.role,
+              })
+              .from(exerciseMuscleMappings)
+              .where(
+                and(
+                  inArray(exerciseMuscleMappings.exerciseDefinitionId, exerciseDefinitionIds),
+                  // Exclude muscle links the user removed (kept as tombstones).
+                  isNull(exerciseMuscleMappings.deletedAt)
+                )
               )
-            )
-            .all()
-        : [];
+              .all()
+          : [];
 
-    const muscleGroupRows = database
-      .select({
-        id: muscleGroups.id,
-        displayName: muscleGroups.displayName,
-        familyName: muscleGroups.familyName,
-        sortOrder: muscleGroups.sortOrder,
-      })
-      .from(muscleGroups)
-      .orderBy(asc(muscleGroups.sortOrder), asc(muscleGroups.displayName))
-      .all();
+      const muscleGroupRows = database
+        .select({
+          id: muscleGroups.id,
+          displayName: muscleGroups.displayName,
+          familyName: muscleGroups.familyName,
+          sortOrder: muscleGroups.sortOrder,
+        })
+        .from(muscleGroups)
+        .orderBy(asc(muscleGroups.sortOrder), asc(muscleGroups.displayName))
+        .all();
 
-    const exerciseDefinitionRows =
-      exerciseDefinitionIds.length > 0
-        ? database
-            .select({
-              id: exerciseDefinitions.id,
-              loadInputMode: exerciseDefinitions.loadInputMode,
-              bodyweightContribution: exerciseDefinitions.bodyweightContribution,
-            })
-            .from(exerciseDefinitions)
-            .where(inArray(exerciseDefinitions.id, exerciseDefinitionIds))
-            .all()
-        : [];
+      const exerciseDefinitionRows =
+        exerciseDefinitionIds.length > 0
+          ? database
+              .select({
+                id: exerciseDefinitions.id,
+                name: exerciseDefinitions.name,
+                loadInputMode: exerciseDefinitions.loadInputMode,
+                bodyweightContribution: exerciseDefinitions.bodyweightContribution,
+              })
+              .from(exerciseDefinitions)
+              .where(inArray(exerciseDefinitions.id, exerciseDefinitionIds))
+              .all()
+          : [];
 
-    return {
-      bodyweightCalculationsEnabled,
-      effortPolicy: getPersonalEffortPolicy(),
-      sessions: sessionsInPeriod,
-      exerciseDefinitions: exerciseDefinitionRows,
-      sessionExercises: sessionExerciseRows,
-      exerciseSets: exerciseSetRows.map((set) => ({
-        ...set,
-        performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
-      })),
-      muscleMappings: muscleMappingRows,
-      muscleGroups: muscleGroupRows,
-    };
+      return {
+        bodyweightCalculationsEnabled,
+        effortPolicy: getPersonalEffortPolicy(),
+        sessions: sessionsInPeriod,
+        exerciseDefinitions: exerciseDefinitionRows,
+        sessionExercises: sessionExerciseRows,
+        exerciseSets: exerciseSetRows.map((set) => ({
+          ...set,
+          performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
+        })),
+        muscleMappings: muscleMappingRows,
+        muscleGroups: muscleGroupRows,
+      };
+    });
   },
   async loadMuscleGroupTaxonomy() {
     const database = await bootstrapLocalDataLayer();
@@ -352,12 +373,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
 
 export const createStatsRepository = (store: StatsStore = createDrizzleStatsStore()) => ({
   async computeSummary(options: ComputeStatsSummaryOptions): Promise<StatsSummary> {
-    const now = options.now ?? new Date();
-    const currentPeriod = options.periodWeeks === undefined ? computePeriodBounds(options.periodDays, now)
-      : { days: options.periodWeeks * 7, ...calendarWeekBounds(options.periodWeeks, now) };
-    const previousPeriod = options.periodWeeks === undefined ? computePreviousPeriodBounds(currentPeriod)
-      : { days: currentPeriod.days, start: shiftCalendarWeeks(currentPeriod.start, -options.periodWeeks),
-        end: shiftCalendarWeeks(currentPeriod.end, -options.periodWeeks) };
+    const { current: currentPeriod, previous: previousPeriod } = comparisonPeriods(options);
 
     const [currentInput, previousInput] = await Promise.all([
       store.loadAggregationInput({ start: currentPeriod.start, end: currentPeriod.end }),
@@ -367,6 +383,17 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     return {
       current: { period: currentPeriod, totals: aggregateStats(currentInput) },
       previous: { period: previousPeriod, totals: aggregateStats(previousInput) },
+    };
+  },
+  async computeProgressComparisons(options: ComputeStatsSummaryOptions): Promise<ProgressComparisons> {
+    const periods = comparisonPeriods(options);
+    // One awaited read, then synchronous derivation: edits, mappings, dated
+    // weight context and the active durable effort policy cannot split periods.
+    const input = await store.loadAggregationInput({ start: periods.previous.start, end: periods.current.end });
+    return {
+      current: { period: periods.current, totals: aggregateStats(inputInPeriod(input, periods.current)) },
+      previous: { period: periods.previous, totals: aggregateStats(inputInPeriod(input, periods.previous)) },
+      muscles: aggregateProgressComparisons(input, periods),
     };
   },
   async computeSelectedMuscleDailyEffort(
@@ -412,6 +439,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
 const defaultStatsRepository = createStatsRepository();
 
 export const computeStatsSummary = defaultStatsRepository.computeSummary;
+export const computeProgressComparisons = defaultStatsRepository.computeProgressComparisons;
 export const computeSelectedMuscleDailyEffort =
   defaultStatsRepository.computeSelectedMuscleDailyEffort;
 export const computeSelectedMuscleWeeklyEffort =

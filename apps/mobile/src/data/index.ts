@@ -105,6 +105,7 @@ export {
   computeSelectedMuscleDailyEffortMetrics,
   computeSelectedMuscleWeeklyEffort,
   computeStatsSummary,
+  computeProgressComparisons,
   createDrizzleStatsStore,
   createStatsRepository,
   type ComputeSelectedMuscleDailyEffortOptions,
@@ -116,8 +117,19 @@ export {
   type StatsPeriodDays,
   type StatsStore,
   type StatsSummary,
+  type ProgressComparisons,
   type StatsTotals,
 } from './stats';
+export {
+  aggregateProgressComparisons,
+  compareProgressVolume,
+  type ProgressPeriodValues,
+  type ProgressVolumeChange,
+  type ProgressComparison,
+  type ProgressExerciseComparison,
+  type ProgressMuscleComparison,
+  type ProgressComparisonPeriods,
+} from './progress-comparisons';
 export {
   aggregateExerciseCatalogStats,
   createDrizzleExerciseCatalogStatsStore,
