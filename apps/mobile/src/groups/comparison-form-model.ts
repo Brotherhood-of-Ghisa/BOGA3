@@ -19,7 +19,8 @@ export const parseContributionPercent = (text: string): number =>
 
 const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
   left.loadInputMode === right.loadInputMode &&
-  left.bodyweightCalculationsEnabled === right.bodyweightCalculationsEnabled &&
+  (left.bodyweightCalculationsEnabled && left.bodyweightContribution > 0) ===
+    (right.bodyweightCalculationsEnabled && right.bodyweightContribution > 0) &&
   left.bodyweightContribution === right.bodyweightContribution;
 
 export type ComparisonPreview = { summary: string; attestationNote: string };
