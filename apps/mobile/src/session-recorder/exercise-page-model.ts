@@ -1,3 +1,4 @@
+import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import {
   pickSessionRecordSet, type RecordBaseline, type RecordSetCandidate,
 } from '@/src/exercise-calculations/records';
@@ -138,7 +139,7 @@ export const sessionRecordBlocks = (
 const recordCandidate = (set: ExercisePageSet, context: LoadContext): RecordSetCandidate | null => {
   if (!isWorkingSet({
     weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
-  })) return null;
+  }, context.effortPolicy)) return null;
   const metrics = metricsOf(set.weightValue, set.repsValue, context);
   return { id: set.id, oneRepMax: metrics.oneRepMax, weight: metrics.weight, reps: metrics.reps };
 };
@@ -309,7 +310,7 @@ export const createLocalSetId = () =>
  * `+ Add set`: copies the last row's values and applies effort defaults, not
  * performed until ticked (`ux-rules.md` §5.11).
  */
-export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId()): ExercisePageSet[] => {
+export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(), displayEfforts?: readonly EffortChoice[]): ExercisePageSet[] => {
   const last = sets[sets.length - 1];
   const copied = last ? displayedValues(last) : { weightValue: '', repsValue: '', setType: null };
   return [
@@ -318,7 +319,7 @@ export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId())
       id,
       weightValue: copied.weightValue,
       repsValue: copied.repsValue,
-      setType: defaultSessionSetType(last ? copied.setType : undefined),
+      setType: defaultSessionSetType(last ? copied.setType : undefined, displayEfforts),
       plannedWeightValue: null,
       plannedRepsValue: null,
       plannedSetType: null,

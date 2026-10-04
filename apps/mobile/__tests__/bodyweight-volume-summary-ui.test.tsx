@@ -6,7 +6,7 @@ import type { VolumeCoverage } from '@/src/exercise-calculations/load-metrics';
 
 const partial: VolumeCoverage = { knownVolumeKgReps: 500, totalVolumeKgReps: null,
   eligibleSetCount: 2, knownSetCount: 1, missingSetCount: 1, invalidSetCount: 0, complete: false, overflow: false };
-const note = 'Volume incomplete. Known subtotal from 1 of 2 working sets.';
+const note = 'Volume incomplete. Known subtotal from 1 of 2 included sets.';
 
 it('keeps an active session subtotal compact and its incomplete coverage readable', () => {
   render(<SessionSummaryCard startedAt={new Date()} gymName={null} workingSetCount={2}

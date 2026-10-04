@@ -91,13 +91,36 @@ own synced raw rows; they never cross the wire.
 
 ### Device-local preferences
 
-`apps/mobile/src/preferences/` owns typed account-local browsing choices (exercise
-sort, Show never-done, detail date format and past-records gym filter). Ordinary
-scalar keys in the existing `expo-sqlite/kv-store` are scoped to the authenticated
-account ID; local-only builds have a distinct local profile. They are **out of
-sync scope**: device presentation choices, without dirty bits, sync nudges,
-`user_settings` columns or server counterparts. Types/defaults are import-free;
-browsing hooks adapt the store for screens.
+`apps/mobile/src/preferences/` owns typed account-local browsing and Progress choices:
+exercise sort, Show never-done, detail date format, past-records gym filter, weekly
+working-set target shared by all muscle groups, effort Display/Working set/Volume
+selections, Progress-period weeks, history-look-back weeks (1–520), and the
+Daily/Weekly heatmap view. Scalar and JSON keys in `expo-sqlite/kv-store` are scoped
+to the authenticated account ID; local-only builds use a distinct local profile.
+They are **out of sync scope**: device choices, without dirty bits, sync nudges,
+`user_settings` columns or server counterparts. Hooks adapt the same durable
+store for screens. The configuration boundary in `src/config/personal-effort.ts`
+publishes the active account's calculation policy; persistence adapters pass it
+explicitly to the pure kernel. Groups and coaching never read these keys.
+
+Progress defaults are eight W/sets per muscle per week, a four-week Progress
+period, a 52-week history look-back and Weekly heatmaps. The fixed effort rows
+are Warm-up, Unspecified, RIR-4 through RIR-0, Technique and Cooldown. All are
+shown by default. Unspecified/RIR rows default on for both calculation columns;
+Warm-up/Technique/Cooldown default off. The columns are independent: hidden
+labels may contribute, and visible labels may be excluded. At least one Display
+choice is required; either calculation column may be empty. Legacy visible-RIR
+keys retain their selected fixed grades, with RIR-4/Technique/Cooldown added;
+historical custom RIR values keep their labels and follow RIR-4 for calculations;
+unrecognised stored effort follows Unspecified.
+
+The target is a positive safe integer; Progress periods are 1–52 whole weeks.
+Missing or malformed keys receive typed defaults. Failed writes preserve the
+last durable configuration and pending edits, retried by Settings' existing
+Data & Sync Refresh; validation errors share its Error row. Calculation edits
+invalidate personal projections and rebuild facts under the new policy before
+reading them. They never rewrite workouts. Eligibility, records and counted
+sessions are defined by `tech/training-metrics-contract.md`.
 
 Auth selects the scope before its snapshot reaches consumers. Sign-out hides
 account values and clears failed input; saved keys survive sign-out, account
@@ -139,7 +162,7 @@ unsaved input for Retry.
 - `exercise_session_facts`, `exercise_session_facts_stale`,
   `exercise_session_facts_state` — local-only, derived, rebuildable personal
   history facts (`apps/mobile/src/data/schema/exercise-session-facts.ts`,
-  migrations `0011`–`0012`; rules in *Exercise session facts* below). Sync
+  migrations `0011`–`0014`; rules in *Exercise session facts* below). Sync
   impact decision: `out of sync scope` — no dirty columns, no FKs, no server
   counterpart, outside the drift checker. Guardrails: FK-free (local integrity
   rule 2) with reads inner-joining the live session rows; cleared by the
@@ -150,10 +173,10 @@ unsaved input for Retry.
 ### Exercise session facts (local-only, derived)
 
 One row per completed, non-deleted session and linked exercise definition with
-at least one working set: `session_id`, `exercise_definition_id`,
+at least one working or volume-included set: `session_id`, `exercise_definition_id`,
 `achieved_at` (the session's `completed_at`), `best_e1rm_kg` +
 `best_e1rm_set_id`, `top_weight_kg` + `top_weight_set_id`, `volume_kg` +
-`volume_complete`, `working_sets`, and the flags `pr_e1rm`, `pr_weight`,
+`volume_complete`, `working_sets`, `volume_sets`, and the flags `pr_e1rm`, `pr_weight`,
 `pr_volume`. Primary key `(exercise_definition_id, session_id)`; indexes
 `(exercise_definition_id, achieved_at)` and `(achieved_at)`. Code:
 `apps/mobile/src/data/exercise-session-facts.ts` (rebuild, drain, reads) and
@@ -162,15 +185,15 @@ at least one working set: `session_id`, `exercise_definition_id`,
 - **Grain.** Repeated blocks of one definition in a session fold into one row.
   Unlinked legacy session exercises, active sessions and deleted sessions have
   no rows.
-- **Metrics** read working sets only (`tech/training-metrics-contract.md` §1).
-  A row exists only for a counted session of the definition (§2), and a
-  warm-up never sets a best or a PR flag. 1RM uses the personal
+- **Metrics** use independent personal working-set and volume eligibility (`tech/training-metrics-contract.md` §1).
+  A row with zero working sets may hold a Volume record, but contributes no
+  counted session or strength record (§2). 1RM uses the personal
   calculation policy (`tech/bodyweight-load-contract.md`). Top weight is the
   raw entered kg; an equal weight goes to the set with more reps. Volume is
   calculated load × reps, summed as the completed-session volume comparison
   does; `volume_kg` is the known subtotal when `volume_complete` is false.
-  `working_sets` counts the sets the row was derived from (*Sync v2
-  data-model contract* #5).
+  `working_sets` and `volume_sets` independently count the selected performed
+  sets used for strength/counts and volume.
 - **Bests and PR flags** are the record rules of
   `tech/training-metrics-contract.md` §3: a row holds the session's values
   (`summarizeSessionBests`), and a flag is set when the record book
@@ -195,7 +218,7 @@ at least one working set: `session_id`, `exercise_definition_id`,
   `All-time bests`) fold one definition's rows through the record book
   (`loadExerciseBests`). One query joins each row's best sets and its
   session's gym. An optional gym scope (or no gym) and an optional completed
-  session to count before narrow the rows; the newest row left names the
+  session to count before narrow the rows; the newest row with a working set names the
   panel's `Last`, and only that session's sets are read.
 - **Staleness.** SQLite triggers on `sessions`, `session_exercises`,
   `exercise_sets`, `exercise_definitions` (load mode, contribution),
@@ -206,8 +229,11 @@ at least one working set: `session_id`, `exercise_definition_id`,
   a session queues its definitions. Every facts read first drains the queue in
   one transaction, rebuilding each queued definition's whole history (cost
   bounded by that definition's history). `exercise_session_facts_state` holds
-  the rules version the table was fully built under; a missing row (fresh
-  install, wipe) or another version rebuilds every definition before the read.
+  the rules version and canonical effort-policy key the table was fully built
+  under; a missing row (fresh install, wipe), another version, or a different
+  active-account policy rebuilds every definition before the read. Local-only
+  migrations add `effort_policy_key` to the state and `volume_sets` to facts,
+  keeping volume record set counts independent of working-set counts.
   Changing a rule, including one in the shared calculation kernel or the
   working-set rule (`isWorkingSet`), bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`; a Jest
   fixture pins the values the current version derives and fails when a rule
@@ -451,7 +477,7 @@ section states only the data-model-level invariants.
    (first sign-in or wiped-client reinstall). It must be coherent across all
    user-owned entities listed in this document, with FK integrity preserved at every
    layer boundary (parents drain before children).
-5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | null`, where `n` is a canonical non-negative safe integer) and remains nullable for legacy/unspecified sets. RIR values are in sync scope through the existing nullable text fields (`set_type` and `planned_set_type`); no migration or wire-envelope change is needed. Which sets and sessions count toward a statistic (only `warm_up` is excluded; null, any RIR and unrecognised stored values count) is defined in `tech/training-metrics-contract.md` §1–§2, not here. `apps/mobile/src/config/training.ts` sets `EFFORT_LOGGING_POLICY.maxSelectableRir` (default `3`) for generated picker/cycle choices. Reducing that range never clears stored or imported higher RIRs, their labels, or inherited effort; tapping a higher historical effort re-enters the current cycle at Warm-up. Working-set classification is independent of the selectable range; it is not a user preference or a synced field.
+5. `exercise_sets` metadata includes optional `set_type` (`warm_up | rir_<n> | technique | cooldown | null`, with canonical non-negative safe-integer RIR values). Actual and prescribed efforts remain nullable text in sync scope; the added labels need no wire or server migration. The fixed picker uses the account-local Display selection, in Warm-up → Unspecified → RIR-4–0 → Technique → Cooldown order. Hidden historical and prescribed labels remain readable. New rows use a visible inherited effort, the next harder visible RIR, or Unspecified/first visible choice; a hidden effort's explicit tap re-enters at the first visible choice. Personal Working set and Volume choices are independent, device-local policies (§ Device-local preferences); groups and coaching keep their shared rule. The owning eligibility contract is `tech/training-metrics-contract.md` §1–§2.
 6. Planned workout execution targets and explicit performance state are `in sync scope`: `exercise_sets.planned_weight_value`, `planned_reps_value`, `planned_set_type`, and `performance_status` are carried in the existing push/pull wire envelope. `performance_status` is nullable unconstrained text; new writes use `planned` and `unperformed`, while a valid actual row with `null` is the confirmed/performed representation. The historical `skipped` value remains accepted for backward compatibility but hydrates as an untouched `planned` row and is never written by current session actions. This adds no column, server migration, or wire-envelope field.
    - New empty and copied/defaulted active rows use `unperformed`, even when copied values are already valid. For upgrade compatibility, a pre-existing valid row with legacy `null` remains confirmed; a blank or partial legacy draft row with `null` hydrates as `unperformed` so later entry cannot silently confirm it.
    - Active and completed-edit autosave preserve planned and unperformed rows losslessly. Completed-edit is the session view and exercise page editing a completed session (`/session/<id>`): their autosave writes the session back as `completed` through `persistCompletedSessionSnapshot`, never replaying completion. Legacy skipped rows normalize to planned on hydration. Final active-session submit and completed-edit save (the session view's `Done`) write completed workout history from valid confirmed actual rows only. Entered valid unconfirmed rows require a specific discard confirmation; they are never promoted or discarded implicitly.
@@ -479,11 +505,11 @@ section states only the data-model-level invariants.
    `exercise_definitions` row, falling back to the captured session-exercise
    name only for an unlinked legacy row.
    Completed-session exercise-volume comparisons remain a read-time projection,
-   not persisted data. They sum the working sets' Volume (contract §1, §4),
+   not persisted data. They sum independently included Volume (contract §1, §4),
    combine repeated blocks by
    linked exercise definition, and compare only complete totals from earlier
    completed, nondeleted sessions for that definition. A definition with only
-   warm-ups in a session is neither compared nor a baseline. Missing/invalid load preserves
+   sets excluded from Working set in a session is neither compared nor a baseline. Missing/invalid load preserves
    independent rep/set counts and an explicitly incomplete known subtotal;
    overflow is unavailable, never Infinity or a complete zero. P5, median, and P95 use linear interpolation over the prior
    per-session totals; unlinked legacy rows stay isolated and report no history.

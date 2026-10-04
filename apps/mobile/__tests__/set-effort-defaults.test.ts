@@ -74,49 +74,20 @@ describe('working-set rule', () => {
   });
 });
 
-describe('file-configured selectable RIR range', () => {
-  afterEach(() => {
-    jest.dontMock('@/src/config/training');
-  });
-
-  it.each([
-    [0, ['warm_up', null, 'rir_0']],
-    [2, ['warm_up', null, 'rir_2', 'rir_1', 'rir_0']],
-    [4, ['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_1', 'rir_0']],
-  ] as const)('uses maximum RIR %i for cycling, the picker and import enrichment', (maxSelectableRir, cycle) => {
-    jest.doMock('@/src/config/training', () => ({
-      ...jest.requireActual('@/src/config/training'),
-      EFFORT_LOGGING_POLICY: { maxSelectableRir },
-    }));
-    jest.isolateModules(() => {
-      const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
-      const page = jest.requireActual<typeof import('@/src/session-recorder/exercise-page-model')>('@/src/session-recorder/exercise-page-model');
-      const importer = jest.requireActual<typeof import('../scripts/import/set-type-enricher')>('../scripts/import/set-type-enricher');
-      expect(types.SESSION_SET_TYPE_CYCLE).toEqual(cycle);
-      expect(page.EFFORT_OPTIONS).toEqual(cycle);
-      const visited = [types.SESSION_SET_TYPE_CYCLE[0]];
-      for (let i = 1; i < cycle.length; i += 1) visited.push(types.nextSessionSetType(visited[i - 1]));
-      expect(visited).toEqual(cycle);
-      expect(types.nextSessionSetType(visited[visited.length - 1])).toBe('warm_up');
-      expect(importer.setTypeForRank(2, 3)).toBe(`rir_${maxSelectableRir}`);
-      expect(page.formatEffort(`rir_${maxSelectableRir}`)).toBe(`RIR ${maxSelectableRir}`);
-    });
-  });
-
-  it('preserves stored effort and working-set status after reducing the picker range', () => {
-    jest.doMock('@/src/config/training', () => ({
-      EFFORT_LOGGING_POLICY: { maxSelectableRir: 2 },
-    }));
-    jest.isolateModules(() => {
-      const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
-      expect(types.SESSION_SET_TYPES).not.toContain('rir_4');
-      expect(types.normalizeSessionSetType('rir_4')).toBe('rir_4');
-      expect(types.formatSessionSetType('rir_4')).toBe('RIR 4');
-      expect(types.formatSessionSetType('rir_4', 'compact')).toBe('R4');
-      expect(types.defaultSessionSetType('rir_4')).toBe('rir_4');
-      expect(isWorkingSetType('rir_4')).toBe(true);
-      expect(types.nextSessionSetType('rir_4')).toBe('warm_up');
-    });
+describe('fixed selectable efforts', () => {
+  it('offers the nine fixed choices, while retaining canonical historical RIR labels', () => {
+    const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
+    const cycle = ['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_1', 'rir_0', 'technique', 'cooldown'];
+    expect(types.SESSION_SET_TYPE_CYCLE).toEqual(cycle);
+    const visited = [types.SESSION_SET_TYPE_CYCLE[0]];
+    for (let i = 1; i < cycle.length; i += 1) visited.push(types.nextSessionSetType(visited[i - 1]));
+    expect(visited).toEqual(cycle);
+    expect(types.nextSessionSetType('cooldown')).toBe('warm_up');
+    expect(types.normalizeSessionSetType('rir_12')).toBe('rir_12');
+    expect(types.formatSessionSetType('rir_12')).toBe('RIR 12');
+    expect(types.SESSION_SET_TYPES).not.toContain('rir_12');
+    expect(types.normalizeSessionSetType('cooldown')).toBe('cooldown');
+    expect(types.normalizeSessionSetType('technique')).toBe('technique');
   });
 
   it.each(['rir_-1', 'rir_1.5', 'rir_01', 'rir_NaN', 'rir_9007199254740992', 'rir_3\n', 'rir_ 3', 'drop_set'])(

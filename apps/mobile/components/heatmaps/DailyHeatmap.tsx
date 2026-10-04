@@ -62,7 +62,8 @@ export function DailyHeatmap({
   const AXIS_H = 18;
 
   // Default selection = today; falls back to the most recent day with data.
-  const selectedDateKey = pickedDateKey ?? data.todayDateKey;
+  const selectedDateKey = pickedDateKey && data.daily.some(day => day.dateKey === pickedDateKey) ? pickedDateKey : data.todayDateKey;
+  if (pickedDateKey && selectedDateKey !== pickedDateKey) setPickedDateKey(null);
   const selectedDay = useMemo(
     () => data.daily.find((d) => d.dateKey === selectedDateKey) ?? null,
     [data.daily, selectedDateKey]
@@ -103,7 +104,7 @@ export function DailyHeatmap({
   return (
     <View style={heatmapStyles.wrap} testID={heatmapTestID}>
       <View style={heatmapStyles.headerRow}>
-        <Text allowFontScaling={false} style={heatmapStyles.title}>Last 12 months</Text>
+        <Text allowFontScaling={false} style={heatmapStyles.title}>{data.weekly.length}-week history</Text>
         <Text allowFontScaling={false} style={heatmapStyles.caption}>each square = one day</Text>
       </View>
 
@@ -162,7 +163,7 @@ export function DailyHeatmap({
                       <Pressable
                         key={r}
                         accessibilityRole="button"
-                        accessibilityLabel={`${d.dateKey}, ${d.unavailable ? `${metricLabel} unavailable or incomplete` : d.hasTraining || d.level ? `${metricLabel} ${formatValue(d.value)}` : 'Rest day'}`}
+                        accessibilityLabel={`${d.dateKey}, ${d.unavailable ? `${metricLabel} unavailable or incomplete` : d.hasTraining || d.level ? `${metricLabel} ${formatValue(d.value)}` : 'Rest day'}${d.targetAttainment === undefined ? '' : `, ${Math.round(d.targetAttainment * 100)}% of weekly muscle target${data.targetLegend?.includes('average') ? ', averaged across muscles' : ''}`}`}
                         accessibilityState={{ selected }}
                         onPress={() => setPickedDateKey(d.dateKey)}
                         testID={`${heatmapTestID}-cell-${d.dateKey}`}
@@ -220,6 +221,7 @@ export function DailyHeatmap({
       ) : null}
 
       <HeatmapLegend label={legendLabel} />
+      {data.targetLegend ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>{data.targetLegend}. Full colour at 100%.</Text> : null}
       {data.daily.some(day => day.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
         Dashed cells: unavailable or incomplete load
       </Text> : null}

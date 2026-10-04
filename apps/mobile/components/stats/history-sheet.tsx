@@ -1,3 +1,5 @@
+import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
+import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo } from 'react';
@@ -26,7 +28,6 @@ import type {
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
 export type HistoryKind = 'muscle' | 'exercise';
-export type HeatmapView = 'weekly' | 'daily';
 export type MuscleHistoryMetric = Extract<CalendarHeatmapMetric, 'totalVolume' | 'workingSetCount'>;
 
 export type HistoryMetricOption<TMetric extends CalendarHeatmapMetric> = {
@@ -53,11 +54,6 @@ export const EXERCISE_HISTORY_METRIC_OPTIONS: readonly HistoryMetricOption<Calen
 export const MUSCLE_HISTORY_METRIC_OPTIONS: readonly HistoryMetricOption<MuscleHistoryMetric>[] = [
   { value: 'totalVolume', label: METRIC_LABELS.totalVolume },
   { value: 'workingSetCount', label: METRIC_LABELS.workingSetCount },
-];
-
-const HEATMAP_VIEW_OPTIONS: readonly { value: HeatmapView; label: string }[] = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'daily', label: 'Daily' },
 ];
 
 // The sheet's body takes this share of the window; with the handle and the
@@ -147,6 +143,8 @@ function HistoryHeatmap({
   onSelectWeek,
   testIDPrefix,
   todayDateKey,
+  lookbackWeeks,
+  muscleTargets,
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
@@ -156,11 +154,13 @@ function HistoryHeatmap({
   onSelectWeek: (weekKey: string | null) => void;
   testIDPrefix: string;
   todayDateKey?: string;
+  lookbackWeeks: number;
+  muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
 }) {
   // Both views span the full available history and scroll horizontally.
   const data = useMemo(
-    () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: 'all' }),
-    [dailyMetrics, metric, todayDateKey]
+    () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: lookbackWeeks, muscleTargets }),
+    [dailyMetrics, metric, todayDateKey, lookbackWeeks, muscleTargets]
   );
   const formatDailyValue = useCallback((value: number) => formatDayValue(value, metric), [metric]);
   const dailyHeatmap = useMemo(
@@ -224,13 +224,13 @@ export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   metric: TMetric;
   onSelectMetric: (metric: TMetric) => void;
   view: HeatmapView;
-  onSelectView: (view: HeatmapView) => void;
   weeklyEffort: SelectedMuscleWeeklyEffort[];
   dailyMetrics: DailyEffortMetrics[];
   isLoading: boolean;
   errorMessage: string | null;
   // The loaded window, named in the empty state.
-  windowDays: number;
+  lookbackWeeks: number;
+  muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   selectedWeekKey: string | null;
   onSelectWeek: (weekKey: string | null) => void;
   // The backdrop, Android back and the VoiceOver escape; there is no close
@@ -247,12 +247,12 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   metric,
   onSelectMetric,
   view,
-  onSelectView,
   weeklyEffort,
   dailyMetrics,
   isLoading,
   errorMessage,
-  windowDays,
+  lookbackWeeks,
+  muscleTargets,
   selectedWeekKey,
   onSelectWeek,
   onDismiss,
@@ -283,6 +283,9 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
         </View>
 
         <View style={styles.controls}>
+          <Text allowFontScaling={false} style={styles.controlLabel} testID={`${prefix}-window`}>
+            {view === 'daily' ? 'Daily' : 'Weekly'} · {lookbackWeeks} {lookbackWeeks === 1 ? 'week' : 'weeks'}
+          </Text>
           <View style={styles.controlGroup}>
             <Text allowFontScaling={false} style={styles.controlLabel}>
               Metric
@@ -295,18 +298,6 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
               options={metricOptions}
               testIDPrefix={`${prefix}-metric-chip`}
               value={metric}
-            />
-          </View>
-          <View style={styles.controlGroup}>
-            <Text allowFontScaling={false} style={styles.controlLabel}>
-              View
-            </Text>
-            <SegmentedControl
-              accessibilityLabel="Select heatmap view"
-              onChange={onSelectView}
-              options={HEATMAP_VIEW_OPTIONS}
-              testIDPrefix={`${prefix}-view-chip`}
-              value={view}
             />
           </View>
         </View>
@@ -340,11 +331,11 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
             />
           ) : null}
 
-          {!isLoading && !errorMessage ? (
+          {!errorMessage ? (
             <>
-              {weeklyEffort.length === 0 ? (
+              {!isLoading && weeklyEffort.length === 0 ? (
                 <StatePanel
-                  body={`No ${title} training was found in the last ${windowDays} days.`}
+                  body={`No ${title} training was found in the selected ${lookbackWeeks}-week history window.`}
                   fill={false}
                   testID={`${prefix}-empty`}
                   title="No history yet"
@@ -353,6 +344,8 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 
               <HistoryHeatmap
                 dailyMetrics={dailyMetrics}
+                lookbackWeeks={lookbackWeeks}
+                muscleTargets={muscleTargets}
                 metric={metric}
                 metricLabel={metricLabel}
                 onSelectWeek={onSelectWeek}

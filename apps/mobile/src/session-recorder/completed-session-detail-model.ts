@@ -12,7 +12,7 @@ import {
   type SessionViewSetRow,
 } from './session-view-model';
 import {
-  canonicalizeWeightForReps, isConfirmedPerformedSet, isWorkingSet, type SessionSetPerformanceStatus,
+  canonicalizeWeightForReps, isConfirmedPerformedSet, isWorkingSet, isVolumeSet, type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -92,6 +92,7 @@ export const buildCompletedSessionDetailModel = (
 ): CompletedSessionDetailModel => {
   const insightExercises = toInsightExercises(exercises);
   const metrics: SetMetrics[] = [];
+  let workingSetCount = 0;
 
   const cards = exercises.flatMap((exercise): CompletedSessionDetailCard[] => {
     const performed = exercise.sets.flatMap((set) => {
@@ -109,10 +110,11 @@ export const buildCompletedSessionDetailModel = (
           baseline: recordBaselineByDefinitionId.get(definitionId) ?? null,
         });
 
-    // The counts and the summary Volume read working sets only; every row keeps
-    // its own figures.
-    const working = performed.filter(({ set }) => isWorkingSet(set));
-    for (const { set } of working) {
+    // Count working sets and sum independently included volume; each row
+    // retains its own figures.
+    const working = performed.filter(({ set }) => isWorkingSet(set, exercise.loadContext?.effortPolicy));
+    workingSetCount += working.length;
+    for (const { set } of performed.filter(({ set }) => isVolumeSet(set, exercise.loadContext?.effortPolicy))) {
       metrics.push(calculateAnalyticsSetMetrics({
         ...(exercise.loadContext ?? ordinaryLoadContext()),
         weightValue: set.weight,
@@ -142,5 +144,5 @@ export const buildCompletedSessionDetailModel = (
     ];
   });
 
-  return { cards, workingSetCount: metrics.length, ...sessionVolumeSummary(summarizeVolume(metrics)) };
+  return { cards, workingSetCount, ...sessionVolumeSummary(summarizeVolume(metrics)) };
 };

@@ -59,6 +59,7 @@ import {
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_PAGE_FIXTURE } from '@/src/maestro/exercise-page-fixture';
+import { updatePreferences } from '@/src/preferences/hooks';
 import {
   bootLocalApp,
   closeLocalData,
@@ -444,9 +445,32 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 0');
   });
 
+  it('preserves hidden prescribed effort while updating the mounted picker and cycle', async () => {
+    await openPage();
+    const saved = await benchSets();
+    expect(saved[2].plannedSetType).toBe('rir_1');
+    act(() => updatePreferences({ displayEfforts: ['warm_up', 'unspecified', 'rir_4', 'rir_0'] }));
+    expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('EffortRIR 1');
+    expect((await benchSets())[2]).toMatchObject(saved[2]);
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
+    expect(screen.queryByTestId('exercise-effort-option-rir_1')).toBeNull();
+    expect(screen.getByTestId('exercise-effort-option-rir_4')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-effort-sheet-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
+    expect(screen.getByLabelText('Change effort, currently W-Up')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
+    fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
+    expect(screen.getByLabelText('Change effort, currently RIR 4')).toBeTruthy();
+    // Historical records remain based on every confirmed non-warm-up set.
+    fireEvent.press(screen.getByTestId('exercise-records-toggle'));
+    expect(screen.getByTestId('exercise-record-vol')).toHaveTextContent(/Vol2080.*4 sets/);
+    expect(screen.getByTestId('exercise-record-1rm')).toHaveTextContent(/^1RM102\.1/);
+    await waitFor(async () => expect((await benchSets())[2].setType).toBe('rir_4'));
+  });
+
   it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
     await openPage();
-    for (const label of ['RIR 0', 'W-Up', 'none', 'RIR 3', 'RIR 2', 'RIR 1']) {
+    for (const label of ['RIR 0', 'Technique', 'Cooldown', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
       fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
       expect(screen.getByLabelText(`Change effort, currently ${label}`)).toBeTruthy();
     }
@@ -541,6 +565,34 @@ describe('ExercisePageScreen', () => {
       performanceStatus: 'unperformed',
     });
     expect(within(screen.getByTestId('exercise-set-logger')).getByText('Set 6')).toBeTruthy();
+  });
+
+  it.each(['add', 'swipe'] as const)('uses visible default effort for a new set through %s', async (action) => {
+    await openPage();
+    fireEvent.press(screen.getByTestId('exercise-add-set'));
+    await waitFor(async () => expect(await benchSets()).toHaveLength(6));
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
+    fireEvent.press(await screen.findByTestId('exercise-effort-option-rir_3'));
+    await waitFor(async () => expect((await benchSets())[5].setType).toBe('rir_3'));
+    act(() => updatePreferences({ displayEfforts: ['warm_up', 'unspecified', 'rir_4', 'rir_2', 'rir_0'] }));
+    if (action === 'add') fireEvent.press(screen.getByTestId('exercise-add-set'));
+    else fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
+      nativeEvent: { actionName: 'confirm' },
+    });
+    await waitFor(async () => expect(await benchSets()).toHaveLength(7));
+    const saved = await benchSets();
+    expect(saved[5].setType).toBe('rir_3');
+    expect(saved[6]).toMatchObject({ setType: 'rir_2', performanceStatus: 'unperformed' });
+    expect(screen.getByLabelText('Change effort, currently RIR 2')).toBeTruthy();
+  });
+
+  it('uses the first visible choice when inherited effort has no harder visible RIR', async () => {
+    await openPage();
+    act(() => updatePreferences({ displayEfforts: ['rir_4', 'rir_2'] }));
+    fireEvent.press(screen.getByTestId('exercise-add-set'));
+    await waitFor(async () => expect(await benchSets()).toHaveLength(6));
+    expect((await benchSets())[5].setType).toBe('rir_4');
+    expect(screen.getByLabelText('Change effort, currently RIR 4')).toBeTruthy();
   });
 
   it('warns before Complete discards planned sets, keeps them as not performed, then goes back', async () => {

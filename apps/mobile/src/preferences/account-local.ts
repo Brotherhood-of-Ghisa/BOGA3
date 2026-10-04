@@ -1,9 +1,11 @@
 import { __resetPreferenceMigrationForTests, migrateBrowsingPreferences } from './migration';
+import { configureDisplayEfforts, configurePersonalEffortPolicy } from '../config/personal-effort';
 import {
   type AccountLocalPreferences,
-  DEFAULT_EXERCISE_LIST_PREFERENCES,
+  DEFAULT_ACCOUNT_LOCAL_PREFERENCES,
   isPreferenceValue,
   preferenceFields,
+  preferenceValidationMessages,
 } from './model';
 import { type PreferenceProfile, readScopedPreferences, writeScopedPreference } from './storage';
 
@@ -13,11 +15,13 @@ export type AccountLocalPreferenceState = {
   error: string | null;
 };
 const emptyState = (): AccountLocalPreferenceState => ({
-  values: DEFAULT_EXERCISE_LIST_PREFERENCES, pending: {}, error: null,
+  values: DEFAULT_ACCOUNT_LOCAL_PREFERENCES, pending: {}, error: null,
 });
 let state = emptyState();
 let loadError: string | null = null;
 let saveError: string | null = null;
+let validationError: string | null = null;
+const currentError = () => validationError ?? saveError ?? loadError;
 let profile: PreferenceProfile | null | undefined;
 let generation = 0;
 let loaded = false;
@@ -30,6 +34,8 @@ const publish = (next: Partial<AccountLocalPreferenceState>) => {
   const updated = { ...state, ...next, values };
   if (updated.values === state.values && updated.pending === state.pending && updated.error === state.error) return;
   state = updated;
+  configureDisplayEfforts(updated.values.displayEfforts);
+  configurePersonalEffortPolicy(updated.values);
   for (const listener of listeners) listener();
 };
 export function initializeAccountLocalPreferences(isConfigured: boolean): void {
@@ -50,6 +56,7 @@ export function setAccountLocalPreferenceAccount(userId: string | null, isConfig
   profile = next;
   loadError = null;
   saveError = null;
+  validationError = null;
   generation += 1;
   loaded = false;
   loading = null;
@@ -62,11 +69,11 @@ function loadScoped(profileAtStart: PreferenceProfile): boolean {
     const { values } = readScopedPreferences(profileAtStart);
     loaded = true;
     loadError = null;
-    publish({ values, error: saveError });
+    publish({ values, error: currentError() });
     return true;
   } catch {
     loadError = 'Preferences could not be loaded. Try again.';
-    publish({ error: saveError ?? loadError });
+    publish({ error: currentError() });
     return false;
   }
 }
@@ -83,7 +90,7 @@ export async function ensureAccountLocalPreferencesLoaded(): Promise<void> {
       if (capturedGeneration !== generation) return;
       const { values } = readScopedPreferences(capturedProfile);
       loadError = null;
-      publish({ values, error: saveError });
+      publish({ values, error: currentError() });
     } catch {
       if (capturedGeneration !== generation) return;
       // A scalar may have committed before a later migration write failed.
@@ -91,7 +98,7 @@ export async function ensureAccountLocalPreferencesLoaded(): Promise<void> {
       try { publish({ values: readScopedPreferences(capturedProfile).values }); }
       catch { /* Keep the last successfully read durable snapshot. */ }
       loadError = 'Preferences could not be loaded. Try again.';
-      publish({ error: saveError ?? loadError });
+      publish({ error: currentError() });
     }
   })();
   loading = operation;
@@ -99,9 +106,22 @@ export async function ensureAccountLocalPreferencesLoaded(): Promise<void> {
   if (capturedGeneration === generation) loading = null;
 }
 
+/** Field drafts can report validation without submitting an invalid preference patch. */
+export function setAccountLocalPreferenceValidationError(message: string): void {
+  if (currentProfile() === null) return;
+  validationError = message;
+  publish({ error: currentError() });
+}
+
 export function setAccountLocalPreferences(patch: Partial<AccountLocalPreferences>): void {
   const activeProfile = currentProfile();
   if (activeProfile === null) return;
+  const invalid = preferenceFields.find(field => Object.hasOwn(patch, field) && !isPreferenceValue(field, patch[field]));
+  if (invalid) {
+    setAccountLocalPreferenceValidationError(preferenceValidationMessages[invalid]);
+    return;
+  }
+  validationError = null;
   const pending = { ...state.pending };
   for (const field of preferenceFields) {
     if (isPreferenceValue(field, patch[field])) Object.assign(pending, { [field]: patch[field] });
@@ -120,10 +140,10 @@ export function setAccountLocalPreferences(patch: Partial<AccountLocalPreference
       delete pending[field];
     }
     saveError = null;
-    publish({ values, pending, error: loadError });
+    publish({ values, pending, error: currentError() });
   } catch {
     saveError = 'Preferences could not be saved. Try again.';
-    publish({ values, pending, error: saveError });
+    publish({ values, pending, error: currentError() });
   }
 }
 
@@ -139,8 +159,11 @@ export function __resetAccountLocalPreferencesForTests(): void {
   __resetPreferenceMigrationForTests();
   generation += 1;
   state = emptyState();
+  configureDisplayEfforts(state.values.displayEfforts);
+  configurePersonalEffortPolicy(state.values);
   loadError = null;
   saveError = null;
+  validationError = null;
   profile = undefined;
   loaded = false;
   loading = null;

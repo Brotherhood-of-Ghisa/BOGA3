@@ -1,5 +1,5 @@
-// Reading, session-time and calculation-policy changes invalidate every
-// personal projection that resolves bodyweight-aware maths.
+// Reading, session-time, bodyweight and effort-policy changes invalidate
+// every personal calculation projection.
 const listeners = new Set<() => void>();
 let revision = 0;
 

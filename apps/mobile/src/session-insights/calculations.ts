@@ -238,6 +238,7 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
     .sort(compareSessionPosition);
 
   return {
+    effortPolicy: exercises.find(exercise => exercise.loadContext?.effortPolicy)?.loadContext?.effortPolicy,
     bodyweightCalculationsEnabled: exercises.some(exercise => exercise.loadContext?.policy === 'personal'),
     sessions: [{ id: input.sessionId, completedAt: input.sessionAt, bodyWeightKg: input.bodyWeightKg ?? exercises[0]?.loadContext?.bodyWeightKg }],
     exerciseDefinitions: input.exerciseDefinitions,
@@ -274,11 +275,11 @@ export const summarizeCurrentSessionMuscleLoad = (
   const muscleGroupById = new Map(
     input.muscleGroups.map((group) => [group.id, group]),
   );
-  // Contributions are working sets only (§1): every figure, the set counts included.
+  // Counts use working identities; muscle load independently uses volume.
   const contributions = collectMuscleSetContributions(analyticsInput);
   const mappedSetIdentities = new Set(
     contributions
-      .filter((contribution) => muscleGroupById.has(contribution.muscleGroupId))
+      .filter((contribution) => contribution.working !== false && muscleGroupById.has(contribution.muscleGroupId))
       .map((contribution) => contribution.setIdentity),
   );
   const weightedVolumeByMuscle = new Map<string, number | null>();
@@ -292,6 +293,7 @@ export const summarizeCurrentSessionMuscleLoad = (
       contribution.muscleGroupId,
       addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
     );
+    if (contribution.working === false) continue;
     const workingSetIdentities =
       workingSetIdentitiesByMuscle.get(contribution.muscleGroupId) ??
       new Set<string>();
@@ -581,7 +583,7 @@ const collectExerciseVolumeObservations = (
       .filter(isEligiblePerformedSet)
       .sort(compareSessionPosition);
     if (eligibleSets.length === 0) continue;
-    const workingSets = workingSetsOnly(eligibleSets);
+    const workingSets = workingSetsOnly(eligibleSets, exercise.loadContext?.effortPolicy);
 
     const identity = exercise.exerciseDefinitionId
       ? `definition:${exercise.exerciseDefinitionId}`
@@ -598,7 +600,7 @@ const collectExerciseVolumeObservations = (
 
     current.sessionExerciseIds.push(exercise.id);
     current.workingSetCount += workingSets.length;
-    const coverage = summarizeExerciseLoad(workingSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
+    const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
     current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
     current.volume = addFiniteVolume(current.volume, coverage.totalVolumeKgReps);
     observationsByIdentity.set(identity, current);
@@ -737,7 +739,7 @@ export const deriveSessionMuscleVolumeComparisons = (
 
   const groupById = new Map(muscleGroups.map((group) => [group.id, group]));
   // A muscle is observed when it has a valid mapped working set, even when its
-  // volume is zero; its volume reads working sets only. The positive-only
+  // volume is zero; its volume uses the independent selection. The positive-only
   // muscle-load bars are a separate presentation and cannot supply a
   // distribution's observations or counts.
   const observe = (session: PersonalRecordSessionInput) => {
@@ -767,7 +769,7 @@ export const deriveSessionMuscleVolumeComparisons = (
       byMuscle.set(contribution.muscleGroupId, observation);
       observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
-      observation.workingSetIds.add(contribution.setIdentity);
+      if (contribution.working !== false) observation.workingSetIds.add(contribution.setIdentity);
     }
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,

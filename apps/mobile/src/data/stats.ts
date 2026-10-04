@@ -1,4 +1,5 @@
 import { loadAsOfWeightResolver } from './bodyweight';
+import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
@@ -26,11 +27,12 @@ import {
   userSettings,
 } from './schema';
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
+import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
 
 export type StatsPeriodBounds = {
-  days: StatsPeriodDays;
+  days: number;
   start: Date;
   end: Date;
 };
@@ -72,8 +74,9 @@ export type StatsStore = {
   loadMuscleGroupTaxonomy(): Promise<StatsAggregationInput['muscleGroups']>;
 };
 
-export type ComputeStatsSummaryOptions = {
-  periodDays: StatsPeriodDays;
+/** Progress uses calendar weeks; day-based readers retain their fixed period domain. */
+export type ComputeStatsSummaryOptions = ({ periodDays: StatsPeriodDays; periodWeeks?: never }
+  | { periodWeeks: number; periodDays?: never }) & {
   now?: Date;
 };
 
@@ -118,7 +121,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   };
   const accumulatorsByMuscleId = new Map<string, MuscleAccumulator>();
 
-  // Contributions are working sets only (§1): every figure, the set count included.
+  // Count physical working-set identities separately from included volume.
   for (const contribution of collectMuscleSetContributions(input)) {
     const accumulator = accumulatorsByMuscleId.get(contribution.muscleGroupId) ?? {
       workingSetIdentities: new Set<string>(),
@@ -126,7 +129,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       knownVolume: 0,
     };
     accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
-    accumulator.workingSetIdentities.add(contribution.setIdentity);
+    if (contribution.working !== false) accumulator.workingSetIdentities.add(contribution.setIdentity);
     accumulator.knownVolume = addFiniteVolume(accumulator.knownVolume, contribution.weightedVolume ?? 0);
     accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume);
   }
@@ -320,6 +323,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
 
     return {
       bodyweightCalculationsEnabled,
+      effortPolicy: getPersonalEffortPolicy(),
       sessions: sessionsInPeriod,
       exerciseDefinitions: exerciseDefinitionRows,
       sessionExercises: sessionExerciseRows,
@@ -349,8 +353,11 @@ export const createDrizzleStatsStore = (): StatsStore => ({
 export const createStatsRepository = (store: StatsStore = createDrizzleStatsStore()) => ({
   async computeSummary(options: ComputeStatsSummaryOptions): Promise<StatsSummary> {
     const now = options.now ?? new Date();
-    const currentPeriod = computePeriodBounds(options.periodDays, now);
-    const previousPeriod = computePreviousPeriodBounds(currentPeriod);
+    const currentPeriod = options.periodWeeks === undefined ? computePeriodBounds(options.periodDays, now)
+      : { days: options.periodWeeks * 7, ...calendarWeekBounds(options.periodWeeks, now) };
+    const previousPeriod = options.periodWeeks === undefined ? computePreviousPeriodBounds(currentPeriod)
+      : { days: currentPeriod.days, start: shiftCalendarWeeks(currentPeriod.start, -options.periodWeeks),
+        end: shiftCalendarWeeks(currentPeriod.end, -options.periodWeeks) };
 
     const [currentInput, previousInput] = await Promise.all([
       store.loadAggregationInput({ start: currentPeriod.start, end: currentPeriod.end }),

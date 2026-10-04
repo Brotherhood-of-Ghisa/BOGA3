@@ -7,6 +7,7 @@ import { AppearanceSettingsRow } from '@/components/appearance/appearance-settin
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button';
+import { ProgressSettings } from '@/components/preferences/progress-settings';
 import {
   ActionButton,
   Card,
@@ -28,7 +29,8 @@ import {
   wipeLocalAndReBootstrap,
   wipeRemoteForCurrentUser,
 } from '@/src/sync/dev-affordances';
-import { setExerciseListPreferences, useExerciseListPreferenceState } from '@/src/exercise-catalog/list-preferences';
+import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { formatVersionBuild, readAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
@@ -38,7 +40,8 @@ type DevFeedback = { tone: 'success' | 'error'; message: string } | null;
 export default function SettingsScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { values: listPreferences, error: preferenceError, retry: refreshPreferences } = useExerciseListPreferenceState();
+  const preferences = useAccountLocalPreferenceState();
+  const { values: listPreferences, error: preferenceError, retry: refreshPreferences } = preferences;
   const [connectError, setConnectError] = useState<string | null>(null);
   const runtimeMetadata = readAppRuntimeMetadata();
   const versionBuild = formatVersionBuild(runtimeMetadata);
@@ -168,6 +171,7 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       testID="settings-screen">
       <MoreHubBackButton />
       <PageHeader title="Settings" />
@@ -266,6 +270,8 @@ export default function SettingsScreen() {
           </View>
         </Card>
       </View>
+
+      <ProgressSettings key={user ? `account:${user.id}` : 'local'} state={preferences} />
 
       <View style={styles.section} testID="settings-section-data-sync">
         <SectionLabel title="Data & sync" />

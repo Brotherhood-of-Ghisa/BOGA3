@@ -2,6 +2,7 @@ import type { Session, SessionExercise, SessionSet } from '@/components/session-
 import type { ExerciseBlockHistorySuggestedSet, SessionDraftSnapshot } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
 import { defaultSessionSetType, formatSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
+import { getDisplayEfforts } from '@/src/config/personal-effort';
 import {
   canonicalizeSetValues,
   canonicalizeWeightForReps,
@@ -101,7 +102,7 @@ function createEmptySet(): SessionSet {
     id: createSetId(),
     reps: '',
     weight: '',
-    setType: defaultSessionSetType(undefined),
+    setType: defaultSessionSetType(undefined, getDisplayEfforts()),
     plannedReps: null,
     plannedWeight: null,
     plannedSetType: null,

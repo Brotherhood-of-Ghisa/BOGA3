@@ -30,6 +30,20 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
   existing Refresh retries preferences and refreshes sync when signed in.
   Signed-out/local-only failures use that same row and Refresh inside the
   existing guidance card. Preference controls add no error boxes or Retry buttons.
+- Settings has a Progress section using the same Card, form-field and row
+  vocabulary: one inline “Weekly working sets per muscle” field applying the same
+  target to every muscle group, “Progress period (weeks)” and “History look-back
+  (weeks)” fields, the sole Daily/Weekly selector labelled “Heatmap view”, and
+  the operator's fixed effort table (2026-10-04): Warm-up, Unspecified, RIR-4–0,
+  Technique and Cooldown, with Display, Working set and Volume columns. No Add
+  control. Every checkbox has a 44pt target and a label naming its row and column.
+  All Display defaults are on; the two calculation columns default on for
+  Unspecified/RIR and off for Warm-up/Technique/Cooldown. Keep at least one
+  Display choice; calculation columns may be empty. The columns are independent
+  and account-local on this device. Groups keep their shared rule and show no
+  effort settings. This operator brief supersedes the earlier visibility-only
+  controls. Numeric drafts commit on editing completion;
+  invalid and unsaved drafts remain recoverable, with errors in Data & Sync.
 - Neither screen has an `accent` button.
 - Developer tools (dev builds only) is one `Card` headed by the `warning` glyph
   and a micro-label. Its buttons are outlines, `Wipe remote` an outline in

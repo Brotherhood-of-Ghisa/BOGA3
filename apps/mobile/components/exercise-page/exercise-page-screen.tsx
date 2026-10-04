@@ -1,3 +1,4 @@
+import { personalCalculationContext } from '@/src/config/personal-effort';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -15,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EMPTY_SESSION_WEIGHT, isValidSessionWeight } from '@/src/bodyweight/weight-entry';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
-import { personalLoadContext } from '@/src/exercise-calculations/analytics';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
@@ -25,6 +25,7 @@ import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
 import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
@@ -110,6 +111,7 @@ export function ExercisePageScreen({
   const [recordsRevision, setRecordsRevision] = useState(0);
   const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
   const [listPreferences] = useExerciseListPreferences();
+  const { values: trainingPreferences } = useAccountLocalPreferenceState();
   const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
@@ -137,7 +139,7 @@ export function ExercisePageScreen({
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
   const bodyWeight = draft.state.status === 'ready' ? draft.state.bodyWeight : EMPTY_SESSION_WEIGHT;
-  const loadContext = personalLoadContext(
+  const loadContext = personalCalculationContext(
     bodyweightCalculationsEnabled,
     editingExercise ? {
       bodyweightContribution: editingExercise.bodyweightContribution,
@@ -194,7 +196,7 @@ export function ExercisePageScreen({
   };
 
   const onAddSet = () => {
-    const next = addSet(sets);
+    const next = addSet(sets, undefined, trainingPreferences.displayEfforts);
     const added = next[next.length - 1];
     updateSets(() => next, 'structural');
     setOpenSetId(added?.id ?? null);
@@ -220,7 +222,7 @@ export function ExercisePageScreen({
       if (isTargetOpen) setOpenSetId(null);
       return;
     }
-    const next = addSet(committed);
+    const next = addSet(committed, undefined, trainingPreferences.displayEfforts);
     updateSets(() => next, 'structural');
     setOpenSetId(next[next.length - 1]?.id ?? null);
     requestAnimationFrame(() => weightInputRef.current?.focus());
@@ -342,7 +344,7 @@ export function ExercisePageScreen({
                     onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
                     onCommit={onCommit}
                     onConfirm={() => onSwipeRight(row.id)}
-                    onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType))}
+                    onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType, trainingPreferences.displayEfforts))}
                     onDrop={() => onSwipeLeft(row.id)}
                     onOpenEffort={() => setOpenSheet('effort')}
                     ref={weightInputRef}

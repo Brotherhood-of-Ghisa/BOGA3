@@ -15,7 +15,7 @@ import {
 import {
   LEGACY_PREFERENCES_KEY, LEGACY_PREFERENCES_OWNER_KEY, migrationCompleteKey,
 } from '@/src/preferences/migration';
-import { DEFAULT_EXERCISE_LIST_PREFERENCES as defaults } from '@/src/preferences/model';
+import { DEFAULT_EXERCISE_LIST_PREFERENCES as defaults, DEFAULT_ACCOUNT_LOCAL_PREFERENCES as allDefaults } from '@/src/preferences/model';
 import { preferenceKey } from '@/src/preferences/storage';
 
 const nativeWrite = Storage.setItemSync;
@@ -113,7 +113,7 @@ it('clears failed input on account switches and isolates a user named local', as
   await select('local'); expect(values()).toEqual(defaults);
   jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
   update({ showNeverDone: false }); expect(state().pending).toEqual({ showNeverDone: false });
-  await select('B'); expect(state()).toEqual({ values: defaults, error: null, pending: {} });
+  await select('B'); expect(state()).toEqual({ values: allDefaults, error: null, pending: {} });
 });
 
 it('discards late migration results after switching to B, signing out and returning to A', async () => {
@@ -131,7 +131,7 @@ it('a stale failed request cannot publish its error into a later account', async
   read.mockReturnValue(new Promise((_, fail) => { reject = fail; }));
   account('A', true); const initial = load();
   await select('B'); reject(Error('locked')); await initial;
-  expect(state()).toEqual({ values: defaults, pending: {}, error: null });
+  expect(state()).toEqual({ values: allDefaults, pending: {}, error: null });
 });
 
 it('a failed read blocks saving defaults over stored values and preserves retry input', async () => {

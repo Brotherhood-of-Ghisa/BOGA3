@@ -71,6 +71,7 @@ describe('exercise session facts — metrics', () => {
       volumeKg: 100 * 5,
       volumeComplete: true,
       workingSets: 1,
+      volumeSets: 1,
     });
   });
 
@@ -239,7 +240,7 @@ describe('exercise session facts — rules version', () => {
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(4);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(5);
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s1', 1, [block('a1', 0, [['100', '5', 'rir_3'], ['60', '10', 'warm_up'], ['90', '8', 'rir_4']])]),
       session('s2', 2, [block('b1', 0, [['', '12', 'rir_0'], ['102.5', '5', null], ['110', '1', 'rir_1', 'planned'], ['130', '2', 'warm_up']])]),
@@ -255,17 +256,17 @@ describe('exercise session facts — rules version', () => {
     }))).toEqual([
       {
         sessionId: 's1', exerciseDefinitionId: DEFINITION, bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
-        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, volumeComplete: true, workingSets: 2,
+        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, volumeComplete: true, workingSets: 2, volumeSets: 2,
         prE1rm: false, prWeight: false, prVolume: false,
       },
       {
         sessionId: 's2', exerciseDefinitionId: DEFINITION, bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
-        topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, volumeComplete: true, workingSets: 2,
+        topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, volumeComplete: true, workingSets: 2, volumeSets: 2,
         prE1rm: true, prWeight: true, prVolume: false,
       },
       {
         sessionId: 's4', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
-        topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, volumeComplete: true, workingSets: 1,
+        topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, volumeComplete: true, workingSets: 1, volumeSets: 1,
         prE1rm: true, prWeight: true, prVolume: false,
       },
     ]);

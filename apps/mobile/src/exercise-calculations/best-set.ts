@@ -6,7 +6,7 @@
 import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg } from './analytics.ts';
 import { summarizeVolume, type LoadContext, type SetMetrics } from './load-metrics.ts';
 import { compareWeightRecord } from './records.ts';
-import { isWorkingSet, type SessionSetPerformanceStatus } from './set-semantics.ts';
+import { isWorkingSet, isVolumeSet, type SessionSetPerformanceStatus } from './set-semantics.ts';
 
 type Ordered = { orderIndex: number; id: string };
 
@@ -43,7 +43,7 @@ export const eligibleSetsByBlockInSessionOrder = <S extends BestSetSetInput, B e
       if ((set.deletedAt ?? null) !== null) return [];
       if (!isWorkingSet({
         weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
-      })) return [];
+      }, block.loadContext.effortPolicy)) return [];
       const metric = calculateAnalyticsSetMetrics({ ...set, ...block.loadContext });
       return metric.eligible ? [{ block, set, metric }] : [];
     }),
@@ -94,21 +94,24 @@ export const pickTopWeightSet = <B, S extends { weightValue: string; repsValue: 
 };
 
 /**
- * One session's bests for one exercise, from its blocks' working sets
- * (`eligibleSetsByBlockInSessionOrder`): the inputs of every record
- * (`records.ts`). Null when the session has no working set of it.
+ * One session's strength bests from working sets and volume from independently
+ * included sets: the inputs of every record (`records.ts`). Null when neither
+ * calculation has an included performed set.
  */
 export const summarizeSessionBests = <S extends BestSetSetInput, B extends BestSetBlockInput<S>>(
   blocks: readonly B[],
 ) => {
-  const byBlock = eligibleSetsByBlockInSessionOrder<S, B>(blocks).filter((sets) => sets.length > 0);
-  if (byBlock.length === 0) return null;
+  const byBlock = eligibleSetsByBlockInSessionOrder<S, B>(blocks);
   const sets = byBlock.flat();
+  const volumeByBlock = blocks.map(block => block.sets.filter(set => (set.deletedAt ?? null) === null && isVolumeSet({
+    weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
+  }, block.loadContext.effortPolicy)).map(set => calculateAnalyticsSetMetrics({ ...set, ...block.loadContext })));
+  if (sets.length === 0 && volumeByBlock.every(metrics => metrics.length === 0)) return null;
   let knownVolume: number | null = 0;
   let totalVolume: number | null = 0;
   // Each block sums alone, as the completed-session volume comparison does.
-  for (const blockSets of byBlock) {
-    const coverage = summarizeVolume(blockSets.map(({ metric }) => metric));
+  for (const metrics of volumeByBlock) {
+    const coverage = summarizeVolume(metrics);
     knownVolume = addFiniteVolume(knownVolume, coverage.knownVolumeKgReps);
     totalVolume = addFiniteVolume(totalVolume, coverage.totalVolumeKgReps);
   }
@@ -118,5 +121,6 @@ export const summarizeSessionBests = <S extends BestSetSetInput, B extends BestS
     volumeKg: totalVolume ?? knownVolume,
     volumeComplete: totalVolume !== null,
     workingSets: sets.length,
+    volumeSets: volumeByBlock.reduce((count, metrics) => count + metrics.length, 0),
   };
 };

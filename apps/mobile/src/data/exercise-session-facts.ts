@@ -5,6 +5,8 @@
 
 import { and, eq, gte, inArray, isNotNull, isNull, lt, lte, or, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
+import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
+import { effortPolicyKey } from '@/src/exercise-calculations/effort-policy';
 
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { personalLoadContext } from '@/src/exercise-calculations/analytics';
@@ -141,7 +143,7 @@ const createLoadContextResolver = (tx: FactsTx, definitionIds: readonly string[]
   // Ordinary policy ignores readings, so skip the timeline read when calculations are off.
   const resolveWeight = enabled ? loadAsOfWeightResolver(tx) : () => null;
   return (definitionId: string, startedAt: Date) =>
-    personalLoadContext(enabled, definitions.get(definitionId) ?? null, resolveWeight(startedAt));
+    personalLoadContext(enabled, definitions.get(definitionId) ?? null, resolveWeight(startedAt), getPersonalEffortPolicy());
 };
 
 /** Each definition's completed history, grouped by session. */
@@ -182,7 +184,7 @@ const writeFacts = (tx: FactsTx, scope: DefinitionScope): number => {
   }
   const rows = [...loadDefinitionHistories(tx, scope)]
     .flatMap(([definitionId, history]) => deriveExerciseSessionFacts(definitionId, history));
-  // 13 columns a row: 60 rows stay under the bound-parameter limit.
+  // 14 columns a row: 60 rows stay under the bound-parameter limit.
   for (const batch of chunks(rows, 60)) {
     tx.insert(exerciseSessionFacts).values(batch).run();
   }
@@ -200,10 +202,10 @@ export const rebuildAllExerciseSessionFacts = (tx: FactsTx): number => {
   const written = writeFacts(tx, 'all');
   tx.delete(exerciseSessionFactsStale).run();
   tx.insert(exerciseSessionFactsState)
-    .values({ id: STATE_ID, rulesVersion: EXERCISE_SESSION_FACTS_RULES_VERSION })
+    .values({ id: STATE_ID, rulesVersion: EXERCISE_SESSION_FACTS_RULES_VERSION, effortPolicyKey: effortPolicyKey(getPersonalEffortPolicy()) })
     .onConflictDoUpdate({
       target: exerciseSessionFactsState.id,
-      set: { rulesVersion: EXERCISE_SESSION_FACTS_RULES_VERSION },
+      set: { rulesVersion: EXERCISE_SESSION_FACTS_RULES_VERSION, effortPolicyKey: effortPolicyKey(getPersonalEffortPolicy()) },
     })
     .run();
   return written;
@@ -224,7 +226,7 @@ export const drainExerciseSessionFacts = (database: LocalDatabase): ExerciseSess
     const tx = transaction as Transaction;
     const state = tx.select().from(exerciseSessionFactsState)
       .where(eq(exerciseSessionFactsState.id, STATE_ID)).get();
-    if (state?.rulesVersion !== EXERCISE_SESSION_FACTS_RULES_VERSION) {
+    if (state?.rulesVersion !== EXERCISE_SESSION_FACTS_RULES_VERSION || state.effortPolicyKey !== effortPolicyKey(getPersonalEffortPolicy())) {
       return { kind: 'full', rows: rebuildAllExerciseSessionFacts(tx) };
     }
     const stale = tx.select().from(exerciseSessionFactsStale).all()
@@ -253,6 +255,7 @@ const factColumns = {
   volumeKg: exerciseSessionFacts.volumeKg,
   volumeComplete: exerciseSessionFacts.volumeComplete,
   workingSets: exerciseSessionFacts.workingSets,
+  volumeSets: exerciseSessionFacts.volumeSets,
   prE1rm: exerciseSessionFacts.prE1rm,
   prWeight: exerciseSessionFacts.prWeight,
   prVolume: exerciseSessionFacts.prVolume,
@@ -322,8 +325,8 @@ export type ExerciseBests = {
   oneRepMax: (ExerciseBestSession & { value: number; weight: number; reps: number }) | null;
   topWeight: (ExerciseBestSession & { weight: number; reps: number }) | null;
   /** The best complete session volume. */
-  volume: (ExerciseBestSession & { value: number; workingSets: number }) | null;
-  /** The newest session in scope: every fact row has a working set. */
+  volume: (ExerciseBestSession & { value: number; workingSets: number; volumeSets?: number }) | null;
+  /** The newest session in scope with at least one working set. */
   latest: ExerciseBestSession | null;
 };
 
@@ -343,6 +346,7 @@ const bestsColumns = {
   volumeKg: exerciseSessionFacts.volumeKg,
   volumeComplete: exerciseSessionFacts.volumeComplete,
   workingSets: exerciseSessionFacts.workingSets,
+  volumeSets: exerciseSessionFacts.volumeSets,
 };
 
 type BestsRow = {
@@ -359,6 +363,7 @@ type BestsRow = {
   volumeKg: number | null;
   volumeComplete: boolean;
   workingSets: number;
+  volumeSets: number;
 };
 
 // The derivation names its best sets in the same drained transaction, so a
@@ -408,9 +413,9 @@ const pickBests = (rows: BestsRow[]): ExerciseBests => {
         reps: bestSetReps(row.e1rmRepsValue),
       },
       weight: row.topWeightKg === null ? null : { ...session, weight: row.topWeightKg, reps: bestSetReps(row.topWeightRepsValue) },
-      volume: row.volumeComplete && row.volumeKg !== null ? { ...session, value: row.volumeKg, workingSets: row.workingSets } : null,
+      volume: row.volumeComplete && row.volumeKg !== null ? { ...session, value: row.volumeKg, workingSets: row.workingSets, volumeSets: row.volumeSets } : null,
     });
-    latest = session;
+    if (row.workingSets > 0) latest = session;
   }
   const { oneRepMax, weight, volume } = book.holders;
   return { oneRepMax, topWeight: weight, volume, latest };

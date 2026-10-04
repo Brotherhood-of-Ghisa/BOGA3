@@ -171,7 +171,7 @@ describe('exercise session facts — rows and reads', () => {
     expect(db().select().from(exerciseSessionFactsState).all()).toEqual([]);
 
     expect(drainExerciseSessionFacts(asLocal())).toEqual({ kind: 'full', rows: 1 });
-    expect(db().select().from(exerciseSessionFactsState).all()).toEqual([{ id: 'facts', rulesVersion: EXERCISE_SESSION_FACTS_RULES_VERSION }]);
+    expect(db().select().from(exerciseSessionFactsState).all()).toEqual([{ id: 'facts', rulesVersion: EXERCISE_SESSION_FACTS_RULES_VERSION, effortPolicyKey: '001111111111110000' }]);
     expect(queued()).toEqual([]);
     expect(drainExerciseSessionFacts(asLocal())).toEqual({ kind: 'fresh' });
   });

@@ -180,6 +180,22 @@ describe('exercise page model', () => {
       .toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
   });
 
+  it('uses Working set for Weight records independently of Volume, retaining every row figure', () => {
+    const sets = [performedSet('technique', '100', '6', 'technique')];
+    const baseline = { oneRepMax: 200, weight: { weight: 100, reps: 5 } };
+    const volumeOnly = buildSetRows(sets, baseline, {
+      ...ordinaryLoadContext(), effortPolicy: { workingSetEfforts: [], volumeEfforts: ['technique'] },
+    });
+    expect(volumeOnly[0]).toMatchObject({ weight: 100, reps: 6, volume: 600, weightRecord: false, oneRepMaxRecord: false });
+    expect(recordBandFor(volumeOnly)).toBeNull();
+
+    const workingOnly = buildSetRows(sets, baseline, {
+      ...ordinaryLoadContext(), effortPolicy: { workingSetEfforts: ['technique'], volumeEfforts: [] },
+    });
+    expect(workingOnly[0]).toMatchObject({ volume: 600, weightRecord: true, oneRepMaxRecord: false });
+    expect(recordBandFor(workingOnly)?.kind).toBe('weight');
+  });
+
   it('picks the session\'s record set across every block of the exercise', () => {
     const baseline = { oneRepMax: 100, weight: { weight: 85, reps: 5 } };
     const earlierBlock = { id: 'block-1', sets: [performedSet('e', '110', '5', 'rir_0')] };
@@ -375,6 +391,15 @@ describe('exercise page model', () => {
       });
     }
   );
+
+  it('skips hidden efforts for new rows without rewriting the prescribed source', () => {
+    const source = plannedSet('p', '80', '6', 'rir_3');
+    expect(addSet([source], 'next', ['rir_2', 'rir_0'])[1]).toMatchObject({
+      setType: 'rir_2', plannedSetType: null, performanceStatus: 'unperformed',
+    });
+    expect(source.plannedSetType).toBe('rir_3');
+    expect(addSet([source], 'next', ['rir_4'])[1].setType).toBe('rir_4');
+  });
 
   it('keeps an explicitly cleared planned effort blank through edits and confirmation', () => {
     const sets = [plannedSet('p', '80', '6', 'rir_3')];

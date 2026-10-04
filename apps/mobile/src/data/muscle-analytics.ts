@@ -1,15 +1,18 @@
 import type { SessionWeightContext } from '@/src/bodyweight/as-of';
+import type { EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
 import { type SetMetrics } from '@/src/exercise-calculations/load-metrics';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg, personalLoadContext } from '@/src/exercise-calculations/analytics';
 import {
   countedSessionIds,
   isWorkingSet,
+  isVolumeSet,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
 export type MuscleAnalyticsInput = {
+  effortPolicy?: EffortCalculationPolicy;
   bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: {
     id: string;
@@ -48,6 +51,8 @@ export type MuscleAnalyticsInput = {
 };
 
 export type MuscleSetContribution = {
+  working: boolean;
+  volumeIncluded: boolean;
   /** Stable identity of the physical source set within one aggregation run. */
   setIdentity: string;
   muscleGroupId: string;
@@ -105,16 +110,16 @@ export const getMuscleContributionRoleWeight = (role: MuscleContributionRole): n
   return 0;
 };
 
-/** Muscle analytics reads working sets only (`isWorkingSet`); a warm-up contributes nothing. */
+/** Personal working-set eligibility controls counts and strength metrics. */
 const isMuscleAnalyticsWorkingSet = (
-  set: MuscleAnalyticsInput['exerciseSets'][number]
+  set: MuscleAnalyticsInput['exerciseSets'][number], policy?: EffortCalculationPolicy,
 ): boolean =>
   isWorkingSet({
     reps: set.repsValue,
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
     setType: set.setType,
-  });
+  }, policy);
 
 const sessionIdByExerciseId = (input: MuscleAnalyticsInput): Map<string, string> => {
   const sessionIds = new Set(input.sessions.map((session) => session.id));
@@ -128,7 +133,7 @@ const sessionIdByExerciseId = (input: MuscleAnalyticsInput): Map<string, string>
 export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): number => {
   const sessionIdOf = sessionIdByExerciseId(input);
   return input.exerciseSets.filter(
-    (set) => sessionIdOf.has(set.sessionExerciseId) && isMuscleAnalyticsWorkingSet(set)
+    (set) => sessionIdOf.has(set.sessionExerciseId) && isMuscleAnalyticsWorkingSet(set, input.effortPolicy)
   ).length;
 };
 
@@ -141,7 +146,7 @@ export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): S
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
     setType: set.setType,
-  }));
+  }), input.effortPolicy);
 };
 
 const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
@@ -193,11 +198,12 @@ export const collectMuscleSetContributions = (
   );
   const contributions: MuscleSetContribution[] = [];
 
-  // Every contribution is a working set's: no consumer re-checks the rule.
+  // Emit either contribution, carrying settled eligibility for each column.
   for (const [setIndex, set] of input.exerciseSets.entries()) {
-    if (!isMuscleAnalyticsWorkingSet(set)) {
-      continue;
-    }
+    const working = isMuscleAnalyticsWorkingSet(set, input.effortPolicy);
+    const volumeIncluded = isVolumeSet({ reps: set.repsValue, weight: set.weightValue,
+      performanceStatus: set.performanceStatus, setType: set.setType }, input.effortPolicy);
+    if (!working && !volumeIncluded) continue;
 
     const exercise = sessionExerciseById.get(set.sessionExerciseId);
     if (!exercise || exercise.exerciseDefinitionId === null) continue;
@@ -212,9 +218,10 @@ export const collectMuscleSetContributions = (
       input.bodyweightCalculationsEnabled ?? false,
       definitionById.get(exercise.exerciseDefinitionId),
       session,
+      input.effortPolicy,
     );
     const metrics = calculateAnalyticsSetMetrics({ ...set, ...context });
-    const rawSetVolume = metrics.eligible && metrics.load.status === 'known'
+    const rawSetVolume = !volumeIncluded ? 0 : metrics.eligible && metrics.load.status === 'known'
       ? metrics.load.perSideCalculatedLoadKg * metrics.reps : null;
     const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
@@ -223,6 +230,7 @@ export const collectMuscleSetContributions = (
       if (roleWeight === 0) continue;
 
       contributions.push({
+        working, volumeIncluded,
         setIdentity: set.id !== undefined ? `id:${set.id}` : `row:${setIndex}`,
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
@@ -294,14 +302,16 @@ export const aggregateSelectedMuscleDailyEffort = (
     };
 
     entriesByDate.set(dateKey, entry);
-    entry.setCount += 1;
-    entry.sessionIds.add(contribution.sessionId);
+    if (contribution.working !== false) {
+      entry.setCount += 1;
+      entry.sessionIds.add(contribution.sessionId);
+    }
     entry.knownWeight = addFiniteVolume(entry.knownWeight, contribution.weightedVolume ?? 0);
     entry.totalWeight = addFiniteVolume(entry.totalWeight, contribution.weightedVolume);
     entry.contributions.push(contribution);
   }
 
-  // Contributions are working sets only, so a warm-up-only day makes no cell.
+  // A volume-only day has a volume cell and zero counted sets/sessions.
   return Array.from(entriesByDate.values())
     .map(({ sessionIds, ...entry }) => ({
       ...entry,
@@ -332,6 +342,8 @@ export type SelectedMuscleWeeklyEffort = {
  */
 export type DailyEffortMetrics = {
   dateKey: string;
+  /** Per-muscle counts for target grading; the existing displayed metrics are unchanged. */
+  workingSetCountsByMuscle?: Record<string, number>;
   totalVolume: number | null;
   knownVolume?: number | null;
   workingSetCount: number;
@@ -363,6 +375,7 @@ export const accumulateContributionMetrics = (
   acc.knownVolume = addFiniteVolume(acc.knownVolume, contribution.weightedVolume ?? 0);
   acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume);
 
+  if (contribution.working === false) return;
   acc.workingSetCount += 1;
 
   const weight = contribution.enteredWeightKg;
@@ -466,11 +479,17 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
   dailyEffort
     .map((day) => {
       const acc = createEffortMetricAccumulator();
+      const identitiesByMuscle = new Map<string, Set<string>>();
       for (const contribution of day.contributions) {
         accumulateContributionMetrics(acc, contribution);
+        if (contribution.working === false) continue;
+        const identities = identitiesByMuscle.get(contribution.muscleGroupId) ?? new Set<string>();
+        identities.add(contribution.setIdentity);
+        identitiesByMuscle.set(contribution.muscleGroupId, identities);
       }
       return {
         dateKey: day.dateKey,
+        workingSetCountsByMuscle: Object.fromEntries([...identitiesByMuscle].map(([id, identities]) => [id, identities.size])),
         totalVolume: acc.totalVolume, knownVolume: acc.knownVolume,
         workingSetCount: acc.workingSetCount,
         estimatedRM1: acc.bestRM1,

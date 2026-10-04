@@ -4,7 +4,7 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 
-import { canonicalizeWeightForReps, isWorkingSet } from '@/src/exercise-calculations/set-semantics';
+import { canonicalizeWeightForReps, isWorkingSet, isVolumeSet } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 
@@ -14,7 +14,7 @@ import type { ExerciseRecordBaseline } from './exercise-page-model';
  * exercise, each with where it was set, and the sets of the previous session.
  * The records come from the exercise session facts (`ExerciseBests`); `Last`
  * is built from that one session's completed history entries. Only working
- * sets count toward a record or a summary figure; a warm-up keeps its own line
+ * sets count toward strength records; Volume has its own policy. Every set keeps its line
  * in `Last`, and a session with no working set is not one for this exercise.
  */
 
@@ -59,7 +59,7 @@ export type LastSession = {
   /** The heaviest working set's entered weight. */
   maxWeight: number | null;
   volume: number | null;
-  /** Every line, warm-ups included; the figures above read working sets only. */
+  /** Every performed line; aggregate figures apply the two independent policies. */
   sets: RecordSet[];
   knownVolume?: number | null;
   volumeComplete?: boolean;
@@ -79,6 +79,7 @@ type SessionBlock = {
   sets: RecordSet[];
   /** The lines that count toward records and summaries. */
   workingSets: RecordSet[];
+  volumeSets: RecordSet[];
 };
 
 type HistorySet = ExerciseHistorySessionEntry['sets'][number];
@@ -110,13 +111,17 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
       gymName: entry.gymName ?? null,
       sets: [],
       workingSets: [],
+      volumeSets: [],
     };
     for (const set of entry.sets) {
       const recordSet = toRecordSet(set, entry);
       if (!recordSet) continue;
       block.sets.push(recordSet);
-      if (isWorkingSet({ weight: set.weightValue, reps: set.repsValue, setType: set.setType })) {
+      if (isWorkingSet({ weight: set.weightValue, reps: set.repsValue, setType: set.setType }, entry.loadContext?.effortPolicy)) {
         block.workingSets.push(recordSet);
+      }
+      if (isVolumeSet({ weight: set.weightValue, reps: set.repsValue, setType: set.setType }, entry.loadContext?.effortPolicy)) {
+        block.volumeSets.push(recordSet);
       }
     }
     blocks.set(entry.sessionId, block);
@@ -152,7 +157,7 @@ export const exerciseRecordsFrom = (bests: ExerciseBests): ExerciseRecords => ({
     ? { ...sessionOf(bests.topWeight), weight: bests.topWeight.weight, reps: bests.topWeight.reps }
     : null,
   volume: bests.volume
-    ? { ...sessionOf(bests.volume), value: bests.volume.value, setCount: bests.volume.workingSets }
+    ? { ...sessionOf(bests.volume), value: bests.volume.value, setCount: bests.volume.volumeSets ?? bests.volume.workingSets }
     : null,
 });
 
@@ -160,7 +165,7 @@ export const exerciseRecordsFrom = (bests: ExerciseBests): ExerciseRecords => ({
 export const deriveLastSession = (entries: ExerciseHistorySessionEntry[]): LastSession | null => {
   const newest = groupBySession(entries)[0];
   if (!newest) return null;
-  const volume = sumVolume(newest.workingSets);
+  const volume = sumVolume(newest.volumeSets);
   return {
     completedAt: newest.completedAt,
     gymId: newest.gymId,
@@ -168,7 +173,7 @@ export const deriveLastSession = (entries: ExerciseHistorySessionEntry[]): LastS
     oneRepMax: bestOneRepMax(newest.workingSets),
     maxWeight: Math.max(...newest.workingSets.map((set) => set.weight)),
     volume,
-    knownVolume: newest.workingSets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
+    knownVolume: newest.volumeSets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
     volumeComplete: volume !== null,
     sets: newest.sets,
   };

@@ -2,7 +2,8 @@ import { sessionBodyWeightForCalculation, type SessionWeightContext } from '../b
 import { parseSetWeight } from './index.ts';
 import { formatVolume } from './format.ts';
 import { compareWeightRecord } from './records.ts';
-import { canonicalizeWeightForReps, isWorkingSet } from './set-semantics.ts';
+import { canonicalizeWeightForReps, isWorkingSet, isVolumeSet } from './set-semantics.ts';
+import type { EffortCalculationPolicy } from './effort-policy.ts';
 import {
   calculateSetMetrics, summarizeVolume,
   type LoadContext, type LoadInputMode, type SetMetricInput, type VolumeCoverage,
@@ -19,7 +20,9 @@ export const personalLoadContext = (
   enabled: boolean,
   definition?: { bodyweightContribution?: number; loadInputMode?: LoadInputMode } | null,
   session?: SessionWeightContext | null,
+  effortPolicy?: EffortCalculationPolicy,
 ): LoadContext => ({
+  effortPolicy,
   policy: enabled ? 'personal' : 'ordinary',
   bodyweightContribution: enabled ? definition?.bodyweightContribution ?? 0 : 0,
   loadInputMode: definition?.loadInputMode ?? 'total_load',
@@ -44,11 +47,11 @@ export type AnalyticsSetInput = Omit<SetMetricInput, keyof LoadContext>;
  * The sets a stat reads (`isWorkingSet`): filter before summarizing. Per-set
  * figures still come from `calculateAnalyticsSetMetrics` on any row.
  */
-export const workingSetsOnly = <T extends AnalyticsSetInput>(sets: readonly T[]): T[] =>
+export const workingSetsOnly = <T extends AnalyticsSetInput>(sets: readonly T[], policy?: EffortCalculationPolicy): T[] =>
   sets.filter(set => isWorkingSet({
     weight: set.weightValue ?? '', reps: set.repsValue ?? '',
     performanceStatus: set.performanceStatus, setType: set.setType,
-  }));
+  }, policy));
 
 /** Resolve derived metrics from the entered Weight and internal calculation context. */
 export function calculateAnalyticsSetMetrics(input: SetMetricInput) {
@@ -66,11 +69,15 @@ export function summarizeExerciseLoad(
   context: LoadContext = ordinaryLoadContext(),
 ) {
   const metrics = sets.map(set => calculateAnalyticsSetMetrics({ ...set, ...context }));
-  const volumeCoverage = summarizeVolume(metrics);
+  const volumeCoverage = summarizeVolume(metrics.filter((_, index) => isVolumeSet({
+    weight: sets[index].weightValue ?? '', reps: sets[index].repsValue ?? '',
+    performanceStatus: sets[index].performanceStatus, setType: sets[index].setType,
+  }, context.effortPolicy)));
   let estimatedOneRepMax: number | null = null;
   let topWeightSet: { weight: number; reps: number } | null = null;
   for (const [index, metric] of metrics.entries()) {
-    if (!metric.eligible) continue;
+    if (!metric.eligible || !isWorkingSet({ weight: sets[index].weightValue ?? '', reps: sets[index].repsValue ?? '',
+      performanceStatus: sets[index].performanceStatus, setType: sets[index].setType }, context.effortPolicy)) continue;
     if (metric.estimatedOneRepMaxKg !== null) {
       estimatedOneRepMax = Math.max(estimatedOneRepMax ?? 0, metric.estimatedOneRepMaxKg);
     }
@@ -101,10 +108,10 @@ export function sessionVolumeSummary(coverage: VolumeCoverage): { volume: string
   if (coverage.knownSetCount === 0 || coverage.knownVolumeKgReps === null) {
     return { volume: '—', volumeNote: coverage.overflow
       ? 'Volume unavailable. The combined load exceeds the supported numeric range.'
-      : 'Volume unavailable. Some working sets have missing or invalid load information.' };
+      : 'Volume unavailable. Some included sets have missing or invalid load information.' };
   }
   return { volume: formatVolume(coverage.knownVolumeKgReps),
-    volumeNote: `Volume incomplete. Known subtotal from ${coverage.knownSetCount} of ${coverage.eligibleSetCount} working sets.` };
+    volumeNote: `Volume incomplete. Known subtotal from ${coverage.knownSetCount} of ${coverage.eligibleSetCount} included sets.` };
 }
 
 /** Numeric slot only: callers must render coverage alongside this figure. */
