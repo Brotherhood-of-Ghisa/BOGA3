@@ -1,10 +1,12 @@
 # Accepted replacement target — Progress tables
 
-**Implemented landing direction.** On 2026-10-04 the user chose the first
+**Implemented and verified against the accepted direction.** On 2026-10-04 the user chose the first
 chevron proposal and asked to remove unnecessary subtitles. `/progress` now
-owns the table implementation and `/stats-history` re-exports it. The shipping
-PR carries real-data Jest and native capture evidence; final milestone-wide
-acceptance is a separate follow-up. Current rules live in `../ux-rules.md`
+owns the table implementation and `/stats-history` re-exports it. Shipping PRs
+carry real-data Jest, native captures and the comparison against this target.
+The retained palette, repository typography and native frame follow the written
+brief; the full taxonomy scrolls beyond the image's illustrative excerpt.
+Current rules live in `../ux-rules.md`
 §13, `../screen-map.md` and `../navigation-contract.md`.
 
 ## Target
@@ -60,7 +62,7 @@ acceptance is a separate follow-up. Current rules live in `../ux-rules.md`
 
 | Flow | Trigger and steps | Success | Failure / edge |
 | --- | --- | --- | --- |
-| Compare muscles | Open Progress; choose period or metric | All individual rows show both periods and the correct signed change | First load shows Loading; a failed read offers Retry; unknown values never become zero |
+| Compare muscles | Open Progress; choose period or metric | All individual rows show both periods and the correct signed change | First load shows Loading; a failed read says `Could not load progress` with Retry, without raw database details; unknown values never become zero |
 | Inspect contributions | Press a muscle's chevron; bring the inline section into view | One selected muscle; exercise rows and Total reconcile with its row in both periods | Previous-only exercises remain; a successful all-zero read shows a metric-specific empty state; superseded reads cannot publish |
 | Open individual history | Press a muscle or exercise name; dismiss its sheet | Exactly one muscle ID or exercise definition ID; previous selection, period, metric and scroll restored | Names never also select; families and Total are inert; history failure remains inline and retryable |
 | Respect Settings | Change the saved view, look-back or calculation choices; reopen/refocus | All projections use the durable active account choices; unset view opens Daily, valid saved Weekly still works | Failed writes keep the prior durable value and retry; account switches clear foreign state and ignore old responses |
@@ -91,8 +93,9 @@ cells on a full-width second line, with matching shared headers. Never split a
 figure's digits across lines. If extreme figures/percentages exceed even that
 three-cell budget, labelled Now/Previous/Change lines each use the full row
 width. This additional fallback preserves figures and units; it deliberately
-extends the reference's second-line layout. Coverage copy may occupy a separate
-line. No horizontal table scrolling, clipped controls or content hidden under
+extends the reference's second-line layout. Incomplete Volume coverage uses
+separate full-width lines beneath the figures, labelled Now/Previous. No
+horizontal table scrolling, clipped controls or content hidden under
 the tabs.
 
 Signed deltas use the existing ink roles, never red/green. Preserve the landed
@@ -130,8 +133,9 @@ family history targets never silently open a multi-muscle heatmap.
 
 ## Target states and acceptance evidence
 
-These states are governed by the brief; the selected image is a design reference, not a runtime screenshot. The selected
-image illustrates the contribution state; the remaining states use this brief
+These states are governed by the brief; the selected image is a design
+reference, not a runtime screenshot. The image illustrates the contribution
+state; the remaining states use this brief
 and the retained [history target](progress.md#history-sheets-and-heatmaps-dlm-t09).
 
 | State | Required result |

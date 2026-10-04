@@ -359,7 +359,7 @@ export function StatsScreenShell({
             testID="stats-comparison-label">{formatPeriodComparison(periodDays)}</Text>
         </> : <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
           value={viewMode} onChange={onSelectViewMode} testIDPrefix="stats-view-mode-chip" />}
-        {errorMessage ? <StatePanel body={errorMessage} fill={false} kind="error" title="Could not load progress"
+        {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}

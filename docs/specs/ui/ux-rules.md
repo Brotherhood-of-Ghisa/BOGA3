@@ -712,7 +712,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    separators, reduced font sizes or split digits. Names wrap. If figures cannot
    fit beside name/actions, put three aligned numeric cells on a full-width
    second line with matching headers; if extreme figures exceed that budget too,
-   use labelled full-width Now/Previous/Change lines. Coverage can occupy another line. No
+   use labelled full-width Now/Previous/Change lines. Incomplete Volume coverage
+   uses full-width lines beneath the figures, labelled Now/Previous. No
    horizontal table scroll. Selection differs from target shading: working
    counts use the saved quota × selected weeks, capped at 100%, in `viz1`–`viz4`.
    Text on a viz ground is ink; accessible values explain the quota and count.
