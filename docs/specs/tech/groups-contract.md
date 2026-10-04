@@ -372,11 +372,15 @@ unit of work, coalesced on its natural key. It follows ground rules 1–5.
 | `group_id`, `group_exercise_id` | Target jobs only; → `groups` / `group_exercises` `on delete cascade` |
 | `causes` | `text[]`, the union of `set`, `link`, `load_mode`, `rules`, and (M25-T06) `certification`. T05 reads it: `{rules}` alone is a silent recompute (§2.11). |
 | `generation` | Bumped by every re-enqueue. `group_eval_complete` deletes a job only if it is unchanged since the claim. |
-| `attempts`, `available_at`, `last_sqlstate` | Failure backoff: 2 s, 4 s, … capped at 5 min |
+| `attempts`, `available_at`, `last_sqlstate` | Failure backoff: 2 s, 4 s, … capped at 5 min. The failure that reaches `group_eval_max_attempts()` (10, about 13.5 min after the first) parks the job: `available_at = 'infinity'`. |
 | `claimed_until` | A 2-minute lease |
 
 A re-enqueue merges `causes`, bumps `generation`, and makes the job available
-now. The job is never dropped: a failure only delays it.
+now, a parked one included. It keeps `attempts`, so a job that still fails
+parks again after one try. The job is never dropped: a failure delays it, and a
+failing job parks rather than retrying forever. The comparison queue
+(`group_metric_eval_queue`, §11.2) parks the same way at the same cap; its
+re-enqueue resets `attempts`.
 
 ### 2.9 `group_set_facts` — normalized sets (M25-T04)
 
@@ -471,8 +475,10 @@ service-role key, a service-role boundary with no client API. One drain:
 
    On any error, `group_eval_fail(job, sqlstate)` applies the backoff and
    writes one `group.eval_failed` row with `context = {job_id, kind,
-   sqlstate}`, or `EVALX` for a non-database error. The rest of the drain
-   continues.
+   sqlstate}`, or `EVALX` for a non-database error. The failure that reaches
+   `group_eval_max_attempts()` parks the job instead (§2.8) and writes one
+   `group.eval_parked` row whose `context` also carries `attempts`. The rest
+   of the drain continues.
 
 The reply is `{ rules_version, rules_requeued, claimed, completed, requeued,
 failed, jobs[] }`, each job carrying its `outcome` and live `targets`.
@@ -516,7 +522,8 @@ Archive and leave queue nothing: the board freezes.
 - `service_role` executes only `group_eval_check_secret`, `_claim`,
   `_session_rows`, `_complete`, `_fail`, and `_requeue_rules`. `anon` and
   `authenticated` execute none. Everything else is owner-only: the triggers,
-  enqueue, kick, sweep, config, targets, apply, and fingerprint.
+  enqueue, kick, sweep, config, targets, apply, fingerprint, the attempt cap,
+  and `group_eval_retry_parked`.
 
 **Rules version 4** adds the facts' `working`, so the evaluator stores the
 app's working-set rule without a SQL copy of it; a change to
@@ -549,6 +556,10 @@ sets `allowImportingTsExtensions` so Deno loads it by relative path, as
 - `group.eval_kick_failed` and missed kicks: the sweep covers them.
 - `group.eval_failed`: the job retries with backoff. Check
   `group_eval_queue.last_sqlstate` for poison jobs.
+- `group.eval_parked`: the job hit the attempt cap and waits. Fix the cause
+  (often an evaluator deployed behind its migrations), then
+  `select app_public.group_eval_retry_parked();` gives every parked job in
+  both queues a fresh attempt budget; the sweep picks them up.
 - Manual drain: `select app_public.group_eval_kick();`.
 
 ### 2.11 Boards and board events (M25-T05)
