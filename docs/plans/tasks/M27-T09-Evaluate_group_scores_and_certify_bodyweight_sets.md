@@ -1,96 +1,80 @@
----
-task_id: M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets
-milestone_id: M27
-status: in_progress
-ui_impact: "no"
-areas: "cross-stack"
-runtimes: "node|deno|supabase|sql"
-gates_fast: "./boga test fast"
-gates_slow: "./boga test backend; ./boga test ios-groups-e2e"
-docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/tech/groups-contract.md, docs/specs/tech/bodyweight-load-contract.md, docs/specs/06-testing-strategy.md"
----
+# M27-T09 — Evaluate private percentage group scores
 
-# M27-T09 — Evaluate group scores and certify bodyweight sets
-
-- Status: `in_progress`
-- Depends on: M27-T06, M27-T08.
-- Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
-- Governing decisions: D7–D10.
+- Status: `planned` (re-scoped 2026-10-04)
+- Depends on: [M27-T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [M27-T13](M27-T13-Preserve_certifications_across_rule_changes.md), [existing #411 task](T-20260930-01-Keep_zero_contribution_group_boards_stable.md)
+- Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
+- Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
+- Areas: cross-stack; UI impact: yes (server-projected scores and omissions)
 
 ## Objective and scope
 
-Rank actual performances under each target group's rules and keep corrections,
-recalculation and certification coherent. Read AGENTS.md, specs 02/03/05/09/10,
-groups/bodyweight contracts and `supabase/README.md`. Refresh evaluator queue,
-facts, SQL apply and fingerprint paths; read test-directory READMEs.
+Implement T08's accepted percentage representation throughout evaluation,
+publication and every group reader. Preserve T13's witness certificates while
+scores change and enforce milestone D5 privacy before data reaches a client.
+The old snapshot/three-board/public-bodyweight implementation is not this task.
 
 ## Deliverables and acceptance
 
-1. Carry group-independent performance facts (entered amount/mode, reps,
-   performed state and session B/provenance) into target-specific scoring.
-   Resolve effective load using the target group's coefficient, not personal
-   coefficient or a precomputed personal 1RM. Reuse T03's TS mathematics.
-2. Materialize best-per-member entries for all three boards with eligibility,
-   correct units, deterministic ties and Certified/All scope. Reps requires
-   unassisted zero external load but no B; strength requires valid B. Do not
-   let assistance sets count as unweighted reps. Conventional boards regress cleanly.
-3. Body-weight corrections/backfill, load-mode/amount edits, deletes/undeletes,
-   links, rule changes and membership changes enqueue the appropriate work.
-   Personal coefficient changes cannot rescore a group performance.
-4. Rebuild and publish a rule revision coherently using T08's frozen-entry
-   policy. Identify rules changes separately; do not generate performed-record
-   cards from them. Preserve old historic event meanings and existing valid
-   link/void/provisional-record behaviour.
-5. Pin the inputs the certified metrics depend on, including B/provenance for
-   strength and actual external mode. Corrections invalidate affected
-   attestations; new weigh-ins and rule-only edits do not falsify the old raw
-   performance. No automatic migration of an unpinned B into a certified score.
-6. Group stream/friend session calculations use shared effective-load semantics
-   and explicit scope: linked group comparisons use group rules; personal/as-
-   logged summaries are labelled as such and cannot be passed off as board scores.
-7. Preserve failure isolation, generation guards, retries, locks and cache
-   refresh behaviour. A broken group evaluation never aborts personal sync.
+1. Resolve the same private dated reading for effective-load computation and
+   normalization. Use the shared TypeScript kernel, current source/target
+   distribution rules and accepted T08 formula; never duplicate Wathan in SQL
+   or normalize a target-mode value with an incompatible denominator.
+2. Materialize T08's chosen Volume and 1RM results in Certified/All scopes.
+   Off and c=0 use ordinary Volume (kg·reps)/1RM (kg) without querying readings.
+   On with c>0 uses %BW 1RM and the chosen Volume policy. Unavailable private
+   input omits dependent enabled scores; never substitute zero, fall back to kg
+   while On, or reveal why the dependency failed. Rank before display rounding.
+3. Re-evaluate affected comparisons after effective rules/contribution/mode
+   changes and publish one coherent revision using existing generation/claim/
+   lease locks. Recompute Certified entries without changing original certificate
+   IDs/witness/time/audit metadata or ending them solely on rules changes.
+   Ineligible scores can leave a board without ending their witness certificate.
+4. Apply T15's explicitly chosen reading-correction outcomes; retain performance
+   edits/deletes, manual withdraw/cancel and archived/former-member boundaries.
+   Later readings irrelevant to a session never change its selected dependency.
+   Personal preference/contribution edits never rescore a group performance.
+5. Enforce D5 in actual current and legacy board/podium/record/history/event/
+   stream/session/summary/certification RPC responses. Retain safe raw public
+   context such as reps, but suppress enabled bodyweight absolute kg/load/volume
+   counterparts, including session totals and same-group cross-endpoint joins.
+   Ordinary Off sharing follows D5's explicitly limited privacy claim. Keep old absolute audit data server-side.
+6. Migrate public history representation/visibility and invalidate incompatible
+   caches per T08. Preserve history meaning and source clocks; do not silently
+   relabel kg records or rewrite observed certificate values. Old readers must
+   fail safely or receive an explicitly supported safe response.
+7. Keep source enqueue/apply failures isolated from personal sync and from
+   certification commits. Retain retries, stale-result fences and honest
+   rebuilding/archived states. No new private-reading disclosure in logs/events.
 
-## Verification and closeout
+## Verification
 
-Use real backend vectors for two members, two different groups linked to one
-personal exercise, all metrics/scopes, no B and estimated B, personal coefficient
-edits, B corrections, rule rebuilding, archived/former entries, link/unlink,
-provisional/final records and certification edits/deletions/re-certification.
-Assert the 60+20 versus 90+20 equal-rep ranking reversal and stable historic
-scores after a new weigh-in. Inject queue/evaluator failures as existing lanes do.
+Read test-directory READMEs. Reuse existing backend lanes, actual pushes and
+Edge drains. Cover two members with different B at equal reps/external load,
+relative-rank results, ordinary and chosen bodyweight Volume, c=0/positive and
+switch transitions, unweighted sets, distribution
+conversions, no/invalid readings, later/relevant reading edits, rules-only
+changes, edits/deletions, migration, history, archive/rejoin and legacy readers.
+Assert exact active certificate identity/metadata and normalized values.
 
-Run `./boga test fast`, `./boga test backend` (including `groups-leaderboards`
-and `sync-infra`) and `./boga test ios-groups-e2e`; resolve additional lanes
-with `./boga test for`. T12 owns deployed Edge Function smoke/rollout.
-Graduate evaluator/certification rules, attach evidence, mark the milestone
-entry complete and delete this card when shipped.
+Privacy checks inspect every enabled-group RPC payload and paired responses
+for disallowed absolute/relative values, including full session and aggregate
+subtraction. Verify ordinary Volume/1RM while Off without reading access, On
+cache/history redaction, and the documented cross-mode/cross-group limit. Anonymous/OAuth/outsider tests remain. Add Jest scorer/decoder/cache
+coverage for the shared behavior; use failure injection for queue/publication.
 
-## Execution checkpoint (2026-09-27)
+## Specs to update
 
-The shared target-specific scorer and full-graph score adapter are integrated. Tests cover the two-member ranking reversal, group coefficient/distribution authority, assistance, missing/invalid B, dependency-pin propagation and unlinked observations. Database queue/publication, event reconciliation, certification and group readers remain pending.
+- `docs/specs/tech/groups-contract.md` — shipped scoring, privacy, lifecycle,
+  publication and readers.
+- `docs/specs/tech/bodyweight-load-contract.md`, `training-metrics-contract.md`
+  — public normalization over private dated context.
+- `docs/specs/05-data-model.md`, `03-technical-architecture.md` — changed projections.
 
-Full fast and backend gates passed at `19fc54d`: 181 mobile suites / 2,150
-mobile tests, all backend contracts, 6 real-sync suites / 15 tests and real
-OAuth/MCP smoke. Logs: `/tmp/boga-m27-group-score-verified-fast.log` and
-`/tmp/boga-m27-group-score-verified-backend.log`. `./boga timings` and
-`./boga test for` ran. Device gates remain in progress. No new server RPC,
-publisher, certification behavior or group UI is claimed shipped.
+## Gates and closeout
 
-
-### Integrated backend checkpoint (2026-09-27)
-
-The migration, Deno evaluator, atomic versioned publication, legacy compatibility,
-metric-specific certification, readers and client decoders are integrated.
-`./boga test backend` passed in full with the expanded `groups-bodyweight.sh`
-body, including actual SQL responses decoded by the mobile guards, paged mixed
-streams, UTF-16 validation, role/privacy checks, generation/lease fencing,
-rollback/retry, legacy activation, archived/former entries and correction pins.
-Evidence: `/tmp/boga-m27-group-integration-backend-3.log`.
-The earlier fast run passed before UI integration; the later full fast gate
-passed with 184 mobile suites / 2,214 tests at this working checkpoint:
-`/tmp/boga-m27-comparison-ui-fast-2.log`. Timings and trigger rules ran.
-
-T10 native rendering and new two-user device
-proof remain in progress. Hosted rollout and final frontend acceptance are
-pending; neither task is shipped.
+Use `./boga test for`; propose `fast`, `backend` (group leaderboards and API-live)
+plus `ios-groups-e2e`, with sync e2e only for a real sync-path change. Obtain the
+operator's lane agreement and run to green, plus required quality targets.
+Do not add Maestro scenarios without justification and approval. Delete this
+card and mark its M27 row completed in the implementing PR; T10 owns UI and T14
+owns human acceptance/combined closeout and authorized hosted smoke.

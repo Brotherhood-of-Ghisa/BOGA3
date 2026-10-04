@@ -12,6 +12,12 @@ docs_touched: "docs/specs/00-product.md, docs/specs/03-technical-architecture.md
 
 # M27-T12 — Verify, roll out and close the bodyweight milestone
 
+> Historical scope: the [reconciled M27 milestone](../milestones/M27-bodyweight-load-and-group-comparisons.md)
+> supersedes this card for workstream #420. Its old snapshot, public bodyweight,
+> absolute-board and closeout requirements are historical context rather than part
+> of that workstream. Current personal behavior is owned by the accepted specs;
+> active group delivery is T08–T10/T13–T15 and the existing #411 card.
+
 - Status: `in_progress`
 - Depends on: M27-T01 through M27-T11.
 - Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
