@@ -190,7 +190,9 @@ describe('Today: the Progress card over real data', () => {
     );
     expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12');
     expect(text('today-latest-session-figures')).toHaveTextContent('6 sets · 2 exercises');
-    expect(text('today-latest-session-exercises')).toHaveTextContent('Barbell Bench Press, Barbell Back Squat');
+    // A count, not the names: the row matches the group stream session card.
+    expect(screen.queryByTestId('today-latest-session-exercises')).toBeNull();
+    expect(screen.queryByText(/Barbell Bench Press/)).toBeNull();
     expect(text('today-latest-session-prs')).toHaveTextContent('1 PR');
 
     fireEvent.press(row);

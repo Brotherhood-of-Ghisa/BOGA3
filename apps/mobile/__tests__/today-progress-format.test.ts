@@ -63,7 +63,6 @@ const latest = (overrides: Partial<LatestSessionSummary> = {}): LatestSessionSum
   gymName: 'Canal Street Gym',
   workingSets: 12,
   exerciseCount: 4,
-  exerciseNames: ['Back Squat', 'Romanian Deadlift', 'Leg Press', 'Calf Raise'],
   prs: 2,
   ...overrides,
 });

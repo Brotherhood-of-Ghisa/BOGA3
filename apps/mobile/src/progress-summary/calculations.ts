@@ -55,8 +55,6 @@ export type LatestSessionSummary = {
   gymName: string | null;
   workingSets: number;
   exerciseCount: number;
-  /** Every exercise in session order; the card ellipsises. */
-  exerciseNames: string[];
   prs: number;
 };
 

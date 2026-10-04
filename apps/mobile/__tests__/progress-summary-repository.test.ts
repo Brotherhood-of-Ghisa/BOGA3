@@ -200,7 +200,6 @@ describe('loadTodayProgress', () => {
       gymName: 'Iron Works',
       workingSets: 3,
       exerciseCount: 3,
-      exerciseNames: ['Back Squat', 'Bench Press', 'Face Pull'],
       prs: 2,
     });
   });
