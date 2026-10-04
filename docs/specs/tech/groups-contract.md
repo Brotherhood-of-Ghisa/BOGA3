@@ -2501,35 +2501,66 @@ isolated from personal reading and sync writes and retry through the normal queu
 
 ### 11.3 Metric attestations
 
-Certification attests the observed/logged set, not that the witness verified a
-member's bodyweight. The server stores an internal dependency digest covering
-the raw kg Weight, reps/performed state, both the member/source and group-target
-distributions, and the applicable group preference/contribution/revision. Only
-when the preference is enabled and contribution is positive does the digest add
-the selected private reading dependency: the known reading's identity/date/value
-or an explicit `missing` sentinel. Off/zero digests do not look up, include or
-change because of a private reading. Reading value, date, identifier, provenance
-and the digest itself never cross a public group RPC or enter a client
-cache/event.
+Certification attests the witnessed logged set. Its ID, witness, time, observed
+revision/value and original public performance snapshot are immutable audit.
+Scoring fingerprints still fence stale writes/publication, but are separate from
+the internal observed-set pin (source identities, raw kg Weight, reps, performed
+state and effort). Exercise-level source/target distributions, group preference,
+contribution and revision are calculation rules: changing them preserves an
+unchanged set's active certificate, even if the new score happens to equal the
+old one. The eligible Certified entry uses its recalculated score. Temporary
+rule-driven ineligibility omits the entry without ending the witness; eligibility
+returning restores the same witness. Retired All/Certified boards retain their
+saved witness associations rather than requiring today's scoring fingerprint.
 
-`group_metric_certify` identifies the record and expected rules revision. A
-warm-up is never a record set: `NOT_FOUND: record set not found for this
-metric`, as §4.6. It
-refreshes the live source graph and computes dependencies server-side; clients
-neither submit nor receive private bodyweight facts. Stale rules/performance
-return `CONFLICT`. A current member may attest another current member's eligible
-set; existing withdraw/cancel role rules remain. Set, source/target distribution,
-preference or contribution changes void the active certification before a
-recalculated result can inherit it, even when the displayed score is
-coincidentally equal. Reading changes do so only for enabled positive-
-contribution dependencies; adding a reading invalidates an earlier `missing`
-sentinel, while off/zero certifications are unaffected.
+Set edits, identity changes, deletion/tombstoning and missing source rows void
+the observation. Withdrawal by its witness and cancellation by owner/admin keep
+their existing permissions and terminal outcomes; ended rows never reopen.
+Relevant private-reading corrections remain separate: the active 1RM projection
+ends, while raw Weight remains attested. Later/no-op readings are harmless.
+Only enabled positive-contribution evaluation resolves private readings. Its
+server-only reading pin is established on first dependency activation and kept
+while disabled; a changed dependency on reactivation still voids 1RM. Off/zero
+reconciliation neither resolves a reading nor invalidates because one changed.
+Observation/reading pins remain outside public RPCs, events and caches; the
+existing public scoring fingerprint continues to fence stale writes.
 
-Record sheets may show raw Weight/reps, derived public score, revision and normal
-certification state. They never show a bodyweight value, reading date/source,
-calculation breakdown or dependency digest. Enqueue/publication failures remain
-isolated from certification and personal-sync commits; no evaluation error may
-roll back a workout push.
+The forward migration derives existing active raw pins from stored audit values,
+not today's weight/reps, and reconstructs reading dependencies under the observed
+rule revision/source mode to retain pending correction detection. Old pins had
+no effort field: migration adopts current effort once, then subsequent effort
+edits invalidate. Missing sources remain invalid; ended rows are untouched.
+Legacy raw witnesses remain in `group_certifications` with their original audit
+and public ID. Internal per-metric rows reference that witness when its comparison
+enters the current engine; they preserve original kg observed values/witness/time,
+never substitute today's calculated score. Both public projections use the
+original witness ID. `group_metric_certification_get` accepts optional `p_metric`
+so current callers select the correct projection; omitted context defaults to
+1RM. Withdraw/cancel through either API ends both projections and the original
+witness. A raw-set void ends all three; a private-reading correction ends only
+the 1RM projection. No ended legacy witness is imported or resurrected.
+
+`group_metric_certify` identifies the record and expected rules revision and
+refreshes the live source graph. A warm-up remains ineligible (`NOT_FOUND`).
+Stale rules/performance return `CONFLICT`. A retry against a current score returns
+the retained witness instead of replacing it. Recalculation publishes coherently;
+a source distribution-only job is silent for performed-record attribution, while
+mixed performance/correction jobs retain normal reconciliation. Coalesced
+certification changes still publish their metric's Certified lead change. A
+server-only record baseline advances only after reconstructing the previous
+source-mode pin against current raw/reading dependencies; later reconciliation
+compares against that baseline, preserving the original public record score/pin.
+Equivalent numeric raw edits refresh the baseline, while actual score corrections
+still void the record. Stream context keeps its historic `fingerprint` and adds
+an optional `write_fingerprint` for the current score; review writes use that
+token, including for standing records below a newer All-board best. Older
+contexts fall back to the historic token; stale old-client attempts return
+`CONFLICT`. Neither the baseline nor private reading facts become public.
+
+Record sheets show permitted raw Weight/reps, public score, observed revision and
+certification state. They never show reading facts or internal pins; decoder
+checks reject internal pin fields before UI/cache. Enqueue/publication failure
+is isolated from workout pushes and certification commits.
 
 ### 11.4 Readers, privacy and client boundary
 

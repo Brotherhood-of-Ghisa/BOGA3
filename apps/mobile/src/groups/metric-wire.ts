@@ -187,6 +187,8 @@ export type GroupMetricRecordContextWire = {
   former: boolean;
   metrics: {
     metric: GroupMetric; fingerprint: string; eligible: boolean;
+    /** Current write token; fingerprint still identifies the historic display. */
+    write_fingerprint?: string;
     certification: GroupMetricCertificationWire | null;
   }[];
 };

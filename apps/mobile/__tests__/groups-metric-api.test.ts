@@ -11,6 +11,7 @@ import {
   createGroupComparison,
   getGroupMetricBoard,
   getGroupMetricHistory,
+  getGroupMetricCertification,
   getGroupMetricStream,
 } from '@/src/groups/api';
 import {
@@ -190,6 +191,12 @@ describe('Weight/1RM group payloads', () => {
     const context = { exercise, former: false, metrics: [{ metric: 'e1rm' as const, fingerprint: 'pin', eligible: true,
       certification: certificate }] };
     expect(isGroupMetricStreamItem({ ...record, record_context: context })).toBe(true);
+    expect(isGroupMetricStreamItem({ ...record, record_context: { ...context,
+      metrics: [{ ...context.metrics[0], write_fingerprint: 'current-score-pin' }] } })).toBe(true);
+    for (const write_fingerprint of [null, 1, '']) {
+      expect(isGroupMetricStreamItem({ ...record, record_context: { ...context,
+        metrics: [{ ...context.metrics[0], write_fingerprint }] } })).toBe(false);
+    }
     expect(isGroupMetricStreamItem({ ...record, record_context: { ...context, former: true } })).toBe(false);
     expect(isGroupMetricStreamItem({ ...record, record_context: { ...context,
       metrics: [{ ...context.metrics[0], fingerprint: 'other' }] } })).toBe(false);
@@ -206,7 +213,24 @@ describe('Weight/1RM group payloads', () => {
   });
 });
 
+it.each(['observed_set_pin', 'reading_pin', 'current_fingerprint', 'legacy_certification_id', 'rule_rescore_baseline', 'source_rules_only'])(
+  'rejects the internal %s before a board or attestation reaches UI/cache', key => {
+    expect(isGroupMetricBoardWire({ ...board, entries: [{ ...row, [key]: 'internal' }] })).toBe(false);
+    expect(isGroupMetricCertificationWire({ ...certificate, [key]: 'internal' })).toBe(false);
+    expect(isGroupMetricStreamItem({ ...record, [key]: 'internal' })).toBe(false);
+  },
+);
+
 describe('versioned group API', () => {
+  it('reads the selected metric of a shared legacy witness and rejects a different metric', async () => {
+    respond({ contract_version: 3, certification: certificate });
+    await expect(getGroupMetricCertification('group', certificate.certification_id, 'e1rm')).resolves.toMatchObject({ certification: certificate });
+    expect(mockRpc).toHaveBeenCalledWith('group_metric_certification_get', {
+      p_group_id: 'group', p_certification_id: certificate.certification_id, p_metric: 'e1rm',
+    });
+    respond({ contract_version: 3, certification: certificate });
+    await expect(getGroupMetricCertification('group', certificate.certification_id, 'weight')).rejects.toMatchObject({ code: 'INTERNAL' });
+  });
   it('passes the opaque cursor and selected revision unchanged', async () => {
     respond(board);
     await expect(getGroupMetricBoard({ ...view, after: 'opaque', revision: 2, limit: 3 })).resolves.toEqual(board);

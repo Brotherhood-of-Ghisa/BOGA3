@@ -1,7 +1,7 @@
 # M27-T14 — Human acceptance and group workstream closeout
 
 - Status: `planned`
-- Depends on: [existing #411 task](T-20260930-01-Keep_zero_contribution_group_boards_stable.md), [T13](M27-T13-Preserve_certifications_across_rule_changes.md), [T15](M27-T15-Decide_percentage_reading_correction_policy.md), [T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [T09](M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md), [T10](M27-T10-Expose_group_standards_and_bodyweight_rankings.md)
+- Depends on: [existing #411 task](T-20260930-01-Keep_zero_contribution_group_boards_stable.md), T13 (completed), [T15](M27-T15-Decide_percentage_reading_correction_policy.md), [T08](M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md), [T09](M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md), [T10](M27-T10-Expose_group_standards_and_bodyweight_rankings.md)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: cross-stack; UI impact: yes

@@ -50,7 +50,7 @@ export function useMetricCertification({
     setCertification(known);
     const certificateId = written.current?.certification_id ?? row.certification_id;
     if (!certificateId || online === false) return;
-    void getGroupMetricCertification(groupId, certificateId).then(result => {
+    void getGroupMetricCertification(groupId, certificateId, row.metric).then(result => {
       if (activeRead && mounted.current && sequence.current === request) {
         // Keep the latest server end state across connectivity changes; a
         // successful write must not resurrect an attestation already cancelled.
@@ -63,7 +63,7 @@ export function useMetricCertification({
       if (activeRead && mounted.current && sequence.current === request) setNotice({ tone: 'error', message: toGroupApiError(error).message });
     });
     return () => { activeRead = false; };
-  }, [groupId, row.certification_id, row.fingerprint, online, reload, initialCertification, readOnlyReason, mounted]);
+  }, [groupId, row.certification_id, row.fingerprint, row.metric, online, reload, initialCertification, readOnlyReason, mounted]);
 
   // Another performance or rules revision starts without the last one's review or notice.
   const rowKey = JSON.stringify([row.fingerprint, row.rules_revision]);

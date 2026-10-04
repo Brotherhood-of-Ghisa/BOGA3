@@ -94,5 +94,9 @@ The group evaluator uses the same kernel with the strict group policy and the
 server-authoritative group preference/contribution. It publishes a coherent
 rules revision and never puts the member's reading value, date, identifier or
 dependency digest into group payloads, caches, events, boards or certifications.
-Group authority and certification invalidation are governed by
+Witnessed set facts and current scoring dependencies have separate pins:
+rule-only edits recalculate Certified entries without replacing the witness or
+its original audit. Legacy witnesses retain their original public IDs through
+internal per-metric projections. Relevant reading corrections keep their
+metric-specific invalidation behavior. Group authority and lifecycle are governed by
 `tech/groups-contract.md` §11.

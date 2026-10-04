@@ -202,7 +202,7 @@ and compatible clients in the documented order with explicit hosted authority.
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | [Existing #411 task — Keep zero-contribution group boards stable](../tasks/T-20260930-01-Keep_zero_contribution_group_boards_stable.md) | No-op legacy preference changes; reconcile rule metadata/history | T13 | planned |
-| [M27-T13 — Preserve certifications across rule changes](../tasks/M27-T13-Preserve_certifications_across_rule_changes.md) | Observed-set pins, migration and rule-only retention; closes #419 | — | planned |
+| M27-T13 — Preserve certifications across rule changes | Observed-set pins, migration and rule-only retention; closes #419 | — | completed |
 | [M27-T15 — Decide percentage reading-correction policy](../tasks/M27-T15-Decide_percentage_reading_correction_policy.md) | Explicit private-data correction outcome for the new metric | — | planned |
 | [M27-T08 — Group percentage contracts](../tasks/M27-T08-Add_group_bodyweight_rules_and_metric_contracts.md) | Volume definition, versioned units, privacy and activation contracts | T15 | planned |
 | [M27-T09 — Evaluate private percentage scores](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Normalized worker/SQL publication and all group reader privacy | T08, T13, existing #411 task | planned |
@@ -210,7 +210,7 @@ and compatible clients in the documented order with explicit hosted authority.
 | [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T13 and T15; the existing #411 task follows T13. The formula and
+Ready now: T15 and the existing #411 task; T13 is complete. The formula and
 switch policy are settled. T08 must record the Volume decision before building.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
