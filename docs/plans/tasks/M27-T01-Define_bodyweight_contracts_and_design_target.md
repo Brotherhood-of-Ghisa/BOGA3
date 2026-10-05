@@ -12,7 +12,7 @@ docs_touched: "docs/specs/tech/bodyweight-load-contract.md, docs/specs/ui/design
 
 # M27-T01 — Define bodyweight contracts and the design target
 
-> Historical scope: the [reconciled M27 milestone](../milestones/M27-bodyweight-load-and-group-comparisons.md)
+> Historical scope: the [reconciled M27 milestone](https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/0e5115a87aff26e67035806973060852bdf67bab/docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md)
 > supersedes this card for workstream #420. Its old snapshot, public bodyweight,
 > absolute-board and closeout requirements are historical context rather than part
 > of that workstream. Current personal behavior is owned by the accepted specs;
@@ -20,7 +20,7 @@ docs_touched: "docs/specs/tech/bodyweight-load-contract.md, docs/specs/ui/design
 
 - Status: `in_progress`
 - Depends on: none.
-- Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
+- Historical milestone spec: [historical milestone](https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/0e5115a87aff26e67035806973060852bdf67bab/docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Governing decisions: D1–D10; this task resolves representation, not the already accepted product choices.
 
 ## Objective and scope

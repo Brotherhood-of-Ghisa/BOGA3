@@ -14,7 +14,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/tech/bodyweight-load-cont
 
 - Status: `in_progress`
 - Depends on: M27-T02, M27-T03.
-- Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
+- Historical milestone spec: [historical milestone](https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/0e5115a87aff26e67035806973060852bdf67bab/docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Governing decisions: D3, D5, D10.
 
 ## Objective and scope
