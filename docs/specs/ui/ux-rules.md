@@ -611,6 +611,8 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    Label averages as whole volume or one decimal for Sets/1RM/Top weight,
    using the shared figure formatters. An empty/all-zero scale has no average
    reference. Colour retains its independent bucket/target meaning; aggregation is unchanged.
+   Keep current-week wording beside its row and the average label above the
+   reference, without repeating either as a footer sentence.
 3. Buckets are min–max over the window's positive values: the lightest logged
    day is `viz1`, the heaviest `viz4`. Zero-effort days are `viz0` with a `rule`
    hairline, and stay visible, tappable and accessible.

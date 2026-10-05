@@ -38,7 +38,35 @@ const transport = new StreamableHTTPClientTransport(endpoint, {
   },
 });
 
+// A rejected token must produce a challenge (not a 500) so remote clients
+// refresh or re-authorize instead of reporting the server as broken.
+const assertRejectedTokenIsChallenged = async (): Promise<void> => {
+  const response = await fetch(endpoint, {
+    body: JSON.stringify({
+      id: 1,
+      jsonrpc: '2.0',
+      method: 'initialize',
+      params: {
+        capabilities: {},
+        clientInfo: { name: 'boga-local-smoke', version: '1.0.0' },
+        protocolVersion: '2025-11-25',
+      },
+    }),
+    headers: {
+      accept: 'application/json, text/event-stream',
+      authorization: 'Bearer revoked.or.expired.token',
+      'content-type': 'application/json',
+    },
+    method: 'POST',
+  });
+  const challenge = response.headers.get('www-authenticate') ?? '';
+  if (response.status !== 401 || !challenge.includes('resource_metadata=')) {
+    throw new Error(`A rejected token returned ${response.status} without an OAuth challenge.`);
+  }
+};
+
 try {
+  await assertRejectedTokenIsChallenged();
   await client.connect(transport);
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
@@ -124,4 +152,4 @@ try {
   await client.close();
 }
 
-console.log('[boga-mcp-smoke] PASS: four tools discovered and called through the real agent API');
+console.log('[boga-mcp-smoke] PASS: rejected token challenged; four tools discovered and called through the real agent API');

@@ -7,10 +7,19 @@ It has no database client, Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
 
-- `POST /mcp` — authenticated MCP Streamable HTTP endpoint.
+- `POST /mcp` — authenticated MCP Streamable HTTP endpoint. A missing,
+  rejected (revoked, expired, non-agent) or past-expiry token gets `401` with a
+  `WWW-Authenticate` challenge carrying `scope` and `resource_metadata`, so
+  clients refresh or re-authorize. An unreachable agent API, or one answering
+  `429`/`5xx`, gets `503` with `Retry-After` instead of a token challenge. (The
+  agent API currently reports a Supabase Auth outage as `401`, which still
+  reaches clients as a challenge.)
 - `GET /.well-known/oauth-protected-resource/mcp` — OAuth protected-resource
   metadata for the MCP endpoint. It advertises the resource's required
-  `openid` and `profile` scopes; Supabase authorization-server discovery also
+  `openid` and `profile` scopes plus `offline_access` when the issuer supports
+  it; the 401 challenge carries the same set, so Claude, ChatGPT and Gemini all
+  request one scope set and receive a refresh token. The scopes are advertised,
+  not enforced on the token. Supabase authorization-server discovery also
   advertises the standard `email` and `phone` identity scopes, which the BoGa
   consent surface accepts and discloses.
 - `GET /.well-known/oauth-authorization-server` — authorization-server
@@ -85,8 +94,12 @@ The complete real-token cross-stack proof is:
 ```
 
 It boots/reuses this worktree's local Supabase, seeds a unique training fixture,
-completes an OAuth authorization-code + PKCE consent flow, starts this service,
-discovers and invokes all four tools, verifies fixture IDs, and cleans up. See
+starts this service, then connects the way a remote client does: 401 challenge,
+protected-resource and authorization-server discovery, dynamic registration,
+authorization code + PKCE with the challenged scopes and `resource`, the
+consent page's scope gate, token exchange and a refresh. It checks that a
+rejected token is challenged, discovers and invokes all four tools with the
+refreshed token, verifies fixture IDs, and cleans up. See
 `RUNBOOK.md` for the supplied-token form.
 
 ## Production deployment
