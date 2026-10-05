@@ -16,7 +16,7 @@
 // matching `app_public.<entity>` migration; the drift checker fails the slow
 // gate if the two diverge.
 //
-// M23 (session planning) moved three performed tables down and added four plan
+// Session planning moved three performed tables down and added four plan
 // tables, keeping five layers:
 //   - `training_programmes` joins Layer 0 (no outbound entity FK).
 //   - `session_plans` joins Layer 1 (FKs gyms, training_programmes — both L0).

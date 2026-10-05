@@ -242,7 +242,7 @@ pass "both universal triggers present on every entity table"
 #   session_exercise_tags_exercise_tag_definition_fk on delete cascade    -> c
 #   exercise_group_links_exercise_definition_fk      on delete no action  -> a
 #
-# M23 additions:
+# Planning additions:
 #   session_plans_programme_fk                       on delete set null   -> n
 #   session_plans_gym_fk                             on delete set null   -> n
 #   session_plan_exercises_session_plan_fk           on delete cascade    -> c

@@ -757,7 +757,7 @@ CREATE UNIQUE INDEX \`session_exercises_owner_source_block_unique\` ON \`session
 ALTER TABLE \`sessions\` ADD \`source_plan_id\` text REFERENCES session_plans(id);--> statement-breakpoint
 CREATE INDEX \`sessions_source_plan_id_idx\` ON \`sessions\` (\`source_plan_id\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`sessions_owner_source_plan_unique\` ON \`sessions\` (\`source_plan_id\`) WHERE "sessions"."deleted_at" is null and "sessions"."source_plan_id" is not null;`,
-  m0017: `-- M23: reset the per-layer pull cursors for the 16-entity / five-layer Sync v2
+  m0017: `-- reset the per-layer pull cursors for the 16-entity / five-layer Sync v2
 -- topology. This implements the strategy locked in
 -- docs/specs/tech/session-planning-contract.md §3.2 ("Pull Cursor Reset and
 -- Protocol-4 Gate"): cursor remapping is rejected because Layers 0–3 each gain

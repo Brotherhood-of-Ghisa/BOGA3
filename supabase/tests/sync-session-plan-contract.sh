@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sourced by sync-push-contract.sh: the M23 planning entities
+# Sourced by sync-push-contract.sh: the session planning entities
 # (training_programmes, session_plans, session_plan_exercises,
 # session_plan_sets) and the three performed-domain provenance links
 # (sessions.source_plan_id, session_exercises.source_plan_exercise_id,
@@ -87,7 +87,7 @@ assert_json_expr --arg spe "${SPE_ID}" 'length == 1 and .[0].source_plan_exercis
 service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${PLAN_SET_ID}&select=source_plan_set_id,planned_weight_value,performance_status"
 assert_json_expr --arg sps "${SPS_ID}" 'length == 1 and .[0].source_plan_set_id == $sps and .[0].planned_weight_value == "100" and .[0].performance_status == "planned"' "exercise_sets.source_plan_set_id landed"
 
-# Layer mapping: each planning type drains in its M23 layer. The parent push
+# Layer mapping: each planning type drains in its planning layer. The parent push
 # lane has no sync_pull helper, so post the pull RPC directly.
 plan_sync_pull() {
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${ANON_KEY}" "app_public" "$1"

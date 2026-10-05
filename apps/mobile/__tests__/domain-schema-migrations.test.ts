@@ -131,7 +131,7 @@ describe('domain schema and runtime migrations', () => {
     // exercise_group_links is m0006, the kg-only cutover is m0010, the
     // derived exercise session facts are m0011 (tables) and m0012 (triggers),
     // the local store's owning account (`account_user_id`) is m0015, and the
-    // M23 planning schema (0016) plus pull-cursor reset (0017) append after it.
+    // session planning schema (0016) plus pull-cursor reset (0017) append after it.
     expect(localRuntimeMigrations.journal.entries).toHaveLength(18);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,

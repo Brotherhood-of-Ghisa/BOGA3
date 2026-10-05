@@ -42,11 +42,11 @@ written only through `sync_push`.
   - Domain columns are nullable wherever the client may write NULL. Only the
     structural columns (PK, `owner_user_id`, `client_updated_at_ms`) are
     NOT NULL.
-  - No content-validating triggers, except the M23 provenance trigger
+  - No content-validating triggers, except the planning provenance trigger
     (`exercise_sets_source_plan_provenance`, see "Per-entity rules"): Sync v2's
     other triggers are the two structural ones (group triggers follow "Out of
     scope").
-  - No uniqueness beyond the PK, except the three M23 provenance guards
+  - No uniqueness beyond the PK, except the three planning provenance guards
     (`sessions_owner_source_plan_unique`,
     `session_exercises_owner_source_block_unique`,
     `exercise_sets_owner_source_set_unique`; see "Per-entity rules"). Slot and
@@ -120,7 +120,7 @@ listed here:
   CHECK enforces that form, so a pulled row that breaks it fails the layer-1
   page apply with `INTERNAL` and pull cannot advance past it. Its sync scope and
   FK-free group columns are owned by `docs/specs/05-data-model.md`.
-- **M23 planning** adds `training_programmes`, `session_plans`,
+- **Session planning** adds `training_programmes`, `session_plans`,
   `session_plan_exercises` and `session_plan_sets`, and three performed-domain
   provenance columns (`sessions.source_plan_id`,
   `session_exercises.source_plan_exercise_id`,
@@ -132,7 +132,7 @@ listed here:
 
 ## Deferrable foreign keys
 
-All eighteen cross-entity FKs (ten pre-M23 plus the eight M23 planning edges)
+All eighteen cross-entity FKs (ten pre-planning plus the eight session planning edges)
 are `DEFERRABLE INITIALLY DEFERRED`, so the checks run at COMMIT. A push may
 write a child before its parent in one transaction, and any unsatisfied FK at
 COMMIT rolls back the whole batch. Names, targets and on-delete actions are in
@@ -185,7 +185,7 @@ Any order within a layer is safe because no FK joins two tables in one layer
 and every FK points to a strictly earlier layer (or is a self-edge). The drift
 checker asserts both against the live FK graph, and that every entity sits in
 exactly one layer. Adding an entity or FK means updating
-`topo-order.ts` and the `sync_pull` layer mapping together. M23 moved
+`topo-order.ts` and the `sync_pull` layer mapping together.  moved
 `sessions` L1→L2, `session_exercises` L2→L3 and `exercise_sets` L3→L4; an
 upgraded client resets `pull_cursor` and the server gates the new mapping on
 protocol 4 (`docs/specs/tech/session-planning-contract.md`).

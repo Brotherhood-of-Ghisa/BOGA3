@@ -1,4 +1,4 @@
--- M23: reset the per-layer pull cursors for the 16-entity / five-layer Sync v2
+-- reset the per-layer pull cursors for the 16-entity / five-layer Sync v2
 -- topology. This implements the strategy locked in
 -- docs/specs/tech/session-planning-contract.md §3.2 ("Pull Cursor Reset and
 -- Protocol-4 Gate"): cursor remapping is rejected because Layers 0–3 each gain

@@ -10,7 +10,7 @@
  *
  * It also asserts the checker introspected all sixteen owner-scoped entity
  * tables, including the muscle-group taxonomy, exercise-group links, dated
- * weight readings, synced user settings, and the four M23 planning tables. Exit
+ * weight readings, synced user settings, and the four session planning tables. Exit
  * 0 with those tables present
  * transitively proves their FK columns have a typed
  * server counterpart and its parent table sits at a valid topological layer

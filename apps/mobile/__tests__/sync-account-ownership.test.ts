@@ -105,7 +105,7 @@ const sessionExerciseEntity = (id: string, sessionId: string, ms: number): WireE
   },
 });
 
-/** Each account's server rows, by pull layer (M23 five-layer topology). */
+/** Each account's server rows, by pull layer (five-layer topology). */
 const SERVER_ROWS: Record<string, Record<number, WireEntity[]>> = {
   [USER_A]: { 2: [sessionEntity('a-session', 100)], 3: [sessionExerciseEntity('a-sx', 'a-session', 100)] },
   [USER_B]: { 2: [sessionEntity('b-session', 200)], 3: [sessionExerciseEntity('b-sx', 'b-session', 200)] },

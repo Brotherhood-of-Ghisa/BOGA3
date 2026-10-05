@@ -43,7 +43,7 @@ import { smokeRecords } from './schema/smoke';
  * The sixteen synced, per-account entity tables, child before parent so foreign
  * keys stay satisfied even where a cascade is missing (`exercise_group_links`
  * has a `no action` FK into `exercise_definitions`). Each carries `local_dirty`.
- * The M23 planning tables sit after the performed rows that hold their source
+ * The session planning tables sit after the performed rows that hold their source
  * links (sessions/session_exercises/exercise_sets) and before their `gyms`
  * parent, so child-before-parent order holds across the plan↔performed graph.
  */

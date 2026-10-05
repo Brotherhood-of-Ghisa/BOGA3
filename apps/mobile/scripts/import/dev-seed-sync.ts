@@ -122,7 +122,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   }
 };
 
-// Layered for the M23 five-layer topology. Only the types this seed emits are
+// Layered for the five-layer topology. Only the types this seed emits are
 // listed; the plan entities and tag/link tables are not seeded here.
 const layerRank = (type: WireEntity['type']) => {
   switch (type) {

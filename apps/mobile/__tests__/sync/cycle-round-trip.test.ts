@@ -323,7 +323,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
     // of each layer by following the cursor until the server reports no more.
     const scoped = authed.client.schema(SYNC_RPC_SCHEMA);
     const seen = new Set<string>();
-    // Five layers under the M23 planning topology (0..4); exercise_sets moved
+    // Five layers under the session planning topology (0..4); exercise_sets moved
     // to layer 4.
     for (let layer = 0; layer < 5; layer += 1) {
       let cursor: unknown = null;

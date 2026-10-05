@@ -66,7 +66,7 @@ describe('the single source of truth has the expected shape', () => {
     expect(TOPO_LAYERS).toHaveLength(5);
     const flat = TOPO_LAYERS.flat();
     expect(new Set(flat).size).toBe(16);
-    // Layer 0 anchors the FK graph (no outbound entity FKs); M23 adds the
+    // Layer 0 anchors the FK graph (no outbound entity FKs);  adds the
     // programme container.
     expect([...TOPO_LAYERS[0]].sort()).toEqual([
       'exercise_definitions',
@@ -76,7 +76,7 @@ describe('the single source of truth has the expected shape', () => {
       'user_settings',
     ]);
     // exercise_group_links sits in Layer 1, after its exercise_definitions parent;
-    // M23 adds session_plans (FKs gyms + training_programmes, both Layer 0).
+    //  adds session_plans (FKs gyms + training_programmes, both Layer 0).
     expect(TOPO_LAYERS[1]).toContain('exercise_group_links');
     expect(TOPO_LAYERS[1]).toContain('session_plans');
     // sessions moved L1->L2 to sit below session_plans; the block joins it.

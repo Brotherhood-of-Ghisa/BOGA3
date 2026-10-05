@@ -1,5 +1,5 @@
 /**
- * Outcome: the four M23 planning entities and the three performed-domain
+ * Outcome: the four session planning entities and the three performed-domain
  * provenance links are first-class synced data — they serialise onto the wire,
  * drain in FK-safe layer order, and survive a wiped/reinstalled client with
  * every reference (programme order, plan→block→target chain, and
@@ -233,7 +233,7 @@ const seedDirtyPlanGraph = (db: InMemoryTestDatabase): void => {
     .run();
 };
 
-describe('M23 planning graph round-trips through the sync cycle and survives reinstall', () => {
+describe('session planning graph round-trips through the sync cycle and survives reinstall', () => {
   it('pushes, wipes, and re-pulls the whole chain in FK-safe layer order with provenance intact', async () => {
     const server = createStubServer();
     mockRpc.mockImplementation(server.rpc);

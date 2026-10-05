@@ -1,5 +1,5 @@
 -- =============================================================================
--- M23: synced session-plan schema and server contract.
+-- Session planning: synced session-plan schema and server contract.
 --
 -- Adds four synced planning entities (training_programmes, session_plans,
 -- session_plan_exercises, session_plan_sets) and three performed-domain
@@ -346,7 +346,7 @@ end;
 $func$;
 
 comment on function app_public.enforce_source_plan_set_provenance() is
-  'Sync v2/M23: deferred constraint trigger body rejecting a performed set whose source_plan_set_id is not under its card''s source block. See docs/specs/tech/session-planning-contract.md §2.2.';
+  'Sync v2 session planning: deferred constraint trigger body rejecting a performed set whose source_plan_set_id is not under its card''s source block. See docs/specs/tech/session-planning-contract.md §2.2.';
 
 create constraint trigger exercise_sets_source_plan_provenance
   after insert or update on app_public.exercise_sets
@@ -390,7 +390,7 @@ begin
   revised := replace(definition,
     $anchor$        gym_id, status, started_at, completed_at, duration_sec,$anchor$,
     $patch$        gym_id, source_plan_id, status, started_at, completed_at, duration_sec,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: sessions insert columns'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: sessions insert columns'; end if;
   definition := revised;
 
   -- sessions insert values
@@ -400,7 +400,7 @@ begin
     $patch$        _fields ->> 'gym_id',
         _fields ->> 'source_plan_id',
         _fields ->> 'status',$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: sessions insert values'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: sessions insert values'; end if;
   definition := revised;
 
   -- sessions conflict update
@@ -410,14 +410,14 @@ begin
     $patch$        set gym_id               = excluded.gym_id,
             source_plan_id       = excluded.source_plan_id,
             status               = excluded.status,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: sessions conflict update'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: sessions conflict update'; end if;
   definition := revised;
 
   -- session_exercises insert columns
   revised := replace(definition,
     $anchor$        session_id, exercise_definition_id, order_index, name, machine_name,$anchor$,
     $patch$        session_id, exercise_definition_id, source_plan_exercise_id, order_index, name, machine_name,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: session_exercises insert columns'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: session_exercises insert columns'; end if;
   definition := revised;
 
   -- session_exercises insert values
@@ -429,7 +429,7 @@ begin
         _fields ->> 'exercise_definition_id',
         _fields ->> 'source_plan_exercise_id',
         (_fields ->> 'order_index')::integer,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: session_exercises insert values'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: session_exercises insert values'; end if;
   definition := revised;
 
   -- session_exercises conflict update
@@ -441,28 +441,28 @@ begin
             exercise_definition_id = excluded.exercise_definition_id,
             source_plan_exercise_id = excluded.source_plan_exercise_id,
             order_index            = excluded.order_index,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: session_exercises conflict update'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: session_exercises conflict update'; end if;
   definition := revised;
 
   -- exercise_sets insert columns
   revised := replace(definition,
     $anchor$        owner_user_id,id,session_exercise_id,order_index,weight_value,reps_value,set_type,$anchor$,
     $patch$        owner_user_id,id,session_exercise_id,source_plan_set_id,order_index,weight_value,reps_value,set_type,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: exercise_sets insert columns'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: exercise_sets insert columns'; end if;
   definition := revised;
 
   -- exercise_sets insert values
   revised := replace(definition,
     $anchor$        _uid,_id,_fields->>'session_exercise_id',(_fields->>'order_index')::integer,$anchor$,
     $patch$        _uid,_id,_fields->>'session_exercise_id',_fields->>'source_plan_set_id',(_fields->>'order_index')::integer,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: exercise_sets insert values'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: exercise_sets insert values'; end if;
   definition := revised;
 
   -- exercise_sets conflict update
   revised := replace(definition,
     $anchor$        session_exercise_id=excluded.session_exercise_id,order_index=excluded.order_index,$anchor$,
     $patch$        session_exercise_id=excluded.session_exercise_id,source_plan_set_id=excluded.source_plan_set_id,order_index=excluded.order_index,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: exercise_sets conflict update'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: exercise_sets conflict update'; end if;
   definition := revised;
 
   -- four new entity branches, before the unknown-type else
@@ -597,7 +597,7 @@ begin
     else
       raise exception
         'INTERNAL: sync_push unknown entity type %'$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_push: new entity branches'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_push: new entity branches'; end if;
 
   execute revised;
 end
@@ -622,7 +622,7 @@ begin
     $patch$      'exercise_group_links', 'user_settings', 'body_weight_measurements',
       'training_programmes', 'session_plans', 'session_plan_exercises', 'session_plan_sets'
     ) then$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_pull: cursor type list'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_pull: cursor type list'; end if;
   definition := revised;
 
   -- layer → types
@@ -641,7 +641,7 @@ begin
     when 3 then v_types := array['session_exercises', 'session_plan_sets'];
     when 4 then v_types := array['exercise_sets', 'session_exercise_tags', 'body_weight_measurements'];
   end case;$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_pull: layer types'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_pull: layer types'; end if;
   definition := revised;
 
   -- sessions projection
@@ -651,7 +651,7 @@ begin
     $patch$             'gym_id', s.gym_id,
              'source_plan_id', s.source_plan_id,
              'status', s.status,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_pull: sessions projection'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_pull: sessions projection'; end if;
   definition := revised;
 
   -- session_exercises projection
@@ -663,7 +663,7 @@ begin
              'exercise_definition_id', sx.exercise_definition_id,
              'source_plan_exercise_id', sx.source_plan_exercise_id,
              'order_index', sx.order_index,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_pull: session_exercises projection'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_pull: session_exercises projection'; end if;
   definition := revised;
 
   -- exercise_sets projection
@@ -673,7 +673,7 @@ begin
     $patch$             'session_exercise_id', es.session_exercise_id,
              'source_plan_set_id', es.source_plan_set_id,
              'order_index', es.order_index,$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_pull: exercise_sets projection'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_pull: exercise_sets projection'; end if;
   definition := revised;
 
   -- four new projections before the closing of all_rows
@@ -748,7 +748,7 @@ begin
      where sps.owner_user_id = auth.uid()
        and 'session_plan_sets' = any(v_types)
   ),$patch$);
-  if revised = definition then raise exception 'M23 failed to patch sync_pull: new projections'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch sync_pull: new projections'; end if;
 
   execute revised;
 end
@@ -792,7 +792,7 @@ begin
   _total := _total + _deleted;
 
   delete from app_public.user_settings where owner_user_id = _uid;$patch$);
-  if revised = definition then raise exception 'M23 failed to patch dev_wipe_my_data: planning tables'; end if;
+  if revised = definition then raise exception 'The planning migration failed to patch dev_wipe_my_data: planning tables'; end if;
 
   execute revised;
 end

@@ -391,7 +391,7 @@ describe('FK_VIOLATION handling', () => {
     let servedOrphan = false;
     mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
       if (name === 'sync_pull') {
-        // sessions live in Layer 2 under the M23 planning topology.
+        // sessions live in Layer 2 under the session planning topology.
         if (args.layer === 2 && !servedOrphan) {
           servedOrphan = true;
           return {
