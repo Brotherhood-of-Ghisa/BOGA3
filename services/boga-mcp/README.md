@@ -11,9 +11,7 @@ It has no database client, Supabase data credentials, SQL, or service-role key.
   rejected (revoked, expired, non-agent) or past-expiry token gets `401` with a
   `WWW-Authenticate` challenge carrying `scope` and `resource_metadata`, so
   clients refresh or re-authorize. An unreachable agent API, or one answering
-  `429`/`5xx`, gets `503` with `Retry-After` instead of a token challenge. (The
-  agent API currently reports a Supabase Auth outage as `401`, which still
-  reaches clients as a challenge.)
+  `429`/`5xx`, gets `503` with `Retry-After` instead of a token challenge.
 - `GET /.well-known/oauth-protected-resource/mcp` — OAuth protected-resource
   metadata for the MCP endpoint. It advertises the resource's required
   `openid` and `profile` scopes plus `offline_access` when the issuer supports

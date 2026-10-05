@@ -320,6 +320,9 @@ read; no derived value is persisted.
 - `413` the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.
+- `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth could not
+  check the token (unreachable, timeout, `408`/`429` or `5xx` from `getUser` or
+  the grants endpoint). Only a `4xx` rejection from Auth is a `401`.
 
 Run `./boga test agent-api` for the real OAuth/RLS contract and
 `./boga test mcp-smoke` for the real MCP-to-API path.

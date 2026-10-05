@@ -28,13 +28,15 @@ request() {
   local api_key="${4:-}"
   local body="${5:-}"
   local content_type="${6:-application/json}"
-  local response_file
+  local response_file headers_file
   response_file="$(mktemp)"
+  headers_file="$(mktemp)"
   local -a request_args=(
     --silent
     --show-error
     -X "${method}"
     -H "Accept: application/json"
+    -D "${headers_file}"
     -o "${response_file}"
     -w "%{http_code}"
   )
@@ -45,7 +47,8 @@ request() {
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${url}")"
   RESPONSE_BODY="$(cat "${response_file}")"
-  rm -f "${response_file}"
+  RESPONSE_HEADERS="$(tr -d '\r' <"${headers_file}")"
+  rm -f "${response_file}" "${headers_file}"
 }
 
 app_public_request() {
@@ -230,7 +233,24 @@ agent_get() {
   request GET "${AGENT_API_BASE}/${route}" "${token}" ""
 }
 
+# A failed run must not leave this slot's stack without Auth.
+start_auth_container() {
+  [[ "${AUTH_STOPPED:-0}" == "1" ]] || return 0
+  docker start "${AUTH_CONTAINER}" >/dev/null
+  for _ in $(seq 1 60); do
+    request GET "${API_URL}/auth/v1/health" "" "${ANON_KEY}"
+    if [[ "${RESPONSE_STATUS}" == "200" ]]; then
+      AUTH_STOPPED=0
+      return 0
+    fi
+    sleep 1
+  done
+  echo "[agent-api-test] Auth did not become healthy after restarting ${AUTH_CONTAINER}" >&2
+  return 1
+}
+
 cleanup() {
+  start_auth_container || true
   [[ -n "${RUN_TAG:-}" && -n "${USER_A_UUID:-}" && -n "${USER_B_UUID:-}" ]] || return 0
   run_psql "
     begin;
@@ -669,6 +689,24 @@ EXPIRED_TOKEN="$(make_expired_token "${AGENT_ACCESS_TOKEN}")" ||
   fail "could not construct a locally signed expired token"
 agent_get "profile" "${EXPIRED_TOKEN}"
 assert_status "401" "expired bearer token"
+
+echo "[agent-api-test] verifying a Supabase Auth outage is retryable, not a token rejection"
+AUTH_CONTAINER="${DB_CONTAINER/#supabase_db_/supabase_auth_}"
+docker ps --format '{{.Names}}' | grep -Fxq "${AUTH_CONTAINER}" ||
+  fail "this slot's Auth container ${AUTH_CONTAINER} is not running"
+AUTH_STOPPED=1
+docker stop "${AUTH_CONTAINER}" >/dev/null
+agent_get "profile"
+assert_status "503" "agent request during an Auth outage"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.error.code == "UPSTREAM_UNAVAILABLE"' >/dev/null ||
+  fail "Auth outage did not report UPSTREAM_UNAVAILABLE"
+printf '%s\n' "${RESPONSE_HEADERS}" | grep -Eqi '^retry-after: 5$' ||
+  fail "Auth outage response has no Retry-After"
+! printf '%s\n' "${RESPONSE_HEADERS}" | grep -qi '^www-authenticate:' ||
+  fail "Auth outage response challenged the token"
+start_auth_container || fail "Auth did not recover after the outage probe"
+agent_get "profile"
+assert_status "200" "agent request after Auth recovers"
 
 echo "[agent-api-test] verifying agent credentials cannot use app write surfaces"
 WRITE_GYM="agent-api-${RUN_TAG}-write-probe"
