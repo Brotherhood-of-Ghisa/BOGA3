@@ -654,7 +654,7 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
-  - the effort sheet (W-Up / None / descending RIR from the file-configured maximum, default 3) and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
+  - the effort sheet (long press; a tap cycles) of the Display efforts in `apps/mobile/src/exercise-calculations/effort-policy.ts` order and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
   - Swap exercise: the same Search, one-row `Never-done` · `Sort` filters and family list as the catalogue; excludes the current/deleted exercise, reveals search matches, and handles loading/error/empty history explicitly
   - a missing session or exercise, or a deleted session: an inline message
 - Key exits:

@@ -291,7 +291,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - `SessionCompletionScreen` — the post-submit composition on `paper`:
     `SessionTopBar mode="complete"` (`Session complete` · Done), a
-    `SessionFactsCard` (Duration / Exercises / Sets / Working, then Gym) with
+    `SessionFactsCard` (Duration / Exercises / Sets, then Gym) with
     the sets-by-muscle table (primary / secondary / weighted sets) under a `rule-soft` divider, every
     `PersonalRecordCard`, shared exercise/muscle comparisons and the
     `Share session` outline `ActionButton`. The muscle table is informational,
