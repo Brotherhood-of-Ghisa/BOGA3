@@ -159,7 +159,7 @@ trap cleanup_on_exit EXIT
 
 sync_push() { http_request POST "${API_URL}/rest/v1/rpc/sync_push" "$1" "$2"; }
 sync_pull() {
-  # Layer/cursor/limit body shape per the server contract §B.4.1.
+  # Layer/cursor/limit body shape per the server contract ("`sync_pull`").
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "$1" "$2"
 }
 

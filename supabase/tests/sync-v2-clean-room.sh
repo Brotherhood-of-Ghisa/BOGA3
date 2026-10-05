@@ -18,7 +18,7 @@
 #      (<table>_touch_server_received_at, <table>_owner_user_id_immutable);
 #      the enforce_owner_user_id_immutable function body contains the
 #      literal strings 'IS DISTINCT FROM' and 'auth.uid() IS NULL'
-#      (NULL-safe form per §A.6.3).
+#      (NULL-safe form; contract "RLS and owner immutability").
 #
 # This script overlaps with sync-v2-schema-smoke.sh but reads the catalogs at
 # the integration level (column-type assertions, function-body introspection)
@@ -183,7 +183,7 @@ pass "check 2.A — composite (owner_user_id, id) PK on every entity"
 
 # 2.B — universal columns present with correct Postgres types.
 # (owner_user_id uuid, client_updated_at_ms bigint, server_received_at
-# timestamptz, deleted_at bigint per §A.2.)
+# timestamptz, deleted_at bigint; contract "Universal columns, index and triggers".)
 #
 # Parallel arrays (not assoc array) to keep this portable to older bash on
 # macOS dev boxes where `declare -A` interacts badly with `set -u`.
@@ -212,7 +212,7 @@ pass "check 2.B — universal columns (owner_user_id uuid, client_updated_at_ms 
 
 # 2.C — per-table owner_received_idx present (composite index on
 # (owner_user_id, server_received_at)). This is the index the sync_pull RPC
-# plans against; §A.2 requires it on every entity.
+# plans against; the contract requires it on every entity.
 for entity in "${ENTITIES[@]}"; do
   idx_name="${entity}_owner_received_idx"
   count="$(run_psql "
@@ -228,7 +228,7 @@ for entity in "${ENTITIES[@]}"; do
 done
 pass "check 2.C — <table>_owner_received_idx present on every entity"
 
-# 2.D — only the exact CHECK constraints allowed by §A.1.
+# 2.D — only the exact CHECK constraints allowed by the contract's "Ground rules".
 for entity in "${ENTITIES[@]}"; do
   names="$(run_psql "
     select coalesce(string_agg(con.conname, ',' order by con.conname), '')
@@ -277,8 +277,8 @@ pass "check 3.A — both <table>_touch_server_received_at and <table>_owner_user
 
 # 3.B — enforce_owner_user_id_immutable function body contains the literal
 # 'IS DISTINCT FROM' and 'auth.uid() IS NULL' tokens (NULL-safe form per
-# §A.6.3). Compare case-insensitively because Postgres normalises some SQL
-# tokens on prosrc storage; the §A.6.3 canonical text uses lowercase, so we
+# contract "RLS and owner immutability"). Compare case-insensitively because Postgres normalises some SQL
+# tokens on prosrc storage; the canonical text in the clean-room migration uses lowercase, so we
 # do a lowercase substring match.
 PROSRC="$(run_psql "
   select prosrc

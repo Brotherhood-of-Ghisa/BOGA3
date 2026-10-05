@@ -15,8 +15,8 @@ This document is project-level source of truth for what data exists and how it i
 - The verified-accurate, normative Sync v2 reference (server schema, the
   push/pull RPC protocol, LWW/undelete semantics, drift control) is
   `docs/specs/tech/sync-v2-server-contract.md`. This document owns the
-  data-model boundaries and ownership invariants; it defers deep wire/RPC detail
-  to that contract by anchor (`§A.x` server schema, `§B.x` push/pull protocol).
+  data-model boundaries and ownership invariants; it defers wire/RPC detail
+  to that contract (cited by heading name).
 - Milestone/task docs may add detail but must not override this document.
 
 ## Current model layers
@@ -303,8 +303,7 @@ wire.
 Device-global sync state lives on the `sync_runtime_state` singleton row:
 `pull_cursor` (per-layer JSON cursor map), `last_emitted_ms` (the monotonic-clock
 high-water mark), `bootstrap_completed_at`, and `account_user_id` (the account
-whose data the store holds). Deep detail:
-`docs/specs/tech/sync-v2-server-contract.md` §B.9.
+whose data the store holds).
 
 `sync_quarantine` stores one row per quarantined dirty entity, keyed by
 `(entity_type, entity_id)` with `error_code`, diagnostic FK context
@@ -326,8 +325,9 @@ mirror of its client Drizzle table (no projection layer): composite primary key
 `(owner_user_id, id)`, all ten composite cross-entity FKs declared
 `DEFERRABLE INITIALLY DEFERRED`, and the universal sync columns
 `client_updated_at_ms` (the LWW key), `server_received_at` (the pull-cursor axis),
-and a nullable `deleted_at` tombstone. Per-column mapping is in
-`docs/specs/tech/sync-v2-server-contract.md` §A.2.
+and a nullable `deleted_at` tombstone. Per-column mapping is the Drizzle schema
+plus the migrations, kept in parity by the drift checker (see "Client schema
+drift rule").
 
 - `app_public.gyms` (carries the four nullable private coordinate columns)
 - `app_public.user_settings` (owner-private singleton preference mirror)
@@ -408,7 +408,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
     no per-owner LWW semantics. The only Sync v2 touch point is the
     failure-isolated `AFTER INSERT OR UPDATE` trigger on `sessions`, which can
     never abort `sync_push`. `sync_push`, `sync_pull`, the Sync v2 tables, and the
-    wire envelope are unchanged (`sync-v2-server-contract.md` §B.11).
+    wire envelope are unchanged (`sync-v2-server-contract.md`, "Out of scope").
 - **As-built (M22-T03):** the mobile `group_cache` table (local-only,
   disposable; see *Local schema inventory*), `out of sync scope`.
 - **As-built (M25-T03):** `exercise_group_links` is the member's own link data,
@@ -468,13 +468,13 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
    `client_updated_at_ms`; there is no central ordering authority, no per-device
    sequence, and no event log. Acknowledged trade-off: a stale-clock write can lose
    to a newer stored value (including the undelete-loses case in
-   `docs/specs/tech/sync-v2-server-contract.md` §A.1.1.2 Scenario A).
+   `docs/specs/tech/sync-v2-server-contract.md`, "LWW and undelete").
 5. Diagnostic log rows are write-only from authenticated clients and are manually inspected through backend operator tooling.
 6. All twelve sync-domain mirror tables use composite primary key
    `(owner_user_id, id)` — **owner-first**. The column order is load-bearing: the
    canonical pull query (`where owner_user_id = … order by server_received_at`)
    leads with the PK column, and the per-layer pull cursor depends on it (contract
-   §A.1, §B.4.3). Every user owns their own `id` keyspace, so two users may
+   "Ground rules"). Every user owns their own `id` keyspace, so two users may
    legitimately hold rows with the same `id` (for example, the same seeded
    `exercise_definitions.id`) without conflict. Cross-owner row-level conflicts are
    not possible by construction, and the backend has no cross-owner rejection path.
@@ -523,11 +523,11 @@ section states only the data-model-level invariants.
 2. Conflict resolution is per-row last-write-wins keyed on `client_updated_at_ms`,
    resolved identically on both ends (the `sync_push` upsert predicate and the
    client pull-apply). Row identity is the composite PK `(owner_user_id, id)`;
-   idempotency follows from LWW (contract §A.1.1, §B.10).
+   idempotency follows from LWW (contract "LWW and undelete").
 3. The backend stores each pushed row directly under LWW upsert. Deletion is
    `deleted_at` going non-null; undelete is the same row with `deleted_at` returning
    to null under the same LWW rule. There is no separate `deleted` flag and no
-   special delete/undelete path (contract §A.1.1).
+   special delete/undelete path (contract "LWW and undelete").
 4. Under protocol 3, restore/bootstrap is a full
    `sync_pull` drain across all five topological layers
    (first sign-in or wiped-client reinstall). It must be coherent across all
@@ -548,7 +548,7 @@ section states only the data-model-level invariants.
    within the existing string column and Sync v2 field; it introduces no schema
    migration or wire-envelope change.
 8. `gyms` may include nullable coordinate metadata: `latitude`, `longitude`, `coordinate_accuracy_m`, and `coordinates_updated_at`. The sync impact decision is `in sync scope`; all four columns are carried verbatim by the `gyms` push/pull wire envelope, the first-full-pull bootstrap, and reinstall restore parity.
-9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract §A.1).
+9. Gym coordinate fields are either all null or all non-null. Valid ranges are latitude `-90..90`, longitude `-180..180`, accuracy `>= 0`, and non-negative `coordinates_updated_at` epoch milliseconds. Clearing saved coordinates sets all four coordinate fields to null. These ranges are client-enforced — the server runs no validation (contract "Ground rules").
 10. Muscle volume, like every figure, is computed at read time from current
    exercise metadata and the applicable private policy; the calculation is
    `tech/training-metrics-contract.md` §4. Persisted
@@ -573,7 +573,7 @@ section states only the data-model-level invariants.
    database or sync entities.
 11. `exercise_group_links` (M25) is `in sync scope`: a member links one of their
    own exercises to a group exercise, and the link backs up, syncs, and works
-   offline like the rest of their data (contract §A.2.10). Its id is
+   offline like the rest of their data (contract "Per-entity rules"). Its id is
    `<group_id>:<exercise_definition_id>`, so a personal exercise links to at
    most one group exercise per group; unlink tombstones the row and relink
    undeletes the same id. Its only FK is `exercise_definition_id →
@@ -582,43 +582,14 @@ section states only the data-model-level invariants.
    `group_exercise_id` are opaque text, so a link to a group the member has
    left or a group exercise that no longer exists is kept and simply inert.
 
-### Wire envelope (Sync v2)
-
-Push request and pull response share **one** envelope shape per row:
-
-```json
-{ "type": "<entity>", "id": "...", "client_updated_at_ms": 0, "fields": { } }
-```
-
-`fields` carries every typed column for the entity (including `deleted_at`, which
-is a normal LWW column); `owner_user_id` never crosses the wire (the RPCs are
-`security invoker`, so it is derived from `auth.uid()` via RLS). The envelope
-carries no event-log metadata — no device, sequence, or event ids — because there
-is no event log. Field-by-field detail: contract §B.2.
-
 ### Entity coverage (Sync v2)
 
-There are no per-entity event types. Every one of the twelve entities moves through
-the same LWW upsert path. A delete is a row whose `deleted_at` is non-null; an
-undelete is that same row with `deleted_at` back to null. A reorder or complete is
-an ordinary field change (`order_index` / `status`); an attach is the join-table
-row (`exercise_muscle_mappings` / `session_exercise_tags`) being inserted or
-undeleted, and a detach is that same row soft-deleted via `deleted_at`. A group
-link follows the same shape: link inserts or undeletes the deterministic-id
-`exercise_group_links` row, unlink soft-deletes it.
-
-### Push/pull contract (Sync v2)
-
-- `sync_push` uploads a batch of `1..200` dirty rows and upserts them under LWW in
-  **one transaction**, returning a single `{ "ok": true, "server_received_at": … }`
-  ack — no per-row outcomes, no partial-batch commit. The whole batch either
-  commits or rolls back (deferrable FKs are checked at COMMIT). Failures surface as
-  exactly one of `AUTH_REQUIRED`, `FK_VIOLATION`, or `INTERNAL` (contract §B.2.2,
-  §B.3).
-- `sync_pull` downloads rows newer than a per-layer cursor, draining the five
-  topological layers in order so a child page never lands before its parents
-  (contract §B.4). The five per-layer cursors persist in
-  `sync_runtime_state.pull_cursor`.
+Every one of the twelve entities moves through the same typed-envelope LWW
+upsert path; there are no per-entity event types. Delete and undelete are
+`deleted_at` going non-null and back to null; reorder and complete are ordinary
+field changes; attach and group link insert or undelete the join or link row,
+and detach and unlink soft-delete it. The envelope, `sync_push` / `sync_pull`
+and their errors are owned by `docs/specs/tech/sync-v2-server-contract.md`.
 
 ## Maintenance rule (mandatory)
 
@@ -662,7 +633,7 @@ enforces the rule by booting a local Postgres, applying every migration, and
 introspecting the live schema. PRs failing the gate cannot merge. The checker
 also asserts the hardcoded topological table order in
 `apps/mobile/src/sync/topo-order.ts` against the live FK graph (see
-`docs/specs/tech/sync-v2-server-contract.md` §A.7.7) — adding a new entity table
+`docs/specs/tech/sync-v2-server-contract.md`, "Topological layers") — adding a new entity table
 or FK without updating that list also fails the gate.
 
 This rule does NOT apply to: `smoke_records`, `sync_runtime_state`,
@@ -680,4 +651,4 @@ FK-checked column like any other.)
 If your client change adds a value to an existing column (e.g., a new enum literal),
 the rule does not apply because the column already exists on both sides; the client
 is free to validate the enum and the server stores arbitrary text per the v2
-no-server-validation policy in `docs/specs/tech/sync-v2-server-contract.md` §A.1.
+no-server-validation policy in `docs/specs/tech/sync-v2-server-contract.md` ("Ground rules").

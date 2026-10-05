@@ -2,7 +2,7 @@
 
 # Integration test — deferrable FKs.
 #
-# Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md §A.5.2:
+# Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md ("Deferrable foreign keys"):
 #
 #   A. All ten cross-entity FKs are present in information_schema.
 #      referential_constraints with is_deferrable='YES' and
@@ -16,8 +16,8 @@
 #
 # This is integration-level on top of the per-table schema smoke (which only
 # checks pg_constraint.condeferred). The transaction-level assertion is the
-# behaviour the push RPC relies on (docs/specs/tech/sync-v2-server-contract.md §B.3.2
-# "SET CONSTRAINTS ALL DEFERRED inside the function").
+# behaviour the push RPC relies on (docs/specs/tech/sync-v2-server-contract.md, "`sync_push`"
+# atomicity: deferred constraints inside the function).
 
 set -euo pipefail
 
@@ -88,7 +88,7 @@ pass() { echo "[sync-v2-deferrable-fk] pass: $*"; }
 # -----------------------------------------------------------------------------
 # A. All ten cross-entity FKs deferrable + initially deferred.
 #
-# Map (constraint_name -> child_table) per docs/specs/tech/sync-v2-server-contract.md §A.5.2.
+# Map (constraint_name -> child_table), as declared by the sync-v2 migrations.
 # -----------------------------------------------------------------------------
 
 FK_SPECS=(

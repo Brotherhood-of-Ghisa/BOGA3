@@ -2,9 +2,9 @@
 /**
  * check-sync-schema-drift — Sync v2 client/server schema drift checker.
  *
- * Spec: docs/specs/tech/sync-v2-server-contract.md §A.7 (especially §A.7.3
- * algorithm and §A.7.7 topological FK assertion). This script implements that
- * drift-control contract.
+ * Spec: docs/specs/tech/sync-v2-server-contract.md ("Drift checker",
+ * "Topological layers") states what this gate guarantees; this script is the
+ * source of truth for how (algorithm, type map, exit codes).
  *
  * High-level steps:
  *   1. Reset the local Supabase Postgres (apply every migration from scratch).
@@ -12,15 +12,15 @@
  *   3. Introspect Postgres via information_schema / pg_indexes / pg_policies /
  *      pg_proc / pg_trigger.
  *   4. Per entity (derived: every app_public table with `owner_user_id`):
- *      walk client→server and server→client; run §7.3 step 4f sanity checks
+ *      walk client→server and server→client; run the step-4f sanity checks
  *      (universal index, two triggers, four owner RLS policies plus the
  *      restrictive direct-app-only policy, all w/ body hashes,
  *      no CHECK, no `extras`, no `deleted` boolean).
- *   5. Run the §7.7 topo-order assertion against TOPO_LAYERS.
+ *   5. Run the topological-layer assertion against TOPO_LAYERS.
  *
- * Exit codes (§7.4):
+ * Exit codes:
  *   0 — no drift, no warnings.
- *   1 — drift / §1 ground-rule regression.
+ *   1 — drift / contract ground-rule regression.
  *   2 — server has columns absent on the client (warn-only; FAIL under --strict).
  *
  * Flags:
@@ -279,7 +279,7 @@ interface SqliteForeignKey {
 // -----------------------------------------------------------------------------
 
 async function listEntityTables(pg: PgClient): Promise<string[]> {
-  // §7.7: derive ENTITY_TABLES from the live schema.
+  // Derive ENTITY_TABLES from the live schema.
   const r = await pg.query<{ table_name: string }>(`
     select c.table_name
       from information_schema.columns c
@@ -460,7 +460,7 @@ function quoteIdent(name: string): string {
 }
 
 // -----------------------------------------------------------------------------
-// Type-compat map (§7.3)
+// Type-compat map
 // -----------------------------------------------------------------------------
 
 /**
@@ -469,9 +469,8 @@ function quoteIdent(name: string): string {
  * reports for the server column (`text`, `int4`, `int8`, `float8`, `numeric`,
  * `bool`, `uuid`, `timestamp`, `timestamptz`).
  *
- * Returns true if the pair is acceptable per the §A.7.3 narrow map
- * (docs/specs/tech/sync-v2-server-contract.md). The timestamp_ms discriminator
- * on the client is reflected as `integer` by the SQLite catalog; bigint on the
+ * Returns true if the pair is acceptable per this narrow map. The
+ * timestamp_ms discriminator on the client is reflected as `integer` by the SQLite catalog; bigint on the
  * server is `int8`. The narrow map accepts client `integer` against either
  * `int4` or `int8`, plus the one synced SQLite boolean stored as integer.
  * Default-expression equality is NOT compared.
@@ -496,7 +495,8 @@ function camelToSnake(s: string): string {
 }
 
 // The wire-envelope columns (universal server-side, never declared on the
-// client Drizzle side) — per docs/specs/tech/sync-v2-server-contract.md §A.2.
+// client Drizzle side) — per docs/specs/tech/sync-v2-server-contract.md
+// ("Universal columns, index and triggers").
 const WIRE_ENVELOPE_COLUMNS = new Set([
   'owner_user_id',
   'client_updated_at_ms',
@@ -508,7 +508,7 @@ const WIRE_ENVELOPE_COLUMNS = new Set([
 // -----------------------------------------------------------------------------
 
 /**
- * Normalisation rule (§7.3 step 4f): "whitespace collapsed, comments stripped".
+ * Normalisation rule (step 4f): "whitespace collapsed, comments stripped".
  *   - Strip SQL line comments (`-- …` to end-of-line).
  *   - Strip SQL block comments (`/* … *\/`).
  *   - Collapse runs of whitespace to a single space.
@@ -568,7 +568,7 @@ function addWarning(f: Findings, msg: string): void {
   warn(msg);
 }
 
-// Pretty fix-template for a missing server counterpart (§7.4 verbatim shape).
+// Pretty fix-template for a missing server counterpart.
 function formatMissingServerCounterpart(
   entity: string,
   column: string,
@@ -590,7 +590,7 @@ function formatMissingServerCounterpart(
     `    alter table app_public.${entity}`,
     `      add column ${column} ${pgType};`,
     ``,
-    `  Server-first deploy is unconditional (per docs/specs/tech/sync-v2-server-contract.md §A.3 and §A.9). Once`,
+    `  Server-first deploy is unconditional (per docs/specs/05-data-model.md, "Client schema drift rule"). Once`,
     `  deployed, re-run \`npm run check:sync-drift\` — the local DB reset will pick`,
     `  up the new migration and the check will pass.`,
   ].join('\n');
@@ -667,7 +667,7 @@ async function main(): Promise<number> {
 
     const entities = await listEntityTables(pg);
     if (entities.length === 0) {
-      addError(findings, 'no entity tables with owner_user_id found in app_public; expected 9+ per docs/specs/tech/sync-v2-server-contract.md §A.2');
+      addError(findings, 'no entity tables with owner_user_id found in app_public; expected twelve per docs/specs/tech/sync-v2-server-contract.md');
     }
 
     log(`introspecting ${entities.length} entity table(s): ${entities.join(', ')}`);
@@ -693,7 +693,7 @@ async function main(): Promise<number> {
           `  expected: ${fixtureFile.enforce_owner_user_id_immutable_sha256}\n` +
           `  actual:   ${immutableHash}\n` +
           `  If this change is intentional, re-run with --write-fixtures and commit the diff.\n` +
-          `  Otherwise, restore the canonical body from docs/specs/tech/sync-v2-server-contract.md §A.6.3.`
+          `  Otherwise, restore the canonical body from supabase/migrations/20260525120000_sync_v2_clean_room.sql.`
       );
     }
 
@@ -712,7 +712,7 @@ async function main(): Promise<number> {
       });
     }
 
-    // ---- §7.7 topological FK assertion ------------------------------------
+    // ---- topological FK assertion -----------------------------------------
     await assertTopoOrder({ pg, entities, findings });
 
     // ---- Write fixtures if requested --------------------------------------
@@ -725,7 +725,7 @@ async function main(): Promise<number> {
     if (findings.errors.length > 0) {
       exitCode = 1;
     } else if (findings.warnings.length > 0) {
-      // Per §7.4: exit 2 is the "server-only column" warn lane; under --strict
+      // Exit 2 is the "server-only column" warn lane; under --strict
       // it becomes 1. Other warnings are surfaced but don't change the code.
       exitCode = flags.strict ? 1 : 2;
     } else {
@@ -785,45 +785,45 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
   const pgColByName = new Map(pgCols.map((c) => [c.column_name, c]));
   const pgColumnsInOrder = pgCols.map((c) => c.column_name);
 
-  // ---- 4f sanity: §1 ground-rule regressions ------------------------------
+  // ---- 4f sanity: contract ground-rule regressions ---------------------
   const allowedCheckNames =
     entity === 'exercise_definitions' ? ['exercise_definitions_load_input_mode_valid'] : [];
   if (JSON.stringify(checkNames) !== JSON.stringify(allowedCheckNames)) {
     addError(
       findings,
-      `${entity}: unexpected CHECK constraints ${JSON.stringify(checkNames)}; expected ${JSON.stringify(allowedCheckNames)} per docs/specs/tech/sync-v2-server-contract.md §A.1`
+      `${entity}: unexpected CHECK constraints ${JSON.stringify(checkNames)}; expected ${JSON.stringify(allowedCheckNames)} per docs/specs/tech/sync-v2-server-contract.md ("Ground rules")`
     );
   }
   if (pgColByName.has('extras')) {
     addError(
       findings,
-      `${entity}: server has an "extras" column; v2 forbids extras-blob columns per docs/specs/tech/sync-v2-server-contract.md §A.1`
+      `${entity}: server has an "extras" column; v2 forbids extras-blob columns per docs/specs/tech/sync-v2-server-contract.md ("Ground rules")`
     );
   }
   if (pgColByName.has('deleted')) {
     addError(
       findings,
-      `${entity}: server has a "deleted" boolean column; v2 uses only deleted_at (docs/specs/tech/sync-v2-server-contract.md §A.1)`
+      `${entity}: server has a "deleted" boolean column; v2 uses only deleted_at (docs/specs/tech/sync-v2-server-contract.md, "Ground rules")`
     );
   }
 
   // ---- 4f sanity: universal index, two structural triggers ---------------
   const universalIdx = `${entity}_owner_received_idx`;
   if (!pgIdx.some((ix) => ix.indexname === universalIdx)) {
-    addError(findings, `${entity}: missing universal index ${universalIdx} (docs/specs/tech/sync-v2-server-contract.md §A.2)`);
+    addError(findings, `${entity}: missing universal index ${universalIdx} (docs/specs/tech/sync-v2-server-contract.md, "Universal columns, index and triggers")`);
   }
   const expectedTouch = `${entity}_touch_server_received_at`;
   const expectedImmut = `${entity}_owner_user_id_immutable`;
   if (!pgTrigs.includes(expectedTouch)) {
-    addError(findings, `${entity}: missing trigger ${expectedTouch} (docs/specs/tech/sync-v2-server-contract.md §A.2)`);
+    addError(findings, `${entity}: missing trigger ${expectedTouch} (docs/specs/tech/sync-v2-server-contract.md, "Universal columns, index and triggers")`);
   }
   if (!pgTrigs.includes(expectedImmut)) {
-    addError(findings, `${entity}: missing trigger ${expectedImmut} (docs/specs/tech/sync-v2-server-contract.md §A.6.3)`);
+    addError(findings, `${entity}: missing trigger ${expectedImmut} (docs/specs/tech/sync-v2-server-contract.md, "RLS and owner immutability")`);
   }
 
   // ---- 4f sanity: RLS enabled with owner + agent-boundary policies --------
   if (!rlsEnabled) {
-    addError(findings, `${entity}: RLS not enabled (docs/specs/tech/sync-v2-server-contract.md §A.6.1)`);
+    addError(findings, `${entity}: RLS not enabled (docs/specs/tech/sync-v2-server-contract.md, "RLS and owner immutability")`);
   }
   const polByName = new Map(pgPols.map((p) => [p.policyname, p]));
   const expectedPolicies = [
@@ -839,7 +839,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
     const name = `${entity}_${spec.suffix}`;
     const pol = polByName.get(name);
     if (!pol) {
-      addError(findings, `${entity}: missing RLS policy ${name} (docs/specs/tech/sync-v2-server-contract.md §A.6.1)`);
+      addError(findings, `${entity}: missing RLS policy ${name} (docs/specs/tech/sync-v2-server-contract.md, "RLS and owner immutability")`);
       continue;
     }
     if (
@@ -878,7 +878,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
           `${name}: policy USING-expression hash drifted.\n` +
             `  expected: ${expected.qual}\n` +
             `  actual:   ${qualHash}\n` +
-          `  Canonical bodies are documented in docs/specs/tech/sync-v2-server-contract.md §A.6.1.\n` +
+          `  Canonical bodies are in the migrations that create each table's policies.\n` +
             `  If intentional, --write-fixtures.`
         );
       }
@@ -888,7 +888,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
           `${name}: policy WITH-CHECK expression hash drifted.\n` +
             `  expected: ${expected.with_check}\n` +
             `  actual:   ${withCheckHash}\n` +
-          `  Canonical bodies are documented in docs/specs/tech/sync-v2-server-contract.md §A.6.1.\n` +
+          `  Canonical bodies are in the migrations that create each table's policies.\n` +
             `  If intentional, --write-fixtures.`
         );
       }
@@ -925,13 +925,13 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
         addError(
           findings,
           `${entity}.${wireName}: type mismatch — client ${col.type} vs server ${pgCol.udt_name} (udt). ` +
-            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric; user_settings.bodyweight_calculations_enabled integer↔bool (docs/specs/tech/sync-v2-server-contract.md §A.7.3).`
+            `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric; user_settings.bodyweight_calculations_enabled integer↔bool (see isTypeCompatible).`
         );
       }
       continue;
     }
     if (untypedTextRefs.has(wireName)) continue;
-    // Missing — emit a §7.4-shaped failure.
+    // Missing — emit the fix-template failure.
     const msg = formatMissingServerCounterpart(entity, wireName, col.type, pgColumnsInOrder);
     findings.errors.push(msg);
     console.error(msg);
@@ -956,7 +956,7 @@ async function checkEntity(ctx: EntityContext): Promise<void> {
 }
 
 // -----------------------------------------------------------------------------
-// §7.7 topological FK order assertion
+// Topological FK order assertion
 // -----------------------------------------------------------------------------
 
 async function assertTopoOrder(args: {

@@ -5,8 +5,7 @@
 # Greps docs/specs/05-data-model.md for:
 #   - The literal heading `## Client schema drift rule (Sync v2)`
 #   - The exact sentence about the server migration being deployed first
-#     before the client change ships (the server-first deploy rule, server
-#     contract §A.8)
+#     before the client change ships (the server-first deploy rule)
 #
 # Exits non-zero if either is missing. This is intentionally a one-shot
 # grep — the rule wording is contractual and must not drift; any rephrasing
@@ -30,7 +29,7 @@ if ! grep -qxF "## Client schema drift rule (Sync v2)" "${SPEC_FILE}"; then
 fi
 pass "spec rule — heading '## Client schema drift rule (Sync v2)' present"
 
-# Assertion B: the server-first deploy sentence (server contract §A.8).
+# Assertion B: the server-first deploy sentence.
 #
 # The exact wording in the as-merged spec is:
 #   "and the server migration must be deployed to production before the
