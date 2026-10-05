@@ -55,6 +55,9 @@ drifted from the code and predated several UI milestones. Git history has them.)
   - implemented and verified replacement target: grouped muscle
     comparisons, separate chevron selection/name history, inline contributions
     and minimal copy; `/progress` owns the shared `/stats-history` surface
+- `design-targets/history-popup.md`
+  - accepted, pending implementation: full-height muscle/exercise history
+    popup with header swipe dismissal, no close button, and existing heatmaps
 
 ## Maintenance rules (for future tasks)
 
