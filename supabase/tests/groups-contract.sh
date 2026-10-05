@@ -961,7 +961,7 @@ check "All: ordered by sort_at_ms desc, kind asc, key desc" '
   def before($a; $b): ($a.sort_at_ms > $b.sort_at_ms)
     or ($a.sort_at_ms == $b.sort_at_ms and (($a.kind < $b.kind) or ($a.kind == $b.kind and $a.key > $b.key)));
   .items as $xs | ($xs | length) > 10 and all(range(0; ($xs | length) - 1); before($xs[.]; $xs[. + 1]))'
-check "All: S1 appears once, listing both groups (dedupe, AC14)" \
+check "All: S1 appears once, listing both groups (dedupe)" \
   '[.items[] | select(.key == $k)] | length == 1
    and (.[0].groups == [{group_id: $a, name: $an}, {group_id: $b, name: $bn}])' \
   --arg k "${S1_KEY}" --arg a "${GA}" --arg an "Record A ${RUN_TAG}" --arg b "${GB}" --arg bn "Record B ${RUN_TAG}"
@@ -1051,7 +1051,7 @@ expect_ok "a user with no groups streams All"
 check "no groups → empty stream" '. == {items: [], next_cursor: null, has_more: false}'
 pass "scope, VALIDATION for bad cursors/limits, NOT_FOUND for non-members"
 
-# Removal (AC11): the viewer loses B.
+# Removal: the viewer loses B.
 rpc "${OWNER_TOKEN}" group_remove_member "$(b_target "${GB}" "${VIEWER_UID}")"
 expect_ok "owner removes the viewer from B"
 stream "${VIEWER_TOKEN}" "${GB}" null 5
@@ -1073,7 +1073,7 @@ expect_ok "owner B-scope stream"
 check "the owner sees the removal as a membership item" \
   '[.items[] | select(.kind == "membership" and .member.user_id == $v) | .event] | sort == ["joined","removed"]' \
   --arg v "${VIEWER_UID}"
-pass "removed caller: NOT_FOUND for the group, All excludes it (AC11); removal item recorded"
+pass "removed caller: NOT_FOUND for the group, All excludes it; removal item recorded"
 
 # =============================================================================
 # Group exercises (groups contract)

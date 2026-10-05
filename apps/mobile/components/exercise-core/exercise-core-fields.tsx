@@ -35,11 +35,11 @@ const LOAD_MODE_OPTIONS = LOAD_INPUT_MODES.map((mode) => ({
 }));
 
 /**
- * The `ExerciseCore` fields (M25 design T1): the exercise name and the
+ * The `ExerciseCore` fields (T1): the exercise name and the
  * `Total load` / `Per side` weight entry. The personal exercise editor and the
  * group exercise form render these same fields and validate them with
  * `validateExerciseCore` (`src/exercise-core`). A `FormField` for the name and
- * a `SegmentedControl` for the weight entry (DLM-T07).
+ * a `SegmentedControl` for the weight entry.
  */
 export function ExerciseCoreFields({
   name,

@@ -207,7 +207,7 @@ describe('SyncSetupScreen', () => {
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeTruthy();
   });
 
-  it('shows the cycle error in danger, not as muted text (T05-D3)', () => {
+  it('shows the cycle error in danger, not as muted text', () => {
     renderGate();
 
     publish({ lastCycleErrorCode: 'INTERNAL' });

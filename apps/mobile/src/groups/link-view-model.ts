@@ -1,5 +1,5 @@
 // Pure presentation rules for linking personal exercises to group exercises
-// (product E0.1–E0.3, P2, P4, D8). No I/O: callers pass
+// (E0.1–E0.3, P2, P4, D8). No I/O: callers pass
 // the member's exercises (local catalogue), live links (local
 // `exercise_group_links`), and the cached group-exercise catalogues
 // (`group_cache`). Linked-state always comes from links, so it renders offline

@@ -1,10 +1,9 @@
 # Accepted target — More and Settings (repo-native brief)
 
-Target record per `../ai-design-policy.md`, for DLM-T04 of the design-language
-migration. Chosen by the user on 2026-09-24 (plan decision G1 (a)): a brief plus
-the gallery states the user accepts. Logs, Settings' Developer tools and the
-Maestro harness are dev-only (plan G8): a mechanical restyle, captured for
-information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
+Target record per `../ai-design-policy.md`. Chosen by the user on 2026-09-24:
+a brief plus the gallery states the user accepts. Logs, Settings' Developer tools and the
+Maestro harness are dev-only: a mechanical restyle, captured for
+information only. **Accepted** by the user in the gallery on 2026-09-25.
 
 ## Target
 
@@ -15,10 +14,10 @@ information only. **Accepted** by the user in the DLM-T04 gallery on 2026-09-25.
 
 - More and Settings are `paper` under a `PageHeader`. Each section is an
   `ink-muted` micro-label over one `Card` of hairline `ListRow`s: a leading
-  glyph in `ink-muted` (no badge, T04-D1), the label and an `ink-muted`
+  glyph in `ink-muted` (no badge), the label and an `ink-muted`
   description, and a trailing `chevron-right`, or `arrow-up-right` for the
   external setup link. A failed browser launch shows `danger` text under its row.
-- Settings' date format is a `SegmentedControl` (T04-D3). The signed-out sync
+- Settings' date format is a `SegmentedControl`. The signed-out sync
   guidance is a `StatePanel` in a `Card`. About is a `Card` of text rows.
 - The sync-status panel is a `Card` of `ListRow`s: the labels in body text,
   the values in Plex Mono.

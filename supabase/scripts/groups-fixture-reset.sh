@@ -7,7 +7,7 @@
 #
 #   1. hard-deletes, with the service role, every group either user created or
 #      has any membership period in (memberships, invites, share-ledger rows,
-#      and the M25 group exercises, events, boards, and certifications go with
+#      and the group exercises, events, boards, and certifications go with
 #      it by `on delete cascade`);
 #   2. hard-deletes both users' Sync v2 rows (the tables `dev_wipe_my_data`
 #      covers, child-first because each REST call is its own transaction), so

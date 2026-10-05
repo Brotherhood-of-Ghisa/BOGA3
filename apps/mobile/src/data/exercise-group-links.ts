@@ -21,7 +21,7 @@ import { notifyLocalWrite } from '@/src/sync/write-nudge';
 //
 // The repository accepts any local exercise, soft-deleted ones included: pulled
 // rows and LWW undeletes must apply as-is, and such a link is inert on the
-// server. The UI never offers a soft-deleted exercise for linking (M25-T07).
+// server. The UI never offers a soft-deleted exercise for linking.
 
 export type ExerciseGroupLinkRecord = {
   id: string;
@@ -68,7 +68,7 @@ const readLink = (database: LocalDatabase, id: string, after: string): ExerciseG
 
 /**
  * `linkExercise` inside the caller's transaction, so a link can commit together
- * with other local writes (M25-T07 "Add as new"). Returns whether it wrote; the
+ * with other local writes ("Add as new"). Returns whether it wrote; the
  * caller calls `notifyLocalWrite()` after commit when it did.
  */
 export const linkExerciseInTransaction = (

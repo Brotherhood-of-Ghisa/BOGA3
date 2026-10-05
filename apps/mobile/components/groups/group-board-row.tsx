@@ -18,8 +18,8 @@ type GroupBoardRowProps = {
  * One full-board row (E1.2), a dense `ListRow` in the board's card: rank and
  * value in Plex Mono, the member ("You", "(former)") with the 1RM's set below
  * it, the date, and on All the certification mark (a check, or a ring and
- * "uncertified"). My row sits on `paper` and reads "You" (DLM-T12-D1).
- * The whole row opens the row detail sheet (E2, M25-T10).
+ * "uncertified"). My row sits on `paper` and reads "You".
+ * The whole row opens the row detail sheet (E2).
  */
 export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps) {
   const testID = `group-board-row-${row.rank}`;

@@ -10,7 +10,7 @@ export type MainTabDefinition = {
   href: `/${MainTabKey}`;
 };
 
-/** Canonical M26 top-level navigation model. */
+/** Canonical top-level navigation model. */
 export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
   {
     key: 'today',

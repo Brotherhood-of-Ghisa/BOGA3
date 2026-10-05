@@ -1,4 +1,4 @@
-# UI Docs Bundle (Authoritative, M8)
+# UI Docs Bundle
 
 ## Purpose
 
@@ -9,9 +9,9 @@ This folder is the authoritative, app-specific UI documentation bundle for the c
 - Use `ai-design-policy.md` for provider-neutral design sources, handoff, and
   visual acceptance.
 
-(The one-time M8 audit snapshots — `repo-discovery-baseline.md`,
+(The one-time audit snapshots — `repo-discovery-baseline.md`,
 `ui-pattern-audit.md` — were deleted 2026-06-10: dated 2026-02-26, they had
-drifted from the code and predated several UI milestones. Git history has them.)
+drifted from the code. Git history has them.)
 
 ## Status legend
 

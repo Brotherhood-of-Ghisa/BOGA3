@@ -168,7 +168,7 @@ Progress failure-intensity rows, all use it.
 | `viz3` | `#BCA18A` | 68 | |
 | `viz4` | `#A4866B` | 58 | the strongest intensity |
 
-**Picked on device 2026-09-25** (DLM-T08, "B2", from a gallery of a teal, a
+**Picked on device 2026-09-25** ("B2", from a gallery of a teal, a
 warm monochrome and a green, then three warmer takes on the monochrome): a
 bronze taupe at LCh hue 68, chroma 9–20. It sits between `accent` (hue 47,
 chroma 73) and `record` (hue 81, chroma 47) but at a fraction of their chroma
@@ -182,7 +182,7 @@ steps are even in lightness (L* 87 / 78 / 68 / 58) so each bucket reads as
 - Colour is never the only channel: counts and accessibility labels still say
   how much.
 - Marks on a `viz` cell are `ink`: today a 1px ring, selected a 2px border
-  (G2; the heatmaps, DLM-T09). An empty `viz0` cell takes a `rule` hairline,
+  (G2; the heatmaps). An empty `viz0` cell takes a `rule` hairline,
   since `viz0` is only 1.18:1 against `surface`.
 
 Gated by `ui-design-tokens.test.ts`: the steps darken monotonically with
@@ -316,7 +316,7 @@ additionally render faded (§6).
   every screen (`tech/training-metrics-contract.md` §4, `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
-  Mono column (decided for Progress, DLM-T08-D2).
+  Mono column (decided for Progress).
 - **No unit suffix inside an input.** The unit belongs in the field label.
 - **Show a figure wherever it can be computed**, including for values that are
   not yet realised — a planned set shows its projected 1RM and volume faded:

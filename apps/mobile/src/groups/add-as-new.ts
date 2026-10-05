@@ -1,4 +1,4 @@
-// "Add as new" (M25-T07; product E0.2) prefill: a new personal exercise that
+// "Add as new" (E0.2) prefill: a new personal exercise that
 // copies a group exercise's `ExerciseCore` (name + load mode). A group exercise
 // has no muscles, and a personal exercise needs at least one, so the editor
 // opens prefilled and the member confirms. When the group exercise was copied

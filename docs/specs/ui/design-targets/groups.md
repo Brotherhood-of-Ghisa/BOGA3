@@ -4,13 +4,12 @@ Current competition content is governed by [group-competitions](group-competitio
 The selected legacy Weight/raw-set captures below retain their layout authority;
 Volume/1RM, explicit units and safe public context replace their old content.
 
-Target record per `../ai-design-policy.md`, for DLM-T11 (the Groups tab's
-stream, the record sheet, the group page shell and the state panels) of the
-design-language migration. DLM-T12 (Leaderboards), DLM-T13 (group management)
-and DLM-T14 (group exercises) extend it with their own sections. Chosen by the
-user on 2026-09-24 (plan decision G1 (a)): a brief plus the gallery states the
+Target record per `../ai-design-policy.md` for the Groups tab's stream, the
+record sheet, the group page shell and the state panels; Leaderboards, group
+management and group exercises have their own sections. Chosen by the user on
+2026-09-24: a brief plus the gallery states the
 user accepts. It supersedes `group-exercise-unlink.md` for appearance only; that
-record's behaviour brief stays. **Accepted** by the user in the DLM-T11 gallery on
+record's behaviour brief stays. **Accepted** by the user in the gallery on
 2026-09-25.
 
 ## Target
@@ -38,7 +37,7 @@ record's behaviour brief stays. **Accepted** by the user in the DLM-T11 gallery 
   Plex Mono (`140.0 × 1 · 1RM 142.5`: `1RM`, no unit in a figure, G7), the
   boards as `Tag`s and the certification line (a check in `ink`, a ring in
   `ink-muted`). `Certify` is an outline. A voided record loses the band, fades
-  to `ink-faint` and puts its status first (T11-D2).
+  to `ink-faint` and puts its status first.
 - **The record sheet** is a `Sheet` titled with the lifter and the exercise,
   with no Close: the backdrop dismisses it (G5). The set and the 1RM are
   `record` `Stat`s, then the logged, date · gym, logged-as and status lines.
@@ -79,9 +78,9 @@ card, and a failed certification.
 No target screenshots are committed; runtime captures stay in the gitignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence.
 
-## Leaderboards (DLM-T12)
+## Leaderboards
 
-**Accepted** by the user in the DLM-T12 gallery on 2026-09-26, with the
+**Accepted** by the user in the gallery on 2026-09-26, with the
 session card's `1500 kg` (no separator) and `You` at Source Sans 600 (the
 face ships no 700) confirmed.
 
@@ -99,13 +98,13 @@ face ships no 700) confirmed.
   `Certified` | `All` (solid `ink` when on). The rows are one `Card` of dense
   `ListRow`s behind `rule-soft` hairlines: rank and value in Plex Mono, the
   member in Source Sans with the 1RM's set under it in `ink-muted`, and the
-  date with the certification mark on All (T11's check in `ink`, ring and
+  date with the certification mark on All (the stream's check in `ink`, ring and
   `uncertified` in `ink-muted`). My row sits on `paper` and reads
-  `You` (T12-D1). Empty, missing-data and lost-access are T11's `StatePanel`s;
+  `You`. Empty, missing-data and lost-access are the group `StatePanel`s;
   `See all sets` is their outline.
 - **History** is the view's micro-label over one `Card` of rows: the date in
   small Plex Mono, then the sentence in Source Sans.
-- **Numbers (G7, T12-D2).** The metric reads `1RM`, never `e1RM`. A value is
+- **Numbers (G7).** The metric reads `1RM`, never `e1RM`. A value is
   a figure with no unit: a 1RM to one decimal (`64.1`) and a set in the app's
   weight figure (`55.0 × 5`, `51.25 × 5`). History sentences are prose and
   keep `kg`. No figure groups thousands, so the session card's volume reads
@@ -136,9 +135,9 @@ Jest only: the podium row with `You` in bold, the offline marker over loaded
 rows, the offline and error panels, the exercise-missing state, and the
 older-page footer.
 
-## Group management (DLM-T13)
+## Group management
 
-**Accepted** by the user in the DLM-T13 gallery on 2026-09-26.
+**Accepted** by the user in the gallery on 2026-09-26.
 
 ### Brief
 
@@ -150,7 +149,7 @@ older-page footer.
 - **The group screen.** A header `Card`: the name in Archivo 700, the
   description in `ink-muted`, then a `Members` row with the count · role in
   `ink-muted` and a chevron (it opens Members). For owners and admins `Invite`
-  is the screen's one `accent` beside an outline `Edit` (T13-D1). `Exercises`
+  is the screen's one `accent` beside an outline `Edit`. `Exercises`
   is a section micro-label, and its `Add exercise` is an outline.
 - **Members.** The same header `Card` (name, count · role), the outcome
   `Notice`s, then one `Card` of dense rows: the name (+ `(you)`), the role as a
@@ -160,10 +159,10 @@ older-page footer.
 - **The action sheets** (members, and the group exercises' sheet, which shares
   `GroupActionSheet`) are `Sheet`s titled with the item, an `ink-muted`
   subtitle (the member's role), then one `ListRow` per action, `danger` when
-  destructive. No Cancel: the backdrop dismisses them (G5, T13-D2). The native
+  destructive. No Cancel: the backdrop dismisses them (G5). The native
   confirmations after `Remove` / `Transfer` are unchanged.
 - **Invite.** A `Card`: the title in Archivo 700, the body in `ink-muted`, the
-  code in Plex Mono 700 at `xxl`, letter-spaced (T13-D3), and the link in
+  code in Plex Mono 700 at `xxl`, letter-spaced, and the link in
   `ink-muted`. `Share invite` is the one `accent`; `Regenerate code` an outline
   in `danger`. "New code ready…" is a neutral `Notice` with the `success`
   glyph (G3).
@@ -192,20 +191,20 @@ Device: iPhone simulator at 390pt width, light. All from `groups-two-user-stream
 Jest only (no flow reaches them): Join (the counterparty joins by script), the
 empty create form, Edit, a regenerated code's notice, and the offline and
 error states of each screen. `groups-08` (the stream) and `groups-09` (a
-board) end the same flow but show no T13 screen.
+board) end the same flow but show no group-management screen.
 
-## Group exercises and linking (DLM-T14)
+## Group exercises and linking
 
-**Accepted** by the user in the DLM-T14 gallery on 2026-09-26, with `Sheet`
+**Accepted** by the user in the gallery on 2026-09-26, with `Sheet`
 titles wrapping to two lines (the pick sheet's `<exercise> · <group>`). This
 section is the appearance target of `group-exercise-unlink.md`, whose behaviour
-brief stays (T14-D4).
+brief stays.
 
 ### Brief
 
 - **Exercises section.** `Exercises` is a micro-label with `Add exercise` as
   an outline beside it (owner/admin): `Invite` is the group screen's one
-  `accent` (T13-D1). The rows are one `Card` of dense `ListRow`s behind
+  `accent`. The rows are one `Card` of dense `ListRow`s behind
   `rule-soft` hairlines: the name in Archivo 600, the weight entry and my link
   status (`Linked: …` / `Not linked`) in `ink-muted`, an `Archived` `Tag`
   centred on the text and a chevron when the row opens the exercise actions.
@@ -224,18 +223,17 @@ brief stays (T14-D4).
   `radio-off` in `ink`, no ground change), the other exercises under a
   `SearchField` with unavailable ones in `ink-faint` beside their reason, the
   notes in `ink-muted`, a `danger` `Notice` and the confirm, the sheet's one
-  `accent` (T14-D3).
+  `accent`.
 - **The unlink chooser** is a `Sheet` (`Your linked exercises`, then
   `<exercise> · <group>` in `ink-muted`) with no Cancel: one row per personal
   exercise, its name wrapping, and a `danger` text `Unlink`. The native
-  confirmation opens only once the sheet has gone (`Sheet.onDismissed`,
-  T14-D2); its `Cancel` / `Unlink` are OS chrome.
+  confirmation opens only once the sheet has gone (`Sheet.onDismissed`); its `Cancel` / `Unlink` are OS chrome.
 - **The Link screen.** The outcome is a `Notice` (neutral with the `success`
   glyph, or `danger`) in place of bare coloured text. `Linked`, `Suggested`
   and `All group exercises` are micro-labels over `Card`s of dense rows (a
   group's name in Archivo 700 above its card): `Unlink` a `danger` text button,
   `Link` an outline. A `SearchField` filters; empty, offline and error states
-  are T11's `StatePanel`s and notices. No `accent`: the screen has no primary.
+  are the group `StatePanel`s and notices. No `accent`: the screen has no primary.
 
 ### States
 

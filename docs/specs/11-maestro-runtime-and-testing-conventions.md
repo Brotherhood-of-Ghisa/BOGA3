@@ -1,4 +1,4 @@
-# Maestro Runtime and Testing Conventions (M10 Contract)
+# Maestro Runtime and Testing Conventions
 
 > **Owns:** the Maestro iOS runtime/testing contract — reset taxonomy, artifacts, config files, isolation. **Not here:** lane membership → `02`/`scripts/lanes.tsv`; when lanes are required → `06`. **Load when:** Maestro/iOS e2e flow or harness work.
 
@@ -9,13 +9,13 @@ This document is the authoritative source of truth for the `apps/mobile` Maestro
 It has two jobs:
 
 1. record the verified current implementation as of `2026-03-01`, based on code rather than historical runbooks;
-2. lock the exact M10 runtime, config, script, artifact, and terminology contract that follow-up tasks must implement.
+2. lock the exact runtime, config, script, artifact, and terminology contract.
 
 ## Status / scope
 
 - Scope: iOS Maestro runtime/tooling, flow execution conventions, and the related documentation ownership model for `apps/mobile/**`.
 - Current-state status: the implemented runtime uses an Expo development client, shared host-local build reuse, and explicit provision/launch/teardown scripts.
-- Target-state status: M10 now has the reset taxonomy and harness-based navigation implemented; broader docs/runbook integration remains in follow-up work.
+- Target-state status: the reset taxonomy and harness-based navigation are implemented; broader docs/runbook integration remains in follow-up work.
 - Phase-2 runtime-toolkit status (`2026-03-01`): the shared development-client runtime toolkit is implemented and the smoke/data-smoke runners now execute through it on real iOS simulator runs.
 - Authority rule:
   - this doc is normative for Maestro runtime/testing conventions;
@@ -46,14 +46,14 @@ index); for lane membership and commands, `scripts/lanes.tsv` / `./boga test
 --list`. Dated "verified current-state" snapshots were removed from this doc:
 they duplicated the scripts and went stale — the scripts win.
 
-## Locked M10 target contract
+## Locked target contract
 
-Everything in this section is normative for follow-up M10 tasks.
+Everything in this section is normative.
 
 ### 1. Runtime model
 
 1. The primary iOS automation runtime is `Maestro + iOS Simulator + Expo development client`.
-2. `Expo Go` is a verified current-state baseline only; it is not the target M10 automation runtime.
+2. `Expo Go` is a verified current-state baseline only; it is not the target automation runtime.
 3. The user-facing runner commands remain:
    - `npm run test:e2e:ios:smoke`
    - `npm run test:e2e:ios:data-smoke`
@@ -90,7 +90,7 @@ Existing environment names that are already implemented remain canonical:
 - `EXPO_START_WAIT_SECONDS`
 - `IOS_SIM_BOOT_TIMEOUT_SECONDS` (hard deadline for `ios-sim-boot.sh`'s boot + boot-ready wait; default 120)
 
-New M10-required environment names are locked as:
+Required environment names are locked as:
 
 - `MAESTRO_IOS_SHARED_BUILD_ROOT`
   - canonical shared host-local directory for reusable development-client artifacts.
@@ -250,7 +250,7 @@ The canonical artifact root remains:
 
 - `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`
 
-M10 runtime scripts must emit:
+Runtime scripts must emit:
 
 - `runtime.env`
 - `provision.log`
@@ -299,7 +299,7 @@ Implementation note:
 
 ### 8. Reset taxonomy
 
-M10 locks these exact terms:
+These exact terms are locked:
 
 1. `full reset`
    - cold-start/install-level reset;

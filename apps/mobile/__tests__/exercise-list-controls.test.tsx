@@ -1,6 +1,6 @@
 /**
- * The shared exercise list (`components/exercise-catalog/exercise-list-controls.tsx`,
- * DLM-T06) on its own: the rows the catalogue, the session view's picker and
+ * The shared exercise list (`components/exercise-catalog/exercise-list-controls.tsx`)
+ * on its own: the rows the catalogue, the session view's picker and
  * the exercise page's swap sheet render, and the shared list options. The
  * screens' own tests cover what each does with a pick.
  */

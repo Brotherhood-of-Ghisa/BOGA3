@@ -16,7 +16,7 @@ Current docs:
   stream, evaluator, boards, certification, comparisons, RPC conventions and
   error tokens, the mobile `src/groups` client and cache, and the rule IDs.
 - `session-planning-contract.md`: authoritative technical contract for session
-  planning and programmes (M23): data model, schema, 16-entity Sync v2 expansion,
+  planning and programmes: data model, schema, 16-entity Sync v2 expansion,
   materialization algorithms, block lifecycle, set reordering invariants, agent
   write permissions/API, and MCP tools.
 

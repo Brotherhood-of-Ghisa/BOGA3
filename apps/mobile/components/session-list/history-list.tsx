@@ -186,7 +186,7 @@ export function HistoryList({
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
           History
         </Text>
-        {/* A view toggle, not a filter group: its on state is `checked` (T10-D5). */}
+        {/* A view toggle, not a filter group: its on state is `checked`. */}
         <ActionButton
           accessibilityLabel={showDeletedSessions ? 'Hide deleted sessions' : 'Show deleted sessions'}
           checked={showDeletedSessions}

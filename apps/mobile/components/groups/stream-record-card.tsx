@@ -25,7 +25,7 @@ type GroupStreamRecordCardProps = {
  * A record card (product E3, P14, P15; 08 pattern 6): who, the group exercise
  * and value, one tag per board it broke, and the certification status in text.
  * It sits below its session card. A standing record carries the `record` band
- * with its title and its value in bold `record` (T11-D2), as the app's own
+ * with its title and its value in bold `record`, as the app's own
  * records do. The summary is one press target that opens the row detail;
  * Certify sits beside it (not inside, so it stays its own accessibility
  * element) and certifies without opening it. A voided card stays, without the

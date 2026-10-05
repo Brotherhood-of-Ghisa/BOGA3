@@ -93,7 +93,7 @@ describe('groups api client', () => {
     }
   };
 
-  it('keeps record, record_voided, and link items; drops a kind this build does not know, keeping the server cursor (M25-T10)', async () => {
+  it('keeps record, record_voided, and link items; drops a kind this build does not know, keeping the server cursor', async () => {
     const session = { kind: 'session', key: 'u:s', sort_at_ms: 9 };
     const record = { kind: 'record', key: 'e1', sort_at_ms: 9 };
     const voided = { kind: 'record_voided', key: 'e2', sort_at_ms: 8 };

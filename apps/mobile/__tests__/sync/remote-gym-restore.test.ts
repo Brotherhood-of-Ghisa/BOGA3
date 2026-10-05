@@ -3,8 +3,7 @@
  * already holding personal gyms must restore those gyms into the local `gyms`
  * table on the first authenticated sync.
  *
- * This is the concrete bug behind the M13 sync-restore/FK-hardening series
- * (task cards T-20260606-01..05): a reinstalled or fresh device starts with no
+ * The bug: a reinstalled or fresh device starts with no
  * local rows, signs in, and must end up holding the user's remote gyms locally
  * — otherwise the gym sheet and Gyms screen can never surface them.
  *
@@ -154,7 +153,7 @@ describe('empty local DB restores remote gyms on first authenticated sync', () =
     expect(getAuthRequiredSignal()).toBe(false);
 
     // The picker reads active gyms (id + name, non-deleted) ordered by name.
-    // This is exactly the row shape T-20260517-01 will hydrate the picker from;
+    // This is exactly the row shape the picker hydrates from;
     // assert all three remote gyms are now present, clean, and undeleted.
     const restored = database
       .select({

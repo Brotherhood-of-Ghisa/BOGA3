@@ -1,10 +1,10 @@
 /* eslint-disable import/first */
 
 /**
- * M22-T05 AC3: the invite link `boga3://group/join?code=…` resolves through
+ * The invite link `boga3://group/join?code=…` resolves through
  * the real Expo Router to the Join screen (the static `group/join` route wins
  * over `group/[groupId]`) with the code prefilled from the route params. The
- * device-level link is covered by Maestro in M22-T06.
+ * device-level link is covered by Maestro.
  */
 
 import { screen } from '@testing-library/react-native';

@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
     textAlign: 'center',
   },
-  // An error, so `danger` (T05-D3), beside the one `accent` Retry.
+  // An error, so `danger`, beside the one `accent` Retry.
   errorMessage: {
     fontFamily: uiFonts.body.family,
     fontWeight: '600',

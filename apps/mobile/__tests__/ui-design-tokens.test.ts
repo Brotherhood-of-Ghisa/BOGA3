@@ -59,7 +59,7 @@ describe('design-language tokens', () => {
   });
 
   it('exports one vocabulary: the retired scales stay gone', () => {
-    // `uiColors` and `uiRadius` were retired 2026-09-26 (DLM-T15), `uiElevation`
+    // `uiColors` and `uiRadius` were retired 2026-09-26, `uiElevation`
     // 2026-09-24: depth is a hairline and a ground change, never a shadow (§4).
     // `scripts/check-ui-guardrails.js` (`legacyVocabulary`) blocks their use.
     const exported = Object.keys(tokens);

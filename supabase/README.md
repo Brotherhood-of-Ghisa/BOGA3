@@ -1,13 +1,13 @@
-# Supabase Local Runtime (M5 Baseline)
+# Supabase Local Runtime
 
-This folder is the backend root for M5 (`Supabase` local-first development and testing).
+This folder is the backend root (`Supabase` local-first development and testing).
 
-## Purpose (T-20260220-08)
+## Purpose
 
 - Provide a reproducible local backend runtime scaffold.
 - Prove migration + reset/seed flow from a clean local state.
 - Expose a health endpoint for explicit API-surface smoke checks.
-- Establish backend-local smoke test and fixture conventions for follow-on M5 tasks.
+- Establish backend-local smoke test and fixture conventions.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ This folder is the backend root for M5 (`Supabase` local-first development and t
   - used by `supabase functions serve --env-file ...`
 - Hosted placeholders (no secrets committed): `supabase/.env.hosted`
   - setup links this to `~/.config/boga/supabase/env.hosted`
-  - detailed hosted env/deployment command path is owned by `T-20260220-09`
+  - detailed hosted env/deployment command path is owned by `RUNBOOK.md`
 
 ## One-command local startup path
 
@@ -128,7 +128,7 @@ Current coverage:
 - Edge health endpoint smoke
 - deterministic fixture seed smoke
 
-## M5 auth/authz baseline (implemented in `T-20260220-10`)
+## Auth/authz baseline
 
 Current auth posture for backend/API work:
 
@@ -185,7 +185,7 @@ Notes:
 
 ## Auth/authz contract tests (local Supabase)
 
-Run the M5 auth/authz baseline suite:
+Run the auth/authz baseline suite:
 
 ```bash
 ./boga test auth-authz
@@ -202,9 +202,9 @@ Coverage includes:
 - owner spoofing denial
 - cross-user parent/child ownership mismatch rejection (DB constraint path)
 
-## M5 sync API contract baseline (implemented in `T-20260220-11`)
+## Sync API contract baseline
 
-Chosen API surface for the M5 sync baseline:
+Chosen API surface for the sync baseline:
 
 - `PostgREST` table routes on `app_public` (`gyms`, `sessions`, `session_exercises`, `exercise_sets`)
 - auth via `anon` key + user JWT
@@ -237,7 +237,7 @@ Parallel-run note:
 - tests require the deterministic fixture baseline to exist but do not require empty app tables.
 - run `./boga worktree doctor` when a backend suite appears to hit another worktree's local runtime.
 
-## M21 read-only agent API and OAuth boundary
+## Read-only agent API and OAuth boundary
 
 The Virtual Coach read path is:
 
@@ -264,7 +264,7 @@ Disabling the gateway check does not make a route public: the function rejects
 missing, invalid, expired, normal-app, and revoked credentials before creating
 its service-role data client.
 
-The M21 migration adds restrictive RLS policies requiring `client_id IS NULL`
+The `20260725175643_m21_agent_access_boundary.sql` migration adds restrictive RLS policies requiring `client_id IS NULL`
 for direct domain/profile/log access. An OAuth token therefore cannot use
 PostgREST, `sync_push`, app profile/log paths, or any application write route.
 The service role is confined to `agent-api`; it must never be injected into
@@ -327,8 +327,6 @@ Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sq
 
 For local parity before and after a hosted reset, run `./supabase/scripts/reset-local.sh`, `./supabase/scripts/ensure-local-runtime-baseline.sh`, `./scripts/quality-fast.sh backend`, and `./scripts/quality-slow.sh backend`. On WSL, verify Docker Desktop integration from this distribution first with `docker info`.
 
-(An earlier hosted migration-history repair predates the sync redesign; its task card has been archived out.)
-
 ## Fixture baseline (deterministic)
 
 `supabase/seed.sql` seeds `public.dev_fixture_principals` with named fixtures used by follow-on ownership/authz tests:
@@ -338,7 +336,7 @@ For local parity before and after a hosted reset, run `./supabase/scripts/reset-
 - `user_b`
 - `service_role_helper` (optional helper fixture)
 
-These are dev fixtures only and do **not** lock the final auth linkage design for M5 auth/sync tasks.
+These are dev fixtures only and do **not** lock the final auth linkage design.
 
 ## Health endpoint note
 
@@ -348,15 +346,15 @@ The `health` Edge Function is a local runtime smoke surface only. It exists to v
 - local Edge Function serving path
 - deterministic endpoint smoke checks
 
-It does **not** lock the final sync API surface choice for `T-20260220-11` (`Edge Functions` vs `PostgREST/RPC` mix).
+It does **not** lock the final sync API surface choice (`Edge Functions` vs `PostgREST/RPC` mix).
 
 ## Follow-on testing layers (documented now, implemented incrementally)
 
 - `DB` tests: `pgTAP` (`supabase test db`) for policies/functions/constraints
 - `Edge` unit tests: add when Edge logic beyond simple health exists
 - `Supabase-local` integration/contract tests: required for auth/RLS/API tasks
-- hosted smoke validation: owned by `T-20260220-09` (manual by default until CI exists)
-- cross-stack `E2E`: strategy only in M5; repo-root `e2e/` reserved for later implementation
+- hosted smoke validation: manual by default until CI exists
+- cross-stack `E2E`: strategy only; repo-root `e2e/` reserved for later implementation
 
 ## Optional bodyweight-calculation cutover
 

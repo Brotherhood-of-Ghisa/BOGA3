@@ -95,7 +95,7 @@ and clears every account group projection at upgrade/normalized mode cutover.
 - `session_exercise_tags`
 - `muscle_groups` (per-user taxonomy; system-seeded as a starter catalog, then
   synced like any other entity — modeled on `exercise_definitions`)
-- `exercise_group_links` (M25) — a member's link from one of their own
+- `exercise_group_links` — a member's link from one of their own
   exercises to a group exercise; deterministic id
   `<group_id>:<exercise_definition_id>` (see Sync v2 data-model contract #11)
 
@@ -161,7 +161,7 @@ unsaved input for Retry.
 - `sync_runtime_state` (singleton row; see *Local sync bookkeeping* below)
 - `sync_quarantine` — local-only push-side quarantine bookkeeping for dirty rows
   whose required FK parents are missing locally. Never synced and FK-free.
-- `group_cache` (M22) — local-only, disposable cache of server-authoritative
+- `group_cache` — local-only, disposable cache of server-authoritative
   group RPC results: `cache_key` PK, `user_id`, `payload_json`,
   `fetched_at_ms` (`apps/mobile/src/data/schema/group-cache.ts`, migration
   `0004`). Reads return nothing unless `user_id` matches the signed-in user.
@@ -341,13 +341,13 @@ drift rule").
 - `app_public.session_exercise_tags`
 - `app_public.muscle_groups` (per-user taxonomy mirror; FK parent of
   `exercise_muscle_mappings.muscle_group_id`)
-- `app_public.exercise_group_links` (M25; FK only to `exercise_definitions`;
+- `app_public.exercise_group_links` (FK only to `exercise_definitions`;
   `group_id` / `group_exercise_id` are plain text with no FK into group tables)
 
 There are no backend ingest-metadata tables: with no event log there is nothing
 to deduplicate per device, so idempotency falls out of per-row LWW.
 
-### Diagnostics tables (M14 baseline)
+### Diagnostics tables
 
 - `public.app_logs`
   - minimal app diagnostics for auth/sync failure investigation.
@@ -355,7 +355,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   - client-side `SELECT`, `UPDATE`, and `DELETE` are intentionally unavailable.
   - sync impact decision: `out of sync scope`; logs are operational diagnostics, not user-domain backup/restore data.
 
-### Agent access metadata (M21)
+### Agent access metadata
 
 - `public.agent_access_audit`
   - minimal metadata-only audit for authenticated BoGa3 agent API requests;
@@ -370,11 +370,10 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   - sync impact decision: `out of sync scope` because `user_profiles` is
     explicitly outside the twelve-table Sync v2 mirror.
 
-### Group domain (M22)
+### Group domain
 
-- The earlier M18 group text is superseded (M18 is `outdated`).
 - Contract: `docs/specs/tech/groups-contract.md`
-- **As-built (M22-T01, `supabase/migrations/20260910120000_m22_groups_membership.sql`):**
+- **`supabase/migrations/20260910120000_m22_groups_membership.sql`:**
   - `app_public.groups` — group header (`name`, `description`, `created_by`,
     timestamps, reserved `deleted_at`). Ownership is a membership role, not a
     column on this row.
@@ -390,7 +389,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
     entities (contract §1.1). The Sync v2 tables and their owner-only RLS
     are unchanged, and `sync-drift --strict` stays green because no group
     table carries `owner_user_id`.
-- **As-built (M22-T02, `supabase/migrations/20260911120000_m22_group_record.sql`):**
+- **`supabase/migrations/20260911120000_m22_group_record.sql`:**
   - `app_public.group_session_shares` is the group record: one row per
     `(group_id, member_user_id, session_id)`, plus `session_started_at` and
     `shared_at`.
@@ -409,13 +408,13 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
     failure-isolated `AFTER INSERT OR UPDATE` trigger on `sessions`, which can
     never abort `sync_push`. `sync_push`, `sync_pull`, the Sync v2 tables, and the
     wire envelope are unchanged (`sync-v2-server-contract.md`, "Out of scope").
-- **As-built (M22-T03):** the mobile `group_cache` table (local-only,
+- The mobile `group_cache` table (local-only,
   disposable; see *Local schema inventory*), `out of sync scope`.
-- **As-built (M25-T03):** `exercise_group_links` is the member's own link data,
+- `exercise_group_links` is the member's own link data,
   so unlike the tables above it is `in sync scope` — the tenth Sync v2 entity
   (Sync v2 data-model contract #11). It points at group rows only by plain-text
   id; no group table became a synced parent.
-- **As-built (M25-T05, `supabase/migrations/20260914120000_m25_group_boards.sql`):**
+- **`supabase/migrations/20260914120000_m25_group_boards.sql`:**
   `app_public.group_board_entries` (one row per group exercise, member,
   metric, and certified flag: the member's best counting set, converted to
   the group exercise's load mode) and `app_public.group_board_state` (the
@@ -425,7 +424,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   into Sync v2 tables). Sync impact decision: `out of sync scope`; they are
   server-authoritative and written only by the group evaluator
   (`docs/specs/tech/groups-contract.md`).
-- **As-built (M25-T06, `supabase/migrations/20260916120000_m25_group_certification.sql`):**
+- **`supabase/migrations/20260916120000_m25_group_certification.sql`:**
   `app_public.group_certifications` (one row per certification of a member's
   record set: the certifier, the pinned fingerprint and raw values, and
   `ended_at` / `end_reason` / `ended_by`), plus `group_board_state.certification_ids`.
@@ -571,7 +570,7 @@ section states only the data-model-level invariants.
    per-session totals; unlinked legacy rows stay isolated and report no history.
    The generated session-share PNG and its temporary file URI are likewise not
    database or sync entities.
-11. `exercise_group_links` (M25) is `in sync scope`: a member links one of their
+11. `exercise_group_links` is `in sync scope`: a member links one of their
    own exercises to a group exercise, and the link backs up, syncs, and works
    offline like the rest of their data (contract "Per-entity rules"). Its id is
    `<group_id>:<exercise_definition_id>`, so a personal exercise links to at

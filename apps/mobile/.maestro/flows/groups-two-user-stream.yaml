@@ -55,7 +55,7 @@ appId: com.dinoderek.mobile
 # "after a refresh" below leaves the Groups screen for My groups and returns,
 # so the screen re-reads on focus (a synthetic swipe does not reliably fire
 # pull-to-refresh on iOS 26); the counterparty script logs the sync_push ->
-# card-visible time (AC4 evidence).
+# card-visible time.
 
 # --- Boot + sign in as user_c (pattern: auth-profile-happy-path.yaml) ---------
 # clearState relaunches a wiped dev client that lost its Metro connection:

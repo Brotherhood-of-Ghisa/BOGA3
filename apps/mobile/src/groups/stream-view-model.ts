@@ -47,7 +47,7 @@ const resolveDurationSec = (
 
 /**
  * "Training now" for an `active` session regardless of how long ago it started
- * (C7.2: indefinite), otherwise "Completed · <compact duration>" using the
+ * (indefinitely), otherwise "Completed · <compact duration>" using the
  * session list's compact duration format. A completed session with no duration
  * and no completion time reads plain "Completed".
  */
@@ -73,7 +73,7 @@ const pluralize = (count: number, singular: string, plural: string): string =>
 export const formatSetCount = (count: number): string => pluralize(count, 'set', 'sets');
 export const formatExerciseCount = (count: number): string => pluralize(count, 'exercise', 'exercises');
 
-/** C7.3 wording: "X joined", "X left the group", "X was removed". */
+/** Membership wording: "X joined", "X left the group", "X was removed". */
 export const formatMembershipSentence = (event: GroupMembershipEvent, username: string | null): string => {
   const name = formatMemberName(username);
   switch (event) {

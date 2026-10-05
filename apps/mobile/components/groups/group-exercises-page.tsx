@@ -70,14 +70,14 @@ const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', group
   archiveCompetitionExercise(groupId,groupExerciseId,action === 'archive');
 
 /**
- * The group management page's Exercises list (product E0.4; contract): the
+ * The group management page's Exercises list (E0.4; contract): the
  * group's exercises with my local link status and, on an active row none of
  * mine is linked to, "Link your exercise" for every member — the pick
  * sheet in link-only mode (a local write, so it works offline; nothing is
  * added to a session). The owner and admins also get Add exercise and a
  * per-row sheet (Rename, Archive / Unarchive): online-only writes (08
  * pattern 9); Archive confirms first. `Add exercise` is an outline beside the
- * section's micro-label: `Invite` is the group screen's one `accent` (T13-D1).
+ * section's micro-label: `Invite` is the group screen's one `accent`.
  */
 export function GroupExercisesPage({
   groupId,

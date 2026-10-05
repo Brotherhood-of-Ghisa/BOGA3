@@ -11,7 +11,7 @@ type GroupStreamMembershipItemProps = {
   onPress?: (item: StreamMembershipViewModel) => void;
 };
 
-/** "X joined / left the group / was removed" (C7.3): a light row, not a card (08 pattern 6). */
+/** "X joined / left the group / was removed": a light row, not a card (08 pattern 6). */
 export function GroupStreamMembershipItem({ item, showGroupName, onPress }: GroupStreamMembershipItemProps) {
   const testID = `group-stream-membership-${item.key}`;
   const content = (

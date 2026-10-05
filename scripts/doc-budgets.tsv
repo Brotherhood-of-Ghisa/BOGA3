@@ -21,12 +21,12 @@ budget	*	3000
 exempt	docs/specs/ui/design-targets/
 ceiling	RUNBOOK.md	6282
 ceiling	docs/specs/02-quality-and-test-gates.md	3597
-ceiling	docs/specs/03-technical-architecture.md	4084
-ceiling	docs/specs/05-data-model.md	5734
-ceiling	docs/specs/06-testing-strategy.md	8801
-ceiling	docs/specs/11-maestro-runtime-and-testing-conventions.md	3195
+ceiling	docs/specs/03-technical-architecture.md	4061
+ceiling	docs/specs/05-data-model.md	5703
+ceiling	docs/specs/06-testing-strategy.md	8799
+ceiling	docs/specs/11-maestro-runtime-and-testing-conventions.md	3177
 ceiling	docs/specs/12-worktree-config-and-isolation.md	3031
-ceiling	docs/specs/tech/session-planning-contract.md	3820
-ceiling	docs/specs/ui/components-catalog.md	7297
-ceiling	docs/specs/ui/navigation-contract.md	5303
-ceiling	docs/specs/ui/screen-map.md	7661
+ceiling	docs/specs/tech/session-planning-contract.md	3812
+ceiling	docs/specs/ui/components-catalog.md	7168
+ceiling	docs/specs/ui/navigation-contract.md	5269
+ceiling	docs/specs/ui/screen-map.md	7614

@@ -139,7 +139,7 @@ export function ProfileEditForm({ username, newEmail, newPassword, onChangeUsern
         value={newPassword}
       />
 
-      {/* Inline edit stays in place (T05-D2): Cancel steps back, Update
+      {/* Inline edit stays in place: Cancel steps back, Update
           is the screen's one primary. */}
       <View style={styles.actionRow}>
         <ActionButton
@@ -192,7 +192,7 @@ export function ProfileSummary({ username, email, pendingEmail, editDisabled, si
       </Card>
 
       {/* Neither is the primary: Edit opens the form, and Sign out is an
-          outline in `danger` with no confirmation (T05-D4). */}
+          outline in `danger` with no confirmation. */}
       <View style={styles.actionRow}>
         <View style={styles.actionFill}>
           <ActionButton

@@ -1,10 +1,9 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T07 AC5 (catalogue half): the Exercise Catalog row ⋮ actions sheet
+ * The Exercise Catalog row ⋮ actions sheet
  * gains "Link to group exercise…", which pushes the Link screen for that
- * exercise. It is signed-in only, and disabled for a soft-deleted exercise
- * (card decision (b)).
+ * exercise. It is signed-in only, and disabled for a soft-deleted exercise.
  *
  * Over real data like exercise-catalog-screen.test.tsx: the starter catalogue
  * on the migrated in-memory SQLite database (helpers/local-data.ts), the
@@ -61,7 +60,7 @@ const expandChest = async () => {
 
 const openActions = async (name: string) => {
   fireEvent.press(await screen.findByLabelText(`Exercise actions ${name}`));
-  // The actions sheet is titled with the exercise's name (DLM-T07).
+  // The actions sheet is titled with the exercise's name.
   await screen.findByTestId('exercise-catalog-actions-sheet');
 };
 
