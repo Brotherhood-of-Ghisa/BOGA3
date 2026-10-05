@@ -16,10 +16,12 @@ issuance/refresh, expiry, and revocation. On the consent route this app only
 signs the BoGa user in, shows the requesting client and read-only training-data
 disclosure, and calls the supported approve/deny methods.
 
-The consent surface accepts the four identity scopes currently advertised by
-the Supabase OAuth server: `openid`, `profile`, `email`, and `phone`. It renders
-every requested permission before approval and fails closed when a client
-requests any unknown/additional scope.
+The consent surface accepts the scopes currently advertised by the Supabase
+OAuth server: `openid`, `profile`, `email`, `phone`, and `offline_access`
+(Claude requests `offline_access` so it can refresh instead of re-asking for
+consent; the MCP service advertises it to every client). It renders every
+requested permission before approval and fails closed when a client requests
+any unknown/additional scope.
 
 It is a static Vite application. It contains only a Supabase project URL and
 client-safe publishable key. Never provide it a service-role/secret key.
@@ -173,6 +175,30 @@ connect their own BoGa accounts. Remote connectors configured in Claude are
 also available in Claude Desktop. See
 [Claude's custom connector instructions][claude-connectors].
 
+The Claude iOS and Android apps cannot add a custom connector, but they use one
+added on the web or desktop: connect it there first, then enable it in a mobile
+conversation.
+
+#### ChatGPT
+
+Custom MCP servers need developer mode, which is web-only (Plus or higher plan):
+
+1. On chatgpt.com, open **Settings > Security and login** and turn on
+   **Developer mode**.
+2. Open the plugins page, choose **+**, enter `https://boga3.onrender.com/mcp`
+   and choose OAuth with no client ID or secret (ChatGPT registers itself).
+3. Sign in to BoGa and approve the requested read-only access.
+
+The ChatGPT mobile apps do not run developer-mode servers. See the
+[ChatGPT developer mode documentation][chatgpt-dev-mode].
+
+#### Gemini app
+
+Google's consumer custom apps are limited to personal Google accounts in the
+US (18+, English). Add the server under **Settings > Connected Apps > Custom
+apps** on gemini.google.com; once it has been added there, the Gemini mobile
+apps can use it. See [Gemini custom apps][gemini-custom-apps].
+
 #### Claude Code
 
 Add BoGa as a user-scoped HTTP server, then start its OAuth flow:
@@ -222,4 +248,6 @@ operator steps; the local smoke is not evidence that they were completed.
 
 [claude-code-mcp]: https://code.claude.com/docs/en/mcp
 [claude-connectors]: https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
+[chatgpt-dev-mode]: https://developers.openai.com/api/docs/guides/developer-mode
+[gemini-custom-apps]: https://support.google.com/gemini/answer/17209137
 [gemini-mcp]: https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md

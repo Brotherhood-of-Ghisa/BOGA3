@@ -5,12 +5,12 @@ import {
   getOAuthProtectedResourceMetadataUrl,
   mcpAuthMetadataRouter,
 } from '@modelcontextprotocol/sdk/server/auth/router.js';
-import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 import type { OAuthMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { OAuthMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { BogaAgentApi } from './api-client.js';
+import { bogaBearerAuth } from './auth.js';
 import type { BogaMcpConfig } from './config.js';
 import { buildBogaMcpServer } from './tools.js';
 
@@ -21,6 +21,17 @@ export type BogaMcpAppOptions = {
 };
 
 export const BOGA_OAUTH_SCOPES = ['openid', 'profile'] as const;
+
+// Requested in addition when the authorization server supports it, so clients
+// receive a refresh token instead of re-authorizing when the hour-long access
+// token expires. Claude, ChatGPT and Gemini all pick their scopes from the
+// challenge or protected-resource metadata, so this keeps them on one set.
+export const BOGA_OFFLINE_SCOPE = 'offline_access';
+
+export const advertisedScopes = (oauthMetadata: OAuthMetadata): string[] =>
+  oauthMetadata.scopes_supported?.includes(BOGA_OFFLINE_SCOPE)
+    ? [...BOGA_OAUTH_SCOPES, BOGA_OFFLINE_SCOPE]
+    : [...BOGA_OAUTH_SCOPES];
 
 export const loadOAuthMetadata = async (
   config: BogaMcpConfig,
@@ -73,12 +84,14 @@ export const createBogaMcpApp = async (
     host: config.host,
   });
 
+  const scopes = advertisedScopes(oauthMetadata);
+
   app.disable('x-powered-by');
   app.use(mcpAuthMetadataRouter({
     oauthMetadata,
     resourceName: 'BoGa Virtual Coach',
     resourceServerUrl: config.resourceUrl,
-    scopesSupported: [...BOGA_OAUTH_SCOPES],
+    scopesSupported: scopes,
   }));
 
   app.get('/health', (_request, response) => {
@@ -89,20 +102,10 @@ export const createBogaMcpApp = async (
   });
 
   const resourceMetadataUrl = getOAuthProtectedResourceMetadataUrl(config.resourceUrl);
-  const authMiddleware = requireBearerAuth({
-    requiredScopes: [],
+  const authMiddleware = bogaBearerAuth({
+    api,
+    challengeScopes: scopes,
     resourceMetadataUrl,
-    verifier: {
-      verifyAccessToken: async (token) => {
-        const session = await api.verifySession(token);
-        return {
-          clientId: session.client_id,
-          expiresAt: session.expires_at,
-          scopes: session.scopes,
-          token,
-        };
-      },
-    },
   });
   const mcpRateLimit = rateLimit({
     keyGenerator: (request) => request.auth?.clientId ?? 'unauthenticated',
