@@ -1,4 +1,4 @@
-// Pure future competition scorer; protocol-3 publication does not call it.
+// Pure competition scorer; only activated protocol-4 publication calls it.
 // Every numerator comes from the existing kernel, with the SAME dated B.
 import { isValidSessionWeight } from '../bodyweight/as-of.ts';
 import { groupLoadContext } from '../exercise-calculations/analytics.ts';

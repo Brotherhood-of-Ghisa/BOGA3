@@ -101,3 +101,11 @@ its original audit. Legacy witnesses retain their original public IDs through
 internal per-metric projections. Relevant reading corrections keep their
 metric-specific invalidation behavior. Group authority and lifecycle are governed by
 `tech/groups-contract.md` §11.
+
+The versioned competition worker dispatches pending graphs to that existing
+engine and activated graphs to the shared Volume/percentage scorer. SQL owns
+atomic revision publication and witness provenance; exact safe RPC projections
+own public disclosure. A shared/exclusive fence orders group operations against
+the service-only activation transaction. Additive installation remains pending
+until activation; compatible mobile UI and hosted release authority are separate.
+See `tech/group-competition-contract.md` for metric meanings and reader inventory.

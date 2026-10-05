@@ -287,14 +287,15 @@ and compatible clients in the documented order with explicit hosted authority.
 | M27-T13 — Preserve certifications across rule changes | Observed-set pins, migration and rule-only retention; closes #419 | — | completed |
 | M27-T15 — Decide percentage reading-correction policy | D4: relevant private corrections end bound dependent projections; delegated decision | — | completed |
 | M27-T08 — Group percentage contracts | Single-set Volume, versioned units, allowlists and pending negotiation; owning representation contract | T15 | completed |
-| [M27-T09 — Evaluate private percentage scores](../tasks/M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md) | Normalized worker/SQL publication and all group reader privacy | T08, T13, existing #411 task | planned |
+| M27-T09 — Evaluate private percentage scores | Normalized worker/SQL publication and all group reader privacy; installation stays pending until authorized activation | T08, T13, existing #411 task | completed |
 | [M27-T10 — Group percentage UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Group rules, %BW boards, details, certification copy and safe caches | T09 | planned |
 | [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T09; T08, T15, T13 and the existing #411 task are complete. Formula,
-switch, Volume and reading-correction decisions are recorded. Runtime percentage
-publication/privacy and UI activation remain pending.
+Ready now: T10; T08, T09, T15, T13 and the existing #411 task are complete. Formula,
+switch, Volume and reading-correction decisions are recorded. Versioned runtime
+publication/privacy is implemented with pending installation; compatible UI,
+authorized hosted activation and human acceptance remain pending.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
 

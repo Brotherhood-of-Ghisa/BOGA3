@@ -76,6 +76,10 @@ Define the canonical repository structure, path ownership, and placement convent
     type-only imports. `metric-wire.ts` / `metric-wire-guards.ts` own versioned
     payloads and privacy validation at `api.ts`; `session-metrics.ts` owns the
     raw/public shared-session projection and never a private reading context.
+    `competition-score.ts` / `competition-evaluation.ts` own activated
+    protocol-4 scoring/worker dispatch; competition wire guards own its exact
+    safe reader shapes at the same API boundary. They follow the same `.ts`
+    relative-import rule where shared with the Edge worker.
 - `apps/mobile/src/exercise-core/` (M25)
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.

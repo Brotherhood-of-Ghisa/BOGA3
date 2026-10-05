@@ -19,7 +19,8 @@ import {
   type GroupSetFact,
 } from '../../../apps/mobile/src/groups/set-facts.ts';
 
-import { evaluateGroupMetricGraph, type GroupMetricEvaluationGraph } from '../../../apps/mobile/src/groups/metric-evaluation.ts';
+import type { GroupMetricEvaluationGraph } from '../../../apps/mobile/src/groups/metric-evaluation.ts';
+import { evaluateGroupComparisonGraph, type CompetitionEvaluationGraph } from '../../../apps/mobile/src/groups/competition-evaluation.ts';
 
 const CLAIM_LIMIT = 20;
 const MAX_CLAIM_ROUNDS = 10;
@@ -132,11 +133,11 @@ type MetricJobResult = MetricJob & {
 const processMetricJob = async (db: SupabaseClient, job: MetricJob): Promise<MetricJobResult> => {
   const claim = { p_job_id: job.job_id, p_generation: job.generation, p_claim_id: job.claim_id };
   try {
-    const prepared = await rpc<{ prepared: boolean; frozen?: boolean; graph?: GroupMetricEvaluationGraph }>(
+    const prepared = await rpc<{ prepared: boolean; frozen?: boolean; graph?: GroupMetricEvaluationGraph | CompetitionEvaluationGraph }>(
       db, 'group_metric_eval_prepare', claim);
     if (!prepared.prepared) return { ...job, outcome: 'requeued', sqlstate: null };
     if (!prepared.frozen && !prepared.graph) throw new Error('Missing comparison source graph');
-    const evaluation = prepared.frozen ? null : evaluateGroupMetricGraph(prepared.graph!);
+    const evaluation = prepared.frozen ? null : evaluateGroupComparisonGraph(prepared.graph!);
     const done = await rpc<{ completed: boolean }>(db, 'group_metric_eval_publish', {
       ...claim, p_evaluation: evaluation,
     });

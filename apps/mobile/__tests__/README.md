@@ -169,7 +169,7 @@ and stale edits. Screen tests must cover Weight/1RM scope switching, rebuilding,
 generic absent-score copy, certification invalidation and offline reopen without
 private context. These do not replace three-size rendering or two-user device proof.
 
-## Pending protocol-4 group competition coverage
+## Versioned protocol-4 group competition coverage
 
 `groups-competition-contract.test.ts` fixes Volume/1RM mode-specific units,
 single-set Volume, effective total-load 1RM normalization with the same dated B,
@@ -180,5 +180,14 @@ fields, dependency digests and unsupported units/versions must fail decoding.
 whole-group-cache eviction across generations. The backend bodyweight fixture
 runs the actual negotiation response through the mobile decoder and proves
 pending activation plus anonymous/OAuth/outsider/unsupported-protocol denial.
-These do not replace the current protocol-3 assertions above; publication and
-public-reader activation remain pending the competition reader cutover.
+`groups-competition-evaluation.test.ts` covers worker dispatch, complete
+versioned graphs, shared-kernel precision, eligibility and private-context
+short-circuiting. `groups-competition-readers.test.ts` covers every exact nested
+reader shape, scope coherence, request-local capability headers, normalized kg
+rejection and server-normalized write responses.
+The backend competition fixture performs a populated prior-schema upgrade and
+local activation, tests both-metric selected-reading corrections, exact witness
+audit, legacy aliases, frozen membership catch-up, paired-reader privacy and
+publication failure/fence behavior. It restores pending state on exit. These do
+not replace the retained protocol-3 assertions; compatible UI and authorized
+hosted activation remain separate release work.

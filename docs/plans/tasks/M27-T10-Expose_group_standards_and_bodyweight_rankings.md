@@ -1,7 +1,7 @@
 # M27-T10 — Expose group percentage rules and rankings
 
 - Status: `planned` (re-scoped 2026-10-04)
-- Depends on: [M27-T09](M27-T09-Evaluate_group_scores_and_certify_bodyweight_sets.md)
+- Depends on: M27-T09 (completed)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: frontend; UI impact: yes

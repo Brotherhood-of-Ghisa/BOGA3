@@ -1,3 +1,11 @@
+import { isCompetitionBoardWire, isCompetitionContractWire } from './competition-wire-guards';
+import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
+  isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
+  isCompetitionSessionDetailWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire } from './competition-reader-guards';
+import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionContractWire,
+  CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire,
+  CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
+import type { CompetitionMetric } from './competition-contract';
 import { validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from './metric-contract';
 import { isGroupMetricBoardWire, isGroupMetricCertificationWire, isGroupMetricExerciseWire,
   isGroupMetricHistoryWire, isGroupMetricPodiumWire, isGroupMetricRevisionWire,
@@ -145,11 +153,26 @@ export type GroupRpcName =
   | 'group_metric_history'
   | 'group_metric_certify'
   | 'group_metric_certification_get'
-  | 'group_metric_certification_end';
+  | 'group_metric_certification_end'
+  | 'group_competition_contract'
+  | 'group_competition_board'
+  | 'group_competition_podiums'
+  | 'group_competition_exercise_list'
+  | 'group_competition_exercise_create'
+  | 'group_competition_exercise_update'
+  | 'group_competition_exercise_archive'
+  | 'group_competition_certify'
+  | 'group_competition_certification_get'
+  | 'group_competition_certification_end'
+  | 'group_competition_revisions'
+  | 'group_competition_history'
+  | 'group_competition_stream'
+  | 'group_competition_session_detail'
+  | 'group_competition_week_summary';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
-const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>): Promise<unknown> => {
+const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>, capability?: 4): Promise<unknown> => {
   let client: ReturnType<typeof getRequiredSupabaseMobileClient>;
   try {
     client = getRequiredSupabaseMobileClient();
@@ -159,7 +182,8 @@ const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>): 
 
   let response: RpcResponse;
   try {
-    response = (await client.schema('app_public').rpc(name, args)) as RpcResponse;
+    const request = client.schema('app_public').rpc(name, args);
+    response = (await (capability === 4 ? request.setHeader('x-boga-group-contract','4') : request)) as RpcResponse;
   } catch (error) {
     throw new GroupApiError('NETWORK', describeUnknownError(error, 'Network request failed.'));
   }
@@ -662,3 +686,58 @@ export const getGroupMetricStream = async ({ groupId, before = null, limit = GRO
       (!isRenderedGroupMetricStreamKind(item.kind) || isGroupMetricStreamItem(item))));
   return { ...page, items: page.items.filter(item => isRenderedGroupMetricStreamKind(item.kind)) };
 };
+
+// Protocol 4 stays dormant until negotiation is active; UI activation is separate.
+// Headers belong to the request, never mutable client-wide auth/config.
+const competitionRpc = async <T>(name: GroupRpcName, args: Record<string, unknown>, guard: (v: unknown) => v is T, matches?: (v: T) => boolean): Promise<T> => {
+  const data = await callGroupRpc(name,args,4);
+  if (!guard(data) || (matches !== undefined && !matches(data))) throw new GroupApiError('INTERNAL', `${name} returned an unexpected competition payload.`);
+  return data;
+};
+export const getCompetitionContract = (groupId: string): Promise<CompetitionContractWire> =>
+  competitionRpc('group_competition_contract',{ p_group_id: groupId },isCompetitionContractWire);
+export const listCompetitionExercises = (groupId: string): Promise<CompetitionExerciseListWire> =>
+  competitionRpc('group_competition_exercise_list',{ p_group_id: groupId },isCompetitionExerciseListWire);
+export const getCompetitionBoard = ({ groupId, exerciseId, metric, certified = true, limit = 50, cursor = null }: {
+  groupId: string; exerciseId: string; metric: CompetitionMetric; certified?: boolean; limit?: number; cursor?: string | null }): Promise<CompetitionBoardWire> =>
+  competitionRpc('group_competition_board',{ p_group_id: groupId, p_group_exercise_id: exerciseId, p_metric: metric,
+    p_certified: certified, p_limit: limit, p_cursor: cursor },isCompetitionBoardWire,b => b.group_exercise_id === exerciseId && b.metric === metric && b.certified === certified);
+export const getCompetitionPodiums = (groupId: string, certified = true): Promise<CompetitionPodiumsWire> =>
+  competitionRpc('group_competition_podiums',{ p_group_id: groupId, p_certified: certified },isCompetitionPodiumsWire,p => p.certified === certified);
+export const getCompetitionRevisions = (groupId: string, exerciseId: string): Promise<CompetitionRevisionsWire> =>
+  competitionRpc('group_competition_revisions',{ p_group_id: groupId, p_group_exercise_id: exerciseId },isCompetitionRevisionsWire,p => p.exercise.group_exercise_id === exerciseId);
+export const getCompetitionHistory = ({ groupId, exerciseId, metric, certified, revision = null, before = null, limit = 50 }: {
+  groupId: string; exerciseId: string; metric: CompetitionHistoricalMetric; certified: boolean; revision?: number | null; before?: string | null; limit?: number }): Promise<CompetitionHistoryWire> =>
+  competitionRpc('group_competition_history',{ p_group_id: groupId, p_group_exercise_id: exerciseId, p_metric: metric,
+    p_certified: certified, p_revision: revision, p_before: before, p_limit: limit },isCompetitionHistoryWire,p => p.exercise.group_exercise_id === exerciseId && p.metric === metric &&
+      p.certified === certified && p.revision.rules_revision === (revision ?? p.exercise.rules.rules_revision));
+export const getCompetitionStream = (groupId: string | null = null, before: string | null = null, limit = 20): Promise<CompetitionStreamWire> =>
+  competitionRpc('group_competition_stream',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
+    p => groupId === null || p.items.every(item => item.kind === 'session' ? item.groups.every(g => g.group_id === groupId) :
+      item.kind === 'competition' ? item.event.group.group_id === groupId : item.group.group_id === groupId));
+export const getCompetitionSession = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionDetailWire> =>
+  competitionRpc('group_competition_session_detail',{ p_group_id: groupId, p_member_user_id: memberId, p_session_id: sessionId },isCompetitionSessionDetailWire,p => p.group_id === groupId && p.session.member.user_id === memberId && p.session.session_id === sessionId);
+export const getCompetitionWeek = (groupId: string, start: number, end: number): Promise<CompetitionWeekSummaryWire> =>
+  competitionRpc('group_competition_week_summary',{ p_group_id: groupId, p_window_start_ms: start, p_window_end_ms: end },isCompetitionWeekSummaryWire,p => p.group_id === groupId);
+export const certifyCompetition = ({ groupId, exerciseId, memberId, setId, metric, revision, token }: {
+  groupId: string; exerciseId: string; memberId: string; setId: string; metric: CompetitionMetric; revision: number; token: string }): Promise<CompetitionCertifyResultWire> =>
+  competitionRpc('group_competition_certify',{ p_group_id: groupId, p_group_exercise_id: exerciseId, p_member_user_id: memberId,
+    p_set_id: setId, p_metric: metric, p_expected_revision: revision, p_write_token: token },isCompetitionCertifyResultWire,p => p.certification.metric === metric);
+export const getCompetitionCertification = (groupId: string, certificateId: string, metric: CompetitionMetric): Promise<CompetitionCertificationResultWire> =>
+  competitionRpc('group_competition_certification_get',{ p_group_id: groupId, p_certification_id: certificateId, p_metric: metric },isCompetitionCertificationResultWire,p => p.certification.metric === metric && p.certification.certification_id === certificateId);
+export const endCompetitionCertification = (groupId: string, certificateId: string, metric: CompetitionMetric,
+  action: 'withdraw' | 'cancel'): Promise<CompetitionCertificationResultWire> =>
+  competitionRpc('group_competition_certification_end',{ p_group_id: groupId, p_certification_id: certificateId, p_metric: metric,
+    p_action: action },isCompetitionCertificationResultWire,p => p.certification.metric === metric && p.certification.certification_id === certificateId);
+export const createCompetitionExercise = ({ groupId, name, mode, contribution = 0, metric = 'e1rm', sourceId = null }: {
+  groupId: string; name: string; mode: 'total_load' | 'per_side_load'; contribution?: number; metric?: CompetitionMetric; sourceId?: string | null }): Promise<CompetitionExerciseWriteWire> =>
+  competitionRpc('group_competition_exercise_create',{ p_group_id: groupId, p_name: name, p_load_input_mode: mode,
+    p_bodyweight_contribution: contribution, p_default_metric: metric, p_source_exercise_id: sourceId },isCompetitionExerciseWriteWire,p => p.exercise.rules.load_input_mode === mode &&
+      p.exercise.rules.bodyweight_contribution === contribution && p.exercise.rules.default_metric === metric);
+export const updateCompetitionExercise = ({ groupId, exerciseId, revision, name, mode, contribution, metric }: {
+  groupId: string; exerciseId: string; revision: number; name: string; mode: 'total_load' | 'per_side_load'; contribution: number; metric: CompetitionMetric }): Promise<CompetitionExerciseWriteWire> =>
+  competitionRpc('group_competition_exercise_update',{ p_group_id: groupId, p_exercise_id: exerciseId, p_expected_revision: revision,
+    p_name: name, p_load_input_mode: mode, p_bodyweight_contribution: contribution, p_default_metric: metric },isCompetitionExerciseWriteWire,p => p.exercise.group_exercise_id === exerciseId &&
+      p.exercise.rules.load_input_mode === mode && p.exercise.rules.bodyweight_contribution === contribution && p.exercise.rules.default_metric === metric);
+export const archiveCompetitionExercise = (groupId: string, exerciseId: string, archived: boolean): Promise<CompetitionExerciseWriteWire> =>
+  competitionRpc('group_competition_exercise_archive',{ p_group_id: groupId, p_exercise_id: exerciseId, p_archived: archived },isCompetitionExerciseWriteWire,p => p.exercise.group_exercise_id === exerciseId && (p.exercise.archived_at_ms !== null) === archived);

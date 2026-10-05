@@ -73,6 +73,8 @@ describe('training-metric rules have one implementation', () => {
       'apps/mobile/src/groups/metric-evaluation.ts',
       // Performed sets only (`selectGroupPerformedExercises`).
       'apps/mobile/src/groups/session-metrics.ts',
+      // The competition scorer already admits only performed projections.
+      'apps/mobile/src/groups/competition-evaluation.ts',
     ])).toEqual([]);
   });
 

@@ -458,6 +458,7 @@ export type GroupWeekSummaryResult = {
 
 /** Tokens the server raises as `'<TOKEN>: <message>'` (contract §4). */
 export const GROUP_SERVER_ERROR_CODES = [
+  'UPDATE_REQUIRED',
   'AUTH_REQUIRED',
   'AGENT_FORBIDDEN',
   'NOT_FOUND',
