@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, Icon, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
-import type { StreamSessionCardViewModel } from '@/src/groups';
+import type { CompetitionSessionCard as StreamSessionCardViewModel } from '@/src/groups/competition-stream-view-model';
 
 type GroupStreamSessionCardProps = {
   card: StreamSessionCardViewModel;
@@ -21,7 +21,7 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
 
   return (
     <Card
-      accessibilityLabel={[card.memberName, card.statusLabel, context, card.setsLabel, card.volumeLabel, card.exercisesLabel, card.volumeNote, card.recordsLabel].filter(Boolean).join(', ')}
+      accessibilityLabel={[card.memberName, card.statusLabel, context, card.setsLabel, card.exercisesLabel].filter(Boolean).join(', ')}
       onPress={() => onPress(card)}
       style={styles.card}
       testID={testID}>
@@ -43,21 +43,8 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress }: GroupS
         {context}
       </Text>
       <Text allowFontScaling={false} style={styles.metrics} testID={`${testID}-metrics`}>
-        {`${card.setsLabel} · ${card.volumeLabel} · ${card.exercisesLabel}`}
+        {`${card.setsLabel} · ${card.exercisesLabel}`}
       </Text>
-      {card.volumeNote ? (
-        <Text allowFontScaling={false} style={styles.muted} testID={`${testID}-volume-note`}>
-          {card.volumeNote}
-        </Text>
-      ) : null}
-      {card.recordsLabel ? (
-        <View style={styles.records}>
-          <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} style={styles.recordsText} testID={`${testID}-records`}>
-            {card.recordsLabel}
-          </Text>
-        </View>
-      ) : null}
       {showGroupNames && card.groupNames.length > 0 ? (
         <Text allowFontScaling={false} numberOfLines={1} style={styles.muted} testID={`${testID}-groups`}>
           {card.groupNames.join(', ')}

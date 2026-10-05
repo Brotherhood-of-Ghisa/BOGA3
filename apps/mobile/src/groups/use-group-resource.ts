@@ -12,12 +12,14 @@
 // NetInfo and the local cache and calls the group RPC it is given.
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect,useRef, useState, useSyncExternalStore } from 'react';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 
 import { GroupApiError, toGroupApiError } from './api';
-import { deleteGroupCacheEntry, evictGroup, readGroupCache, writeGroupCache } from './cache';
+import { deleteGroupCacheEntry, getCompetitionCacheGeneration,
+  readGroupCache, subscribeCompetitionCache, writeGroupCache } from './cache';
+import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useNetworkOnline } from './use-network-online';
 
 export const GROUP_RESOURCE_POLL_INTERVAL_MS = 30_000;
@@ -51,6 +53,8 @@ export type GroupResourceState<T> = {
 };
 
 type InternalState<T> = {
+  identity: string | null;
+  generation: number;
   data: T | null;
   lastUpdatedAtMs: number | null;
   hydrated: boolean;
@@ -60,7 +64,9 @@ type InternalState<T> = {
   lostAccess: boolean;
 };
 
-const initialState = <T>(): InternalState<T> => ({
+const initialState = <T>(identity: string | null, generation: number): InternalState<T> => ({
+  identity,
+  generation,
   data: null,
   lastUpdatedAtMs: null,
   hydrated: false,
@@ -78,9 +84,16 @@ export function useGroupResource<T>({
   pollIntervalMs = GROUP_RESOURCE_POLL_INTERVAL_MS,
 }: GroupResourceOptions<T>): GroupResourceState<T> {
   const online = useNetworkOnline();
-  const [state, setState] = useState<InternalState<T>>(initialState);
-
   const identity = userId && cacheKey ? `${userId}\u0000${cacheKey}` : null;
+  const generation = useSyncExternalStore(subscribeCompetitionCache,
+    () => getCompetitionCacheGeneration(userId), () => getCompetitionCacheGeneration(userId));
+  const [state, setState] = useState<InternalState<T>>(() => initialState(identity,generation));
+  // Account, group and disclosure changes hide prior data in this render.
+  const visible = state.identity === identity && state.generation === generation
+    ? state : initialState<T>(identity,generation);
+  const visibleRef=useRef(visible);
+  useLayoutEffect(() => { visibleRef.current=visible; });
+  const focusedEpoch=useRef(generation);
   const identityRef = useRef<string | null>(identity);
   const fetcherRef = useRef(fetcher);
   const onlineRef = useRef(online);
@@ -98,10 +111,11 @@ export function useGroupResource<T>({
   useEffect(() => {
     identityRef.current = identity;
     inFlightRef.current = null;
-    setState(initialState<T>());
+    setState(previous => previous.identity === identity && previous.generation === generation
+      ? previous : initialState<T>(identity,generation));
 
     if (!userId || !cacheKey || identity === null) {
-      setState({ ...initialState<T>(), hydrated: true });
+      setState({ ...initialState<T>(identity,generation), hydrated: true });
       return;
     }
 
@@ -112,6 +126,8 @@ export function useGroupResource<T>({
         const entry = readGroupCache<T>(database, cacheKey, userId);
         if (cancelled) return;
         setState((previous) => {
+          if (cancelled || identityRef.current !== identity || getCompetitionCacheGeneration(userId) !== generation ||
+            previous.identity !== identity || previous.generation !== generation) return previous;
           // A refresh that already landed is fresher than the cache: keep it.
           const keepFresher =
             entry === null ||
@@ -122,14 +138,19 @@ export function useGroupResource<T>({
         });
       } catch (error) {
         if (cancelled) return;
-        setState((previous) => ({ ...previous, hydrated: true, error: toGroupApiError(error) }));
+        setState(previous=>{
+          if(cancelled || identityRef.current!==identity || getCompetitionCacheGeneration(userId)!==generation ||
+            previous.identity!==identity || previous.generation!==generation) return previous;
+          const protocolFailure=previous.lostAccess || previous.error?.invalidPayload || previous.error?.code==='UPDATE_REQUIRED';
+          return { ...previous,hydrated: true,error: protocolFailure?previous.error:toGroupApiError(error) };
+        });
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [identity, userId, cacheKey]);
+  }, [identity, userId, cacheKey, generation]);
 
   const refresh = useCallback((): Promise<void> => {
     if (!userId || !cacheKey || identity === null) {
@@ -143,7 +164,8 @@ export function useGroupResource<T>({
       return Promise.resolve();
     }
 
-    const isCurrent = () => identityRef.current === identity;
+    const requestGeneration = getCompetitionCacheGeneration(userId);
+    const isCurrent = () => identityRef.current === identity && getCompetitionCacheGeneration(userId) === requestGeneration;
 
     const run = (async () => {
       setState((previous) => ({ ...previous, refreshing: true }));
@@ -155,27 +177,23 @@ export function useGroupResource<T>({
         const error = toGroupApiError(caught);
         if (!isCurrent()) return;
 
+        if (error.code === 'UPDATE_REQUIRED' || error.invalidPayload) {
+          const cleanup=retireCompetitionAccount(userId);
+          if (identityRef.current !== identity) return;
+          setState({ ...initialState<T>(identity,getCompetitionCacheGeneration(userId)),
+            hydrated: true, error });
+          await cleanup;
+          return;
+        }
+
         if (error.code === 'NOT_FOUND') {
-          let evictionError: GroupApiError | null = null;
-          try {
-            const database = await bootstrapLocalDataLayer();
-            deleteGroupCacheEntry(database, cacheKey);
-            if (evictGroupIdOnNotFound) {
-              evictGroup(database, evictGroupIdOnNotFound);
-            }
-          } catch (evictCaught) {
-            evictionError = toGroupApiError(evictCaught);
-          }
-          if (!isCurrent()) return;
-          setState((previous) => ({
-            ...previous,
-            data: null,
-            lastUpdatedAtMs: null,
-            refreshing: false,
-            networkFailed: false,
-            lostAccess: true,
-            error: evictionError ?? error,
-          }));
+          const cleanup=evictGroupIdOnNotFound?retireCompetitionAccount(userId,evictGroupIdOnNotFound):
+            bootstrapLocalDataLayer().then(database=>deleteGroupCacheEntry(database,cacheKey)).catch(()=>undefined);
+          if (identityRef.current !== identity) return;
+          const publishedGeneration=getCompetitionCacheGeneration(userId);
+          setState(previous=>identityRef.current===identity && getCompetitionCacheGeneration(userId)===publishedGeneration
+            ?{ ...initialState<T>(identity,publishedGeneration),hydrated: true,lostAccess: true,error }:previous);
+          await cleanup;
           return;
         }
 
@@ -190,22 +208,18 @@ export function useGroupResource<T>({
 
       if (!isCurrent()) return;
       const fetchedAtMs = Date.now();
-      setState((previous) => ({
-        ...previous,
-        data: payload,
-        lastUpdatedAtMs: fetchedAtMs,
-        refreshing: false,
-        networkFailed: false,
-        lostAccess: false,
-        error: null,
-      }));
-
       try {
         const database = await bootstrapLocalDataLayer();
-        writeGroupCache(database, { cacheKey, userId, payload, fetchedAtMs });
+        if (!isCurrent()) return;
+        writeGroupCache(database,{ cacheKey,userId,payload,fetchedAtMs });
+        const publishedGeneration=getCompetitionCacheGeneration(userId);
+        setState(previous => {
+          if (identityRef.current !== identity || getCompetitionCacheGeneration(userId) !== publishedGeneration) return previous;
+          return { ...initialState<T>(identity,publishedGeneration),data: payload,lastUpdatedAtMs: fetchedAtMs,hydrated: true };
+        });
       } catch (writeCaught) {
         if (!isCurrent()) return;
-        setState((previous) => ({ ...previous, error: toGroupApiError(writeCaught) }));
+        setState(previous => ({ ...previous,refreshing: false,error: toGroupApiError(writeCaught) }));
       }
     })().finally(() => {
       if (inFlightRef.current === run) {
@@ -219,24 +233,28 @@ export function useGroupResource<T>({
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
+      const changed=focusedEpoch.current !== generation;
+      focusedEpoch.current=generation;
+      const current=visibleRef.current;
+      if (current.error?.invalidPayload || current.error?.code === 'UPDATE_REQUIRED') return;
+      if (!changed || current.data === null) void refresh();
       const handle = setInterval(() => {
         void refresh();
       }, pollIntervalMs);
       return () => {
         clearInterval(handle);
       };
-    }, [refresh, pollIntervalMs]),
+    }, [refresh, pollIntervalMs,generation]),
   );
 
   return {
-    data: state.data,
-    lastUpdatedAtMs: state.lastUpdatedAtMs,
-    hydrated: state.hydrated,
-    refreshing: state.refreshing,
-    offline: online === false || state.networkFailed,
-    error: state.error,
-    lostAccess: state.lostAccess,
+    data: visible.data,
+    lastUpdatedAtMs: visible.lastUpdatedAtMs,
+    hydrated: visible.hydrated,
+    refreshing: visible.refreshing,
+    offline: online === false || visible.networkFailed,
+    error: visible.error,
+    lostAccess: visible.lostAccess,
     refresh,
   };
 }

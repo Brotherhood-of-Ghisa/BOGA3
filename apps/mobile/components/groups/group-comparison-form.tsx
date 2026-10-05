@@ -5,11 +5,11 @@ import { ActionButton, Card, SegmentedControl, uiSpace } from '@/components/ui';
 import {
   comparisonSubmitLabel,
   deriveComparisonFormStatus,
-  parseContributionPercent,
+  validateCompetitionFormRules,
   type ComparisonPreview,
 } from '@/src/groups/comparison-form-model';
-import { GROUP_METRICS, validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from '@/src/groups/metric-contract';
-import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
+import { GROUP_COMPETITION_METRICS as GROUP_METRICS, type CompetitionRules as GroupExerciseRules, type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
+import type { CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 
 import { useComparisonDraft } from './use-comparison-draft';
 import { GroupWriteNotice } from './write-notice';
@@ -27,29 +27,35 @@ type Props = {
   errorMessage: string | null;
   onSubmit: (rules: GroupExerciseRules, expectedRevision: number | null) => void;
 };
-const empty: GroupExerciseRules = { name: '', loadInputMode: 'total_load', bodyweightCalculationsEnabled: false,
+export const emptyComparisonRules: GroupExerciseRules = { name: '', loadInputMode: 'total_load', bodyweightCalculationsEnabled: false,
   bodyweightContribution: 0,
   defaultMetric: 'e1rm' };
-const rulesFromWire = (exercise: GroupMetricExerciseWire): GroupExerciseRules => ({
-  name: exercise.name, loadInputMode: exercise.load_input_mode,
-  bodyweightCalculationsEnabled: exercise.bodyweight_calculations_enabled,
-  bodyweightContribution: exercise.bodyweight_contribution,
-  defaultMetric: exercise.default_metric,
+export const comparisonRulesFromWire = (exercise: GroupMetricExerciseWire): GroupExerciseRules => ({
+  name: exercise.name, loadInputMode: exercise.rules.load_input_mode,
+  bodyweightCalculationsEnabled: exercise.rules.bodyweight_calculations_enabled,
+  bodyweightContribution: exercise.rules.bodyweight_contribution,
+  defaultMetric: exercise.rules.default_metric,
 });
 const metricLabels: Record<GroupMetric, string> = {
-  weight: 'Weight kg', e1rm: '1RM kg',
+  volume: 'Volume', e1rm: '1RM',
 };
 const METRIC_OPTIONS = GROUP_METRICS.map(metric => ({
   value: metric, label: metricLabels[metric], accessibilityLabel: metricLabels[metric],
 }));
 
 /** Shared field recipe, with a version-bound preview for group-wide changes. */
-export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRules = empty, existing, note,
+export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRules = emptyComparisonRules, existing, note,
   submitLabel, pendingLabel, pending, errorMessage, onSubmit }: Props) {
-  const prefill = existing ? rulesFromWire(existing) : { ...initialRules, bodyweightCalculationsEnabled };
+  const prefill = existing ? comparisonRulesFromWire(existing) : { ...initialRules, bodyweightCalculationsEnabled };
   const draft = useComparisonDraft(prefill, existing);
-  const validation = validateGroupExerciseRules({ name: draft.name, loadInputMode: draft.loadInputMode,
-    bodyweightCalculationsEnabled, bodyweightContribution: parseContributionPercent(draft.contributionField.percentage) / 100,
+  return <GroupComparisonFormFields bodyweightCalculationsEnabled={bodyweightCalculationsEnabled} existing={existing}
+    note={note} submitLabel={submitLabel} pendingLabel={pendingLabel} pending={pending} errorMessage={errorMessage} onSubmit={onSubmit} draft={draft} />;
+}
+
+export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existing,note,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft }:
+  Props & { draft: ReturnType<typeof useComparisonDraft> }) {
+  const validation = validateCompetitionFormRules({ name: draft.name, loadInputMode: draft.loadInputMode,
+    bodyweightCalculationsEnabled, bodyweightContribution: draft.contribution,
     defaultMetric: draft.defaultMetric });
   const status = deriveComparisonFormStatus({ validation, baseline: draft.baseline, existing,
     dirty: draft.dirty, showErrors: draft.showErrors, reviewed: draft.reviewed });

@@ -11,11 +11,13 @@ import {
   formatTrainingStart,
   joinNames,
   type GroupWeekBoardRow,
-  type GroupWeekLatestSession,
   type GroupWeekRecord,
   type GroupWeekTrainingSession,
 } from '@/src/groups';
 
+import { competitionEvent } from './helpers/competition-fixtures';
+import type { CompetitionEventWire,CompetitionWeekSummaryWire } from '@/src/groups/competition-wire';
+type GroupWeekLatestSession = NonNullable<CompetitionWeekSummaryWire['latest_completed']>;
 const ME = 'me';
 
 const row = (userId: string, rank: number, workingSets: number, groupRecords = 0, username: string | null = userId): GroupWeekBoardRow => ({
@@ -40,11 +42,9 @@ const training = (userId: string, overrides: Partial<GroupWeekTrainingSession> =
   ...overrides,
 });
 
-const record = (name: string, boards: GroupWeekRecord['boards']): GroupWeekRecord => ({
-  key: `${name}-record`,
-  group_exercise: { group_exercise_id: `${name}-id`, name },
-  set_id: `${name}-set`,
-  boards,
+const record = (name: string,boards: GroupWeekRecord['boards']): CompetitionEventWire => ({
+  ...competitionEvent,group_exercise: { group_exercise_id: `${name}-id`,name },
+  values: boards.map(board => ({ role: 'record',metric: board.metric,unit: board.unit,value: board.value,unavailable: false,member: null })),
 });
 
 const completed = (overrides: Partial<GroupWeekLatestSession> = {}): GroupWeekLatestSession => ({
@@ -172,8 +172,8 @@ describe('buildLatestActivity', () => {
       status: 'Completed · 52m',
       context: '10/16 06:10 · Iron Works',
       figures: '18 sets · 4 exercises',
-      record: { lead: 'Deadlift 1RM 213.3', note: 'group record' },
-      accessibilityLabel: 'dave, Completed · 52m, 10/16 06:10 · Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 · group record',
+      record: { lead: 'Deadlift 1RM 213.3 kg', note: 'group record' },
+      accessibilityLabel: 'dave, Completed · 52m, 10/16 06:10 · Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 kg · group record',
     });
   });
 
@@ -209,11 +209,11 @@ describe('formatting', () => {
   it('leads a record line with its first record and counts the rest', () => {
     expect(buildGroupRecordLine([])).toBeNull();
     expect(buildGroupRecordLine([record('Bench', [{ metric: 'weight', value: 100, unit: 'kg' }])])).toEqual({
-      lead: 'Bench Weight 100.0',
+      lead: 'Bench Weight 100.0 kg',
       note: 'group record',
     });
     expect(
       buildGroupRecordLine([record('Squat', []), record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }])]),
-    ).toEqual({ lead: 'Squat', note: '2 group records' });
+    ).toEqual({ lead: 'Squat Score unavailable', note: '2 group records' });
   });
 });

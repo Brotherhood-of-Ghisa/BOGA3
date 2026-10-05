@@ -2,11 +2,12 @@
 
 The optional bodyweight calculation boundary is specified in §11 and the
 [bodyweight contract](bodyweight-load-contract.md). Earlier sections describe
-the group foundation; §11 owns the current group preference, contribution,
-strict calculation and privacy rules.
+the group foundation and retained legacy contracts. §12 and
+[group-competition-contract.md](group-competition-contract.md) own current
+Volume/1RM percentage units, strict scoring and public privacy boundaries.
 
 > **Status: current contract.** Membership, sharing, stream/detail reads,
-> comparisons, Weight/1RM boards, certification and the optional group
+> comparisons, Volume/1RM boards, certification and the optional group
 > bodyweight policy are implemented. The backend contract suites and the
 > two-user device lane own executable coverage.
 
@@ -2651,7 +2652,8 @@ are implemented. Installation leaves negotiation pending and preserves §11's
 kg Weight/1RM behavior. Service-only `group_competition_activate(4)` atomically
 enables the safe reader boundary before any percentage publication, changes
 legacy Weight defaults to Volume on a new revision and queues active comparisons.
-Compatible UI and authorized hosted activation are separate release steps.
+The compatible mobile UI uses the safe protocol-4 family. Authorized hosted
+activation and integrated human acceptance remain separate release steps.
 
 The activated worker uses `competition-evaluation.ts` and the shared scorer;
 publication retains full kernel precision, checks the versioned source graph,
@@ -2693,3 +2695,31 @@ installs the migration, activates locally and checks actual RPC responses with
 mobile guards. It restores the installed pending schema on exit so the retained
 protocol-3 group fixtures remain independent. Pure graph and reader/API Jest
 suites cover service dispatch, privacy allowlists and request-scoped headers.
+
+### 12.1 Mobile competition presentation and cache retirement
+
+The current UI uses only safe competition readers for boards, history, stream,
+Today and group-scoped full sessions. Volume/1RM and Certified/All keep explicit
+units and comparison defaults. Historical values keep their original units;
+retired revision Scores are unavailable. Owners/admins review effective scoring
+edits; c=0 switches promise no rebuild. Rules-only edits preserve witnesses.
+Normalized context shows reps/effort without weight, absolute metrics, totals or
+private audit. Ended/unavailable copy is generic. The accepted
+[target](../ui/design-targets/group-competitions.md) owns presentation.
+
+Generation-5 disk rows are account checked and closed-shape validated before
+hydration. Public group/rules/session-disclosure observations retire incompatible
+account projections before publishing a fresh result. A sticky public absolute
+projection flag also protects source-link disclosure changes without discarding
+compatible normalized pagination. Mounted views and late requests share the
+memory epoch. Unsupported payloads, confirmed group access loss and policy
+observer failures synchronously quarantine the account; failed SQLite cleanup
+cannot restore old disk rows. Repeated denial of the same group fences once until
+a fresh authorized response. Fresh validated publication cleans quarantine before
+reuse. Only public name/rules/archive labels survive for removing inactive local
+links; local synced mappings and personal settings remain independent.
+
+The two-user device lane negotiates protocol 4 and reuses its existing create,
+join, keyboard, session navigation, certify and removal scenario. A local-only
+wrapper temporarily activates the leased stack and restores an initially pending
+stack by reset on exit; it provides no hosted deployment authority.

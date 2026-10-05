@@ -69,13 +69,14 @@ set_username "${MEMBER_UID}" "live-member-${RUN_TAG}"
 echo "[${LANE_LABEL}] running the groups client suite against ${API_URL}"
 (
   cd "${REPO_ROOT}/apps/mobile"
-  GROUPS_LIVE_SUPABASE_URL="${API_URL}" \
-  GROUPS_LIVE_SUPABASE_ANON_KEY="${ANON_KEY}" \
-  GROUPS_LIVE_OWNER_EMAIL="${FIXTURE_EMAIL_PREFIX}-owner-${RUN_TAG}@example.test" \
-  GROUPS_LIVE_MEMBER_EMAIL="${FIXTURE_EMAIL_PREFIX}-member-${RUN_TAG}@example.test" \
-  GROUPS_LIVE_PASSWORD="${PASSWORD}" \
-  GROUPS_LIVE_RUN_TAG="${RUN_TAG}" \
-    npm run --silent test:groups:live
+  export GROUPS_LIVE_SUPABASE_URL="${API_URL}"
+  export GROUPS_LIVE_SUPABASE_ANON_KEY="${ANON_KEY}"
+  export GROUPS_LIVE_OWNER_EMAIL="${FIXTURE_EMAIL_PREFIX}-owner-${RUN_TAG}@example.test"
+  export GROUPS_LIVE_MEMBER_EMAIL="${FIXTURE_EMAIL_PREFIX}-member-${RUN_TAG}@example.test"
+  export GROUPS_LIVE_PASSWORD="${PASSWORD}"
+  export GROUPS_LIVE_RUN_TAG="${RUN_TAG}"
+  npm run --silent test:groups:live
+  "${SUPABASE_DIR}/scripts/with-local-group-competitions.sh" npm run --silent test:groups:competition-live
 )
 COMPLETED=1
 pass "the groups client's calls match the live server (run ${RUN_TAG})"

@@ -5,16 +5,17 @@
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
 
-import { formatBoardFigure, formatOrdinal } from './board-view-model';
-import { formatExerciseCount, formatStreamPersonName, METRIC_NAMES } from './stream-view-model';
+import { formatOrdinal } from './board-view-model';
+import { formatExerciseCount, formatStreamPersonName } from './stream-view-model';
 import type {
   GroupMemberRef,
   GroupWeekBoardRow,
-  GroupWeekLatestSession,
-  GroupWeekRecord,
-  GroupWeekSummaryResult,
-  GroupWeekTrainingSession,
 } from './types';
+
+import type { CompetitionEventWire, CompetitionWeekSummaryWire as GroupWeekSummaryResult } from './competition-wire';
+import { formatCompetitionHistoricalValue } from './competition-view-model';
+type GroupWeekLatestSession = NonNullable<GroupWeekSummaryResult['latest_completed']>;
+type GroupWeekTrainingSession = GroupWeekSummaryResult['training_now'][number];
 
 export const WEEK_BOARD_SIZE = 3;
 
@@ -84,21 +85,16 @@ const joinContext = (...parts: (string | null | undefined)[]): string =>
 export const joinNames = (names: string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
-// A record's leading board: 1RM first, as the boards default to it.
-const leadingBoard = (record: GroupWeekRecord) =>
-  record.boards.find((board) => board.metric === 'e1rm') ?? record.boards[0] ?? null;
-
 export type GroupRecordLine = { lead: string; note: string };
 
-/** `Deadlift 1RM 213.3` + `group record`; with more, `3 group records`. The lead is the `record` figure. */
-export const buildGroupRecordLine = (records: GroupWeekRecord[]): GroupRecordLine | null => {
+/** Historical values retain their original unit and revision. */
+export const buildGroupRecordLine = (records: CompetitionEventWire[]): GroupRecordLine | null => {
   const first = records[0];
   if (!first) return null;
-  const board = leadingBoard(first);
-  const lead = board
-    ? `${first.group_exercise.name} ${METRIC_NAMES[board.metric]} ${formatBoardFigure(board.metric, board.value)}`
-    : first.group_exercise.name;
-  return { lead, note: records.length === 1 ? 'group record' : plural(records.length, 'group record', 'group records') };
+  const value=first.values.find(value => value.role === 'record' && value.metric === 'e1rm')
+    ?? first.values.find(value => value.role === 'record');
+  return { lead: `${first.group_exercise.name} ${value ? formatCompetitionHistoricalValue(value) : 'Score unavailable'}`,
+    note: records.length === 1 ? 'group record' : plural(records.length,'group record','group records') };
 };
 
 const recordLineText = (line: GroupRecordLine | null): string | null => (line ? `${line.lead} · ${line.note}` : null);

@@ -45,6 +45,9 @@ drifted from the code and predated several UI milestones. Git history has them.)
   - accepted repo-native replacement target for optional private/group
     bodyweight calculations; integrated rendering and human acceptance remain
     required before closeout
+- `design-targets/group-competitions.md`
+  - accepted group Volume/1RM target, public percentage units, rules review and
+    safe record/session context; replaces the older group Weight examples
 - `design-targets/progress-tables.md`
   - implemented and verified replacement target: grouped muscle
     comparisons, separate chevron selection/name history, inline contributions

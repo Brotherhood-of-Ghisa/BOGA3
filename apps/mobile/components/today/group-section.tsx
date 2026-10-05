@@ -16,7 +16,7 @@ export type TodayGroupSectionProps = {
   onSignIn: () => void;
   onFindGroup: () => void;
   onOpenGroup: (groupId: string) => void;
-  onOpenSession: (memberUserId: string, sessionId: string) => void;
+  onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
 };
 
 function AccountPanel({ state, onSignIn }: { state: Exclude<TodayGroupState, Available>; onSignIn: () => void }) {

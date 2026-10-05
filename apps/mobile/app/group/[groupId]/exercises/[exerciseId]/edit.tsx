@@ -10,10 +10,11 @@ import {
 } from '@/components/groups';
 import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
-import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
-import type { GroupExerciseRules } from '@/src/groups/metric-contract';
-import type { GroupMetricExerciseListWire } from '@/src/groups/metric-wire';
-import { listGroupComparisons, updateGroupComparison } from '@/src/groups/api';
+import { GroupComparisonFormFields,comparisonRulesFromWire,emptyComparisonRules } from '@/components/groups/group-comparison-form';
+import { useComparisonDraft } from '@/components/groups/use-comparison-draft';
+import type { CompetitionRules as GroupExerciseRules } from '@/src/groups/competition-contract';
+import type { CompetitionExerciseListWire as GroupMetricExerciseListWire } from '@/src/groups/competition-wire';
+import { listCompetitionExercises, updateCompetitionExercise } from '@/src/groups/api';
 import {
   canManageGroup,
   describeGroupExerciseWriteError,
@@ -29,8 +30,8 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 /**
- * Rename a group exercise or change its weight entry (owner, admin; contract
- * §4.4 `group_exercise_update` replaces both), prefilled from the cached list.
+ * Edit public comparison rules (owner/admin) through the versioned competition
+ * writer, prefilled from the validated catalogue.
  * Archived exercises are read-only.
  */
 export default function EditGroupExerciseRoute() {
@@ -44,7 +45,7 @@ export default function EditGroupExerciseRoute() {
   if (!groupId || !exerciseId) {
     return null;
   }
-  return <EditGroupExerciseContent exerciseId={exerciseId} groupId={groupId} userId={user.id} />;
+  return <EditGroupExerciseContent key={`${user.id}:${groupId}:${exerciseId}`} exerciseId={exerciseId} groupId={groupId} userId={user.id} />;
 }
 
 function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: string; groupId: string; exerciseId: string }) {
@@ -56,14 +57,14 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
     fetcher: groupFetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const exercisesFetcher = useCallback(() => listGroupComparisons(groupId), [groupId]);
+  const exercisesFetcher = useCallback(() => listCompetitionExercises(groupId), [groupId]);
   const exercises = useGroupResource<GroupMetricExerciseListWire>({
     userId,
     cacheKey: groupCacheKeys.groupExercises(groupId),
     fetcher: exercisesFetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const update = useGroupAction((core: GroupExerciseRules, revision: number) => updateGroupComparison(groupId, exerciseId, revision, core));
+  const update = useGroupAction((core: GroupExerciseRules, revision: number) => updateCompetitionExercise({ groupId,exerciseId,revision,name: core.name,mode: core.loadInputMode,contribution: core.bodyweightContribution,metric: core.defaultMetric }));
   const mounted = useMountedRef();
 
   const onSubmit = async (core: GroupExerciseRules, revision: number | null) => {
@@ -83,6 +84,8 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
   };
 
   const exercise = exercises.data?.exercises.find((candidate) => candidate.group_exercise_id === exerciseId) ?? null;
+
+  const draft=useComparisonDraft(exercise ? comparisonRulesFromWire(exercise) : emptyComparisonRules,exercise ?? undefined);
 
   let body;
   if (group.lostAccess || exercises.lostAccess) {
@@ -119,7 +122,8 @@ function EditGroupExerciseContent({ userId, groupId, exerciseId }: { userId: str
     );
   } else {
     body = (
-      <GroupComparisonForm
+      <GroupComparisonFormFields
+        draft={draft}
         bodyweightCalculationsEnabled={group.data.group.bodyweight_calculations_enabled}
         errorMessage={update.error ? describeGroupExerciseWriteError(update.error) : null}
         existing={exercise}

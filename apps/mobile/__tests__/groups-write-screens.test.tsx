@@ -13,6 +13,7 @@ import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, Share, type AlertButton } from 'react-native';
 
+import { competitionExercise } from './helpers/competition-fixtures';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 
 let fixture: InMemoryDatabaseFixture;
@@ -58,8 +59,8 @@ jest.mock('@/src/groups/api', () => {
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
-  getGroupStream: streamRead,
-  getGroupMetricStream: streamRead,
+  listCompetitionExercises: jest.fn(),
+  getCompetitionStream: streamRead,
   createGroup: jest.fn(),
   updateGroup: jest.fn(),
   getGroupInviteCode: jest.fn(),
@@ -151,8 +152,9 @@ beforeEach(() => {
   profile.loadUserProfile.mockResolvedValue(profileWith('me'));
   profile.saveUsername.mockResolvedValue(profileWith('alex').profile);
   api.listMyGroups.mockResolvedValue({ groups: [summary('owner')] });
-  api.getGroupStream.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
+  api.getCompetitionStream.mockResolvedValue({ contract_version: 4,items: [], next_cursor: null, has_more: false });
   api.getGroup.mockResolvedValue(detailFor('owner'));
+  api.listCompetitionExercises.mockResolvedValue({ contract_version: 4,exercises: [] });
   api.getGroupInviteCode.mockResolvedValue({ code: 'ABCD2345' });
 });
 
@@ -172,7 +174,7 @@ describe('Groups tab and My groups actions', () => {
   it('keeps Join / Create off the Groups screen and on My groups', async () => {
     render(<GroupsTabRoute />);
     await settleReads();
-    expect(api.getGroupStream).toHaveBeenCalledTimes(1);
+    expect(api.getCompetitionStream).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('groups-stream-empty')).toBeTruthy();
     expect(screen.queryByTestId('groups-create-button')).toBeNull();
     expect(screen.queryByTestId('groups-join-button')).toBeNull();
@@ -453,6 +455,34 @@ describe('Edit group (flow 5)', () => {
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
+  it('requires a review before an effective group switch and retains typed input through catalogue retirement',async()=>{
+    writeGroupCache(fixture.database,{ cacheKey: groupCacheKeys.groupExercises(GROUP_ID),userId: USER_ID,fetchedAtMs: 0,
+      payload: { contract_version: 4,exercises: [{ ...competitionExercise,rules: { ...competitionExercise.rules,bodyweight_contribution: 0,bodyweight_calculations_enabled: false } }] } });
+    let resolve!: (value: Parameters<typeof api.listCompetitionExercises.mockResolvedValue>[0])=>void;
+    api.listCompetitionExercises.mockReturnValueOnce(new Promise(res=>{resolve=res;}));
+    render(<EditGroupRoute />);await screen.findByTestId('group-form');
+    fireEvent.changeText(screen.getByTestId('group-form-name-input'),'Typed group name');
+    api.listCompetitionExercises.mockResolvedValue({ contract_version: 4,exercises: [{ ...competitionExercise,published_revision: 3,rules: { ...competitionExercise.rules,rules_revision: 3,bodyweight_calculations_enabled: false } }] });
+    await act(async()=>resolve({ contract_version: 4,exercises: [{ ...competitionExercise,published_revision: 3,rules: { ...competitionExercise.rules,rules_revision: 3,bodyweight_calculations_enabled: false } }] }));
+    await waitFor(()=>expect(screen.getByTestId('group-form-bodyweight-calculations-on')).not.toBeDisabled());
+    expect(screen.getByTestId('group-form-name-input')).toHaveProp('value','Typed group name');
+    fireEvent.press(screen.getByTestId('group-form-bodyweight-calculations-on'));
+    fireEvent.press(screen.getByTestId('group-form-submit'));
+    expect(api.updateGroup).not.toHaveBeenCalled();expect(screen.getByTestId('group-policy-preview')).toHaveTextContent(/Existing certifications retain their witness/);
+    api.updateGroup.mockRejectedValue(new GroupApiError('FORBIDDEN','forbidden'));
+    await act(async()=>fireEvent.press(screen.getByTestId('group-form-submit')));
+    expect(api.updateGroup).toHaveBeenCalledWith(GROUP_ID,expect.objectContaining({ name: 'Typed group name',bodyweightCalculationsEnabled: true }));
+    expect(screen.getByTestId('group-form-name-input')).toHaveProp('value','Typed group name');
+  });
+  it('saves a zero-contribution switch without promising a rebuild',async()=>{
+    render(<EditGroupRoute />);await screen.findByTestId('group-form');
+    await waitFor(()=>expect(screen.getByTestId('group-form-bodyweight-calculations-on')).not.toBeDisabled());
+    fireEvent.press(screen.getByTestId('group-form-bodyweight-calculations-on'));
+    expect(screen.getByTestId('group-policy-zero-effect')).toHaveTextContent(/Score revisions stay unchanged/);
+    api.updateGroup.mockResolvedValue({ group: summary('owner') });
+    await act(async()=>fireEvent.press(screen.getByTestId('group-form-submit')));
+    expect(api.updateGroup).toHaveBeenCalledTimes(1);expect(screen.queryByTestId('group-policy-preview')).toBeNull();
+  });
   it('refuses offline and changes nothing (AC12)', async () => {
     render(<EditGroupRoute />);
     await screen.findByTestId('group-form');
@@ -626,6 +656,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
 
     fireEvent.press(screen.getByTestId('group-members-leave-button'));
     expect(alert).toHaveBeenLastCalledWith('Leave Garage Gym?', expect.any(String), expect.any(Array));
+    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND','group not found'));
     await pressAlertButton(alert, 'Leave');
     expect(api.leaveGroup).toHaveBeenCalledWith(GROUP_ID);
     expect(mockRouter.dismissTo).toHaveBeenCalledWith('/groups');
@@ -637,6 +668,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
     await renderAs('member');
     emitNetInfo(false);
     fireEvent.press(screen.getByTestId('group-members-leave-button'));
+    api.getGroup.mockRejectedValue(new GroupApiError('NOT_FOUND','group not found'));
     await pressAlertButton(alert, 'Leave');
     expect(api.leaveGroup).not.toHaveBeenCalled();
     expect(mockRouter.dismissTo).not.toHaveBeenCalled();

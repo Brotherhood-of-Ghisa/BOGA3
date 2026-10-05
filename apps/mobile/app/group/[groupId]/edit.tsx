@@ -2,12 +2,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 
 import {
-  GroupDetailsForm,
   GroupMissingDataState,
   GroupStateView,
   GroupsSignInRequired,
   pickInlineError,
 } from '@/components/groups';
+import { GroupDetailsFormFields,useGroupDetailsDraft } from '@/components/groups/group-details-form';
+import { listCompetitionExercises } from '@/src/groups/api';
+import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -36,7 +38,7 @@ export default function EditGroupRoute() {
   if (!groupId) {
     return null;
   }
-  return <EditGroupContent groupId={groupId} userId={user.id} />;
+  return <EditGroupContent key={`${user.id}:${groupId}`} groupId={groupId} userId={user.id} />;
 }
 
 function EditGroupContent({ userId, groupId }: { userId: string; groupId: string }) {
@@ -48,6 +50,11 @@ function EditGroupContent({ userId, groupId }: { userId: string; groupId: string
     fetcher,
     evictGroupIdOnNotFound: groupId,
   });
+  const exerciseFetcher = useCallback(() => listCompetitionExercises(groupId),[groupId]);
+  const exercises = useGroupResource<CompetitionExerciseListWire>({ userId,
+    cacheKey: groupCacheKeys.groupExercises(groupId),fetcher: exerciseFetcher,evictGroupIdOnNotFound: groupId });
+  const draft=useGroupDetailsDraft(group.data?{ name: group.data.group.name,description: group.data.group.description ?? '',
+    bodyweightCalculationsEnabled: group.data.group.bodyweight_calculations_enabled }:null);
   const update = useGroupAction((details: GroupUpdateInput) => updateGroup(groupId, details));
 
   const onSubmit = async (details: GroupDetailsInput & { bodyweightCalculationsEnabled?: boolean }) => {
@@ -84,12 +91,15 @@ function EditGroupContent({ userId, groupId }: { userId: string; groupId: string
     );
   } else {
     body = (
-      <GroupDetailsForm
+      <GroupDetailsFormFields
+        draft={draft}
         errorMessage={update.error ? describeGroupWriteError(update.error) : null}
         initialDescription={group.data.group.description}
         initialBodyweightCalculationsEnabled={group.data.group.bodyweight_calculations_enabled}
         initialName={group.data.group.name}
         onSubmit={(details) => void onSubmit(details)}
+        positiveContributionCount={exercises.data ? exercises.data.exercises.filter(exercise =>
+          exercise.archived_at_ms === null && exercise.rules.bodyweight_contribution > 0).length : null}
         pending={update.pending}
         pendingLabel="Saving…"
         submitLabel="Save changes"

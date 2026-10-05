@@ -2,12 +2,13 @@ import { useState } from 'react';
 
 import type { BodyweightContributionFieldValue } from '@/components/exercise-core/exercise-core-fields';
 import type { LoadInputMode } from '@/src/exercise-core';
-import { baselineFrom } from '@/src/groups/comparison-form-model';
-import type { GroupExerciseRules, GroupMetric } from '@/src/groups/metric-contract';
-import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
+import { formatContributionPercent } from '@/src/groups/competition-view-model';
+import { baselineFrom, parseContributionPercent } from '@/src/groups/comparison-form-model';
+import type { CompetitionRules as GroupExerciseRules, CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
+import type { CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 
 const contributionFieldFromRules = (rules: GroupExerciseRules): BodyweightContributionFieldValue => ({
-  percentage: String(rules.bodyweightContribution * 100),
+  percentage: formatContributionPercent(rules.bodyweightContribution),
 });
 
 /**
@@ -24,7 +25,7 @@ export function useComparisonDraft(prefill: GroupExerciseRules, existing: GroupM
   const [dirty, setDirty] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [reviewed, setReviewed] = useState(false);
-  const prefillKey = JSON.stringify([prefill, existing?.rules_revision, existing?.legacy]);
+  const prefillKey = JSON.stringify([prefill, existing?.rules.rules_revision]);
   const [followedKey, setFollowedKey] = useState<string | null>(prefillKey);
   if (!dirty && followedKey !== prefillKey) {
     setFollowedKey(prefillKey);
@@ -39,6 +40,9 @@ export function useComparisonDraft(prefill: GroupExerciseRules, existing: GroupM
 
   return {
     baseline, name, loadInputMode, contributionField, defaultMetric, dirty, showErrors, reviewed,
+    // Preserve the exact server number while the percentage field is unchanged.
+    contribution: contributionField.percentage === contributionFieldFromRules(baseline.rules).percentage
+      ? baseline.rules.bodyweightContribution : parseContributionPercent(contributionField.percentage) / 100,
     changeName: edit(setName),
     changeLoadInputMode: edit(setLoadInputMode),
     changeContribution: edit(setContributionField),

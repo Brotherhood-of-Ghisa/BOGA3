@@ -3,19 +3,19 @@ import { Text, Alert, ScrollView } from 'react-native';
 
 import { ActionButton, ListRow, SegmentedControl, Sheet, Stat, uiSpace } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
-import { describeGroupRules, formatGroupMetricValue, formatGroupRawPerformance, GROUP_METRIC_LABELS, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
-import type { GroupMetric } from '@/src/groups/metric-contract';
+import { describeCompetitionRules as describeGroupRules,formatCompetitionValue as formatGroupMetricValue,formatCompetitionPerformance as formatGroupRawPerformance,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
+import type { CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import {
   buildMetricRecordSheetModel,
   metricCertificationEndConfirmation,
   type MetricCertificationEndAction,
 } from '@/src/groups/metric-record-sheet-view-model';
-import type { GroupMetricBoardRowWire, GroupMetricCertificationWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
+import type { CompetitionBoardRowWire as GroupMetricBoardRowWire,CompetitionCertificationWire as GroupMetricCertificationWire,CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 import { useMetricCertification } from '@/src/groups/use-metric-certification';
 import { GroupWriteNotice } from './write-notice';
 import { groupMetricTextStyles as textStyles } from './screen-styles';
 
-/** A metric attestation always submits the revision and dependency pin shown here. */
+/** A metric attestation always submits the revision and random write token shown here. */
 export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole, onClose, onChanged, readOnlyReason, initialCertification, metricOptions, onSelectMetric, onHistory }: {
   row: GroupMetricBoardRowWire; exercise: GroupMetricExerciseWire; groupId: string; userId: string;
   readOnlyReason?: string; initialCertification?: GroupMetricCertificationWire | null;
@@ -25,7 +25,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   const router = useRouter();
   const online = useNetworkOnline();
   const { certification, pending, needsReview, notice, perform, refresh } = useMetricCertification({
-    groupId, row, exercise, online, readOnlyReason, initialCertification, onChanged,
+    groupId,userId, row, exercise, online, readOnlyReason, initialCertification, onChanged,
   });
   const model = buildMetricRecordSheetModel({
     row, exercise, userId, myRole, certification, readOnlyReason, online, pending, needsReview, notice,
@@ -44,7 +44,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
-      <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.achieved_at_ms)}</Text>
+      <Text allowFontScaling={false} style={textStyles.body}>{formatBoardMemberLabel(row.member, row.former, userId)} · {formatBoardDate(row.performance.achieved_at_ms)}</Text>
       <Text allowFontScaling={false} style={textStyles.body} testID="group-metric-record-raw">As logged: {formatGroupRawPerformance(row.performance)}</Text>
       <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules(exercise)}</Text>
       <Text allowFontScaling={false} style={textStyles.muted}>Certification attests this logged performance. Rule changes preserve it; corrections can invalidate it.</Text>
@@ -64,7 +64,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       {model.canCancel ? <ListRow label="Cancel certification" disabled={model.blocked}
         onPress={() => confirmEnd('cancel')} tone="danger" testID="group-metric-record-cancel" /> : null}
       {onHistory ? <ListRow label="View rules history" onPress={onHistory} testID="group-metric-record-history" /> : null}
-      <ListRow label="View full session" onPress={() => { onClose(); router.push(`/group-session/${row.member.user_id}/${row.performance.session_id}`); }}
+      <ListRow label="View full session" onPress={() => { onClose(); router.push(`/group-session/${row.member.user_id}/${row.performance.session_id}?groupId=${encodeURIComponent(groupId)}`); }}
         testID="group-metric-record-session" />
     </ScrollView>
   </Sheet>;

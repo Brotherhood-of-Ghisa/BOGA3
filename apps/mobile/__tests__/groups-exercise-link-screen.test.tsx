@@ -50,7 +50,7 @@ jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
-  listGroupExercises: jest.fn(),
+  listCompetitionExercises: jest.fn(),
 }));
 
 import { exerciseDefinitions, exerciseGroupLinks } from '@/src/data/schema';
@@ -62,11 +62,10 @@ import {
   groupCacheKeys,
   readGroupCache,
   writeGroupCache,
-  type GroupExercise,
-  type GroupExerciseListResult,
   type GroupListMineResult,
   type GroupSummary,
 } from '@/src/groups';
+import type { CompetitionExerciseWire as GroupExercise,CompetitionExerciseListWire as GroupExerciseListResult } from '@/src/groups/competition-wire';
 import * as groupsApi from '@/src/groups/api';
 
 import ExerciseLinkRoute from '../app/exercise-link';
@@ -79,19 +78,18 @@ const IRON: GroupSummary = { group_id: 'g-iron', name: 'Iron Brotherhood', descr
 const TUESDAY: GroupSummary = { group_id: 'g-tue', name: 'Tuesday Crew', description: null, member_count: 2, my_role: 'member', bodyweight_calculations_enabled: false };
 
 const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, 'group_exercise_id' | 'name'>): GroupExercise => ({
-  load_input_mode: 'total_load',
-  source_exercise_id: null,
-  archived_at_ms: null,
+  rules: { bodyweight_calculations_enabled: false,bodyweight_contribution: 0,load_input_mode: 'total_load',default_metric: 'e1rm',rules_revision: 1 },
+  published_revision: 1,rebuilding: false,source_exercise_id: null,archived_at_ms: null,
   ...overrides,
 });
 
 const GX_BENCH = groupExercise({ group_exercise_id: 'gx-bench', name: 'Bench Press', source_exercise_id: 'seed_barbell_bench_press' });
 const GX_DEADLIFT = groupExercise({ group_exercise_id: 'gx-deadlift', name: 'Deadlift' });
-const GX_TUE_BENCH = groupExercise({ group_exercise_id: 'gx-tue-bench', name: 'Bench', load_input_mode: 'per_side_load' });
+const GX_TUE_BENCH = groupExercise({ group_exercise_id: 'gx-tue-bench', name: 'Bench', rules: { bodyweight_calculations_enabled: false,bodyweight_contribution: 0,load_input_mode: 'per_side_load',default_metric: 'e1rm',rules_revision: 1 } });
 
 const MINE: GroupListMineResult = { groups: [IRON, TUESDAY] };
-const IRON_EXERCISES: GroupExerciseListResult = { exercises: [GX_BENCH, GX_DEADLIFT] };
-const TUESDAY_EXERCISES: GroupExerciseListResult = { exercises: [GX_TUE_BENCH] };
+const IRON_EXERCISES: GroupExerciseListResult = { contract_version: 4,exercises: [GX_BENCH, GX_DEADLIFT] };
+const TUESDAY_EXERCISES: GroupExerciseListResult = { contract_version: 4,exercises: [GX_TUE_BENCH] };
 
 const liveLinks = () =>
   fixture.database
@@ -123,7 +121,7 @@ beforeEach(() => {
   mockConnected = true;
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
   api.listMyGroups.mockResolvedValue(MINE);
-  api.listGroupExercises.mockImplementation(async (groupId: string) =>
+  api.listCompetitionExercises.mockImplementation(async (groupId: string) =>
     groupId === 'g-iron' ? IRON_EXERCISES : TUESDAY_EXERCISES,
   );
   insertExercise('seed_barbell_bench_press', 'Barbell Bench Press');
@@ -160,7 +158,7 @@ describe('Link screen', () => {
     const suggested = await screen.findByTestId('exercise-link-row-gx-bench');
     expect(within(suggested).getByText(/Bench Press/)).toBeTruthy();
     // Tuesday's "Bench" is a name match → Suggested too, with the load-mode note.
-    expect(screen.getByText('Weight stays as logged. 1RM is compared in per-side terms.')).toBeTruthy();
+    expect(screen.getByText(/Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load/)).toBeTruthy();
     expect(screen.getByTestId('exercise-link-row-gx-deadlift')).toBeTruthy();
 
     await act(async () => {
@@ -221,7 +219,7 @@ describe('Link screen', () => {
   const goOffline = () => {
     mockConnected = false;
     api.listMyGroups.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
-    api.listGroupExercises.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
+    api.listCompetitionExercises.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
   };
 
   it('offline with a warm cache: renders from the cache, and Link writes locally with no group RPC', async () => {
@@ -232,7 +230,7 @@ describe('Link screen', () => {
     expect(await screen.findByTestId('groups-offline-banner')).toHaveTextContent('Offline · last updated 09:05');
     const linkButton = await screen.findByTestId('exercise-link-link-gx-bench');
     api.listMyGroups.mockClear();
-    api.listGroupExercises.mockClear();
+    api.listCompetitionExercises.mockClear();
 
     await act(async () => {
       fireEvent.press(linkButton);
@@ -241,7 +239,7 @@ describe('Link screen', () => {
     expect(liveLinks()).toHaveLength(1);
     expect(await screen.findByTestId('exercise-link-linked-row-gx-bench')).toBeTruthy();
     expect(api.listMyGroups).not.toHaveBeenCalled();
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
+    expect(api.listCompetitionExercises).not.toHaveBeenCalled();
     // The offline marker covers NETWORK; no second error next to it.
     expect(screen.queryByTestId('exercise-link-inline-error')).toBeNull();
   });
@@ -255,7 +253,7 @@ describe('Link screen', () => {
 
     const unlinkButton = await screen.findByTestId('exercise-link-unlink-gx-bench');
     api.listMyGroups.mockClear();
-    api.listGroupExercises.mockClear();
+    api.listCompetitionExercises.mockClear();
     fireEvent.press(unlinkButton);
     const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
     await act(async () => {
@@ -266,7 +264,7 @@ describe('Link screen', () => {
     await waitFor(() => expect(screen.queryByTestId('exercise-link-linked-row-gx-bench')).toBeNull());
     expect(screen.getByTestId('exercise-link-link-gx-bench')).toBeTruthy();
     expect(api.listMyGroups).not.toHaveBeenCalled();
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
+    expect(api.listCompetitionExercises).not.toHaveBeenCalled();
   });
 
   it('offline with my groups cached but no exercise lists yet: the "Connect once" state, not an empty list', async () => {
@@ -305,7 +303,7 @@ describe('Link screen', () => {
   it('losing access to a group evicts its cached exercises but never my links (AC6)', async () => {
     warmCache();
     await linkExercise('seed_barbell_bench_press', 'g-tue', 'gx-tue-bench');
-    api.listGroupExercises.mockImplementation(async (groupId: string) => {
+    api.listCompetitionExercises.mockImplementation(async (groupId: string) => {
       if (groupId === 'g-tue') {
         throw new GroupApiError('NOT_FOUND', 'group not found');
       }
@@ -346,10 +344,11 @@ describe('Link screen', () => {
 
   it('a failed local read hides unlink and retries independently of server reads', async () => {
     await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
-    jest.spyOn(linksRepo, 'listLinks').mockRejectedValueOnce(new Error('Read failed'));
+    const failedRead=jest.spyOn(linksRepo,'listLinks').mockRejectedValue(new Error('Read failed'));
     await renderScreen();
     expect(await screen.findByTestId('exercise-link-links-error')).toBeTruthy();
     expect(screen.queryByTestId('exercise-link-unlink-gx-bench')).toBeNull();
+    failedRead.mockRestore();
     fireEvent.press(screen.getByTestId('exercise-link-links-retry'));
     expect(await screen.findByTestId('exercise-link-unlink-gx-bench')).toBeTruthy();
   });
@@ -359,7 +358,7 @@ describe('Link screen', () => {
     const spy = jest.spyOn(Alert, 'alert');
     await renderScreen();
     fireEvent.press(await screen.findByTestId('exercise-link-unlink-gx-bench'));
-    jest.spyOn(linksRepo, 'listLinks').mockRejectedValueOnce(new Error('Read failed'));
+    jest.spyOn(linksRepo,'listLinks').mockRejectedValueOnce(new Error('Read failed'));
     await act(async () => spy.mock.calls.at(-1)?.[2]?.find((action) => action.text === 'Unlink')?.onPress?.());
     expect(liveLinks()).toEqual([]);
     expect(screen.getByTestId('exercise-link-notice')).toHaveTextContent('Unlinked “Barbell Bench Press” from “Bench Press”.');
@@ -368,11 +367,11 @@ describe('Link screen', () => {
   });
 
   it('archived plus inactive targets explain both freezes and remain removable', async () => {
-    const old = { exercises: [{ ...GX_BENCH, archived_at_ms: 1 }] };
+    const old = { contract_version: 4 as const,exercises: [{ ...GX_BENCH, archived_at_ms: 1 }] };
     warmCache();
     writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.groupExercises('g-iron'), userId: USER_ID, payload: old, fetchedAtMs: 1 });
     await linkExercise('seed_barbell_bench_press', 'g-iron', 'gx-bench');
-    api.listGroupExercises.mockImplementation(async (id) => {
+    api.listCompetitionExercises.mockImplementation(async (id) => {
       if (id === 'g-iron') throw new GroupApiError('NOT_FOUND', 'group not found');
       return TUESDAY_EXERCISES;
     });

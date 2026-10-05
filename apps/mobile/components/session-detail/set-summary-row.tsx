@@ -9,7 +9,7 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // figure in a row shares the row's colour and weight; only the record set's
 // 1RM and Weight records stand out, in `record`, as on the exercise page
 // (decided on device 2026-09-23: per-column bests read as noise).
-export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID: string }) {
+export function SetSummaryRow({ row, testID, hideDerivedMetrics = false }: { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean }) {
   const state = row.done ? 'realised' : 'planned';
   return (
     <View style={styles.setRow} testID={testID}>
@@ -23,6 +23,7 @@ export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID:
         testID={`${testID}-values`}>
         {row.weightReps}
       </Text>
+      {!hideDerivedMetrics ? <>
       <Stat
         emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
         label="1RM"
@@ -40,6 +41,7 @@ export function SetSummaryRow({ row, testID }: { row: SessionViewSetRow; testID:
         testID={`${testID}-vol`}
         value={row.volume}
       />
+      </> : null}
     </View>
   );
 }

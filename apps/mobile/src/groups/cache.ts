@@ -3,10 +3,13 @@
 // handle explicitly so it runs unchanged against the production expo-sqlite
 // database and the in-memory test fixture.
 
-import { and, eq, inArray, like, or } from 'drizzle-orm';
+import { and, eq, inArray, like, notLike, or } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import * as schema from '@/src/data/schema';
+import { isCompetitionCachePayload } from './competition-cache-guards';
+import { applyCompetitionPolicy, bootstrapCompetitionPolicy, competitionPolicyObservations, emptyCompetitionPolicy, isObservedCompetitionPolicy,
+  type ObservedCompetitionPolicy } from './competition-cache-policy';
 
 const { groupCache } = schema;
 
@@ -14,16 +17,16 @@ const { groupCache } = schema;
 export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
 export const groupCacheKeys = {
-  mine: 'groups:v4:mine',
-  group: (groupId: string) => `group:v4:${groupId}`,
-  stream: (groupId: string) => `stream:v4:${groupId}`,
-  session: (memberUserId: string, sessionId: string) => `session:v4:${memberUserId}:${sessionId}`,
+  mine: 'groups:v5:mine',
+  group: (groupId: string) => `group:v5:${groupId}`,
+  stream: (groupId: string) => `stream:v5:${groupId}`,
+  session: (groupId: string, memberUserId: string, sessionId: string) => `session:v5:${groupId}:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
-  groupExercises: (groupId: string) => `group-exercises:v4:${groupId}`,
+  groupExercises: (groupId: string) => `group-exercises:v5:${groupId}`,
   /** Versioned podium payload. Full boards and history are never cached. */
-  boards: (groupId: string) => `boards:v4:${groupId}`,
+  boards: (groupId: string) => `boards:v5:${groupId}`,
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
-  weekSummary: (groupId: string) => `week:v4:${groupId}`,
+  weekSummary: (groupId: string) => `week:v5:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
@@ -35,15 +38,16 @@ export type GroupCacheEntry<T> = {
 
 /**
  * Returns the cached payload for `cacheKey` only when it was fetched by
- * `userId`; another account's row reads as absent. A payload that is not valid
- * JSON throws (it is only ever written by `writeGroupCache`, so corruption is a
- * bug to surface, not a miss to hide).
+ * `userId`; another account's row reads as absent. Malformed JSON, incompatible generations and unsafe payloads are evicted
+ * before reaching a screen.
  */
 export const readGroupCache = <T>(
   database: GroupCacheDatabase,
   cacheKey: string,
   userId: string,
 ): GroupCacheEntry<T> | null => {
+  if (quarantinedAccounts.has(userId)) return null;
+  evictObsoleteGroupCache(database,userId);
   const row = database
     .select()
     .from(groupCache)
@@ -52,7 +56,16 @@ export const readGroupCache = <T>(
   if (!row) {
     return null;
   }
-  return { payload: JSON.parse(row.payloadJson) as T, fetchedAtMs: row.fetchedAtMs };
+  let payload: unknown;
+  try { payload=JSON.parse(row.payloadJson); } catch {
+    deleteGroupCacheEntry(database,cacheKey);
+    return null;
+  }
+  if (!isCompetitionCachePayload(cacheKey,payload)) {
+    deleteGroupCacheEntry(database,cacheKey);
+    return null;
+  }
+  return { payload: payload as T, fetchedAtMs: row.fetchedAtMs };
 };
 
 /** Upserts the last successful payload for `cacheKey`, replacing any previous owner. */
@@ -60,6 +73,11 @@ export const writeGroupCache = <T>(
   database: GroupCacheDatabase,
   entry: { cacheKey: string; userId: string; payload: T; fetchedAtMs: number },
 ): void => {
+  if (quarantinedAccounts.has(entry.userId)) deleteAccountCompetitionCache(database,entry.userId);
+  evictObsoleteGroupCache(database,entry.userId);
+  if (!isCompetitionCachePayload(entry.cacheKey,entry.payload)) throw new Error('Unsafe group cache payload.');
+  observeCompetitionPolicy(database,entry.cacheKey,entry.userId,entry.payload,entry.fetchedAtMs);
+  clearObservedGroupLoss(entry.userId,entry.cacheKey,entry.payload);
   const values = {
     cacheKey: entry.cacheKey,
     userId: entry.userId,
@@ -83,49 +101,146 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 
 /**
  * Access loss removes the current versioned group, stream, exercise, board,
- * week summary, and every session entry. Session entries are not
- * group-scoped (a session can be shared into several groups), so all of them
- * go. The member's `exercise_group_links` rows are synced data and are never
+ * week summary, and every session entry. A session can be shared into several
+ * groups, so all cached group-specific session projections go. The member's `exercise_group_links` rows are synced data and are never
  * touched here.
  */
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
-  database
-    .delete(groupCache)
-    .where(
-      or(
-        inArray(groupCache.cacheKey, [
-          groupCacheKeys.group(groupId),
-          groupCacheKeys.stream(groupId),
-          groupCacheKeys.groupExercises(groupId),
-          groupCacheKeys.boards(groupId),
-          groupCacheKeys.weekSummary(groupId),
-          `group:${groupId}`, `stream:${groupId}`, `group-exercises:${groupId}`, `boards:${groupId}`,
-        ]),
-        like(groupCache.cacheKey, SESSION_KEY_PATTERN),
-      ),
-    )
-    .run();
+  const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
+    groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),groupCacheKeys.weekSummary(groupId),`group-policy:v5:${groupId}`]),
+    like(groupCache.cacheKey,SESSION_KEY_PATTERN));
+  const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
+  database.delete(groupCache).where(scope).run();
+  accounts.forEach(invalidateCompetitionMemory);
 };
 
 /** Clears the whole cache. `wipeLocalTables` deletes the table inside its own transaction. */
 export const wipeGroupCache = (database: GroupCacheDatabase): void => {
   database.delete(groupCache).run();
+  cacheGenerations.forEach((_generation,userId) => invalidateCompetitionMemory(userId));
 };
 
 /** Competition activation/mode changes evict ALL of this account's disposable
  * group projections, including unscoped session joins and previous generations.
- * Existing protocol-3 consumers do not call this until the safe reader cutover. */
+ * Mounted readers observe the generation and hide previous projections immediately. */
 export const evictCompetitionCache = (database: GroupCacheDatabase, userId: string): void => {
-  database.delete(groupCache).where(eq(groupCache.userId, userId)).run();
+  quarantineCompetitionCache(userId);
+  deleteAccountCompetitionCache(database,userId);
 };
 
-export const competitionCacheKeys = {
-  mine: 'groups:v5:mine',
-  group: (id: string) => `group:v5:${id}`,
-  stream: (id: string) => `stream:v5:${id}`,
-  groupExercises: (id: string) => `group-exercises:v5:${id}`,
-  boards: (id: string) => `boards:v5:${id}`,
-  weekSummary: (id: string) => `week:v5:${id}`,
-  // Full-session responses must bind their disclosure to a group.
-  session: (groupId: string, memberId: string, sessionId: string) => `session:v5:${groupId}:${memberId}:${sessionId}`,
-} as const;
+export const competitionCacheKeys = groupCacheKeys;
+
+const quarantinedAccounts = new Set<string>();
+const lostGroups = new Map<string,Set<string>>();
+const cacheGenerations = new Map<string,number>();
+const cacheListeners = new Set<() => void>();
+export const getCompetitionCacheGeneration = (userId: string | null): number => userId ? cacheGenerations.get(userId) ?? 0 : 0;
+export const subscribeCompetitionCache = (listener: () => void): (() => void) => {
+  cacheListeners.add(listener);
+  return () => { cacheListeners.delete(listener); };
+};
+/** Upgrade removes all prior generations for this account before hydration. */
+export const evictObsoleteGroupCache = (database: GroupCacheDatabase,userId: string): void => {
+  database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'%:v5:%'))).run();
+};
+
+export function invalidateCompetitionMemory(userId: string): void {
+  cacheGenerations.set(userId,getCompetitionCacheGeneration(userId) + 1);
+  cacheListeners.forEach(listener => listener());
+}
+
+/** A public policy stamp persists across projection retirement, so readers of
+ * different endpoints share observations even when their own cache key was absent. */
+function observeCompetitionPolicy(database: GroupCacheDatabase,key: string,userId: string,payload: unknown,fetchedAtMs: number): void {
+  try { observeCompetitionPolicyUnchecked(database,key,userId,payload,fetchedAtMs); }
+  catch(error) {
+    if(!quarantinedAccounts.has(userId)) quarantineCompetitionCache(userId);
+    throw error;
+  }
+}
+function observeCompetitionPolicyUnchecked(database: GroupCacheDatabase,key: string,userId: string,payload: unknown,fetchedAtMs: number): void {
+  const rows = readClosedAccountCache(database,userId);
+  const policies = new Map<string,ObservedCompetitionPolicy>();
+  const projections = new Set<string>();
+  for (const row of rows) {
+    if (row.key.startsWith('group-policy:') && isObservedCompetitionPolicy(row.value)) policies.set(row.key.split(':')[2],row.value);
+  }
+  for (const row of rows) {
+    if (row.key.startsWith('group-policy:')) continue;
+    const observations=competitionPolicyObservations(row.key,row.value);
+    const groupId=row.key.split(':')[2];
+    if (!row.key.startsWith('groups:') && groupId) projections.add(groupId);
+    for (const observation of observations) {
+      projections.add(observation.groupId);
+      const before=policies.get(observation.groupId) ?? emptyCompetitionPolicy();
+      policies.set(observation.groupId,bootstrapCompetitionPolicy(before,observation));
+    }
+  }
+  let changed=false;
+  const incomingAbsoluteGroups=new Set<string>();
+  for (const observation of competitionPolicyObservations(key,payload)) {
+    if(observation.absolute_projection_seen) incomingAbsoluteGroups.add(observation.groupId);
+    const before=policies.get(observation.groupId) ?? emptyCompetitionPolicy();
+    const next=applyCompetitionPolicy(before,observation,projections.has(observation.groupId));
+    changed ||= next.changed;
+    policies.set(observation.groupId,next.policy);
+  }
+  if (changed) {
+    quarantineCompetitionCache(userId);
+    database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'group-policy:v5:%'))).run();
+    for (const [groupId,policy] of policies) policies.set(groupId,{ ...policy,absolute_projection_seen: incomingAbsoluteGroups.has(groupId) });
+  }
+  for (const [groupId,policy] of policies) {
+    const cacheKey=`group-policy:v5:${groupId}`;
+    const values={ cacheKey,userId,payloadJson: JSON.stringify({ ...policy,sessions: policy.sessions.slice(-256) }),fetchedAtMs };
+    database.insert(groupCache).values(values).onConflictDoUpdate({ target: groupCache.cacheKey,set: values }).run();
+  }
+  if(changed) quarantinedAccounts.delete(userId);
+}
+
+function readClosedAccountCache(database: GroupCacheDatabase,userId: string) {
+  return database.select().from(groupCache).where(eq(groupCache.userId,userId)).all()
+    .sort((a,b) => b.fetchedAtMs-a.fetchedAtMs).flatMap(row => {
+      try {
+        const value: unknown=JSON.parse(row.payloadJson);
+        return isCompetitionCachePayload(row.cacheKey,value) ? [{ key: row.cacheKey,value }] : [];
+      } catch { return []; }
+    });
+}
+
+/** Online-only readers publish their current public policy before displaying a page. */
+export function observeGroupCompetitionPolicy(database: GroupCacheDatabase,groupId: string,userId: string,payload: unknown): number {
+  if (quarantinedAccounts.has(userId)) deleteAccountCompetitionCache(database,userId);
+  observeCompetitionPolicy(database,`group-read:v5:${groupId}`,userId,payload,Date.now());
+  clearObservedGroupLoss(userId,`group-read:v5:${groupId}`,payload);
+  return getCompetitionCacheGeneration(userId);
+}
+
+/** Account-wide fail-closed retirement also applies while SQLite is unavailable. */
+export function quarantineCompetitionCache(userId: string): number {
+  quarantinedAccounts.add(userId);
+  invalidateCompetitionMemory(userId);
+  return getCompetitionCacheGeneration(userId);
+}
+export function deleteAccountCompetitionCache(database: GroupCacheDatabase,userId: string): void {
+  database.delete(groupCache).where(eq(groupCache.userId,userId)).run();
+  quarantinedAccounts.delete(userId);
+}
+
+/** Multiple mounted readers can discover the same loss. Fence once until a
+ * fresh authorized response for this group; repeated denial must not refetch forever. */
+export function quarantineCompetitionGroup(userId: string,groupId: string): number {
+  const groups=lostGroups.get(userId) ?? new Set<string>();
+  if (!groups.has(groupId)) {
+    groups.add(groupId);lostGroups.set(userId,groups);
+    quarantineCompetitionCache(userId);
+  }
+  return getCompetitionCacheGeneration(userId);
+}
+function clearObservedGroupLoss(userId: string,key: string,payload: unknown): void {
+  const groups=lostGroups.get(userId);
+  if (!groups) return;
+  if (!key.startsWith('groups:')) groups.delete(key.split(':')[2]);
+  for (const observation of competitionPolicyObservations(key,payload)) groups.delete(observation.groupId);
+  if (groups.size===0) lostGroups.delete(userId);
+}

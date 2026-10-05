@@ -43,7 +43,7 @@ jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
-  getGroupWeekSummary: jest.fn(),
+  getCompetitionWeek: jest.fn(),
 }));
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
@@ -55,8 +55,8 @@ import {
   setLastViewedGroupId,
   writeGroupCache,
   type GroupSummary,
-  type GroupWeekSummaryResult,
 } from '@/src/groups';
+import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
@@ -82,7 +82,7 @@ const LUNCH = group('g2', 'Lunch Club');
 const member = (userId: string) => ({ user_id: userId, username: userId });
 
 const summary = (overrides: Partial<GroupWeekSummaryResult> = {}): GroupWeekSummaryResult => ({
-  members: [
+  contract_version: 4,group_id: 'g1',members: [
     { rank: 1, member: member('dave'), working_sets: 58, group_records: 3 },
     { rank: 2, member: member('maria'), working_sets: 39, group_records: 1 },
     { rank: 3, member: member('sam'), working_sets: 35, group_records: 2 },
@@ -138,7 +138,7 @@ beforeEach(() => {
   mockInitialOnline = null;
   setLastViewedGroupId(null);
   api.listMyGroups.mockReset();
-  api.getGroupWeekSummary.mockReset();
+  api.getCompetitionWeek.mockReset();
   signedIn();
 });
 
@@ -173,23 +173,19 @@ describe('Today: the group card account states', () => {
     expect(screen.getByText('Train with friends')).toBeTruthy();
     fireEvent.press(byId('today-group-find-group'));
     expect(mockPush).toHaveBeenCalledWith('/group/mine');
-    expect(api.getGroupWeekSummary).not.toHaveBeenCalled();
+    expect(api.getCompetitionWeek).not.toHaveBeenCalled();
   });
 });
 
 describe('Today: the group card', () => {
   it('with one group: no switcher, the board names the group, and this local week is read', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getGroupWeekSummary.mockResolvedValue(summary());
+    api.getCompetitionWeek.mockResolvedValue(summary());
     await renderToday();
 
     await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
     const week = localWeekWindow(new Date());
-    expect(api.getGroupWeekSummary).toHaveBeenCalledWith({
-      groupId: 'g1',
-      windowStartMs: week.start.getTime(),
-      windowEndMs: week.end.getTime(),
-    });
+    expect(api.getCompetitionWeek).toHaveBeenCalledWith('g1',week.start.getTime(),week.end.getTime());
     expect(screen.queryByTestId('today-group-switcher')).toBeNull();
     expect(byId('today-group-board-title')).toHaveTextContent('Iron Wednesdays · this week');
 
@@ -208,7 +204,7 @@ describe('Today: the group card', () => {
     fireEvent.press(byId('today-group-board'));
     fireEvent.press(byId('today-view-groups-button'));
     expect(mockPush.mock.calls).toEqual([
-      ['/group-session/dave/dave-done'],
+      ['/group-session/dave/dave-done?groupId=g1'],
       ['/groups?groupId=g1'],
       ['/groups?groupId=g1'],
     ]);
@@ -217,34 +213,34 @@ describe('Today: the group card', () => {
   it('with several groups: shows the switcher on the Groups screen pick, and a pick moves both', async () => {
     setLastViewedGroupId('g2');
     api.listMyGroups.mockResolvedValue({ groups: [IRON, LUNCH] });
-    api.getGroupWeekSummary.mockImplementation(async ({ groupId }) =>
-      summary({ members: [{ rank: 1, member: member(groupId === 'g1' ? 'dave' : 'lena'), working_sets: 5, group_records: 0 }] }),
+    api.getCompetitionWeek.mockImplementation(async (groupId) =>
+      summary({ group_id: groupId,members: [{ rank: 1, member: member(groupId === 'g1' ? 'dave' : 'lena'), working_sets: 5, group_records: 0 }] }),
     );
     await renderToday();
 
     await waitFor(() => expect(byId('today-group-board-row-lena')).toBeTruthy());
     expect(byId('today-group-switcher')).toBeTruthy();
     expect(byId('today-group-board-title')).toHaveTextContent('This week');
-    expect(api.getGroupWeekSummary).toHaveBeenLastCalledWith(expect.objectContaining({ groupId: 'g2' }));
+    expect(api.getCompetitionWeek).toHaveBeenLastCalledWith('g2',expect.any(Number),expect.any(Number));
 
     fireEvent.press(within(byId('today-group-switcher')).getByTestId('groups-stream-filter-g1'));
     await waitFor(() => expect(byId('today-group-board-row-dave')).toBeTruthy());
-    expect(api.getGroupWeekSummary).toHaveBeenLastCalledWith(expect.objectContaining({ groupId: 'g1' }));
+    expect(api.getCompetitionWeek).toHaveBeenLastCalledWith('g1',expect.any(Number),expect.any(Number));
     expect(getLastViewedGroupId()).toBe('g1');
   });
 
   it('opens one member training now on their session, and several on the group', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getGroupWeekSummary.mockResolvedValueOnce(summary({ training_now: [live('maria')] }));
+    api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: [live('maria')] }));
     const view = await renderToday();
 
     await waitFor(() => expect(byId('today-group-latest-training')).toBeTruthy());
     expect(within(byId('today-group-latest-status')).getByText('Training now')).toBeTruthy();
     fireEvent.press(byId('today-group-latest-training'));
-    expect(mockPush).toHaveBeenLastCalledWith('/group-session/maria/maria-live');
+    expect(mockPush).toHaveBeenLastCalledWith('/group-session/maria/maria-live?groupId=g1');
     view.unmount();
 
-    api.getGroupWeekSummary.mockResolvedValueOnce(summary({ training_now: [live('maria'), live('sam'), live('tom')] }));
+    api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: [live('maria'), live('sam'), live('tom')] }));
     await renderToday();
     await waitFor(() => expect(byId('today-group-latest-title')).toHaveTextContent('3 training now'));
     expect(screen.getByText('maria, sam and tom')).toBeTruthy();
@@ -254,7 +250,7 @@ describe('Today: the group card', () => {
 
   it('says so when the group has no shared session yet', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getGroupWeekSummary.mockResolvedValue(summary({ latest_completed: null }));
+    api.getCompetitionWeek.mockResolvedValue(summary({ latest_completed: null }));
     await renderToday();
 
     await waitFor(() => expect(byId('today-group-latest-empty')).toBeTruthy());
@@ -264,19 +260,19 @@ describe('Today: the group card', () => {
 describe('Today: the group card offline and on errors', () => {
   it('keeps the cached week, with the offline marker, when the device goes offline', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getGroupWeekSummary.mockResolvedValue(summary());
+    api.getCompetitionWeek.mockResolvedValue(summary());
     const view = await renderToday();
     await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
     view.unmount();
 
     mockInitialOnline = false;
-    api.getGroupWeekSummary.mockClear();
+    api.getCompetitionWeek.mockClear();
     await renderToday();
 
     await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
     expect(byId('groups-offline-banner')).toBeTruthy();
     expect(byId('today-group-board-me-rank')).toHaveTextContent('You · 4th');
-    expect(api.getGroupWeekSummary).not.toHaveBeenCalled();
+    expect(api.getCompetitionWeek).not.toHaveBeenCalled();
   });
 
   it('never shows an earlier week from the cache as this week', async () => {
@@ -298,8 +294,8 @@ describe('Today: the group card offline and on errors', () => {
 
   it('reports a failed first read with Retry, then a failed refresh inline above the board', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
-    api.getGroupWeekSummary.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Server unavailable'));
-    api.getGroupWeekSummary.mockResolvedValueOnce(summary());
+    api.getCompetitionWeek.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Server unavailable'));
+    api.getCompetitionWeek.mockResolvedValueOnce(summary());
     const view = await renderToday();
 
     await waitFor(() => expect(byId('today-group-error-state')).toBeTruthy());
@@ -309,8 +305,8 @@ describe('Today: the group card offline and on errors', () => {
     await waitFor(() => expect(byId('today-group-card')).toBeTruthy());
     view.unmount();
 
-    api.getGroupWeekSummary.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Server unavailable'));
-    api.getGroupWeekSummary.mockResolvedValueOnce(summary());
+    api.getCompetitionWeek.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'Server unavailable'));
+    api.getCompetitionWeek.mockResolvedValueOnce(summary());
     await renderToday();
     await waitFor(() => expect(byId('today-group-inline-error')).toBeTruthy());
     expect(byId('today-group-card')).toBeTruthy();
@@ -322,9 +318,9 @@ describe('Today: the group card offline and on errors', () => {
 
   it('moves to a remaining group when access to the shown one is lost', async () => {
     api.listMyGroups.mockResolvedValueOnce({ groups: [IRON, LUNCH] }).mockResolvedValue({ groups: [LUNCH] });
-    api.getGroupWeekSummary.mockImplementation(async ({ groupId }) => {
+    api.getCompetitionWeek.mockImplementation(async (groupId) => {
       if (groupId === 'g1') throw new GroupApiError('NOT_FOUND', 'group not found');
-      return summary({ members: [{ rank: 1, member: member('lena'), working_sets: 5, group_records: 0 }] });
+      return summary({ group_id: groupId,members: [{ rank: 1, member: member('lena'), working_sets: 5, group_records: 0 }] });
     });
     await renderToday();
 

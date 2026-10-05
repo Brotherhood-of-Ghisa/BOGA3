@@ -13,8 +13,8 @@ import {
 import { ScreenScroll, SegmentedControl, uiFonts, uiRoles, uiTypography } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
-import type { GroupExerciseRules } from '@/src/groups/metric-contract';
-import { createGroupComparison } from '@/src/groups/api';
+import type { CompetitionRules as GroupExerciseRules } from '@/src/groups/competition-contract';
+import { createCompetitionExercise } from '@/src/groups/api';
 import {
   canManageGroup,
   describeGroupExerciseWriteError,
@@ -65,7 +65,7 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
   });
   const [source, setSource] = useState<ExerciseSource>('catalogue');
   const [picked, setPicked] = useState<StandardExerciseOption | null>(null);
-  const create = useGroupAction((input: GroupExerciseRules & { sourceExerciseId: string | null }) => createGroupComparison(groupId, input));
+  const create = useGroupAction((input: GroupExerciseRules & { sourceExerciseId: string | null }) => createCompetitionExercise({ groupId,name: input.name,mode: input.loadInputMode,contribution: input.bodyweightContribution,metric: input.defaultMetric,sourceId: input.sourceExerciseId }));
   const mounted = useMountedRef();
 
   const onSubmit = async (core: GroupExerciseRules) => {

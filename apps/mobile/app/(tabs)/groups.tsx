@@ -1,5 +1,5 @@
-import { getGroupMetricPodiums } from '@/src/groups/api';
-import type { GroupMetricPodiumWire } from '@/src/groups/metric-wire';
+import { getCompetitionPodiums } from '@/src/groups/api';
+import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useReducer, useState } from 'react';
 import { RefreshControl, StyleSheet, View } from 'react-native';
@@ -87,7 +87,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
 
   // No group selected (My groups loading or empty): read nothing.
   const stream = useGroupStream({ userId, groupId: selectedGroupId });
-  const boardsFetcher = useCallback(() => getGroupMetricPodiums(selectedGroupId ?? ''), [selectedGroupId]);
+  const boardsFetcher = useCallback(() => getCompetitionPodiums(selectedGroupId ?? ''), [selectedGroupId]);
   // Cache-first, read only while the Leaderboards segment is open.
   const boards = useGroupResource<GroupMetricPodiumWire>({
     userId,
@@ -201,7 +201,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
       emptyState={emptyState}
       header={header}
       onCertificationChanged={() => void refreshAll()}
-      onPressSession={(card) => router.push(`/group-session/${card.memberUserId}/${card.sessionId}`)}
+      onPressSession={(card) => router.push(`/group-session/${card.memberUserId}/${card.sessionId}?groupId=${encodeURIComponent(card.groupId)}`)}
       onRefresh={onRefresh}
       pulling={pulling}
       roleForGroup={(groupId) => groups.find((group) => group.group_id === groupId)?.my_role ?? null}

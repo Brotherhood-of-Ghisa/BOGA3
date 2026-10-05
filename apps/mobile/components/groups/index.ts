@@ -26,7 +26,6 @@ export {
 } from './group-state-view';
 export { GroupStreamList } from './group-stream-list';
 export { GroupSummaryRow } from './group-summary-row';
-export { RecordSetSheet } from './record-set-sheet';
 export { GroupDetailsForm } from './group-details-form';
 export { GroupMemberActionSheet } from './member-action-sheet';
 export { GroupMemberRow } from './member-row';

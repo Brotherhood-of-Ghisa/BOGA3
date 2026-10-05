@@ -5,7 +5,10 @@
 > group policy, dated context, kg-only migration, refresh and consumer behavior.
 > Storage/wire mechanics remain in [05](../05-data-model.md) and
 > [Sync v2](sync-v2-server-contract.md); group authorization and publication
-> remain in the [groups contract](groups-contract.md).
+> remain in the [groups contract](groups-contract.md). Current group competition
+> units, target conversion, certification projections and public disclosure are
+> owned by [group-competition-contract.md](group-competition-contract.md); its
+> protocol-4 boundary supersedes the retained legacy group examples here.
 
 Ordinary logging is the default for every exercise. Bodyweight-aware calculations
 are optional and independently enabled by a private user or a group. Turning a
@@ -216,9 +219,10 @@ rejected by the clean package/protocol version rather than silently preserved.
 Pure vectors cover all three policies; contribution 0/decimal/100%; total and
 per-side input; exact kg conversion; blank/zero; missing, malformed and changed
 readings; invalid/overflow values; Wathan projection; and zero record exclusion.
-Group mismatch vectors keep raw Weight unchanged, derive 1RM in source mode
-before converting it to target mode, leave Volume target-unconverted, and prove
-both mode changes rebuild/invalidate. Privacy vectors prove off/zero group
+Retained protocol-3 mismatch vectors keep raw Weight unchanged, derive 1RM in
+source mode before converting it to target mode, and keep legacy aggregate Volume
+target-unconverted. Protocol-4 competition vectors use ordinary target conversion and normalized physical total-load representation;
+both mode changes rebuild coherently. Privacy vectors prove off/zero group
 evaluation performs no reading lookup or reading-change invalidation, while a
 positive missing dependency is rebuilt when its first reading arrives.
 Migration tests use populated old schemas and prove retained identities, clocks,

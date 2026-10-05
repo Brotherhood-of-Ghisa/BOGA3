@@ -1,12 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
-import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
-
-const existing: GroupMetricExerciseWire = {
-  group_exercise_id: 'exercise', name: 'Pull-up', load_input_mode: 'total_load', source_exercise_id: null,
-  bodyweight_calculations_enabled: true, bodyweight_contribution: 1, default_metric: 'e1rm',
-  rules_revision: 2, published_revision: 2, rebuilding: false, archived_at_ms: null, legacy: false,
-};
+import { competitionExercise } from './helpers/competition-fixtures';
+const existing = { ...competitionExercise,group_exercise_id: 'exercise' };
 const props = { existing, bodyweightCalculationsEnabled: true,
   submitLabel: 'Save changes', pendingLabel: 'Saving…', pending: false, errorMessage: null };
 
@@ -47,15 +42,24 @@ describe('group comparison rule editor', () => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Pull-ups');
-    fireEvent.press(screen.getByTestId('group-exercise-default-metric-weight'));
+    fireEvent.press(screen.getByTestId('group-exercise-default-metric-volume'));
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Pull-ups', defaultMetric: 'weight' }), 2);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Pull-ups', defaultMetric: 'volume' }), 2);
+    expect(screen.queryByTestId('group-rules-preview')).toBeNull();
+  });
+  it.each([0.0061, 0.29])('preserves untouched decimal contribution %s on a name/default-only save', contribution => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} existing={{ ...existing,rules: { ...existing.rules,bodyweight_contribution: contribution } }} onSubmit={onSubmit} />);
+    fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'New name');
+    fireEvent.press(screen.getByTestId('group-exercise-default-metric-volume'));
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: contribution,defaultMetric: 'volume' }), 2);
     expect(screen.queryByTestId('group-rules-preview')).toBeNull();
   });
   it.each([false, true])('saves zero-contribution edits without a rule review when the group switch is %s', enabled => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props} bodyweightCalculationsEnabled={enabled}
-      existing={{ ...existing, bodyweight_calculations_enabled: false, bodyweight_contribution: 0 }} onSubmit={onSubmit} />);
+      existing={{ ...existing,rules: { ...existing.rules,bodyweight_calculations_enabled: false,bodyweight_contribution: 0 } }} onSubmit={onSubmit} />);
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Conventional lift');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ name: 'Conventional lift',
@@ -65,7 +69,7 @@ describe('group comparison rule editor', () => {
   it('still reviews changing zero contribution to positive under an enabled group switch', () => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props}
-      existing={{ ...existing, bodyweight_calculations_enabled: false, bodyweight_contribution: 0 }} onSubmit={onSubmit} />);
+      existing={{ ...existing,rules: { ...existing.rules,bodyweight_calculations_enabled: false,bodyweight_contribution: 0 } }} onSubmit={onSubmit} />);
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '100');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).not.toHaveBeenCalled();
@@ -75,7 +79,7 @@ describe('group comparison rule editor', () => {
     const onSubmit = jest.fn();
     const { rerender } = render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '70');
-    rerender(<GroupComparisonForm {...props} existing={{ ...existing, bodyweight_contribution: 0.8, rules_revision: 3, published_revision: 3 }} onSubmit={onSubmit} />);
+    rerender(<GroupComparisonForm {...props} existing={{ ...existing,rules: { ...existing.rules,bodyweight_contribution: 0.8,rules_revision: 3 },published_revision: 3 }} onSubmit={onSubmit} />);
     expect(screen.getByTestId('group-exercise-form-bodyweight-percentage')).toHaveProp('value', '70');
     expect(screen.getByTestId('group-rules-stale')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
@@ -86,11 +90,11 @@ describe('group comparison rule editor', () => {
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: 0.8 }), 3);
   });
-  it('shows original certification coverage when activating a legacy comparison', () => {
-    render(<GroupComparisonForm {...props} existing={{ ...existing, legacy: true, bodyweight_contribution: 0 }} onSubmit={jest.fn()} />);
+  it('preserves witnesses when changing contribution', () => {
+    render(<GroupComparisonForm {...props} existing={{ ...existing,rules: { ...existing.rules,bodyweight_contribution: 0 } }} onSubmit={jest.fn()} />);
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '100');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
-    expect(screen.getByText(/Existing certifications keep their original coverage/)).toBeOnTheScreen();
+    expect(screen.getByText(/Certifications of unchanged witnessed sets keep the same witness and time/)).toBeOnTheScreen();
   });
   it('retains values and the inline failure for a retry, and disables pending writes', () => {
     const onSubmit = jest.fn();
@@ -126,7 +130,7 @@ describe('group comparison rule editor: creating and edge inputs', () => {
 
   it('starts from prefilled rules and follows a new prefill until edited', () => {
     const initialRules = { name: 'Bench', loadInputMode: 'total_load' as const, bodyweightCalculationsEnabled: false,
-      bodyweightContribution: 0, defaultMetric: 'weight' as const };
+      bodyweightContribution: 0, defaultMetric: 'volume' as const };
     const { rerender } = render(<GroupComparisonForm {...createProps} initialRules={initialRules} onSubmit={jest.fn()} />);
     expect(screen.getByTestId('group-exercise-form-name-input')).toHaveProp('value', 'Bench');
     rerender(<GroupComparisonForm {...createProps} initialRules={{ ...initialRules, name: 'Incline bench' }} onSubmit={jest.fn()} />);
@@ -184,7 +188,7 @@ describe('group comparison rule editor: creating and edge inputs', () => {
       'Apply rules revision 3: 100% → 100% bodyweight contribution, per-side Weight. The whole board will rebuild together. ' +
         'Previous scores stay in their original rules history; this is not a new performed record.',
     );
-    expect(screen.getByText(/Attestations of unchanged performance inputs stay valid/)).toBeOnTheScreen();
+    expect(screen.getByText(/Certifications of unchanged witnessed sets keep the same witness and time/)).toBeOnTheScreen();
     expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Apply group rules');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ loadInputMode: 'per_side_load' }), 2);

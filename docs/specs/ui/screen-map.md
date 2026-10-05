@@ -495,9 +495,9 @@ Brief entrypoint map of the current mobile screens.
   - cached stream first, then refreshed on focus, every 30 s, and on pull-to-refresh; older pages load online at the end of the list
   - offline marker over cached data; offline empty state with no cache; inline error or error state with `Retry`
 - Key exits:
-  - `/group-session/<memberId>/<sessionId>` (session card), `/group/mine` (header), `/group/new`, `/group/join` (empty state); membership items do not navigate
+  - `/group-session/<memberId>/<sessionId>?groupId=<groupId>` (session card), `/group/mine` (header), `/group/new`, `/group/join` (empty state); membership items do not navigate
   - `/group/<groupId>/leaderboards/<exerciseId>` (podium card)
-  - the in-route row detail sheet (record card), whose `View full session` opens `/group-session/<memberId>/<sessionId>`
+  - the in-route row detail sheet (record card), whose `View full session` opens `/group-session/<memberId>/<sessionId>?groupId=<groupId>`
 
 13. `/group/mine`
 - File: `apps/mobile/app/group/mine.tsx`
@@ -556,7 +556,7 @@ Brief entrypoint map of the current mobile screens.
 14d. `/group/[groupId]/leaderboards/[exerciseId]` (M25-T09)
 - File: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/index.tsx`
 - Purpose:
-  - a group exercise's full board (E1.2): `Weight | 1RM` and `Certified | All` toggles that switch in place, rows in rank order in one card (rank, `You` / name, `(former)`, value, date; a check icon, or a ring icon and `uncertified`, on All only)
+  - a group exercise's full board (E1.2): `Volume | 1RM` and `Certified | All` toggles that switch in place, rows in rank order in one card (rank, `You` / name, `(former)`, value, date; a check icon, or a ring icon and `uncertified`, on All only)
 - Key states (high level):
   - `Archived · read-only` above the toggles (the name is the header title); empty Certified: "No certified sets yet" with `See all sets`; empty All: "No sets yet"
   - rows read online and paged (never cached): offline with nothing loaded shows the offline empty state, loaded rows stay with the offline marker, a failed next page shows `Retry`
@@ -564,7 +564,7 @@ Brief entrypoint map of the current mobile screens.
   - (M25-T10) a row opens the row detail sheet: value (with the 1RM), the as-logged value when converted, date and gym, `Logged as "…"`, the certification line, and `Certify` / `Remove my certification` / `Cancel certification` as my relationship allows; a write refetches the first page
 - Key exits:
   - `History` → `/group/<groupId>/leaderboards/<exerciseId>/history`; back to the group screen
-  - the sheet's `View full session` → `/group-session/<memberId>/<sessionId>`
+  - the sheet's `View full session` → `/group-session/<memberId>/<sessionId>?groupId=<groupId>`
 - Notes:
   - sets its stack title to the exercise name once loaded
 
@@ -614,7 +614,7 @@ Brief entrypoint map of the current mobile screens.
 19. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
 - Purpose:
-  - read-only friend's session view on `paper`, drawn with View Session's cards (`components/session-detail/`): a facts card with the member, the status (`In progress` beside the `set-current` ring, or `Completed · <duration>`), Start / End, Gym, Sets and Volume, then one card per exercise with its performed sets as `type · weight × reps · 1RM · VOL`; no collapse and no record band (the friend's history is not on this device)
+  - read-only friend's session view on `paper`, drawn with View Session's cards (`components/session-detail/`): a facts card with the member, the status (`In progress` beside the `set-current` ring, or `Completed · <duration>`), Start / End, Gym and Sets, then one card per exercise with permitted reps/effort; normalized cards omit raw load and derived absolute metrics, while ordinary cards retain permitted kg; no collapse and no record band (the friend's history is not on this device)
 - Key states (high level):
   - `In progress` for an active session; cache-first with the offline marker; pull-to-refresh (the offline marker, errors and empty states keep the groups screens' styling)
   - `NOT_FOUND`: "This session is no longer available", and the cached detail is evicted
@@ -742,8 +742,9 @@ enabled, add/edit group exercise shows only the group's independent
 `Bodyweight contribution (%)`. Expected-revision conflicts retain edits; linking
 never changes personal settings or contribution.
 
-Existing Weight/1RM board/history routes remain. Weight is raw kg; strict 1RM
-may be generically absent while raw shared activity remains. Rebuilding and
-archived states keep their existing recipes. Record details show public raw set,
-score, revision and certification state but no private reading or calculation
-dependency.
+Group Volume/1RM boards and podiums show explicit `kg·reps`/`kg` or
+`%BW·reps`/`%BW` units. Record detail and history retain public witness state and
+original units; normalized sessions omit raw/absolute loads and all session
+aggregate volume. Rebuilding, archived, offline and generic unavailable/ended
+states retain the group recipes. Group Settings reviews effective switches;
+c=0 switches do not promise a rebuild. [Accepted target](design-targets/group-competitions.md).

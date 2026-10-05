@@ -3,13 +3,12 @@ import { useCallback, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
 import { ChipGroup, SegmentedControl } from '@/components/ui';
-import { formatBoardDate, formatBoardMemberLabel, useGroupOnlinePages, type BoardRowViewModel, type GroupBoardScope } from '@/src/groups';
-import { formatBoardKg } from '@/src/groups/board-view-model';
-import { formatSetValue } from '@/src/groups/stream-view-model';
-import { getGroupMetricBoard, getGroupMetricHistory, getGroupMetricRevisions } from '@/src/groups/api';
-import { GROUP_METRICS, isGroupMetric, type GroupMetric } from '@/src/groups/metric-contract';
-import { buildGroupMetricRow, describeGroupMetricHistory, describeGroupRules, describeLegacyMetricHistory, GROUP_METRIC_SHORT_LABELS } from '@/src/groups/metric-view-model';
-import type { GroupMetricBoardRowWire, GroupMetricBoardWire, GroupMetricExerciseWire, GroupMetricHistoryWire, GroupMetricRevisionWire, GroupMetricRevisionsWire } from '@/src/groups/metric-wire';
+import { formatBoardDate, useGroupOnlinePages, type GroupBoardScope } from '@/src/groups';
+import { getCompetitionBoard, getCompetitionHistory, getCompetitionRevisions } from '@/src/groups/api';
+import { GROUP_COMPETITION_METRICS, isCompetitionMetric } from '@/src/groups/competition-contract';
+import { buildCompetitionRow, describeCompetitionEvent, describeCompetitionRules, HISTORICAL_METRIC_LABELS } from '@/src/groups/competition-view-model';
+import type { CompetitionBoardRowWire, CompetitionBoardWire, CompetitionExerciseWire, CompetitionHistoricalMetric,
+  CompetitionHistoryWire, CompetitionRevisionWire, CompetitionRevisionsWire } from '@/src/groups/competition-wire';
 import { GroupBoardHistoryItem } from './group-board-history-item';
 import { GroupBoardRow } from './group-board-row';
 import { GroupOfflineBanner } from './offline-banner';
@@ -18,123 +17,98 @@ import { GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInline
 import { groupScreenStyles, groupMetricTextStyles as textStyles } from './screen-styles';
 import { usePullToRefresh } from './use-pull-to-refresh';
 
-type Event = GroupMetricHistoryWire['events'][number];
-const revisionItems = (page: GroupMetricRevisionsWire) => page.revisions;
+const revisionItems = (page: CompetitionRevisionsWire) => page.revisions;
 const noCursor = () => null;
 const noMore = () => false;
-const revisionKey = (revision: GroupMetricRevisionWire) => String(revision.rules.rules_revision);
-const historyItems = (page: GroupMetricHistoryWire) => page.events;
-const historyCursor = (page: GroupMetricHistoryWire) => page.next_cursor;
-const historyMore = (page: GroupMetricHistoryWire) => page.next_cursor !== null;
-const eventKey = (event: Event) => event.event_id;
-const scoreItems = (page: GroupMetricBoardWire) => page.entries;
-const scoreCursor = (page: GroupMetricBoardWire) => page.next_cursor;
-const scoreMore = (page: GroupMetricBoardWire) => page.next_cursor !== null;
-const scoreKey = (row: GroupMetricBoardRowWire) => row.member.user_id;
+const revisionKey = (revision: CompetitionRevisionWire) => String(revision.rules_revision);
+const historyItems = (page: CompetitionHistoryWire) => page.events;
+const historyCursor = (page: { next_cursor: string | null }) => page.next_cursor;
+const more = (page: { next_cursor: string | null }) => page.next_cursor !== null;
+const scoreItems = (page: CompetitionBoardWire) => page.entries;
+const scoreKey = (row: CompetitionBoardRowWire) => row.member.user_id;
+const allowedMetrics = (revision: CompetitionRevisionWire | undefined): CompetitionHistoricalMetric[] =>
+  revision?.representation_version === 3 ? [...new Set<CompetitionHistoricalMetric>(['weight','e1rm',revision.rules.default_metric])] : [...GROUP_COMPETITION_METRICS];
 
 export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, initialScope, initialRevision }: {
-  userId: string; groupId: string; exercise: GroupMetricExerciseWire;
+  userId: string; groupId: string; exercise: CompetitionExerciseWire;
   initialMetric: string | null; initialScope: GroupBoardScope; initialRevision: number | null;
 }) {
   const router = useRouter();
   const exerciseId = exercise.group_exercise_id;
-  const fetchRevisions = useCallback(() => getGroupMetricRevisions(groupId, exerciseId), [groupId, exerciseId]);
-  const revisions = useGroupOnlinePages<GroupMetricRevisionsWire, GroupMetricRevisionWire, never>({ userId, groupId,
-    viewKey: exerciseId, fetchPage: fetchRevisions, selectItems: revisionItems, selectCursor: noCursor, selectHasMore: noMore, itemKey: revisionKey });
-  const [pickedRevision, setPickedRevision] = useState(initialRevision ?? exercise.rules_revision);
-  const revision = revisions.items.find(row => row.rules.rules_revision === pickedRevision) ?? revisions.items[0];
-  const rules = revision?.rules ?? exercise;
-  const allowed = GROUP_METRICS;
-  const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);
-  const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : rules.default_metric;
-  const [scope, setScope] = useState(initialScope);
-  const [view, setView] = useState<'events' | 'scores'>('events');
-  // A requested view (a reused route, or a param change) replaces the local picks in the render that sees it.
-  const requestKey = JSON.stringify([exerciseId, exercise.rules_revision, initialRevision, initialMetric, initialScope]);
-  const [shownRequestKey, setShownRequestKey] = useState(requestKey);
+  const fetchRevisions = useCallback(() => getCompetitionRevisions(groupId,exerciseId),[groupId,exerciseId]);
+  const revisions = useGroupOnlinePages<CompetitionRevisionsWire,CompetitionRevisionWire,never>({ userId,groupId,
+    viewKey: exerciseId,fetchPage: fetchRevisions,selectItems: revisionItems,selectCursor: noCursor,selectHasMore: noMore,itemKey: revisionKey });
+  const [pickedRevision,setPickedRevision] = useState(initialRevision ?? exercise.rules.rules_revision);
+  const revision = revisions.items.find(row => row.rules_revision === pickedRevision) ?? revisions.items[0];
+  const revisionId = revision?.rules_revision ?? exercise.rules.rules_revision;
+  const allowed = allowedMetrics(revision);
+  const [pickedMetric,setPickedMetric] = useState<CompetitionHistoricalMetric | null>(initialMetric && Object.hasOwn(HISTORICAL_METRIC_LABELS,initialMetric) ? initialMetric as CompetitionHistoricalMetric : null);
+  const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : revision?.rules.default_metric ?? exercise.rules.default_metric;
+  const [scope,setScope] = useState(initialScope);
+  const [view,setView] = useState<'events'|'scores'>('events');
+  const requestKey = JSON.stringify([exerciseId,initialRevision,initialMetric,initialScope]);
+  const [shownRequestKey,setShownRequestKey] = useState(requestKey);
   if (shownRequestKey !== requestKey) {
-    setShownRequestKey(requestKey);
-    setPickedRevision(initialRevision ?? exercise.rules_revision);
-    setPickedMetric(isGroupMetric(initialMetric) ? initialMetric : null);
-    setScope(initialScope);
+    setShownRequestKey(requestKey);setPickedRevision(initialRevision ?? exercise.rules.rules_revision);
+    setPickedMetric(initialMetric && Object.hasOwn(HISTORICAL_METRIC_LABELS,initialMetric) ? initialMetric as CompetitionHistoricalMetric : null);setScope(initialScope);
   }
-  const selectView = (nextMetric: GroupMetric, nextScope: GroupBoardScope, nextRevision: number) => {
-    setPickedMetric(nextMetric);
-    setScope(nextScope);
-    setPickedRevision(nextRevision);
-    router.setParams({ metric: nextMetric, scope: nextScope, revision: String(nextRevision) });
+  const select = (nextMetric: CompetitionHistoricalMetric,nextScope: GroupBoardScope,nextRevision: number) => {
+    setPickedMetric(nextMetric);setScope(nextScope);setPickedRevision(nextRevision);
+    router.setParams({ metric: nextMetric,scope: nextScope,revision: String(nextRevision) });
   };
-  const identity = `${exerciseId}|${rules.rules_revision}|${metric}|${scope}`;
-  const fetchHistory = useCallback((before: string | null) => getGroupMetricHistory({ groupId, groupExerciseId: exerciseId,
-    metric, certified: scope === 'certified', revision: rules.rules_revision, before }), [groupId, exerciseId, metric, scope, rules.rules_revision]);
-  const history = useGroupOnlinePages<GroupMetricHistoryWire, Event, string>({ userId, groupId,
-    viewKey: revision && view === 'events' ? identity : null, fetchPage: fetchHistory,
-    selectItems: historyItems, selectCursor: historyCursor, selectHasMore: historyMore, itemKey: eventKey });
-  const fetchScores = useCallback((after: string | null) => getGroupMetricBoard({ groupId, groupExerciseId: exerciseId,
-    metric, certified: scope === 'certified', revision: rules.rules_revision, after }), [groupId, exerciseId, metric, scope, rules.rules_revision]);
-  const scores = useGroupOnlinePages<GroupMetricBoardWire, GroupMetricBoardRowWire, string>({ userId, groupId,
-    viewKey: revision && !revision.legacy && view === 'scores' ? identity : null, fetchPage: fetchScores,
-    selectItems: scoreItems, selectCursor: scoreCursor, selectHasMore: scoreMore, itemKey: scoreKey });
-  const refreshRevisions = revisions.refresh;
-  const refreshHistory = history.refresh;
-  const refreshScores = scores.refresh;
-  const refresh = useCallback(async () => { await refreshRevisions(); await (view === 'events' ? refreshHistory() : refreshScores()); },
-    [refreshRevisions, refreshHistory, refreshScores, view]);
-  const { pulling, onRefresh } = usePullToRefresh(refresh);
+  const identity = `${exerciseId}|${revisionId}|${metric}|${scope}`;
+  const fetchHistory = useCallback((before: string | null) => getCompetitionHistory({ groupId,exerciseId,
+    metric,certified: scope === 'certified',revision: revisionId,before }),[groupId,exerciseId,metric,scope,revisionId]);
+  const history = useGroupOnlinePages({ userId,groupId,viewKey: revision && view === 'events' ? identity : null,
+    fetchPage: fetchHistory,selectItems: historyItems,selectCursor: historyCursor,selectHasMore: more,itemKey: event => event.event_id });
+  const current = revisionId === exercise.rules.rules_revision && isCompetitionMetric(metric);
+  const fetchScores = useCallback((cursor: string | null) => getCompetitionBoard({ groupId,exerciseId,
+    metric: isCompetitionMetric(metric) ? metric : 'e1rm',certified: scope === 'certified',cursor }),[groupId,exerciseId,metric,scope]);
+  const scores = useGroupOnlinePages({ userId,groupId,viewKey: current && view === 'scores' ? identity : null,
+    fetchPage: fetchScores,selectItems: scoreItems,selectCursor: historyCursor,selectHasMore: more,itemKey: scoreKey });
+  const refresh = async () => { await revisions.refresh();await (view === 'events' ? history.refresh() : scores.refresh()); };
+  const { pulling,onRefresh } = usePullToRefresh(refresh);
   const resource = view === 'events' ? history : scores;
   const offline = revisions.offline || resource.offline;
-  const error = pickInlineError(revisions.error, resource.error, resource.loadMoreError);
+  const error = pickInlineError(revisions.error,resource.error,resource.loadMoreError);
   if (revisions.lostAccess || resource.lostAccess) return <GroupLostAccessState testID="group-board-history-lost-access" />;
   if (revisions.exerciseMissing || resource.exerciseMissing) return <GroupStateView title="This exercise isn't in this group" testID="group-board-history-exercise-missing" />;
   if (!revision) return <GroupMissingDataState error={error} offline={offline} onRetry={onRefresh} testIDPrefix="group-board-history" />;
-  const legacyRows: BoardRowViewModel[] = (revision.legacy_entries ?? []).filter(row => row.metric === metric && row.certified === (scope === 'certified'))
-    .sort((a, b) => b.value_kg - a.value_kg || a.achieved_at_ms - b.achieved_at_ms || a.member_user_id.localeCompare(b.member_user_id))
-    .map((row, index) => ({ key: row.member_user_id, rank: index + 1, rankLabel: String(index + 1),
-      memberLabel: formatBoardMemberLabel(row.member, false, userId), isMe: row.member_user_id === userId, former: false,
-      valueLabel: formatBoardKg(row.metric, row.value_kg), detailLabel: formatSetValue(row.weight_kg, row.reps), dateLabel: formatBoardDate(row.achieved_at_ms),
-      certification: null, accessibilityLabel: `${index + 1}, ${formatBoardMemberLabel(row.member, false, userId)}, ${formatBoardKg(row.metric, row.value_kg)}, original rules ${rules.rules_revision}` }));
   const header = <View style={groupScreenStyles.header}>
     <Text allowFontScaling={false} style={textStyles.heading}>{exercise.name} · History</Text>
-    <ChipGroup mode="single" accessibilityLabel="Rules revision" value={rules.rules_revision}
-      options={revisions.items.map(item => ({ value: item.rules.rules_revision,
-        label: `Rules ${item.rules.rules_revision}${item.legacy ? ' · original kg-only' : ''}${item.retired_at_ms !== null ? ' · retired' : ''}` }))}
-      onChange={next => {
-        const nextRules = revisions.items.find(item => item.rules.rules_revision === next)?.rules;
-        if (nextRules) selectView(GROUP_METRICS.includes(metric)
-          ? metric : nextRules.default_metric, scope, next);
-      }} testIDPrefix="group-history-revision" />
-    <Text allowFontScaling={false} style={textStyles.muted}>{describeGroupRules({ ...exercise, ...rules })}</Text>
-    <Text allowFontScaling={false} style={textStyles.muted}>{revision.legacy ? 'Original kg-only records retain their original certification coverage.'
-      : 'Rules changes recalculate the comparison. They are listed separately from new performances.'}</Text>
-    <SegmentedControl accessibilityLabel="Metric" value={metric} onChange={next => selectView(next, scope, rules.rules_revision)}
-      options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))} testIDPrefix="group-history-metric" />
-    <SegmentedControl accessibilityLabel="Sets" value={scope} onChange={next => selectView(metric, next, rules.rules_revision)}
-      options={[{ value: 'certified', label: 'Certified' }, { value: 'all', label: 'All' }]} testIDPrefix="group-history-scope" />
-    <SegmentedControl accessibilityLabel="History or revision scores" value={view} onChange={setView}
-      options={[{ value: 'events', label: 'History' }, { value: 'scores', label: 'Revision scores' }]} testIDPrefix="group-history-view" />
+    <ChipGroup mode="single" accessibilityLabel="Rules revision" value={revisionId}
+      options={revisions.items.map(item => ({ value: item.rules_revision,label: `Rules ${item.rules_revision}${item.retired_at_ms !== null ? ' · retired' : ''}` }))}
+      onChange={next => { const r=revisions.items.find(item => item.rules_revision === next);
+        if (r) select(allowedMetrics(r).includes(metric) ? metric : r.rules.default_metric,scope,next); }} testIDPrefix="group-history-revision" />
+    <Text allowFontScaling={false} style={textStyles.muted}>{describeCompetitionRules({ rules: { ...revision.rules,rules_revision: revisionId } })}</Text>
+    <Text allowFontScaling={false} style={textStyles.muted}>History keeps each value’s original unit. Recalculation preserves unchanged witnessed sets.</Text>
+    <SegmentedControl accessibilityLabel="Metric" value={metric} onChange={next => select(next,scope,revisionId)}
+      options={allowed.map(value => ({ value,label: HISTORICAL_METRIC_LABELS[value] }))} testIDPrefix="group-history-metric" />
+    <SegmentedControl accessibilityLabel="Sets" value={scope} onChange={next => select(metric,next,revisionId)}
+      options={[{ value: 'certified',label: 'Certified' },{ value: 'all',label: 'All' }]} testIDPrefix="group-history-scope" />
+    <SegmentedControl accessibilityLabel="History or scores" value={view} onChange={setView}
+      options={[{ value: 'events',label: 'History' },{ value: 'scores',label: 'Scores' }]} testIDPrefix="group-history-view" />
     {offline ? <GroupOfflineBanner lastUpdatedAtMs={resource.loadedAtMs ?? revisions.loadedAtMs} /> : null}
     {error ? <GroupStateView title="Couldn't refresh this revision" body={error.message} actionLabel="Refresh" onAction={onRefresh} testID="group-board-history-error" /> : null}
   </View>;
   const footer = <GroupPagesFooter loadingMore={resource.loadingMore} loadMoreError={resource.loadMoreError}
     onRetry={() => void resource.loadMore()} noun="history" testIDPrefix="group-board-history" />;
   if (view === 'scores') {
-    const rows = revision.legacy ? legacyRows : scores.items.map(row => buildGroupMetricRow(row, scope, userId));
+    const rows = current ? scores.items.map(row => buildCompetitionRow(row,scope,userId)) : [];
     return <FlatList data={rows} keyExtractor={row => row.key} ListHeaderComponent={header} ListFooterComponent={footer}
-      ListEmptyComponent={revision.legacy || scores.firstPage
-        ? <GroupStateView title={scores.firstPage?.state === 'rebuilding' ? 'Recalculating under the new rules' : 'No scores in this revision'} testID="group-history-scores-empty" />
+      ListEmptyComponent={!current || scores.firstPage ? <GroupStateView title={scores.firstPage?.state === 'rebuilding'
+        ? 'Recalculating under the new rules' : 'Score unavailable'} testID="group-history-scores-empty" />
         : <GroupMissingDataState error={error} offline={offline} onRetry={onRefresh} testIDPrefix="group-history-scores" />}
-      renderItem={({ item, index }) => <GroupBoardRow row={item} index={index} count={rows.length} />}
-      onEndReached={() => { if (!revision.legacy) void scores.loadMore(); }}
-      style={groupScreenStyles.screen} contentContainerStyle={groupScreenStyles.cardListContent}
-      ListHeaderComponentStyle={groupScreenStyles.cardListHeader} refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />}
-      testID="group-history-scores" />;
+      renderItem={({ item,index }) => <GroupBoardRow row={item} index={index} count={rows.length} />}
+      onEndReached={() => { if (current) void scores.loadMore(); }} style={groupScreenStyles.screen}
+      contentContainerStyle={groupScreenStyles.cardListContent} ListHeaderComponentStyle={groupScreenStyles.cardListHeader}
+      refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />} testID="group-history-scores" />;
   }
-  return <FlatList data={history.items} keyExtractor={eventKey} ListHeaderComponent={header} ListFooterComponent={footer}
+  return <FlatList data={history.items} keyExtractor={event => event.event_id} ListHeaderComponent={header} ListFooterComponent={footer}
     ListEmptyComponent={history.firstPage ? <GroupStateView title="No history for this view yet" testID="group-board-history-empty" />
       : <GroupMissingDataState error={error} offline={offline} onRetry={onRefresh} testIDPrefix="group-board-history" />}
-    renderItem={({ item, index }) => <GroupBoardHistoryItem index={index} count={history.items.length}
-      testID={`group-board-history-item-${item.sequence}`} item={{ key: item.event_id, dateLabel: formatBoardDate(item.sort_at_ms),
-        sentence: 'legacy' in item ? describeLegacyMetricHistory(item, userId) : describeGroupMetricHistory(item, userId) }} />}
+    renderItem={({ item,index }) => <GroupBoardHistoryItem index={index} count={history.items.length}
+      testID={`group-board-history-item-${item.sequence}`} item={{ key: item.event_id,dateLabel: formatBoardDate(item.sort_at_ms),sentence: describeCompetitionEvent(item,userId) }} />}
     onEndReached={() => void history.loadMore()} style={groupScreenStyles.screen} contentContainerStyle={groupScreenStyles.cardListContent}
     ListHeaderComponentStyle={groupScreenStyles.cardListHeader} refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />}
     testID="group-board-history-list" />;

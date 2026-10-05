@@ -1,194 +1,49 @@
-import { GroupMetricStreamRecordSheet, type MetricStreamRecord } from './group-metric-stream-record-sheet';
-import { isMetricStreamEvent } from '@/src/groups/metric-wire';
-import { GroupMetricStreamCard } from './group-metric-stream-card';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { FlatList, RefreshControl, type StyleProp, type ViewStyle } from 'react-native';
-
 import { StatePanel } from '@/components/ui';
-import {
-  buildStreamItemViewModel,
-  buildStreamViewModel,
-  recordSetFromStreamRecord,
-  recordSetKey,
-  useRecordSetCertification,
-  writtenCertificationSettled,
-  type GroupRole,
-  type GroupStreamState,
-  type RecordSetDetail,
-  type StreamItemViewModel,
-  type StreamMembershipViewModel,
-  type StreamSessionCardViewModel,
-} from '@/src/groups';
-
-import { RecordSetSheet } from './record-set-sheet';
+import type { GroupRole, GroupStreamState, StreamMembershipViewModel } from '@/src/groups';
+import { buildCompetitionStreamItem, type CompetitionSessionCard, type CompetitionStreamModel } from '@/src/groups/competition-stream-view-model';
+import { GroupMetricStreamRecordSheet } from './group-metric-stream-record-sheet';
+import { GroupMetricStreamCard } from './group-metric-stream-card';
 import { groupScreenStyles } from './screen-styles';
 import { GroupStreamMembershipItem } from './stream-membership-item';
-import { GroupStreamRecordCard } from './stream-record-card';
-import { GroupStreamSentenceItem } from './stream-sentence-item';
 import { GroupStreamSessionCard } from './stream-session-card';
 
-type GroupStreamListProps = {
-  stream: GroupStreamState;
-  userId: string;
-  /** My role in a record's group (Cancel certification); null when unknown. */
-  roleForGroup: (groupId: string) => GroupRole | null;
-  /**
-   * Re-read after a certification write, or after one that found the data (or
-   * my access) had moved on. It refreshes the stream at least.
-   */
-  onCertificationChanged: () => void;
-  /** All: name each item's groups. A single group's stream does not. */
-  showGroupNames: boolean;
-  onPressSession: (card: StreamSessionCardViewModel) => void;
+type Props = {
+  stream: GroupStreamState; userId: string; roleForGroup: (groupId: string) => GroupRole | null;
+  onCertificationChanged: () => void; showGroupNames: boolean;
+  onPressSession: (card: CompetitionSessionCard) => void;
   onPressMembership?: (item: StreamMembershipViewModel) => void;
-  pulling: boolean;
-  onRefresh: () => void;
-  header: ReactElement;
-  emptyState: ReactElement;
-  contentContainerStyle?: StyleProp<ViewStyle>;
-  testID: string;
+  pulling: boolean; onRefresh: () => void; header: ReactElement; emptyState: ReactElement;
+  contentContainerStyle?: StyleProp<ViewStyle>; testID: string;
 };
 
-/**
- * Newest-first stream with pull-to-refresh and online infinite scroll (older
- * pages). Record cards open the shared row detail sheet and certify inline; the
- * list owns the one certification write state both use (M25-T10).
- */
-export function GroupStreamList({
-  stream,
-  userId,
-  roleForGroup,
-  onCertificationChanged,
-  showGroupNames,
-  onPressSession,
-  onPressMembership,
-  pulling,
-  onRefresh,
-  header,
-  emptyState,
-  contentContainerStyle,
-  testID,
-}: GroupStreamListProps) {
-  const [metricSnapshot, setMetricSnapshot] = useState<MetricStreamRecord | null>(null);
-  const liveMetric = metricSnapshot ? stream.items.find((item): item is MetricStreamRecord =>
-    isMetricStreamEvent(item) && item.kind === 'record' && item.key === metricSnapshot.key) ?? metricSnapshot : null;
-  const refreshMetric = async () => { await stream.refresh(); onCertificationChanged(); };
-  const certification = useRecordSetCertification({
-    myUserId: userId,
-    onChanged: onCertificationChanged,
-    onLostAccess: onCertificationChanged,
-  });
-  // The open sheet follows the live stream item, so a refresh after a write shows the server's state.
-  const [sheetSnapshot, setSheetSnapshot] = useState<{ itemKey: string; detail: RecordSetDetail } | null>(null);
-  const sheetDetail = useMemo(() => {
-    if (!sheetSnapshot) return null;
-    const live = stream.items.find((item) => !isMetricStreamEvent(item) && item.kind === 'record' && item.key === sheetSnapshot.itemKey);
-    return live && !isMetricStreamEvent(live) && live.kind === 'record' ? recordSetFromStreamRecord(live) : sheetSnapshot.detail;
-  }, [sheetSnapshot, stream.items]);
-
-  // Show the write's result until the stream agrees with it. A read already in
-  // flight when the write committed can land with the old state, so a mere
-  // change of items is not enough (see `writtenCertificationSettled`).
-  const { clearWritten, written, reset } = certification;
-  useEffect(() => {
-    if (!written) return;
-    const live = stream.items.find(
-      (item) => !isMetricStreamEvent(item) && item.kind === 'record' && recordSetKey(recordSetFromStreamRecord(item)) === written.setKey,
-    );
-    const liveCertification = live && !isMetricStreamEvent(live) && live.kind === 'record' ? (live.certified ? live.certification : null) : undefined;
-    if (writtenCertificationSettled(written, liveCertification)) clearWritten();
-  }, [stream.items, written, clearWritten]);
-
-  const viewModels = useMemo(() => {
-    const models = buildStreamViewModel(stream.items, userId);
-    if (!written) return models;
-    return models.map((model): StreamItemViewModel => {
-      if (model.kind !== 'record' || model.record.voided !== null) return model;
-      if (recordSetKey(recordSetFromStreamRecord(model.record)) !== written.setKey) return model;
-      return buildStreamItemViewModel(
-        { ...model.record, certified: written.certification !== null, certification: written.certification },
-        userId,
-      );
-    });
-  }, [stream.items, userId, written]);
-  const { loadMore, loadMoreError, loadingMore } = stream;
-
-  const openSheet = useCallback(
-    (itemKey: string, detail: RecordSetDetail) => {
-      reset();
-      setSheetSnapshot({ itemKey, detail });
-    },
-    [reset],
-  );
-
-  let footer: ReactElement | undefined = undefined;
-  if (loadingMore) {
-    footer = <StatePanel fill={false} kind="loading" testID={`${testID}-loading-more`} />;
-  } else if (loadMoreError) {
-    footer = (
-      <StatePanel
-        action={{ label: 'Retry', onPress: () => void loadMore(), testID: `${testID}-load-more-retry` }}
-        body={`Couldn't load older items. ${loadMoreError.message}`}
-        fill={false}
-        kind="error"
-      />
-    );
-  }
-
-  const renderItem = ({ item }: { item: StreamItemViewModel }) => {
-    switch (item.kind) {
-      case 'metric_event':
-        return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames}
-          onPress={item.event.kind === 'record' ? () => { if (item.event.kind === 'record') setMetricSnapshot(item.event); } : undefined}
-          pressHint={item.event.kind === 'record' ? 'Opens the recorded performance and certification' : undefined} />;
-      case 'session':
-        return <GroupStreamSessionCard card={item} onPress={onPressSession} showGroupNames={showGroupNames} />;
-      case 'membership':
-        return <GroupStreamMembershipItem item={item} onPress={onPressMembership} showGroupName={showGroupNames} />;
-      case 'record': {
-        const detail = recordSetFromStreamRecord(item.record);
-        const setKey = recordSetKey(detail);
-        return (
-          <GroupStreamRecordCard
-            card={item}
-            certifying={certification.pendingSetKey === setKey}
-            notice={sheetDetail === null && certification.notice?.setKey === setKey ? certification.notice : null}
-            onCertify={() => void certification.certify(detail)}
-            onPress={() => openSheet(item.key, detail)}
-            showGroupName={showGroupNames}
-          />
-        );
-      }
-      default:
-        return <GroupStreamSentenceItem item={item} showGroupName={showGroupNames} />;
-    }
+export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChanged,showGroupNames,
+  onPressSession,onPressMembership,pulling,onRefresh,header,emptyState,contentContainerStyle,testID }: Props) {
+  const [selectedKey,setSelectedKey] = useState<string | null>(null);
+  // No snapshot fallback: access, mode or account changes immediately remove an open detail.
+  const live = stream.items.find(item => item.key === selectedKey);
+  const models = useMemo(() => stream.items.map(buildCompetitionStreamItem),[stream.items]);
+  const refresh = async () => { await stream.refresh(); onCertificationChanged(); };
+  const renderItem = ({ item }: { item: CompetitionStreamModel }) => {
+    if (item.kind === 'session') return <GroupStreamSessionCard card={item} onPress={onPressSession} showGroupNames={showGroupNames} />;
+    if (item.kind === 'membership') return <GroupStreamMembershipItem item={item} onPress={onPressMembership} showGroupName={showGroupNames} />;
+    return <GroupMetricStreamCard item={item.event} userId={userId} showGroupName={showGroupNames}
+      onPress={item.event.kind === 'record' ? () => setSelectedKey(item.key) : undefined}
+      pressHint={item.event.kind === 'record' ? 'View record and certification' : undefined} />;
   };
-
-  return (
-    <>
-      <FlatList
-        ListEmptyComponent={emptyState}
-        ListFooterComponent={footer}
-        ListHeaderComponent={header}
-        contentContainerStyle={[groupScreenStyles.content, contentContainerStyle]}
-        data={viewModels}
-        keyExtractor={(item) => `${item.kind}:${item.key}`}
-        onEndReached={() => void loadMore()}
-        onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
-        renderItem={renderItem}
-        style={groupScreenStyles.screen}
-        testID={testID}
-      />
-      {liveMetric ? <GroupMetricStreamRecordSheet record={liveMetric} userId={userId}
-        myRole={roleForGroup(liveMetric.group.group_id)} onClose={() => setMetricSnapshot(null)} onChanged={refreshMetric} /> : null}
-      <RecordSetSheet
-        certification={certification}
-        detail={sheetDetail}
-        myRole={sheetDetail ? roleForGroup(sheetDetail.groupId) : null}
-        onClose={() => setSheetSnapshot(null)}
-        userId={userId}
-      />
-    </>
-  );
+  const footer = stream.loadingMore ? <StatePanel fill={false} kind="loading" testID={`${testID}-loading-more`} />
+    : stream.loadMoreError ? <StatePanel fill={false} kind="error" body="Could not load older items."
+      action={{ label: 'Retry',onPress: () => void stream.loadMore(),testID: `${testID}-load-more-retry` }} /> : undefined;
+  return <>
+    <FlatList ListEmptyComponent={emptyState} ListFooterComponent={footer} ListHeaderComponent={header}
+      contentContainerStyle={[groupScreenStyles.content,contentContainerStyle]} data={models}
+      keyExtractor={item => `${item.kind}:${item.key}`} renderItem={renderItem}
+      onEndReached={() => void stream.loadMore()} onEndReachedThreshold={0.5}
+      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
+      style={groupScreenStyles.screen} testID={testID} />
+    {live?.kind === 'competition' && live.event.kind === 'record' ?
+      <GroupMetricStreamRecordSheet key={`${userId}:${live.key}`} record={live.event} userId={userId}
+        myRole={roleForGroup(live.event.group.group_id)} onClose={() => setSelectedKey(null)} onChanged={refresh} /> : null}
+  </>;
 }

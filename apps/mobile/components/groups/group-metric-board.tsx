@@ -4,10 +4,10 @@ import { Text, FlatList, RefreshControl, View } from 'react-native';
 
 import { ActionButton, SegmentedControl, uiSpace } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
-import { getGroupMetricBoard } from '@/src/groups/api';
-import { GROUP_METRICS, isGroupMetric, type GroupMetric } from '@/src/groups/metric-contract';
-import { buildGroupMetricRow, describeGroupRules, GROUP_METRIC_SHORT_LABELS, GROUP_METRIC_VIEW_LABELS } from '@/src/groups/metric-view-model';
-import type { GroupMetricBoardRowWire, GroupMetricBoardWire, GroupMetricExerciseWire } from '@/src/groups/metric-wire';
+import { getCompetitionBoard } from '@/src/groups/api';
+import { GROUP_COMPETITION_METRICS as GROUP_METRICS,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
+import { buildCompetitionRow as buildGroupMetricRow,describeCompetitionRules as describeGroupRules,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS,competitionViewLabel } from '@/src/groups/competition-view-model';
+import type { CompetitionBoardRowWire as GroupMetricBoardRowWire,CompetitionBoardWire as GroupMetricBoardWire,CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 import { GroupBoardRow } from './group-board-row';
 import { GroupMetricRecordSheet } from './group-metric-record-sheet';
 import { GroupOfflineBanner } from './offline-banner';
@@ -28,15 +28,15 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const router = useRouter();
   const allowed = GROUP_METRICS;
   const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);
-  const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : initialExercise.default_metric;
+  const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : initialExercise.rules.default_metric;
   const [scope, setScope] = useState(initialScope);
   const exerciseId = initialExercise.group_exercise_id;
-  const fetchPage = useCallback((after: string | null) => getGroupMetricBoard({ groupId, groupExerciseId: exerciseId,
-    metric, certified: scope === 'certified', after }), [exerciseId, groupId, metric, scope]);
+  const fetchPage = useCallback((after: string | null) => getCompetitionBoard({ groupId, exerciseId,
+    metric, certified: scope === 'certified', cursor: after }), [exerciseId, groupId, metric, scope]);
   const board = useGroupOnlinePages<GroupMetricBoardWire, GroupMetricBoardRowWire, string>({ userId, groupId,
-    viewKey: `${exerciseId}|${metric}|${scope}|${initialExercise.rules_revision}`, fetchPage, selectItems, selectCursor, selectHasMore, itemKey });
+    viewKey: `${exerciseId}|${metric}|${scope}|${initialExercise.rules.rules_revision}`, fetchPage, selectItems, selectCursor, selectHasMore, itemKey });
   const { pulling, onRefresh } = usePullToRefresh(board.refresh);
-  const exercise = board.firstPage?.exercise ?? initialExercise;
+  const exercise = board.firstPage ? { ...initialExercise,rules: board.firstPage.rules,rebuilding: board.firstPage.state === 'rebuilding' } : initialExercise;
   const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({ userId, cacheKey: groupCacheKeys.group(groupId), fetcher: groupFetcher, evictGroupIdOnNotFound: groupId });
   const [selected, setSelected] = useState<GroupMetricBoardRowWire | null>(null);
@@ -69,12 +69,12 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const header = <View style={groupScreenStyles.header}>
     <Stack.Screen options={{ title: exercise.name }} />
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: uiSpace.md }}>
-      <Text allowFontScaling={false} style={[textStyles.heading, { flex: 1 }]}>{GROUP_METRIC_VIEW_LABELS[metric]}</Text>
+      <Text allowFontScaling={false} style={[textStyles.heading, { flex: 1 }]}>{competitionViewLabel(metric,exercise.rules)}</Text>
       <ActionButton label="History" variant="text" testID="group-board-history-button" onPress={() => router.push(
-        `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}&revision=${exercise.rules_revision}`)} />
+        `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}&revision=${exercise.rules.rules_revision}`)} />
     </View>
     <Text allowFontScaling={false} style={textStyles.muted} testID="group-board-rules">{describeGroupRules(exercise)}</Text>
-    {exercise.archived_at_ms !== null ? <Text allowFontScaling={false} style={textStyles.body} testID="group-board-archived">Archived · read-only</Text> : null}
+    {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={textStyles.body} testID="group-board-archived">Archived · read-only</Text> : null}
     <SegmentedControl accessibilityLabel="Metric" options={allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
       value={metric} onChange={value => selectView(value, scope)} testIDPrefix="group-board-metric" />
     <SegmentedControl accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
@@ -88,7 +88,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const empty = !board.firstPage ? <GroupMissingDataState error={error} offline={board.offline} onRetry={onRefresh} testIDPrefix="group-board" />
     : rebuilding ? <GroupStateView title="Recalculating under the new rules" body="The whole board will appear together."
         actionLabel="Refresh board" onAction={onRefresh} testID="group-board-rebuilding" />
-    : <GroupStateView title={scope === 'certified' ? 'No certified sets yet' : 'No eligible sets yet'}
+    : <GroupStateView title={scope === 'certified' ? 'No certified sets yet' : 'Score unavailable'}
         actionLabel={scope === 'certified' ? 'See all sets' : undefined} onAction={() => selectView(metric, 'all')}
         actionTestID="group-board-see-all-button" testID="group-board-empty" />;
   return <>
@@ -101,8 +101,8 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
       refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />}
       renderItem={({ item, index }) => <GroupBoardRow row={item} index={index} count={rows.length}
         onPress={() => setSelected(board.items.find(row => row.member.user_id === item.key) ?? null)} />} />
-    {liveSelected && !rebuilding ? <GroupMetricRecordSheet key={`${liveSelected.member.user_id}:${liveSelected.set_id}:${metric}:${exercise.rules_revision}`}
-      row={liveSelected} exercise={exercise} groupId={groupId} userId={userId} myRole={group.data?.group.my_role ?? null}
+    {liveSelected && !rebuilding ? <GroupMetricRecordSheet key={`${liveSelected.member.user_id}:${liveSelected.performance.set_id}:${metric}:${exercise.rules.rules_revision}`}
+      row={liveSelected} exercise={exercise} readOnlyReason={board.firstPage?.state === 'archived' ? 'archived' : undefined} groupId={groupId} userId={userId} myRole={group.data?.group.my_role ?? null}
       onClose={() => setSelected(null)} onChanged={async () => { await Promise.all([board.refresh(), group.refresh()]); }} /> : null}
   </>;
 }

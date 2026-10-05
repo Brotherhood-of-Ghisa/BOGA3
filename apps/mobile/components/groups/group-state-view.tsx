@@ -66,7 +66,7 @@ export function GroupInlineError({ error, onRetry, testID }: { error: GroupApiEr
     <Notice
       action={<ActionButton label="Retry" onPress={onRetry} testID={`${testID}-retry`} variant="outline" />}
       live
-      message={error.message}
+      message={publicGroupReadError(error)}
       testID={testID}
       tone="danger"
     />
@@ -136,11 +136,11 @@ export function GroupMissingDataState({ offline, error, onRetry, testIDPrefix }:
       <GroupStateView
         actionLabel="Retry"
         actionTestID={`${testIDPrefix}-error-state-retry`}
-        body={error.message}
+        body={publicGroupReadError(error)}
         kind="error"
         onAction={onRetry}
         testID={`${testIDPrefix}-error-state`}
-        title="Couldn't load this"
+        title={error.code === 'UPDATE_REQUIRED' ? 'Group comparisons unavailable' : "Couldn't load this"}
       />
     );
   }
@@ -158,3 +158,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
 });
+
+const publicGroupReadError = (error: GroupApiError): string => error.code === 'UPDATE_REQUIRED' || error.invalidPayload
+  ? 'Group comparisons are unavailable. Please try again later.' : error.message;

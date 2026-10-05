@@ -16,12 +16,13 @@
 // Group code never runs inside the sync cycle (C3.10.5).
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 
 import { GroupApiError, isGroupExerciseNotFound, toGroupApiError } from './api';
-import { evictGroup } from './cache';
+import { getCompetitionCacheGeneration, subscribeCompetitionCache,observeGroupCompetitionPolicy } from './cache';
+import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useNetworkOnline } from './use-network-online';
 
 export type GroupOnlinePagesOptions<TPage, TItem, TCursor> = {
@@ -63,6 +64,7 @@ export type GroupOnlinePagesState<TPage, TItem> = {
 type InternalState<TPage, TItem, TCursor> = {
   // The view the state belongs to: another identity reads as `initialState`.
   identity: string | null;
+  cacheGeneration: number;
   firstPage: TPage | null;
   items: TItem[];
   cursor: TCursor | null;
@@ -79,6 +81,7 @@ type InternalState<TPage, TItem, TCursor> = {
 
 const initialState = <TPage, TItem, TCursor>(identity: string | null): InternalState<TPage, TItem, TCursor> => ({
   identity,
+  cacheGeneration: 0,
   firstPage: null,
   items: [],
   cursor: null,
@@ -118,28 +121,16 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   itemKey,
 }: GroupOnlinePagesOptions<TPage, TItem, TCursor>): GroupOnlinePagesState<TPage, TItem> {
   const online = useNetworkOnline();
+  const cacheGeneration = useSyncExternalStore(subscribeCompetitionCache,
+    () => getCompetitionCacheGeneration(userId),() => getCompetitionCacheGeneration(userId));
   const identity = userId && viewKey ? `${userId}\u0000${groupId}\u0000${viewKey}` : null;
-  const [stored, setStored] = useState<InternalState<TPage, TItem, TCursor>>(() => initialState(identity));
+  const [stored, setStored] = useState<InternalState<TPage, TItem, TCursor>>(() => ({ ...initialState<TPage,TItem,TCursor>(identity),cacheGeneration }));
   // A new view forgets everything (also on a return to an earlier view); its
   // first page loads on the identity effect.
   if (stored.identity !== identity) {
     setStored(initialState(identity));
   }
-  const state = stored.identity === identity ? stored : initialState<TPage, TItem, TCursor>(identity);
-  // Writes for `identity`, starting from empty if the stored state is another view's.
-  const setState = useCallback(
-    (
-      next:
-        | InternalState<TPage, TItem, TCursor>
-        | ((previous: InternalState<TPage, TItem, TCursor>) => InternalState<TPage, TItem, TCursor>),
-    ) =>
-      setStored((previous) => {
-        const base = previous.identity === identity ? previous : initialState<TPage, TItem, TCursor>(identity);
-        return typeof next === 'function' ? next(base) : next;
-      }),
-    [identity],
-  );
-
+  const state = stored.identity === identity && stored.cacheGeneration === cacheGeneration ? stored : initialState<TPage, TItem, TCursor>(identity);
   // Bumped on every identity change and every first-page request: a response
   // from an older generation is dropped.
   const generationRef = useRef(0);
@@ -150,6 +141,24 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   const stateRef = useRef(state);
   const callbacksRef = useRef({ fetchPage, selectItems, selectCursor, selectHasMore, itemKey });
 
+
+  // Writes for `identity`, starting from empty if the stored state is another view's.
+  const setState = useCallback(
+    (
+      next:
+        | InternalState<TPage, TItem, TCursor>
+        | ((previous: InternalState<TPage, TItem, TCursor>) => InternalState<TPage, TItem, TCursor>),
+    ) => {
+      const epoch = getCompetitionCacheGeneration(userId);
+      return setStored((previous) => {
+        if (getCompetitionCacheGeneration(userId) !== epoch || identityRef.current !== identity) return previous;
+        const base = previous.identity === identity && previous.cacheGeneration === epoch ? previous : initialState<TPage, TItem, TCursor>(identity);
+        return { ...(typeof next === 'function' ? next(base) : next),cacheGeneration: epoch };
+      });
+    },
+    [identity,userId],
+  );
+
   // Before any effect or handler reads them.
   useLayoutEffect(() => {
     onlineRef.current = online;
@@ -158,22 +167,25 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
   });
 
   const handleNotFound = useCallback(
-    async (error: GroupApiError, isCurrent: () => boolean) => {
+    async (error: GroupApiError) => {
       if (isGroupExerciseNotFound(error)) {
         setState({ ...initialState<TPage, TItem, TCursor>(identity), exerciseMissing: true });
         return;
       }
-      let evictionError: GroupApiError | null = null;
-      try {
-        evictGroup(await bootstrapLocalDataLayer(), groupId);
-      } catch (caught) {
-        evictionError = toGroupApiError(caught);
-      }
-      if (!isCurrent()) return;
-      setState({ ...initialState<TPage, TItem, TCursor>(identity), lostAccess: true, error: evictionError ?? error });
+      if (!userId) return;
+      const cleanup=retireCompetitionAccount(userId,groupId);
+      if (identityRef.current === identity) setState({ ...initialState<TPage,TItem,TCursor>(identity),lostAccess: true,error });
+      await cleanup;
     },
-    [groupId, identity, setState],
+    [groupId, identity, setState,userId],
   );
+
+  const handleUnsafe = useCallback(async (error: GroupApiError) => {
+    if (!userId) return;
+    const cleanup=retireCompetitionAccount(userId);
+    if (identityRef.current === identity) setState({ ...initialState<TPage,TItem,TCursor>(identity),error });
+    await cleanup;
+  },[userId,identity,setState]);
 
   const refresh = useCallback((): Promise<void> => {
     if (identity === null) {
@@ -188,7 +200,9 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
 
     generationRef.current += 1;
     const generation = generationRef.current;
-    const isCurrent = () => generationRef.current === generation && identityRef.current === identity;
+    const epoch = getCompetitionCacheGeneration(userId);
+    const isCurrent = () => generationRef.current === generation && identityRef.current === identity &&
+      getCompetitionCacheGeneration(userId) === epoch;
     loadingMoreRef.current = false;
 
     const run = (async () => {
@@ -201,14 +215,23 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
       } catch (caught) {
         const error = toGroupApiError(caught);
         if (!isCurrent()) return;
-        if (error.code === 'NOT_FOUND') {
-          await handleNotFound(error, isCurrent);
+        if (error.invalidPayload || error.code === 'UPDATE_REQUIRED') { await handleUnsafe(error); return; }
+      if (error.code === 'NOT_FOUND') {
+          await handleNotFound(error);
           return;
         }
         setState((previous) => ({ ...previous, refreshing: false, networkFailed: error.code === 'NETWORK', error }));
         return;
       }
       if (!isCurrent()) return;
+      try {
+        const database=await bootstrapLocalDataLayer();
+        if (!isCurrent() || !userId) return;
+        observeGroupCompetitionPolicy(database,groupId,userId,page);
+      } catch (caught) {
+        if (isCurrent()) setState({ ...initialState<TPage,TItem,TCursor>(identity),error: toGroupApiError(caught) });
+        return;
+      }
       setState({
         ...initialState<TPage, TItem, TCursor>(identity),
         firstPage: page,
@@ -225,7 +248,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
 
     inFlightRef.current = run;
     return run;
-  }, [identity, handleNotFound, setState]);
+  }, [identity, groupId,handleNotFound, handleUnsafe,setState,userId]);
 
   // A new view: drop the old view's requests, then load its first page (the
   // state already reads empty for it).
@@ -234,13 +257,9 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
     generationRef.current += 1;
     inFlightRef.current = null;
     loadingMoreRef.current = false;
-  }, [identity]);
+  }, [identity,cacheGeneration]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-    }, [refresh]),
-  );
+  usePageFocus(cacheGeneration,state,refresh);
 
   const loadMore = useCallback(async (): Promise<void> => {
     const current = stateRef.current;
@@ -255,7 +274,9 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
       return;
     }
     const generation = generationRef.current;
-    const isCurrent = () => generationRef.current === generation && identityRef.current === identity;
+    const epoch = getCompetitionCacheGeneration(userId);
+    const isCurrent = () => generationRef.current === generation && identityRef.current === identity &&
+      getCompetitionCacheGeneration(userId) === epoch;
     const cursor = current.cursor;
     loadingMoreRef.current = true;
     setState((previous) => ({ ...previous, loadingMore: true, loadMoreError: null }));
@@ -263,6 +284,11 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
     try {
       const page = await callbacks.fetchPage(cursor);
       if (!isCurrent()) return;
+      const database=await bootstrapLocalDataLayer();
+      if (!isCurrent() || !userId) return;
+      const publishedEpoch=observeGroupCompetitionPolicy(database,groupId,userId,page);
+      // A newer policy cannot be appended to old revision pages.
+      if (publishedEpoch !== epoch) { void refresh(); return; }
       setState((previous) => ({
         ...previous,
         items: appendUniqueByKey(previous.items, callbacks.selectItems(page), callbacks.itemKey),
@@ -273,8 +299,9 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
     } catch (caught) {
       const error = toGroupApiError(caught);
       if (!isCurrent()) return;
+      if (error.invalidPayload || error.code === 'UPDATE_REQUIRED') { await handleUnsafe(error); return; }
       if (error.code === 'NOT_FOUND') {
-        await handleNotFound(error, isCurrent);
+        await handleNotFound(error);
         return;
       }
       setState((previous) => ({ ...previous, loadingMore: false, loadMoreError: error }));
@@ -283,7 +310,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
         loadingMoreRef.current = false;
       }
     }
-  }, [identity, handleNotFound, setState]);
+  }, [identity, groupId,handleNotFound, handleUnsafe,setState,userId,refresh]);
 
   return {
     firstPage: state.firstPage,
@@ -300,4 +327,17 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
     refresh,
     loadMore,
   };
+}
+
+function usePageFocus(epoch: number,state: { firstPage: unknown;error: GroupApiError | null },refresh: () => Promise<void>) {
+  const focusedEpoch=useRef(epoch);
+  const current=useRef(state);
+  useLayoutEffect(()=>{current.current=state;});
+  useFocusEffect(useCallback(()=>{
+    const changed=focusedEpoch.current!==epoch;
+    focusedEpoch.current=epoch;
+    if(current.current.error?.invalidPayload || current.current.error?.code==='UPDATE_REQUIRED') return;
+    if(changed && current.current.firstPage!==null) return;
+    void refresh();
+  },[refresh,epoch]));
 }

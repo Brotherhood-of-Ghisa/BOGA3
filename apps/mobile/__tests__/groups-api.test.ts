@@ -70,7 +70,10 @@ describe('groups api client', () => {
     mockRpc.mockReset();
     mockSchema.mockReset();
     mockGetRequiredSupabaseMobileClient.mockReset();
-    mockSchema.mockReturnValue({ rpc: mockRpc });
+    mockSchema.mockReturnValue({ rpc: (...args: unknown[]) => {
+      const request = mockRpc(...args);
+      return Object.assign(request,{ setHeader: jest.fn(() => request) });
+    } });
     mockGetRequiredSupabaseMobileClient.mockReturnValue({ schema: mockSchema });
   });
 

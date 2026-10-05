@@ -4,16 +4,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
-import { computeGroupSessionMetrics } from '@/src/groups/session-metrics';
+import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
+import type { CompetitionSessionWire } from '@/src/groups/competition-wire';
 import {
   formatGroupDateTime,
   formatMemberName,
   formatSessionStatusLabel,
-  selectGroupPerformedExercises,
-  type GroupSessionDetail,
 } from '@/src/groups';
-import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
 const IN_PROGRESS_LABEL = 'In progress';
 
@@ -28,30 +25,18 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
  * Performed sets only: the server returns every live set raw, and the device
  * selects the performed ones (contract §5).
  */
-export function FriendSessionContent({ session }: { session: GroupSessionDetail }) {
-  const model = useMemo(() => {
-    const metrics = computeGroupSessionMetrics(session.exercises);
-    const cards = selectGroupPerformedExercises(session.exercises).map(exercise => ({
-      id: exercise.sessionExerciseId,
-      name: exercise.name,
-      rows: exercise.sets.map(set => formatSetRow({ id: set.setId, weight: set.enteredWeight,
-        reps: set.reps, setType: set.setType, done: true, loadContext: exercise.loadContext })),
-    }));
-    const summary = sessionVolumeSummary(metrics.coverage);
-    return { cards, setCount: metrics.workingSets, volume: summary.volume,
-      note: summary.volumeNote };
-  }, [session]);
+export function FriendSessionContent({ session }: { session: CompetitionSessionWire }) {
+  const model = useMemo(() => buildCompetitionSession(session),[session]);
 
   const isActive = session.status === 'active';
 
   return (
     <>
       <SessionFactsCard
-        note={model.note}
         facts={[
           { label: 'Gym', value: session.gym_name?.trim() || 'No gym', kind: 'text', testID: 'group-session-gym' },
           { label: 'Sets', value: String(model.setCount), testID: 'group-session-sets' },
-          { label: 'Volume', value: model.volume, align: 'end', testID: 'group-session-volume' },
+          { label: 'Exercises', value: String(model.exerciseCount), align: 'end', testID: 'group-session-exercises' },
         ]}
         header={
           <View style={styles.header} testID="group-session-header">
@@ -62,7 +47,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
               {/* A ring marks "current" in the design language (§5). */}
               {isActive ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
               <Text allowFontScaling={false} style={styles.statusText} testID="group-session-status">
-                {isActive ? IN_PROGRESS_LABEL : formatSessionStatusLabel(session)}
+                {isActive ? IN_PROGRESS_LABEL : session.status === 'draft' ? 'Draft' : formatSessionStatusLabel({ ...session,status: session.status })}
               </Text>
             </View>
           </View>
@@ -88,6 +73,7 @@ export function FriendSessionContent({ session }: { session: GroupSessionDetail 
             record={null}
             rowTestID={(row) => `group-session-set-row-${row.id}`}
             rows={card.rows}
+            hideDerivedMetrics={card.hideDerivedMetrics}
             testID={`group-session-exercise-${card.id}`}
           />
         ))

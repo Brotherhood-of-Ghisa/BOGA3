@@ -1,3 +1,4 @@
+import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire, isCompetitionContractWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
   isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
@@ -61,7 +62,7 @@ import {
 export class GroupApiError extends Error {
   readonly code: GroupErrorCode;
 
-  constructor(code: GroupErrorCode, message: string) {
+  constructor(code: GroupErrorCode, message: string, readonly invalidPayload = false) {
     super(message);
     this.name = 'GroupApiError';
     this.code = code;
@@ -172,6 +173,11 @@ export type GroupRpcName =
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
+// Shared membership/settings RPCs remain public-safe. Legacy score readers keep
+// their original protocol and are rejected by the server after activation.
+const PUBLIC_GROUP_RPCS = new Set<GroupRpcName>(['group_list_mine','group_get','group_invite_preview',
+  'group_create','group_update','group_invite_get','group_invite_regenerate','group_join','group_leave',
+  'group_remove_member','group_set_role','group_transfer_ownership']);
 const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>, capability?: 4): Promise<unknown> => {
   let client: ReturnType<typeof getRequiredSupabaseMobileClient>;
   try {
@@ -183,7 +189,7 @@ const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>, c
   let response: RpcResponse;
   try {
     const request = client.schema('app_public').rpc(name, args);
-    response = (await (capability === 4 ? request.setHeader('x-boga-group-contract','4') : request)) as RpcResponse;
+    response = (await (capability === 4 || PUBLIC_GROUP_RPCS.has(name) ? request.setHeader('x-boga-group-contract','4') : request)) as RpcResponse;
   } catch (error) {
     throw new GroupApiError('NETWORK', describeUnknownError(error, 'Network request failed.'));
   }
@@ -204,7 +210,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  */
 const expectShape = <T>(rpc: GroupRpcName, data: unknown, isValid: (record: Record<string, unknown>) => boolean): T => {
   if (!isRecord(data) || !isValid(data)) {
-    throw new GroupApiError('INTERNAL', `${rpc} returned an unexpected payload.`);
+    throw new GroupApiError('INTERNAL', `${rpc} returned an unexpected payload.`,true);
   }
   return data as T;
 };
@@ -216,11 +222,11 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 export const GROUP_STREAM_DEFAULT_LIMIT = 20;
 
 export const listMyGroups = async (): Promise<GroupListMineResult> =>
-  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => Array.isArray(r.groups));
+  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v5:mine',r));
 
 export const getGroup = async (groupId: string): Promise<GroupGetResult> =>
   expectShape('group_get', await callGroupRpc('group_get', { p_group_id: groupId }), (r) =>
-    isRecord(r.group) && Array.isArray(r.members),
+    isCompetitionCachePayload(`group:v5:${groupId}`,r),
   );
 
 export type GroupStreamRequest = {
@@ -691,7 +697,7 @@ export const getGroupMetricStream = async ({ groupId, before = null, limit = GRO
 // Headers belong to the request, never mutable client-wide auth/config.
 const competitionRpc = async <T>(name: GroupRpcName, args: Record<string, unknown>, guard: (v: unknown) => v is T, matches?: (v: T) => boolean): Promise<T> => {
   const data = await callGroupRpc(name,args,4);
-  if (!guard(data) || (matches !== undefined && !matches(data))) throw new GroupApiError('INTERNAL', `${name} returned an unexpected competition payload.`);
+  if (!guard(data) || (matches !== undefined && !matches(data))) throw new GroupApiError('INTERNAL', `${name} returned an unexpected competition payload.`,true);
   return data;
 };
 export const getCompetitionContract = (groupId: string): Promise<CompetitionContractWire> =>

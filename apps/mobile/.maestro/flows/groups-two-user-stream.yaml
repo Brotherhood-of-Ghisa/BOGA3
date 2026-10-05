@@ -253,7 +253,7 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
     visible:
-      text: "Sled Push, Rules 1.*per-side Weight, Not linked"
+      text: "Sled Push, Per side, Rules 1.*per-side load, Not linked"
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: "groups-04b-1-exercises-added"
@@ -291,7 +291,7 @@ appId: com.dinoderek.mobile
     text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
 - assertVisible:
     id: "group-stream-session-card-${output.groupsCardKey}-metrics"
-    text: "3 sets · 1500 kg · 2 exercises"
+    text: "3 sets · 2 exercises"
 - waitForAnimationToEnd
 - takeScreenshot: "groups-05-training-now-card"
 

@@ -1,7 +1,7 @@
 import { baselineFrom, deriveComparisonFormStatus } from '@/src/groups/comparison-form-model';
-import type { GroupExerciseRules } from '@/src/groups/metric-contract';
+import type { CompetitionRules } from '@/src/groups/competition-contract';
 
-const rules: GroupExerciseRules = { name: 'Bench', loadInputMode: 'total_load',
+const rules: CompetitionRules = { name: 'Bench', loadInputMode: 'total_load',
   bodyweightCalculationsEnabled: false, bodyweightContribution: 0, defaultMetric: 'e1rm' };
 
 it.each([

@@ -9,6 +9,7 @@
  * not), and nothing ever written to `group_cache`.
  */
 
+import { competitionGroupDetail } from './helpers/competition-fixtures';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -314,8 +315,8 @@ describe('useGroupOnlinePages', () => {
   });
 
   it('group NOT_FOUND evicts the group and reports lost access', async () => {
-    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: {}, fetchedAtMs: 1 });
-    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.group(GROUP), userId: USER, payload: {}, fetchedAtMs: 1 });
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: true,podiums: [] }, fetchedAtMs: 1 });
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.group(GROUP), userId: USER, payload: { ...competitionGroupDetail,group: { ...competitionGroupDetail.group,group_id: GROUP } }, fetchedAtMs: 1 });
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()
       .mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
@@ -328,7 +329,7 @@ describe('useGroupOnlinePages', () => {
   });
 
   it('exercise NOT_FOUND reports exerciseMissing and evicts nothing', async () => {
-    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: {}, fetchedAtMs: 1 });
+    writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: true,podiums: [] }, fetchedAtMs: 1 });
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()
       .mockRejectedValue(new GroupApiError('NOT_FOUND', 'group exercise not found'));
@@ -337,7 +338,7 @@ describe('useGroupOnlinePages', () => {
 
     expect(result.current.exerciseMissing).toBe(true);
     expect(result.current.lostAccess).toBe(false);
-    expect(fixture.database.select().from(groupCache).all()).toHaveLength(1);
+    expect(fixture.database.select().from(groupCache).all().filter(row => !row.cacheKey.startsWith('group-policy:'))).toHaveLength(1);
   });
 
   it('never writes group_cache', async () => {

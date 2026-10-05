@@ -64,7 +64,7 @@ function signIn() {
 }
 
 function rpc(token, name, args) {
-  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '3' });
+  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '3', 'x-boga-group-contract': '4' });
 }
 
 function rpcOk(token, name, args) {
@@ -184,7 +184,7 @@ var steps = {
     // The share rule compares started_at with the server's joined_at: read it
     // back from our own "joined" stream item so the live session can never
     // start before it, whatever the host/VM clock skew.
-    var stream = rpcOk(output.groupsToken, 'group_stream', { p_group_id: joined.group_id, p_before: null, p_limit: 50 });
+    var stream = rpcOk(output.groupsToken, 'group_competition_stream', { p_group_id: joined.group_id, p_before: null, p_limit: 50 });
     var mine = (stream.items || []).filter(function (item) {
       return item.kind === 'membership' && item.event === 'joined' && item.member.user_id === output.groupsCounterpartyUserId;
     });
@@ -253,10 +253,10 @@ var steps = {
   // active custom group exercise, Sled Push (per side), with a sync_push like
   // its own app would. Its completed sets from before the link then count as a
   // link effect (contract §2.11). Waits until the evaluator has written the
-  // board, so the device's reads are deterministic: raw Weight 102.5 kg × 5,
-  // uncertified. The per-side group rule affects calculated 1RM, not Weight.
+  // board, so the device's reads are deterministic: single-set Volume 256.25 kg·reps (102.5 total kg → 51.25 per-side kg × 5), uncertified.
+  // Both ordinary scores convert from source distribution to the group target.
   'link-board': function () {
-    var list = rpcOk(output.groupsToken, 'group_exercise_list_v2', { p_group_id: output.groupsGroupId });
+    var list = rpcOk(output.groupsToken, 'group_competition_exercise_list', { p_group_id: output.groupsGroupId });
     var targets = (list.exercises || []).filter(function (exercise) {
       return exercise.name === 'Sled Push' && exercise.archived_at_ms === null;
     });
@@ -287,12 +287,12 @@ var steps = {
     var board;
     for (;;) {
       polls += 1;
-      board = rpcOk(output.groupsToken, 'group_metric_board', {
+      board = rpcOk(output.groupsToken, 'group_competition_board', {
         p_group_id: output.groupsGroupId,
         p_group_exercise_id: groupExerciseId,
-        p_metric: 'weight',
+        p_metric: 'volume',
         p_certified: false,
-        p_after: null,
+        p_cursor: null,
         p_limit: 10,
       });
       if (board.entries && board.entries.length > 0) break;
@@ -305,12 +305,12 @@ var steps = {
     if (
       board.entries.length !== 1 ||
       row.member.user_id !== output.groupsCounterpartyUserId ||
-      Number(row.value) !== 102.5 ||
+      Number(row.value) !== 256.25 || row.unit !== 'kg_reps' ||
       Number(row.performance.reps) !== 5 ||
       Number(row.performance.weight_value) !== 102.5 || row.performance.source_load_input_mode !== 'total_load' ||
-      row.certified !== false
+      row.certification !== null
     ) {
-      fail('unexpected Weight · All board: ' + JSON.stringify(board.entries));
+      fail('unexpected Volume · All board: ' + JSON.stringify(board.entries));
     }
     console.log(
       TAG + ' GROUPS_E2E_LATENCY board sync_push->board row: ' + (Date.now() - output.groupsPushedAtMs) + ' ms (' + polls + ' polls)',

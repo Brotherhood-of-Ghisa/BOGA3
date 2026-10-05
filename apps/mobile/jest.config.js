@@ -28,6 +28,7 @@ module.exports = {
     '<rootDir>/__tests__/sync/cycle-fresh-device-and-account-switch.test.ts',
     // The groups client against a live endpoint: lane groups-api-live.
     '<rootDir>/__tests__/groups-api-live.test.ts',
+    '<rootDir>/__tests__/groups-competition-api-live.test.ts',
   ],
   // Explicit per-test/hook ceiling: a hung test or hook (unresolved await,
   // infinite loop) now fails loudly here instead of stalling the run. This is
