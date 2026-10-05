@@ -1,9 +1,9 @@
 # Group competition representation and cutover
 
-> **Status:** representation, versioned worker/publication, safe readers,
-> witness migration and cache eviction are implemented. Installation remains
-> pending until service-only activation. Compatible UI and authorized hosted
-> activation/acceptance remain separate release work; this is not a hosted claim.
+> **Status:** representation, compatible UI, versioned worker/publication, safe
+> readers, witness migration and cache eviction are implemented and accepted.
+> The authorized hosted rollout is complete. A fresh installation defaults to
+> pending until service-only activation after a compatible client is available.
 
 Owns competitive metric meanings and the protocol-4 transition. Authorization,
 queues, coherent publication and current certification storage remain in

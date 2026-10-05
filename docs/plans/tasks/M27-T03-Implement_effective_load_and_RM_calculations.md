@@ -14,7 +14,7 @@ docs_touched: "docs/specs/03-technical-architecture.md, docs/specs/tech/bodyweig
 
 - Status: `in_progress`
 - Depends on: M27-T01.
-- Milestone spec: `docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md`
+- Historical milestone spec: [historical milestone](https://github.com/Brotherhood-of-Ghisa/BOGA3/blob/0e5115a87aff26e67035806973060852bdf67bab/docs/plans/milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Governing decisions: D1, D2, D5, D6, D8.
 
 ## Objective and scope
