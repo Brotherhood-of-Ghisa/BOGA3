@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the twelve v2 entity tables. All four operations must either:
+# one of the sixteen v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -83,6 +83,10 @@ ENTITIES=(
   exercise_group_links
   user_settings
   body_weight_measurements
+  training_programmes
+  session_plans
+  session_plan_exercises
+  session_plan_sets
 )
 
 # -----------------------------------------------------------------------------
@@ -116,7 +120,7 @@ sign_in() {
   status="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -157,6 +161,9 @@ NOW_MS="$(($(date +%s) * 1000))"
 # session_exercise + exercise_tag_definition, and an exercise_group_link
 # referencing the exercise_definition (its group_id is plain text, no FK; the
 # id is the client's deterministic `<group_id>:<exercise_definition_id>`).
+# The v2 plan chain adds a training_programme, a session_plan referencing the
+# programme + gym, a session_plan_exercise referencing the plan +
+# exercise_definition, and a session_plan_set referencing the plan exercise.
 GYM_ID="rls-${RUN_TAG}-bgym"
 EDEF_ID="rls-${RUN_TAG}-bedef"
 MG_ID="rls-${RUN_TAG}-bmg"
@@ -170,9 +177,17 @@ GRP_ID="rls-${RUN_TAG}-bgrp"
 EGL_ID="${GRP_ID}:${EDEF_ID}"
 SETTINGS_ID="rls-${RUN_TAG}-bsettings"
 BODY_WEIGHT_ID="rls-${RUN_TAG}-bweight"
+TP_ID="rls-${RUN_TAG}-btp"
+SP_ID="rls-${RUN_TAG}-bsp"
+SPE_ID="rls-${RUN_TAG}-bspe"
+SPS_ID="rls-${RUN_TAG}-bsps"
 
 cleanup_rows() {
   run_psql_sql "
+    delete from app_public.session_plan_sets        where id = '${SPS_ID}';
+    delete from app_public.session_plan_exercises   where id = '${SPE_ID}';
+    delete from app_public.session_plans            where id = '${SP_ID}';
+    delete from app_public.training_programmes      where id = '${TP_ID}';
     delete from app_public.session_exercise_tags    where id = '${SXTAG_ID}';
     delete from app_public.exercise_group_links     where id = '${EGL_ID}';
     delete from app_public.user_settings            where id = '${SETTINGS_ID}';
@@ -282,6 +297,29 @@ run_psql_sql "
        created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${BODY_WEIGHT_ID}', 81.5, ${NOW_MS},
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.training_programmes
+      (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${TP_ID}', 'B Programme', ${NOW_MS},
+            ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plans
+      (owner_user_id, id, programme_id, gym_id, title,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SP_ID}', '${TP_ID}', '${GYM_ID}', 'B Plan',
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plan_exercises
+      (owner_user_id, id, session_plan_id, exercise_definition_id, order_index,
+       name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SPE_ID}', '${SP_ID}', '${EDEF_ID}', 0,
+            'B PE', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plan_sets
+      (owner_user_id, id, session_plan_exercise_id, order_index, target_reps,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${SPS_ID}', '${SPE_ID}', 0, 8,
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   commit;
 " >/dev/null
 
@@ -306,7 +344,7 @@ http_request() {
   )
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -402,6 +440,33 @@ insert_payload_for() {
         '{owner_user_id: $owner, id: $id, weight_kg: 81.5, measured_at: $ts,
           client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    training_programmes)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, name: "Injected",
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
+    session_plans)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg tp "${TP_ID}" --arg gym "${GYM_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, programme_id: $tp, gym_id: $gym,
+          title: "Injected",
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
+    session_plan_exercises)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg sp "${SP_ID}" --arg edef "${EDEF_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, session_plan_id: $sp,
+          exercise_definition_id: $edef, order_index: 0, name: "Injected",
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
+    session_plan_sets)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg spe "${SPE_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, session_plan_exercise_id: $spe,
+          order_index: 0, target_reps: 8,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
   esac
 }
 
@@ -419,6 +484,10 @@ target_row_id_for() {
     exercise_group_links)     echo "${EGL_ID}" ;;
     user_settings)            echo "${SETTINGS_ID}" ;;
     body_weight_measurements) echo "${BODY_WEIGHT_ID}" ;;
+    training_programmes)      echo "${TP_ID}" ;;
+    session_plans)            echo "${SP_ID}" ;;
+    session_plan_exercises)   echo "${SPE_ID}" ;;
+    session_plan_sets)        echo "${SPS_ID}" ;;
   esac
 }
 

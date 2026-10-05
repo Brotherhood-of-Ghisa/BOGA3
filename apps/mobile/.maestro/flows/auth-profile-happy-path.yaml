@@ -127,7 +127,9 @@ appId: com.dinoderek.mobile
       id: "connected-agents-empty"
     timeout: 15000
 - takeScreenshot: "connected-agents-empty"
-# The native back item is arrow-only; its accessibility label is "Back".
+# The native back item is arrow-only; its accessibility label is the previous
+# route's title. Settings is a tab, and the root stack titles the `(tabs)`
+# group "Back" (components/navigation/root-stack.tsx), so the label is "Back".
 - tapOn: "Back"
 - extendedWaitUntil:
     visible:

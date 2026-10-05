@@ -8,7 +8,7 @@
 # Scenarios covered:
 #   1. Snapshot pull (cursor=null)
 #   2. Paginated drain (limit=2 over 5 rows)
-#   3. Layer→type mapping integrity (all four layers, all ten entities;
+#   3. Layer→type mapping integrity (all five layers, all ten entities;
 #      asserts the topological-layer partition: pairwise disjoint, union = all 10)
 #   4. RLS isolation (user_a vs user_b)
 #   5. Tombstones included (rows with deleted_at != null appear in the pull)
@@ -116,7 +116,7 @@ sync_pull() {
     -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -136,7 +136,7 @@ sync_pull_anon() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -183,7 +183,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -366,7 +366,7 @@ cleanup_run_rows
 # Scenario 3: Layer→type mapping integrity — THE plan-level outcome.
 #
 # Seed at least one row of EVERY entity type for user A, with a fully-
-# connected FK chain. Drain each FK-bearing layer (0..3) in pages so rows
+# connected FK chain. Drain each FK-bearing layer (0..4) in pages so rows
 # left by other local suites cannot push our fixture beyond the first page.
 # Assert each layer's response `type` set equals exactly the topological-layer mapping;
 # union = all ten; pairwise disjoint.
@@ -383,14 +383,12 @@ run_psql_sql "
   insert into app_public.muscle_groups (owner_user_id, id, display_name, family_name, sort_order, is_editable, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l0-mg', 'Pectorals', 'chest', 0, 0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
+  -- Layer 1: exercise_muscle_mappings, exercise_tag_definitions,
   -- exercise_group_links.
   -- exercise_tag_definitions lives here (not Layer 0) per the corrected
-  -- partition in docs/specs/tech/sync-v2-server-contract.md ("Topological layers"): it FKs
+  -- partition in docs/specs/tech/sync-v2-server-contract.md (Topological layers): it FKs
   -- into exercise_definitions (Layer 0), so the no-intra-layer-FK rule
   -- forces it into a strictly later layer.
-  insert into app_public.sessions (owner_user_id, id, gym_id, started_at, created_at, updated_at, client_updated_at_ms)
-    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_muscle_mappings (owner_user_id, id, exercise_definition_id, muscle_group_id, weight, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-emm', 'pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l0-mg', 1.0, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.exercise_tag_definitions (owner_user_id, id, exercise_definition_id, name, normalized_name, created_at, updated_at, client_updated_at_ms)
@@ -400,11 +398,16 @@ run_psql_sql "
   insert into app_public.exercise_group_links (owner_user_id, id, exercise_definition_id, group_id, group_exercise_id, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-grp:pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l0-ed', 'pull-${RUN_TAG}-l1-grp', 'gex', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 2: session_exercises.
+  -- Layer 2: sessions (FKs into Layer 0 gyms).
+  insert into app_public.sessions (owner_user_id, id, gym_id, started_at, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+  -- Layer 3: session_exercises (FKs into Layer 2 sessions + Layer 0
+  -- exercise_definitions).
   insert into app_public.session_exercises (owner_user_id, id, session_id, exercise_definition_id, order_index, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l2-sx', 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-ed', 0, 'SX', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
-  -- Layer 3: exercise_sets, session_exercise_tags.
+  -- Layer 4: exercise_sets, session_exercise_tags.
   insert into app_public.exercise_sets (owner_user_id, id, session_exercise_id, order_index, weight_value, reps_value, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l3-es', 'pull-${RUN_TAG}-l2-sx', 0, '100', '10', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   insert into app_public.session_exercise_tags (owner_user_id, id, session_exercise_id, exercise_tag_definition_id, created_at, client_updated_at_ms)
@@ -442,26 +445,32 @@ L0_TYPES="${LAYER_TYPES}"
 
 collect_fixture_types_for_layer 1
 L1_TYPES="${LAYER_TYPES}"
-[[ "${L1_TYPES}" == '["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions","sessions"]' ]] \
-  || fail "scenario 3 layer 1: expected {sessions, exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links}, got ${L1_TYPES}"
+[[ "${L1_TYPES}" == '["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions"]' ]] \
+  || fail "scenario 3 layer 1: expected {exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links}, got ${L1_TYPES}"
 
 collect_fixture_types_for_layer 2
 L2_TYPES="${LAYER_TYPES}"
-[[ "${L2_TYPES}" == '["session_exercises"]' ]] \
-  || fail "scenario 3 layer 2: expected {session_exercises}, got ${L2_TYPES}"
+[[ "${L2_TYPES}" == '["sessions"]' ]] \
+  || fail "scenario 3 layer 2: expected {sessions}, got ${L2_TYPES}"
 
 collect_fixture_types_for_layer 3
 L3_TYPES="${LAYER_TYPES}"
-[[ "${L3_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
-  || fail "scenario 3 layer 3: expected {exercise_sets, session_exercise_tags}, got ${L3_TYPES}"
+[[ "${L3_TYPES}" == '["session_exercises"]' ]] \
+  || fail "scenario 3 layer 3: expected {session_exercises}, got ${L3_TYPES}"
+
+collect_fixture_types_for_layer 4
+L4_TYPES="${LAYER_TYPES}"
+[[ "${L4_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
+  || fail "scenario 3 layer 4: expected {exercise_sets, session_exercise_tags}, got ${L4_TYPES}"
 
 # Union equals all ten; pairwise disjoint (jq computes both at once).
 UNION_AND_DISJOINT="$(jq -nc \
   --argjson l0 "${L0_TYPES}" \
   --argjson l1 "${L1_TYPES}" \
   --argjson l2 "${L2_TYPES}" \
-  --argjson l3 "${L3_TYPES}" '
-  ($l0 + $l1 + $l2 + $l3) as $all
+  --argjson l3 "${L3_TYPES}" \
+  --argjson l4 "${L4_TYPES}" '
+  ($l0 + $l1 + $l2 + $l3 + $l4) as $all
   | {
       union_sorted: ($all | unique | sort),
       total_count: ($all | length),

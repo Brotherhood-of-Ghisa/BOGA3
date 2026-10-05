@@ -1,727 +1,116 @@
-# Components Catalog (Authoritative Current UI Components)
+# Components Catalog
 
-## Purpose
+> **Owns:** which reusable component to reach for, which folder owns each UI
+> area, and where a new component belongs. **Not here:** a component's props,
+> variants and testIDs — the component file and the names of its Jest tests are
+> its specification; colour, type and surface recipes → `design-language.md`;
+> cross-screen semantics → `ux-rules.md`; a screen's own behaviour →
+> `screen-map.md` and its record under `design-targets/`.
+> **Load when:** you are building or changing UI and need to find the component
+> that already exists. Update this doc when a reusable component is added,
+> removed, renamed or changes role (`README.md` "Maintenance rules").
 
-Brief entrypoint inventory of the current reusable UI component set.
+Two standing rules:
 
-- This doc answers: "what exists, where it lives, and what it is for?"
-- Source files remain the authority for exact props, variants, and implementation details.
+1. **Build screens from the primitives in `apps/mobile/components/ui/`**,
+   imported from the barrel (`apps/mobile/components/ui/index.ts`). A
+   hand-styled `View` / `Text` / `Pressable` where a primitive fits is a
+   defect, and the `ui-guardrails` lane rejects raw colour, size, spacing and
+   radius literals in `app/` and `components/` either way (`ux-rules.md`
+   "Styling guardrails").
+2. **Look here before adding a component.** Duplicating a shared row, card,
+   sheet, summary line or state panel is the failure this catalog exists to
+   prevent.
 
-## Sources
+## Primitives (`apps/mobile/components/ui/`)
 
-- UI docs index: `docs/specs/ui/README.md`
-- UX rules/semantics: `docs/specs/ui/ux-rules.md`
+| You need | Reach for |
+| --- | --- |
+| The page ground; a scrolling page body with the gutter and card gap | `Screen` / `ScreenScroll` (`screen.tsx`) |
+| A container for content | `Card` (`card.tsx`) — with `onPress` the whole card is one labelled link |
+| A legend plus a figure | `Stat` (`stat.tsx`) — `stacked` or `inline`; its only emphasis is `record` |
+| A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
+| A secondary workflow: row actions, options, a picker of one value, an editor | `Sheet` (`sheet.tsx`) |
+| The screen's one primary action, or an outline / text button | `ActionButton` (`action-button.tsx`) |
+| An icon-only control | `IconButton` (`icon-button.tsx`) |
+| A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
+| A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
+| The inline outcome of an action | `Notice` (`notice.tsx`) |
+| A labelled text or figure input | `FormField` (`form-field.tsx`) |
+| A search input | `SearchField` (`search-field.tsx`) |
+| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) |
+| Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
+| A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
+| A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`) |
+| Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
-## Canonical locations (current)
+Rules the code cannot state for itself:
 
-- `apps/mobile/components/ui/`
-  - canonical tokens + primitive UI building blocks
-- `apps/mobile/components/navigation/`
-  - shared navigation-specific UI (app-specific, not generic primitives)
-- `apps/mobile/components/exercise-catalog/`
-  - shared exercise-catalog editing and list UI reused by the catalogue route,
-    the session view's exercise picker and the exercise page's swap sheet
-- `apps/mobile/components/session-recorder/`
-  - the exercise picker and supporting UI modules; the folder name predates
-    the session view
-- `apps/mobile/components/session-complete/`
-  - the completion presentation: summary, PR and volume cards, share sheet and
-    share image
-- `apps/mobile/components/session-detail/`
-  - the read-only session cards shared by the session view, View Session and
-    the group session view (set row, exercise card, facts card)
-- `apps/mobile/components/view-session/`
-  - View Session, the completed-session detail's composition
-- `apps/mobile/components/session-list/`
-  - shared building blocks originally extracted from the retired session-list
-    screen (summary line, active-session row, history list, data hook); now
-    consumed by Progress/`stats-history` and session-list flows
-- `apps/mobile/components/today/`
-  - Today's Progress card: the week figures and their share bars, the month
-    chart, the latest-session row and the progress read hook
-- `apps/mobile/components/heatmaps/` and `apps/mobile/components/stats/`
-  - Progress's calendar heatmaps and its history sheet (`DailyHeatmap` /
-    `WeeklyHeatmap`, and `HistorySheet` below)
+- A primitive draws on `uiRoles` / `uiFonts` / `uiGeometry` only — never a
+  feature module, never a literal. Values: `apps/mobile/components/ui/tokens.ts`;
+  the rules that govern them: `design-language.md`.
+- **There is no elevation token and no second palette.** The legacy vocabulary
+  (`uiColors`, `uiRadius`, `uiElevation`, `UiText`, `UiSurface`, `UiButton`,
+  `SegmentedChips`) was deleted 2026-09-26 and the `legacyVocabulary` guardrail
+  blocks its return.
+- `ListRow`'s trailing control sits in a fixed tap-target-wide column, so every
+  row's control shares one vertical axis; it is a slot, so the row itself
+  carries no icon dependency.
+- `Sheet` never grows past the top of the screen: a taller body shrinks so a
+  full 44pt dismissal target stays below the status bar. It has no Cancel and
+  no Close (`ux-rules.md` "Sheets"). Use `onDismissed` when a native `Alert`
+  must follow a choice made in the sheet, so the two never stack.
+- `Icon`'s `name` is a closed union. A glyph is decorative by default — hidden
+  from assistive tech and never takes touches — until given a `label`. Geometry
+  is vendored from **Lucide 1.47.0** (ISC; notice in `LICENSE.lucide`) plus a
+  few BoGa glyphs; add new icons from that same release and name them by role.
+  `apps/mobile/__tests__/ui-icon.test.tsx` fails if a retired Unicode glyph
+  returns anywhere in `app/`, `components/` or `src/` — no file is exempt.
+- Coverage for the whole set:
+  `apps/mobile/__tests__/ui-design-primitives.test.tsx`.
 
-## Current component set (authoritative)
+## Shared components by area
 
-### Tokens and primitive exports
+One folder under `apps/mobile/components/` per area. Reach into another area's
+folder rather than re-implementing its row, card or sheet.
 
-1. Tokens
-- File: `apps/mobile/components/ui/tokens.ts`
-- Purpose:
-  - the app's one styling vocabulary: `uiRoles` (colour roles, including the
-    `viz0`…`viz4` data-visualisation ramp, generated from four seeds by
-    `generateRoles` in `components/ui/theme.ts` — the seeds of the theme preset
-    chosen on this device, read once at launch, `components/ui/theme-presets.ts`
-    and `theme-launch.ts`), `uiFonts` (the three embedded
-    typefaces and their shipped weights), `uiGeometry` (card / sheet / control /
-    pill radii, the 44pt tap target, the 38pt metric column, the sheet handle,
-    the 50pt labelled-field height, micro-label tracking), `uiSpace` (6 spacing
-    steps), `uiTypography` (8 type sizes, a `lineHeight` per size, weights),
-    `uiIconSize` (`xs` 12 / `sm` 16 / `md` 20 / `lg` 24, the icon edge lengths
-    `Icon` takes) and `uiBorder`; values and rationale:
-    `docs/specs/ui/design-language.md` §2–§4
-  - there is no elevation token and no second palette: the legacy vocabulary
-    (`uiColors`, `uiRadius`, `uiElevation`, `UiText`, `UiSurface`, `UiButton`,
-    `SegmentedChips`) was deleted 2026-09-26 and the `legacyVocabulary`
-    guardrail blocks its return (`ux-rules.md` "Styling guardrails")
+| Folder | What it owns |
+| --- | --- |
+| `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, the session view and exercise history; `MoreHubBackButton` (the `source=more` back action); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and presses go through `apps/mobile/components/navigation/use-open-main-tab.ts` so Train opens a workout in progress |
+| `exercise-core/` | `ExerciseCoreFields` — the exercise name and weight-entry controls with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |
+| `exercise-catalog/` | `ExerciseEditorModal` (create/edit, reused by the catalogue, the picker's `Add new`, group `Add as new`, the exercise page and the group exercises page) and `ExerciseListContent` / `ExerciseListPreferenceControls` — the shared list rows, family headers and filter row for every exercise list. The grouping, filtering, sorting, row stats and preference models are `apps/mobile/src/exercise-catalog/`. Target: `design-targets/exercise-catalogue.md` |
+| `exercise-page/` | the in-workout exercise page: top bar, `RecordsPanel`, `SetRow`, `SetLogger`, `SwipeSetRow`, the effort and options sheets, and `ExerciseSwapSheet` (which reuses `ExerciseListContent`). Rules live in `apps/mobile/src/session-recorder/exercise-page-model.ts` |
+| `session-recorder/` | the exercise picker (body of the `app/session/[sessionId]/add-exercise.tsx` page-sheet route — it only **adds**; swapping is the exercise page's `ExerciseSwapSheet`), `SessionInsightPresentation` (shared by live, completion and historical Summary) and the session / exercise / set / location types in `types.ts`. The folder name predates the session view |
+| `session-view/` | the active session and completed-session edit: `SessionTopBar` (its `active` / `completed` / `complete` modes), `SessionSummaryCard`, `SessionTimesFields`, `SessionExerciseCard`, the gym and options sheets |
+| `session-detail/` | the read-only session cards — `SetSummaryRow`, `ExerciseSetsCard`, `SessionFactsCard` — shared by the session view, View Session, exercise history and the group session view. Row and card models: `src/session-recorder/session-view-model.ts`, `completed-session-detail-model.ts` |
+| `session-complete/` | the post-submit presentation: `SessionCompletionScreen`, `SessionMuscleBreakdown` / `SessionSummaryContent` (shared with historical review), `PersonalRecordCard`, `ExerciseVolumeCard`, and `SessionShareSheet` / `SessionShareCard`. The share image is privacy-limited: all PRs and exercise comparisons, never gym or location data |
+| `view-session/` | View Session's composition, top bar and sheets (route `app/completed-session/[sessionId].tsx`) |
+| `session-list/` | `SessionSummaryLine`, `ActiveSessionRow`, `HistoryList`, and the `SessionListItem` types plus the `useSessionListData` hook and data client (`history-data.ts`) so any screen reusing the session buckets shares one repository mapping. Extracted from the retired session-list screen; now also consumed by Progress history |
+| `today/` | the Today cards: `TodayProgressCard` with `WeekFigures`, `ShareBar` and `MonthPace`; the group card; and `SessionSummaryRow` + `TrainingNowMark`, the session row both cards share. Reads: `apps/mobile/src/progress-summary/`. Target: `design-targets/today-landing.md` |
+| `train/` | `StartDisc`, Train's one action (`design-targets/train-page.md`) |
+| `heatmaps/` | `DailyHeatmap` / `WeeklyHeatmap`, `HeatmapLegend` and their data and metric modules; semantics in `apps/mobile/components/heatmaps/README.md` |
+| `stats/` | Progress's `HistorySheet` (the history of one exercise definition or one muscle), the comparison tables and their read hooks. Targets: `design-targets/progress.md`, `progress-tables.md`, `history-popup.md` |
+| `gyms/` | `GymsScreen` and `GymEditor`; the gym directory and writes are `src/session-recorder/gym-options.ts`, location reads `src/location/gym-location-reads.ts` |
+| `groups/` | every group surface, behind the barrel `apps/mobile/components/groups/index.ts`: stream session and membership items, `GroupStreamList`, boards (`GroupBoardRow`, `GroupMetricBoard`, `GroupMetricHistory`, `GroupPodiumCard`, `GroupLeaderboardsPage`), the record and action sheets, member and exercise rows, the group / comparison / details forms, `StandardExercisePicker`, `UsernameGate`, `GroupCertificationStatus`, `GroupOfflineBanner`, `GroupWriteNotice`, the feature state panels (thin `StatePanel` wrappers), `usePullToRefresh` and the `groupScreenStyles` page shell. Data comes from `apps/mobile/src/groups`. Targets: `design-targets/groups.md`, `group-competitions.md`, `group-exercise-unlink.md` |
+| `bodyweight/` | `WeightEntrySheet`, `BodyWeightSettingsRow`, `BodyWeightScreen` — the only bodyweight entry surfaces. No session, logger or analytics component shows or edits a reading (`docs/specs/tech/bodyweight-load-contract.md`) |
+| `sync-status/` | `SyncStatusPanel`, Settings' one Data & Sync card |
+| `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview |
+| `preferences/` | the Settings preference editors (effort, Progress) and `NumberField` |
+| `profile/` | the Profile cards and their panel and form hooks |
 
-2. Design-language primitives: `Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`
-- Files: `apps/mobile/components/ui/card.tsx`, `stat.tsx`, `list-row.tsx`, `sheet.tsx`, `action-button.tsx`
-- Purpose:
-  - the building blocks of the exercise page and session view, drawn from
-    `uiRoles` / `uiFonts` / `uiGeometry` only (`docs/specs/ui/design-language.md`);
-    adopted by the exercise page (`components/exercise-page/`), the session view
-    (`components/session-view/`, including its `Gym` picker sheet
-    `session-gym-sheet.tsx`), the Gyms screen (`components/gyms/`) and View
-    Session (`components/view-session/`, `components/session-detail/`,
-    `components/session-complete/`)
-  - `Card` — `surface` on `paper`, 1px `rule`, card radius, no shadow, no
-    padding (content owns its insets); with `onPress` the whole card is one
-    labelled `link` target
-  - `Stat` — a micro-label legend with a monospaced value; `stacked` (label
-    above value: summary card, records panel) or `inline` (legend left of the
-    fixed-width right-aligned metric column: the set row, `rank` primary 1RM /
-    secondary VOL); `state="planned"` fades it, `emphasis="record"` sets it
-    bold `record` (the only emphasis — `design-language.md` §5);
-    `kind="text"` for a non-figure value; a stacked `rank="secondary"` is a
-    figure in a list row (Plex Mono 600 `base`, Progress muscle rows), and
-    `ground="viz"` turns the legend `ink` on a data-viz ground; `spokenLabel`
-    reads an abbreviated legend in full to VoiceOver
-  - `ListRow` — `[leading][label or children][meta][trailing]`, the trailing
-    control always in a fixed tap-target-wide column so controls share one
-    vertical axis; `density` `sheet` (option rows) or `list` (dense rows in a
-    card, e.g. the set row); `selected` (`accent-wash`), `tone="danger"`,
-    `divider`; pressable as one row only when given `onPress`. The trailing
-    control is a slot, so the row carries no icon dependency. `expanded` announces a disclosure row's state: the exercise list's family
-    headers. Also `checked` (a radio row, announced checked with no
-    ground change; the caller's `leading` glyph shows it), `accessible` (a row
-    with no `onPress` read as one element) and `ref` (the host view, to move
-    focus back to it)
-  - `Sheet` — bottom-anchored panel over a `scrim` backdrop, sheet radius,
-    38×4 handle, optional title; the backdrop tap, Android back and the
-    VoiceOver escape gesture dismiss it — there is no Cancel button. It never
-    grows past the top of the screen; a taller body shrinks to fit while leaving
-    a full 44pt dismissal target below the status bar. It
-    takes `headerActions` (controls on the title's row, `<testID>-header`) and
-    `keyboardAvoiding` (lifts the panel above the keyboard), first for the
-    exercise picker, which became a page-sheet route on 2026-10-05. `headerLeading` (one control before the title): the
-    exercise editor's `chevron-left` `Back to exercise` from its muscle list.
-    `onDismissed` is called once the sheet has gone (the iOS
-    modal's `onDismiss`, or at once on Android), so a native `Alert` can follow
-    a choice made in the sheet (the unlink chooser); `<testID>-modal` is on the
-    native modal
-  - `ActionButton` — `primary` (`accent` ground: the screen's one primary),
-    `outline` (`ink` hairline) or `text` (caps label); `tone="danger"` recolours
-    an outline or text button. Control radius, 44pt tall, Archivo caps label.
-    Replaced the session view's `OutlineButton` and the Gyms screen's
-    `GymButton` (View Session was its third consumer). `checked` is
-    for a text button that toggles a view (Sessions' `Show deleted`)
-  - covered by `apps/mobile/__tests__/ui-design-primitives.test.tsx`
+## Where a new component belongs
 
-3. Design-language primitives, second set
-- Files: `apps/mobile/components/ui/icon-button.tsx`, `state-panel.tsx`,
-  `screen.tsx`, `form-field.tsx`, `search-field.tsx`, `segmented-control.tsx`,
-  `chip-group.tsx`, `tag.tsx`, `notice.tsx`
-- Purpose: the rest of the primitive set every screen is built from;
-  each has two or more consumers. `uiRoles` / `uiFonts` / `uiGeometry` only
-  - `IconButton` — a labelled 44pt icon-only control; `tone` `default` (`ink`),
-    `muted`, `danger`, or `accent` (a filled square: the screen's one primary as
-    an icon). Every top bar's back and ⋮, View Session's card ⋮, and the
-    exercise picker's Manage / Add new / Close, and the catalogue's `accent`
-    `+`, ⋮ and row ⋮ and the editor's back and remove controls
-  - `StatePanel` — a loading / message / error state: optional spinner, title
-    (Archivo), body (`ink-muted`), one outline action and optional children;
-    `fill` (centred in its space, the default) or inline. The session view's,
-    exercise page's and View Session's non-content states; the catalogue's
-    and the exercise editor's loading and error; Progress's
-    loading, error and empty states and the history sheets' (inline); every group state panel, wrapped by `GroupStateView` and friends
-  - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body (accepting the native scroll ref for feature focus/scroll restoration) with the page
-    gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
-    other `ScrollView` props through (refresh, keyboard insets). Used by the
-    session view, exercise page, View Session, Gyms and the group session view;
-    the Groups tab (`ScreenScroll` with `refreshControl`)
-  - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule`
-    turning `danger` while invalid, the error below (`<testID>-error` or
-    `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
-    `text`. The completed edit's Start / End (`session-times-fields`), and the
-    credential and profile fields of Sign in and Profile, and the
-    exercise name in `ExerciseCoreFields`
-  - `SearchField` — search glyph, text, and a clear control while there is text;
-    `accessibilityLabel` required. The swap sheet's search, the exercise
-    picker's filter, the Progress filter and the
-    catalogue's filter
-  - `SegmentedControl` — one choice from a few, joined in a `rule` frame,
-    the selected segment solid `ink`; `layout` `fill` (equal width), `inline`,
-    or `fit` (across the row, label-sized segments sharing the rest: the
-    exercise history's four metrics);
-    `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
-    testIDs the retired `SegmentedChips` used. The records panel's `Records` | `Last`,
-    Settings' date format, Progress's period and table Metric, retained browsing Breakdown, and history Metric
-    (`stats-<kind>-history-metric-chip-*`); Settings owns the history View, and
-    `ExerciseCoreFields`' weight entry
-    (`<prefix>-load-mode-*`, with `disabled` for the group
-    exercise form's pending state), and the Groups tab's `Stream` |
-    `Leaderboards` (`groups-segment-*`)
-  - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
-    (checkboxes, `checked`), the same testID contract, per-chip accessibility
-    labels. Logs' level filter,
-    the catalogue's Show deleted control (`multi`), and the Groups tab's group
-    chips (`single`, `groups-stream-filter-*`). Also a
-    per-option `faint` (a deleted tag) and `single` mode's `clearValue`
-    (pressing the selected chip selects the clear value: exercise history's
-    tag filter, where tapping the selected tag returns to `All tags`)
-  - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
-    role); `neutral` or `faint`. Connected agents' `AI` tag, the
-    exercise list's `Deleted` (`faint`), and a group record card's
-    boards
-  - `Notice` — a `paper` band on a `rule` hairline: optional glyph, words,
-    optional action; `neutral` or `danger` (`alert`); `live` announces it. There
-    is no success or warning hue: the glyph and words carry the state. An
-    optional `title` (Archivo 700, a `header`) names a message that is a reason
-    ("Sign-in unavailable"). Settings' developer-tool outcomes;
-    Sign-in, the first-sync gate and Profile; the catalogue's outcome
-    and the exercise editor's save failure; the group offline marker,
-    write notice and inline error
-  - `PageHeader` / `SectionHeader` (`page-header.tsx`) — a tab
-    screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
-    intro; a section's heading (Archivo 700 `lg`) with an optional caps text
-    action. Today and Train; `PageHeader` also More and Settings,
-    Sign in and Groups
-  - `ListRow` also takes an `accessibilityHint` for a pressable row,
-    and a `description` (a wrapping `ink-muted` second line) and
-    `accessibilityRole="link"` for a row that opens the browser (the
-    More and Settings destinations)
-  - covered by `apps/mobile/__tests__/ui-design-primitives.test.tsx`
-
-4. `Icon`
-- Files: `apps/mobile/components/ui/icon.tsx`, `icon-glyphs.ts` (geometry),
-  `LICENSE.lucide`
-- Purpose:
-  - the app's icon set: `<Icon name size color label testID />` over
-    `react-native-svg`. `name` is a closed union (`IconName`); `size` a
-    `uiIconSize` key (default `md`); `color` a token value (default
-    `uiRoles.ink`)
-  - decorative by default (hidden from assistive tech, never takes touches); a
-    `label` makes it an accessible image, for the rare icon no surrounding text
-    or control label explains
-  - `delete` (Lucide `trash-2`) marks a destructive menu option
-  - geometry is vendored from Lucide 1.47.0 (ISC; notice in `LICENSE.lucide`),
-    plus `chevron-left` (back), `pencil` (edit), `swap` (Lucide
-    `arrow-left-right`) and `trash` (Lucide `trash-2`) for the exercise page,
-    `link` (Lucide `link`) for its ⋮ `Link to group exercise…`, `location`
-    (Lucide `map-pin`) for a gym's saved location and the gym sheet's nearby
-    suggestion, `search` and `list` (Lucide `search`, `list`), `palette`
-    (Lucide `palette`) for Settings' Appearance row, and the status
-    glyphs `offline` (Lucide `wifi-off`), `success` (`circle-check`) and
-    `warning` (`triangle-alert`), which stay `ink` — the design language has no
-    success or warning hue,
-    `play` (Lucide `play`, filled) for Train's start disc,
-    plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
-    design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
-    check), `set-current` (`accent` ring), `set-planned` (dashed `ink-ghost` ring),
-    which carry their role colour by default and are meant for `ListRow`'s
-    trailing slot on the set row. Add icons from the same Lucide
-    release, named by role
-  - replaced the improvised Unicode glyphs on every screen;
-    `__tests__/ui-icon.test.tsx` fails if a retired glyph comes back
-    anywhere in `app/`, `components/` or `src/` (no file is exempt)
-
-5. `ui` barrel exports
-- File: `apps/mobile/components/ui/index.ts`
-- Purpose:
-  - single import entrypoint for current tokens and UI primitives
-
-### Specialized shared components (reusable, not generic primitives)
-
-1. `MainTabBar`
-- File: `apps/mobile/components/navigation/main-tab-bar.tsx`
-- Purpose:
-  - the one bottom bar: `MainTabs` on the `paper` ground with the page gutter,
-    above the home indicator; the tab layout, the session view and
-    `exercise-history` all draw it, so the bar never changes between them.
-    Fixed (the collapsible `BottomTray` was removed 2026-10-05). testID
-    `main-tab-bar`
-  - presses go through `useOpenMainTab` (`use-open-main-tab.ts`), so Train
-    opens a workout in progress
-
-2. `MainTabs`
-- File: `apps/mobile/components/navigation/main-tabs.tsx`
-- Purpose:
-  - token-backed, accessible four-tab presentation for `Today`, `Train`,
-    `Progress`, and `More`, driven by the single declarative model in
-    `apps/mobile/src/navigation/main-tabs.ts`
-  - the body of `MainTabBar`
-  - design language: one `Card`-recipe strip (`surface`, `rule`,
-    card radius) of plain Archivo labels; the active tab is `ink` 700 over a
-    2pt `ink` underline (`<tab testID>-indicator`), the others `ink-muted` 600;
-    never `accent`
-  - the non-visual model owns canonical order, labels, routes, test IDs,
-    canonical/legacy ownership resolution, and unknown-route null fallback
-
-3. `MoreHubBackButton`
-- File: `apps/mobile/components/navigation/more-hub-back-button.tsx`
-- Purpose:
-  - source-aware `Back to More` action shared by the tab-owned Exercise
-    Catalog and Settings destinations; renders only for `source=more` and
-    replaces to the hub (Groups does not use it); a `chevron-left` `IconButton`
-    (`back-to-more-button`) at the top left
-
-4. `ExerciseEditorModal`
-- File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
-- Purpose:
-  - shared create/edit exercise editor reused by `exercise-catalog`, the exercise picker's `Add new` and group `Add as new`, the exercise page and the group exercises page
-  - optional `prefill` (name, weight entry, muscles for a new exercise), `onSave` (replaces the default save; a rejection shows inline), and `title` (the picker's group `Add as new` prefills from the group exercise and saves through `createExerciseWithGroupLink`); the fields are unchanged
-  - in the design language: a tall `Sheet` (`keyboardAvoiding`, testID `exercise-editor`, backdrop `Dismiss exercise editor overlay`, no Cancel) holding `ExerciseCoreFields`, a field-framed `ListRow` for the primary muscle (`exercise-editor-primary-muscle-trigger`), the secondary muscles as `ListRow`s in a `Card` with a `danger` `x` each, an outline `Add secondary muscle` (`exercise-editor-secondary-muscle-trigger`), and `Save Exercise`, the sheet's one `accent`. The muscle list is a panel swap in the same sheet: the title changes, `headerLeading` is a `chevron-left` `Back to exercise` (`exercise-editor-muscle-selector-back`), and the rows are `ListRow`s (`exercise-editor-muscle-option-<id>`, `radio-on` / `radio-off` for the primary, `plus` for a secondary) in `exercise-editor-muscle-selector-list`. Target: `design-targets/exercise-catalogue.md`
-
-5. `ExerciseListContent` / `ExerciseListPreferenceControls`
-- File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
-- Purpose:
-  - shared exercise list row/header rendering and the shared filter row for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
-  - in the design language: hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are one row of `FilterChip`s (pills one tap target tall, solid `ink` while on; `exercise-list-controls`): `Never-done` (a checkbox, `exercise-list-never-done`), the host's own chips as `children` (the picker's `Groups`), and `Sort: Favourite` / `Sort: A–Z` (a button that switches the order, `exercise-list-sort`). `useFamilyExpansion(isSearching)` holds a surface's open families: closed until tapped while browsing, open until tapped while searching. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion, and a family's header still toggles it; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
-  - covered by `apps/mobile/__tests__/exercise-list-controls.test.tsx`
-  - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so all three surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
-
-6. Session completion (the completion presentation of `/completed-session/<id>`)
-- Folder: `apps/mobile/components/session-complete/`
-- Purpose:
-  - `SessionCompletionScreen` — the post-submit composition on `paper`:
-    `SessionTopBar mode="complete"` (`Session complete` · Done), a
-    `SessionFactsCard` (Duration / Exercises / Sets, then Gym) with
-    the sets-by-muscle table (primary / secondary / weighted sets) under a `rule-soft` divider, every
-    `PersonalRecordCard`, shared exercise/muscle comparisons and the
-    `Share session` outline `ActionButton`. The muscle table is informational,
-    never analytics links; all PRs stay visible together
-  - `SessionMuscleBreakdown` / `SessionSummaryContent` (`session-summary-content.tsx`)
-    share the muscle table, records, comparisons and Share between completion and
-    historical review. Hosts own their facts/top bar; completion keeps its
-    post-Finish composition and share-image content.
-  - `SessionInsightPresentation` (`components/session-recorder/`) — shared by
-    live, completion and historical Summary; `SegmentedControl` selects exercise
-    or muscle `ExerciseVolumeCard`s, defaulting to exercise. Keeps the completion
-    flow's `session-completion-exercise-volume` selector and explicit empty states.
-    Historical View Session controls grouping across local section changes and
-    uses its shared top-bar Edit action. Separate history/catalog states isolate
-    optional enrichment failures; active sessions keep uncontrolled grouping.
-  - `PersonalRecordCard` — a `Card` with a `record` band (`New 1RM record ·
-    <1RM>` or `New top weight · <weight> × <reps>`), the exercise and its set
-    (`185.0 × 8`), the figures the record set beat bold `record`; read as one
-    accessibility element
-  - `ExerciseVolumeCard` — name, set counts, the `Vol` figure (no separator,
-    no unit) and its delta from the median, and the P5–P95 range (`rule`
-    track, `ink-muted` median tick, `ink` current dot) or the single/equal
-    baseline and no-history states; no `accent`. `variant="share"` for the share
-    image
-  - `SessionShareSheet` / `SessionShareCard` — a `Sheet` (`Share session`)
-    previewing the exact privacy-limited image, `Share image` its one action,
-    inline retryable failure and temporary-file cleanup; no Close or Cancel.
-    The card (`paper`, `ink` mark, record band, mono figures) includes all PRs
-    and exercise comparisons, never gym or location data
-  - covered by `apps/mobile/__tests__/completed-session-local-data.test.tsx`,
-    `completed-session-detail-screen.test.tsx`, and the `ios-data-smoke` lane
-    (`session-completion-states-fixture`: the native share sheet)
-
-7. `SessionSummaryLine`
-- File: `apps/mobile/components/session-list/session-summary-line.tsx`
-- Purpose:
-  - shared two-line summary row (date/duration/gym + sets/exercises) reused by
-    `ActiveSessionRow`, `HistoryList`, and Progress history
-  - figures in Plex Mono (`ink` for the start and duration, `ink-muted` for the
-    counts), the gym in Source Sans, `·` separators in `ink-faint`
-
-8. `ActiveSessionRow`
-- File: `apps/mobile/components/session-list/active-session-row.tsx`
-- Purpose:
-  - the active session on `/sessions` as a `Card`: a `ListRow` with
-    the `set-current` glyph and `SessionSummaryLine` (resume), then `check`
-    (review and complete) and ⋮ `IconButton`s
-  - ⋮ opens a `Sheet` with one `danger` `Delete`, which confirms in an `Alert`
-    before discarding
-
-9. `HistoryList`
-- File: `apps/mobile/components/session-list/history-list.tsx`
-- Purpose:
-  - the completed-session history on `/sessions`, rendered inside its host's
-    scroll: a `History` micro-label with the `Show deleted` / `Hide
-    deleted` text `ActionButton` (`checked`), the rows as `ListRow`s in one
-    `Card` (a deleted row faded, with a `Deleted` `Tag`), and `StatePanel`s for
-    loading, the load error (`Retry`) and the empties
-  - a row's ⋮ opens a `Sheet` titled with the session's start stamp: `Edit`,
-    `Append`, `Delete` (`danger`) or `Undelete`
-
-10. `DailyHeatmap` / `WeeklyHeatmap`, and `HistorySheet`
-- Files: `apps/mobile/components/heatmaps/` (`DailyHeatmap.tsx`,
-  `WeeklyHeatmap.tsx`, `HeatmapLegend.tsx`, `heatmap-style.ts`,
-  `heatmap-metric.ts`, `heatmapData.ts`; `README.md`) and
-  `apps/mobile/components/stats/history-sheet.tsx`
-- Purpose:
-  - `DailyHeatmap` / `WeeklyHeatmap` — daily-cell and weekly-bar views over one
-    `HeatmapData`: Daily scrolls horizontally; Weekly virtualizes a vertical
-    newest-first list with proportional horizontal lengths, date/value columns
-    and a dashed vertical average on a shared zero-based scale. Both use the
-    design language: cells and bars on the `viz0`–`viz4` ramp
-    (`HEAT_RAMP`), an empty day `viz0` with a `rule` hairline; **today (or the
-    current week) a 1px `ink` ring, the selected cell a 2px `ink` border** plus
-    the selected state, and a filled `ink` caret beside the selected week
-    (`<prefix>-heatmap-selected-marker`). The daily view's detail is a `Card`
-    with a Plex Mono value; gutter, axis and the Less…More `HeatmapLegend` are
-    `ink-faint` micro-labels. testIDs `<prefix>-heatmap`,
-    `-heatmap-cell-<dateKey | weekStartDateKey>`, `-heatmap-bar-<weekStartDateKey>`,
-    `-heatmap-day-detail` (`-date`, `-value`). Semantics:
-    `components/heatmaps/README.md`
-  - `HistorySheet` — the Progress history of one exercise definition or one muscle ID (which merged the two legacy overlays): a `Sheet` at
-    about three quarters of the screen, no close button (G5); eyebrow and name;
-    `Metric` `SegmentedControl` and a static saved view/window label;
-    Settings owns Daily/Weekly, with Daily for unset/invalid choices and valid
-    saved Weekly retained; a `rule-soft`
-    week banner only while a week is selected, with no tap instruction; inline `StatePanel`s for loading, error (Retry
-    for the same entity/window) and no history; both heatmap views kept mounted, the inactive one transparent,
-    inert and hidden from accessibility. `kind` (`muscle` | `exercise`) names
-    the testIDs: `stats-<kind>-history` (the `Sheet`; `-backdrop`, labelled
-    `Dismiss <kind> history`), `-overlay` (the body), `-title`,
-    `-metric-chip-<metric>`, `-retry`, `-week-banner` (`-range`,
-    `-value`), `-loading`, `-error`, `-empty`, `-scroll`,
-    `-heatmap-panel-<view>`. Target:
-    `design-targets/progress.md`
-
-11. Group components
-- Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
-- Purpose:
-  - `GroupStreamSessionCard` — the stream card, a `Card` link: member (Archivo 700), status in words (`Training now` beside the `set-current` ring, `Completed · 45m` in `ink-muted`), start · gym, `N sets · N exercises` in Plex Mono (`-metrics`), group names in All; one press target
-  - `GroupStreamMembershipItem` — "X joined / left the group / was removed" light row behind a `rule` hairline, `ink-muted`; pressable only where it opens another screen
-  - `GroupFilterChips` — a single `ChipGroup` with one chip per group, exactly one selected (no `All`), wrapping rather than scrolling sideways; the Groups screen's group selector
-  - `GroupStreamList` — `FlatList` on `groupScreenStyles` with `RefreshControl`, online older-page loading, and an inline `StatePanel` Retry footer; it renders session cards, membership rows and `GroupMetricStreamCard`s in server order, and opens a record's `GroupMetricStreamRecordSheet`
-  - `GroupMetricStreamCard` — one competition event, a `Card` link with no band and no inline action: the label in `record` (`<name> · record`, `Leaderboard changed`, `Group rules changed`, `Certification ended`), exercise · rules revision, figures with explicit units (`kg`, `%BW`, `kg·reps`) in Plex Mono, then on a record the certification in words (`Uncertified` / `Certified by …` / `Certification ended`) and `Session in progress`; a record opens the record sheet, any other event the rules history. Target: `design-targets/group-competitions.md`. testID `group-metric-stream-<eventId>`
-  - `GroupMetricRecordSheet` (a `Sheet`) — the row detail (E2) shared by record cards and board rows, titled with the lifter and the exercise: the set and 1RM as `record` `Stat`s, then the logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, `Certify` (the sheet's one `accent`), `Remove my certification` / `Cancel certification` as `danger` `ListRow`s (confirmed with `Alert.alert`), and `View full session` as a `ListRow` with a chevron. No Close: the backdrop (`Close set details`) dismisses it (G5). Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-backdrop`, `-header` (the title), `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`
-  - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker: a neutral `Notice` with the `offline` glyph, live (08 pattern 7)
-  - `GroupMemberRow`, `GroupSummaryRow` — dense `ListRow`s inside one `Card` (`divider` on every row but the first). `GroupMemberRow`: the name (+ "(you)") and the role as a `Tag` (`group-member-role-<userId>`); it takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron, the control column staying empty otherwise so the tags align. `GroupSummaryRow`: the name in Archivo 600, the description (two lines) in `ink-muted`, member count · my role as a micro-label, a chevron; the My groups `FlatList` draws the card with `cardListItemStyles`
-  - `GroupHeaderCard` — the group and Members screens' header: one `Card` with the name in Archivo 700, the description and an optional meta line in `ink-muted`, then its children (the group screen's `Members` `ListRow`)
-  - `GroupMemberActionSheet` — `GroupActionSheet` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin`, `Transfer ownership` / `Remove from group` (`danger`; the caller confirms with `Alert.alert`). testIDs `group-member-actions-sheet` (+ `-backdrop`), `group-member-action-<action>`
-  - `GroupActionSheet` (a `Sheet`) — behind both action sheets (members, group exercises): the title, an optional `ink-muted` subtitle, one `ListRow` per action (`tone="danger"` when destructive). No Cancel: the backdrop dismisses it (G5). testIDs `<prefix>-sheet`, `<prefix>-sheet-backdrop` and `<actionPrefix>-<key>`
-  - `GroupExercisesPage` — the group screen's Exercises section: the `Exercises` micro-label (`group-screen-exercises-title`) with owner/admin `Add exercise` as an outline beside it, outcome `Notice`s, a failed links read as a `danger` `Notice` with an outline `Retry` (`group-exercises-links-retry`), the rows as one `Card` (`group-exercises-list`), empty and missing-data `StatePanel`s, and the exercise sheet (`Rename` / `Archive` / `Unarchive`). Target: `design-targets/groups.md`
-  - `GroupExerciseRow` — a dense `ListRow` slice of the section's `Card`: the name (Archivo 600), weight entry and my link status (`Linked: …` / `Not linked`) in `ink-muted`, and an `Archived` `Tag`; pressable with a chevron for owner/admin only; optional `Link your exercise` (outline) and `Unlink…` (`danger` text) buttons (`group-exercise-link-button-<id>` / `group-exercise-unlink-button-<id>`) sit outside that press target; `personalLinks` retains stable IDs and labels, and unlink pending disables repeat taps
-  - `GroupExerciseUnlinkSheet` — a `Sheet` (`Your linked exercises`, testID `group-unlink-chooser`, backdrop `Dismiss your linked exercises`, no Cancel) for multiple personal links: the target/group context in `ink-muted`, then a `ListRow` per link with a `danger` text `Unlink` (`group-unlink-choice-<id>`), duplicate/missing names identified; the host confirms from `Sheet.onDismissed`, once the sheet has gone, then restores focus to the row
-  - `GroupExerciseForm` — the add / edit group-exercise form: a `Card` over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the copy note in `ink-muted`, the write's failure as a `danger` `Notice` above the submit, and the submit as the screen's one `accent`
-  - `StandardExercisePicker` — a micro-label, a `SearchField` and one `Card` of radio `ListRow`s (`radio-on` in `ink` on the pick, no ground change; the weight entry as `meta`) over the bundled standard exercises to copy into a group, and `Showing N of M`
-  - `GroupLostAccessState` — the shared "You're no longer a member of this group" panel
-  - `GroupLeaderboardsPage`, `GroupPodiumCard` — the Groups screen's Leaderboards segment: one link `Card` per group exercise (the name in Archivo 700, the view label as a micro-label, an `Archived` `Tag`, up to three podium rows with rank, value and date in Plex Mono and my row's `You` in bold, the empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
-  - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupBoardRow`
-  - `GroupBoardRow` — one full-board row, a dense `ListRow` in the board's one card (`cardListItemStyles` in `screen-styles.ts` draws the card across the `FlatList`'s cells), as a single accessibility element: rank and value in Plex Mono, the member in Source Sans with the 1RM's set below it in `ink-muted`, the date, the certification mark on All; my row on `paper` reading `You`; a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
-  - `GroupBoardHistoryItem` — one lead change, a row of the history's one card: the date in small Plex Mono, then the sentence in Source Sans. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
-  - `GroupPagesFooter` — the footer of an online paged list: an inline `StatePanel`, loading, or the failure with an outline `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
-  - `UsernameGate` + `useUsernameGate(userId)` — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`): a `Card` with the reason, a `FormField` and `Save username` (`accent`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
-  - `GroupDetailsForm` — the shared create / edit form: name (1–50) and optional description (≤280) as two `FormField`s, the counter (`n/280`, `group-form-description-counter`) in Plex Mono under the description, inline validation, the write's failure as a `danger` `Notice` above the submit (`accent`)
-  - `GroupWriteNotice` — inline outcome of a group write: a `danger` `Notice`, or a neutral one with the `success` glyph (08 pattern 9)
-  - `GroupsEmptyActions` — the empty state's `Create group` (the screen's one primary) / `Join with a code` (outline) buttons
-  - `FriendSessionContent` — the friend's session body on View Session's cards (`components/session-detail/`): a `SessionFactsCard` headed by the member and status, then an `ExerciseSetsCard` per exercise (rows `group-session-set-row-<setId>`), read-only, no record band
-  - `PickerGroupSectionList`, `PickerGroupsToggle` — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch in the filter row, a `FilterChip` solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
-  - `GroupExercisePickSheet` — a `Sheet` (keyboard-avoiding, backdrop `Dismiss group exercise pick sheet`, no Cancel) for an unlinked group exercise, its options radio `ListRow`s (`radio-on` / `radio-off` in `ink`, unavailable choices `ink-faint`) and its confirm the sheet's one `accent`: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (group page) confirms with `Link` and adds nothing to a session
-  - `GroupStateView`, `GroupLoadingState`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels, thin wrappers over `StatePanel` (inline; the sign-in panel centres on the page); `GroupInlineError` is a `danger` `Notice` with an outline `Retry`
-  - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll`.
-  - `usePullToRefresh`, `groupScreenStyles` — pull spinner state, and the shared page shell and action row
-
-12. Exercise core fields
-- File: `apps/mobile/components/exercise-core/exercise-core-fields.tsx`
-- Purpose:
-  - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`). In the design language: a `FormField` (`face="text"`) for the name and a micro-labelled `SegmentedControl` (`<prefix>-load-mode`, `disabled` while not editable) for the weight entry, each segment labelled `<label> weight entry`
-
-13. Exercise page
-- Folder: `apps/mobile/components/exercise-page/`; rules in `apps/mobile/src/session-recorder/exercise-page-model.ts`, records in `exercise-records.ts`, persistence in `session-exercise-draft.ts` + `use-session-exercise-draft.ts`
-- Purpose:
-  - `ExercisePageScreen` — the page's composition (route: `app/session/[sessionId]/exercise/[sessionExerciseId].tsx`)
-  - `ExerciseTopBar` — back · title · ⋮, each control a 44pt target
-  - `RecordsPanel` — a `Card` with the `Records` | `Last` selector (control radius), the `History` link, three stacked `Stat`s collapsed, record lines or the previous session's sets expanded
-  - `SetRow` — the set-row recipe: `ListRow density="list"`, the effort label in `leading`, weight × reps in `children` (the row-body target that opens the logger), the inline 1RM / Vol `Stat`s in `meta`, the set-state glyph (a checkbox) in `trailing`
-  - `SetLogger` — the open set in place: Weight / Reps / Effort fields at `uiGeometry.fieldHeight`, the `accent` commit tick on the control axis; effort tap cycles W-Up → blank → configured maximum RIR down to RIR 0, and long press opens `EffortSheet`
-  - `EffortSheet`, `ExerciseOptionsSheet` — `Sheet` + `ListRow`; effort includes all configured cycle choices with `None` for blank and scrolls for longer ranges; the options sheet shows `Link to group exercise…` only when its host passes `onLink` (signed in)
-  - `ExerciseSwapSheet` — `Sheet` over the shared `ExerciseListContent` / `buildExerciseListModel` and list preferences
-  - `pageText` — the page's shared type roles (micro-label, control label, running / detail / headline figures)
-  - covered by `__tests__/exercise-page-screen.test.tsx`, `exercise-page-model.test.ts`, `exercise-page-persistence.test.ts` and the `ios-exercise-page` lane
-
-14. Exercise picker
-- File: `apps/mobile/components/session-recorder/exercise-picker.tsx`
-- Purpose:
-  - the body of the Add exercise route (`app/session/[sessionId]/add-exercise.tsx`,
-    an iOS page sheet), its only consumer: a grabber and `Select Exercise`
-    with Manage / Add new / Close `IconButton`s (`exercise-picker-header`),
-    search, the shared filter row with `Groups`, the add preselection
-    (`Add empty set` outline / `Append plan`, its one `accent`; the plan's
-    sets as planned `SetSummaryRow`s), `From your groups` with its pick sheet,
-    inline create and Manage (`/exercise-catalog?source=session&intent=manage`).
-    A pick closes the keyboard; the list closes it on drag. It only adds —
-    there is no replace mode (the exercise page swaps through
-    `ExerciseSwapSheet`). It owns its own state and reports a choice
-    (`onSelectExercise` / `onAppendPlan` / `onOpenManage` / `onClose`); the
-    route writes it, goes back, and shows a failed add through `notice`
-  - covered by `apps/mobile/__tests__/exercise-picker.test.tsx`
-
-15. Session view components
-- Folder: `apps/mobile/components/session-view/`
-- Purpose:
-  - `SessionTopBar` — `mode="active"`: `<Time of day> training · <elapsed>`
-    (ticking, shrinks to fit; testID `session-view-title`) · ⋮ · `Finish` (`accent`);
-    `mode="completed"`: `Edit session` · `Done` (`accent`, testID
-    `session-view-done-button`), no ⋮; `mode="complete"`: `Session complete` ·
-    `Done` (testID `session-completion-done`) on the completion screen, Done
-    omitted on its unavailable states. Under the status bar; the primary is
-    an `ActionButton`
-  - `SessionSummaryCard` — `Card` with stacked `Stat`s Gym / Ex (spoken `Exercises`) /
-    Sets / Volume; given `times`, `SessionTimesFields` sit above the row
-  - `SessionTimesFields` — a completed session's `Start` / `End` text fields
-    (`YYYY-MM-DD HH:mm`, the logger's field style: `fieldHeight`,
-    `radius.control`, `rule`, `danger` while invalid), each field's error
-    below it and the autosave-paused notice. testIDs `session-view-start-time`,
-    `session-view-end-time` (`-error`), `session-view-times-notice`
-  - `SessionExerciseCard` — `ExerciseSetsCard` as a link per exercise: name,
-    `n/m`, a chevron, the read-only set rows and the `record` band. testID
-    `session-view-exercise-<id>` with `-count`, `-set-<n>` (`-values`, `-1rm`,
-    `-vol`), `-record`
-  - `SessionOptionsSheet` — `Sheet` + a `Session vs history` chevron `ListRow`
-    (`session-view-compare`) and a danger `ListRow` (`Abandon session`)
-  - `SessionGymSheet` — `Sheet` + `ListRow`s: the optional `Nearby · <gym>`
-    suggestion row (its host runs the lookup and passes `suggestion`), `No gym`
-    and the gyms with the current one checked, and a `Manage gyms` footer row.
-    testIDs `session-view-gym-sheet`, `-suggestion`, `-option-<id>` /
-    `-option-none`, `-manage`
-  - covered by `apps/mobile/__tests__/session-view-screen.test.tsx`
-
-16. Session detail (shared by the session view, View Session and the group session view)
-- Folder: `apps/mobile/components/session-detail/`; the row and card models in
-  `apps/mobile/src/session-recorder/session-view-model.ts` (`formatSetRow`, one
-  set as plain values) and `completed-session-detail-model.ts`
-- Purpose:
-  - `SetSummaryRow` — one read-only set: effort label, weight × reps
-    (`-values`), inline `Stat` 1RM / VOL with legends, all at the row's colour
-    and weight; only the record set's beaten figures (1RM, Weight) in
-    `record`; planned rows faded
-  - `ExerciseSetsCard` — `Card` per exercise: name, a count, an inline
-    `accessory` (the session view's chevron) or a 44pt `control` (View Session's
-    ⋮), the set rows and the `record` band (`record`, a `RecordBand`). Given
-    `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`
-    (or the caller's `rowTestID`), `-record`. Also `nameFace="figure"`
-    (a date as the name, in Plex Mono) and a `summary` slot under the header
-    (exercise history's gym, tags and session `Stat`s)
-  - `SessionFactsCard` — `Card` with an optional header slot, a finished
-    session's `Start` / `End` read-only (the completed edit's field layout),
-    one or more rows of stacked `Stat`s (a `text` fact takes the spare width)
-    and an optional footer (the completion's sets-by-muscle table)
-  - covered by `completed-session-detail-screen.test.tsx`,
-    `session-view-screen.test.tsx`, `completed-session-detail-model.test.ts`
-    and `exercise-history-screen.test.tsx`
-
-17. View Session (the completed-session detail)
-- Folder: `apps/mobile/components/view-session/` (route
-  `app/completed-session/[sessionId].tsx`)
-- Purpose:
-  - `ViewSessionScreen` — the detail's composition on `paper`: top bar, the
-    deleted band, an inline write error, `SessionFactsCard`, then the shared
-    `SegmentedControl` (`view-session-section-summary` / `-sets`). Summary
-    composes `SessionMuscleBreakdown` and `SessionSummaryContent` from
-    `components/session-complete/session-summary-content.tsx`; Sets shows one
-    `ExerciseSetsCard` per exercise with a ⋮ `control`. The route owns section
-    and chart grouping so refocus and section switches retain them. testIDs
-    `completed-session-detail-screen`, `-summary`, `-times` (`-start` /
-    `-end`), `-duration`, `-gym`, `-sets`, `-volume`, `-deleted-band`,
-    `-error-notice`, `-no-exercises`, `-exercise-<id>` (and its `-count`,
-    `-set-<n>`, `-record`), `-exercise-options-<id>`
-  - `ViewSessionTopBar` — back · `View Session` · ⋮ · `Edit` (`accent`,
-    `ActionButton`); ⋮ and Edit omitted while loading, Edit while deleted.
-    testIDs `completed-session-detail-back`, `-options-button`, `-edit-button`
-  - `ViewSessionOptionsSheet` — `Sheet` `Session`: `Delete session` (danger) or
-    `Undelete session`, both `completed-session-detail-delete-button`
-  - `ViewSessionExerciseSheet` — `Sheet` titled with the exercise:
-    `Append to current session`
-    (`completed-session-detail-append-exercise-button-<id>`)
-  - covered by `apps/mobile/__tests__/completed-session-local-data.test.tsx`
-    and `completed-session-detail-screen.test.tsx`
-
-18. Gyms
-- Folder: `apps/mobile/components/gyms/`; the gym directory and writes in
-  `apps/mobile/src/session-recorder/gym-options.ts`, the location reads in
-  `apps/mobile/src/location/gym-location-reads.ts`
-- Purpose:
-  - `GymsScreen` — the Gyms screen's composition (route `app/gyms.tsx`): a
-    `Card` of `ListRow density="list"` rows (location glyph, name, `Location
-    saved` / `No location saved`), `+ Add gym`, `Show archived` and the
-    `Archived` card; takes an injectable `readPosition`. testIDs
-    `gyms-screen`, `gyms-list`, `gyms-row-<id>` (`-status`), `gyms-add`,
-    `gyms-toggle-archived`, `gyms-archived-list`
-  - `GymEditor` — one gym's editor in place of its row: name field at `uiGeometry.fieldHeight`, the location
-    status and actions with inline Replace / Clear confirmation and feedback,
-    and the `Archive` / `Unarchive` · `Cancel` · `Save` footer. testIDs
-    `gym-editor`, `-name`, `-location-status`, `-location-save` / `-replace` /
-    `-clear` / `-confirm` / `-cancel`, `-feedback`, `-archive` / `-unarchive`,
-    `-cancel`, `-save`
-  - covered by `apps/mobile/__tests__/gyms-screen.test.tsx`,
-    `gym-directory.test.ts`, `gym-location-reads.test.ts` and the
-    `ios-session-view` lane
-
-19. Today's Progress card
-- Folder: `apps/mobile/components/today/`; the read is
-  `apps/mobile/src/progress-summary/`
-- Purpose (target `design-targets/today-landing.md`):
-  - `TodayProgressCard` — one `Card`: `WeekFigures`, a `rule-soft` hairline,
-    `MonthPace`, a hairline, then `Latest session` with its `All sessions`
-    text button and the latest-session `SessionSummaryRow`.
-    testIDs `today-progress-card`, `today-all-sessions-button`,
-    `today-latest-session` (`-start`, `-figures`, `-record`)
-  - `SessionSummaryRow` (`session-summary-row.tsx`) — one session as a link
-    row, shared by both Today cards: an optional member header (Archivo 700
-    `lg`, with `TrainingNowMark` — the `set-current` ring and `Training now`
-    — while training; the Group card only), the summary line (stamp ·
-    duration @ gym, Plex Mono 500 figures), `sets · exercises` in muted
-    `detail` Plex Mono, then the PR line (`record` `arrow-up`; one PR named in
-    `record` Plex Mono with its noun in `ink-muted`, several only counted;
-    `src/session-insights/record-line.ts`). testIDs `<id>` (`-member`,
-    `-training-now`, `-start`, `-figures`, `-record`)
-  - `WeekFigures` — `This week` with the Mon–Sun range in `ink-faint`, then
-    `Sessions`, `Sets` and `PRs` (Plex Mono 700; a non-zero PR count in
-    `record` with its `arrow-up`), each over a `ShareBar` and `vs <n> last wk`.
-    testIDs `today-progress-week` (`-range`), `today-progress-week-<sessions |
-    working-sets | prs>` (`-value`, `-bar`, `-bar-fill`, `-previous`)
-  - `ShareBar` — a 6pt bar filling in laps of a total (`weekShare`): a `viz2`
-    fill over the `viz0` track up to the total, then `viz3` over a full `viz2`
-    up to twice it, then `viz4` over a full `viz3` up to three times
-  - `MonthPace` — `<Month> so far` and its working sets, the signed difference
-    from the previous month at the same day with `ahead of / behind / level
-    with <Mon>'s pace`, a `react-native-svg` cumulative chart (this month
-    `ink` over a `viz0` fill, the previous month dashed `ink-faint`, the
-    projection dotted `ink-ghost`, a dot on each line at today, `1` / today /
-    last-day axis labels) that is one accessible image labelled with its
-    summary sentence. testIDs
-    `today-progress-month` (`-working-sets`, `-difference`, `-pace`),
-    `today-progress-chart`
-  - `useTodayProgress` — the read on every focus: loading only before the
-    first result, a retryable error
-  - covered by `apps/mobile/__tests__/today-screen.test.tsx` (over real data)
-    and `today-progress-format.test.ts` (words and chart geometry)
-
-20. `StartDisc`
-- File: `apps/mobile/components/train/start-disc.tsx`
-- Purpose:
-  - Train's one action (`design-targets/train-page.md`): an `accent` disc
-    (232pt, `compact` 204pt) inside a `rule` ring, the `play` glyph over an
-    Archivo 800 caps label; `disabled` greys the disc to `ink-ghost`.
-    testIDs `<testID>`, `-ring`
-  - covered by `apps/mobile/__tests__/train-screen.test.tsx`
-
-### Optional bodyweight settings and readings
-
-- `components/bodyweight/weight-entry-sheet.tsx`: `WeightEntrySheet` uses a
-  keyboard-avoiding, scrollable `Sheet` and kg `FormField`. `initial` supplies
-  kg value; required `measuredAt`
-  supplies the editable local date field. `onSave` and optional `onDelete` are async; failure
-  retains input, in-flight writes block dismissal and duplicate submission.
-  Delete confirms with an Alert. `onDismiss` closes after success or cancellation;
-  the controlled `visible` flag keeps the native modal mounted while dismissing.
-  Reopening resets cancelled input to the chosen reading.
-  TestIDs: `weight-entry-sheet`, `weight-entry-value`,
-  `weight-entry-date`, `weight-entry-save`, `weight-entry-delete`.
-- `BodyWeightSettingsRow` composes a calculation row with an On/Off control
-  and a separate, always-visible `Body weight log` row. It reads/writes the
-  synced private preference and navigates to `/body-weight` independently of
-  that preference. A failed preference write restores the stored state and
-  presents an inline retryable error.
-- `BodyWeightScreen` composes current reading, Add and history with edit/delete;
-  history and saves stay in the owner-private local/sync domain. Covered by
-  `bodyweight-entry.test.ts` and `bodyweight-screen.test.tsx`; `ios-sync-e2e`
-  drives the real weight editor on device.
-- No reusable session/logger component shows or edits the selected reading.
-
-### Optional contribution and ordinary logger
-
-- `ExerciseCoreFields` conditionally renders one
-  `Bodyweight contribution (%)` field when the owning private/group preference
-  is enabled. It preserves hidden values and owns decimal 0–100 inline validation.
-- `SetLogger` keeps one kg `Weight` field, reps, effort and confirmation. It
-  receives derived 1RM/Volume but no reading/source/breakdown props.
-- Pure/data coverage: `bodyweight-contribution.test.ts`, `bodyweight-import.test.ts`;
-  interaction coverage over real data: `bodyweight-logging-ui.test.tsx` (logger
-  and session row, including a reading's changed RM/volume) and
-  `exercise-catalog-screen.test.tsx` (the editor's contribution field).
-
-### UI-supporting shared module (non-visual)
-
-1. `session-recorder/types.ts`
-- File: `apps/mobile/components/session-recorder/types.ts`
-- Purpose:
-  - the session/exercise/set/location types and the seeded gyms
-    (`SEEDED_LOCATIONS`) shared by the session repository, the session view,
-    the exercise page and the Gyms screen
-
-2. `session-list/types.ts` and `session-list/history-data.ts`
-- Files:
-  - `apps/mobile/components/session-list/types.ts` — `SessionListItem`, `SessionListDataClient`, `DEFAULT_SESSION_LIST_ITEMS`, and the `formatCompactDuration` re-export
-  - `apps/mobile/components/session-list/history-data.ts` — `DEFAULT_SESSION_LIST_DATA_CLIENT` and `useSessionListData` (loads/refreshes buckets via the data layer)
-- Purpose:
-  - shared data plumbing so any screen that needs the session list buckets can
-    reuse the same hook and data client without re-implementing repository
-    mapping
-  - the hook accepts focus enablement as its sole automatic-load trigger and
-    generations automatic/explicit requests so superseded or unmounted results
-    cannot update the consumer
-
-## Excluded from this catalog (document elsewhere)
-
-- Route-level screen shells (for example `CompletedSessionDetailScreenShell`, `ExerciseHistoryScreenShell`)
-  - Document in `docs/specs/ui/screen-map.md` and `docs/specs/ui/navigation-contract.md`
-  - Reason: they are route composition/test helpers, not reusable UI building blocks
-  - `ExerciseHistoryScreenShell` is exported separately from `apps/mobile/app/exercise-history.tsx` so the per-exercise history surface can be wired from any future route (currently entered from Progress and the preserved `/stats-history` path); the component remains a route-level shell, not a reusable primitive
-
-The retired audit's candidate primitives (audit deleted 2026-06-10; in git
-history) all shipped in the design language: `IconActionButton` → `IconButton`,
-`EmptyState` / state panels → `StatePanel`, `ScreenContainer` /
-`ScreenScrollContainer` → `Screen` / `ScreenScroll`, `FormField` → `FormField`,
-`ModalSurface` / `ModalBackdrop` → `Sheet`, `PressableRowCard` → `Card` or
-`ListRow` with `onPress`. A new primitive is built when a screen asks for it,
-from the tokens in entry 1.
-
-### Personal load projections
-
-- `SetSummaryRow` uses one Weight/1RM/Volume layout for every exercise; zero is a
-  numeric figure and no bodyweight context is rendered.
-- `RecordsPanel` keeps raw Top weight independent from derived 1RM/Volume.
-- Stats and `HistorySheet` use the same Weight/1RM/Volume labels; missing personal
-  reading never creates an unavailable/incomplete state.
-- Coverage must live in `bodyweight-analytics-parity.test.ts`, `bodyweight-analytics-data.test.ts`,
-  `bodyweight-analytics-formatting.test.ts`
-  and existing screen tests. `bodyweight-logging-ui.test.tsx` asserts a reading's
-  RM and volume effect over real data; pure/data tests cover other calculations.
-
-The logger's fixed-height amount field uses `Weight · kg`; its accessibility
-label says Weight in kilograms. The figure and label remain legible at 375pt.
-
-
-### Group competition controls
-
-- Group Settings has an admin-only `Bodyweight calculations` toggle. Positive
-  active comparisons require an impact review before Apply; c=0 toggles keep
-  score revisions. Typed inputs survive policy refresh and failed writes.
-- `GroupComparisonForm` preserves Off contribution, reviews effective rule
-  changes and retains stale edits; its owning route keeps the draft across
-  cache retirement. Members read the same standard in catalogue/linking rows.
-- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` retain the
-  group recipes with Volume/1RM, Certified/All and explicit kg/%BW units.
-  Historical units remain original; retired Scores are unavailable.
-- `competition-view-model.ts` and the safe session/stream models consume closed
-  protocol-4 data. Normalized cards omit weight/absolute metrics; full sessions
-  omit aggregate volume. Generic unavailable/ended copy reveals no private cause.
-- Saved native certification confirmations recheck the account, target, online
-  and read-only state; uncertainty requires review before another write.
-
-### Data and sync status
-
-- `SyncStatusPanel` (`components/sync-status/sync-status-panel.tsx`) reuses one
-  Settings Data & Sync card. Signed-in fields show sync time, pending changes
-  and network; the Error row combines sync and preference-storage failures.
-  `isSignedIn`, `preferenceError` and `onRefreshPreferences` let Settings keep
-  local-only failures in the existing signed-out card. Refresh retries
-  preferences and nudges/reads sync only when signed in; it is the only action.
-  Error feedback uses `settings-sync-status-error`; the existing Refresh keeps
-  `settings-sync-status-refresh-button`.
-
-## Maintenance rule
-
-If a task adds/removes/renames reusable UI components or changes their role,
-update this doc in the same session.
+- **A feature folder by default.** A new *primitive* in `components/ui/` is
+  added only when a screen asks for it and it has two or more consumers, built
+  from the tokens above — not speculatively.
+- **Non-visual models, data hooks and formatting go under
+  `apps/mobile/src/**`,** paired with the feature folder (`src/exercise-catalog/`,
+  `src/navigation/`, `src/session-recorder/`, `src/progress-summary/`,
+  `src/groups/`). `src/**` may not import `components/**` or `app/**`
+  (`AGENTS.md`, "Quality targets"), so a component holding its own rules cannot
+  be tested or reused without the UI.
+- **A route-level screen shell is not a catalog entry.**
+  `ExerciseHistoryScreenShell` and `CompletedSessionDetailScreenShell` are
+  exported from their route files so the surface can be wired from another
+  route; they are route composition and test seams, not reusable building
+  blocks. Document them in `screen-map.md` and `navigation-contract.md`.

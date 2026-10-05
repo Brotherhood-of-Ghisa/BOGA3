@@ -31,7 +31,7 @@ This folder is the backend root (`Supabase` local-first development and testing)
   - used by `supabase functions serve --env-file ...`
 - Hosted placeholders (no secrets committed): `supabase/.env.hosted`
   - setup links this to `~/.config/boga/supabase/env.hosted`
-  - detailed hosted env/deployment command path is owned by `RUNBOOK.md`
+  - detailed hosted env/deployment command path is owned by `docs/runbook-hosted-operations.md`
 
 ## One-command local startup path
 
@@ -230,6 +230,24 @@ These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.
 
 Coverage includes success read/write flows, validation failures, unauthenticated denial, and cross-user denial across all sync-domain entities, including session metadata parity fields (`session_exercises.exercise_definition_id`, `exercise_sets.set_type`).
 
+### Session-planning schema
+
+Migration `supabase/migrations/20261004120000_m23_session_planning.sql` adds four
+synced plan entities (`training_programmes`, `session_plans`,
+`session_plan_exercises`, `session_plan_sets`) and three performed-domain
+provenance columns (`sessions.source_plan_id`,
+`session_exercises.source_plan_exercise_id`, `exercise_sets.source_plan_set_id`),
+expanding Sync v2 from twelve to sixteen entities across five layers. It patches
+`sync_push` / `sync_pull` / `dev_wipe_my_data` in place and raises
+`require_sync_protocol()` to protocol 4, because the layer→type mapping changed
+(`sessions` L1→L2, `session_exercises` L2→L3, `exercise_sets` L3→L4). Deploy
+server-first: protocol-3 clients get `UPDATE_REQUIRED` before any row moves.
+Deferred triggers reject a source-derived set whose plan set is not under its
+card's source block, including when only a parent's source block changes. Local
+verification: `./boga db reset` then `./boga test sync-v2-schema`,
+`./boga test sync-push-contract`, `./boga test sync-pull-contract`,
+`./boga test dev-wipe-my-data`.
+
 Parallel-run note:
 
 - each initialized BOGA worktree gets readable Supabase `project_id`, slot-derived ports, containers, and database volume.
@@ -321,7 +339,7 @@ Standard hosted enablement on a fresh project:
 2. `supabase db push --linked --include-all` to apply every checked-in migration.
 3. Keep `app_public` listed in Dashboard **Project Settings -> API -> Data API Settings -> Exposed schemas**.
 
-Reset hosted to a known-good clean slate (when there is no data worth preserving): use Dashboard **Database -> Reset**, or `supabase db reset --linked --yes`. Both reapply `supabase/migrations/*.sql` in order against a fresh DB. See `RUNBOOK.md` for the operator-facing checklist.
+Reset hosted to a known-good clean slate (when there is no data worth preserving): use Dashboard **Database -> Reset**, or `supabase db reset --linked --yes`. Both reapply `supabase/migrations/*.sql` in order against a fresh DB. See `docs/runbook-hosted-operations.md` for the operator-facing checklist.
 
 Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` was a one-off hotfix retained for archival. The FK it relaxed no longer exists after the sync redesign, so the file is inert against the current schema.
 
@@ -355,13 +373,3 @@ It does **not** lock the final sync API surface choice (`Edge Functions` vs `Pos
 - `Supabase-local` integration/contract tests: required for auth/RLS/API tasks
 - hosted smoke validation: manual by default until CI exists
 - cross-stack `E2E`: strategy only; repo-root `e2e/` reserved for later implementation
-
-## Optional bodyweight-calculation cutover
-
-The accepted forward migration adds synced private settings and group enablement,
-renames contributions, converts retained lb values to kg, removes retired
-unit/mode/movement/loading/hydration fields and requires sync protocol 3 before
-removed-column access. Release an update-required compatibility client first,
-then the reviewed migration, matching functions and protocol-3 client. Follow
-[RUNBOOK](../RUNBOOK.md#optional-bodyweight-calculation-cutover) for hosted
-checks and forward repair; local gates do not deploy.

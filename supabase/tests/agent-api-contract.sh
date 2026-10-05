@@ -71,7 +71,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"

@@ -124,7 +124,7 @@ drain() {
   local out
   out="$(mktemp)"
   STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
     -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
   BODY="$(cat "${out}")"
   rm -f "${out}"

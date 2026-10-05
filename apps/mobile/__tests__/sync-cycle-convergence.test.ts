@@ -391,7 +391,8 @@ describe('FK_VIOLATION handling', () => {
     let servedOrphan = false;
     mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
       if (name === 'sync_pull') {
-        if (args.layer === 1 && !servedOrphan) {
+        // sessions live in Layer 2 under the session planning topology.
+        if (args.layer === 2 && !servedOrphan) {
           servedOrphan = true;
           return {
             data: {
@@ -411,14 +412,14 @@ describe('FK_VIOLATION handling', () => {
 
     expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
     expect(database.select().from(sessions).where(eq(sessions.id, 'sess-orphan')).get()).toBeUndefined();
-    expect(readPullCursorJson()).not.toHaveProperty('1');
+    expect(readPullCursorJson()).not.toHaveProperty('2');
     expect(mockLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'error',
         source: 'database',
         event: 'sync.pull_local_fk_violation',
         context: expect.objectContaining({
-          layer: 1,
+          layer: 2,
           entity_types: ['sessions'],
           row_count: 1,
           operation: 'pull_page_apply',
@@ -439,7 +440,7 @@ describe('FK_VIOLATION handling', () => {
 
     mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
       if (name === 'sync_pull') {
-        if (args.layer === 1) {
+        if (args.layer === 2) {
           return {
             data: {
               entities: [orphanSessionEntity('sess-orphan', 100)],

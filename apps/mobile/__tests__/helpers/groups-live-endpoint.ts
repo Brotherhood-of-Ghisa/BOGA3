@@ -75,7 +75,7 @@ export const signInLiveClient = async (env: GroupsLiveEnv, email: string): Promi
   // The app's client sends the sync protocol header on every call; so does this one.
   const client = createClient(env.url, env.anonKey, {
     auth: NO_TIMER_AUTH,
-    global: { headers: { 'x-boga-sync-protocol': '3', Authorization: `Bearer ${data.session.access_token}` } },
+    global: { headers: { 'x-boga-sync-protocol': '4', Authorization: `Bearer ${data.session.access_token}` } },
   });
   return {
     client,

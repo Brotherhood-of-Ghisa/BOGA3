@@ -4,7 +4,7 @@
 #
 # Asserts the two halves of the deferrable-FK contract from docs/specs/tech/sync-v2-server-contract.md ("Deferrable foreign keys"):
 #
-#   A. All ten cross-entity FKs are present in information_schema.
+#   A. All eighteen cross-entity FKs are present in information_schema.
 #      referential_constraints with is_deferrable='YES' and
 #      initially_deferred='YES'.
 #   B. A transaction that inserts a complete FK chain in child-before-parent
@@ -86,22 +86,30 @@ fail() { echo "[sync-v2-deferrable-fk] FAIL: $*" >&2; exit 1; }
 pass() { echo "[sync-v2-deferrable-fk] pass: $*"; }
 
 # -----------------------------------------------------------------------------
-# A. All ten cross-entity FKs deferrable + initially deferred.
+# A. All eighteen cross-entity FKs deferrable + initially deferred.
 #
 # Map (constraint_name -> child_table), as declared by the sync-v2 migrations.
 # -----------------------------------------------------------------------------
 
 FK_SPECS=(
   "sessions|sessions_gym_fk"
+  "sessions|sessions_source_plan_fk"
   "session_exercises|session_exercises_session_fk"
   "session_exercises|session_exercises_exercise_definition_fk"
+  "session_exercises|session_exercises_source_plan_exercise_fk"
   "exercise_sets|exercise_sets_session_exercise_fk"
+  "exercise_sets|exercise_sets_source_plan_set_fk"
   "exercise_muscle_mappings|exercise_muscle_mappings_exercise_definition_fk"
   "exercise_muscle_mappings|exercise_muscle_mappings_muscle_group_fk"
   "exercise_tag_definitions|exercise_tag_definitions_exercise_definition_fk"
   "session_exercise_tags|session_exercise_tags_session_exercise_fk"
   "session_exercise_tags|session_exercise_tags_exercise_tag_definition_fk"
   "exercise_group_links|exercise_group_links_exercise_definition_fk"
+  "session_plans|session_plans_programme_fk"
+  "session_plans|session_plans_gym_fk"
+  "session_plan_exercises|session_plan_exercises_session_plan_fk"
+  "session_plan_exercises|session_plan_exercises_exercise_definition_fk"
+  "session_plan_sets|session_plan_sets_session_plan_exercise_fk"
 )
 
 for spec in "${FK_SPECS[@]}"; do
@@ -132,9 +140,9 @@ for spec in "${FK_SPECS[@]}"; do
     fail "${fk_name}: expected initially_deferred=YES, got '${initially_deferred}'"
   fi
 done
-pass "deferrable-fk A — ten expected FKs present with is_deferrable=YES and initially_deferred=YES (information_schema.referential_constraints joined to .table_constraints)"
+pass "deferrable-fk A — eighteen expected FKs present with is_deferrable=YES and initially_deferred=YES (information_schema.referential_constraints joined to .table_constraints)"
 
-# Also check: exactly 10 cross-entity FKs in app_public schema with both flags
+# Also check: exactly 18 cross-entity FKs in app_public schema with both flags
 # set. (The auth.users CASCADE FKs from each entity's owner_user_id sit in
 # information_schema with unique_constraint_schema='auth', so they don't show
 # up under app_public; the ten here are exactly the cross-entity set.)
@@ -150,10 +158,10 @@ TOTAL_DEFERRED_FKS="$(run_psql "
      and tc.is_deferrable = 'YES'
      and tc.initially_deferred = 'YES';
 ")"
-if [[ "${TOTAL_DEFERRED_FKS}" != "10" ]]; then
-  fail "expected exactly 10 deferrable+initially-deferred app_public→app_public FKs; got ${TOTAL_DEFERRED_FKS}"
+if [[ "${TOTAL_DEFERRED_FKS}" != "18" ]]; then
+  fail "expected exactly 18 deferrable+initially-deferred app_public→app_public FKs; got ${TOTAL_DEFERRED_FKS}"
 fi
-pass "deferrable-fk A — exactly 10 cross-entity deferrable FKs in app_public"
+pass "deferrable-fk A — exactly 18 cross-entity deferrable FKs in app_public"
 
 # -----------------------------------------------------------------------------
 # B. Behavioural: insert children before parents inside one transaction.

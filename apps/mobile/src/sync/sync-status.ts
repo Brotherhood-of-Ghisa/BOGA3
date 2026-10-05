@@ -38,6 +38,10 @@ const DIRTY_COUNTED_TABLES = [
   schema.exerciseSets,
   schema.sessionExerciseTags,
   schema.bodyWeightMeasurements,
+  schema.trainingProgrammes,
+  schema.sessionPlans,
+  schema.sessionPlanExercises,
+  schema.sessionPlanSets,
 ] as const;
 
 /**
@@ -56,7 +60,7 @@ export type SyncNetworkState = 'unknown' | 'online' | 'offline';
 export interface SyncStatusSnapshot {
   /** Epoch-ms of the most recent clean sync cycle, or null if none yet. */
   lastSuccessAtMs: number | null;
-  /** Count of local rows still waiting to be pushed, across all 11 tables. */
+  /** Count of local rows still waiting to be pushed, across every counted table. */
   dirtyCount: number;
   /** The latest cycle's error message, or null when the latest cycle was clean. */
   errorMessage: string | null;

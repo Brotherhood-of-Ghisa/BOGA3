@@ -10,7 +10,6 @@ Current docs:
 - `bodyweight-load-contract.md`: current contract for ordinary and optional
   private/group bodyweight calculations, kg-only migration, dated readings,
   privacy and rollout.
-
 - `sync-v2-server-contract.md`: authoritative Sync v2 server contract — Part A (server schema, composite PKs, RLS, deferrable FKs, LWW/undelete, drift checker) and Part B (push/pull RPC wire protocol, batch caps, per-layer cursor drain). Verified against the as-built migrations and RPCs.
 - `groups-contract.md`: group domain rules — share ledger and share rule,
   stream, evaluator, boards, certification, comparisons, RPC conventions and
@@ -19,6 +18,9 @@ Current docs:
   planning and programmes: data model, schema, 16-entity Sync v2 expansion,
   materialization algorithms, block lifecycle, set reordering invariants, agent
   write permissions/API, and MCP tools.
+- `group-competition-contract.md`: group competition representation and the
+  versioned cutover — metric/unit revisions, witness migration, publication
+  fences and the public-reader guard.
 
 Maintenance rule:
 

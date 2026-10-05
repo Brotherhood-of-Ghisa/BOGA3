@@ -108,4 +108,4 @@ Current verdict after repository call-graph review:
 - `maestro-ios-teardown.sh`
   - cleanup phase
 
-If you change one of these scripts, update `apps/mobile/README-maestro.md` and `docs/specs/11-maestro-runtime-and-testing-conventions.md` in the same task when the command surface or runtime contract changes.
+This file owns the script inventory. If you change the command surface, update `apps/mobile/README-maestro.md` in the same task; update `docs/specs/11-maestro-runtime-and-testing-conventions.md` only when the runtime *contract* changes.

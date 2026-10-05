@@ -301,7 +301,14 @@ describe('describeServerFkViolation', () => {
     expect(detail.suspectColumn).toBe('exercise_definition_id');
     expect(detail.truncated).toBe(false);
     expect(detail.rows).toEqual([
-      { id: 'se-1', refs: { session_id: 'sess-1', exercise_definition_id: 'def-missing' } },
+      {
+        id: 'se-1',
+        refs: {
+          session_id: 'sess-1',
+          exercise_definition_id: 'def-missing',
+          source_plan_exercise_id: null,
+        },
+      },
     ]);
   });
 
@@ -316,6 +323,7 @@ describe('describeServerFkViolation', () => {
     expect(Object.keys(detail.rows[0].refs).sort()).toEqual([
       'exercise_definition_id',
       'session_id',
+      'source_plan_exercise_id',
     ]);
   });
 

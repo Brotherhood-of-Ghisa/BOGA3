@@ -4,8 +4,8 @@
  * The sync-status composer: it folds the scheduler's production status, the
  * runtime-state row, and a dirty-row count into the single snapshot the Settings
  * surface renders. These tests pin two things against a real in-memory database:
- *  1. the dirty count sums `local_dirty = 1` rows across all eleven entity tables
- *     (and excludes clean rows), and
+ *  1. the dirty count sums `local_dirty = 1` rows across every counted entity
+ *     table (and excludes clean rows), and
  *  2. the snapshot carries the scheduler's last-success time, error, network
  *     state, the auth-required flag, and the bootstrap-completed flag.
  */
@@ -43,9 +43,13 @@ import {
   muscleGroups,
   sessionExercises,
   sessionExerciseTags,
+  sessionPlanExercises,
+  sessionPlanSets,
+  sessionPlans,
   sessions,
   syncQuarantine,
   syncRuntimeState,
+  trainingProgrammes,
 } from '@/src/data/schema';
 import { getSyncStatus } from '@/src/sync/sync-status';
 
@@ -160,10 +164,20 @@ describe('dirty-row count across the synced entity tables', () => {
       localDirty: true,
     });
 
+    // One dirty row in each of the four planning entities.
+    await db.insert(trainingProgrammes).values({ id: 'tp-1', name: 'Wave', localDirty: true });
+    await db.insert(sessionPlans).values({ id: 'sp-1', title: 'Day 1', localDirty: true });
+    await db
+      .insert(sessionPlanExercises)
+      .values({ id: 'spe-1', sessionPlanId: 'sp-1', orderIndex: 0, name: 'Squat', localDirty: true });
+    await db
+      .insert(sessionPlanSets)
+      .values({ id: 'sps-1', sessionPlanExerciseId: 'spe-1', orderIndex: 0, targetReps: 5, localDirty: true });
+
     const status = await getSyncStatus();
     // 2 gyms + 1 def + 1 muscle group + 1 tag-def + 1 mapping + 1 link
-    // + 1 session + 1 se + 1 set + 1 se-tag = 11
-    expect(status.dirtyCount).toBe(11);
+    // + 1 session + 1 se + 1 set + 1 se-tag + 4 planning = 15
+    expect(status.dirtyCount).toBe(15);
   });
 
   it('counts a dirty muscle_groups row like every other synced entity', async () => {

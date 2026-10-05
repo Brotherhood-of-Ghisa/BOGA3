@@ -19,14 +19,3 @@ budget	docs/specs/03-technical-architecture.md	2500
 budget	docs/specs/09-project-structure.md	2500
 budget	*	3000
 exempt	docs/specs/ui/design-targets/
-ceiling	RUNBOOK.md	6282
-ceiling	docs/specs/02-quality-and-test-gates.md	3597
-ceiling	docs/specs/03-technical-architecture.md	4061
-ceiling	docs/specs/05-data-model.md	5703
-ceiling	docs/specs/06-testing-strategy.md	8799
-ceiling	docs/specs/11-maestro-runtime-and-testing-conventions.md	3177
-ceiling	docs/specs/12-worktree-config-and-isolation.md	3031
-ceiling	docs/specs/tech/session-planning-contract.md	3812
-ceiling	docs/specs/ui/components-catalog.md	7062
-ceiling	docs/specs/ui/navigation-contract.md	5269
-ceiling	docs/specs/ui/screen-map.md	7614

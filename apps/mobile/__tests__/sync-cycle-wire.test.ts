@@ -36,6 +36,10 @@ afterEach(() => {
 const TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
+  training_programmes: schema.trainingProgrammes,
+  session_plans: schema.sessionPlans,
+  session_plan_exercises: schema.sessionPlanExercises,
+  session_plan_sets: schema.sessionPlanSets,
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
   muscle_groups: schema.muscleGroups,
@@ -56,6 +60,9 @@ const seedParents = (): void => {
   database.insert(schema.exerciseTagDefinitions).values({ id: 'tag-1', exerciseDefinitionId: 'def-1', name: 'Heavy', normalizedName: 'heavy' }).run();
   database.insert(schema.sessions).values({ id: 'sess-1', startedAt: new Date('2026-05-29T08:00:00.000Z') }).run();
   database.insert(schema.sessionExercises).values({ id: 'sx-1', sessionId: 'sess-1', orderIndex: 0, name: 'Bench' }).run();
+  database.insert(schema.trainingProgrammes).values({ id: 'tp-1', name: 'Wave' }).run();
+  database.insert(schema.sessionPlans).values({ id: 'sp-1', programmeId: 'tp-1', gymId: 'gym-1', title: 'Day 1' }).run();
+  database.insert(schema.sessionPlanExercises).values({ id: 'spe-1', sessionPlanId: 'sp-1', exerciseDefinitionId: 'def-1', orderIndex: 0, name: 'Squat' }).run();
 };
 
 /** A representative row literal per entity type, including null and value cases. */
@@ -72,6 +79,52 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: new Date('2026-05-29T10:00:00.000Z'),
+  },
+  training_programmes: {
+    id: 'tp-wire',
+    name: 'Squat Wave',
+    description: 'Six weeks',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
+  },
+  session_plans: {
+    id: 'sp-wire',
+    programmeId: 'tp-1',
+    programmeOrderIndex: 0,
+    gymId: 'gym-1',
+    title: 'Day 1',
+    scheduledFor: new Date('2026-05-30T08:00:00.000Z'),
+    provenance: 'human',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
+  },
+  session_plan_exercises: {
+    id: 'spe-wire',
+    sessionPlanId: 'sp-1',
+    exerciseDefinitionId: 'def-1',
+    // orderIndex 1: seedParents already holds a block at orderIndex 0 under
+    // this plan (the local plan/order unique index is not partial).
+    orderIndex: 1,
+    name: 'Squat',
+    machineName: null,
+    progressStatus: 'pending',
+    resolvedAt: null,
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
+  },
+  session_plan_sets: {
+    id: 'sps-wire',
+    sessionPlanExerciseId: 'spe-1',
+    orderIndex: 0,
+    targetWeightValue: '100',
+    targetReps: 5,
+    targetSetType: 'rir_4',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
   },
   gyms: {
     id: 'gym-wire',

@@ -39,6 +39,26 @@ export { sessionExercises, type NewSessionExercise, type SessionExercise } from 
 export { sessions, type NewSession, type Session } from './sessions';
 export { userSettings, type NewUserSettings, type UserSettings } from './user-settings';
 export {
+  trainingProgrammes,
+  type TrainingProgramme,
+  type NewTrainingProgramme,
+} from './training-programmes';
+export {
+  sessionPlans,
+  type SessionPlan,
+  type NewSessionPlan,
+} from './session-plans';
+export {
+  sessionPlanExercises,
+  type SessionPlanExercise,
+  type NewSessionPlanExercise,
+} from './session-plan-exercises';
+export {
+  sessionPlanSets,
+  type SessionPlanSet,
+  type NewSessionPlanSet,
+} from './session-plan-sets';
+export {
   syncQuarantine,
   type NewSyncQuarantineRecord,
   type SyncQuarantineRecord,

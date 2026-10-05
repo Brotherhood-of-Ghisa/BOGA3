@@ -84,9 +84,12 @@ REST="${API_URL}/rest/v1"
 
 # 1. Sync v2 rows (service role), children before the rows they reference.
 sync_rows=0
-for table in session_exercise_tags exercise_sets session_exercises exercise_muscle_mappings \
-  exercise_tag_definitions sessions exercise_group_links exercise_definitions muscle_groups gyms \
-  body_weight_measurements user_settings; do
+# The performed rows that carry a source-plan link (exercise_sets,
+# session_exercises, sessions) precede the plan rows they reference.
+for table in session_exercise_tags exercise_sets session_exercises sessions \
+  session_plan_sets session_plan_exercises session_plans training_programmes \
+  exercise_muscle_mappings exercise_tag_definitions exercise_group_links exercise_definitions \
+  muscle_groups gyms body_weight_measurements user_settings; do
   http DELETE "${REST}/${table}?owner_user_id=eq.${B_UID}" "${SERVICE_ROLE_KEY}" "" \
     "Prefer: return=representation"
   expect_2xx "delete user_b ${table}"
@@ -99,7 +102,7 @@ done
 sync_pull() {
   http POST "${REST}/rpc/sync_pull" "${B_TOKEN}" \
     "$(jq -nc --argjson layer "$1" '{layer: $layer, cursor: null, limit: 1}')" \
-    "x-boga-sync-protocol: 3" "Prefer: params=single-object"
+    "x-boga-sync-protocol: 4" "Prefer: params=single-object"
   expect_2xx "sync_pull layer $1 as user_b"
 }
 LAST_LAYER=4
