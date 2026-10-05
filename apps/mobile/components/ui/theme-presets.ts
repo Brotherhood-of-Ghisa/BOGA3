@@ -1,10 +1,11 @@
 import { defaultThemeSeeds, type ThemeSeeds } from '@/components/ui/theme';
+import { hueThemeId, parseHueThemeId, seedsFromHue, type HueThemeId } from '@/components/ui/theme-hue';
 
 // The themes a user can choose (`docs/specs/ui/design-language.md` §2,
 // "Presets"). A preset is four seeds, fixed here and gated in
-// `__tests__/ui-theme.test.ts`: there is no free colour picker, so no seed
-// ever needs correcting at runtime. Picked 2026-10-01 from a mock of six: one
-// per hue family.
+// `__tests__/ui-theme.test.ts`, so no seed ever needs correcting at runtime;
+// the custom colour (`theme-hue.ts`) fixes everything but the hue for the same
+// reason. Picked 2026-10-01 from a mock of six: one per hue family.
 export type ThemePreset = {
   id: ThemePresetId;
   label: string;
@@ -40,14 +41,28 @@ export type ThemeLaunchProblem =
   | { kind: 'unknown-preset'; storedId: string }
   | { kind: 'read-failed'; message: string };
 
-export type ResolvedTheme = { preset: ThemePreset; problem: ThemeLaunchProblem | null };
+// A theme from one hue the user picked (`theme-hue.ts`), stored as `hue:<deg>`.
+export type CustomTheme = { id: 'custom'; label: string; hue: number; seeds: ThemeSeeds };
 
-// The preset a stored id names. No stored id is the default with no problem:
+export type ResolvedTheme = { preset: ThemePreset | CustomTheme; problem: ThemeLaunchProblem | null };
+
+export function customTheme(hue: number): CustomTheme {
+  return { id: 'custom', label: 'Custom', hue, seeds: seedsFromHue(hue) };
+}
+
+// The value a theme is stored under: a preset id, or `hue:<deg>`.
+export function storedThemeId(theme: ThemePreset | CustomTheme): ThemePresetId | HueThemeId {
+  return theme.id === 'custom' ? hueThemeId(theme.hue) : theme.id;
+}
+
+// The theme a stored id names: a preset, or a custom hue. No stored id is the default with no problem:
 // the user has never chosen. An id no preset has (a preset since removed, or a
 // corrupted value) is the default, reported.
 export function resolveThemePreset(storedId: string | null): ResolvedTheme {
   const fallback = getThemePreset(DEFAULT_THEME_PRESET_ID);
   if (storedId === null) return { preset: fallback, problem: null };
+  const hue = parseHueThemeId(storedId);
+  if (hue !== null) return { preset: customTheme(hue), problem: null };
   const preset = findThemePreset(storedId);
   return preset
     ? { preset, problem: null }

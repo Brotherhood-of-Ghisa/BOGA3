@@ -1,6 +1,7 @@
 import { uiRoles } from '@/components/ui';
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
 import { defaultThemeSeeds, generateRoles, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 import { DEFAULT_THEME_PRESET_ID, themePresets } from '@/components/ui/theme-presets';
 
 // The theme generator (`docs/specs/ui/design-language.md` §2, "Derivation"
@@ -46,6 +47,12 @@ const OTHER_SEEDS: Record<string, ThemeSeeds> = {
 
 const PRESET_SEEDS: Record<string, ThemeSeeds> = Object.fromEntries(
   themePresets.map((preset) => [`${preset.id} preset`, preset.seeds]),
+);
+
+// A custom colour's seeds, around the wheel every 30° (every hue is checked
+// against the floors in "custom hue themes").
+const HUE_SEEDS: Record<string, ThemeSeeds> = Object.fromEntries(
+  Array.from({ length: 12 }, (_, index) => [`hue ${index * 30}°`, seedsFromHue(index * 30)]),
 );
 
 describe('lch colour space', () => {
@@ -110,7 +117,7 @@ describe('theme generator', () => {
     expect(() => generateRoles({ ...defaultThemeSeeds, accent: 'orange' })).toThrow('expected #RRGGBB');
   });
 
-  describe.each(Object.entries({ ...PRESET_SEEDS, ...OTHER_SEEDS }))('for the %s seeds', (_name, seeds) => {
+  describe.each(Object.entries({ ...PRESET_SEEDS, ...OTHER_SEEDS, ...HUE_SEEDS }))('for the %s seeds', (_name, seeds) => {
     const roles = generateRoles(seeds);
     const ground = hexToLch(seeds.ground);
 
@@ -204,6 +211,70 @@ describe('theme presets', () => {
       });
     },
   );
+});
+
+describe('custom hue themes', () => {
+  const everyHue = Array.from({ length: 360 }, (_, hue) => hue);
+
+  it('meet every preset floor at every hue', () => {
+    // The floors a preset is gated on, by construction: the user picks the
+    // hue, lightness and chroma are fixed.
+    const failures = everyHue.filter((hue) => {
+      const roles = generateRoles(seedsFromHue(hue));
+      return !(
+        contrastRatio(roles.surface, roles.accent) >= 4.5 &&
+        [roles.paper, roles.surface, roles.recordWash].every((ground) => contrastRatio(roles.record, ground) >= 4.5) &&
+        hueDistance(hexToLch(roles.record).hue, hexToLch(roles.accent).hue) >= 30 &&
+        new Set(Object.values(roles)).size === Object.values(roles).length
+      );
+    });
+    expect(failures).toEqual([]);
+  });
+
+  it('put the ground, accent and ramp on the picked hue', () => {
+    const seeds = seedsFromHue(200);
+    for (const seed of [seeds.ground, seeds.accent, seeds.viz]) {
+      expect(hueDistance(hexToLch(seed).hue, 200)).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('keep `record` the shipped brass unless the accent comes near it, then step it away', () => {
+    const brass = hexToLch('#8A6516').hue;
+    expect(hueDistance(hexToLch(seedsFromHue(240).record).hue, brass)).toBeLessThanOrEqual(2);
+    // Just below and just above the brass: `record` moves to the far side.
+    expect(hexToLch(seedsFromHue(70).record).hue).toBeGreaterThan(brass);
+    expect(hexToLch(seedsFromHue(95).record).hue).toBeLessThan(brass);
+  });
+
+  it('wrap and round the hue', () => {
+    expect(seedsFromHue(-10)).toEqual(seedsFromHue(350));
+    expect(seedsFromHue(360.4)).toEqual(seedsFromHue(0));
+  });
+
+  it('are stored as `hue:<deg>` and read back; anything else is not a hue', () => {
+    expect(hueThemeId(47.4)).toBe('hue:47');
+    expect(parseHueThemeId('hue:47')).toBe(47);
+    expect(parseHueThemeId('hue:0')).toBe(0);
+    for (const id of ['hue:360', 'hue:-5', 'hue:4.5', 'hue:', 'warm', 'hue:1000']) {
+      expect(parseHueThemeId(id)).toBeNull();
+    }
+  });
+
+  it('have a plain name all the way round the wheel', () => {
+    expect([0, 30, 47, 80, 100, 140, 190, 260, 300, 330, 355].map(hueName)).toEqual([
+      'Pink',
+      'Red',
+      'Orange',
+      'Amber',
+      'Olive',
+      'Green',
+      'Teal',
+      'Blue',
+      'Indigo',
+      'Purple',
+      'Pink',
+    ]);
+  });
 });
 
 // CIE76 ΔE*ab: Euclidean distance in L*a*b*. ~2.3 is a just-noticeable

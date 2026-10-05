@@ -555,17 +555,17 @@ guardrail keeps screens on them. It is the app's one styling vocabulary
    preset; like every role it is read once at launch, so it matches the
    screens beneath it.
 4. The user picks a theme from a few curated presets in Settings → Preferences
-   → `Appearance`. There is no free colour picker: each preset's seeds are
-   fixed in code and gated in CI, so nothing is corrected at runtime.
+   → `Appearance`, or one hue on the `Custom colour` ring, whose preview
+   repaints live. Both are gated in CI, so nothing is corrected at runtime
+   (`design-language.md` §2).
 5. The choice is **per device** (not synced to the account) and **applies on
    the next launch**: about a hundred modules bake `uiRoles` into a
    module-scope `StyleSheet`, and a release build cannot restart itself
    (`expo-updates` is not installed). The sheet saves on tap and says so
    ("Slate applies the next time you open BoGa. Close BoGa fully, then open it
    again."); the Settings row reads `<Preset> from next launch` until then.
-   Switching live is a separate decision (context-driven styles or a native
-   styling dependency), not a tweak to this.
-6. A stored choice this build cannot use — an unknown preset id, or a store
+   A development build reloads on save instead.
+6. A stored choice this build cannot use — an unknown preset id or hue, or a store
    that cannot be read — opens the app in the default theme and is logged
    (`theme.unknown_preset` warn, `theme.read_failed` error), never silent. A
    failed save warns too (`theme.save_failed`), and with an unusable choice

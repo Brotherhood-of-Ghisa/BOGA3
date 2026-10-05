@@ -275,14 +275,10 @@ Brief entrypoint map of the current mobile screens.
     sync, About, and development-only Developer tools sections in that order
   - Account routes to `/profile`, showing the signed-in email when available or
     concise signed-out guidance otherwise
-  - Preferences: an `Appearance` row (`settings-appearance-row`, Lucide
-    `palette`) naming the chosen theme (`<Preset> from next launch` until the
-    app reopens), which opens the `Appearance` sheet
-    (`settings-appearance-sheet`): the presets as radio rows
-    (`settings-appearance-option-<id>`) with a decorative swatch of each, saved
-    on tap, and a note that a new theme applies the next time BoGa opens; a
-    failed save restores the previous choice and says nothing changed
-    (`settings-appearance-error`). Rules: `ux-rules.md` §9b
+  - Preferences: an `Appearance` row (`settings-appearance-row`) naming the
+    chosen theme, opening a sheet (`settings-appearance-sheet`) of preset radio
+    rows (`settings-appearance-option-<id>`) with swatches, saved on tap, and a
+    `Custom colour` row opening `/theme-colour`. Rules: `ux-rules.md` §9b
   - Preferences card: date format (`settings-date-format-<format>`) and past-records
     gym filter (`settings-records-gym-<scope>`) are account-local on this device.
     Sign-out hides the choices and returning to the account restores them;
@@ -719,6 +715,12 @@ Brief entrypoint map of the current mobile screens.
 - Native back returns to the caller. History orders by measurement time then ID.
 - No session/detail/logger surface shows or links to a reading. Reading
   value/date changes and deletion recalculate affected projections silently.
+
+24. `/theme-colour` (Custom colour)
+- File: `apps/mobile/app/theme-colour.tsx`; composition: `components/appearance/`
+- A hue ring (`theme-colour-ring`), a live preview of its theme
+  (`theme-colour-preview`) and `Use this colour` (`theme-colour-apply`).
+  Rules: `ux-rules.md` §9b
 
 ## Route shell (not a user-facing screen)
 

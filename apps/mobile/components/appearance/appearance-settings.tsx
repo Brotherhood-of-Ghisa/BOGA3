@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -14,26 +15,33 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { generateRoles } from '@/components/ui/theme';
+import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
 import { launchTheme, readStoredThemePresetId, saveThemePresetId } from '@/components/ui/theme-launch';
 import {
   DEFAULT_THEME_PRESET_ID,
-  getThemePreset,
   resolveThemePreset,
+  storedThemeId,
   themePresets,
   type ThemePreset,
   type ThemePresetId,
 } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
+import { THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 
 // Settings → Preferences → Appearance (`docs/specs/ui/ux-rules.md` §9b): a row
 // naming the chosen theme, and a sheet listing the presets. A choice is saved
-// at once and applies on the next launch; the app cannot restart itself.
+// at once and applies on the next launch; the app cannot restart itself. The
+// last row opens the custom colour picker.
 export function AppearanceSettingsRow() {
-  const [chosenId, setChosenId] = useState<ThemePresetId>(readChosenId);
+  const router = useRouter();
+  const [chosenId, setChosenId] = useState<string>(readChosenId);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const chosen = getThemePreset(chosenId);
-  const pending = chosenId !== launchTheme.preset.id;
+  // Set when the custom row closes the sheet; the picker opens once it is gone.
+  const openPickerOnDismiss = useRef(false);
+  const chosenLabel = themeLabel(chosenId);
+  const customHue = parseHueThemeId(chosenId);
+  const pending = chosenId !== storedThemeId(launchTheme.preset);
 
   const choose = async (id: ThemePresetId) => {
     // Re-choosing the current preset saves nothing, unless this launch could
@@ -61,9 +69,9 @@ export function AppearanceSettingsRow() {
     <>
       <ListRow
         accessibilityHint="Opens the theme choices"
-        accessibilityLabel={`Appearance, ${pending ? `${chosen.label} from next launch` : chosen.label}`}
+        accessibilityLabel={`Appearance, ${pending ? `${chosenLabel} from next launch` : chosenLabel}`}
         density="list"
-        description={pending ? `${chosen.label} from next launch` : chosen.label}
+        description={pending ? `${chosenLabel} from next launch` : chosenLabel}
         divider={false}
         label="Appearance"
         leading={<Icon color={uiRoles.inkMuted} name="palette" />}
@@ -74,6 +82,11 @@ export function AppearanceSettingsRow() {
       <Sheet
         dismissLabel="Dismiss appearance"
         onDismiss={() => setSheetVisible(false)}
+        onDismissed={() => {
+          if (!openPickerOnDismiss.current) return;
+          openPickerOnDismiss.current = false;
+          router.push(THEME_COLOUR_ROUTE);
+        }}
         testID="settings-appearance-sheet"
         title="Appearance"
         visible={sheetVisible}>
@@ -101,6 +114,20 @@ export function AppearanceSettingsRow() {
             </View>
           </ListRow>
         ))}
+        <ListRow
+          accessibilityHint="Opens the colour picker"
+          checked={customHue !== null}
+          description={customHue !== null ? `${hueName(customHue)}, ${customHue}°` : 'Pick any colour'}
+          divider
+          label="Custom colour"
+          leading={<Icon color={uiRoles.ink} name={customHue !== null ? 'radio-on' : 'radio-off'} />}
+          onPress={() => {
+            openPickerOnDismiss.current = true;
+            setSheetVisible(false);
+          }}
+          testID="settings-appearance-option-custom"
+          trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
+        />
         <View style={styles.footer}>
           {saveError ? (
             <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" />
@@ -111,7 +138,7 @@ export function AppearanceSettingsRow() {
             style={styles.note}
             testID="settings-appearance-note">
             {pending
-              ? `${chosen.label} applies the next time you open BoGa. Close BoGa fully, then open it again.`
+              ? `${chosenLabel} applies the next time you open BoGa. Close BoGa fully, then open it again.`
               : 'A new theme applies the next time you open BoGa.'}
           </Text>
         </View>
@@ -120,11 +147,11 @@ export function AppearanceSettingsRow() {
   );
 }
 
-// The stored choice. Falls back to the theme in use, logged, when the store
-// cannot be read.
-function readChosenId(): ThemePresetId {
+// The stored choice, as stored: a preset id or a custom `hue:<deg>`. Falls
+// back to the theme in use, logged, when the store cannot be read.
+function readChosenId(): string {
   try {
-    return resolveThemePreset(readStoredThemePresetId()).preset.id;
+    return storedThemeId(resolveThemePreset(readStoredThemePresetId()).preset);
   } catch (error) {
     void logEvent({
       level: 'error',
@@ -132,8 +159,13 @@ function readChosenId(): ThemePresetId {
       message: 'Could not read the stored theme preset; showing the theme in use.',
       context: { error: error instanceof Error ? error.message : String(error) },
     });
-    return launchTheme.preset.id;
+    return storedThemeId(launchTheme.preset);
   }
+}
+
+function themeLabel(id: string): string {
+  const hue = parseHueThemeId(id);
+  return hue === null ? resolveThemePreset(id).preset.label : `Custom (${hueName(hue)})`;
 }
 
 // A preset as its own colours: `ink`, `accent`, `record` and the ramp's third

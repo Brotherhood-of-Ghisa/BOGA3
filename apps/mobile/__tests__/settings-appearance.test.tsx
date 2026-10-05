@@ -18,9 +18,10 @@ jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow
 // The sync-status panel has its own spec.
 jest.mock('@/components/sync-status/sync-status-panel', () => ({ SyncStatusPanel: () => null }));
 
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
 
 jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: null }) }));
@@ -28,7 +29,8 @@ jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: null }) }));
 const mockLogEvent = jest.fn();
 jest.mock('@/src/logging/logEvent', () => ({ logEvent: (...args: unknown[]) => mockLogEvent(...args) }));
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { Modal } from 'react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 
 import * as themeLaunch from '@/components/ui/theme-launch';
@@ -40,6 +42,7 @@ import SettingsRoute from '../app/(tabs)/settings';
 
 beforeEach(async () => {
   mockLogEvent.mockReset();
+  mockPush.mockReset();
   // Settings' date-format controls load their preferences on mount; load them
   // first so the render settles inside the test.
   await ensureExerciseListPreferencesLoaded();
@@ -143,4 +146,34 @@ it('shows a choice made earlier this run, read from the store', () => {
   Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
   render(<SettingsRoute />);
   expect(screen.getByLabelText('Appearance, Plum from next launch')).toBeTruthy();
+});
+
+it('offers a custom colour last, opening the picker once the sheet has gone', () => {
+  render(<SettingsRoute />);
+  const sheet = within(openSheet());
+  const custom = sheet.getByTestId('settings-appearance-option-custom');
+  expect(custom.props.accessibilityState).toEqual({ checked: false });
+  expect(sheet.getByText('Pick any colour')).toBeTruthy();
+
+  fireEvent.press(custom);
+  // The sheet's modal must be gone before a route can be pushed over it.
+  expect(mockPush).not.toHaveBeenCalled();
+  act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
+  expect(mockPush).toHaveBeenCalledWith('/theme-colour');
+
+  // Dismissing the sheet any other way opens nothing.
+  mockPush.mockReset();
+  act(() => screen.UNSAFE_getByType(Modal).props.onDismiss());
+  expect(mockPush).not.toHaveBeenCalled();
+});
+
+it('names a custom colour chosen earlier this run, checked in the sheet', () => {
+  Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'hue:200');
+  render(<SettingsRoute />);
+  expect(screen.getByLabelText('Appearance, Custom (Teal) from next launch')).toBeTruthy();
+
+  const sheet = within(openSheet());
+  expect(sheet.getByTestId('settings-appearance-option-custom').props.accessibilityState).toEqual({ checked: true });
+  expect(sheet.getByText('Teal, 200°')).toBeTruthy();
+  expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: false });
 });

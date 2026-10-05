@@ -1,5 +1,6 @@
 import { Storage } from 'expo-sqlite/kv-store';
 
+import type { HueThemeId } from '@/components/ui/theme-hue';
 import { resolveThemePreset, type ResolvedTheme, type ThemePresetId } from '@/components/ui/theme-presets';
 
 // The chosen theme, per device: it is not synced to the account. Read
@@ -33,7 +34,8 @@ export function readStoredThemePresetId(): string | null {
   return Storage.getItemSync(THEME_PRESET_STORAGE_KEY);
 }
 
-// Rejects when the write fails; the caller reports that nothing changed.
-export async function saveThemePresetId(id: ThemePresetId): Promise<void> {
+// Rejects when the write fails; the caller reports that nothing changed. `id`
+// is a preset id or a custom hue's `hue:<deg>`.
+export async function saveThemePresetId(id: ThemePresetId | HueThemeId): Promise<void> {
   await Storage.setItem(THEME_PRESET_STORAGE_KEY, id);
 }
