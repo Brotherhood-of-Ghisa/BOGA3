@@ -118,3 +118,5 @@ to today/current week; in-range selection survives look-back edits.
   are required; an all-zero scale has no misleading reference. Averages use whole
   volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row
   values retain the selected metric format.
+- Current-week wording stays beside its row and the average stays above its
+  reference; the footer omits the repeated current-week and average sentences.

@@ -117,6 +117,17 @@ it('handles a truly empty adapter array without a reference or invalid scale', (
   expect(screen.queryAllByTestId(/^bars-heatmap-cell-/)).toEqual([]);
 });
 
+it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training weeks', count => {
+  const days = Array.from({ length: count }, (_, index) => day(new Date(Date.UTC(2026, 9, 5) - index * 7 * 86400000).toISOString().slice(0, 10), 20));
+  render(chart(data(days)));
+  expect(screen.queryByText('Current week is in progress.')).toBeNull();
+  expect(screen.queryByText(/^12-week average:/)).toBeNull();
+  expect(screen.getByText('Current week')).toBeTruthy();
+  expect(screen.getByText('Intensity (per week)')).toBeTruthy();
+  if (count >= 6) expect(screen.getByTestId('bars-heatmap-average-label')).toHaveTextContent('Avg 20');
+  else expect(screen.queryByTestId('bars-heatmap-average-label')).toBeNull();
+});
+
 it('shows only the selected banner, preserves full coverage copy and uses one active vertical scroller', () => {
   function SelectedSheet() {
     const [key, setKey] = useState<string | null>(null);
