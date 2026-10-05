@@ -304,6 +304,9 @@ appId: com.dinoderek.mobile
       STEP: push-complete-edit
 # The native back arrow returns to the stream on every visit, not just the first:
 # react-native-screens 4.16 on iOS 26 left it dead from the second visit on.
+# Its accessibility label is the previous route's title: Groups is a tab, and
+# the root stack titles the `(tabs)` group "Back"
+# (components/navigation/root-stack.tsx).
 - repeat:
     times: 2
     commands:
