@@ -45,6 +45,9 @@ drifted from the code and predated several UI milestones. Git history has them.)
   - accepted repo-native replacement target for optional private/group
     bodyweight calculations; integrated rendering and human acceptance remain
     required before closeout
+- `design-targets/weekly-history-bars.md`
+  - accepted weekly-history redesign: horizontal bars stacked newest first,
+    with visible values and an average reference; awaiting implementation
 - `design-targets/group-competitions.md`
   - accepted group Volume/1RM target, public percentage units, rules review and
     safe record/session context; replaces the older group Weight examples
