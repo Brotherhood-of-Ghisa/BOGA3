@@ -338,7 +338,7 @@ const signIn = async (apiUrl: string, anonKey: string, email: string, password: 
   const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '3',
+      'x-boga-sync-protocol': '4',
       apikey: anonKey,
       'content-type': 'application/json',
     },
@@ -355,7 +355,7 @@ const verifyTokenEmail = async (apiUrl: string, anonKey: string, token: string, 
   const response = await fetch(`${apiUrl}/auth/v1/user`, {
     method: 'GET',
     headers: {
-      'x-boga-sync-protocol': '3',
+      'x-boga-sync-protocol': '4',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       accept: 'application/json',
@@ -375,7 +375,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '3',
+      'x-boga-sync-protocol': '4',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',
@@ -391,21 +391,24 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   }
 };
 
+// Layered for the M23 five-layer topology. Only the types this import emits are
+// listed; the plan entities and tag/link tables are not imported here.
 const layerRank = (type: WireEntity['type']) => {
   switch (type) {
     case 'user_settings':
-    case 'body_weight_measurements':
     case 'gyms':
     case 'exercise_definitions':
     case 'muscle_groups':
       return 0;
     case 'exercise_muscle_mappings':
-    case 'sessions':
       return 1;
-    case 'session_exercises':
+    case 'sessions':
       return 2;
-    case 'exercise_sets':
+    case 'session_exercises':
       return 3;
+    case 'exercise_sets':
+    case 'body_weight_measurements':
+      return 4;
   }
 };
 

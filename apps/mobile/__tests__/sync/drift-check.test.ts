@@ -8,9 +8,10 @@
  * server's column set; exit 0 means the two-column additions and the added
  * soft-delete columns line up with the server with no drift.
  *
- * It also asserts the checker introspected all twelve owner-scoped entity
+ * It also asserts the checker introspected all sixteen owner-scoped entity
  * tables, including the muscle-group taxonomy, exercise-group links, dated
- * weight readings and synced user settings. Exit 0 with those tables present
+ * weight readings, synced user settings, and the four M23 planning tables. Exit
+ * 0 with those tables present
  * transitively proves their FK columns have a typed
  * server counterpart and its parent table sits at a valid topological layer
  * (the checker fails on an untyped FK column or a same-layer/inverted FK edge).
@@ -43,7 +44,7 @@ import { join } from 'path';
 const MOBILE_ROOT = join(__dirname, '..', '..');
 
 describe('schema drift checker', () => {
-  it('exits 0 against the as-built client schemas under --strict and covers all twelve entities', () => {
+  it('exits 0 against the as-built client schemas under --strict and covers all sixteen entities', () => {
     const result = spawnSync(
       'npm',
       ['run', 'check:sync-drift', '--', '--strict', '--skip-reset'],
@@ -69,10 +70,14 @@ describe('schema drift checker', () => {
     const combined = `${stdout}\n${stderr}`;
     const introspectMatch = combined.match(/introspecting (\d+) entity table\(s\): (.+)/);
     expect(introspectMatch).not.toBeNull();
-    expect(Number(introspectMatch?.[1])).toBe(12);
+    expect(Number(introspectMatch?.[1])).toBe(16);
     expect(introspectMatch?.[2]).toContain('muscle_groups');
     expect(introspectMatch?.[2]).toContain('exercise_group_links');
     expect(introspectMatch?.[2]).toContain('body_weight_measurements');
     expect(introspectMatch?.[2]).toContain('user_settings');
+    expect(introspectMatch?.[2]).toContain('training_programmes');
+    expect(introspectMatch?.[2]).toContain('session_plans');
+    expect(introspectMatch?.[2]).toContain('session_plan_exercises');
+    expect(introspectMatch?.[2]).toContain('session_plan_sets');
   }, 130_000);
 });

@@ -43,7 +43,7 @@ http_request() {
   fi
 
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
   fi
 
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
@@ -108,7 +108,7 @@ postgrest_insert() {
     -H "Authorization: Bearer ${token}" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Prefer: return=representation" \
     -o "${response_file}" \
     -w "%{http_code}" \
@@ -131,7 +131,7 @@ postgrest_patch() {
     -H "Authorization: Bearer ${token}" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Prefer: return=representation" \
     -o "${response_file}" \
     -w "%{http_code}" \
@@ -158,7 +158,7 @@ public_postgrest_insert_minimal() {
     -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${token}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Prefer: return=minimal" \
     -o "${response_file}" \
     -w "%{http_code}" \
@@ -179,7 +179,7 @@ public_postgrest_patch_minimal() {
     -X PATCH \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${token}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Prefer: return=minimal" \
     -o "${response_file}" \
     -w "%{http_code}" \

@@ -82,7 +82,7 @@ RUN_TAG="$(date +%s)-$$-${RANDOM}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 NOW_MS="$(($(date +%s) * 1000))"
 
-# IDs for user A's full twelve-table FK chain (deleted by the helper) plus a
+# IDs for user A's full sixteen-table FK chain (deleted by the helper) plus a
 # single user B gym that must survive (owner-scoping check).
 A_BW="dw-${RUN_TAG}-abw"
 A_GYM="dw-${RUN_TAG}-agym"
@@ -98,10 +98,20 @@ A_SXTAG="dw-${RUN_TAG}-asxtag"
 # group_id is plain text (no FK, no group row needed).
 A_GRP="dw-${RUN_TAG}-agrp"
 A_EGL="${A_GRP}:${A_EDEF}"
+# New v2 plan-chain rows: training_programmes → session_plans →
+# session_plan_exercises → session_plan_sets.
+A_TP="dw-${RUN_TAG}-atp"
+A_SP="dw-${RUN_TAG}-asp"
+A_SPE="dw-${RUN_TAG}-aspe"
+A_SPS="dw-${RUN_TAG}-asps"
 B_GYM="dw-${RUN_TAG}-bgym"
 
 cleanup_rows() {
   run_psql_sql "
+    delete from app_public.session_plan_sets        where id in ('${A_SPS}');
+    delete from app_public.session_plan_exercises   where id in ('${A_SPE}');
+    delete from app_public.session_plans            where id in ('${A_SP}');
+    delete from app_public.training_programmes      where id in ('${A_TP}');
     delete from app_public.session_exercise_tags    where id in ('${A_SXTAG}');
     delete from app_public.exercise_sets            where id in ('${A_SET}');
     delete from app_public.session_exercises        where id in ('${A_SX}');
@@ -171,9 +181,9 @@ pass "scenario 2: unset app.env raises FORBIDDEN_ENV"
 # ---------------------------------------------------------------------------
 # Scenario 3: owner-scoped wipe under a non-production env.
 #
-# Seed user A's full twelve-table FK chain plus one user B gym, then call the
+# Seed user A's full sixteen-table FK chain plus one user B gym, then call the
 # helper as user A with app.env='local'. Assert: the return count equals A's
-# ten rows, all of A's rows are gone, and B's gym survives.
+# sixteen rows, all of A's rows are gone, and B's gym survives.
 # ---------------------------------------------------------------------------
 echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 
@@ -181,10 +191,14 @@ echo "[dev-wipe] scenario 3: owner-scoped wipe deletes only the caller's rows"
 # earlier suites in the same gate run may have left rows owned by this fixture
 # user, and the helper (correctly) deletes ALL of the caller's rows. Removing
 # A's existing rows up front means the helper's count reflects exactly the
-# ten rows seeded below.
+# sixteen rows seeded below.
 run_psql_sql "
   begin;
     set constraints all deferred;
+    delete from app_public.session_plan_sets        where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.session_plan_exercises   where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.session_plans            where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.training_programmes      where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercises        where owner_user_id = '${USER_A_UUID}'::uuid;
@@ -210,6 +224,26 @@ run_psql_sql "
     insert into app_public.exercise_definitions
       (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, '${A_EDEF}', 'A Exercise', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.training_programmes
+      (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_TP}', 'A Programme', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plans
+      (owner_user_id, id, programme_id, title, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_SP}', '${A_TP}', 'A Plan', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plan_exercises
+      (owner_user_id, id, session_plan_id, exercise_definition_id, order_index,
+       name, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_SPE}', '${A_SP}', '${A_EDEF}', 0,
+            'A PE', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plan_sets
+      (owner_user_id, id, session_plan_exercise_id, order_index, target_reps,
+       created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_SPS}', '${A_SPE}', 0, 8,
+            ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
     insert into app_public.muscle_groups
       (owner_user_id, id, display_name, family_name, sort_order, is_editable,
@@ -285,14 +319,18 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "12" ]]; then
-  fail "scenario 3 expected 12 rows deleted, got '${deleted}'"
+if [[ "${deleted}" != "16" ]]; then
+  fail "scenario 3 expected 16 rows deleted, got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 12"
+pass "scenario 3: helper returned rows_deleted = 16"
 
 remaining_a="$(run_psql "
   select
     (select count(*) from app_public.gyms                     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_GYM}')
+  + (select count(*) from app_public.training_programmes      where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_TP}')
+  + (select count(*) from app_public.session_plans            where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SP}')
+  + (select count(*) from app_public.session_plan_exercises   where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SPE}')
+  + (select count(*) from app_public.session_plan_sets        where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SPS}')
   + (select count(*) from app_public.exercise_definitions     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EDEF}')
   + (select count(*) from app_public.muscle_groups            where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_MG}')
   + (select count(*) from app_public.exercise_tag_definitions where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_ETD}')

@@ -113,6 +113,20 @@
       "when": 1791133028890,
       "tag": "0015_local_data_owner",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791153845137,
+      "tag": "0016_nice_blink",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791153848075,
+      "tag": "0017_session_plan_cursor_reset",
+      "breakpoints": true
     }
   ]
 }

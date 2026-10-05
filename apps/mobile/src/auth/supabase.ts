@@ -71,7 +71,9 @@ export const getSupabaseMobileClient = () => {
   }
 
   supabaseClient = createClient(config.url, config.anonKey, {
-    global: { headers: { 'x-boga-sync-protocol': '3' } },
+    // Sync v4 (M23): the 16-entity / five-layer planning topology. The server
+    // rejects older protocols with UPDATE_REQUIRED before any row moves.
+    global: { headers: { 'x-boga-sync-protocol': '4' } },
     auth: {
       storage: getAuthStorageAdapter(),
       // Pin the session storage key to the deployment flavor instead of letting

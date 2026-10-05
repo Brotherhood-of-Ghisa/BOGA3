@@ -46,14 +46,14 @@ round-trip and the drift checker ignores it.
 
 | Table group | Scope | Owning path |
 | --- | --- | --- |
-| The twelve user-owned entities (`apps/mobile/src/sync/topo-order.ts` names all twelve with their FK layers) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
+| The sixteen user-owned entities (`apps/mobile/src/sync/topo-order.ts` names all sixteen with their FK layers) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
 | Device-local browsing and Progress preferences (key-value, not SQL tables) | out — device choices | `apps/mobile/src/preferences/` |
 | The three `exercise_session_facts*` tables | out — derived, rebuildable local facts | `apps/mobile/src/data/schema/exercise-session-facts.ts` |
 | `group_cache` | out — disposable cache of server group-RPC results, readable only by the signed-in `user_id` | `apps/mobile/src/data/schema/group-cache.ts` |
 | `sync_runtime_state`, plus the two local-only columns on each entity table | out — local sync bookkeeping | `apps/mobile/src/data/schema/sync-runtime-state.ts` |
 | `sync_quarantine` | out — local push-side quarantine | `apps/mobile/src/data/schema/sync-quarantine.ts` |
 | `smoke_records` | out — test scaffolding | `apps/mobile/src/data/schema/smoke.ts` |
-| `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the twelve-table mirror | `supabase/migrations/` |
+| `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the sixteen-table mirror | `supabase/migrations/` |
 | `public.app_logs` | out — operational diagnostics. Authenticated clients **insert only**; client `SELECT`/`UPDATE`/`DELETE` are intentionally unavailable and rows are read through operator tooling | `supabase/migrations/` |
 | `public.agent_access_audit` | out — security metadata only; service-side insert only; an app session reads only its own rows and an OAuth token cannot read it at all | `supabase/migrations/` |
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
@@ -132,7 +132,7 @@ different rules versions never mix values.
 The local store holds one account's data; `sync_runtime_state.account_user_id`
 records which (null on a fresh or signed-out store). One complete wipe,
 `wipeLocalDatabaseRows` (`apps/mobile/src/data/local-wipe.ts`), empties it in
-one transaction — the twelve entity tables child before parent, `group_cache`,
+one transaction — the sixteen entity tables child before parent, `group_cache`,
 `sync_quarantine`, then the three facts tables last, after the raw deletes have
 fired their triggers — resets `bootstrap_completed_at`, `pull_cursor` and
 `applied_seed_migration_app_version`, sets `account_user_id`, keeps
@@ -167,7 +167,7 @@ the sync cycle's lock, so it never lands between two pages of a pull.
 
 ## Local sync bookkeeping (Sync v2)
 
-Per-row sync state is two local-only columns on each of the twelve user-owned
+Per-row sync state is two local-only columns on each of the sixteen user-owned
 entity tables — `local_dirty` (1 iff the row needs pushing) and
 `local_updated_at_ms` (the monotonic client timestamp, sent as
 `client_updated_at_ms`). Neither crosses the wire, and there is no outbox or
@@ -198,7 +198,7 @@ one local orphan cannot wedge the backlog.
    `docs/specs/tech/sync-v2-server-contract.md`, "LWW and undelete").
 5. Diagnostic log rows are write-only from authenticated clients, inspected
    through backend operator tooling.
-6. All twelve mirror tables use composite primary key `(owner_user_id, id)` —
+6. All sixteen mirror tables use composite primary key `(owner_user_id, id)` —
    **owner-first**. The order is load-bearing: the canonical pull query
    (`where owner_user_id = … order by server_received_at`) leads with the PK
    column and the per-layer cursor depends on it. Every user owns their own
@@ -299,7 +299,7 @@ the data-model-level invariants.
 
 ### Entity coverage (Sync v2)
 
-All twelve entities move through that same typed-envelope LWW upsert path: no
+All sixteen entities move through that same typed-envelope LWW upsert path: no
 bespoke paths, no per-entity event types. Deletion is `deleted_at` going
 non-null and undelete is the same row with `deleted_at` back to null; reorder
 and complete are ordinary field changes; attach and link insert or undelete the
@@ -318,7 +318,7 @@ undefined sync behaviour.
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the twelve
+Modifying any file under `apps/mobile/src/data/schema/` for the sixteen
 user-owned entities to add a domain column requires a paired server migration
 under `supabase/migrations/` that adds the matching `app_public.<entity>`
 column with a compatible Postgres type, **and the server migration must be
@@ -340,7 +340,7 @@ against the live FK graph, so adding an entity table or FK without updating
 that list fails too.
 
 The rule does NOT apply to any `out of sync scope` local table above: no
-server counterpart, and the checker introspects only the twelve
+server counterpart, and the checker introspects only the sixteen
 `app_public.<entity>` mirror tables. Nor does it apply to the two local-only
 bookkeeping columns, listed under `exemptions.local_only_columns` in
 `apps/mobile/src/data/schema/sync-extras.json`. Nor does it assert indexes:

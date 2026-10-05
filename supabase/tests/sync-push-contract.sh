@@ -67,7 +67,7 @@ http_request() {
   fi
 
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL-3}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL-4}" -H "Content-Type: application/json" --data "${body}")
   fi
 
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
@@ -733,6 +733,9 @@ assert_body_contains "AUTH_REQUIRED" "auth: no JWT body carries AUTH_REQUIRED"
 
 # shellcheck source=sync-bodyweight-contract.sh
 source "${SUPABASE_DIR}/tests/sync-bodyweight-contract.sh"
+
+# shellcheck source=sync-session-plan-contract.sh
+source "${SUPABASE_DIR}/tests/sync-session-plan-contract.sh"
 
 echo "[sync-push] cleanup"
 service_delete "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=like.push-set-%-${RUN_TAG}"

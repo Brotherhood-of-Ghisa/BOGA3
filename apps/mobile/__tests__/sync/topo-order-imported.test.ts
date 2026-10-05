@@ -62,20 +62,33 @@ describe('the cycle and scheduler import the layer partition, never redefine it'
 });
 
 describe('the single source of truth has the expected shape', () => {
-  it('declares five layers spanning twelve entity types', () => {
+  it('declares five layers spanning sixteen entity types', () => {
     expect(TOPO_LAYERS).toHaveLength(5);
     const flat = TOPO_LAYERS.flat();
-    expect(new Set(flat).size).toBe(12);
-    // New readers get a fresh cursor without replaying the legacy layers.
-    expect(TOPO_LAYERS[4]).toEqual(['body_weight_measurements']);
-    // exercise_group_links sits in Layer 1, after its exercise_definitions parent.
-    expect(TOPO_LAYERS[1]).toContain('exercise_group_links');
-    // Layer 0 anchors the FK graph (no outbound entity FKs).
+    expect(new Set(flat).size).toBe(16);
+    // Layer 0 anchors the FK graph (no outbound entity FKs); M23 adds the
+    // programme container.
     expect([...TOPO_LAYERS[0]].sort()).toEqual([
       'exercise_definitions',
       'gyms',
       'muscle_groups',
+      'training_programmes',
       'user_settings',
+    ]);
+    // exercise_group_links sits in Layer 1, after its exercise_definitions parent;
+    // M23 adds session_plans (FKs gyms + training_programmes, both Layer 0).
+    expect(TOPO_LAYERS[1]).toContain('exercise_group_links');
+    expect(TOPO_LAYERS[1]).toContain('session_plans');
+    // sessions moved L1->L2 to sit below session_plans; the block joins it.
+    expect(TOPO_LAYERS[2]).toEqual(['sessions', 'session_plan_exercises']);
+    // session_exercises moved L2->L3 to sit below session_plan_exercises.
+    expect(TOPO_LAYERS[3]).toEqual(['session_exercises', 'session_plan_sets']);
+    // exercise_sets moved L3->L4 to sit below session_plan_sets, alongside the
+    // tags join and the independently cursorable bodyweight root.
+    expect(TOPO_LAYERS[4]).toEqual([
+      'exercise_sets',
+      'session_exercise_tags',
+      'body_weight_measurements',
     ]);
   });
 });

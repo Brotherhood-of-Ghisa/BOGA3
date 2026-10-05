@@ -186,6 +186,10 @@ independent `body_weight_measurements` cursor.
   client never observes the new mapping, so a client filtering rows by its own
   layer list can never advance the page cursor past rows it dropped.
 
+**As-built.** Migrations `0016_nice_blink` (schema) and
+`0017_session_plan_cursor_reset` (reset); `require_sync_protocol()` requires
+protocol 4.
+
 ## 4. Lifecycle and Materialization
 
 ### 4.1 Plan Block Lifecycle

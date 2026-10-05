@@ -13,7 +13,7 @@ for the how (fix the doc when they disagree):
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
 
-Authenticated app push and pull require the header `x-boga-sync-protocol: 3`
+Authenticated app push and pull require the header `x-boga-sync-protocol: 4`
 (see `sync_push`, "Update-required cutoff").
 
 ---
@@ -42,11 +42,16 @@ written only through `sync_push`.
   - Domain columns are nullable wherever the client may write NULL. Only the
     structural columns (PK, `owner_user_id`, `client_updated_at_ms`) are
     NOT NULL.
-  - No content-validating triggers: Sync v2's own triggers are the two
-    structural ones (group triggers follow "Out of scope").
-  - No uniqueness beyond the PK. Slot and pair uniqueness are client-enforced
-    (see "Client-enforced constraints"); the server has non-unique btree
-    indexes for them, for query speed only.
+  - No content-validating triggers, except the M23 provenance trigger
+    (`exercise_sets_source_plan_provenance`, see "Per-entity rules"): Sync v2's
+    other triggers are the two structural ones (group triggers follow "Out of
+    scope").
+  - No uniqueness beyond the PK, except the three M23 provenance guards
+    (`sessions_owner_source_plan_unique`,
+    `session_exercises_owner_source_block_unique`,
+    `exercise_sets_owner_source_set_unique`; see "Per-entity rules"). Slot and
+    pair uniqueness is otherwise client-enforced (see "Client-enforced
+    constraints") with non-unique btree indexes for speed only.
 - **Typed columns only.** No `extras jsonb` blob anywhere: schema, wire or
   drift checker.
 - **Tombstones keep the full row.** A delete sets `deleted_at` and clears
@@ -115,13 +120,23 @@ listed here:
   CHECK enforces that form, so a pulled row that breaks it fails the layer-1
   page apply with `INTERNAL` and pull cannot advance past it. Its sync scope and
   FK-free group columns are owned by `docs/specs/05-data-model.md`.
+- **M23 planning** adds `training_programmes`, `session_plans`,
+  `session_plan_exercises` and `session_plan_sets`, and three performed-domain
+  provenance columns (`sessions.source_plan_id`,
+  `session_exercises.source_plan_exercise_id`,
+  `exercise_sets.source_plan_set_id`). The columns, wire shapes and lifecycle
+  are owned by `docs/specs/tech/session-planning-contract.md`; this doc adds the
+  server rules: the three partial-unique guards and a DEFERRABLE constraint
+  trigger `exercise_sets_source_plan_provenance` rejecting a source-derived set
+  whose `source_plan_set_id` is not under its card's source block.
 
 ## Deferrable foreign keys
 
-All ten cross-entity FKs are `DEFERRABLE INITIALLY DEFERRED`, so the checks
-run at COMMIT. A push may write a child before its parent in one transaction,
-and any unsatisfied FK at COMMIT rolls back the whole batch. Names, targets and
-on-delete actions are in the migrations and are asserted by
+All eighteen cross-entity FKs (ten pre-M23 plus the eight M23 planning edges)
+are `DEFERRABLE INITIALLY DEFERRED`, so the checks run at COMMIT. A push may
+write a child before its parent in one transaction, and any unsatisfied FK at
+COMMIT rolls back the whole batch. Names, targets and on-delete actions are in
+the migrations and are asserted by
 `supabase/tests/sync-v2-deferrable-fk.sh` and
 `supabase/tests/sync-v2-schema-smoke.sh`.
 
@@ -160,17 +175,20 @@ Push batching and pull draining both use the layering in
 
 | Layer | Tables |
 | --- | --- |
-| 0 | `gyms`, `exercise_definitions`, `muscle_groups`, `user_settings` |
-| 1 | `sessions`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links` |
-| 2 | `session_exercises` |
-| 3 | `exercise_sets`, `session_exercise_tags` |
-| 4 | `body_weight_measurements` (an independent root, drained last so readings have their own cursor) |
+| 0 | `gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`, `training_programmes` |
+| 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links` |
+| 2 | `sessions`, `session_plan_exercises` |
+| 3 | `session_exercises`, `session_plan_sets` |
+| 4 | `exercise_sets`, `session_exercise_tags`, `body_weight_measurements` (an independent root) |
 
 Any order within a layer is safe because no FK joins two tables in one layer
 and every FK points to a strictly earlier layer (or is a self-edge). The drift
 checker asserts both against the live FK graph, and that every entity sits in
 exactly one layer. Adding an entity or FK means updating
-`topo-order.ts` and the `sync_pull` layer mapping together.
+`topo-order.ts` and the `sync_pull` layer mapping together. M23 moved
+`sessions` L1→L2, `session_exercises` L2→L3 and `exercise_sets` L3→L4; an
+upgraded client resets `pull_cursor` and the server gates the new mapping on
+protocol 4 (`docs/specs/tech/session-planning-contract.md`).
 
 ## Drift checker
 
@@ -217,7 +235,7 @@ Push requests and pull responses carry rows in one shape:
 }
 ```
 
-- `type` is one of the twelve entity table names.
+- `type` is one of the sixteen entity table names.
 - `id` is client-assigned (a ULID, or a slug for seeds) and stable forever.
 - `client_updated_at_ms` comes from the clock-monotonicity guard.
 - `fields` holds every typed column of the entity, keyed by its snake_case
@@ -252,7 +270,7 @@ in one transaction with deferred constraints, forces the FK check before it
 returns (so it can raise `FK_VIOLATION`), and commits or rolls back the whole
 batch.
 
-**`fields`.** Protocol-3 writers send every typed column. Any extra key is
+**`fields`.** Protocol-4 writers send every typed column. Any extra key is
 rejected as drift rather than preserved. Local-only columns are never sent.
 LWW stays per row; there are no per-field clocks.
 
@@ -261,7 +279,7 @@ LWW stays per row; there are no per-field clocks.
 `UPDATE_REQUIRED: …` before it touches any row. The cutoff is compatibility
 enforcement, not authorization; auth and OAuth denial are unchanged. The app
 client (`apps/mobile/src/auth/supabase.ts`) and the import CLI send
-protocol 3.
+protocol 4.
 
 **Batch building.** The client takes dirty rows layer by layer up to the cap,
 so no child ships without its parent: each FK target of a batched row is in an

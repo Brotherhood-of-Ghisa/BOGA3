@@ -1,0 +1,15 @@
+-- M23: reset the per-layer pull cursors for the 16-entity / five-layer Sync v2
+-- topology. This implements the strategy locked in
+-- docs/specs/tech/session-planning-contract.md §3.2 ("Pull Cursor Reset and
+-- Protocol-4 Gate"): cursor remapping is rejected because Layers 0–3 each gain
+-- at least one new entity and the old Layer-4 bodyweight cursor must survive,
+-- so no arithmetic preserves every entity's unread range.
+--
+-- Setting pull_cursor to '{}' makes the next sync re-drain every layer from its
+-- earliest position. Replayed rows arrive as idempotent last-write-wins merges
+-- (rows already at their current state are no-ops), so the replay is safe and
+-- converges to the same state. The cost is one full historical replay per device
+-- after upgrading. The server projection flip is separately gated on sync
+-- protocol 4 (app_public.require_sync_protocol), so a protocol-3 client never
+-- observes the new layer→type mapping.
+UPDATE `sync_runtime_state` SET `pull_cursor` = '{}';
