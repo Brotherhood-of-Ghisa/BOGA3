@@ -13,7 +13,7 @@ import {
   uiSpace,
   uiTypography,
 } from '@/components/ui/tokens';
-import type { SessionSetTypeValue } from '@/src/data/set-types';
+import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   canCommitLogger,
   formatEffort,
@@ -61,6 +61,9 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
   const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, loadContext);
   const canCommit = canCommitLogger({ weightValue, repsValue });
   const effort = formatEffort(setType);
+  const effortText = setType === 'technique' || setType === 'cooldown'
+    ? formatSessionSetType(setType, 'compact')
+    : effort;
 
   return (
     <View style={styles.logger} testID="exercise-set-logger">
@@ -126,7 +129,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
           <Text allowFontScaling={false} style={pageText.microLabel}>Effort</Text>
           <View style={styles.effortValue}>
             <Text allowFontScaling={false} numberOfLines={1} style={styles.effortText}>
-              {effort}
+              {effortText}
             </Text>
             <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
           </View>

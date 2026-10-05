@@ -468,6 +468,21 @@ describe('ExercisePageScreen', () => {
     await waitFor(async () => expect((await benchSets())[2].setType).toBe('rir_4'));
   });
 
+  it.each([
+    ['technique', 'Technique', 'Tech'],
+    ['cooldown', 'Cooldown', 'CD'],
+  ])('shows a compact %s label in the logger and keeps its full accessible and picker names', async (setType, fullLabel, compactLabel) => {
+    await openPage();
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
+    const option = await screen.findByTestId(`exercise-effort-option-${setType}`);
+    expect(option).toHaveTextContent(fullLabel);
+    fireEvent.press(option);
+
+    expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent(`Effort${compactLabel}`);
+    expect(screen.getByLabelText(`Change effort, currently ${fullLabel}`)).toBeTruthy();
+    await waitFor(async () => expect((await benchSets())[2].setType).toBe(setType));
+  });
+
   it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
     await openPage();
     for (const label of ['RIR 0', 'Technique', 'Cooldown', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
