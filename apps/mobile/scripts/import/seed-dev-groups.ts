@@ -192,7 +192,7 @@ export const buildRecentSessionEntities = (trainee: DevTrainee, now: Date): Wire
 type Env = { apiUrl: string; anonKey: string; serviceRoleKey: string };
 type SignedIn = DevTrainee & { token: string; userId: string };
 
-const rpc = async (env: Env, token: string, name: string, args: Record<string, unknown>) => {
+export const rpc = async (env: Env, token: string, name: string, args: Record<string, unknown>) => {
   const response = await fetch(`${env.apiUrl}/rest/v1/rpc/${name}`, {
     method: 'POST',
     headers: {
@@ -201,6 +201,7 @@ const rpc = async (env: Env, token: string, name: string, args: Record<string, u
       'content-type': 'application/json',
       'content-profile': 'app_public',
       'accept-profile': 'app_public',
+      'x-boga-group-contract': '4',
     },
     body: JSON.stringify(args),
   });

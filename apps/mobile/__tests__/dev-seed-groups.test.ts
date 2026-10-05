@@ -5,6 +5,7 @@ import {
   buildRecentSessionEntities,
   recentWindowStart,
   trainingDays,
+  rpc,
 } from '../scripts/import/seed-dev-groups';
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
 
@@ -12,6 +13,21 @@ import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-se
 const NOW = new Date(2026, 9, 3, 10, 30);
 
 describe('dev groups seed: recent training', () => {
+  it('advertises the supported group protocol when seeding an activated local database', async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ groups: [] }) });
+    global.fetch = fetchMock;
+    try {
+      await expect(rpc({ apiUrl: 'http://local.test', anonKey: 'anon', serviceRoleKey: 'service' },
+        'member-token', 'group_list_mine', {})).resolves.toEqual({ groups: [] });
+      expect(fetchMock).toHaveBeenCalledWith('http://local.test/rest/v1/rpc/group_list_mine',
+        expect.objectContaining({ headers: expect.objectContaining({
+          'x-boga-group-contract': '4', authorization: 'Bearer member-token',
+        }) }));
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
   it('trains on the trainee weekdays inside the window, never today', () => {
     const days = trainingDays(NOW, [6]);
 

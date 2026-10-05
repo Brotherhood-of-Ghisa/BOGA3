@@ -20,7 +20,9 @@ const as=async <T>(user: LiveClient,call: () => Promise<T>) => {
   try { return await call(); } finally { mockActiveClient=null; }
 };
 const poll=async <T>(read: () => Promise<T>,ready: (value: T) => boolean): Promise<T> => {
-  const deadline=Date.now()+90_000;
+  // A rules-only rebuild can rely on the five-minute cron sweep. Allow one
+  // complete interval plus processing time rather than depending on its phase.
+  const deadline=Date.now()+360_000;
   for (;;) {
     const value=await read();
     if (ready(value)) return value;
@@ -99,4 +101,4 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   expect(ordinary.entries[0]).toMatchObject({ unit: 'kg_reps',value: 100,performance: { visibility: 'ordinary',weight_value: '20' } });
   expect((await as(owner,() => archiveCompetitionExercise(groupId,exerciseId,true))).exercise.archived_at_ms).not.toBeNull();
   expect((await as(owner,() => archiveCompetitionExercise(groupId,exerciseId,false))).exercise.archived_at_ms).toBeNull();
-},120_000);
+},840_000);
