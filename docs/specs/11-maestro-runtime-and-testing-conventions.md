@@ -29,9 +29,6 @@ It has two jobs:
 - Secondary operational entrypoints:
   - `apps/mobile/README-maestro.md`
   - `apps/mobile/README_HUMAN_TESTING.md`
-- Supporting but non-authoritative context:
-  - `docs/brainstorms/Maestro-Revamp`
-  - historical Maestro task cards
 
 Rules:
 

@@ -4,6 +4,7 @@
 #
 #   ./scripts/gen-docs.sh gen     # rewrite generated blocks in place
 #   ./scripts/gen-docs.sh check   # fail if blocks are stale or docs are broken
+#   ./scripts/gen-docs.sh budgets # report word counts of the agent-loadable docs
 #
 # Canonical invocations: `./boga docs gen` / `./boga docs check`; `check` also
 # runs as the `docs-check` lane (fast gate + CI).
@@ -22,7 +23,10 @@
 #      - no file outside docs/plans/** and docs/brainstorms/** references a
 #        plan file (plans are ephemeral; AGENTS.md "Planning").
 #      - no tracked or new text file holds a merge-conflict marker line
-#        (`<<<<<<< `, `||||||| `, `>>>>>>> `).
+#        (`<<<<<<< `, `||||||| `, `>>>>>>> `),
+#      - every repo path cited in a persistent doc exists, never at a line,
+#      - every doc reachable from AGENTS.md fits its word budget
+#        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings).
 
 set -euo pipefail
 
@@ -33,8 +37,8 @@ source "${REPO_ROOT}/scripts/lane-timing.sh"
 RECORDS_DIR="$(boga_timing_records_dir)"
 
 case "${MODE}" in
-  gen|check) ;;
-  *) echo "usage: $0 gen|check" >&2; exit 2 ;;
+  gen|check|budgets) ;;
+  *) echo "usage: $0 gen|check|budgets" >&2; exit 2 ;;
 esac
 
 REPO_ROOT="${REPO_ROOT}" MODE="${MODE}" RECORDS_DIR="${RECORDS_DIR}" python3 - <<'PY'
@@ -293,6 +297,188 @@ for rel in listed:
             if target == "README.md" or target.startswith("templates/"):
                 continue
             problems.append(f"{rel}:{ln}: references plan file {m.group(0)} — plans are ephemeral; cite the owning spec instead")
+
+# 6. repo paths cited in persistent docs exist. A path is an inline-code
+#    token or link target with a `/` whose first segment exists under one of
+#    the doc's bases (its directory, its package root, the repo root,
+#    apps/mobile); anything else (`origin/main`, `@scope/pkg`) is not a path.
+#    Skipped: fenced code, globs and placeholders, gitignored outputs, and
+#    lines marked HISTORICAL. `docs/specs/NN` is shorthand for that spec.
+#    A citation never points at a line (`file.ts:42`, `file.ts#L42`).
+HISTORICAL = "<!-- docs-check: historical-path -->"
+LINE_REF = re.compile(r"^[^\s`]+\.(?:md|tsx?|jsx?|cjs|mjs|sh|sql|json|tsv|ya?ml|toml|py|swift|kt|plist)"
+                      r"(?::\d+(?:-\d+)?|#L\d+(?:-L?\d+)?)$")
+INLINE_CODE = re.compile(r"(?<!`)`([^`\n]+)`(?!`)")
+ANY_LINK = re.compile(r"\]\(([^)\s]+)\)")
+SEGMENT = r"[A-Za-z0-9_.@()\[\]+-]+"
+PATHLIKE = re.compile(rf"^(?:\./)?{SEGMENT}(?:/{SEGMENT})*/?$")
+PERSISTENT_DOCS = sorted(
+    rel for rel in listed
+    if rel.endswith(".md") and not rel.startswith(("docs/plans/", "docs/brainstorms/"))
+    and os.path.isfile(os.path.join(root, rel)) and not os.path.islink(os.path.join(root, rel)))
+
+def package_root(d):
+    while d:
+        if os.path.exists(os.path.join(root, d, "package.json")):
+            return d
+        d = os.path.dirname(d)
+    return ""
+
+# Existence is judged against git's file list (tracked + new), never the disk,
+# so local-only outputs (node_modules, dist) count the same here as on CI.
+REPO_PATHS = set()
+for rel in listed:
+    while rel:
+        REPO_PATHS.add(rel)
+        rel = os.path.dirname(rel)
+
+def repo_path(base, path):
+    return os.path.normpath(os.path.join(base, path))
+
+def path_exists(base, path):
+    full = repo_path(base, path)
+    if full in REPO_PATHS:
+        return True
+    m = re.fullmatch(r"docs/specs/(\d{2})", full)
+    return bool(m) and any(p.startswith(f"docs/specs/{m.group(1)}-") for p in REPO_PATHS)
+
+cited = []  # (doc, line, token, candidate repo paths)
+for rel in PERSISTENT_DOCS:
+    d = os.path.dirname(rel)
+    bases = list(dict.fromkeys([d, package_root(d), "", "apps/mobile"]))
+    fenced = False
+    for ln, line in enumerate(open(os.path.join(root, rel), encoding="utf-8"), 1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced or HISTORICAL in line:
+            continue
+        tokens = [t for span in INLINE_CODE.findall(line) for t in span.split()]
+        tokens += ANY_LINK.findall(line)
+        for token in tokens:
+            token = re.sub(r"[,;.)]+$", "", token)
+            if LINE_REF.match(token) and "://" not in token:
+                problems.append(f"{rel}:{ln}: links to a line ('{token}') — line numbers rot with every "
+                                "edit; link to the file or path")
+            token = re.sub(r"(?::\d+(?:-\d+)?|#.*|:)$", "", token)
+            if ("/" not in token or "://" in token or token.startswith(("/", "-"))
+                    or re.search(r"[*<>{}$~|]", token) or not PATHLIKE.match(token)):
+                continue
+            path = token[2:] if token.startswith("./") else token
+            first = path.split("/")[0]
+            anchored = [b for b in bases if first == ".." or repo_path(b, first) in REPO_PATHS]
+            if anchored and not any(path_exists(b, path) for b in anchored):
+                cited.append((rel, ln, token, [repo_path(b, path) for b in anchored]))
+def gitignored(path):
+    """True if a .gitignore rule matches path. Asked one path at a time: git
+    aborts a whole --stdin batch on a path outside the repo or beyond a local
+    symlink. A directory rule (`node_modules/`) only matches a trailing `/`."""
+    return any(subprocess.run(
+        ["git", "-C", root, "check-ignore", "-q", "--no-index", v],
+        capture_output=True).returncode == 0 for v in (path, path + "/"))
+
+if cited:
+    ignored = {c for *_, cs in cited for c in cs if gitignored(c)}
+    for rel, ln, token, cs in cited:
+        if not any(c in ignored for c in cs):
+            problems.append(f"{rel}:{ln}: cites missing path '{token}' — fix the path, or mark a deliberately "
+                            f"historical line with {HISTORICAL}")
+
+# 7. word budgets for the docs an agent can load: AGENTS.md and every
+#    persistent doc reachable from it through Markdown links or inline-code
+#    `.md` paths. Words are whitespace-separated tokens (`wc -w`). Limits,
+#    exempt prefixes and grandfathered ceilings live in scripts/doc-budgets.tsv;
+#    a ceiling only falls (`gen` lowers it to the current count and drops it
+#    once the doc fits its budget; nothing ever raises or adds one).
+ENTRYPOINT = "AGENTS.md"
+BUDGETS_TSV = os.path.join(root, "scripts/doc-budgets.tsv")
+MD_LINK = re.compile(r"\]\(([^)#\s]+\.md)(?:#[^)]*)?\)")
+MD_CODE = re.compile(r"`([^`\s]+\.md)(?:#[^`]*)?`")
+
+def reachable_docs():
+    """doc -> the doc that first links to it (breadth-first from ENTRYPOINT)."""
+    via = {ENTRYPOINT: None}
+    queue = [ENTRYPOINT]
+    while queue:
+        doc = queue.pop(0)
+        text = open(os.path.join(root, doc), encoding="utf-8").read()
+        for target in MD_LINK.findall(text) + MD_CODE.findall(text):
+            if "://" in target or re.search(r"[*<>~]", target):
+                continue
+            for base in (os.path.dirname(doc), ""):
+                full = os.path.normpath(os.path.join(root, base, target.lstrip("/")))
+                if os.path.isfile(full):
+                    rel = os.path.relpath(os.path.realpath(full), os.path.realpath(root))
+                    if rel not in via and not rel.startswith(("docs/plans/", "docs/brainstorms/", "..")):
+                        via[rel] = doc
+                        queue.append(rel)
+                    break
+    return via
+
+budget_rows = []
+if os.path.exists(os.path.join(root, ENTRYPOINT)):
+    limits, exempt, ceilings = {}, [], {}
+    with open(BUDGETS_TSV) as f:
+        for line in f:
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = line.rstrip("\n").split("\t")
+            if parts[0] == "budget" and len(parts) == 3:
+                limits[parts[1]] = int(parts[2])
+            elif parts[0] == "exempt" and len(parts) == 2:
+                exempt.append(parts[1])
+            elif parts[0] == "ceiling" and len(parts) == 3:
+                ceilings[parts[1]] = int(parts[2])
+            else:
+                problems.append(f"scripts/doc-budgets.tsv: malformed row: {line.rstrip()!r}")
+    via = reachable_docs()
+    new_ceilings, stale = {}, []  # stale: what `gen` fixes by rewriting ceilings
+    for doc, parent in via.items():
+        words = len(open(os.path.join(root, doc), encoding="utf-8").read().split())
+        if any(doc.startswith(p) for p in exempt):
+            budget_rows.append((words, None, None, "exempt", doc, parent))
+            continue
+        limit = limits.get(doc, limits["*"])
+        ceiling = ceilings.get(doc)
+        status = "ok" if words <= limit else "grandfathered"
+        if ceiling is None and words > limit:
+            status = "OVER"
+            problems.append(f"{doc}: {words} words, over its {limit}-word budget — split or trim it "
+                            "(rules: docs/specs/README.md)")
+        elif ceiling is not None and words > ceiling:
+            status = "OVER"
+            new_ceilings[doc] = ceiling
+            problems.append(f"{doc}: {words} words, over its grandfathered ceiling of {ceiling} "
+                            f"(budget {limit}) — trim or split it; a ceiling never rises")
+        elif ceiling is not None and words > limit:
+            new_ceilings[doc] = words
+            if words < ceiling:
+                stale.append(f"{doc}: {words} words, under its ceiling of {ceiling} — "
+                             "run ./boga docs gen to lower it")
+        elif ceiling is not None:
+            stale.append(f"{doc}: {words} words fits its {limit}-word budget — "
+                         "run ./boga docs gen to drop its ceiling row")
+        budget_rows.append((words, limit, ceiling, status, doc, parent))
+    for doc in sorted(set(ceilings) - {r[4] for r in budget_rows if r[3] != "exempt"}):
+        stale.append(f"scripts/doc-budgets.tsv: ceiling for '{doc}', which is not a budgeted doc "
+                     "(not reachable from AGENTS.md, or exempt) — run ./boga docs gen to drop it")
+    if mode == "gen" and new_ceilings != ceilings:
+        kept = [l for l in open(BUDGETS_TSV) if not l.startswith("ceiling\t")]
+        rows = [f"ceiling\t{d}\t{n}\n" for d, n in sorted(new_ceilings.items())]
+        open(BUDGETS_TSV, "w").write("".join(kept).rstrip("\n") + "\n" + "".join(rows))
+        print("[gen-docs] lowered grandfathered ceilings in scripts/doc-budgets.tsv")
+    elif mode != "gen":
+        problems += stale
+
+if mode == "budgets":
+    print(f"{'words':>6}  {'budget':>6}  {'ceiling':>7}  {'status':<13}  doc  (loaded via)")
+    for words, limit, ceiling, status, doc, parent in sorted(budget_rows, reverse=True):
+        print(f"{words:6}  {limit or '-':>6}  {ceiling or '-':>7}  {status:<13}  {doc}  ({parent or 'entrypoint'})")
+    budgeted = [r for r in budget_rows if r[3] != "exempt"]
+    print(f"\n{len(budgeted)} budgeted docs, {sum(r[0] for r in budgeted)} words; "
+          f"{sum(r[0] > r[1] for r in budgeted)} over budget by "
+          f"{sum(r[0] - r[1] for r in budgeted if r[0] > r[1])} words in total")
+    sys.exit(0)
 
 if problems:
     print(f"[gen-docs] {len(problems)} problem(s):", file=sys.stderr)
