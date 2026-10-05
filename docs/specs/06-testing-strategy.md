@@ -244,7 +244,8 @@ screenshots are the visual evidence.
 - It runs `docs-check` and `meta-tests` (including `maestro-testids`: every
   Maestro `id:` selector must still exist in app source, so a restyle that
   renames an id a flow taps fails on the PR even when that flow's lane was not
-  required), installs the mobile workspace, runs
+  required; the only exempt ids are UIKit's own, e.g. the native back item's
+  `BackButton`), installs the mobile workspace, runs
   mobile lint/typecheck/Jest, runs the locked `agent-auth-web` and `mcp-unit`
   wrappers in their workspaces. These
   are all infra-free lanes marked CI-enabled in the registry.

@@ -20,6 +20,9 @@
 # `…testIDPrefix` prop. A flow-side slot
 # (`${output.id}`) must line up with a source-side slot. Optional leading `^`
 # and trailing `$` anchors make a selector exact; they are not part of its id.
+# The only ids exempt are those UIKit itself assigns (PLATFORM_IDS below):
+# `BackButton`, the native stack back item, whose accessibility label differs
+# by iOS runtime ("Back" on iOS 27, the previous route's title on iOS 26).
 #
 # Limits: literal-level, not render-level — an id that exists in source but is
 # no longer rendered on that screen passes. Ids built by a text-free join
@@ -109,6 +112,9 @@ def resolves(value, depth=0):
             return True
     return False
 
+# Ids UIKit assigns to native views the app does not render itself.
+PLATFORM_IDS = {"BackButton"}
+
 flows = sorted(glob.glob(os.path.join(mobile, ".maestro", "flows", "*.yaml")))
 if not flows:
     sys.exit(f"  ASSERT FAILED: no flows under {mobile}/.maestro/flows — the glob likely broke")
@@ -129,6 +135,8 @@ for flow in flows:
             selector = selector[1:]
         if selector.endswith("$") and not selector.endswith(r"\$"):
             selector = selector[:-1]
+        if selector in PLATFORM_IDS:
+            continue
         if not resolves(SLOT.sub("X", selector)):
             missing.append(f"{os.path.basename(flow)}: {m.group(1)}")
 if missing:
@@ -204,6 +212,14 @@ expect_check pass "exact anchors around a flow-side template" "${TMP}/anchored-f
 make_tree "${TMP}/anchored-missing"
 printf -- '- tapOn:\n    id: "^gone-${output.n}-toggle$"\n' >>"${TMP}/anchored-missing/.maestro/flows/a.yaml"
 expect_check fail "exact anchors do not excuse a missing id" "${TMP}/anchored-missing"
+
+make_tree "${TMP}/platform-id"
+printf -- '- tapOn:\n    id: "BackButton"\n' >>"${TMP}/platform-id/.maestro/flows/a.yaml"
+expect_check pass "UIKit's native back item id" "${TMP}/platform-id"
+
+make_tree "${TMP}/platform-lookalike"
+printf -- '- tapOn:\n    id: "BackButton-row"\n' >>"${TMP}/platform-lookalike/.maestro/flows/a.yaml"
+expect_check fail "an id merely starting with a platform id" "${TMP}/platform-lookalike"
 
 # --- the real repo ---------------------------------------------------------------
 
