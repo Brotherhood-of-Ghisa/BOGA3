@@ -1,28 +1,12 @@
-import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { isMetricStreamEvent, type CurrentGroupStreamItem as StreamItem, type GroupMetricStreamItemWire } from './metric-wire';
-// Pure presentation for the group stream (`docs/specs/tech/groups-contract.md`):
-// card status, card metrics (computed on the device) and their kg
-// formatting, membership sentences, record cards and record-removed / link
-// sentences, and filter chips. No React, no I/O.
+import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
+// Pure presentation shared by the group screens (`docs/specs/tech/groups-contract.md`):
+// member names, session status, figure and count wording, membership
+// sentences, role wording, and filter chips. No React, no I/O.
 
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatClockTime, formatLocalDateTime, formatMonthDayTime } from '@/src/utils/local-time';
 
-import { computeGroupSessionMetrics } from './session-metrics';
-import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
-import type {
-  GroupBoardMetric,
-  GroupMemberRef,
-  GroupMembershipEvent,
-  GroupRole,
-  GroupSummary,
-  StreamLinkItem,
-  StreamMembershipItem,
-  StreamRecordItem,
-  StreamRecordVoidReason,
-  StreamRecordVoidedItem,
-  StreamSessionItem,
-} from './types';
+import type { GroupMemberRef, GroupMembershipEvent, GroupRole, GroupSummary, StreamSessionItem } from './types';
 
 export const UNNAMED_MEMBER_LABEL = 'Unnamed member';
 export const TRAINING_NOW_LABEL = 'Training now';
@@ -64,8 +48,6 @@ export const formatSessionStatusLabel = (
 /** A Weight or 1RM figure in its one format (`exercise-calculations/format.ts`). */
 export const formatMetricFigure = (metric: 'weight' | 'e1rm', kg: number): string =>
   metric === 'e1rm' ? formatOneRepMax(kg) : formatWeight(kg);
-
-export const formatVolumeKg = (totalVolumeKg: number): string => `${formatVolume(totalVolumeKg)} kg`;
 
 const pluralize = (count: number, singular: string, plural: string): string =>
   `${count} ${count === 1 ? singular : plural}`;
@@ -114,26 +96,6 @@ export const formatMyRole = (role: GroupRole): string => MY_ROLE_SENTENCES[role]
 
 export const formatMemberCount = (count: number): string => pluralize(count, 'member', 'members');
 
-export type StreamSessionCardViewModel = {
-  kind: 'session';
-  key: string;
-  memberUserId: string;
-  sessionId: string;
-  memberName: string;
-  isTrainingNow: boolean;
-  statusLabel: string;
-  startedAtLabel: string;
-  gymName: string | null;
-  groupNames: string[];
-  setsLabel: string;
-  volumeLabel: string;
-  /** Present only when the volume summary needs qualification. */
-  volumeNote: string | null;
-  exercisesLabel: string;
-  /** "1 record" / "N records": the session's non-voided record sets among the loaded items. Null when none. */
-  recordsLabel: string | null;
-};
-
 export type StreamMembershipViewModel = {
   kind: 'membership';
   key: string;
@@ -142,92 +104,7 @@ export type StreamMembershipViewModel = {
   groupName: string;
 };
 
-export type StreamRecordCardViewModel = {
-  kind: 'record';
-  key: string;
-  /** The wire item, for the row detail sheet and the inline Certify. */
-  record: StreamRecordItem;
-  memberUserId: string;
-  /** "dana — group record" / "dana — PR". */
-  title: string;
-  exerciseLabel: string;
-  /** "140.0 × 1", plus " · 1RM 142.5" when a 1RM board is listed (figures: no unit, design-language §6). */
-  valueLabel: string;
-  /** Per listed board, Weight then 1RM: "PR · Weight", then "Group record · Weight" when flagged. */
-  badges: string[];
-  /** "Voided · set edited|set deleted", "Certified by …", or "Not certified yet". */
-  statusLabel: string;
-  /** The state `statusLabel` puts in words, for the glyph drawn beside it. */
-  status: RecordCertificationStatus;
-  /** "Session in progress" while provisional and not voided. */
-  provisionalLabel: string | null;
-  voided: boolean;
-  /** Not voided, not certified, and not my own set. */
-  canCertify: boolean;
-  groupId: string;
-  groupName: string;
-  accessibilityLabel: string;
-};
-
-/** A record-removed (D15) or link (P16) item: a light row with one sentence. */
-export type StreamSentenceViewModel = {
-  kind: 'record_voided' | 'link';
-  key: string;
-  sentence: string;
-  groupId: string;
-  groupName: string;
-};
-
-export type StreamItemViewModel =
-  | StreamSessionCardViewModel
-  | StreamMembershipViewModel
-  | StreamRecordCardViewModel
-  | StreamSentenceViewModel
-  | { kind: 'metric_event'; key: string; event: GroupMetricStreamItemWire };
-
-const buildSessionCard = (item: StreamSessionItem): StreamSessionCardViewModel => {
-  const metrics = computeGroupSessionMetrics(item.exercises);
-  const summary = sessionVolumeSummary(metrics.coverage);
-  return {
-    kind: 'session',
-    key: item.key,
-    memberUserId: item.member.user_id,
-    sessionId: item.session_id,
-    memberName: formatMemberName(item.member.username),
-    isTrainingNow: item.status === 'active',
-    statusLabel: formatSessionStatusLabel(item),
-    startedAtLabel: formatStreamStartedAt(item.started_at_ms),
-    gymName: item.gym_name,
-    groupNames: item.groups.map((group) => group.name),
-    setsLabel: formatSetCount(metrics.workingSets),
-    volumeLabel: metrics.totalVolumeKg === null
-      ? `${summary.volume} kg · ${metrics.coverage.knownSetCount > 0 ? 'incomplete' : 'unavailable'}`
-      : formatVolumeKg(metrics.totalVolumeKg),
-    volumeNote: summary.volumeNote ?? null,
-    exercisesLabel: formatExerciseCount(metrics.exerciseCount),
-    recordsLabel: null,
-  };
-};
-
-const buildMembershipItem = (item: StreamMembershipItem): StreamMembershipViewModel => ({
-  kind: 'membership',
-  key: item.key,
-  sentence: formatMembershipSentence(item.event, item.member.username),
-  groupId: item.group.group_id,
-  groupName: item.group.name,
-});
-
-// ---- Record cards, record-removed and link items ---------------------
-
 export const YOU_NAME = 'You';
-// Display copy only: the metric key stays `e1rm` in params, RPCs and view keys.
-export const METRIC_NAMES: Record<GroupBoardMetric, string> = { weight: 'Weight', e1rm: '1RM' };
-const METRIC_ORDER: GroupBoardMetric[] = ['weight', 'e1rm'];
-const metricRank = (metric: GroupBoardMetric): number => METRIC_ORDER.indexOf(metric);
-const metricName = (metric: GroupBoardMetric): string => METRIC_NAMES[metric] ?? String(metric);
-
-export const RECORD_PROVISIONAL_LABEL = 'Session in progress';
-export const RECORD_UNCERTIFIED_LABEL = 'Not certified yet';
 
 /**
  * Where a record's certification stands. The label says it in words; the card
@@ -242,187 +119,8 @@ const isMyUser = (userId: string, myUserId: string | null): boolean => myUserId 
 export const formatStreamPersonName = (member: GroupMemberRef, myUserId: string | null): string =>
   isMyUser(member.user_id, myUserId) ? YOU_NAME : formatMemberName(member.username);
 
-const formatPossessive = (member: GroupMemberRef, myUserId: string | null): string =>
-  isMyUser(member.user_id, myUserId) ? 'Your' : `${formatMemberName(member.username)}'s`;
-
-/** "140 kg × 1", for sentences (prose keeps its unit). */
-export const formatSetValue = (weightKg: number, reps: number): string => `${formatWeight(weightKg)} kg × ${reps}`;
-
 /** "140.0 × 1", for a figure slot: the app's weight figure, no unit (design-language §6). */
 export const formatSetFigure = (weightKg: number, reps: number): string => `${formatWeight(weightKg)} × ${reps}`;
-
-/** "Certified by sam" / "Certified by you" / "Certified" (the certifier's account is gone). */
-export const formatCertifiedBy = (certifiedBy: GroupMemberRef | null, myUserId: string | null): string => {
-  if (!certifiedBy) return 'Certified';
-  return isMyUser(certifiedBy.user_id, myUserId)
-    ? 'Certified by you'
-    : `Certified by ${formatMemberName(certifiedBy.username)}`;
-};
-
-/** "Voided · set edited" / "Voided · set deleted". */
-export const formatVoidedLabel = (reason: StreamRecordVoidReason): string => `Voided · set ${reason}`;
-
-/** Board badges in Weight, then 1RM order; a group record also lists its PR (E3). */
-export const formatRecordBadges = (boards: StreamRecordItem['boards']): string[] =>
-  [...boards]
-    .sort((a, b) => metricRank(a.metric) - metricRank(b.metric))
-    .flatMap((board) =>
-      board.group_record
-        ? [`PR · ${metricName(board.metric)}`, `Group record · ${metricName(board.metric)}`]
-        : [`PR · ${metricName(board.metric)}`],
-    );
-
-const buildRecordCard = (item: StreamRecordItem, myUserId: string | null): StreamRecordCardViewModel => {
-  const title = `${formatStreamPersonName(item.member, myUserId)} — ${
-    item.boards.some((board) => board.group_record) ? 'group record' : 'PR'
-  }`;
-  const setFigure = formatSetFigure(item.weight_kg, item.reps);
-  const valueLabel =
-    item.e1rm_kg !== null && item.boards.some((board) => board.metric === 'e1rm')
-      ? `${setFigure} · 1RM ${formatOneRepMax(item.e1rm_kg)}`
-      : setFigure;
-  const voided = item.voided !== null;
-  let statusLabel = RECORD_UNCERTIFIED_LABEL;
-  let status: RecordCertificationStatus = 'uncertified';
-  if (item.voided) {
-    statusLabel = formatVoidedLabel(item.voided.reason);
-    status = 'voided';
-  } else if (item.certified) {
-    statusLabel = formatCertifiedBy(item.certification?.certified_by ?? null, myUserId);
-    status = 'certified';
-  }
-  const provisionalLabel = item.provisional && !voided ? RECORD_PROVISIONAL_LABEL : null;
-  const badges = formatRecordBadges(item.boards);
-  return {
-    kind: 'record',
-    key: item.key,
-    record: item,
-    memberUserId: item.member.user_id,
-    title,
-    exerciseLabel: item.group_exercise.name,
-    valueLabel,
-    badges,
-    statusLabel,
-    status,
-    provisionalLabel,
-    voided,
-    canCertify: !voided && !item.certified && myUserId !== null && item.member.user_id !== myUserId,
-    groupId: item.group.group_id,
-    groupName: item.group.name,
-    accessibilityLabel: [title, item.group_exercise.name, valueLabel, ...badges, provisionalLabel, statusLabel]
-      .filter((part): part is string => part !== null)
-      .join(', '),
-  };
-};
-
-/**
- * "dana's Bench Press record removed (140 kg × 1) — set edited · Now #1 on
- * Weight: sam 138 kg · No one holds #1 on 1RM" (D15).
- */
-export const formatRecordVoidedSentence = (item: StreamRecordVoidedItem, myUserId: string | null): string => {
-  const head = `${formatPossessive(item.member, myUserId)} ${item.group_exercise.name} record removed (${formatSetValue(
-    item.record.weight_kg,
-    item.record.reps,
-  )}) — set ${item.reason}`;
-  const leaders = [...item.leaders]
-    .sort((a, b) => metricRank(a.metric) - metricRank(b.metric))
-    .map(({ metric, leader }) =>
-      leader
-        ? `Now #1 on ${metricName(metric)}: ${formatStreamPersonName(leader.member, myUserId)} ${formatMetricFigure(metric, leader.value_kg)} kg`
-        : `No one holds #1 on ${metricName(metric)}`,
-    );
-  return [head, ...leaders].join(' · ');
-};
-
-/** " — now #1 on Weight and 1RM", " — now #2 on Weight, #1 on 1RM", " — off the 1RM board"; "" with no effects. */
-export const formatLinkEffects = (effects: StreamLinkItem['effects']): string => {
-  const sorted = [...effects].sort((a, b) => metricRank(a.metric) - metricRank(b.metric));
-  const ranked = sorted.flatMap((effect) => (effect.after ? [{ metric: effect.metric, rank: effect.after.rank }] : []));
-  const parts: string[] = [];
-  if (ranked.length > 1 && ranked.every((effect) => effect.rank === ranked[0].rank)) {
-    parts.push(`now #${ranked[0].rank} on ${ranked.map((effect) => metricName(effect.metric)).join(' and ')}`);
-  } else if (ranked.length > 0) {
-    parts.push(`now ${ranked.map((effect) => `#${effect.rank} on ${metricName(effect.metric)}`).join(', ')}`);
-  }
-  for (const effect of sorted) {
-    if (effect.after === null) parts.push(`off the ${metricName(effect.metric)} board`);
-  }
-  return parts.length > 0 ? ` — ${parts.join(', ')}` : '';
-};
-
-/** "dana linked Bench (comp grip) to Bench Press — now #1 on 1RM" / "dana unlinked A from Bench Press — off the Weight board" (P16). */
-export const formatLinkSentence = (item: StreamLinkItem, myUserId: string | null): string => {
-  const names = item.exercises.map((exercise) => exercise.name?.trim() || 'an exercise');
-  const exercises = names.length > 0 ? names.join(', ') : 'an exercise';
-  const verb = item.event === 'unlink' ? `unlinked ${exercises} from` : `linked ${exercises} to`;
-  return `${formatStreamPersonName(item.member, myUserId)} ${verb} ${item.group_exercise.name}${formatLinkEffects(item.effects)}`;
-};
-
-export const formatRecordCount = (count: number): string => pluralize(count, 'record', 'records');
-
-const buildSentenceItem = (item: StreamRecordVoidedItem | StreamLinkItem, myUserId: string | null): StreamSentenceViewModel => ({
-  kind: item.kind,
-  key: item.key,
-  sentence: item.kind === 'link' ? formatLinkSentence(item, myUserId) : formatRecordVoidedSentence(item, myUserId),
-  groupId: item.group.group_id,
-  groupName: item.group.name,
-});
-
-/** One item on its own; a session card's `recordsLabel` needs the whole list (`buildStreamViewModel`). */
-export const buildStreamItemViewModel = (item: StreamItem, myUserId: string | null = null): StreamItemViewModel => {
-  if (isMetricStreamEvent(item)) return { kind: 'metric_event', key: item.key, event: item };
-  switch (item.kind) {
-    case 'session':
-      return buildSessionCard(item);
-    case 'membership':
-      return buildMembershipItem(item);
-    case 'record':
-      return buildRecordCard(item, myUserId);
-    case 'record_voided':
-    case 'link':
-      return buildSentenceItem(item, myUserId);
-    default: {
-      const unhandled: never = item;
-      throw new Error(`Unhandled stream item kind: ${String((unhandled as { kind?: unknown }).kind)}`);
-    }
-  }
-};
-
-/** A session item's key and a record's session identity share one shape: `<member_user_id>:<session_id>`. */
-type AnyRecord = StreamRecordItem | Extract<GroupMetricStreamItemWire, { kind: 'record' }>;
-const recordSessionKey = (record: AnyRecord): string => `${record.member?.user_id ?? ''}:${record.session_id}`;
-
-/**
- * Server order, except that a record whose session card is among the items
- * moves directly below that card (E3). The session card counts those records,
- * non-voided and deduplicated by set. A record whose session card is not loaded
- * stays where the server put it.
- */
-export const buildStreamViewModel = (items: StreamItem[], myUserId: string | null = null): StreamItemViewModel[] => {
-  const loadedSessions = new Set(items.filter((item) => item.kind === 'session').map((item) => item.key));
-  const attached = new Map<string, AnyRecord[]>();
-  for (const item of items) {
-    if (item.kind === 'record' && loadedSessions.has(recordSessionKey(item))) {
-      attached.set(recordSessionKey(item), [...(attached.get(recordSessionKey(item)) ?? []), item]);
-    }
-  }
-
-  const models: StreamItemViewModel[] = [];
-  for (const item of items) {
-    if (item.kind === 'record' && attached.has(recordSessionKey(item))) {
-      continue;
-    }
-    if (item.kind !== 'session') {
-      models.push(buildStreamItemViewModel(item, myUserId));
-      continue;
-    }
-    const records = attached.get(item.key) ?? [];
-    const recordSets = new Set(records.filter((record) => isMetricStreamEvent(record) ? !record.voided : record.voided === null).map((record) => record.set_id));
-    models.push({ ...buildSessionCard(item), recordsLabel: recordSets.size > 0 ? formatRecordCount(recordSets.size) : null });
-    models.push(...records.map((record) => buildStreamItemViewModel(record, myUserId)));
-  }
-  return models;
-};
 
 export type StreamFilterChip = {
   key: string;

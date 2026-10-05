@@ -27,17 +27,16 @@ record's behaviour brief stays. **Accepted** by the user in the gallery on
   `SegmentedControl`.
 - **Session cards** are `Card` links: the member in Archivo 700; the status in
   words, never a colour (G3): `Training now` beside the `set-current` ring, or
-  `Completed · 45m` in `ink-muted`; start · gym in `ink-muted`; the metrics in
-  Plex Mono; `N records` in `record` with an up arrow. Membership, link and
-  record-removed items are light `ink-muted` rows behind a `rule` hairline, not
-  cards.
-- **Record cards** sit indented under their session card. A standing record
-  carries the `record` band (`record-wash` / `record-rule`) with its title
-  (`dave — group record`), then the exercise and its figures in bold `record`
-  Plex Mono (`140.0 × 1 · 1RM 142.5`: `1RM`, no unit in a figure, G7), the
-  boards as `Tag`s and the certification line (a check in `ink`, a ring in
-  `ink-muted`). `Certify` is an outline. A voided record loses the band, fades
-  to `ink-faint` and puts its status first.
+  `Completed · 45m` in `ink-muted`; start · gym in `ink-muted`;
+  `N sets · N exercises` in Plex Mono. Membership items are light `ink-muted`
+  rows behind a `rule` hairline, not cards.
+- **Record cards** (content per [group-competitions](group-competitions.md))
+  are `Card` links in the stream's server order, never moved under their
+  session card, with no band and no inline `Certify`: `<name> · record` in
+  `record`, exercise · rules revision, the figures with explicit units in Plex
+  Mono, and the certification in words (`Uncertified` / `Certified by …` /
+  `Certification ended`). The card opens the record sheet, where `Certify`
+  lives.
 - **The record sheet** is a `Sheet` titled with the lifter and the exercise,
   with no Close: the backdrop dismisses it (G5). The set and the 1RM are
   `record` `Stat`s, then the logged, date · gym, logged-as and status lines.
@@ -104,12 +103,11 @@ face ships no 700) confirmed.
   `See all sets` is their outline.
 - **History** is the view's micro-label over one `Card` of rows: the date in
   small Plex Mono, then the sentence in Source Sans.
-- **Numbers (G7).** The metric reads `1RM`, never `e1RM`. A value is
-  a figure with no unit: a 1RM to one decimal (`64.1`) and a set in the app's
-  weight figure (`55.0 × 5`, `51.25 × 5`). History sentences are prose and
-  keep `kg`. No figure groups thousands, so the session card's volume reads
-  `1500 kg`. The `e1rm` key, `metric=e1rm`, RPC fields and testIDs are
-  unchanged.
+- **Numbers (G7).** The metric reads `1RM`, never `e1RM`. No figure groups
+  thousands. The unitless figures this target first accepted are superseded by
+  [group-competitions](group-competitions.md): podiums and boards use the
+  comparison's default metric and state the unit (`kg`, `%BW`, `kg·reps`). The
+  `e1rm` key, `metric=e1rm`, RPC fields and testIDs are unchanged.
 - **No `accent`** on any leaderboard screen: none has a primary action.
 
 ### States
