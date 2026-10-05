@@ -489,17 +489,11 @@ if present).
 (`project_id BOGA-dev`, API `65431`) that is isolated from the slot-0 stack the
 gates use — so **running `boga test *` never wipes your dev data or session.**
 They run the **dev DB baseline** on every start: reuse the dev stack **without
-resetting it** (your logged data survives), apply any pending migrations in
-place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, push the
-rich imported history into the `history@dev.local` account, and seed the
-`Dev crew` group (`npm run seed:dev-groups`): owned by `history@dev.local`, with
-`b@dev.local` as a member, both memberships backdated, and the last four weeks of
-sessions for both pushed so the group's stream and week board have content.
-It also points the group-eval kick at the dev stack's Edge Function (boards and
-records are built by that worker) and activates group competitions (protocol
-4, which the app reads groups through and migrations install pending); both
-are idempotent, and activation is one-way except by `boga db dev-reset`.
-`a@dev.local` stays near-blank. The full isolation
+resetting it**, apply pending migrations in place, point the group-eval kick
+at it, seed `a@dev.local` (near-blank) / `b@dev.local` / `history@dev.local`
+(rich imported history), seed the `Dev crew` group (`npm run seed:dev-groups`;
+`history@` owns, `b@` joins, both backdated, four recent weeks of sessions
+each), and activate group competitions once (one-way until `boga db dev-reset`). The full isolation
 contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
 stack). Commands:
 
