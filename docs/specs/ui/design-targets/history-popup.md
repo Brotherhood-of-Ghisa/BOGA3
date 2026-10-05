@@ -16,9 +16,9 @@ of Progress tables, exercise browsing or the heatmaps themselves.
   and the bottom explanatory annotation are not application UI.
 - This target replaces the old [Progress target](progress.md)'s three-quarter
   **history popup container and dismissal** prescription when implemented.
-  Current behavior remains documented in [UI rules](../ux-rules.md) §12 until
-  the implementation updates it. Other parts of the older target still apply.
-- [Design language](../design-language.md), [UI rules](../ux-rules.md) §11–§13
+  Current behavior remains documented in the [Progress target](progress.md)
+  and `components/stats/history-sheet.tsx` until the implementation updates it. Other parts of the older target still apply.
+- [Design language](../design-language.md), [UI rules](../ux-rules.md)
   and [design policy](../ai-design-policy.md) govern production tokens,
   accessibility, chart/data semantics and integration.
 

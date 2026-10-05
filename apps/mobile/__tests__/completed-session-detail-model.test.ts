@@ -2,7 +2,7 @@ import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
-// View Session's model (`ux-rules` §7.4–§7.6): confirmed sets with valid
+// View Session's model (`design-targets/view-session.md`): confirmed sets with valid
 // values only, the session view's row, and the session view's record rule.
 
 const bench = {

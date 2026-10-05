@@ -11,7 +11,7 @@ const firstParam = (value: string | string[] | undefined) => (Array.isArray(valu
 /**
  * Session vs history: the open session's volume by exercise and by muscle
  * against the user's earlier sessions. Reached from the session view's ⋮
- * (`ux-rules` §14b.3); it reads the same session as the view and reloads on
+ * (`SessionOptionsSheet`); it reads the same session as the view and reloads on
  * focus.
  */
 export function SessionCompareScreen({ sessionId }: { sessionId: string | null }) {

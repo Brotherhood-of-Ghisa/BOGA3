@@ -10,7 +10,7 @@ type SessionOptionsSheetProps = {
   onCompare: () => void;
 };
 
-// The session ⋮ (`ux-rules` §14b.3): Session vs history, then Abandon session.
+// The session ⋮: Session vs history, then Abandon session.
 export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare }: SessionOptionsSheetProps) {
   return (
     <Sheet

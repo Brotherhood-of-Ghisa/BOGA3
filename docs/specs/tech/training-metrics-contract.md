@@ -69,7 +69,7 @@ Aggregations apply the two policies at the source:
 
 The agent API imports the same modules with the shared default. SQL never
 re-implements the rule: group functions read the evaluator's `working` flag
-(`tech/groups-contract.md`, §2.9). Changing the shared group rule needs a
+(`tech/groups-contract.md`). Changing the shared group rule needs a
 `GROUP_EVAL_RULES_VERSION` bump. Changing personal derivation bumps
 `EXERCISE_SESSION_FACTS_RULES_VERSION`; each facts read also compares its stored
 canonical policy key, rebuilding all definitions when the active choices differ.
@@ -108,7 +108,7 @@ Nothing counts sessions from `sessions.length` or from session status alone.
 | Exercise and muscle heatmap cells, exercise block history (and its `limit`), session-comparison baselines | per exercise / per muscle |
 | Exercise session facts rows | per exercise, with either working or volume-included sets; rows with zero working sets do not imply a counted session |
 | Agent API exercise context, `exercise_count` | per exercise |
-| Group week summary and board counts | the group functions over facts with `working` (`tech/groups-contract.md`, §4.7) |
+| Group week summary and board counts | the group functions over facts with `working` (`tech/groups-contract.md`) |
 
 **Lists, not statistics.** These show sessions, not counts:
 
@@ -150,7 +150,7 @@ sets (§1), including sessions with zero working sets. There are three kinds:
   exercise adds up to three (1RM, Weight and Volume). Every screen that counts
   a session's PRs, or PRs over a period, counts these
   (`sessionRecordKinds`). A group session's count is its group records, one
-  per board taken (`tech/groups-contract.md` §4.7).
+  per board taken (`tech/groups-contract.md`).
 - **The record set of a session** is the one set a screen highlights
   (`design-language.md` §5). Among the session's working sets of the exercise,
   across every block, it is the highest 1RM that beats the 1RM record. When no

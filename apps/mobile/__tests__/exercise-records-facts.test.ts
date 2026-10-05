@@ -1,7 +1,7 @@
 /**
  * The exercise page's records panel and exercise history's `All-time bests`
  * read the exercise session facts (spec 05, "Exercise session facts";
- * `ux-rules` §14a.4, §13.15) over a real, fully migrated database. A tie
+ * training-metrics "Records") over a real, fully migrated database. A tie
  * across sessions goes to the earliest session. On a generated history the
  * facts-backed records equal the replay of every completed set (the
  * derivation the panel used before the facts), for every gym scope and

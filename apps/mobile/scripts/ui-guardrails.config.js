@@ -12,7 +12,7 @@
 //    `src/**` (`.ts` and `.tsx`, tests excluded) blocks on sight. There is no
 //    budget and no allowlist; the list only ever grows. The replacements are
 //    `uiRoles`, `uiGeometry.radius` and the `@/components/ui` primitives
-//    (`docs/specs/ui/ux-rules.md` §9a).
+//    (`docs/specs/ui/components-catalog.md`).
 //
 // 3. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /
 //    130 and have reached 0, so in practice all four rules are now
@@ -22,7 +22,7 @@
 //
 //    Raising a budget is never the fix for a failure. If a screen genuinely
 //    needs a value the scale lacks, change the scale in components/ui/tokens.ts
-//    (and ux-rules.md §9a) rather than reintroducing a literal. To lower a
+//    (and design-language.md) rather than reintroducing a literal. To lower a
 //    budget after removing raw values, run from `apps/mobile/`:
 //
 //      npm run lint:ui-guardrails -- --update-budgets

@@ -39,7 +39,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 /**
- * The group screen (groups contract §6.3; product D10, D14), for managing the
+ * The group screen (groups contract; product D10, D14), for managing the
  * group: the header card with the member count, which opens the Members
  * screen; the role-gated Invite (the screen's one `accent`, T13-D1) and Edit;
  * then the group's Exercises. The stream and leaderboards live on the Groups

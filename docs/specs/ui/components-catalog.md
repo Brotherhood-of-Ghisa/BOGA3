@@ -61,11 +61,11 @@ Brief entrypoint inventory of the current reusable UI component set.
     steps), `uiTypography` (8 type sizes, a `lineHeight` per size, weights),
     `uiIconSize` (`xs` 12 / `sm` 16 / `md` 20 / `lg` 24, the icon edge lengths
     `Icon` takes) and `uiBorder`; values and rationale:
-    `docs/specs/ui/design-language.md` §2–§4, `docs/specs/ui/ux-rules.md` §9a
+    `docs/specs/ui/design-language.md` §2–§4
   - there is no elevation token and no second palette: the legacy vocabulary
     (`uiColors`, `uiRadius`, `uiElevation`, `UiText`, `UiSurface`, `UiButton`,
     `SegmentedChips`) was deleted 2026-09-26 and the `legacyVocabulary`
-    guardrail blocks its return (`ux-rules.md` §9)
+    guardrail blocks its return (`ux-rules.md` "Styling guardrails")
 
 2. Design-language primitives: `Card`, `Stat`, `ListRow`, `Sheet`, `ActionButton`
 - Files: `apps/mobile/components/ui/card.tsx`, `stat.tsx`, `list-row.tsx`, `sheet.tsx`, `action-button.tsx`
@@ -291,7 +291,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose:
   - `SessionCompletionScreen` — the post-submit composition on `paper`:
     `SessionTopBar mode="complete"` (`Session complete` · Done), a
-    `SessionFactsCard` (Duration / Exercises / Sets / Working, then Gym) with
+    `SessionFactsCard` (Duration / Exercises / Sets, then Gym) with
     the sets-by-muscle table (primary / secondary / weighted sets) under a `rule-soft` divider, every
     `PersonalRecordCard`, shared exercise/muscle comparisons and the
     `Share session` outline `ActionButton`. The muscle table is informational,
@@ -371,7 +371,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     with a Plex Mono value; gutter, axis and the Less…More `HeatmapLegend` are
     `ink-faint` micro-labels. testIDs `<prefix>-heatmap`,
     `-heatmap-cell-<dateKey | weekStartDateKey>`, `-heatmap-bar-<weekStartDateKey>`,
-    `-heatmap-day-detail` (`-date`, `-value`). Semantics: `ux-rules.md` §11
+    `-heatmap-day-detail` (`-date`, `-value`). Semantics:
+    `components/heatmaps/README.md`
   - `HistorySheet` — the Progress history of one exercise definition or one muscle ID (DLM-T09-D2, which merged the two legacy overlays): a `Sheet` at
     about three quarters of the screen, no close button (G5); eyebrow and name;
     `Metric` `SegmentedControl` and a static saved view/window label;
@@ -384,7 +385,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `Dismiss <kind> history`), `-overlay` (the body), `-title`,
     `-metric-chip-<metric>`, `-retry`, `-week-banner` (`-range`,
     `-value`), `-loading`, `-error`, `-empty`, `-scroll`,
-    `-heatmap-panel-<view>`. Semantics: `ux-rules.md` §12. Target:
+    `-heatmap-panel-<view>`. Target:
     `design-targets/progress.md`
 
 11. Group components (M22)
@@ -563,7 +564,7 @@ Brief entrypoint inventory of the current reusable UI component set.
 19. Today's Progress card
 - Folder: `apps/mobile/components/today/`; the read is
   `apps/mobile/src/progress-summary/`
-- Purpose (target `design-targets/today-landing.md`; semantics `ux-rules.md` §7):
+- Purpose (target `design-targets/today-landing.md`):
   - `TodayProgressCard` — one `Card`: `WeekFigures`, a `rule-soft` hairline,
     `MonthPace`, a hairline, then `Latest session` with its `All sessions`
     text button and the latest-session `SessionSummaryRow`.

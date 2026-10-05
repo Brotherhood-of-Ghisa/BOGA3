@@ -1,5 +1,5 @@
 // The Progress card's words and chart geometry (pure). The figures come from
-// `src/progress-summary`; this file only says them (`ux-rules.md` §7, §13).
+// `src/progress-summary`; this file only says them (`design-targets/today-landing.md`).
 
 import type { LatestSessionSummary, SessionPersonalRecord, TodayProgressMonth } from '@/src/progress-summary';
 import type { LocalWindow } from '@/src/utils/local-calendar';
@@ -43,7 +43,7 @@ export const formatWeekRange = (window: LocalWindow): string => {
   return `${dayLabel(window.start, acrossMonths)} – ${dayLabel(sunday, acrossMonths)}`;
 };
 
-/** A count's signed absolute difference (`ux-rules.md` §13.2): `+4`, `−3`, `±0`. */
+/** A count's signed absolute difference: `+4`, `−3`, `±0`. */
 export const formatSignedCount = (difference: number): string => {
   if (difference > 0) return `+${difference}`;
   if (difference < 0) return `−${Math.abs(difference)}`;
@@ -112,7 +112,7 @@ export const formatPersonalRecordLead = (record: SessionPersonalRecord): string 
 export const latestRecordLine = (latest: LatestSessionSummary): SessionRecordLine | null =>
   buildSessionRecordLine(latest.records, formatPersonalRecordLead, PERSONAL_RECORD_NOUN);
 
-/** `12 sets · 4 exercises`: the working sets (`ux-rules.md` §5.11). */
+/** `12 sets · 4 exercises`: the working sets (`training-metrics-contract.md` "Counted set"). */
 export const formatLatestFigures = (latest: LatestSessionSummary): string =>
   `${plural(latest.workingSets, 'set', 'sets')} · ${plural(latest.exerciseCount, 'exercise', 'exercises')}`;
 

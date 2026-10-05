@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-# groups-boards.sh — M25 boards and events contract (the second body of the
+# groups-boards.sh — boards and events contract (the second body of the
 # groups-leaderboards lane; groups-leaderboards.sh proves the pipeline).
 #
-# Contract: docs/specs/tech/groups-contract.md §2.6, §2.10–§2.11, §4.2, §4.5.
+# Contract: docs/specs/tech/groups-contract.md
 # Proves, against the real local stack (sync_push, group-eval, PostgREST):
 #
 #   - posture of group_board_entries / group_board_state and the read RPCs;
-#   - every row of design §5's change table (R1–R10), one section each;
+#   - every row of change table (R1–R10), one section each;
 #   - working sets only: a warm-up never ranks, records or certifies, and a
 #     stored warm-up record stands while its board moves silently (forward only);
 #   - the provisional rule for active sessions (T8), D6 conversion, P7 ties,

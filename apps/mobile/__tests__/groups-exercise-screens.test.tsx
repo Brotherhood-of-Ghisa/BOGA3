@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T08 group page (card AC1–AC8; groups contract §4.4, §6.3): the Stream ·
+ * group page (groups contract): the Stream ·
  * Exercises · Leaderboards segments, the Exercises page (link status from the
  * local T03 link rows, owner/admin actions), and the add / edit exercise
  * routes. The group RPCs are mocked; `group_cache`, `exercise_definitions`,
@@ -122,7 +122,7 @@ const exercise = (id: string, name: string, overrides: Partial<CompetitionExerci
 const BENCH = exercise('ge-bench', 'Bench Press', { source_exercise_id: 'seed_barbell_bench_press' });
 const ROW = exercise('ge-row', 'Cable Row', { rules: { ...exercise('unused','').rules,load_input_mode: 'per_side_load' } });
 const OLD = exercise('ge-old', 'Old Squat', { archived_at_ms: T0 });
-/** Server order (contract §4.4): active first, then by name. */
+/** Server order (contract): active first, then by name. */
 const LIST: CompetitionExerciseListWire = { contract_version: 4, exercises: [BENCH, ROW, OLD] };
 
 const META: Record<GroupRole, string> = {

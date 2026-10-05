@@ -4,7 +4,7 @@ Target record per [AI-assisted design policy](../ai-design-policy.md).
 **Accepted target; implemented and runtime-compared on 2026-10-05.** The operator selected Product Design
 option 3 on 2026-10-05, retained Settings as the Daily/Weekly selector, and
 approved the revised selected-week state after removing the tap-instruction
-sentence. This record and `../ux-rules.md` describe the integrated weekly chart;
+sentence. This record and `components/heatmaps/README.md` describe the integrated weekly chart;
 operator review happens in the implementation PR.
 
 ## Target

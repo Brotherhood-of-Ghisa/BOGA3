@@ -5,7 +5,7 @@
 //   - `Dev crew`, owned by history@dev.local, with b@dev.local as a member;
 //   - both memberships start before the recent window, because the share
 //     trigger only shares a session that starts inside a membership period
-//     (docs/specs/tech/groups-contract.md §2.5);
+//     (docs/specs/tech/groups-contract.md);
 //   - a few weeks of recent sessions for both, pushed through `sync_push` after
 //     that, so the trigger shares them into the group (stream, week board).
 //

@@ -2,7 +2,7 @@
  * The record line under a session summary (`design-targets/today-landing.md`):
  * one PR names itself, more than one is only counted. A session's PRs are one
  * per record kind (`training-metrics-contract.md` §3); a group session's are
- * its group records, one per board taken (`groups-contract.md` §4.7).
+ * its group records, one per board taken (`groups-contract.md`).
  */
 
 export type RecordNoun = { one: string; many: string };

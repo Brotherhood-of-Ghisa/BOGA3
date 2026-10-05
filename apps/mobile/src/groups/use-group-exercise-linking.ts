@@ -1,4 +1,4 @@
-// Data for the linking UI (M25-T07; design §7): my groups' exercise
+// Data for the linking UI: my groups' exercise
 // catalogues, cache-first, plus my live links from the local synced table.
 //
 //   - Links come from `exercise_group_links` (`listLinks()`), so linked-state

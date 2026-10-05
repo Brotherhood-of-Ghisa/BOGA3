@@ -2,7 +2,7 @@
 
 ## Target
 
-The groups contract governs the behaviour: [§6.3](../../tech/groups-contract.md#63-routes), *Unlink your exercise* and *Shared unlink contract* (E0.4). **Appearance** is governed by [`groups.md`](groups.md), section "Group exercises and linking": the rows, the chooser `Sheet`, the notices and the Link screen in the design language. The native confirmation `Alert` is OS chrome. No external design artifact or new route.
+This brief and the [groups contract](../../tech/groups-contract.md) (Mobile client, *Linking*; E0.4) govern the behaviour. **Appearance** is governed by [`groups.md`](groups.md), section "Group exercises and linking": the rows, the chooser `Sheet`, the notices and the Link screen in the design language. The native confirmation `Alert` is OS chrome. No external design artifact or new route.
 
 The captures this record once held (baseline, chooser, confirmation, success and offline, on a small and a large iPhone) showed the retired styling and were deleted when the group exercise screens moved to the design language; they remain in git history before that change. The accepted captures are listed in `groups.md`.
 
@@ -17,6 +17,9 @@ The captures this record once held (baseline, chooser, confirmation, success and
 
 - The chooser (`Your linked exercises`) is a `Sheet` with no Cancel: the backdrop, Android back and the VoiceOver escape dismiss it and write nothing. A choice closes it, and the confirmation opens only once it has gone (`Sheet.onDismissed`: the iOS modal's dismissal, or at once on Android), then focus returns to the launching row.
 - Unlink targets are at least 44 pt, names wrap within the row, and the admin row action stays a separate accessible target from `Unlink…`.
+- The confirmation names the personal exercise, the target exercise and the group, and says the sets leave the All and Certified boards after sync. Archived and inactive targets explain their unarchive / rejoin condition instead; an inactive link keeps known archive metadata in memory, and evicted server caches stay evicted (placeholder names).
+- `unlinkExercise` checks the expected group-exercise ID inside its SQLite transaction: a moved, missing or already-unlinked mapping is not mutated, and the UI refreshes and explains the change. A pending write disables repeats. Unlink is a local write offline, with a reconnect / sync notice.
+- A failed local read hides link status and actions and offers a separate retry; a read failure after a committed write never reads as a failed write. No board cache is edited.
 - Ranking, sharing, certification and schema semantics are unchanged by unlinking: past activity and existing certifications are kept; eligibility changes after sync.
 
 ## Flow-to-test coverage

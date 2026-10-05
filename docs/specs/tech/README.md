@@ -12,12 +12,9 @@ Current docs:
   privacy and rollout.
 
 - `sync-v2-server-contract.md`: authoritative Sync v2 server contract — Part A (server schema, composite PKs, RLS, deferrable FKs, LWW/undelete, drift checker) and Part B (push/pull RPC wire protocol, batch caps, per-layer cursor drain). Verified against the as-built migrations and RPCs.
-- `groups-contract.md`: the group domain contract (as-built in M22):
-  - group tables and the share-ledger group record;
-  - the rule and trigger that share a session into a group;
-  - the `SECURITY DEFINER` RPC wire contract and error tokens;
-  - stream-card metrics and the SQL/TS parity vectors;
-  - the mobile `src/groups` client, local cache, and routes.
+- `groups-contract.md`: group domain rules — share ledger and share rule,
+  stream, evaluator, boards, certification, comparisons, RPC conventions and
+  error tokens, the mobile `src/groups` client and cache, and the rule IDs.
 - `session-planning-contract.md`: authoritative technical contract for session
   planning and programmes (M23): data model, schema, 16-entity Sync v2 expansion,
   materialization algorithms, block lifecycle, set reordering invariants, agent

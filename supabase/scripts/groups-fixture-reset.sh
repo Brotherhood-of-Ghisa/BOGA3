@@ -19,7 +19,7 @@
 #   3. clears user_c's profile row (the create screen's username gate must
 #      prompt) and sets user_d's username (group_join requires one).
 #
-# Contract: docs/specs/tech/groups-contract.md §8 (Maestro lane);
+# Contract: docs/specs/tech/groups-contract.md (Maestro lane);
 # docs/specs/11-maestro-runtime-and-testing-conventions.md (fixture users).
 # Called by apps/mobile/scripts/maestro-run-lane.sh (lane groups-e2e) after the
 # local runtime baseline (which provisions the users) is ensured.

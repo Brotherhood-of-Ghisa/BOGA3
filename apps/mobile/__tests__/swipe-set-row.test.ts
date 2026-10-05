@@ -1,5 +1,5 @@
 /**
- * The swipe shell's decision rules (`ux-rules.md` §14a.3), as pure functions:
+ * The swipe shell's decision rules (`ux-rules.md` "Swipes on the exercise page"), as pure functions:
  * a side the screen does not offer can neither be dragged nor fired, and an
  * offered side fires past its distance or on a fling. The gesture itself is
  * native; the screen test covers which sides the open row offers.

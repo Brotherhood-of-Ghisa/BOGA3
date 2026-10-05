@@ -46,7 +46,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 
 type Feedback = { tone: 'error' | 'success'; message: string };
 
-/** One §4.3 member write. Each resolves the post-write `group_get` payload. */
+/** One member write. Each resolves the post-write `group_get` payload. */
 const runMemberWrite = (groupId: string, action: GroupMemberAction, userId: string) => {
   switch (action) {
     case 'make-admin':
@@ -61,9 +61,9 @@ const runMemberWrite = (groupId: string, action: GroupMemberAction, userId: stri
 };
 
 /**
- * The Members screen (product D14; groups contract §6.3), opened from the
+ * The Members screen (product D14; groups contract), opened from the
  * group header's member count: the header card, members in server order as
- * one `Card` of rows, the per-member action sheet (§4.3 role matrix), and Leave
+ * one `Card` of rows, the per-member action sheet (role matrix), and Leave
  * (an outline in `danger`) or the owner's transfer notice.
  */
 export default function GroupMembersRoute() {
@@ -181,7 +181,7 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
       {group.offline ? <GroupOfflineBanner lastUpdatedAtMs={group.lastUpdatedAtMs} /> : null}
       {inlineError ? <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-members-inline-error" /> : null}
       <Card testID="group-members-list">
-        {/* Server order: owner, admins, members, then username (contract §4.2). */}
+        {/* Server order: owner, admins, members, then username (contract). */}
         {data.members.map((member, index) => (
           <GroupMemberRow
             divider={index > 0}

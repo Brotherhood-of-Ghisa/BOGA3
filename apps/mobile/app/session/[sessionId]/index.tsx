@@ -112,7 +112,7 @@ export type SessionViewScreenProps = {
 };
 
 /**
- * The session view (`ux-rules` §14b): the active session, read-only and
+ * The session view: the active session, read-only and
  * navigational. Each exercise card links to its exercise page, where editing
  * happens; Finish and Abandon run the session lifecycle
  * (`src/session-recorder/session-lifecycle.ts`), and Add exercise opens the

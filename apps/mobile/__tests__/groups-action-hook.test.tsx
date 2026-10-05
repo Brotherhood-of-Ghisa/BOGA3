@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * `useGroupAction` (groups contract §6.1, §7; C3.10.3, AC12): offline refusal
+ * `useGroupAction` (groups contract): offline refusal
  * with no RPC and no cache change, mapped errors, and no queueing.
  */
 
