@@ -10,6 +10,7 @@ import {
 import {
   buildSessionViewModel,
   formatElapsed,
+  sessionTitleForStart,
 } from '@/src/session-recorder/session-view-model';
 
 const doneSet = (id: string, weight: string, reps: string, setType: SessionSet['setType']): SessionSet => ({
@@ -184,6 +185,19 @@ describe('session view model', () => {
     expect(formatElapsed(start, new Date('2026-09-23T09:47:12Z'))).toBe('47:12');
     expect(formatElapsed(start, new Date('2026-09-23T10:05:03Z'))).toBe('1:05:03');
     expect(formatElapsed(start, new Date('2026-09-23T08:59:00Z'))).toBe('0:00');
+  });
+
+  it('names the session by the local hour it started, at each boundary', () => {
+    const at = (hour: number, minute = 0) => sessionTitleForStart(new Date(2026, 8, 23, hour, minute));
+    expect(at(4, 59)).toBe('Night training');
+    expect(at(5)).toBe('Morning training');
+    expect(at(11, 59)).toBe('Morning training');
+    expect(at(12)).toBe('Afternoon training');
+    expect(at(16, 59)).toBe('Afternoon training');
+    expect(at(17)).toBe('Evening training');
+    expect(at(20, 59)).toBe('Evening training');
+    expect(at(21)).toBe('Night training');
+    expect(at(0)).toBe('Night training');
   });
 });
 

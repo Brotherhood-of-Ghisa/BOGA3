@@ -85,6 +85,7 @@ import * as sessionDrafts from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import { sessionTitleForStart } from '@/src/session-recorder/session-view-model';
 import * as insightsRepository from '@/src/session-insights/repository';
 import {
   bootLocalApp,
@@ -200,6 +201,14 @@ describe('Session view', () => {
       'accessibilityLabel',
       `Gym ${SESSION_VIEW_FIXTURE.gymName}`
     );
+    // The title names the session by when it started and carries the elapsed time.
+    const title = `${sessionTitleForStart(sessionRow(SESSION)!.startedAt)} · 47:`;
+    expect(screen.getByTestId('session-view-title').props.children).toMatch(new RegExp(`^${title}\\d{2}$`));
+    expect(screen.queryByTestId('session-view-summary-time')).toBeNull();
+    // Every exercise on the session counts, the untouched Cable Flys included;
+    // the legend reads `Ex`, spoken in full.
+    expect(screen.getByLabelText('Exercises 3')).toBeTruthy();
+    expect(screen.getByText('Ex')).toBeTruthy();
     expect(screen.getByLabelText(`Sets ${SESSION_VIEW_FIXTURE.workingSetCount}`)).toBeTruthy();
     // Working sets only: the bench's 100 × 10 warm-up adds no volume.
     expect(screen.getByLabelText('Volume 3200')).toBeTruthy();
