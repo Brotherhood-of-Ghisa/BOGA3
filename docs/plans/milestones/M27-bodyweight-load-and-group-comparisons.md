@@ -300,7 +300,10 @@ decisions are recorded. Versioned runtime publication/privacy and compatible UI
 are implemented with pending installation. T14's combined aggregate pass follows
 human acceptance, which the user has now provided. The hosted target is BOGA_DEV
 (`onluhhnvvmknqzdxgntl`); deployment and activation are on hold while local
-database and Preview validation run. Automated captures are separate evidence.
+database and Preview validation run. The combined local gates and full release
+sweep have passed; Preview 1.1.0 (24) was uploaded to App Store Connect from
+`4753e20e` and is processing. Phone installation/validation remains separate.
+Automated captures are separate evidence.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
 

@@ -80,7 +80,7 @@ The operator named hosted `boga-dev` (connected project `BOGA_DEV`,
 The operator confirmed `boga-dev` is linked to the prod build, then directed
 local database testing and Preview/TestFlight first. Hosted writes and activation
 are on hold; none have been performed. Combined local closeout gates and the
-preview release sweep are in progress. Do not claim hosted completion.
+preview release sweep passed. Do not claim hosted completion.
 
 Fresh local backend and fast aggregates passed. The persistent `BOGA-dev` local
 database is activated on protocol 4 and Metro serves its LAN endpoint. An
@@ -91,5 +91,16 @@ being shorter than the configured five-minute sweep for rules-only rebuilds.
 The poll now allows one full interval plus processing; its corrected lane
 passed without weakening assertions. Fast passed 230 suites / 3043 tests;
 coverage passed with 85.35% branches and 93.25% lines; complexity and dependency
-checks passed. The independent review reported no findings. Preview delivery
-still requires completion of the release sweep and the actual build/submission.
+checks passed. The independent review reported no findings. The full release
+sweep passed every fast/backend/iOS lane on `4753e20e`. Preview 1.1.0 (24),
+bundle `com.phano.boga3.dev`, was built locally from that commit and uploaded
+successfully to App Store Connect; Apple processing and phone installation are
+separate from upload success. The tag is `preview-ios-v1.1.0-b24`.
+The owned `m27-preview-sweep` runtime serves Metro at
+`http://192.168.178.100:8096` and the persistent local `BOGA-dev` database at
+`http://192.168.178.100:65431` for a phone on the same Wi-Fi. Its explicit local
+function entrypoints resolve the worker's shared calculation imports; both
+evaluation queues drained to zero. Evidence and the IPA are preserved under
+`~/.config/boga/evidence/m27-closeout/`. Hosted rollout remains on hold, and
+this card remains open. The retained Preview runtime is released after the
+operator finishes that session, independently of this preparation PR.
