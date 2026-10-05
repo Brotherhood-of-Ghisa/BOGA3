@@ -1,8 +1,7 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { StreamMembershipViewModel } from '@/src/groups';
-
-import { streamRowStyles } from './stream-sentence-item';
 
 type GroupStreamMembershipItemProps = {
   item: StreamMembershipViewModel;
@@ -42,3 +41,33 @@ export function GroupStreamMembershipItem({ item, showGroupName, onPress }: Grou
     </Pressable>
   );
 }
+
+/** The stream's light row: words on the page ground behind a `rule` hairline. */
+const streamRowStyles = StyleSheet.create({
+  row: {
+    minHeight: uiGeometry.tapTarget,
+    justifyContent: 'center',
+    gap: uiSpace.xs,
+    paddingHorizontal: uiSpace.md,
+    paddingVertical: uiSpace.sm,
+    borderLeftWidth: uiBorder.width,
+    borderLeftColor: uiRoles.rule,
+  },
+  pressed: {
+    backgroundColor: uiRoles.paper,
+  },
+  sentence: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: uiRoles.inkMuted,
+  },
+  group: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
+});

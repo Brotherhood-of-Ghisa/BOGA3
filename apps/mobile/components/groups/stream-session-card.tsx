@@ -104,16 +104,4 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
   },
-  records: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  recordsText: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.record,
-  },
 });

@@ -33,8 +33,6 @@ export { GroupOfflineBanner } from './offline-banner';
 export { cardListItemStyles, groupScreenStyles } from './screen-styles';
 export { GroupsSignInRequired } from './sign-in-required';
 export { GroupStreamMembershipItem } from './stream-membership-item';
-export { GroupStreamRecordCard } from './stream-record-card';
-export { GroupStreamSentenceItem } from './stream-sentence-item';
 export { GroupStreamSessionCard } from './stream-session-card';
 export { usePullToRefresh } from './use-pull-to-refresh';
 export { UsernameGate, useUsernameGate, type UsernameGateState, type UsernameGateStatus } from './username-gate';

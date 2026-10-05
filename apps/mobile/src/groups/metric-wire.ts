@@ -215,12 +215,3 @@ export type GroupMetricStreamWire = {
   next_cursor: GroupMetricStreamCursor | null;
   has_more: boolean;
 };
-
-/** Presentation accepts retained legacy items and metric-aware events in one feed. */
-export type CurrentGroupStreamItem = import('./types.ts').StreamItem | GroupMetricStreamItemWire;
-export type CurrentGroupStreamPage = {
-  items: CurrentGroupStreamItem[]; next_cursor: GroupMetricStreamCursor | null; has_more: boolean;
-};
-export function isMetricStreamEvent(item: CurrentGroupStreamItem): item is GroupMetricStreamItemWire {
-  return 'metric_event' in item && item.metric_event === true;
-}
