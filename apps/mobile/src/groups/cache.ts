@@ -1,5 +1,5 @@
 // Read/write access to the local-only `group_cache` table
-// (`docs/specs/tech/groups-contract.md` §6.2). Every function takes the drizzle
+// (`docs/specs/tech/groups-contract.md`). Every function takes the drizzle
 // handle explicitly so it runs unchanged against the production expo-sqlite
 // database and the in-memory test fixture.
 

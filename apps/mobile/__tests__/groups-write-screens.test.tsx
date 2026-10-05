@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M22-T05 group write flows (groups contract §4.3, §6.3; task card flows
+ * group write flows (groups contract
  * 1–5): create with the username gate, join (incl. the deep-link code param),
  * invite / share / regenerate, edit, member actions per role, and leave.
  * Every write's offline attempt is refused with no RPC (C3.10.3, AC12). The

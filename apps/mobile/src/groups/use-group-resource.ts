@@ -1,4 +1,4 @@
-// Cache-first group read hook (`docs/specs/tech/groups-contract.md` §6.1, §7).
+// Cache-first group read hook (`docs/specs/tech/groups-contract.md`).
 //
 //   - renders the cached payload for (user, cacheKey) first;
 //   - refreshes on focus, every 30 s while focused, and on `refresh()`;

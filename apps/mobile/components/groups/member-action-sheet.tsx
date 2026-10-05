@@ -12,7 +12,7 @@ import { GroupActionSheet } from './group-action-sheet';
 type GroupMemberActionSheetProps = {
   /** The member the sheet acts on; null hides it. */
   member: GroupMember | null;
-  /** Exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3). */
+  /** Exactly `groupMemberActionsFor(myRole, me, member)` (contract). */
   actions: GroupMemberAction[];
   onSelect: (action: GroupMemberAction, member: GroupMember) => void;
   onClose: () => void;

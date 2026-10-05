@@ -797,7 +797,7 @@ Exact build/configuration details live in `apps/agent-auth-web/README.md`,
 
 ### Group evaluator (hosted)
 
-The M25 group evaluator (`docs/specs/tech/groups-contract.md` §2.10) needs one
+The group evaluator (`docs/specs/tech/groups-contract.md`) needs one
 deploy and one setting per hosted project:
 
 1. Apply the migration chain. It enables `pg_net` and `pg_cron`, schedules
@@ -910,8 +910,8 @@ NOT update in place.
 
 - Expo/dev-client logs: terminal where `npm run start:ios:dev-client` or `npx expo start --dev-client` is running.
 - Production diagnostic rows: Supabase Dashboard / SQL Editor query against `public.app_logs`. Mobile clients can insert rows only; use operator credentials for inspection.
-  - Group triage. Filter on `source = 'database'` with `event = 'group.share_failed'` or `event = 'group.event_failed'`. `group.share_failed` means the share trigger failed and `group.event_failed` means the stream-item trigger failed. In both cases the session write committed. `context` is `{session_id, sqlstate}` and `user_id` is the session owner. The session's next accepted write heals both. For an `event_failed` session that won't be written again, run `select app_public.group_events_backfill();` in the SQL Editor. It is idempotent and inserts only missing items (`docs/specs/tech/groups-contract.md` §2.6).
-  - **Group evaluator triage** (`docs/specs/tech/groups-contract.md` §2.10). Filter `source = 'database'` on these events; `user_id` is the member.
+  - Group triage. Filter on `source = 'database'` with `event = 'group.share_failed'` or `event = 'group.event_failed'`. `group.share_failed` means the share trigger failed and `group.event_failed` means the stream-item trigger failed. In both cases the session write committed. `context` is `{session_id, sqlstate}` and `user_id` is the session owner. The session's next accepted write heals both. For an `event_failed` session that won't be written again, run `select app_public.group_events_backfill();` in the SQL Editor. It is idempotent and inserts only missing items (`docs/specs/tech/groups-contract.md`).
+  - **Group evaluator triage** (`docs/specs/tech/groups-contract.md`). Filter `source = 'database'` on these events; `user_id` is the member.
     - `group.eval_enqueue_failed`: an enqueue trigger failed, and the sync write committed. `context` is `{table, row_id, sqlstate}`. The member's next accepted write of that session or link re-enqueues it.
     - `group.eval_kick_failed`: the pg_net kick failed. The `group-eval-sweep` cron job (every 5 minutes) retries it.
     - `group.eval_failed`: a job failed and stays queued with backoff. `context` is `{job_id, kind, sqlstate}`. Inspect `app_public.group_eval_queue` (`attempts`, `last_sqlstate`) for a job that keeps failing.

@@ -1,7 +1,7 @@
 /**
- * Pure stream presentation (groups contract §6.1): C7.2 status wording, C7.3
+ * Pure stream presentation (groups contract): status wording,
  * membership sentences, the "Unnamed member" fallback, kg formatting, the
- * filter chips, and (M25-T10, card AC3) record cards, record-removed and link
+ * filter chips, and record cards, record-removed and link
  * sentences, records grouped under their session card, and paging over every
  * item kind.
  */
@@ -213,7 +213,7 @@ describe('group stream view model', () => {
   describe('time, offline marker, and role wording', () => {
     const at = new Date(2026, 8, 7, 6, 4).getTime();
 
-    it('formats local times for cards, the friend view, and the offline marker (contract §7)', () => {
+    it('formats local times for cards, the friend view, and the offline marker (contract)', () => {
       expect(formatClockTime(at)).toBe('06:04');
       expect(formatStreamStartedAt(at)).toBe('9/7 06:04');
       expect(formatGroupDateTime(at)).toBe('2026-09-07 06:04');
@@ -262,7 +262,7 @@ describe('group stream view model', () => {
   });
 });
 
-describe('board stream items (M25-T10)', () => {
+describe('board stream items', () => {
   const card = (item: Parameters<typeof buildStreamItemViewModel>[0], me: string | null = 'me') =>
     buildStreamItemViewModel(item, me) as StreamRecordCardViewModel;
   const sentence = (item: Parameters<typeof buildStreamItemViewModel>[0], me: string | null = 'me') =>

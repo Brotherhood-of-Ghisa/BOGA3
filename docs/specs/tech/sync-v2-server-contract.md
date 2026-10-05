@@ -427,7 +427,7 @@ PK `(owner_user_id, id)`. No CHECK constraints (A.1).
   (A.1.1.3). Retargeting within a group is an ordinary field change.
 - **Server reaction (M25-T04).** The failure-isolated trigger
   `exercise_group_links_group_eval_enqueue` queues a re-evaluation of the old
-  and new group target for the group evaluator (`groups-contract.md` §2.10).
+  and new group target for the group evaluator (`groups-contract.md`).
   It can never abort `sync_push` (B.11). Group ids that are not uuids, or that
   name no group exercise of that group, are skipped silently.
 - **Client writers (M25-T07).** `apps/mobile/src/data/exercise-group-links.ts`
@@ -1384,7 +1384,7 @@ apply (B.4.5).
 
 - Server-side retention/GC of `deleted_at IS NOT NULL` rows (stored as regular
   rows in v2).
-- Group domain (M22 — `groups-contract.md`). Groups, memberships, invites, and the group session record are server-authoritative and reached only through group RPCs, outside the Sync v2 mirror engine. (The one group-adjacent Sync v2 entity, `exercise_group_links` (A.2.10), is the member's own data and carries group ids as plain text with no FK into group tables.) The one touch point is an `AFTER INSERT OR UPDATE` trigger on `app_public.sessions` that records shares; it is failure-isolated so it can never abort `sync_push` (`groups-contract.md` §2.5). Group tables carry no `owner_user_id` column, so they stay out of the drift checker's entity set (§A.7.3).
+- Group domain (`groups-contract.md`). Groups, memberships, invites, and the group session record are server-authoritative and reached only through group RPCs, outside the Sync v2 mirror engine. (The one group-adjacent Sync v2 entity, `exercise_group_links` (A.2.10), is the member's own data and carries group ids as plain text with no FK into group tables.) The one touch point is an `AFTER INSERT OR UPDATE` trigger on `app_public.sessions` that records shares; it is failure-isolated so it can never abort `sync_push` (`groups-contract.md`). Group tables carry no `owner_user_id` column, so they stay out of the drift checker's entity set (§A.7.3).
   **As-built (M22-T02).** The touch point is trigger `sessions_group_share_session`, which calls `app_public.group_share_session()` (`security definer`, `search_path = app_public, pg_temp`), in `supabase/migrations/20260911120000_m22_group_record.sql`. What did not change:
   - `sync_push`, `sync_pull`, the Sync v2 tables, their RLS, and the wire envelope are unchanged;
   - the two structural triggers (§A.1, §A.6.3) are untouched, and the drift checker's 4f checks, which look only for those two by name, still pass.

@@ -15,7 +15,7 @@ import type { GroupMetricBoardWire, GroupMetricCertificationResultWire, GroupMet
   GroupMetricExerciseWriteWire, GroupMetricHistoryWire, GroupMetricPodiumWire, GroupMetricRevisionsWire,
   GroupMetricStreamWire, GroupMetricStreamCursor } from './metric-wire';
 
-// The typed group RPC client (`docs/specs/tech/groups-contract.md` §4, §6.1).
+// The typed group RPC client (`docs/specs/tech/groups-contract.md`).
 // It is the ONLY code that calls Supabase for groups. Every failure leaves this
 // module as a `GroupApiError` with a contract code:
 //
@@ -238,7 +238,7 @@ export type GroupStreamRequest = {
   limit?: number;
 };
 
-/** The stream item kinds this build renders (M25-T10: all five); a later server may send more. */
+/** The stream item kinds this build renders (all five); a later server may send more. */
 const RENDERED_STREAM_KINDS: ReadonlySet<string> = new Set<StreamItem['kind']>([
   'session',
   'membership',
@@ -280,7 +280,7 @@ export type GroupWeekSummaryRequest = {
   windowEndMs: number;
 };
 
-/** One group's week (contract §4.7): its board, who is training now and the latest completed session. */
+/** One group's week (contract): its board, who is training now and the latest completed session. */
 export const getGroupWeekSummary = async ({
   groupId,
   windowStartMs,
@@ -346,7 +346,7 @@ export const joinGroup = async (code: string): Promise<GroupJoinResult> =>
     isString(r.group_id) && typeof r.joined === 'boolean',
   );
 
-// Membership writes (M22-T01 as-built, contract §4.3): `group_leave` returns
+// Membership writes (contract): `group_leave` returns
 // `{ group_id }`; the three member-management writes return the post-write
 // `group_get` payload `{ group, members }`.
 
@@ -380,7 +380,7 @@ export const transferGroupOwnership = async (groupId: string, userId: string): P
     isGroupGetPayload,
   );
 
-// ---- Group exercises (M25-T01, contract §4.4) -----------------------------------
+// ---- Group exercises (contract) -----------------------------------
 
 /** The `ExerciseCore` of a group exercise, e.g. to prefill the shared exercise form. */
 export const groupExerciseCore = (exercise: GroupExercise): ExerciseCore => ({
@@ -454,7 +454,7 @@ export const archiveGroupExercise = async (groupId: string, groupExerciseId: str
 export const unarchiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
   unarchiveGroupComparison(groupId, groupExerciseId);
 
-// ---- Boards (M25-T05, contract §4.5) --------------------------------------------
+// ---- Boards (contract) --------------------------------------------
 
 export const GROUP_BOARD_DEFAULT_LIMIT = 50;
 export const GROUP_BOARD_HISTORY_DEFAULT_LIMIT = 20;
@@ -464,7 +464,7 @@ const isNotFoundMessage = (error: unknown, message: string): boolean =>
 
 /**
  * `NOT_FOUND: group exercise not found` (the board's target is not in the
- * group) as opposed to `NOT_FOUND: group not found` (access lost, §4.5 check
+ * group) as opposed to `NOT_FOUND: group not found` (access lost,
  * order). Only the latter may evict the group.
  */
 export const isGroupExerciseNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group exercise not found');
@@ -472,7 +472,7 @@ export const isGroupExerciseNotFound = (error: unknown): boolean => isNotFoundMe
 /** `NOT_FOUND: group not found`: the caller is not (or no longer) a member. The only `NOT_FOUND` that evicts. */
 export const isGroupNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group not found');
 
-/** `NOT_FOUND: record set not found` (§4.6 step 6): the set is not, or no longer, a record set. */
+/** `NOT_FOUND: record set not found`: the set is not, or no longer, a record set. */
 export const isRecordSetNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'record set not found');
 
 /** `NOT_FOUND: certification not found`. */
@@ -552,7 +552,7 @@ export const getGroupBoardHistory = async ({
     (r) => Array.isArray(r.items) && typeof r.has_more === 'boolean',
   );
 
-// ---- Certification (M25-T06, contract §4.6) --------------------------------------
+// ---- Certification (contract) --------------------------------------
 
 const isCertificationPayload = (r: Record<string, unknown>): boolean =>
   isRecord(r.certification) && isString(r.certification.certification_id);

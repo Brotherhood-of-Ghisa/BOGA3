@@ -19,7 +19,7 @@ export type UsernameGateState = {
 };
 
 /**
- * Contract §6.3 username gate (C3.1): create and join load the profile first,
+ * The username gate (groups contract): create and join load the profile first,
  * and a blank username shows the inline field before the form. A profile that
  * cannot be loaded does not block the form — the server enforces
  * `USERNAME_REQUIRED`, which re-opens the gate.
