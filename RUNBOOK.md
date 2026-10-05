@@ -11,7 +11,7 @@ Load one of these instead when that is your task:
 | --- | --- |
 | running the app on an Android emulator | `docs/runbook-android-emulator.md` |
 | running a development build on a physical iPhone (LAN, Tailscale, tunnel) | `docs/runbook-physical-iphone.md` |
-| operating a **hosted** Supabase project — reset, function deploys, release cutover | `docs/runbook-hosted-operations.md` |
+| operating a **hosted** Supabase project — reset, function deploys, agent/MCP rollout | `docs/runbook-hosted-operations.md` |
 
 Machine prerequisites, worktree open/release, and per-worktree dependency
 isolation live in `docs/specs/01-worktree-and-environment.md`; `./boga doctor`
