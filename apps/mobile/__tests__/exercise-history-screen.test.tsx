@@ -279,8 +279,11 @@ describe('ExerciseHistoryRoute over real data', () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
     fireEvent.press(screen.getByTestId('top-level-tab-more'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/more'));
 
-    expect(mockPush).toHaveBeenCalledWith('/more');
+    // No workout in progress in this fixture: Train opens Train.
+    fireEvent.press(screen.getByTestId('top-level-tab-train'));
+    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/train'));
   });
 
   it('draws its own back arrow that pops the stack', async () => {

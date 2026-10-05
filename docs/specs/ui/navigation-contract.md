@@ -78,18 +78,23 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
+  - the Train tab, from any `MainTabs` strip, opens the workout in progress
+    (`/session/<id>`) instead of `/train` when there is one (transition 57);
+    a failed lookup opens `/train`
   - loads the existing session-list repository while focused and blocks every
     launch action until active-draft detection succeeds
-  - an active draft replaces empty/planned actions with one Resume action to
-    `/session/<id>`
-  - with no draft, `Start empty workout` rechecks for an active session,
+  - an active draft found by Train's read (Train reached by a link, Today's
+    `Open Train`) replaces `/train` with `/session/<id>`: no Resume action and
+    no empty/planned action
+  - with no draft, `Start` rechecks for an active session,
     persists one empty active draft through the existing session repository,
-    and then opens `/session/<id>` (transition 46); simultaneous entry requests share the
+    and then replaces `/train` with `/session/<id>` (transition 46), so back
+    from the workout never returns to Train; simultaneous entry requests share the
     same in-flight result, and persistence failure is inline and retryable
   - exposes typed loading/error/empty/ready/unavailable planning states; a
     ready plan supplies its own materializer and management callback, while the
-    current production state uses the approved `Watch this space 👀` placeholder
-    without blocking empty training or guessing a route
+    current production state is unavailable, which shows nothing beneath the
+    disc, without blocking empty training or guessing a route
 
 1d. `/progress` (canonical tab)
 - File: `apps/mobile/app/(tabs)/progress.tsx`
@@ -509,8 +514,9 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 45. `/today` -> `/groups?groupId=<groupId>`, `/group/mine`
    - `View groups`, the week board or the `<n> training now` row (the selected group); `Find a group` with no group
 46. `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
-   - every active-session entry (Resume, a new launch, Sessions' review/complete,
-     and the append of transition 9), through `sessionViewHref` (`router.push`)
+   - every active-session entry (a new launch, Sessions' review/complete,
+     and the append of transition 9), through `sessionViewHref` (`router.push`;
+     from `/train`, a launch or a workout found in progress `router.replace`s)
 47. `/session/<sessionId>` -> `/completed-session/<sessionId>?presentation=completion`
    - Finish after its cleanup prompts and the completion write (`router.replace`)
 48. `/session/<sessionId>` -> `/train` or another tab
@@ -536,6 +542,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
      since the read is gone on return: Today reads again on focus
 56. `/session/<sessionId>` -> `/session/<sessionId>/compare`
    - the ⋮ sheet's `Session vs history` (the sheet closes, then `router.push`); native Back returns and the session view reloads on focus
+57. any `MainTabs` strip -> `/session/<sessionId>` (the workout in progress)
+   - the Train tab while a workout is in progress (`mainTabDestination`,
+     `useOpenMainTab`): `router.push` from the tab tray and `exercise-history`,
+     `router.dismissTo` from a completed session view; on the session view of
+     the workout in progress the Train tab does nothing
 
 Note:
 

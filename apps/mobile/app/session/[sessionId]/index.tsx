@@ -4,6 +4,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
+import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import type { Session } from '@/components/session-recorder/types';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import {
@@ -213,7 +214,8 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     }, [openGymPicker])
   );
 
-  const openTab = (href: Href) => router.dismissTo(href);
+  const openTab = useCallback((href: Href) => router.dismissTo(href), [router]);
+  const openMainTab = useOpenMainTab(openTab);
 
   const finish = async () => {
     if (!sessionId || isFinishing) return;
@@ -442,7 +444,11 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
       {body}
       <View style={[styles.tabs, { paddingBottom: Math.max(uiSpace.sm, insets.bottom) }]}>
         {/* A completed session is history, which lives under Progress. */}
-        <MainTabs activeTab={isCompleted ? 'progress' : 'train'} onSelect={(tab) => openTab(mainTabHref(tab))} />
+        {/* Train while this workout is in progress is this screen: nothing to open. */}
+        <MainTabs
+          activeTab={isCompleted ? 'progress' : 'train'}
+          onSelect={(tab) => (tab === 'train' && !isCompleted ? undefined : openMainTab(tab))}
+        />
       </View>
 
       <SessionOptionsSheet

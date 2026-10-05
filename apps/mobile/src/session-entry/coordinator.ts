@@ -1,4 +1,4 @@
-import { listSessionListBuckets, persistSessionDraftSnapshot } from '@/src/data';
+import { findActiveSessionId, persistSessionDraftSnapshot } from '@/src/data';
 
 export type SessionEntryResult = {
   kind: 'resumed' | 'started';
@@ -63,10 +63,7 @@ export function createSessionEntryCoordinator(
 }
 
 /** The id of the one active (non-deleted) session, if there is one. */
-export const loadActiveSessionId = async (): Promise<string | null> => {
-  const buckets = await listSessionListBuckets();
-  return buckets.active?.id ?? null;
-};
+export const loadActiveSessionId = (): Promise<string | null> => findActiveSessionId();
 
 export const DEFAULT_SESSION_ENTRY_COORDINATOR = createSessionEntryCoordinator({
   loadActiveSessionId,

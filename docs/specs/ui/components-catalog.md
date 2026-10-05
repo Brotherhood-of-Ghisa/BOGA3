@@ -220,6 +220,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     glyphs `offline` (Lucide `wifi-off`), `success` (`circle-check`) and
     `warning` (`triangle-alert`), which stay `ink` — the design language has no
     success or warning hue,
+    `play` (Lucide `play`, filled) for Train's start disc,
     plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
     check), `set-current` (`accent` ring), `set-planned` (dashed `ink-ghost` ring),
@@ -586,6 +587,15 @@ Brief entrypoint inventory of the current reusable UI component set.
     first result, a retryable error
   - covered by `apps/mobile/__tests__/today-screen.test.tsx` (over real data)
     and `today-progress-format.test.ts` (words and chart geometry)
+
+20. `StartDisc`
+- File: `apps/mobile/components/train/start-disc.tsx`
+- Purpose:
+  - Train's one action (`design-targets/train-page.md`): an `accent` disc
+    (232pt, `compact` 204pt) inside a `rule` ring, the `play` glyph over an
+    Archivo 800 caps label; `disabled` greys the disc to `ink-ghost`.
+    testIDs `<testID>`, `-ring`
+  - covered by `apps/mobile/__tests__/train-screen.test.tsx`
 
 ### Optional bodyweight settings and readings
 

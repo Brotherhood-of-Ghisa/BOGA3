@@ -144,11 +144,15 @@ target and contract.
      never shown as this one.
 8. Train is the personal-training entry hub, while the session view remains
    focused on performing one workout.
+   - A workout in progress is Train: the Train tab opens it directly, and
+     Train reached another way replaces itself with it. There is no Resume
+     button. Train has no title and no explanatory copy: one start disc
+     (`design-targets/train-page.md`).
    - Active-session detection must succeed before Train exposes any new-session
      action; a detection error is retryable and does not assume that no draft
      exists.
-   - An active draft replaces empty and planned start actions with one Resume
-     action.
+   - An active draft replaces empty and planned start actions; Train opens
+     the draft instead of offering them.
    - Every session entry goes through one session-entry coordinator. It
      rechecks the active draft at press time and serializes competing requests
      so an empty or planned action cannot create a second concurrent session.
@@ -156,9 +160,8 @@ target and contract.
      repository (`src/session-recorder/`) before opening it in the session
      view. A failed write stays inline and retryable.
    - Planning loading/error/empty/ready/unavailable states are explicit. Until
-     the planning dependency ships, production shows the approved `Watch this
-     space 👀` placeholder while leaving empty training usable; it does not
-     guess a management route or plan.
+     the planning dependency ships, production is unavailable and shows
+     nothing beneath the disc; it does not guess a management route or plan.
    - Exercise selection remains contextual inside the session view (its
      exercise picker). Exercise-database administration remains owned by More,
      not Train.

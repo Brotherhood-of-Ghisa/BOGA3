@@ -15,6 +15,7 @@ export {
 export {
   createDrizzleSessionListStore,
   createSessionListRepository,
+  findActiveSessionId,
   formatCompactDuration as formatSessionListCompactDuration,
   listSessionListBuckets,
   setSessionDeletedState,

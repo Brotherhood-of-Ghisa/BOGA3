@@ -2,12 +2,13 @@ import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/forma
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabs } from '@/components/navigation/main-tabs';
+import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import {
   Card,
   ChipGroup,
@@ -371,6 +372,7 @@ function SessionCard({
 
 export default function ExerciseHistoryRoute() {
   const router = useRouter();
+  const openMainTab = useOpenMainTab(useCallback((href: Href) => router.push(href), [router]));
   const params = useLocalSearchParams<{
     exerciseDefinitionId?: string | string[];
     tagDefinitionId?: string | string[];
@@ -493,7 +495,7 @@ export default function ExerciseHistoryRoute() {
         onSelectPeriod={handleSelectPeriod}
         onSelectTag={handleSelectTag}
         onPressSession={(sessionId) => router.push(`/completed-session/${sessionId}`)}
-        onSelectMainTab={(tab) => router.push(mainTabHref(tab))}
+        onSelectMainTab={openMainTab}
       />
     </>
   );

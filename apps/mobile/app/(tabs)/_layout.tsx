@@ -1,12 +1,12 @@
-import { Tabs, useRouter, useSegments } from 'expo-router';
-import { useMemo } from 'react';
+import { Tabs, useRouter, useSegments, type Href } from 'expo-router';
+import { useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomTray, TrayVisibilityProvider } from '@/components/navigation/bottom-tray';
 import { MainTabs } from '@/components/navigation/main-tabs';
+import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import {
-  mainTabHref,
   resolveMainTab,
   shouldShowMainNavigation,
 } from '@/src/navigation/main-tabs';
@@ -20,6 +20,7 @@ function TabsBottomTray() {
     () => shouldShowMainNavigation(routeSegments),
     [routeSegments],
   );
+  const openTab = useOpenMainTab(useCallback((href: Href) => router.push(href), [router]));
 
   if (!activeTab || !isVisible) {
     return null;
@@ -29,7 +30,7 @@ function TabsBottomTray() {
     <BottomTray>
       <MainTabs
         activeTab={activeTab}
-        onSelect={(tab) => router.push(mainTabHref(tab))}
+        onSelect={openTab}
       />
     </BottomTray>
   );

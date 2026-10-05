@@ -1,6 +1,6 @@
 import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
 import type { EffortCalculationPolicy } from '@/src/exercise-calculations/effort-policy';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
@@ -349,3 +349,20 @@ const defaultSessionListRepository = createSessionListRepository();
 
 export const listSessionListBuckets = defaultSessionListRepository.listBuckets;
 export const setSessionDeletedState = defaultSessionListRepository.setDeletedState;
+
+/**
+ * The id of the session `listBuckets` returns as `active` (the most recent
+ * active, non-deleted one), read as one row instead of the whole history: the
+ * Train tab looks it up on every press.
+ */
+export const findActiveSessionId = async (): Promise<string | null> => {
+  const database = await bootstrapLocalDataLayer();
+  const row = database
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(and(eq(sessions.status, 'active'), isNull(sessions.deletedAt)))
+    .orderBy(desc(sessions.updatedAt), desc(sessions.createdAt), desc(sessions.startedAt), asc(sessions.id))
+    .limit(1)
+    .get();
+  return row?.id ?? null;
+};

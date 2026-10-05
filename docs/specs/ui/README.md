@@ -38,6 +38,10 @@ drifted from the code and predated several UI milestones. Git history has them.)
 - `design-targets/`
   - accepted design target records per `ai-design-policy.md`, one file per
     accepted target
+- `design-targets/train-page.md`
+  - accepted Claude Design target for the Train page: one start disc, no
+    title, planning beneath only when available; a workout in progress is
+    opened directly, never offered as a Resume button
 - `design-targets/today-landing.md`
   - accepted Claude Design target for the Today landing page (Progress and
     Group activity cards); built, gallery accepted 2026-10-03
