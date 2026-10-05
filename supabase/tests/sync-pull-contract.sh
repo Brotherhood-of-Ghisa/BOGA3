@@ -386,7 +386,7 @@ run_psql_sql "
   -- Layer 1: exercise_muscle_mappings, exercise_tag_definitions,
   -- exercise_group_links.
   -- exercise_tag_definitions lives here (not Layer 0) per the corrected
-  -- partition in docs/specs/tech/sync-v2-server-contract.md ("Topological layers"): it FKs
+  -- partition in docs/specs/tech/sync-v2-server-contract.md (Topological layers): it FKs
   -- into exercise_definitions (Layer 0), so the no-intra-layer-FK rule
   -- forces it into a strictly later layer.
   insert into app_public.exercise_muscle_mappings (owner_user_id, id, exercise_definition_id, muscle_group_id, weight, created_at, updated_at, client_updated_at_ms)
