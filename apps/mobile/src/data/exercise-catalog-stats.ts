@@ -218,7 +218,7 @@ const addWorkingSetToAggregate = (
 };
 
 /**
- * Working sets settle (`ux-rules.md` §5.11) "done", `Last:`,
+ * Working sets settle (`training-metrics-contract.md` "Counted set") "done", `Last:`,
  * favourite recency, session count and 1RM. Volume independently includes
  * selected performed efforts, even when there are no working sets.
  */

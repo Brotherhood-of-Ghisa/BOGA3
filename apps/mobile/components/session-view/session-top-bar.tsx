@@ -63,7 +63,7 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
   );
 }
 
-// `<Time of day> training · <elapsed>` · ⋮ · Finish (`ux-rules` §14b.2);
+// `<Time of day> training · <elapsed>` · ⋮ · Finish;
 // `Edit session` · Done for a completed session; `Session complete` · Done
 // after Finish. The primary is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {

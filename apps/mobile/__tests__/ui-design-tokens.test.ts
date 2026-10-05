@@ -2,7 +2,7 @@ import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
 import * as tokens from '@/components/ui/tokens';
 
 // The token rules that stay true for good (`docs/specs/ui/design-language.md`
-// §2–§4, `ux-rules.md` §9a): the type scale, the colour roles, the geometry,
+// §2–§4): the type scale, the colour roles, the geometry,
 // the embedded faces, `record`'s distinctness from `accent` and its contrast
 // floor, and the one vocabulary (the retired scales never come back).
 
@@ -14,7 +14,7 @@ describe('design-language tokens', () => {
     const sizes = Object.values(uiTypography.size);
     expect(sizes).toHaveLength(8);
     expect(Math.min(...sizes)).toBe(uiTypography.size.xxs);
-    // Every size has a line-height, keyed by the same name (ux-rules §9a.2).
+    // Every size has a line-height, keyed by the same name.
     expect(Object.keys(uiTypography.lineHeight).sort()).toEqual(
       Object.keys(uiTypography.size).sort(),
     );
@@ -79,7 +79,7 @@ describe('design-language tokens', () => {
 
   describe('one value per role (design-language.md §2, rationalised 2026-09-27)', () => {
     it('gives no two roles the same value', () => {
-      // Two roles that cannot be told apart are one role (ux-rules §9a.6a).
+      // Two roles that cannot be told apart are one role (design-language.md "Colour roles").
       const byValue = new Map<string, string[]>();
       for (const [role, value] of Object.entries(uiRoles)) {
         byValue.set(value, [...(byValue.get(value) ?? []), role]);

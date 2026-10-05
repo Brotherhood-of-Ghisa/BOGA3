@@ -2,7 +2,7 @@
 
 Two heatmap views for the exercise and muscle history sheets on Progress
 (`components/stats/history-sheet.tsx`). They replace the older month-grid
-`CalendarHeatmap`. Semantics: `docs/specs/ui/ux-rules.md` §11.
+`CalendarHeatmap`.
 
 | File | What it is |
 |------|-----------|

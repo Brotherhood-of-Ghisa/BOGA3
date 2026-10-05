@@ -10,7 +10,7 @@ type ExerciseTopBarProps = {
   onOpenOptions?: () => void;
 };
 
-// Back · exercise name · ⋮. No subtitle (`ux-rules` §14a).
+// Back · exercise name · ⋮. No subtitle.
 export function ExerciseTopBar({ title, onBack, onOpenOptions }: ExerciseTopBarProps) {
   return (
     <View style={styles.bar}>

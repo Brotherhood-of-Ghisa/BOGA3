@@ -78,7 +78,7 @@ export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string): 
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** `7 sets · 3 exercises`: the working sets (`ux-rules.md` §5.11). */
+/** `7 sets · 3 exercises`: the working sets (`training-metrics-contract.md` "Counted set"). */
 export const formatWeekSessionFigures = (session: { working_sets: number; exercise_count: number }): string =>
   `${plural(session.working_sets, 'set', 'sets')} · ${formatExerciseCount(session.exercise_count)}`;
 

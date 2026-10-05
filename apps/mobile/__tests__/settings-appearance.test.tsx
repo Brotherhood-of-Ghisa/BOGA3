@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * Settings → Preferences → Appearance (`docs/specs/ui/ux-rules.md` §9b): the
+ * Settings → Preferences → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
  * theme presets in a sheet, a choice saved per device at once and applied on
  * the next launch, and the failures that must be logged rather than silent.
  *

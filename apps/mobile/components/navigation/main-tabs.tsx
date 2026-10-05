@@ -14,7 +14,7 @@ type MainTabsProps = {
 /**
  * The four main tabs (M26 ownership model) in the design language: one card
  * of plain labels. The active tab is `ink` at a heavier weight over an `ink`
- * underline — navigation, not an action, so never `accent` (`ux-rules` §1.4).
+ * underline — navigation, not an action, so never `accent` (`ux-rules.md` "Actions and emphasis").
  */
 export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
   return (

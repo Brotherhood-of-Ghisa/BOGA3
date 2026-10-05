@@ -14,7 +14,7 @@ import {
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
- * The read-only session view's presentation model (`ux-rules` §14b): one
+ * The read-only session view's presentation model: one
  * card per exercise with its set rows, a done count and a
  * record, plus the independent working-set and Volume totals. Pure — the route loads the
  * draft and the history and renders what this returns.
@@ -50,7 +50,7 @@ export type SessionViewExerciseCard = {
 
 export type SessionViewModel = {
   cards: SessionViewExerciseCard[];
-  // The summary's `Sets`: the performed working sets (`ux-rules.md` §5.11).
+  // The summary's `Sets`: the performed working sets (`training-metrics-contract.md` "Counted set").
   workingSetCount: number;
   volume: string;
   volumeNote?: string;

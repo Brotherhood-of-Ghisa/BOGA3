@@ -21,7 +21,7 @@ export type SessionShareSnapshot = {
   completedAt: string;
   durationDisplay: string;
   exerciseCount: number;
-  // Working sets (`ux-rules.md` §5.11): the image's one set count.
+  // Working sets (`training-metrics-contract.md` "Counted set"): the image's one set count.
   workingSetCount: number;
   personalRecords: ExercisePersonalRecord[];
   exerciseVolumeComparisons: ExerciseVolumeComparison[];
