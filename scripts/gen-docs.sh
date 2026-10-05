@@ -324,12 +324,23 @@ def package_root(d):
         d = os.path.dirname(d)
     return ""
 
+# Existence is judged against git's file list (tracked + new), never the disk,
+# so local-only outputs (node_modules, dist) count the same here as on CI.
+REPO_PATHS = set()
+for rel in listed:
+    while rel:
+        REPO_PATHS.add(rel)
+        rel = os.path.dirname(rel)
+
+def repo_path(base, path):
+    return os.path.normpath(os.path.join(base, path))
+
 def path_exists(base, path):
-    full = os.path.normpath(os.path.join(root, base, path))
-    if os.path.exists(full):
+    full = repo_path(base, path)
+    if full in REPO_PATHS:
         return True
-    m = re.fullmatch(r"(.*/docs/specs)/(\d{2})", full)
-    return bool(m) and any(f.startswith(m.group(2) + "-") for f in os.listdir(m.group(1)))
+    m = re.fullmatch(r"docs/specs/(\d{2})", full)
+    return bool(m) and any(p.startswith(f"docs/specs/{m.group(1)}-") for p in REPO_PATHS)
 
 cited = []  # (doc, line, token, candidate repo paths)
 for rel in PERSISTENT_DOCS:
@@ -355,14 +366,19 @@ for rel in PERSISTENT_DOCS:
                 continue
             path = token[2:] if token.startswith("./") else token
             first = path.split("/")[0]
-            anchored = [b for b in bases if first == ".." or os.path.exists(os.path.join(root, b, first))]
+            anchored = [b for b in bases if first == ".." or repo_path(b, first) in REPO_PATHS]
             if anchored and not any(path_exists(b, path) for b in anchored):
-                cited.append((rel, ln, token, [os.path.normpath(os.path.join(b, path)) for b in anchored]))
+                cited.append((rel, ln, token, [repo_path(b, path) for b in anchored]))
+def gitignored(path):
+    """True if a .gitignore rule matches path. Asked one path at a time: git
+    aborts a whole --stdin batch on a path outside the repo or beyond a local
+    symlink. A directory rule (`node_modules/`) only matches a trailing `/`."""
+    return any(subprocess.run(
+        ["git", "-C", root, "check-ignore", "-q", "--no-index", v],
+        capture_output=True).returncode == 0 for v in (path, path + "/"))
+
 if cited:
-    candidates = sorted({c for *_, cs in cited for c in cs})
-    ignored = set(subprocess.run(
-        ["git", "-C", root, "check-ignore", "--no-index", "--stdin"],
-        input="\n".join(candidates) + "\n", capture_output=True, text=True).stdout.split("\n"))
+    ignored = {c for *_, cs in cited for c in cs if gitignored(c)}
     for rel, ln, token, cs in cited:
         if not any(c in ignored for c in cs):
             problems.append(f"{rel}:{ln}: cites missing path '{token}' — fix the path, or mark a deliberately "

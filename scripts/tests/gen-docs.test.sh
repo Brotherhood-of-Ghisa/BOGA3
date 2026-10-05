@@ -62,25 +62,29 @@ rm -f "${PROBE}"
 
 # Cited repo paths must exist. The probe is an untracked persistent doc (check
 # scans new files too). Missing paths fail with file:line; non-paths, globs,
-# placeholders, fenced code, gitignored outputs, spec shorthand and lines
-# marked historical pass.
+# placeholders, fenced code, gitignored outputs (incl. a directory rule on a
+# path absent from disk, as on CI), spec shorthand and lines marked historical
+# pass. A path outside the repo is missing and must not mask the ignore checks.
 PATH_PROBE="${REPO_ROOT}/scripts/tests/.gen-docs-path-probe.md"
-trap 'rm -f "${PROBE}" "${PATH_PROBE}"' EXIT
+# An empty directory is on disk but not in git (nor on CI): it is missing.
+EMPTY_DIR="${REPO_ROOT}/scripts/tests/.gen-docs-empty-dir"
+trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rmdir "${EMPTY_DIR}" 2>/dev/null || true' EXIT
+mkdir -p "${EMPTY_DIR}"
 cat > "${PATH_PROBE}" <<'MD'
 Real: `scripts/lanes.tsv`, `./scripts/gen-docs.sh check`, [up](../lanes.tsv), `src/sync/`, `docs/specs/02`.
 Not paths: `origin/main`, `@supabase/supabase-js`, `text/plain`, `/progress`, `127.0.0.1:54321`, [s](../lanes.tsv#columns).
-Skipped: `docs/**/x.md`, `src/<area>/__tests__/`, `apps/mobile/artifacts/maestro/gone.png`.
+Skipped: `docs/**/x.md`, `src/<area>/__tests__/`, `apps/mobile/artifacts/maestro/gone.png`, `apps/mobile/dist`.
 Gone on purpose: `scripts/retired.sh` <!-- docs-check: historical-path -->
 ```bash
 echo `./scripts/not-here.sh` [x](../not-here.md)
 ```
 MD
 "${GD}" check >/dev/null 2>&1 || fail "real, non-path, skipped and historical citations must pass: $("${GD}" check 2>&1)"
-printf 'Gone: `scripts/no-such-file.sh` and [x](../no-such-doc.md#a) and `src/sync/nope.ts:12`.\n' >> "${PATH_PROBE}"
+printf 'Gone: `scripts/no-such-file.sh` and [x](../no-such-doc.md#a) and `src/sync/nope.ts:12` and [o](../../../outside.md) and `scripts/tests/.gen-docs-empty-dir`.\n' >> "${PATH_PROBE}"
 if out="$("${GD}" check 2>&1)"; then
   fail "a missing cited path must fail the check"
 fi
-for token in scripts/no-such-file.sh ../no-such-doc.md src/sync/nope.ts; do
+for token in scripts/no-such-file.sh ../no-such-doc.md src/sync/nope.ts ../../../outside.md scripts/tests/.gen-docs-empty-dir; do
   grep -q "gen-docs-path-probe.md:8: cites missing path '${token}'" <<<"${out}" \
     || fail "missing-path failure must name file, line and '${token}': ${out}"
 done
@@ -100,7 +104,7 @@ rm -f "${PATH_PROBE}"
 # AGENTS.md, exempt prefixes, and the ceiling ratchet (gen lowers and drops,
 # never raises or adds).
 BFIX="$(mktemp -d)"
-trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rm -rf "${BFIX}"' EXIT
+trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rmdir "${EMPTY_DIR}" 2>/dev/null || true; rm -rf "${BFIX}"' EXIT
 mkdir -p "${BFIX}/scripts" "${BFIX}/docs/specs" "${BFIX}/docs/exempt" "${BFIX}/store"
 cp "${GD}" "${REPO_ROOT}/scripts/lane-timing.sh" "${BFIX}/scripts/"
 printf 'lint\textra\tnone\tyes\t.\ttrue\n' > "${BFIX}/scripts/lanes.tsv"
@@ -146,7 +150,7 @@ bgd gen >/dev/null || fail "gen must drop the ceiling of a doc that fits"
 
 # Median rule, on a fixture repo + timing store (never the real ones).
 FIX="$(mktemp -d)"
-trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rm -rf "${FIX}" "${BFIX}"' EXIT
+trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rmdir "${EMPTY_DIR}" 2>/dev/null || true; rm -rf "${FIX}" "${BFIX}"' EXIT
 mkdir -p "${FIX}/scripts" "${FIX}/docs/specs" "${FIX}/store"
 cp "${GD}" "${REPO_ROOT}/scripts/lane-timing.sh" "${FIX}/scripts/"
 for lane in speedup steady legacy unrun; do
