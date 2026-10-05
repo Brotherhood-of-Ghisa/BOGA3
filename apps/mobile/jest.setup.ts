@@ -33,7 +33,7 @@ jest.mock('react-native-gesture-handler', () => {
     const methods = [
       'activeOffsetX', 'activeOffsetY', 'failOffsetX', 'failOffsetY',
       'onBegin', 'onStart', 'onUpdate', 'onChange', 'onEnd', 'onFinalize',
-      'minDistance', 'maxPointers', 'minPointers', 'enabled', 'shouldCancelWhenOutside',
+      'minDistance', 'maxPointers', 'minPointers', 'enabled', 'shouldCancelWhenOutside', 'runOnJS',
     ];
     for (const m of methods) {
       obj[m] = () => obj;

@@ -12,7 +12,8 @@ import {
   saveThemePresetId,
   THEME_PRESET_STORAGE_KEY,
 } from '@/components/ui/theme-launch';
-import { getThemePreset, resolveThemePreset } from '@/components/ui/theme-presets';
+import { seedsFromHue } from '@/components/ui/theme-hue';
+import { customTheme, getThemePreset, resolveThemePreset, storedThemeId } from '@/components/ui/theme-presets';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 
 // The chosen theme (`docs/specs/ui/design-language.md` §2, "Presets"): a preset
@@ -37,6 +38,22 @@ describe('resolveThemePreset', () => {
     expect(resolveThemePreset('slate')).toEqual({ preset: getThemePreset('slate'), problem: null });
   });
 
+  it('is a custom theme for a stored hue', () => {
+    expect(resolveThemePreset('hue:200')).toEqual({
+      preset: { id: 'custom', label: 'Custom', hue: 200, seeds: seedsFromHue(200) },
+      problem: null,
+    });
+    expect(storedThemeId(customTheme(200))).toBe('hue:200');
+    expect(storedThemeId(getThemePreset('plum'))).toBe('plum');
+  });
+
+  it('falls back to the default and reports a hue out of range', () => {
+    expect(resolveThemePreset('hue:400')).toEqual({
+      preset: getThemePreset('warm'),
+      problem: { kind: 'unknown-preset', storedId: 'hue:400' },
+    });
+  });
+
   it('falls back to the default and reports an id no preset has', () => {
     expect(resolveThemePreset('neon')).toEqual({
       preset: getThemePreset('warm'),
@@ -59,6 +76,14 @@ describe('the launch theme', () => {
     expect(readLaunchTheme()).toEqual({
       preset: getThemePreset('warm'),
       problem: { kind: 'read-failed', message: 'database is locked' },
+    });
+  });
+
+  it('draws `uiRoles` in the custom hue stored before launch', () => {
+    Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'hue:265');
+    jest.isolateModules(() => {
+      const { uiRoles } = require('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
+      expect(uiRoles).toEqual(generateRoles(seedsFromHue(265)));
     });
   });
 

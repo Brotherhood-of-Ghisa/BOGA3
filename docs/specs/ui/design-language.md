@@ -155,6 +155,13 @@ from a mock of six candidates on the exercise page, one per hue family:
 Gated by `ui-theme.test.ts`: every preset passes the generator rules above and
 these floors, and Warm is the default seeds.
 
+### Custom colour
+
+**Decided 2026-10-05.** Or one hue on a ring: `seedsFromHue`
+(`apps/mobile/components/ui/theme-hue.ts`) fixes every seed's L\* and chroma,
+so the floors above hold at all 360 hues (gated in `ui-theme.test.ts`). A hue
+near `danger`'s is allowed. Stored as `hue:<deg>` with the preset id.
+
 ### Data visualisation
 
 One sequential ramp, one meaning: **more**. Heatmap cells and bars, and the

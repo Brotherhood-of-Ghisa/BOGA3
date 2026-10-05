@@ -67,6 +67,7 @@ export function RootStack() {
         <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
         <Stack.Screen name="body-weight" options={{ title: 'Body weight' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
+        <Stack.Screen name="theme-colour" options={{ title: 'Custom colour' }} />
         <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />
         <Stack.Screen name="group/new" options={{ title: 'New group' }} />
         <Stack.Screen name="group/join" options={{ title: 'Join group' }} />
