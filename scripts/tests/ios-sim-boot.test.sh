@@ -18,7 +18,13 @@ cat > "$WORK/bin/xcrun" <<'STUB'
 printf '%s\n' "$*" >> "$STUB_LOG"
 case "$1 $2" in
   "simctl list") printf -- '-- iOS 26.2 --\n    BOGA test (%s) (%s) \n' "$UDID" "${STUB_DEVICE_STATE:-Booted}" ;;
-  "simctl boot") exit 0 ;;
+  "simctl boot")
+    # cross-second: return 50ms past the next wall-clock second boundary, so a
+    # whole-second clock (bash SECONDS) reads this short boot as a 1s budget spent.
+    if [[ "${STUB_BOOT:-}" == cross-second ]]; then
+      perl -MTime::HiRes=time,sleep -e 'sleep(int(time) + 1.05 - time)'
+    fi
+    exit 0 ;;
   "simctl spawn") printf 'PID\tStatus\tLabel\n-\t5\tcom.apple.SpringBoard\n' ;;
   "simctl bootstatus")
     case "$STUB_BOOTSTATUS" in
@@ -100,5 +106,17 @@ assert_err "Simulator.app: running"
 assert_err "SpringBoard:   n/a (device not booted)"
 assert_err "SpringBoard crash reports for this device since boot began: 0"
 assert_err "the device never reached the Booted state"
+
+# 5. A short boot that crosses a second boundary still leaves the rest of a 1s
+#    deadline to one bounded bootstatus, which times out with its own message.
+#    Start 0.25s past a boundary so the stub's sleep (to the next one) stays
+#    well inside the 1s bound on simctl boot.
+perl -MTime::HiRes=time,sleep -e 'sleep(int(time) + 1.25 - time)'
+run_boot STUB_BOOT=cross-second STUB_BOOTSTATUS=hang IOS_SIM_BOOT_TIMEOUT_SECONDS=1
+assert '[[ $rc == 1 && -z $out ]]' "cross-second boot then wedged bootstatus fails (rc=$rc)"
+assert '[[ $(grep -c "simctl bootstatus" "$STUB_LOG") == 1 ]]' "bootstatus runs once after a boot that crossed a second boundary"
+assert '[[ -s $STUB_STATE/bootstatus.pid ]] && ! kill -0 "$(cat "$STUB_STATE/bootstatus.pid")" 2>/dev/null' \
+  "cross-second case: timed-out bootstatus process was killed"
+assert_err "did not finish booting: simctl bootstatus did not report boot-complete within 1s"
 
 echo "ios-sim-boot.test.sh: ${PASS} assertions passed"
