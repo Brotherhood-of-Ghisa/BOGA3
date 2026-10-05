@@ -21,7 +21,7 @@ it('the scripted counterparty links and polls protocol-4 single-set Volume',()=>
   vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../.maestro/scripts/groups-counterparty.js'),'utf8'),context);
   expect(calls.map(call=>call.name)).toEqual(['group_competition_exercise_list','sync_push','group_competition_board']);
   expect(calls.at(-1)?.args).toEqual({ p_group_id: 'group',p_group_exercise_id: 'comparison',p_metric: 'volume',p_certified: false,p_cursor: null,p_limit: 10 });
-  expect(calls.every(call=>call.headers['x-boga-group-contract']==='4' && call.headers['x-boga-sync-protocol']==='3')).toBe(true);
+  expect(calls.every(call=>call.headers['x-boga-group-contract']==='4' && call.headers['x-boga-sync-protocol']==='4')).toBe(true);
 });
 
 /** Mock the local tool boundary, then execute the real wrapper to prove its
