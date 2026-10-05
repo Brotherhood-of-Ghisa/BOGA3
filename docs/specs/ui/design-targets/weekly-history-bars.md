@@ -51,6 +51,10 @@ operator review happens in the implementation PR.
   the existing band above the chart. Tapping it again clears selection.
   Unselected state has no instruction or empty band. Remove both
   `Tap a week to select it` and the older `Tap a week to see details` copy.
+- Operator amendment (2026-10-05): remove the two bottom sentences circled in
+  the supplied screenshot: `Current week is in progress` and the repeated
+  `12-week average`. Retain the row's `Current week` label, the average label
+  above its reference, and the existing colour/availability legend.
 - Stay in the same sheet during selection; no session drilldown is introduced.
   Backdrop tap, Android back and VoiceOver escape dismiss it while preserving
   the parent browsing state. No new close button or drag gesture is part of
@@ -112,3 +116,16 @@ metrics, long formatted values and the 1/520-week limits. The maximum window's
 native list was also programmatically scrolled to its oldest rows. Selection,
 clearing, retry, dismissal and parent-state preservation have Jest integration
 coverage; no new Maestro scenario was introduced.
+
+### Footer amendment verification
+
+The 2026-10-05 footer amendment was checked in the production Progress history
+sheet at **390 × 844pt**, **375 × 667pt** and **440 × 956pt**. Operator-approved
+temporary Maestro checks loaded real SQLite sessions and exercised selection,
+clearing, all four metrics, scrolling to the oldest of twelve weeks and backdrop
+dismissal with parent-state preservation. Captures show both repeated sentences
+removed, with the current-week label, average reference and intensity legend
+retained. Evidence lives under
+`apps/mobile/artifacts/maestro/weekly-history-bars/footer-followup/`. This fixture
+has a maximum of 61 sets (average 44.4), verifying the adaptive axis; the existing
+layout differences recorded above remain.

@@ -133,8 +133,6 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
       formatValue={formatValue} metricLabel={metricLabel} targetLegend={data.targetLegend}
       max={max} averagePosition={averagePosition} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
-      <Text allowFontScaling={false} style={styles.note}>Current week is in progress.</Text>
-      {showAverage ? <Text allowFontScaling={false} style={styles.note}>12-week average: {averageLabel} {metricLabel === 'Sets' ? 'sets' : metricLabel}.</Text> : null}
       <HeatmapLegend label={legendLabel} />
       {data.targetLegend ? <Text allowFontScaling={false} style={styles.note}>{data.targetLegend}. Full colour at 100%.</Text> : null}
       {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={styles.note}>?: unavailable or incomplete load; excluded from the average</Text> : null}
