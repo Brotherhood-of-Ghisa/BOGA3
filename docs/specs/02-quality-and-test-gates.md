@@ -54,7 +54,7 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | Lane | Run via | In which gate | CI? | Measured median† |
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
-| lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~4.2s |
+| lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.6s |
 | typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.1s |
 | jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~13s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.3s |
@@ -64,7 +64,7 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |
 | handles | `./boga test handles` | — (run by name) | ❌ | ~1.3m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | ~3.6s |
-| jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | ~22s |
+| jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | ~16s |
 | complexity | `./boga test complexity` | — (run by name) | ❌ | ~8.2s |
 | dependencies | `./boga test dependencies` | — (run by name) | ❌ | ~0.9s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
