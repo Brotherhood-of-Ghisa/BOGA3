@@ -28,26 +28,9 @@ tap.
 ## 2. Colour roles
 
 Semantic roles, not a palette: **a screen names the role, never the hex.** The
-values are generated per theme ("Derivation" below), so neither a doc nor a
-screen may hold one — `uiRoles` is the only source, and `UiRoles` in
-`apps/mobile/components/ui/theme.ts` carries each role's purpose.
-
-| Role | Use |
-| --- | --- |
-| `ink` | primary text, chrome, realised values |
-| `ink-muted` | secondary text |
-| `ink-faint` | mini legends, tertiary labels, not-yet-realised values |
-| `ink-ghost` | legends of not-yet-realised values, absent values, placeholders, disabled controls |
-| `paper` | page ground; a pressed control and an action strip inside a card |
-| `surface` | cards, sheets, inputs |
-| `rule` | card borders, control borders, sheet handle |
-| `rule-soft` | dividers inside a card or panel |
-| `accent` | the one primary action on a screen |
-| `accent-wash` | the row or field being edited |
-| `record` | an all-time best value |
-| `record-wash` / `record-rule` | a band announcing a record |
-| `danger` | destructive actions only |
-| `scrim` | the dimmed backdrop behind a sheet |
+values are generated per theme, so neither a doc nor a screen may hold one —
+`uiRoles` is the only source, and `UiRoles` in
+`apps/mobile/components/ui/theme.ts` documents what each role is for.
 
 Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
@@ -60,76 +43,34 @@ Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 - **A wash is a tint of its role**, within 10° of its hue, so the edited row
   carries the accent's hue rather than the ground's.
 
-### Derivation: four seeds
+**Four seeds make a theme.** `generateRoles(seeds)` turns `ground`, `accent`,
+`record` and `viz` into every role, synchronously at module load so every
+module-scope `StyleSheet.create` keeps working. A seed sets hue and chroma; the
+role sets its own fixed L\* — contrast depends on lightness, so the text floors
+hold whatever the seed. `accent` and `record` are used as given, so their floors
+are the seed's to meet. **Light only:** `app.config.ts` pins
+`userInterfaceStyle: "light"` (`ux-rules.md` "Appearance"); a dark theme would
+be a second ladder, not different seeds.
 
-A theme is four colours. `generateRoles(seeds)` in `theme.ts` turns the seeds
-`ground`, `accent`, `record` and `viz` into every role, and `uiRoles` is the
-chosen theme's seeds generated — synchronously at module load, so every
-module-scope `StyleSheet.create` keeps working.
+**Choosing one.** Four presets or a custom hue, per device, resolved when
+`tokens.ts` first evaluates (`theme-presets.ts`, `theme-launch.ts`); an unknown
+id or unreadable store opens in the default and is logged. `record` stays a
+brass across presets, so "your best ever" keeps one look. For a custom hue,
+`seedsFromHue` (`theme-hue.ts`) fixes every seed's L\* and chroma so the floors
+hold at all 360 hues by construction rather than by checking afterwards. Hue is
+the one thing that moves: `record` keeps the brass unless the picked accent
+lands within 35° of it, then steps 35° away on the far side — that step is what
+makes the `record`-to-`accent` floor hold, so do not "simplify" it away.
+`ui-theme.test.ts` gates the generator and every preset.
 
-- **A seed sets hue and chroma; the role sets lightness.** Each generated role
-  sits at its own fixed L\* on its seed's hue, with the seed's chroma scaled by
-  a per-role factor. Contrast depends on lightness, so the text floors hold
-  whatever the seed.
-- **`accent` and `record` are used as given**, so their floors (above) are the
-  seed's to meet.
-- **`surface` (white), `danger` and `scrim` are the same in every theme.**
-- **Out-of-gamut steps lose chroma**, keeping lightness and hue.
-- **Light only.** The ladder is a light ground; a dark theme would be a second
-  ladder, not different seeds. `app.config.ts` pins
-  `userInterfaceStyle: "light"` (`ux-rules.md` "Appearance").
-
-`apps/mobile/__tests__/ui-theme.test.ts` gates the generator over every shipped
-preset and three seed sets no preset ships: the invariants above, the neutrals
-in a fixed lightness order, `ink` and `ink-muted` ≥ 4.5:1 on both grounds, even
-ramp steps, and `uiRoles` within ΔE\*ab 3 of the palette the roles were first
-picked at by eye.
-
-### Presets
-
-The user picks a theme in Settings → Appearance: four presets, one per hue
-family (`apps/mobile/components/ui/theme-presets.ts`), or a custom hue.
-
-- **`record` stays a brass** in every preset, so "your best ever" keeps one
-  look whatever the accent.
-- **Each preset's `accent` and `record` meet their own floors**, being used as
-  given: `record` ≥ 4.5:1 on `paper`, `surface` and `record-wash`; `record`
-  ≥ 30° of hue from `accent`; and the primary action's `surface` label ≥ 4.5:1
-  on `accent`. Gated per preset in `ui-theme.test.ts`.
-- **Chosen per device, applied at launch.** `tokens.ts` resolves the stored
-  choice to seeds when it first evaluates (`theme-launch.ts`, read
-  synchronously from `expo-sqlite/kv-store`); an unknown id or an unreadable
-  store opens in the default (Warm) and is logged.
-
-### Custom colour
-
-Or one hue on a ring: `seedsFromHue`
-(`apps/mobile/components/ui/theme-hue.ts`) fixes every seed's L\* and chroma,
-so the floors above hold at all 360 hues by construction rather than by
-checking after the fact (gated in `ui-theme.test.ts`). Hue is the one thing
-that moves: `record` keeps the shipped brass unless the picked accent lands
-within 35° of it, then steps 35° away on the far side — that step is what makes
-the `record`-to-`accent` floor hold, so do not "simplify" it away. A hue near
-`danger`'s is allowed. Stored as `hue:<deg>` in place of a preset id.
-
-### Data visualisation
-
-One sequential ramp, one meaning: **more**. Heatmap cells and bars, and the
-Progress failure-intensity rows, all use it — `viz0` is empty / rest (a heatmap
-day with no training), `viz1`…`viz4` the lightest to the strongest intensity.
-
-- **The steps are even in lightness**, so each bucket reads as "more" without
-  relying on hue, and no step is `accent` or `record`.
-- **Text on a `viz` ground is `ink`**, legends and deltas included: `ink-muted`
-  is 3.3:1 on `viz2` and 1.7:1 on `viz4`. `Stat` takes `ground="viz"` for this.
-- **Colour is never the only channel**: counts and accessibility labels still
-  say how much.
-- **Marks on a `viz` cell are `ink`** — today a 1px ring, selected a 2px
-  border. An empty `viz0` cell takes a `rule` hairline, since `viz0` is only
-  1.18:1 against `surface`.
-
-Gated by `ui-design-tokens.test.ts`: ΔL\* ≥ 6 between neighbours, `viz1` ≥ 10
-L\* below `surface`, `ink` on `viz4` ≥ 4.5:1 and on `viz1` ≥ 3:1.
+**Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
+empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps
+are even in lightness, so each bucket reads as "more" without relying on hue,
+and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
+legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
+`ground="viz"`. **Colour is never the only channel** — counts and accessibility
+labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
+a `rule` hairline, being only 1.18:1 against `surface`.
 
 ## 3. Typography
 
@@ -143,22 +84,21 @@ Figures are monospaced so digits align down a column — any list of measurement
 depends on it. Micro-labels are Archivo 700 at **10px**
 (`uiTypography.size.xxs`), tracked 0.1em, and carry units and legends.
 
-**Embedded in the binary**, never loaded at runtime: the eight faces ship
-inside the app via the `expo-font` config plugin (`apps/mobile/app.config.ts`),
-so the OS registers them before JS runs — no loading step, no splash gate, no
-flash of the system font reflowing a numeric column. A screen names a face as
+**Embedded in the binary**, never loaded at runtime: the eight faces ship inside
+the app via the `expo-font` config plugin (`apps/mobile/app.config.ts`), so the
+OS registers them before JS runs — no loading step, no splash gate, no flash of
+the system font reflowing a numeric column. A screen names a face as
 `{ fontFamily, fontWeight }` from `uiFonts`, the same pair on iOS and Android.
 Only the weights above are embedded; any other weight silently lands on the
 nearest one that is. **Web gets system fonts** — config-plugin embedding is
 iOS/Android only. That is accepted, not a bug: web is a dev convenience with no
 gate, and this spec promises no web parity.
 
-**The type scale is eight rungs** (`uiTypography.size`: 10 · 11 · 12 · 13 · 14
-· 16 · 18 · 24), and the raw-literal budgets in
-`apps/mobile/scripts/ui-guardrails.config.js` stay at 0. A size a screen cannot
-express is a case for revising the scale, here and in `tokens.ts`, never for an
-exception (`ux-rules.md` "Styling guardrails"); a design target drawn off the
-scale snaps onto it.
+**The type scale is eight rungs** (`uiTypography.size`), and the raw-literal
+budgets in `apps/mobile/scripts/ui-guardrails.config.js` stay at 0. A size a
+screen cannot express is a case for revising the scale, here and in `tokens.ts`,
+never for an exception (`ux-rules.md` "Styling guardrails"); a design target
+drawn off the scale snaps onto it.
 
 **The 38pt metric column holds** (`uiGeometry.metricValueWidth`, measured on
 device at 390pt): a 1RM up to `999.9` and a five-digit volume both fit with
@@ -167,11 +107,10 @@ produces.
 
 **Weight per figure.** Realised figures and option labels sit one embedded
 weight lighter than the accepted target drew them, which read too heavy on iOS,
-keeping sizes on the scale. Running figures (weight × reps, the inline 1RM,
-VOL) are Plex Mono **500**; a `record` figure is **700**, which stands out from
-them. Sheet option labels are Archivo **600**, the selected one **700**.
-Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
-700, sheet titles Archivo 800.
+keeping sizes on the scale. Running figures (weight × reps, the inline 1RM, VOL)
+are Plex Mono **500**; a `record` figure is **700**. Sheet option labels are
+Archivo **600**, the selected one **700**; headline figures stay Plex Mono 700,
+micro-labels Archivo 700, sheet titles Archivo 800.
 
 ## 4. Surfaces
 
@@ -185,9 +124,7 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
-  value is for: the card, sheet, control and pill radii, the 44pt tap target,
-  the 38pt metric column, the sheet handle, the 50pt labelled-field height and
-  micro-label tracking. **A screen derives its measures from these** instead of
+  value is for. **A screen derives its measures from these** instead of
   adding values (the logger's Reps field is one field height wide, Effort two
   tap targets), and spacing a design target draws off-scale snaps to the scale
   (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).

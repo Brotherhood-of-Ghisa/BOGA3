@@ -26,6 +26,9 @@
 #      - no tracked or new text file holds a merge-conflict marker line
 #        (`<<<<<<< `, `||||||| `, `>>>>>>> `),
 #      - every repo path cited in a persistent doc exists, never at a line,
+#      - the components catalog names every `components/ui/*.tsx` primitive and
+#        every `components/<area>/` folder, and no row names a folder that is
+#        gone (so adding a component forces a catalog edit),
 #      - every doc reachable from AGENTS.md fits its word budget
 #        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings).
 
@@ -429,7 +432,39 @@ if cited:
             problems.append(f"{rel}:{ln}: cites missing path '{token}' — fix the path, or mark a deliberately "
                             f"historical line with {HISTORICAL}")
 
-# 7. word budgets for the docs an agent can load: AGENTS.md and every
+# 7. the components catalog stays an inventory, not a snapshot. A hand-written
+#    catalog rots silently: the pre-trim one had drifted to omit 10 of 21
+#    folders while still reading as authoritative. The descriptions are the
+#    valuable half and cannot be generated, so instead of generating the table
+#    we fail when it falls out of step with the tree in either direction.
+#    Adding a primitive or a component folder therefore forces a catalog edit.
+CATALOG_REL = "docs/specs/ui/components-catalog.md"
+CATALOG = os.path.join(root, CATALOG_REL)
+UI_DIR = os.path.join(root, "apps/mobile/components/ui")
+COMPONENTS_DIR = os.path.join(root, "apps/mobile/components")
+# Non-visual support modules under components/ui/: colour maths and the barrel.
+# They are not primitives a screen reaches for, so the catalog need not list
+# them. `.ts` files are exempt as a class; only `.tsx` must be named.
+if os.path.exists(CATALOG) and os.path.isdir(UI_DIR):
+    catalog_src = open(CATALOG).read()
+    for entry in sorted(os.listdir(UI_DIR)):
+        if not entry.endswith(".tsx"):
+            continue
+        if f"`{entry}`" not in catalog_src:
+            problems.append(f"{CATALOG_REL}: primitive 'apps/mobile/components/ui/{entry}' is not named "
+                            "in the Primitives table — add the row that says what to reach for it for")
+    for entry in sorted(os.listdir(COMPONENTS_DIR)):
+        if entry == "ui" or not os.path.isdir(os.path.join(COMPONENTS_DIR, entry)):
+            continue
+        if f"`{entry}/`" not in catalog_src:
+            problems.append(f"{CATALOG_REL}: component folder 'apps/mobile/components/{entry}/' has no row "
+                            "in 'Shared components by area' — add it with a one-line description")
+    # The reverse direction: a row naming a folder that no longer exists.
+    for folder in sorted(set(re.findall(r"^\| `([a-z0-9-]+)/` \|", catalog_src, re.M))):
+        if not os.path.isdir(os.path.join(COMPONENTS_DIR, folder)):
+            problems.append(f"{CATALOG_REL}: row names 'apps/mobile/components/{folder}/', which does not exist")
+
+# 8. word budgets for the docs an agent can load: AGENTS.md and every
 #    persistent doc reachable from it through Markdown links or inline-code
 #    `.md` paths. Words are whitespace-separated tokens (`wc -w`). Limits,
 #    exempt prefixes and grandfathered ceilings live in scripts/doc-budgets.tsv;

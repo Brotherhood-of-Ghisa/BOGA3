@@ -8,7 +8,9 @@
 > `screen-map.md` and its record under `design-targets/`.
 > **Load when:** you are building or changing UI and need to find the component
 > that already exists. Update this doc when a reusable component is added,
-> removed, renamed or changes role (`README.md` "Maintenance rules").
+> removed, renamed or changes role (`README.md` "Maintenance rules") — the
+> `docs-check` lane fails until a new primitive or component folder is named
+> here, so the inventory cannot quietly go stale.
 
 Two standing rules:
 
