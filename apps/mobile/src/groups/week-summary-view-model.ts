@@ -3,6 +3,12 @@
 // them, and the latest activity row. Pure; the card only draws it.
 
 import { formatCompactDuration } from '@/src/data/session-list';
+import {
+  buildSessionRecordLine,
+  GROUP_RECORD_NOUN,
+  sessionRecordLineText,
+  type SessionRecordLine,
+} from '@/src/session-insights/record-line';
 import { formatClockTime, formatMonthDayTime } from '@/src/utils/local-time';
 
 import { formatOrdinal } from './board-view-model';
@@ -12,7 +18,11 @@ import type {
   GroupWeekBoardRow,
 } from './types';
 
-import type { CompetitionEventWire, CompetitionWeekSummaryWire as GroupWeekSummaryResult } from './competition-wire';
+import type {
+  CompetitionEventWire,
+  CompetitionHistoryValueWire,
+  CompetitionWeekSummaryWire as GroupWeekSummaryResult,
+} from './competition-wire';
 import { formatCompetitionHistoricalValue } from './competition-view-model';
 type GroupWeekLatestSession = NonNullable<GroupWeekSummaryResult['latest_completed']>;
 type GroupWeekTrainingSession = GroupWeekSummaryResult['training_now'][number];
@@ -85,57 +95,63 @@ const joinContext = (...parts: (string | null | undefined)[]): string =>
 export const joinNames = (names: string[]): string =>
   names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
-export type GroupRecordLine = { lead: string; note: string };
+/** One group record: a record event and one board it took #1 on. */
+type GroupRecordBoard = { event: CompetitionEventWire; value: CompetitionHistoryValueWire };
 
-/** Historical values retain their original unit and revision. */
-export const buildGroupRecordLine = (records: CompetitionEventWire[]): GroupRecordLine | null => {
-  const first = records[0];
-  if (!first) return null;
-  const value=first.values.find(value => value.role === 'record' && value.metric === 'e1rm')
-    ?? first.values.find(value => value.role === 'record');
-  return { lead: `${first.group_exercise.name} ${value ? formatCompetitionHistoricalValue(value) : 'Score unavailable'}`,
-    note: records.length === 1 ? 'group record' : plural(records.length,'group record','group records') };
+/**
+ * The session's group records, one per board taken (§4.7): the server keeps
+ * only the `record` values of the boards each record took #1 on.
+ */
+export const groupRecordBoards = (records: CompetitionEventWire[]): GroupRecordBoard[] =>
+  records.flatMap((event) => event.values.filter((value) => value.role === 'record').map((value) => ({ event, value })));
+
+/** `Deadlift 1RM 213.3 kg · group record`; several are only counted. Historical values keep their unit and revision. */
+export const buildGroupRecordLine = (records: CompetitionEventWire[]): SessionRecordLine | null =>
+  buildSessionRecordLine(
+    groupRecordBoards(records),
+    ({ event, value }) => `${event.group_exercise.name} ${formatCompetitionHistoricalValue(value)}`,
+    GROUP_RECORD_NOUN,
+  );
+
+/** One member's session, drawn by the shared session summary row. */
+type MemberSessionRow = {
+  memberUserId: string;
+  sessionId: string;
+  name: string;
+  /** `10/16 06:10`, or `Started 07:40` while training. */
+  stamp: string;
+  duration: string | null;
+  gym: string | null;
+  figures: string;
+  record: SessionRecordLine | null;
+  accessibilityLabel: string;
 };
 
-const recordLineText = (line: GroupRecordLine | null): string | null => (line ? `${line.lead} · ${line.note}` : null);
-
 export type LatestActivityViewModel =
-  | {
-      kind: 'training';
-      memberUserId: string;
-      sessionId: string;
-      name: string;
-      context: string;
-      figures: string;
-      accessibilityLabel: string;
-    }
+  | ({ kind: 'training' } & MemberSessionRow)
   | { kind: 'several'; count: number; names: string; gyms: string; accessibilityLabel: string }
-  | {
-      kind: 'completed';
-      memberUserId: string;
-      sessionId: string;
-      name: string;
-      status: string;
-      context: string;
-      figures: string;
-      record: GroupRecordLine | null;
-      accessibilityLabel: string;
-    };
+  | ({ kind: 'completed' } & MemberSessionRow);
 
 const personName = (member: GroupMemberRef, myUserId: string) => formatStreamPersonName(member, myUserId);
 
+const sessionLabel = (parts: (string | null | undefined)[]): string =>
+  parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(', ');
+
 const trainingRow = (session: GroupWeekTrainingSession, myUserId: string, nowMs: number): LatestActivityViewModel => {
   const name = personName(session.member, myUserId);
-  const context = joinContext(formatTrainingStart(session.started_at_ms, nowMs), session.gym_name);
+  const stamp = formatTrainingStart(session.started_at_ms, nowMs);
   const figures = formatWeekSessionFigures(session);
   return {
     kind: 'training',
     memberUserId: session.member.user_id,
     sessionId: session.session_id,
     name,
-    context,
+    stamp,
+    duration: null,
+    gym: session.gym_name,
     figures,
-    accessibilityLabel: `${name}, training now, ${context}, ${figures}`,
+    record: null,
+    accessibilityLabel: sessionLabel([name, 'training now', stamp, session.gym_name && `at ${session.gym_name}`, figures]),
   };
 };
 
@@ -162,8 +178,8 @@ const completedDuration = (session: GroupWeekLatestSession): number | null => {
 const completedRow = (session: GroupWeekLatestSession, myUserId: string): LatestActivityViewModel => {
   const name = personName(session.member, myUserId);
   const durationSec = completedDuration(session);
-  const status = durationSec === null ? 'Completed' : `Completed · ${formatCompactDuration(durationSec)}`;
-  const context = joinContext(formatMonthDayTime(session.started_at_ms), session.gym_name);
+  const stamp = formatMonthDayTime(session.started_at_ms);
+  const duration = durationSec === null ? null : formatCompactDuration(durationSec);
   const figures = formatWeekSessionFigures(session);
   const record = buildGroupRecordLine(session.group_records);
   return {
@@ -171,11 +187,19 @@ const completedRow = (session: GroupWeekLatestSession, myUserId: string): Latest
     memberUserId: session.member.user_id,
     sessionId: session.session_id,
     name,
-    status,
-    context,
+    stamp,
+    duration,
+    gym: session.gym_name,
     figures,
     record,
-    accessibilityLabel: [name, status, context, figures, recordLineText(record)].filter(Boolean).join(', '),
+    accessibilityLabel: sessionLabel([
+      name,
+      `completed session on ${stamp}`,
+      duration,
+      session.gym_name && `at ${session.gym_name}`,
+      figures,
+      sessionRecordLineText(record),
+    ]),
   };
 };
 

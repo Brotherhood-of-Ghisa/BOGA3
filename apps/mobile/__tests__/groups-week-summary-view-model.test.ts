@@ -9,14 +9,14 @@ import {
   buildWeekBoard,
   buildGroupRecordLine,
   formatTrainingStart,
+  groupRecordBoards,
   joinNames,
   type GroupWeekBoardRow,
-  type GroupWeekRecord,
   type GroupWeekTrainingSession,
 } from '@/src/groups';
 
 import { competitionEvent } from './helpers/competition-fixtures';
-import type { CompetitionEventWire,CompetitionWeekSummaryWire } from '@/src/groups/competition-wire';
+import type { CompetitionEventWire,CompetitionHistoricalMetric,CompetitionWeekSummaryWire } from '@/src/groups/competition-wire';
 type GroupWeekLatestSession = NonNullable<CompetitionWeekSummaryWire['latest_completed']>;
 const ME = 'me';
 
@@ -42,7 +42,9 @@ const training = (userId: string, overrides: Partial<GroupWeekTrainingSession> =
   ...overrides,
 });
 
-const record = (name: string,boards: GroupWeekRecord['boards']): CompetitionEventWire => ({
+type RecordBoard = { metric: CompetitionHistoricalMetric; value: number; unit: string };
+
+const record = (name: string,boards: RecordBoard[]): CompetitionEventWire => ({
   ...competitionEvent,group_exercise: { group_exercise_id: `${name}-id`,name },
   values: boards.map(board => ({ role: 'record',metric: board.metric,unit: board.unit,value: board.value,unavailable: false,member: null })),
 });
@@ -122,9 +124,12 @@ describe('buildLatestActivity', () => {
       memberUserId: 'maria',
       sessionId: 'maria-live',
       name: 'maria',
-      context: 'Started 07:40 · Iron Works',
+      stamp: 'Started 07:40',
+      duration: null,
+      gym: 'Iron Works',
       figures: '7 sets · 3 exercises',
-      accessibilityLabel: 'maria, training now, Started 07:40 · Iron Works, 7 sets · 3 exercises',
+      record: null,
+      accessibilityLabel: 'maria, training now, Started 07:40, at Iron Works, 7 sets · 3 exercises',
     });
   });
 
@@ -157,7 +162,7 @@ describe('buildLatestActivity', () => {
       {
         training_now: [],
         latest_completed: completed({
-          group_records: [record('Deadlift', [{ metric: 'weight', value: 200, unit: 'kg' }, { metric: 'e1rm', value: 213.3, unit: 'kg' }])],
+          group_records: [record('Deadlift', [{ metric: 'e1rm', value: 213.3, unit: 'kg' }])],
         }),
       },
       ME,
@@ -169,15 +174,17 @@ describe('buildLatestActivity', () => {
       memberUserId: 'dave',
       sessionId: 'dave-done',
       name: 'dave',
-      status: 'Completed · 52m',
-      context: '10/16 06:10 · Iron Works',
+      stamp: '10/16 06:10',
+      duration: '52m',
+      gym: 'Iron Works',
       figures: '18 sets · 4 exercises',
-      record: { lead: 'Deadlift 1RM 213.3 kg', note: 'group record' },
-      accessibilityLabel: 'dave, Completed · 52m, 10/16 06:10 · Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 kg · group record',
+      record: { kind: 'one', lead: 'Deadlift 1RM 213.3 kg', note: 'group record' },
+      accessibilityLabel:
+        'dave, completed session on 10/16 06:10, 52m, at Iron Works, 18 sets · 4 exercises, Deadlift 1RM 213.3 kg · group record',
     });
   });
 
-  it('derives a missing duration from the completion time, and reads plain Completed without either', () => {
+  it('derives a missing duration from the completion time, and shows none without either', () => {
     const derived = buildLatestActivity({ training_now: [], latest_completed: completed({ duration_sec: null }) }, ME, NOW);
     const bare = buildLatestActivity(
       { training_now: [], latest_completed: completed({ duration_sec: null, completed_at_ms: null, gym_name: null }) },
@@ -185,8 +192,9 @@ describe('buildLatestActivity', () => {
       NOW,
     );
 
-    expect(derived).toMatchObject({ status: 'Completed · 52m' });
-    expect(bare).toMatchObject({ status: 'Completed', context: '10/16 06:10', record: null });
+    expect(derived).toMatchObject({ duration: '52m' });
+    expect(bare).toMatchObject({ stamp: '10/16 06:10', duration: null, gym: null, record: null });
+    expect(bare?.accessibilityLabel).toBe('dave, completed session on 10/16 06:10, 18 sets · 4 exercises');
   });
 
   it('is null for a group with no live or completed session', () => {
@@ -206,14 +214,34 @@ describe('formatting', () => {
     expect(joinNames(['a', 'b'])).toBe('a and b');
   });
 
-  it('leads a record line with its first record and counts the rest', () => {
+  it('names one group record and only counts several, one per board taken', () => {
     expect(buildGroupRecordLine([])).toBeNull();
+    // A record that took no listed board (no `record` value) adds nothing.
+    expect(buildGroupRecordLine([record('Squat', [])])).toBeNull();
     expect(buildGroupRecordLine([record('Bench', [{ metric: 'weight', value: 100, unit: 'kg' }])])).toEqual({
+      kind: 'one',
       lead: 'Bench Weight 100.0 kg',
       note: 'group record',
     });
-    expect(
-      buildGroupRecordLine([record('Squat', []), record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }])]),
-    ).toEqual({ lead: 'Squat Score unavailable', note: '2 group records' });
+    expect(buildGroupRecordLine([record('Squat', []), record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }])]))
+      .toEqual({ kind: 'one', lead: 'Bench 1RM 120.0 kg', note: 'group record' });
+    // One set #1 on Weight and on 1RM is two group records.
+    expect(buildGroupRecordLine([record('Deadlift', [{ metric: 'weight', value: 200, unit: 'kg' }, { metric: 'e1rm', value: 213.3, unit: 'kg' }])]))
+      .toEqual({ kind: 'many', count: '2 group records' });
+    expect(buildGroupRecordLine([
+      record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }]),
+      record('Bench', [{ metric: 'volume', value: 2400, unit: 'kg' }]),
+    ])).toEqual({ kind: 'many', count: '2 group records' });
+  });
+
+  it('counts only record values, not the leader or previous holders an event may carry', () => {
+    const event: CompetitionEventWire = {
+      ...record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }]),
+      values: [
+        { role: 'record', metric: 'e1rm', unit: 'kg', value: 120, unavailable: false, member: null },
+        { role: 'previous', metric: 'e1rm', unit: 'kg', value: 110, unavailable: false, member: null },
+      ],
+    };
+    expect(groupRecordBoards([event])).toHaveLength(1);
   });
 });

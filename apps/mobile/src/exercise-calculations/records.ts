@@ -45,6 +45,16 @@ export type RecordKind = keyof RecordEntry;
 
 export type RecordFlags = Record<RecordKind, boolean>;
 
+/** Every record kind, in the order a session lists its PRs. */
+export const RECORD_KINDS: readonly RecordKind[] = ['oneRepMax', 'weight', 'volume'];
+
+/**
+ * The PRs one exercise set in a session: one per record kind it took, so one
+ * exercise adds up to three. A session's PR count is the sum over its
+ * exercises; every screen that counts a session's PRs counts these.
+ */
+export const sessionRecordKinds = (flags: RecordFlags): RecordKind[] => RECORD_KINDS.filter((kind) => flags[kind]);
+
 export type RecordHolders<E extends RecordEntry> = { [K in RecordKind]: NonNullable<E[K]> | null };
 
 /**

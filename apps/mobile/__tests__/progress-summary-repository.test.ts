@@ -1,7 +1,8 @@
 /**
  * Today's progress read over a real, fully migrated database. Sessions and
  * working sets come from the stats aggregation (proven equal to
- * `aggregateStats` over the same window), PRs from the exercise session facts,
+ * `aggregateStats` over the same window), PRs from the exercise session facts
+ * (one per record kind),
  * and every figure places a session by its `completed_at`. The suite runs in
  * Europe/London (jest.config.js).
  *
@@ -126,10 +127,10 @@ describe('loadTodayProgress', () => {
     await expect(loadTodayProgress(NOW)).resolves.toEqual({ status: 'empty' });
   });
 
-  it('counts sessions, working sets and 1RM PRs per week and month under the existing rules', async () => {
+  it('counts sessions, working sets and PRs (one per record kind) per week and month', async () => {
     insertSession('sep-28', { completedAt: local(2026, 9, 28, 18) }, [bench('90', 2)]); // first bench: no PR
-    insertSession('oct-6', { completedAt: local(2026, 10, 6, 18) }, [bench('95', 3)]); // PR
-    insertSession('oct-12', { completedAt: THIS_MONDAY }, [ // PR exactly on the week boundary
+    insertSession('oct-6', { completedAt: local(2026, 10, 6, 18) }, [bench('95', 3)]); // 1RM, Weight and Volume: 3 PRs
+    insertSession('oct-12', { completedAt: THIS_MONDAY }, [ // 1RM and Weight (Volume falls short): 2 PRs on the week boundary
       { definitionId: BENCH, sets: [['60', '5', 'warm_up'], ['100', '5'], ['100', '5', 'rir_1', 'planned'], ['100', '']] },
       { definitionId: SQUAT, sets: [['140', '5']] }, // first squat: no PR
       { definitionId: null, sets: [['20', '10', 'rir_1']] }, // unlinked: a working set, never a PR
@@ -140,9 +141,9 @@ describe('loadTodayProgress', () => {
 
     const { week, month } = ready(await loadTodayProgress(NOW));
 
-    expect(week.current).toEqual({ sessions: 2, workingSets: 5, prs: 1 });
-    expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 1 });
-    expect(month.toDate).toEqual({ sessions: 3, workingSets: 8, prs: 2 });
+    expect(week.current).toEqual({ sessions: 2, workingSets: 5, prs: 2 });
+    expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 3 });
+    expect(month.toDate).toEqual({ sessions: 3, workingSets: 8, prs: 5 });
     expect(month.cumulativeWorkingSets).toEqual([0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 6, 8, 8]);
     expect(month.previous.toSameDay).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
     expect(month.previous.total).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
@@ -169,7 +170,8 @@ describe('loadTodayProgress', () => {
 
     const { week } = ready(await loadTodayProgress(NOW));
 
-    expect(week.current).toEqual({ sessions: 1, workingSets: 2, prs: 1 });
+    // 100 × 5 twice over 90 × 5 once: 1RM, Weight and Volume.
+    expect(week.current).toEqual({ sessions: 1, workingSets: 2, prs: 3 });
     expect(week.previous).toEqual({ sessions: 1, workingSets: 1, prs: 0 });
   });
 
@@ -182,9 +184,9 @@ describe('loadTodayProgress', () => {
       durationSec: 4500,
       gymId: 'gym-1',
     }, [
-      { definitionId: SQUAT, name: 'Back Squat', sets: [['110', '5'], ['60', '5', 'warm_up']] }, // PR
+      { definitionId: SQUAT, name: 'Back Squat', sets: [['110', '5'], ['60', '5', 'warm_up']] }, // 1RM, Weight, Volume
       { definitionId: null, name: 'Removed lift', deleted: true, sets: [['50', '5']] },
-      { definitionId: BENCH, name: 'Bench Press', sets: [['95', '5'], ['95', '5']] }, // PR
+      { definitionId: BENCH, name: 'Bench Press', sets: [['95', '5'], ['95', '5']] }, // 1RM, Weight, Volume
       { definitionId: null, name: 'Face Pull', sets: [['15', '15', 'rir_2', 'unperformed']] },
     ]);
     // Started later but completed earlier: not the latest.
@@ -200,7 +202,15 @@ describe('loadTodayProgress', () => {
       gymName: 'Iron Works',
       workingSets: 3,
       exerciseCount: 3,
-      prs: 2,
+      // One per record kind, in exercise then kind order, named by the definition.
+      records: [
+        { kind: 'oneRepMax', exerciseName: 'Bench Press', value: expect.closeTo(110.75, 2), reps: null },
+        { kind: 'weight', exerciseName: 'Bench Press', value: 95, reps: 5 },
+        { kind: 'volume', exerciseName: 'Bench Press', value: 950, reps: null },
+        { kind: 'oneRepMax', exerciseName: 'Squat', value: expect.closeTo(128.24, 2), reps: null },
+        { kind: 'weight', exerciseName: 'Squat', value: 110, reps: 5 },
+        { kind: 'volume', exerciseName: 'Squat', value: 550, reps: null },
+      ],
     });
   });
 
@@ -210,7 +220,8 @@ describe('loadTodayProgress', () => {
 
     const progress = ready(await loadTodayProgress(NOW));
 
-    expect(progress.latest).toMatchObject({ id: 'may-8', workingSets: 4, exerciseCount: 1, prs: 1, gymName: null, durationSec: null });
+    expect(progress.latest).toMatchObject({ id: 'may-8', workingSets: 4, exerciseCount: 1, gymName: null, durationSec: null });
+    expect(progress.latest.records.map((record) => record.kind)).toEqual(['oneRepMax', 'weight', 'volume']);
     expect(progress.week.current).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
     expect(progress.month.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
   });
@@ -220,20 +231,23 @@ describe('loadTodayProgress', () => {
     const counted: ProgressSummaryStore = {
       ...store,
       loadAggregationInput: jest.fn(store.loadAggregationInput),
-      loadPrE1rmFacts: jest.fn(store.loadPrE1rmFacts),
+      loadRecordFacts: jest.fn(store.loadRecordFacts),
     };
     const { loadTodayProgress: load } = createTodayProgressRepository(counted);
 
     insertSession('may-8', { completedAt: local(2026, 5, 8, 18) }, [bench('100')]);
     await load(NOW);
     expect(counted.loadAggregationInput).toHaveBeenCalledTimes(2);
-    expect(counted.loadPrE1rmFacts).toHaveBeenCalledTimes(2);
+    expect(counted.loadRecordFacts).toHaveBeenCalledTimes(2);
 
     jest.mocked(counted.loadAggregationInput).mockClear();
-    jest.mocked(counted.loadPrE1rmFacts).mockClear();
+    jest.mocked(counted.loadRecordFacts).mockClear();
     insertSession('oct-13', { completedAt: local(2026, 10, 13, 18) }, [bench('110', 2)]);
-    expect(ready(await load(NOW)).latest).toMatchObject({ id: 'oct-13', workingSets: 2, prs: 1 });
+    const latest = ready(await load(NOW)).latest;
+    expect(latest).toMatchObject({ id: 'oct-13', workingSets: 2 });
+    // 110 × 5 twice over one 100 × 5: 1RM, Weight and Volume.
+    expect(latest.records.map((record) => record.kind)).toEqual(['oneRepMax', 'weight', 'volume']);
     expect(counted.loadAggregationInput).toHaveBeenCalledTimes(1);
-    expect(counted.loadPrE1rmFacts).toHaveBeenCalledTimes(1);
+    expect(counted.loadRecordFacts).toHaveBeenCalledTimes(1);
   });
 });

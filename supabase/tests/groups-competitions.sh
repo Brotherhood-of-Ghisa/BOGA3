@@ -592,5 +592,36 @@ expect_sql 'publication log contains only sanitized identifiers/SQLSTATE' "selec
   from public.app_logs where event='group.eval_failed' and context->>'group_exercise_id'='${GX}';" t
 pass 'activation fence, metric stale-result/lease fences and publication/Sync/certification failure isolation'
 
+# Week summary (§4.7): the latest session's records carry only the `record`
+# values of the boards they took #1 on, one group record each. On a fresh
+# ordinary comparison R's 100 × 5 takes #1 on Volume and 1RM; A's later
+# 60 × 12 is A's own record on both, but #1 on Volume only (720 > 500;
+# 1RM 84.0 < 116.7).
+rpc4 "${OWNER_TOKEN}" group_competition_exercise_create "$(jq -nc --arg g "${GID}" \
+  '{p_group_id:$g,p_name:"Week press",p_load_input_mode:"total_load",p_source_exercise_id:null,p_bodyweight_contribution:0,p_default_metric:"volume"}')"
+expect_ok 'week comparison'; WEEK_GX="$(jq -er .exercise.group_exercise_id <<<"${BODY}")"
+WEEK_START="$(( $(now_ms) + 1000 ))"
+for spec in RIVAL:100:5:0 ATHLETE:60:12:60000; do
+  IFS=: read -r prefix w r offset <<<"${spec}"; token="${prefix}_TOKEN"; sid="${T}-week-${prefix}"
+  next_cuam
+  push "${!token}" 'week record' "$(e_def "${sid}-def" 'Week press' "${CUAM}")" \
+    "$(e_link "${sid}-def" "${GID}" "${WEEK_GX}" "${CUAM}")" \
+    "$(e_session "${sid}" "$((WEEK_START+offset))" completed "$((WEEK_START+offset+30000))" 30 null "${CUAM}")" \
+    "$(e_se "${sid}-se" "${sid}" "${sid}-def" 0 'Week press' "${CUAM}")" \
+    "$(e_set "${sid}-set" "${sid}-se" 0 "${w}" "${r}" '' "${CUAM}" null rir_0)"
+  drain "week ${prefix}"; drain "week ${prefix} comparison"
+done
+expect_sql "A's week record lists both boards, #1 on Volume only" \
+  "select string_agg((b->>'metric')||'='||(b->>'group_record'),',' order by b->>'metric')
+     from app_public.group_events e, jsonb_array_elements(e.payload->'boards') b
+    where e.kind='record' and e.set_id='${T}-week-ATHLETE-set';" "e1rm=false,volume=true"
+rpc4 "${OWNER_TOKEN}" group_competition_week_summary "$(jq -nc --arg g "${GID}" --argjson s "$((WEEK_START-1000))" \
+  --argjson e "$((WEEK_START+86400000))" '{p_group_id:$g,p_window_start_ms:$s,p_window_end_ms:$e}')"
+expect_ok 'week records'; assert_wire isCompetitionWeekSummaryWire
+check "the latest session's group records are its #1 boards only" \
+  '.latest_completed.session_id==$s and [.latest_completed.group_records[].values[]|select(.role=="record")|.metric]==["volume"]' \
+  --arg s "${T}-week-ATHLETE"
+pass 'week summary: a record keeps only the record values of the boards it took #1 on'
+
 COMPLETED=1
 pass 'competition publication vectors passed'

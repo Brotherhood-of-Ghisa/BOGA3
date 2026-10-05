@@ -146,6 +146,11 @@ sets (§1), including sessions with zero working sets. There are three kinds:
   current-gym filter (today only the exercise page), only that gym's sessions
   count. A completed session being edited, and an active session, are compared
   only with the sessions before it.
+- **A session's PRs** are one per record kind each exercise took, so one
+  exercise adds up to three (1RM, Weight and Volume). Every screen that counts
+  a session's PRs, or PRs over a period, counts these
+  (`sessionRecordKinds`). A group session's count is its group records, one
+  per board taken (`tech/groups-contract.md` §4.7).
 - **The record set of a session** is the one set a screen highlights
   (`design-language.md` §5). Among the session's working sets of the exercise,
   across every block, it is the highest 1RM that beats the 1RM record. When no
@@ -159,6 +164,7 @@ sets (§1), including sessions with zero working sets. There are three kinds:
   rule included);
 - `createRecordBook` is the fold. It returns each session's flags and the
   holders;
+- `sessionRecordKinds` lists the PRs an exercise's flags make;
 - `pickSessionRecordSet` picks the record set;
 - `compareRecordOrder` is the fold's order.
 
@@ -181,7 +187,7 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 | Exercise page set list and band | The record set: 1RM, else Weight |
 | Exercise page records panel, exercise history `All-time bests` | All three holders, each with its session and gym |
 | Session view, completed-session cards, completion and share | The record set: 1RM, else Weight (`deriveExercisePersonalRecord`, from `loadEarlierBestsByDefinition`) |
-| Today `PRs` | 1RM records (`pr_e1rm`) |
+| Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |
 
 Every screen that shows the record set highlights the figures it beat. A 1RM
 record set that is also heavier (or as heavy with more reps) than the Weight

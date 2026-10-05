@@ -1337,7 +1337,9 @@ completed session.
   only warm-ups adds none. The counts trail a push by the evaluator's lag.
 - **Group records.** Non-voided `record` events (§2.11, either contract) in
   this group whose payload lists at least one board with `group_record = true`
-  (the member took #1), one per event. They come from the same sessions as
+  (the member took #1), **one per board taken**: a set #1 on Weight and on
+  1RM is two, as a session's personal PRs are one per record kind
+  (`training-metrics-contract.md` §3). They come from the same sessions as
   the working sets, so provisional records (an active session) and own bests
   that took no #1 never count. The record's set row must still exist
   untombstoned, which also drops a record no apply will void any more (one
@@ -1359,7 +1361,11 @@ completed session.
   be older than the week. `group_records` lists its group records in event
   order, each with only the boards it took #1 on: contract-1 `value_kg` and
   contract-2 `value` both read as `value`, in `unit` `kg`. It opens with
-  `group_session_detail`.
+  `group_session_detail`. `group_competition_week_summary` returns each as its
+  competition event (§12) whose `record` values are only those boards, so
+  the session's group records are its `record` values, one per board: Today
+  names a single one (`Deadlift 1RM 213.3 kg · group record`) and only counts
+  several (`2 group records`).
 - **Check order.** The preamble, then membership (`NOT_FOUND: group not
   found`; a removed member, a non-member, and a nonexistent group read the
   same), then `VALIDATION`: a null or negative start, an end not after the

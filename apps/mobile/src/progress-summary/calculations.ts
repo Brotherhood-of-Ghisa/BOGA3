@@ -4,6 +4,7 @@
 
 import { countedMuscleAnalyticsSessionIds, countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
 import type { StatsAggregationInput } from '@/src/data/stats';
+import type { RecordKind } from '@/src/exercise-calculations/records';
 import {
   daysInLocalMonth,
   isInWindow,
@@ -47,6 +48,16 @@ export type TodayProgressMonth = {
   };
 };
 
+/** One PR of a session: an exercise and one record kind it took (`sessionRecordKinds`). */
+export type SessionPersonalRecord = {
+  kind: RecordKind;
+  exerciseName: string;
+  /** The session's best 1RM (kg), its top Weight (raw entered kg) or its Volume (kg·reps). */
+  value: number;
+  /** The top Weight's reps; null for 1RM and Volume. */
+  reps: number | null;
+};
+
 export type LatestSessionSummary = {
   id: string;
   startedAt: Date;
@@ -55,7 +66,8 @@ export type LatestSessionSummary = {
   gymName: string | null;
   workingSets: number;
   exerciseCount: number;
-  prs: number;
+  /** Its PRs, one per record kind, in exercise then kind order; the count is the length. */
+  records: SessionPersonalRecord[];
 };
 
 export type TodayProgress =
@@ -71,7 +83,7 @@ export type TodayProgressInput = {
   now: Date;
   /** Counted sessions (`workingSetsBySession`) covering at least `todayProgressLoadWindow(now)`. */
   sessions: ProgressSession[];
-  /** `completed_at` of each 1RM PR fact over the same range. */
+  /** `completed_at` of each PR over the same range: one per record kind (`sessionRecordKinds`). */
   prAchievedAt: Date[];
   /** Null when the user has no completed session. */
   latest: LatestSessionSummary | null;
