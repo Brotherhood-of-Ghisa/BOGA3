@@ -937,10 +937,16 @@ unchanged. What differs is presentation:
    its card earns the exercise page's `record` band (§14a.4). It comes from the
    same derivation (`deriveExercisePersonalRecord`) as the completion screen's
    record cards (§7.7).
-5. The summary's `Sets` counts the performed working sets (§5.11; a
-   performed warm-up adds nothing); its `Volume` is their calculated volume under the
-   current private policy (§5.11), and an incomplete Volume's note reads
-   `Known subtotal from X of Y working sets`; Time is elapsed since the session's start.
+5. The active top bar's title is `<Time of day> training · <elapsed>`: the
+   time of day from the session's local start hour (`Morning` 05–11,
+   `Afternoon` 12–16, `Evening` 17–20, else `Night`) and the elapsed time since
+   its start, ticking (`m:ss`, `h:mm:ss` from an hour); a title too long for
+   the bar shrinks to fit rather than truncating the time. The summary reads
+   Gym / Ex / Sets / Volume: `Ex` (spoken `Exercises`) counts the session's
+   exercises (an untouched one included); `Sets` counts the performed working sets
+   (§5.11; a performed warm-up adds nothing); its `Volume` is their calculated
+   volume under the current private policy (§5.11), and an incomplete Volume's
+   note reads `Known subtotal from X of Y working sets`.
 6. The persistent four-tab bar stays at the bottom with Train selected; it is
    the way back out, and returns to the tab rather than stacking it.
 7. **A completed session is edited here**. The top bar reads

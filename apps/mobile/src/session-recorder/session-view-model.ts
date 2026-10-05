@@ -212,3 +212,16 @@ export const formatElapsed = (startedAt: Date, now: Date): string => {
   const seconds = `${totalSeconds % 60}`.padStart(2, '0');
   return hours > 0 ? `${hours}:${`${minutes}`.padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`;
 };
+
+/**
+ * The active session's title from its local start hour: `Morning training`
+ * (05–11), `Afternoon training` (12–16), `Evening training` (17–20), else
+ * `Night training`.
+ */
+export const sessionTitleForStart = (startedAt: Date): string => {
+  const hour = startedAt.getHours();
+  if (hour >= 5 && hour < 12) return 'Morning training';
+  if (hour >= 12 && hour < 17) return 'Afternoon training';
+  if (hour >= 17 && hour < 21) return 'Evening training';
+  return 'Night training';
+};

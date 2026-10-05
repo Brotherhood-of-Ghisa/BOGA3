@@ -12,6 +12,8 @@ export type StatGround = 'plain' | 'viz';
 export type StatProps = {
   // The legend, as written (`1RM`, `Vol`); rendered uppercase.
   label: string;
+  // The legend as read aloud, when `label` is abbreviated (`Ex` → `Exercises`).
+  spokenLabel?: string;
   // Pre-formatted by the caller: no thousands separators, no unit suffix
   // (`design-language.md` §6).
   value: string;
@@ -42,6 +44,7 @@ export type StatProps = {
 // align down a column; the legend is an Archivo micro-label.
 export function Stat({
   label,
+  spokenLabel = label,
   value,
   layout = 'stacked',
   rank = 'primary',
@@ -69,7 +72,7 @@ export function Stat({
 
   if (layout === 'inline') {
     return (
-      <View accessibilityLabel={`${label} ${value}`} accessible style={styles.inline} testID={testID}>
+      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={styles.inline} testID={testID}>
         <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
         <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, styles.inlineValue]}>
           {value}
@@ -80,7 +83,7 @@ export function Stat({
 
   return (
     <View
-      accessibilityLabel={`${label} ${value}`}
+      accessibilityLabel={`${spokenLabel} ${value}`}
       accessible
       style={align === 'end' ? styles.stackedEnd : null}
       testID={testID}>

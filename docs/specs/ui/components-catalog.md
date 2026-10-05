@@ -87,7 +87,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     bold `record` (the only emphasis — `design-language.md` §5);
     `kind="text"` for a non-figure value; a stacked `rank="secondary"` is a
     figure in a list row (Plex Mono 600 `base`, Progress muscle rows), and
-    `ground="viz"` turns the legend `ink` on a data-viz ground (DLM-T08)
+    `ground="viz"` turns the legend `ink` on a data-viz ground (DLM-T08); `spokenLabel`
+    reads an abbreviated legend in full to VoiceOver
   - `ListRow` — `[leading][label or children][meta][trailing]`, the trailing
     control always in a fixed tap-target-wide column so controls share one
     vertical axis; `density` `sheet` (option rows) or `list` (dense rows in a
@@ -462,14 +463,15 @@ Brief entrypoint inventory of the current reusable UI component set.
 15. Session view components
 - Folder: `apps/mobile/components/session-view/`
 - Purpose:
-  - `SessionTopBar` — `mode="active"`: `Session` · ⋮ · `Finish` (`accent`);
+  - `SessionTopBar` — `mode="active"`: `<Time of day> training · <elapsed>`
+    (ticking, shrinks to fit; testID `session-view-title`) · ⋮ · `Finish` (`accent`);
     `mode="completed"`: `Edit session` · `Done` (`accent`, testID
     `session-view-done-button`), no ⋮; `mode="complete"`: `Session complete` ·
     `Done` (testID `session-completion-done`) on the completion screen, Done
     omitted on its unavailable states. Under the status bar; the primary is
     an `ActionButton`
-  - `SessionSummaryCard` — `Card` with stacked `Stat`s Time (ticking) / Gym /
-    Sets / Volume; given `times`, `SessionTimesFields` replace Time
+  - `SessionSummaryCard` — `Card` with stacked `Stat`s Gym / Ex (spoken `Exercises`) /
+    Sets / Volume; given `times`, `SessionTimesFields` sit above the row
   - `SessionTimesFields` — a completed session's `Start` / `End` text fields
     (`YYYY-MM-DD HH:mm`, the logger's field style: `fieldHeight`,
     `radius.control`, `rule`, `danger` while invalid), each field's error

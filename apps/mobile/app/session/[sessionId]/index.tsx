@@ -381,10 +381,10 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     body = (
       <ScreenScroll keyboardShouldPersistTaps="handled" testID="session-view-scroll">
         <SessionSummaryCard
+          exerciseCount={model.cards.length}
           gymName={data.gymName}
           onPressGym={openGymPicker}
           workingSetCount={model.workingSetCount}
-          startedAt={data.startedAt}
           times={
             data.status === 'completed'
               ? {
@@ -438,6 +438,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
           <SessionTopBar
             finishDisabled={isFinishing}
             mode="active"
+            startedAt={state.data.startedAt}
             onFinish={() => void finish()}
             onOpenOptions={() => setIsOptionsVisible(true)}
           />

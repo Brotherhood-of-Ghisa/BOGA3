@@ -185,16 +185,17 @@ Brief entrypoint map of the current mobile screens.
     View Session's top-bar `Edit` and
     `intent=edit` open it
 - Key states (high level):
-  - own top bar: `Session` · ⋮ · `Finish` (the one `accent` primary); the
-    persistent four-tab bar sits at the bottom with Train selected
+  - own top bar: `<Time of day> training · <elapsed>` (e.g.
+    `Morning training · 42:17`, ticking) · ⋮ · `Finish` (the one `accent`
+    primary); the persistent four-tab bar sits at the bottom with Train selected
   - a completed session: `Edit session` · `Done` (no ⋮, nothing to abandon),
-    Progress selected in the tab bar, and the summary card's Time replaced by
-    editable `Start` / `End` fields (`YYYY-MM-DD HH:mm`). A field's error shows
+    Progress selected in the tab bar, and editable `Start` / `End` fields above
+    the summary card's row (`YYYY-MM-DD HH:mm`). A field's error shows
     once it is left; while either is invalid, autosave pauses and the card says
     `Autosave paused until Start/End times are valid.` Gym, `+ Add exercise` and
     the cards work as for an active session, written back to the completed
     session; records compare against the completed sessions before it, never the session itself or later ones
-  - summary card: Time (elapsed, ticking) / Gym / Sets (performed working sets) /
+  - summary card: Gym / Ex (exercises on the session) / Sets (performed working sets) /
     Volume (the working sets' entered-load volume, warm-ups left out); the Gym stat opens
     the `Gym` sheet to change it: opening it starts one foreground location
     lookup (1.5 s budget), and exactly one confident match shows first as

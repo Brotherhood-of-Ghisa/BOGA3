@@ -9,7 +9,7 @@ const partial: VolumeCoverage = { knownVolumeKgReps: 500, totalVolumeKgReps: nul
 const note = 'Volume incomplete. Known subtotal from 1 of 2 included sets.';
 
 it('keeps an active session subtotal compact and its incomplete coverage readable', () => {
-  render(<SessionSummaryCard startedAt={new Date()} gymName={null} workingSetCount={2}
+  render(<SessionSummaryCard gymName={null} exerciseCount={1} workingSetCount={2}
     {...sessionVolumeSummary(partial)} onPressGym={() => {}} />);
   expect(screen.getByTestId('session-view-summary-volume').props.accessibilityLabel).toBe('Known vol 500');
   expect(screen.getByTestId('session-view-summary-volume-note')).toHaveTextContent(note);
