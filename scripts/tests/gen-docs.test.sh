@@ -60,9 +60,93 @@ grep -q "gen-docs-plan-ref-probe.txt:6: merge-conflict marker" <<<"${out}" \
   || fail "conflict-marker failure must name the closing line: ${out}"
 rm -f "${PROBE}"
 
+# Cited repo paths must exist. The probe is an untracked persistent doc (check
+# scans new files too). Missing paths fail with file:line; non-paths, globs,
+# placeholders, fenced code, gitignored outputs, spec shorthand and lines
+# marked historical pass.
+PATH_PROBE="${REPO_ROOT}/scripts/tests/.gen-docs-path-probe.md"
+trap 'rm -f "${PROBE}" "${PATH_PROBE}"' EXIT
+cat > "${PATH_PROBE}" <<'MD'
+Real: `scripts/lanes.tsv`, `./scripts/gen-docs.sh check`, [up](../lanes.tsv), `src/sync/`, `docs/specs/02`.
+Not paths: `origin/main`, `@supabase/supabase-js`, `text/plain`, `/progress`, `127.0.0.1:54321`, [s](../lanes.tsv#columns).
+Skipped: `docs/**/x.md`, `src/<area>/__tests__/`, `apps/mobile/artifacts/maestro/gone.png`.
+Gone on purpose: `scripts/retired.sh` <!-- docs-check: historical-path -->
+```bash
+echo `./scripts/not-here.sh` [x](../not-here.md)
+```
+MD
+"${GD}" check >/dev/null 2>&1 || fail "real, non-path, skipped and historical citations must pass: $("${GD}" check 2>&1)"
+printf 'Gone: `scripts/no-such-file.sh` and [x](../no-such-doc.md#a) and `src/sync/nope.ts:12`.\n' >> "${PATH_PROBE}"
+if out="$("${GD}" check 2>&1)"; then
+  fail "a missing cited path must fail the check"
+fi
+for token in scripts/no-such-file.sh ../no-such-doc.md src/sync/nope.ts; do
+  grep -q "gen-docs-path-probe.md:8: cites missing path '${token}'" <<<"${out}" \
+    || fail "missing-path failure must name file, line and '${token}': ${out}"
+done
+sed -i.bak '$d' "${PATH_PROBE}"; rm -f "${PATH_PROBE}.bak"
+printf 'Lines: `scripts/lanes.tsv:12` and [x](../lanes.tsv#L3-L5).\n' >> "${PATH_PROBE}"
+if out="$("${GD}" check 2>&1)"; then
+  fail "a citation of a line must fail the check"
+fi
+for token in scripts/lanes.tsv:12 ../lanes.tsv#L3-L5; do
+  grep -q "gen-docs-path-probe.md:8: links to a line ('${token}')" <<<"${out}" \
+    || fail "line-link failure must name file, line and '${token}': ${out}"
+done
+grep -q "cites missing path" <<<"${out}" && fail "a line link to a real file is not a missing path: ${out}"
+rm -f "${PATH_PROBE}"
+
+# Word budgets, on a fixture repo (never the real one): reachability from
+# AGENTS.md, exempt prefixes, and the ceiling ratchet (gen lowers and drops,
+# never raises or adds).
+BFIX="$(mktemp -d)"
+trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rm -rf "${BFIX}"' EXIT
+mkdir -p "${BFIX}/scripts" "${BFIX}/docs/specs" "${BFIX}/docs/exempt" "${BFIX}/store"
+cp "${GD}" "${REPO_ROOT}/scripts/lane-timing.sh" "${BFIX}/scripts/"
+printf 'lint\textra\tnone\tyes\t.\ttrue\n' > "${BFIX}/scripts/lanes.tsv"
+printf '# Fixture\n\n> **Owns:** fixture.\n\n<!-- boga:gen:lane-matrix -->\n<!-- /boga:gen:lane-matrix -->\n' \
+  > "${BFIX}/docs/specs/02-quality-and-test-gates.md"
+printf 'budget\tAGENTS.md\t50\nbudget\t*\t10\nexempt\tdocs/exempt/\n' > "${BFIX}/scripts/doc-budgets.tsv"
+words() { printf 'w%.0s ' $(seq "$1"); echo; }
+printf 'If X, load `docs/a.md`; if Y, load [b](docs/b.md).\n' > "${BFIX}/AGENTS.md"
+words 5 > "${BFIX}/docs/a.md"
+{ words 3; echo 'Design: `docs/exempt/c.md`.'; } > "${BFIX}/docs/b.md"
+words 100 > "${BFIX}/docs/exempt/c.md"
+words 100 > "${BFIX}/docs/orphan.md"
+git -C "${BFIX}" init -q
+bgd() { BOGA_TIMINGS_DIR="${BFIX}/store" "${BFIX}/scripts/gen-docs.sh" "$1" 2>&1; }
+ceilings() { grep '^ceiling' "${BFIX}/scripts/doc-budgets.tsv" || true; }
+
+bgd gen >/dev/null || fail "budget fixture: docs within budget, an exempt and an unreachable long doc must pass"
+out="$(bgd budgets)"
+grep -q "exempt .*docs/exempt/c.md  (docs/b.md)" <<<"${out}" || fail "budgets must report exempt docs and who links them: ${out}"
+grep -q "orphan" <<<"${out}" && fail "an unreachable doc must not be budgeted: ${out}"
+words 20 > "${BFIX}/docs/a.md"
+out="$(bgd check)" && fail "a doc over its budget must fail the check"
+grep -q "docs/a.md: 20 words, over its 10-word budget" <<<"${out}" || fail "over-budget failure must name doc and counts: ${out}"
+bgd gen >/dev/null && fail "gen must never add a ceiling for an over-budget doc"
+[ -z "$(ceilings)" ] || fail "gen must never add a ceiling: $(ceilings)"
+printf 'ceiling\tdocs/a.md\t25\nceiling\tdocs/orphan.md\t100\n' >> "${BFIX}/scripts/doc-budgets.tsv"
+out="$(bgd check)" && fail "a ceiling above the doc's count must fail the check"
+grep -q "docs/a.md: 20 words, under its ceiling of 25" <<<"${out}" || fail "stale-ceiling failure must say so: ${out}"
+grep -q "ceiling for 'docs/orphan.md'" <<<"${out}" || fail "a ceiling for an unbudgeted doc must fail: ${out}"
+bgd gen >/dev/null || fail "gen must fix stale ceilings"
+[ "$(ceilings)" = "$(printf 'ceiling\tdocs/a.md\t20')" ] || fail "gen must lower the ceiling and drop the unbudgeted one: $(ceilings)"
+bgd check >/dev/null || fail "check must pass at the lowered ceiling"
+words 21 > "${BFIX}/docs/a.md"
+out="$(bgd check)" && fail "a grandfathered doc that grows must fail the check"
+grep -q "over its grandfathered ceiling of 20" <<<"${out}" || fail "over-ceiling failure must say so: ${out}"
+bgd gen >/dev/null || true
+[ "$(ceilings)" = "$(printf 'ceiling\tdocs/a.md\t20')" ] || fail "gen must never raise a ceiling: $(ceilings)"
+words 5 > "${BFIX}/docs/a.md"
+out="$(bgd check)" && fail "a ceiling on a doc that fits its budget must fail the check"
+grep -q "fits its 10-word budget" <<<"${out}" || fail "fits-budget failure must say so: ${out}"
+bgd gen >/dev/null || fail "gen must drop the ceiling of a doc that fits"
+[ -z "$(ceilings)" ] || fail "gen must drop the ceiling of a doc that fits: $(ceilings)"
+
 # Median rule, on a fixture repo + timing store (never the real ones).
 FIX="$(mktemp -d)"
-trap 'rm -f "${PROBE}"; rm -rf "${FIX}"' EXIT
+trap 'rm -f "${PROBE}" "${PATH_PROBE}"; rm -rf "${FIX}" "${BFIX}"' EXIT
 mkdir -p "${FIX}/scripts" "${FIX}/docs/specs" "${FIX}/store"
 cp "${GD}" "${REPO_ROOT}/scripts/lane-timing.sh" "${FIX}/scripts/"
 for lane in speedup steady legacy unrun; do

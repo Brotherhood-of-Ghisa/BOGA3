@@ -151,6 +151,16 @@ per-feature coverage policies live next to the tests they govern (e.g.
 Product and domain details are maintained in the specs above — do not duplicate
 them here.
 
+## Persistent docs have word budgets
+
+Every doc reachable from this file has a word budget
+(`scripts/doc-budgets.tsv`; `./boga docs budgets` prints each doc's count). A
+doc over its budget is split or trimmed — never given a bigger budget without
+the operator's agreement. Every link to another doc sits behind a load trigger
+("if you are changing X, load Y"). `docs-check` enforces the budgets and that
+every repo path a doc cites exists. Before writing, splitting or trimming a
+persistent doc, load `docs/specs/README.md` ("Doc rules").
+
 ## Planning is optional and ephemeral
 
 How work is planned is the user's choice: no plan, a single plan doc, a

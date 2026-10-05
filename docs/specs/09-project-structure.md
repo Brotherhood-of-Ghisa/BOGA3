@@ -197,7 +197,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/__tests__/`
   - canonical location for mobile Jest suites, shared test helpers (`helpers/`), and per-area coverage policies (`README.md`, `sync/README.md`).
   - never put a test file under `apps/mobile/app/`: Expo Router's typed-routes generator (`expo start` and `scripts/generate-router-types.js`) declares every `.ts`/`.tsx` file there as a route, and enough extra routes make `tsc` fail with TS2590. `__tests__/router-types-generator.test.ts` fails on any test file under `app/`.
-  - a small colocated `__tests__/` under `src/**` (e.g. `src/navigation/__tests__/`) is allowed; tests import routes as `@/app/...` or by relative path.
+  - a small colocated `__tests__/` under `src/**` (`src/<area>/__tests__/`) is allowed; tests import routes as `@/app/...` or by relative path.
 
 ## Placement guidance
 

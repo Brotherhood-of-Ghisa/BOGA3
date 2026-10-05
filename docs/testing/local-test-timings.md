@@ -71,7 +71,7 @@ lane run via `scripts/lane-timing.sh`), and are read with:
 
 ## Importing older records
 
-Until 2026-09 the records were committed under `docs/testing/timings/records/`
+Until 2026-09 the records were committed under `docs/testing/timings/records/` <!-- docs-check: historical-path -->
 (and from 2026-07-16 were accidentally gitignored, so most were lost when
 worktrees were released). To pull that history, or records stranded in an old
 checkout, into your machine's store:
