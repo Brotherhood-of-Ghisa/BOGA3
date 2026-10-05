@@ -6,9 +6,11 @@ import {
   buildSetRows,
   sessionRecordBlocks,
   canCommitLogger,
+  canConfirmSet,
+  canDropSet,
   commitSet,
   describeCompleteExercisePlan,
-  discardSetEntry,
+  dropSet,
   displayedValues,
   findCursorIndex,
   planCompleteExercise,
@@ -320,14 +322,16 @@ describe('exercise page model', () => {
     expect(toggleSetPerformed([plannedSet('p', '', '', null)], 'p')).toBeNull();
   });
 
-  it('drops the in-progress entry by clearing typed values, keeping the row in place', () => {
+  it('drops a touched planned row back to its plan, keeping it in place', () => {
     const sets = quietSets();
     const typed = updateLoggerValues(sets, 's3', { weightValue: '90', repsValue: '4' });
 
-    const dropped = discardSetEntry(typed, 's3');
+    const dropped = dropSet(typed, 's3');
     // The planned row is pristine again: values blank, actual effort blank —
     // it reads as its plan (prescribed 82.5 × 6, RIR 1) through the fallback.
+    expect(dropped).toHaveLength(5);
     expect(dropped[2]).toMatchObject({
+      id: 's3',
       weightValue: '',
       repsValue: '',
       setType: null,
@@ -338,27 +342,42 @@ describe('exercise page model', () => {
     expect(displayedValues(dropped[2])).toEqual({ weightValue: '82.5', repsValue: '6', setType: 'rir_1' });
     expect(findCursorIndex(dropped)).toBe(2);
 
-    // An ad-hoc entry keeps its effort: it has no plan to revert to.
-    const adHoc = [
-      { ...performedSet('x', '60', '8', 'rir_2'), performanceStatus: 'unperformed' as const },
-    ];
-    expect(discardSetEntry(adHoc, 'x')[0]).toMatchObject({
-      weightValue: '',
-      repsValue: '',
-      setType: 'rir_2',
-      performanceStatus: 'unperformed',
-    });
-  });
-
-  it('treats drop as a no-op on an untouched row, and never touches a performed row', () => {
-    const sets = quietSets();
-    // An untouched planned row already reads as its plan.
-    expect(discardSetEntry(sets, 's3')).toBe(sets);
     // A planned row whose only entry is a chosen effort returns to blank.
     const cycled = updateLoggerValues(sets, 's3', { setType: 'rir_0' });
-    expect(discardSetEntry(cycled, 's3')[2]).toMatchObject({ setType: null });
+    expect(dropSet(cycled, 's3')[2]).toMatchObject({ setType: null });
+  });
+
+  it('drops an ad-hoc row by removing it, with or without values', () => {
+    const adHoc = (id: string, weight: string, reps: string) =>
+      ({ ...performedSet(id, weight, reps, 'rir_2'), performanceStatus: 'unperformed' as const });
+    const sets = [...quietSets(), adHoc('x', '60', '8'), adHoc('blank', '', '')];
+
+    expect(dropSet(sets, 'x').map((set) => set.id)).toEqual(['s1', 's2', 's3', 's4', 's5', 'blank']);
+    expect(dropSet(sets, 'blank').map((set) => set.id)).toEqual(['s1', 's2', 's3', 's4', 's5', 'x']);
+    // The last row going leaves an empty list; Add set starts afresh from it.
+    expect(dropSet([adHoc('only', '60', '8')], 'only')).toEqual([]);
+  });
+
+  it('leaves an untouched planned row, a performed row and an unknown id alone', () => {
+    const sets = quietSets();
+    expect(dropSet(sets, 's3')).toBe(sets);
     // Performed rows are the glyph's business, not the swipe's.
-    expect(discardSetEntry(sets, 's1')).toBe(sets);
+    expect(dropSet(sets, 's1')).toBe(sets);
+    expect(dropSet(sets, 'missing')).toBe(sets);
+  });
+
+  it('offers a swipe side only when its move would change the row', () => {
+    const sets = quietSets();
+    // Untouched planned row: nothing to drop, but its plan is a valid set.
+    expect(canDropSet(sets, 's3')).toBe(false);
+    expect(canConfirmSet(sets, 's3')).toBe(true);
+    // Touched with invalid values: droppable, not confirmable.
+    const invalid = updateLoggerValues(sets, 's3', { repsValue: '0' });
+    expect(canDropSet(invalid, 's3')).toBe(true);
+    expect(canConfirmSet(invalid, 's3')).toBe(false);
+    // A performed row is never dropped by a swipe.
+    expect(canDropSet(sets, 's1')).toBe(false);
+    expect(canConfirmSet(sets, 'missing')).toBe(false);
   });
 
   it('adds a set copying the last row, not performed', () => {

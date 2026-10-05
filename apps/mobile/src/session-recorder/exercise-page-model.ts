@@ -281,26 +281,37 @@ export const toggleSetPerformed = (sets: ExercisePageSet[], setId: string): Exer
 };
 
 /**
- * Swipe-left drop: the in-progress entry is discarded — typed weight and reps
- * clear, and a planned row returns to its pristine state (its actual effort
- * back to blank, so it reads as its plan again; the display falls back to the
- * prescribed effort). The row keeps its place and its state otherwise: nothing
- * navigates and the cursor stays on it. An ad-hoc row keeps its effort (it has
- * no plan to revert to). Returns the same array when there is nothing to
- * discard; a performed row is never touched here (the glyph un-performs it).
+ * Swipe-left drop (`ux-rules.md` §14a.3), for a row not yet performed:
+ * - an ad-hoc row (no plan) is removed from the list;
+ * - a planned row the lifter has touched returns to its pristine state —
+ *   typed weight and reps clear and its actual effort goes back to blank, so
+ *   it reads as its plan again (the display falls back to the prescribed
+ *   effort). It keeps its place, and the cursor stays on it.
+ * Returns the same array when there is nothing to drop: an untouched planned
+ * row, or a performed row (the glyph un-performs it; a swipe never touches it).
  */
-export const discardSetEntry = (sets: ExercisePageSet[], setId: string): ExercisePageSet[] => {
+export const dropSet = (sets: ExercisePageSet[], setId: string): ExercisePageSet[] => {
   const set = sets.find((candidate) => candidate.id === setId);
   if (!set || isPerformed(set)) return sets;
-  const hasPlan = hasPlannedValues(set);
-  const untouched = !hasEnteredValues(set) && (!hasPlan || (set.setType ?? null) === null);
+  if (!hasPlannedValues(set)) return sets.filter((candidate) => candidate.id !== setId);
+  const untouched = !hasEnteredValues(set) && (set.setType ?? null) === null;
   if (untouched) return sets;
   return replaceSet(sets, setId, (current) => ({
     ...current,
     weightValue: '',
     repsValue: '',
-    setType: hasPlan ? null : current.setType,
+    setType: null,
   }));
+};
+
+/** Whether swipe-left would change the row: the page offers the drop only then. */
+export const canDropSet = (sets: ExercisePageSet[], setId: string): boolean =>
+  dropSet(sets, setId) !== sets;
+
+/** Whether swipe-right would confirm the row: its displayed values are a valid set. */
+export const canConfirmSet = (sets: ExercisePageSet[], setId: string): boolean => {
+  const set = sets.find((candidate) => candidate.id === setId);
+  return set !== undefined && canCommitLogger(loggerValuesFor(set));
 };
 
 export const createLocalSetId = () =>
