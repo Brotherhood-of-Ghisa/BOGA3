@@ -13,10 +13,12 @@ MODE="${1:-boot}"
 
 # run_bounded <seconds> <cmd...>: run cmd in its own process group; on timeout
 # TERM then KILL the whole group (no orphaned simctl) and return 124. perl
-# because stock macOS has no timeout(1).
+# because stock macOS has no timeout(1). <seconds> may be fractional; it must be
+# positive, since alarm(0) would mean no bound at all.
 run_bounded() {
-  perl -e '
+  perl -MTime::HiRes=alarm -e '
     my $secs = shift;
+    $secs > 0 or die "run_bounded: bound must be positive, got $secs\n";
     my $pid = fork() // die "fork: $!\n";
     if ($pid == 0) { setpgrp(0, 0); exec { $ARGV[0] } @ARGV or die "exec $ARGV[0]: $!\n"; }
     sub reap { kill "TERM", -$pid; select(undef, undef, undef, 0.5); kill "KILL", -$pid; waitpid($pid, 0); }
@@ -175,11 +177,17 @@ fail_boot() {
   exit 1
 }
 
+# The deadline is wall-clock with sub-second resolution. Not bash SECONDS: that
+# is time(NULL) minus its start, so a boot that merely crosses a second boundary
+# reads as a whole second spent and could leave no budget for bootstatus. Stock
+# macOS bash 3.2 has no EPOCHREALTIME, hence perl.
+DEADLINE="$(perl -MTime::HiRes=time -e 'printf "%.3f\n", time + shift' "$IOS_SIM_BOOT_TIMEOUT_SECONDS")"
+
+# Seconds left before DEADLINE (millisecond resolution); prints nothing once spent.
 remaining_budget() {
-  echo $(( IOS_SIM_BOOT_TIMEOUT_SECONDS - SECONDS ))
+  perl -MTime::HiRes=time -e 'my $left = shift() - time; printf "%.3f\n", $left if $left >= 0.001' "$DEADLINE"
 }
 
-SECONDS=0
 rc=0
 run_bounded "$IOS_SIM_BOOT_TIMEOUT_SECONDS" xcrun simctl boot "$SIM_UDID" >/dev/null 2>"$WORK_DIR/bootstatus.err" || rc=$?
 # A non-zero boot is normal for an already-booted device; only a hang fails here.
@@ -193,7 +201,7 @@ BOOT_READY=false
 rc=none
 for _ in 1 2 3 4 5 6; do
   budget="$(remaining_budget)"
-  (( budget > 0 )) || break
+  [[ -n "$budget" ]] || break
   rc=0
   run_bounded "$budget" xcrun simctl bootstatus "$SIM_UDID" -b >/dev/null 2>"$WORK_DIR/bootstatus.err" || rc=$?
   if (( rc == 0 )); then
@@ -206,6 +214,9 @@ for _ in 1 2 3 4 5 6; do
   sleep 2
 done
 
+if [[ "$rc" == none ]]; then
+  fail_boot "simctl boot returned with none of the ${IOS_SIM_BOOT_TIMEOUT_SECONDS}s left for simctl bootstatus"
+fi
 if [[ "$BOOT_READY" != true ]]; then
   fail_boot "simctl bootstatus kept failing (last exit $rc) within ${IOS_SIM_BOOT_TIMEOUT_SECONDS}s"
 fi
