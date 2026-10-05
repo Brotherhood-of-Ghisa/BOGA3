@@ -71,7 +71,7 @@ target and contract.
      - remove destructive menu actions
 4. Tab actions (`MainTabs`) are navigation controls, not generic primary actions.
    - They use tab semantics (`accessibilityRole="tab"` / tablist), active-state
-     visuals, and equal-width flex targets across the available tray width.
+     visuals, and equal-width flex targets across the available bar width.
    - The active tab is marked by weight and an `ink` underline, never by
      colour alone and never in `accent` (which is the screen's one primary).
 5. Persistent navigation contains exactly Today, Train, Progress, and More.
@@ -149,11 +149,16 @@ target and contract.
      never shown as this one.
 8. Train is the personal-training entry hub, while the session view remains
    focused on performing one workout.
+   - A workout in progress is Train: the Train tab opens it directly, and
+     Train reached another way opens it. There is no Resume button, and the
+     workout blocks the back gesture (it is left by the tab bar). Train has no
+     title and no explanatory copy: one start disc that never changes while
+     it checks or starts (`design-targets/train-page.md`).
    - Active-session detection must succeed before Train exposes any new-session
      action; a detection error is retryable and does not assume that no draft
      exists.
-   - An active draft replaces empty and planned start actions with one Resume
-     action.
+   - An active draft replaces empty and planned start actions; Train opens
+     the draft instead of offering them.
    - Every session entry goes through one session-entry coordinator. It
      rechecks the active draft at press time and serializes competing requests
      so an empty or planned action cannot create a second concurrent session.
@@ -161,9 +166,8 @@ target and contract.
      repository (`src/session-recorder/`) before opening it in the session
      view. A failed write stays inline and retryable.
    - Planning loading/error/empty/ready/unavailable states are explicit. Until
-     the planning dependency ships, production shows the approved `Watch this
-     space 👀` placeholder while leaving empty training usable; it does not
-     guess a management route or plan.
+     the planning dependency ships, production is unavailable and shows
+     nothing beneath the disc; it does not guess a management route or plan.
    - Exercise selection remains contextual inside the session view (its
      exercise picker). Exercise-database administration remains owned by More,
      not Train.
@@ -200,11 +204,10 @@ target and contract.
 1. Current user-facing screens use vertical layouts with no horizontal scrolling on phone widths.
 2. Page backgrounds are muted light surfaces (`surfacePage`-like behavior), with card/panel surfaces layered on top.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
-4. Bottom tab navigation (`BottomTray` composing `MainTabs`) remains visible on
-   canonical roots (`today`, `train`, `progress`, `more`) and recognized
-   preserved roots. No route collapses the tray on entry; the lifter drags it
-   to its always-visible peek handle. `exercise-history` renders the same
-   `MainTabs` directly and selects Progress.
+4. Bottom tab navigation (`MainTabBar`) remains visible on canonical roots
+   (`today`, `train`, `progress`, `more`) and recognized preserved roots. It
+   is one fixed bar, identical wherever it shows: the session view and
+   `exercise-history` (which selects Progress) render the same `MainTabBar`.
 
 ### 4. List and row interaction conventions
 

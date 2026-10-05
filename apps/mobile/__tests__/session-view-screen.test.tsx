@@ -39,6 +39,7 @@ const mockNavigation = {
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 
 jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
       mockFocusCallbacks.add(callback);
@@ -310,6 +311,17 @@ describe('Session view', () => {
     expect(sessionRow(SESSION)?.deletedAt).toBeInstanceOf(Date);
     expect(await sessionDrafts.loadLatestSessionDraftSnapshot()).toBeNull();
     expect(mockDismissTo).toHaveBeenCalledWith('/train');
+  });
+
+  it('stays on this workout when Train is pressed, and leaves for any other tab', async () => {
+    await openSession();
+
+    fireEvent.press(screen.getByTestId('top-level-tab-train'));
+    await act(async () => undefined);
+    expect(mockDismissTo).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('top-level-tab-today'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/today'));
   });
 
   it('adds an exercise from the picker with one empty set, leaving the rest as they were', async () => {

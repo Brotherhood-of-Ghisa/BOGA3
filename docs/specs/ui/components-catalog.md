@@ -220,6 +220,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     glyphs `offline` (Lucide `wifi-off`), `success` (`circle-check`) and
     `warning` (`triangle-alert`), which stay `ink` — the design language has no
     success or warning hue,
+    `play` (Lucide `play`, filled) for Train's start disc,
     plus BoGa glyphs: `caret-down`, `radio-on` / `radio-off`, and the
     design-language §5 set-state glyphs `set-done` (filled `ink` disc, knocked-out
     check), `set-current` (`accent` ring), `set-planned` (dashed `ink-ghost` ring),
@@ -237,12 +238,16 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ### Specialized shared components (reusable, not generic primitives)
 
-1. `BottomTray`
-- File: `apps/mobile/components/navigation/bottom-tray.tsx`
+1. `MainTabBar`
+- File: `apps/mobile/components/navigation/main-tab-bar.tsx`
 - Purpose:
-  - collapsible bottom navigation tray that wraps `MainTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
-  - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
-  - the handle is the sheet handle's recipe (38×4, `rule`, `radius.pill`; DLM-T02)
+  - the one bottom bar: `MainTabs` on the `paper` ground with the page gutter,
+    above the home indicator; the tab layout, the session view and
+    `exercise-history` all draw it, so the bar never changes between them.
+    Fixed (the collapsible `BottomTray` was removed 2026-10-05). testID
+    `main-tab-bar`
+  - presses go through `useOpenMainTab` (`use-open-main-tab.ts`), so Train
+    opens a workout in progress
 
 2. `MainTabs`
 - File: `apps/mobile/components/navigation/main-tabs.tsx`
@@ -250,8 +255,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - token-backed, accessible four-tab presentation for `Today`, `Train`,
     `Progress`, and `More`, driven by the single declarative model in
     `apps/mobile/src/navigation/main-tabs.ts`
-  - production navigation body inside `BottomTray` and the matching direct
-    navigation strip on the session view and the `exercise-history` detail screen
+  - the body of `MainTabBar`
   - design language (DLM-T02): one `Card`-recipe strip (`surface`, `rule`,
     card radius) of plain Archivo labels; the active tab is `ink` 700 over a
     2pt `ink` underline (`<tab testID>-indicator`), the others `ink-muted` 600;
@@ -594,6 +598,15 @@ Brief entrypoint inventory of the current reusable UI component set.
     first result, a retryable error
   - covered by `apps/mobile/__tests__/today-screen.test.tsx` (over real data)
     and `today-progress-format.test.ts` (words and chart geometry)
+
+20. `StartDisc`
+- File: `apps/mobile/components/train/start-disc.tsx`
+- Purpose:
+  - Train's one action (`design-targets/train-page.md`): an `accent` disc
+    (232pt, `compact` 204pt) inside a `rule` ring, the `play` glyph over an
+    Archivo 800 caps label; `disabled` greys the disc to `ink-ghost`.
+    testIDs `<testID>`, `-ring`
+  - covered by `apps/mobile/__tests__/train-screen.test.tsx`
 
 ### Optional bodyweight settings and readings
 

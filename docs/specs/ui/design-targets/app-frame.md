@@ -13,12 +13,14 @@ built from the vocabulary `exercise-session-v5.md` already governs.
 
 ## Brief
 
-- The tab strip is one card (`surface`, `rule`, card radius) floating in the
-  tray, with four plain Archivo labels. The active tab is `ink` 700 over a 2pt
+- The tab strip is one card (`surface`, `rule`, card radius) on the `paper`
+  ground, with four plain Archivo labels. The active tab is `ink` 700 over a 2pt
   `ink` underline, and the others are `ink-muted` 600. Tabs are navigation, so
   they are never `accent`.
-- The tray handle is the sheet handle's recipe (38×4, `rule`). The tray
-  still drags and snaps, and collapsing it leaves only the handle.
+- The bar is fixed and the same on every screen that shows it (the tab
+  screens, the session view, exercise history). The collapsible tray and its
+  handle were removed on operator review, 2026-10-05: the bar changed style
+  between Progress and a workout.
 - Every native stack header has a `surface` background, an Archivo 700 `ink`
   title and an `ink` back arrow, which matches the top bars the session view,
   exercise page and View Session draw.
@@ -33,7 +35,6 @@ Device: iPhone simulator at 390pt width, light.
 | Screenshot (lane) | State |
 | --- | --- |
 | `01-m26-today` … `04-m26-more` (`ios-smoke`) | each tab active in turn |
-| `frame-tray-collapsed` (ad hoc) | the tray collapsed to its handle |
 | `05-m26-session-view-empty` (`ios-smoke`) | the tab strip on the session view |
 | `02c-gyms-screen` (`ios-session-view`) | a native header, and `Back to More` |
 | `04-data-runtime-smoke-success` (ad hoc) | the Sessions header |

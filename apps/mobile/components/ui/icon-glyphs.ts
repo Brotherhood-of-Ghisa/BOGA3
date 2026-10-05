@@ -66,6 +66,8 @@ export const ICON_GLYPHS = {
   x: [path('M18 6 6 18'), path('m6 6 12 12')],
   plus: [path('M5 12h14'), path('M12 5v14')],
   check: [path('M20 6 9 17l-5-5')],
+  // Lucide `play`, filled: Train's start disc.
+  play: [path('M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z', 'solid')],
   // Lucide `ellipsis-vertical`: the overflow (kebab) menu.
   'more-vertical': [circle(12, 12, 1), circle(12, 5, 1), circle(12, 19, 1)],
   // Lucide `pencil`: edit the thing itself (an exercise's definition).

@@ -29,8 +29,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `GYMS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
 - The production shell is the typed four-tab model in
   `apps/mobile/src/navigation/main-tabs.ts`: `Today / Train / Progress / More`.
-  `MainTabs`, inside the existing collapsible `BottomTray`, renders exactly
-  those destinations. Canonical routes are visible; preserved roots are
+  `MainTabBar` (`MainTabs` on the `paper` ground) renders exactly those
+  destinations, the same bar on every screen that shows the tabs. Canonical routes are visible; preserved roots are
   registered with `href: null` and map to their canonical owner when opened
   directly.
   `/today` is a landing page: the local progress summary and one joined
@@ -78,18 +78,22 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Params:
   - none
 - Behavior:
-  - loads the existing session-list repository while focused and blocks every
-    launch action until active-draft detection succeeds
-  - an active draft replaces empty/planned actions with one Resume action to
-    `/session/<id>`
-  - with no draft, `Start empty workout` rechecks for an active session,
+  - the Train tab, from any `MainTabs` strip, opens the workout in progress
+    (`/session/<id>`) instead of `/train` when there is one (transition 57);
+    a failed lookup opens `/train`
+  - reads the active draft as one row (`findActiveSessionId`) on every focus
+    and ignores every launch action until that succeeds
+  - an active draft found by Train's read (Train reached by a link, Today's
+    `Open Train`) pushes `/session/<id>`: no Resume action and no
+    empty/planned action
+  - with no draft, `Start` rechecks for an active session,
     persists one empty active draft through the existing session repository,
-    and then opens `/session/<id>` (transition 46); simultaneous entry requests share the
+    and then pushes `/session/<id>` (transition 46); simultaneous entry requests share the
     same in-flight result, and persistence failure is inline and retryable
   - exposes typed loading/error/empty/ready/unavailable planning states; a
     ready plan supplies its own materializer and management callback, while the
-    current production state uses the approved `Watch this space 👀` placeholder
-    without blocking empty training or guessing a route
+    current production state is unavailable, which shows nothing beneath the
+    disc, without blocking empty training or guessing a route
 
 1d. `/progress` (canonical tab)
 - File: `apps/mobile/app/(tabs)/progress.tsx`
@@ -426,8 +430,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - Progress Sessions link row
 5. (removed: Sessions' active Resume to the recorder; see 46)
 6. `/today` <-> `/train` <-> `/progress` <-> `/more`
-   - canonical switching via the shared bottom tray (`BottomTray` ->
-     `MainTabs`); preserved `/stats-history`, `/exercise-catalog`, `/groups`,
+   - canonical switching via the shared bottom bar (`MainTabBar`); preserved `/stats-history`, `/exercise-catalog`, `/groups`,
      and `/settings` roots select Progress or More without becoming tabs
 7. `/completed-session/<sessionId>` -> `/session/<sessionId>`
    - edit action (`push`); `Done` returns by `router.back()`
@@ -509,8 +512,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 45. `/today` -> `/groups?groupId=<groupId>`, `/group/mine`
    - `View groups`, the week board or the `<n> training now` row (the selected group); `Find a group` with no group
 46. `/train`, `/sessions`, `/completed-session/<sessionId>` (append) -> `/session/<sessionId>`
-   - every active-session entry (Resume, a new launch, Sessions' review/complete,
-     and the append of transition 9), through `sessionViewHref` (`router.push`)
+   - every active-session entry (a new launch, Sessions' review/complete,
+     and the append of transition 9), through `sessionViewHref` (`router.push`).
+     A session view of a workout in progress blocks the back gesture
+     (`gestureEnabled: false`); it is left by the tab bar or Abandon/Finish
 47. `/session/<sessionId>` -> `/completed-session/<sessionId>?presentation=completion`
    - Finish after its cleanup prompts and the completion write (`router.replace`)
 48. `/session/<sessionId>` -> `/train` or another tab
@@ -536,6 +541,11 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
      since the read is gone on return: Today reads again on focus
 56. `/session/<sessionId>` -> `/session/<sessionId>/compare`
    - the ⋮ sheet's `Session vs history` (the sheet closes, then `router.push`); native Back returns and the session view reloads on focus
+57. any `MainTabs` strip -> `/session/<sessionId>` (the workout in progress)
+   - the Train tab while a workout is in progress (`mainTabDestination`,
+     `useOpenMainTab`): `router.push` from the tab bar and `exercise-history`,
+     `router.dismissTo` from a completed session view; on the session view of
+     the workout in progress the Train tab does nothing
 
 Note:
 
@@ -549,8 +559,8 @@ Note:
 
 - Routes inside the `(tabs)` group run with `headerShown: false`; per-screen
   titles in `apps/mobile/app/(tabs)/_layout.tsx` are declared for completeness.
-  The visible shell is `BottomTray` composing `MainTabs`. `exercise-history` keeps its native stack header and
-  renders `MainTabs` with Progress selected.
+  The visible shell is `MainTabBar`. `exercise-history` keeps its native stack header and
+  renders the same `MainTabBar` with Progress selected.
 - Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/components/navigation/root-stack.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron's hidden label depends on the iOS runtime — "Back" on iOS 27, the previous route's title on iOS 26 (hence the `(tabs)` group's "Back" title) — so Maestro flows tap it by UIKit's `BackButton` id rather than by label. The same `screenOptions` give every native header one design-language style (DLM-T02): a `surface` background, an Archivo 700 `ink` title at `xl`, and an `ink` back arrow (`headerTintColor`).
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`); all presentations hide the native header and draw their own top bar (`back · View Session · ⋮ · Edit` or `Session complete · Done`), so the title is only the back label of what the detail pushes
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)

@@ -4,7 +4,8 @@ appId: com.dinoderek.mobile
 # (src/maestro/session-view-fixture.ts; ios-session-view lane, infra-free).
 #
 # Proves:
-#   1. Train's Resume opens the session view;
+#   1. the Train tab, with a workout in progress, opens its session view
+#      directly;
 #   2. a card opens its exercise page, and the page's back returns here;
 #   3. the Gym stat's sheet → Manage gyms pushes the Gyms screen; a gym typed
 #      there is saved, and the native back returns to the session view with
@@ -26,7 +27,7 @@ appId: com.dinoderek.mobile
 #   suggestions, the Gyms round trip, the picker add, cleanup prompts, abandon
 #   confirmation), __tests__/session-view-model.test.ts,
 #   __tests__/exercise-picker.test.tsx, __tests__/gyms-screen.test.tsx,
-#   __tests__/train-screen.test.tsx.
+#   __tests__/train-screen.test.tsx, __tests__/train-tab-entry.test.tsx.
 #
 # Hermetic: starts from `reset=data` and ends with a data reset. Infra-free
 # (no sign-in).
@@ -40,7 +41,7 @@ appId: com.dinoderek.mobile
             id: "stats-history-screen"
           timeout: 30000
 
-# --- 1. Train → Resume lands on the session view ---
+# --- 1. The Train tab lands on the workout in progress ---
 - waitForAnimationToEnd:
     timeout: 4000
 - retry:
@@ -50,14 +51,8 @@ appId: com.dinoderek.mobile
           id: "top-level-tab-train"
       - extendedWaitUntil:
           visible:
-            id: "train-resume-session-button"
+            id: "session-view-screen"
           timeout: 15000
-- tapOn:
-    id: "train-resume-session-button"
-- extendedWaitUntil:
-    visible:
-      id: "session-view-screen"
-    timeout: 15000
 # The cards load after the screen; wait for them before tapping one.
 - extendedWaitUntil:
     visible:

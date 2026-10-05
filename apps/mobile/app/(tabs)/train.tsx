@@ -1,30 +1,22 @@
 import { useIsFocused, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  DEFAULT_SESSION_LIST_DATA_CLIENT,
-  DEFAULT_SESSION_LIST_ITEMS,
-  SessionSummaryLine,
-  useSessionListData,
-  type SessionListDataClient,
-  type SessionListItem,
-} from '@/components/session-list';
+import { StartDisc } from '@/components/train';
 import {
   ActionButton,
   Card,
-  Icon,
-  PageHeader,
   ScreenScroll,
-  SectionHeader,
   StatePanel,
   uiFonts,
+  uiGeometry,
   uiRoles,
   uiSpace,
   uiTypography,
 } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
+  loadActiveSessionId as loadActiveSessionIdFromDatabase,
   type PlannedSessionMaterializer,
   type SessionEntryCoordinator,
   type SessionEntryResult,
@@ -45,40 +37,88 @@ export type TrainPlanningState =
     };
 
 export type TrainScreenProps = {
-  dataClient?: SessionListDataClient;
-  initialSessions?: SessionListItem[];
   isFocused?: boolean;
+  loadActiveSessionId?: () => Promise<string | null>;
   planningState?: TrainPlanningState;
   sessionEntry?: SessionEntryCoordinator;
 };
 
 type LaunchKind = 'empty' | 'planned';
 
+type ActiveCheck =
+  | { status: 'checking' }
+  | { status: 'error'; message: string }
+  | { status: 'done'; activeSessionId: string | null };
+
+/**
+ * Whether a workout is in progress, read again on every focus as one row
+ * (`findActiveSessionId`), never the whole history. A focus marks the check
+ * pending in the same render, so a workout abandoned since the last read is
+ * never acted on.
+ */
+function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: () => Promise<string | null>) {
+  const [check, setCheck] = useState<ActiveCheck>({ status: 'checking' });
+  const [attempt, setAttempt] = useState(0);
+  const [checkedFocus, setCheckedFocus] = useState(isFocused);
+  if (checkedFocus !== isFocused) {
+    setCheckedFocus(isFocused);
+    if (isFocused) setCheck({ status: 'checking' });
+  }
+
+  useEffect(() => {
+    if (!isFocused) return;
+    let current = true;
+    loadActiveSessionId().then(
+      (activeSessionId) => {
+        if (current) setCheck({ status: 'done', activeSessionId });
+      },
+      (error: unknown) => {
+        if (current) setCheck({ status: 'error', message: error instanceof Error ? error.message : 'Unable to read sessions' });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [attempt, isFocused, loadActiveSessionId]);
+
+  const retry = () => {
+    setCheck({ status: 'checking' });
+    setAttempt((value) => value + 1);
+  };
+  return { check, retry };
+}
+
+/**
+ * Train, the way into personal training: one large disc that starts an empty
+ * workout, and no title (the tab names the page), with the planning section
+ * beneath it once planning is available. While a workout is in progress Train
+ * is that workout: the Train tab opens it (`mainTabDestination`), and Train
+ * reached any other way opens it too. The session view blocks the back
+ * gesture while the workout is in progress, so this cannot loop.
+ */
 export function TrainScreen({
-  dataClient,
-  initialSessions = DEFAULT_SESSION_LIST_ITEMS,
   isFocused = true,
+  loadActiveSessionId = loadActiveSessionIdFromDatabase,
   planningState = { status: 'unavailable' },
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
 }: TrainScreenProps) {
   const router = useRouter();
   const launchInFlightRef = useRef(false);
-  const [launchKind, setLaunchKind] = useState<LaunchKind | null>(null);
   const [launchError, setLaunchError] = useState<{
     kind: LaunchKind;
     message: string;
   } | null>(null);
-  const { sessions, isLoadingSessions, loadErrorMessage, loadedAtMs, reloadSessions } = useSessionListData({
-    dataClient,
-    initialSessions,
-    showDeletedSessions: false,
-    isFocused,
-  });
+  const { check, retry } = useActiveSessionCheck(isFocused, loadActiveSessionId);
+  const activeSessionId = check.status === 'done' ? check.activeSessionId : null;
 
-  const activeSession = sessions.find(
-    (session) => session.status === 'active' && session.deletedAt === null,
-  );
+  useEffect(() => {
+    if (isFocused && activeSessionId) {
+      router.push(sessionViewHref(activeSessionId));
+    }
+  }, [activeSessionId, isFocused, router]);
 
+  // Nothing on screen changes while a workout starts: the press is simply
+  // ignored until the session view opens (or the start fails).
   const openRecorder = async (
     kind: LaunchKind,
     launch: () => Promise<SessionEntryResult>,
@@ -88,7 +128,6 @@ export function TrainScreen({
     }
 
     launchInFlightRef.current = true;
-    setLaunchKind(kind);
     setLaunchError(null);
     try {
       const entry = await launch();
@@ -98,13 +137,72 @@ export function TrainScreen({
         kind,
         message:
           kind === 'empty'
-            ? "Couldn't start a workout. Try again."
-            : "Couldn't start this planned workout. Try again.",
+            ? "Couldn't start. Try again."
+            : "Couldn't start this plan. Try again.",
       });
     } finally {
       launchInFlightRef.current = false;
-      setLaunchKind(null);
     }
+  };
+
+  const content = () => {
+    if (check.status === 'error') {
+      return (
+        <View style={styles.stage}>
+          <Card style={styles.stretch}>
+            <StatePanel
+              action={{
+                label: 'Retry',
+                onPress: retry,
+                testID: 'train-session-error-retry',
+              }}
+              body={check.message}
+              fill={false}
+              kind="error"
+              testID="train-session-error"
+              title="Couldn't check your workouts"
+            />
+          </Card>
+        </View>
+      );
+    }
+
+    // New-session actions wait until the app knows no workout is in progress
+    // (a workout in progress is being opened instead), without the disc
+    // changing while they wait.
+    const ready = check.status === 'done' && !activeSessionId;
+    return (
+      <>
+        <View style={styles.stage} testID="train-start-section">
+          <StartDisc
+            accessibilityLabel="Start workout"
+            busy={!ready}
+            compact={ready && planningState.status === 'ready'}
+            label="Start"
+            onPress={() => {
+              void openRecorder('empty', sessionEntry.startEmptyOrResume);
+            }}
+            testID="train-start-empty-button"
+          />
+          {launchError?.kind === 'empty' ? (
+            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-empty-launch-error">
+              {launchError.message}
+            </Text>
+          ) : null}
+        </View>
+        {ready ? (
+          <TrainPlanning
+            launchError={launchError?.kind === 'planned' ? launchError.message : null}
+            onStart={(materialize) => {
+              void openRecorder('planned', () =>
+                sessionEntry.startPlannedOrResume(materialize),
+              );
+            }}
+            planningState={planningState}
+          />
+        ) : null}
+      </>
+    );
   };
 
   return (
@@ -112,242 +210,147 @@ export function TrainScreen({
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="train-screen">
-      <PageHeader
-        intro="Start or resume personal training; the session keeps the workout in one place."
-        title="Train"
-      />
-
-      {isLoadingSessions ? (
-        <StatePanel fill={false} kind="loading" testID="train-session-loading" title="Checking for an active workout…" />
-      ) : loadErrorMessage ? (
-        <Card>
-          <StatePanel
-            action={{
-              label: 'Retry',
-              onPress: () => {
-                void reloadSessions();
-              },
-              testID: 'train-session-error-retry',
-            }}
-            body={loadErrorMessage}
-            fill={false}
-            kind="error"
-            testID="train-session-error"
-            title="Couldn't check your workouts"
-          />
-        </Card>
-      ) : activeSession ? (
-        <View style={styles.section} testID="train-active-section">
-          <SectionHeader title="Workout in progress" />
-          <Card style={styles.card} testID="train-active-session-card">
-            <View style={styles.cardCopy}>
-              {/* "Current" is the ring glyph and the words, never a colour (G3). */}
-              <View style={styles.statusRow}>
-                <Icon name="set-current" size="sm" testID="train-active-session-glyph" />
-                <Text allowFontScaling={false} style={styles.cardTitle}>Continue your active session</Text>
-              </View>
-              <SessionSummaryLine
-                nowMs={loadedAtMs}
-                session={activeSession}
-                testIdPrefix={`train-active-session-${activeSession.id}`}
-              />
-              <Text allowFontScaling={false} style={styles.cardBody}>Finish or discard this workout before starting another one.</Text>
-            </View>
-            <ActionButton
-              label="Resume workout"
-              onPress={() => router.push(sessionViewHref(activeSession.id))}
-              testID="train-resume-session-button"
-              variant="primary"
-            />
-          </Card>
-        </View>
-      ) : (
-        <>
-          <View style={styles.section} testID="train-start-section">
-            <SectionHeader title="Start training" />
-            <Card style={styles.card} testID="train-empty-session-card">
-              <View style={styles.cardCopy}>
-                <Text allowFontScaling={false} style={styles.cardTitle}>Empty workout</Text>
-                <Text allowFontScaling={false} style={styles.cardBody}>Start with a blank session and add exercises as you go.</Text>
-                {launchError?.kind === 'empty' ? (
-                  <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-empty-launch-error">
-                    {launchError.message}
-                  </Text>
-                ) : null}
-              </View>
-              {/* One primary (T03-D1): a ready plan takes it, and the empty start steps back to outline. */}
-              <ActionButton
-                disabled={launchKind !== null}
-                label={launchKind === 'empty' ? 'Starting…' : 'Start empty workout'}
-                onPress={() => {
-                  void openRecorder('empty', sessionEntry.startEmptyOrResume);
-                }}
-                testID="train-start-empty-button"
-                variant={planningState.status === 'ready' ? 'outline' : 'primary'}
-              />
-            </Card>
-          </View>
-
-          <View style={styles.section} testID="train-planning-section">
-            <SectionHeader title="Personal planning" />
-            <TrainPlanningCard
-              disabled={launchKind !== null}
-              isStarting={launchKind === 'planned'}
-              launchError={launchError?.kind === 'planned' ? launchError.message : null}
-              onStart={(materialize) => {
-                void openRecorder('planned', () =>
-                  sessionEntry.startPlannedOrResume(materialize),
-                );
-              }}
-              planningState={planningState}
-            />
-          </View>
-        </>
-      )}
+      {content()}
     </ScreenScroll>
   );
 }
 
-function TrainPlanningCard({
-  disabled,
-  isStarting,
+// Beneath the disc, only once planning has something to say: nothing while it
+// is unavailable or loading.
+function TrainPlanning({
   launchError,
   onStart,
   planningState,
 }: {
-  disabled: boolean;
-  isStarting: boolean;
   launchError: string | null;
   onStart: (materialize: PlannedSessionMaterializer) => void;
   planningState: TrainPlanningState;
 }) {
-  if (planningState.status === 'loading') {
-    return <StatePanel fill={false} kind="loading" testID="train-planning-loading" title="Loading your plan…" />;
+  if (planningState.status === 'unavailable' || planningState.status === 'loading') {
+    return null;
   }
 
   if (planningState.status === 'error') {
     return (
-      <Card>
-        <StatePanel
-          action={
-            planningState.retry
-              ? { label: 'Retry', onPress: planningState.retry, testID: 'train-planning-error-retry' }
-              : undefined
-          }
-          body={planningState.message}
-          fill={false}
-          kind="error"
-          testID="train-planning-error"
-          title="Couldn't load planning"
-        />
-      </Card>
-    );
-  }
-
-  if (planningState.status === 'unavailable') {
-    return (
-      <Card>
-        <StatePanel
-          body="Personal planning is warming up. Empty workouts are ready above."
-          fill={false}
-          testID="train-planning-unavailable"
-          title="Watch this space 👀"
-        />
-      </Card>
+      <StatePanel
+        action={
+          planningState.retry
+            ? { label: 'Retry', onPress: planningState.retry, testID: 'train-planning-error-retry' }
+            : undefined
+        }
+        body={planningState.message}
+        fill={false}
+        kind="error"
+        testID="train-planning-error"
+        title="Couldn't load planning"
+      />
     );
   }
 
   if (planningState.status === 'empty') {
     return (
-      <Card>
-        <StatePanel
-          action={{ label: 'Manage planning', onPress: planningState.openManager, testID: 'train-manage-planning-button' }}
-          body="Create a personal plan, or start an empty workout above."
-          fill={false}
-          testID="train-planning-empty"
-          title="No workout planned"
+      <View style={styles.planningLink} testID="train-planning-empty">
+        <ActionButton
+          label="Plan a workout"
+          onPress={planningState.openManager}
+          testID="train-manage-planning-button"
+          variant="text"
         />
-      </Card>
+      </View>
     );
   }
 
   return (
-    <Card style={styles.card} testID="train-planned-session-card">
-      <View style={styles.cardCopy}>
-        <Text allowFontScaling={false} style={styles.cardTitle}>{planningState.title}</Text>
-        <Text allowFontScaling={false} style={styles.cardBody}>{planningState.detail}</Text>
-        {launchError ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-planned-launch-error">
-            {launchError}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.actionStack}>
+    <View style={styles.planning} testID="train-planning-section">
+      <Text allowFontScaling={false} style={styles.microLabel}>Planned</Text>
+      <Card style={styles.planRow} testID="train-planned-session-card">
+        <View style={styles.planCopy}>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.planTitle}>{planningState.title}</Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.planDetail}>{planningState.detail}</Text>
+        </View>
         <ActionButton
-          disabled={disabled}
-          label={isStarting ? 'Starting…' : 'Start planned workout'}
+          accessibilityLabel={`Start ${planningState.title}`}
+          label="Start"
           onPress={() => onStart(planningState.materialize)}
           testID="train-start-planned-button"
-          variant="primary"
+          variant="outline"
         />
+      </Card>
+      {launchError ? (
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={styles.errorText} testID="train-planned-launch-error">
+          {launchError}
+        </Text>
+      ) : null}
+      <View style={styles.planningLink}>
         <ActionButton
-          disabled={disabled}
           label="Manage planning"
           onPress={planningState.openManager}
           testID="train-manage-planning-button"
-          variant="outline"
+          variant="text"
         />
       </View>
-    </Card>
+    </View>
   );
 }
 
 export default function TrainRoute() {
   const isFocused = useIsFocused();
-  return (
-    <TrainScreen
-      dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
-      isFocused={isFocused}
-    />
-  );
+  return <TrainScreen isFocused={isFocused} />;
 }
 
 const styles = StyleSheet.create({
-  // Sections sit a step further apart than the cards inside them.
+  // The disc centres in whatever height the planning section leaves it.
   content: {
+    flexGrow: 1,
     gap: uiSpace.xl,
   },
-  section: {
-    gap: uiSpace.md,
+  stage: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: uiSpace.lg,
   },
-  card: {
-    padding: uiSpace.md,
-    gap: uiSpace.md,
+  stretch: {
+    alignSelf: 'stretch',
   },
-  cardCopy: {
+  planning: {
     gap: uiSpace.sm,
   },
-  statusRow: {
+  microLabel: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '700',
+    fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs,
+    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
+    textTransform: 'uppercase',
+    color: uiRoles.inkMuted,
+  },
+  planRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.sm,
+    gap: uiSpace.md,
+    padding: uiSpace.md,
   },
-  cardTitle: {
+  planCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  planTitle: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
     fontSize: uiTypography.size.lg,
     lineHeight: uiTypography.lineHeight.lg,
     color: uiRoles.ink,
   },
-  cardBody: {
+  planDetail: {
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.inkMuted,
   },
-  actionStack: {
-    gap: uiSpace.sm,
+  planningLink: {
+    alignItems: 'center',
   },
   errorText: {
     fontFamily: uiFonts.body.family,
@@ -355,5 +358,6 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.danger,
+    textAlign: 'center',
   },
 });

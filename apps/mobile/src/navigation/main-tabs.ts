@@ -83,11 +83,3 @@ export function resolveMainTab(segments: readonly string[]): MainTabKey | null {
 
   return null;
 }
-
-/**
- * A single visibility contract for the production shell. Root/detail navigators can
- * stay tabless by returning null; every recognized tab-owned route renders the bar.
- */
-export function shouldShowMainNavigation(segments: readonly string[]): boolean {
-  return resolveMainTab(segments) !== null;
-}

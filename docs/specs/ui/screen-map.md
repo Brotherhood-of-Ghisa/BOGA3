@@ -60,23 +60,28 @@ Brief entrypoint map of the current mobile screens.
 1c. `/train` (canonical tab)
 - File: `apps/mobile/app/(tabs)/train.tsx`
 - Purpose:
-  - single entry surface for starting or resuming personal training and, once
-    its separate dependency ships, managing personal planning
+  - single entry surface for starting personal training and, once its
+    separate dependency ships, its planning. A workout in progress is opened
+    instead: the Train tab goes to it (`mainTabDestination`), and Train
+    reached another way replaces itself with it
 - Key states (high level):
-  - active-session loading and retryable load error; start actions remain
-    absent until the app knows that no active draft exists
-  - active draft with one Resume action and no competing empty/planned action
-  - no active draft with empty-workout start plus retryable inline persistence
+  - checking for a workout in progress (one row, every focus): the disc
+    unchanged but busy; a retryable load error replaces it
+  - a workout in progress: Train opens the session view; no Resume button and
+    no empty/planned action
+  - no workout in progress: the Start disc plus retryable inline persistence
     failure
-  - planning loading/error/empty/ready/unavailable states; production uses the
-    approved `Watch this space 👀` placeholder until M23 supplies a plan
-    read/materialization and management interface
-- Presentation (design language, DLM-T03): `paper` ground, a `PageHeader`
-  and one `SectionHeader` per section. One `accent` at a time:
-  `Resume workout`, or `Start planned workout` when a plan is ready (with
-  `Start empty workout` as an outline), else `Start empty workout`
+  - planning unavailable/loading: nothing beneath the disc; empty: `Plan a
+    workout`; ready: one plan row with its own Start and `Manage planning`;
+    error: a retryable `StatePanel`. Production is unavailable until M23
+    supplies a plan read/materialization and management interface
+- Presentation: `design-targets/train-page.md`. No title; the `accent` disc
+  (`StartDisc`) is the screen's only primary, a step smaller when a plan row
+  sits beneath it
 - Key exits:
-  - `/session/<id>` after guarded empty/planned launch or active resume;
+  - `/session/<id>` (`router.push`) after guarded empty/planned launch or a
+    workout found in progress; the in-progress session view blocks the back
+    gesture, so it is left by the tab bar;
     a future planner exit is supplied by the planning integration rather than
     guessed here
 
@@ -257,7 +262,7 @@ Brief entrypoint map of the current mobile screens.
     `source=session` (the session view picker's Manage)
   - `/exercise-link?exerciseDefinitionId=<id>` (`⋮` `Link to group exercise…`)
   - explicit `Back to More` when opened with `source=more`
-  - the preserved route is owned by More in the shared `MainTabs` tray
+  - the preserved route is owned by More in the shared `MainTabBar`
 
 6. `/settings`
 - File: `apps/mobile/app/(tabs)/settings.tsx`
@@ -715,13 +720,12 @@ Brief entrypoint map of the current mobile screens.
     `exercise-catalog`, `groups`, `settings`)
 - Notes:
   - all tab roots have `headerShown: false`
-  - the system tab bar is supplied via `tabBar`: `BottomTray` wraps exactly four
-    `MainTabs` destinations and exposes a drag handle to collapse to a peek
-    strip. Preserved roots are registered with `href: null`, resolve to their
-    canonical owner, and remain directly addressable. Screens can
-    imperatively expand/collapse via `useTrayVisibility()`; initial state is
-    `expanded`. Snap math is unit-tested in
-    `apps/mobile/src/navigation/tray-snap.ts`.
+  - the system tab bar is supplied via `tabBar`: `MainTabBar`, the same fixed
+    bar the session view and `exercise-history` draw (no collapsible tray),
+    selected from the tab navigator's own focused route, so a screen pushed
+    over the tabs never hides it (and reflows the tab screen) mid-transition.
+    Preserved roots are registered with `href: null`, resolve to their
+    canonical owner, and remain directly addressable.
 
 ## Documentation boundary
 
