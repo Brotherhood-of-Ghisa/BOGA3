@@ -155,19 +155,6 @@ else
          ${NOW_MS},${NOW_MS},${NOW_MS});
     commit;
   " >/dev/null
-
-  (
-    cd "${REPO_ROOT}/apps/agent-auth-web"
-    BOGA_LOCAL_SUPABASE_URL="${API_URL}" \
-    BOGA_LOCAL_SUPABASE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-${ANON_KEY}}" \
-    BOGA_LOCAL_OAUTH_EMAIL="${USER_A_EMAIL}" \
-    BOGA_LOCAL_OAUTH_PASSWORD="${USER_A_PASSWORD}" \
-    BOGA_LOCAL_OAUTH_CLIENT_NAME="BoGa MCP smoke ${RUN_TAG}" \
-      npx tsx scripts/mint-local-oauth.ts
-  ) >"${TOKEN_FILE}"
-  ACCESS_TOKEN="$(jq -er '.accessToken' "${TOKEN_FILE}")"
-  APP_ACCESS_TOKEN="$(jq -er '.appAccessToken' "${TOKEN_FILE}")"
-  AGENT_CLIENT_ID="$(jq -er '.clientId' "${TOKEN_FILE}")"
 fi
 
 echo "[boga-mcp-smoke] building and starting the local MCP service"
@@ -194,6 +181,29 @@ done
 curl --silent --show-error --fail \
   "http://127.0.0.1:${MCP_PORT}/health" >/dev/null ||
   fail "MCP service did not become ready"
+
+if [[ -n "${USER_UUID}" ]]; then
+  echo "[boga-mcp-smoke] connecting like a remote client: challenge, discovery, DCR, consent, token, refresh"
+  (
+    cd "${REPO_ROOT}/apps/agent-auth-web"
+    BOGA_LOCAL_SUPABASE_URL="${API_URL}" \
+    BOGA_LOCAL_SUPABASE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-${ANON_KEY}}" \
+    BOGA_LOCAL_OAUTH_EMAIL="${USER_A_EMAIL}" \
+    BOGA_LOCAL_OAUTH_PASSWORD="${USER_A_PASSWORD}" \
+    BOGA_LOCAL_OAUTH_CLIENT_NAME="BoGa MCP smoke ${RUN_TAG}" \
+    BOGA_LOCAL_OAUTH_MCP_URL="${MCP_URL}" \
+      npx tsx scripts/mint-local-oauth.ts
+  ) >"${TOKEN_FILE}"
+  ACCESS_TOKEN="$(jq -er '.accessToken' "${TOKEN_FILE}")"
+  APP_ACCESS_TOKEN="$(jq -er '.appAccessToken' "${TOKEN_FILE}")"
+  AGENT_CLIENT_ID="$(jq -er '.clientId' "${TOKEN_FILE}")"
+  OAUTH_SCOPE="$(jq -er '.scope' "${TOKEN_FILE}")"
+  echo "[boga-mcp-smoke] OAuth scope from the MCP challenge: ${OAUTH_SCOPE}"
+  # Claude needs offline_access to refresh; hosted Auth advertises it, and the
+  # pinned local CLI (BOGA_SUPABASE_CLI_DEFAULT_VERSION) must too.
+  [[ " ${OAUTH_SCOPE} " == *" offline_access "* ]] ||
+    fail "local Auth does not advertise offline_access; check the Supabase CLI pin (./boga doctor)"
+fi
 
 echo "[boga-mcp-smoke] discovering and calling all four tools"
 BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \

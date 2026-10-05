@@ -133,15 +133,11 @@ describe('Bodyweight heatmap coverage', () => {
 
   it.each([
     [[0, 0, 0, 0, 100, 200], 50],
-    [[0, 0, 0, 0, 0, 0], 0],
-  ])('keeps the average inside the chart when training includes zero', (values, average) => {
+  ])('places the average on the zero-based horizontal scale including known zero training', (values, average) => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
     render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
-    const marker = screen.getByTestId(`${PREFIX}-heatmap-average`);
-    expect(marker).toHaveProp('accessibilityLabel', `12-week average ~${average}`);
-    const top = StyleSheet.flatten(marker.props.style).top;
-    expect(top).toBeGreaterThanOrEqual(0);
-    expect(top).toBeLessThanOrEqual(78);
+    expect(screen.getByTestId(`${PREFIX}-heatmap-average-label`)).toHaveProp('accessibilityLabel', `12-week average ~${average}`);
+    expect(style(`${PREFIX}-heatmap-average`).left).toBe('25%');
   });
 });

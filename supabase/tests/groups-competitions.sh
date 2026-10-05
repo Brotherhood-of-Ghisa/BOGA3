@@ -306,7 +306,9 @@ for group in "\"${GID}\"" null; do
     '([paths|select(.[-1]|IN("weight_kg","body_weight_kg","fingerprint","write_fingerprint","observed_value","reading_pin"))]|length==0)
      and all(.items[]|select(.kind=="session")|.session.exercises[]|select(.visibility=="normalized");all(.sets[];has("weight_value")|not))
      and all(.items[]|select(.kind=="competition")|.event|select(.visibility=="normalized")|.values[];.value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))'
+  check 'stream omits rules changes' 'all(.items[]|select(.kind=="competition"); .event.kind!="rules_change")'
 done
+expect_sql 'rules changes the stream omits still exist' "select count(*)>0 from app_public.group_events where group_id='${GID}' and kind='rules_change';" t
 rpc4 "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok session; assert_wire isCompetitionSessionDetailWire
 check 'full session redacts normalized sets, retains unrelated ordinary context and excludes subtraction total' \

@@ -33,10 +33,10 @@ module.exports = {
   // Explicit per-test/hook ceiling: a hung test or hook (unresolved await,
   // infinite loop) now fails loudly here instead of stalling the run. This is
   // a DIFFERENT failure mode from a leaked handle that keeps the process alive
-  // AFTER tests pass — that one is caught by the CI step timeout plus the
-  // `npm run test:handles` open-handle guard, NOT by `--forceExit` (which would
-  // mask the leak). 15s is generous vs the sub-second real test work, so it
-  // never flakes on a slow CI runner.
+  // AFTER tests pass — the CI step timeout bounds a hung process; the optional
+  // `npm run test:handles` diagnostic helps investigate shutdown warnings or
+  // hangs. Do not add `--forceExit`, which masks leaks. 15s is generous vs the
+  // sub-second real test work, so it never flakes on a slow CI runner.
   testTimeout: 15000,
   // Coverage is opt-in (`npm run test:coverage`, lane `jest-coverage`):
   // instrumentation slows the run, so plain `npm test` stays uninstrumented.

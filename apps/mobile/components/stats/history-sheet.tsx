@@ -2,7 +2,7 @@ import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
@@ -113,23 +113,17 @@ function WeekSelectionBanner({
       ? (weeklyEffort.find((w) => w.weekStartDateKey === selectedWeekKey) ?? null)
       : null;
 
+  if (selectedWeekKey === null) return null;
+
   return (
     <View style={styles.banner} testID={testID}>
-      {selectedWeekKey !== null ? (
-        <>
-          <Text allowFontScaling={false} style={styles.bannerRange} testID={`${testID}-range`}>
-            {formatWeekDateRange(selectedWeekKey)}
-          </Text>
-          <Text allowFontScaling={false} style={styles.bannerLabel} testID={`${testID}-value`}>
-            {metricLabel}:{' '}
-            <Text allowFontScaling={false} style={styles.bannerFigure}>{week !== null ? formatWeekValue(week, metric) : '—'}</Text>
-          </Text>
-        </>
-      ) : (
-        <Text allowFontScaling={false} style={styles.bannerLabel} testID={`${testID}-placeholder`}>
-          Tap a week to see details
-        </Text>
-      )}
+      <Text allowFontScaling={false} style={styles.bannerRange} testID={`${testID}-range`}>
+        {formatWeekDateRange(selectedWeekKey)}
+      </Text>
+      <Text allowFontScaling={false} style={styles.bannerLabel} testID={`${testID}-value`}>
+        {metricLabel}:{' '}
+        <Text allowFontScaling={false} style={styles.bannerFigure}>{week !== null ? formatWeekValue(week, metric) : '—'}</Text>
+      </Text>
     </View>
   );
 }
@@ -145,6 +139,8 @@ function HistoryHeatmap({
   todayDateKey,
   lookbackWeeks,
   muscleTargets,
+  status,
+  chartHidden,
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
@@ -156,8 +152,10 @@ function HistoryHeatmap({
   todayDateKey?: string;
   lookbackWeeks: number;
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
+  status: ReactNode;
+  chartHidden: boolean;
 }) {
-  // Both views span the full available history and scroll horizontally.
+  // Both views span the saved window; only Daily scrolls horizontally.
   const data = useMemo(
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: lookbackWeeks, muscleTargets }),
     [dailyMetrics, metric, todayDateKey, lookbackWeeks, muscleTargets]
@@ -183,9 +181,12 @@ function HistoryHeatmap({
         onSelectWeek={onSelectWeek}
         testIDPrefix={testIDPrefix}
         formatValue={formatDailyValue}
+        metricLabel={metricLabel}
+        formatAverageValue={metric === 'totalVolume' ? formatVolume : formatOneRepMax}
+        header={chartHidden ? null : status}
       />
     ),
-    [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix]
+    [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix, metric, metricLabel, status, chartHidden]
   );
   const dailyVisible = view === 'daily';
 
@@ -200,7 +201,14 @@ function HistoryHeatmap({
         pointerEvents={dailyVisible ? 'auto' : 'none'}
         style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive]}
         testID={`${testIDPrefix}-heatmap-panel-daily`}>
-        {dailyHeatmap}
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+          style={styles.scroll} testID={`${testIDPrefix}-scroll`}>
+          {status}
+          <View accessibilityElementsHidden={chartHidden} importantForAccessibility={chartHidden ? 'no-hide-descendants' : 'auto'}
+            pointerEvents={chartHidden ? 'none' : 'auto'} style={chartHidden ? styles.hiddenChart : undefined}>
+            {dailyHeatmap}
+          </View>
+        </ScrollView>
       </View>
       <View
         accessibilityElementsHidden={dailyVisible}
@@ -208,7 +216,11 @@ function HistoryHeatmap({
         pointerEvents={dailyVisible ? 'none' : 'auto'}
         style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerInactive : styles.heatmapLayerActive]}
         testID={`${testIDPrefix}-heatmap-panel-weekly`}>
-        {weeklyHeatmap}
+        {chartHidden ? <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView> : null}
+        <View accessibilityElementsHidden={chartHidden} importantForAccessibility={chartHidden ? 'no-hide-descendants' : 'auto'}
+          pointerEvents={chartHidden ? 'none' : 'auto'} style={chartHidden ? styles.hiddenWeeklyChart : styles.weeklyChart}>
+          {weeklyHeatmap}
+        </View>
       </View>
     </View>
   );
@@ -314,11 +326,19 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           />
         ) : null}
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-          style={styles.scroll}
-          testID={`${prefix}-scroll`}>
+        <HistoryHeatmap
+          dailyMetrics={dailyMetrics}
+          lookbackWeeks={lookbackWeeks}
+          muscleTargets={muscleTargets}
+          metric={metric}
+          metricLabel={metricLabel}
+          onSelectWeek={onSelectWeek}
+          selectedWeekKey={selectedWeekKey}
+          testIDPrefix={prefix}
+          todayDateKey={todayDateKey}
+          view={view}
+          chartHidden={!!errorMessage}
+          status={<>
           {isLoading ? (
             <StatePanel body={`Loading ${title} history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
           ) : null}
@@ -343,25 +363,8 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
             />
           ) : null}
 
-          <View
-            accessibilityElementsHidden={!!errorMessage}
-            importantForAccessibility={errorMessage ? 'no-hide-descendants' : 'auto'}
-            pointerEvents={errorMessage ? 'none' : 'auto'}
-            style={errorMessage ? [styles.heatmapLayer, styles.heatmapLayerInactive] : undefined}>
-            <HistoryHeatmap
-              dailyMetrics={dailyMetrics}
-              lookbackWeeks={lookbackWeeks}
-              muscleTargets={muscleTargets}
-              metric={metric}
-              metricLabel={metricLabel}
-              onSelectWeek={onSelectWeek}
-              selectedWeekKey={selectedWeekKey}
-              testIDPrefix={prefix}
-              todayDateKey={todayDateKey}
-              view={view}
-            />
-          </View>
-        </ScrollView>
+          </>}
+        />
       </View>
     </Sheet>
   );
@@ -423,6 +426,7 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   bannerLabel: {
+    flexShrink: 1,
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.sm,
@@ -441,7 +445,11 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     padding: uiSpace.lg,
   },
+  hiddenChart: { height: 0, opacity: 0, overflow: 'hidden' },
+  weeklyChart: { flex: 1 },
+  hiddenWeeklyChart: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0 },
   heatmapLayers: {
+    flex: 1,
     position: 'relative',
   },
   heatmapLayer: {
@@ -450,12 +458,14 @@ const styles = StyleSheet.create({
     top: 0,
   },
   heatmapLayerActive: {
+    flex: 1,
     position: 'relative',
     opacity: 1,
     zIndex: 1,
   },
   heatmapLayerInactive: {
     position: 'absolute',
+    bottom: 0,
     opacity: 0,
     zIndex: 0,
   },

@@ -2676,6 +2676,12 @@ and sanitized failure isolation from Sync and certification commits.
 | `group_competition_stream/session_detail/week_summary` | Authorized group scope; safe events/raw reps/counts, no normalized kg or aggregate subtraction total |
 | `group_competition_certify/certification_get/certification_end` | Live source/token fencing, exact witness identity/time, generic terminal state without observed audit/private pins |
 
+`group_competition_stream` lists sessions, memberships and record, void, link
+and unlink events. It omits `rules_change` events: a rules change tells members
+nothing they can act on, and activation writes one per comparison. They remain
+in board history; the stream cursor still accepts the `rules_change` kind so a
+cursor issued before the omission keeps paging.
+
 Unsafe old RPCs return `UPDATE_REQUIRED` once active, including callers forging
 the current header. App authentication, OAuth denial and active membership/role
 remain independent checks. Private helpers and source/projection tables stay
