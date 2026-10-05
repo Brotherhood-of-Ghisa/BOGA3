@@ -7,7 +7,8 @@
 # flow-has-a-lane rules, and
 # the worktree lifecycle (temp git repos + stub gh/docker), Android
 # launchers (stub adb/Expo/JDK), the iOS simulator boot-wait (stub xcrun), and
-# the edge function server stop (stub npx process tree).
+# the edge function server stop (stub npx process tree), and the dev stack's
+# main-checkout-only rule (temp git worktree, stubbed launcher children).
 # Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
 # and in CI.
 
@@ -30,6 +31,7 @@ TESTS=(
   "android-launcher.test.sh"
   "ios-sim-boot.test.sh"
   "functions-serve-stop.test.sh"
+  "dev-stack-main-checkout.test.sh"
 )
 
 failed=0

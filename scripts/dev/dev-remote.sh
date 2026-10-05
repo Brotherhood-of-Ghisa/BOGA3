@@ -31,7 +31,7 @@
 #   - Override the Metro port (default 8081):  EXPO_PORT=8082 ...
 #   - Run ONE worktree at a time: the 443/8443 serve mappings are per-machine.
 #   - Supabase containers + serve mappings persist after Ctrl+C. Tear down with:
-#       ./supabase/scripts/local-runtime-down.sh
+#       ./boga db dev-down   (main checkout)  |  ./boga db down   (linked worktree)
 #       tailscale serve --https=443 off && tailscale serve --https=8443 off
 #   - Extra args are forwarded to `expo start`, e.g. ./scripts/dev/dev-remote.sh --clear
 #
@@ -43,15 +43,24 @@ MOBILE_DIR="$REPO_ROOT/apps/mobile"
 EXPO_PORT="${EXPO_PORT:-8081}"
 TS_METRO_HTTPS_PORT=8443
 
-# Target the dedicated dev Supabase stack (BOGA-dev), not the slot-0 gate stack,
-# so running the gates never wipes this phone session's data. The env-half and
-# ensure-dev-baseline below both honor this flag. See docs/specs/12.
-export BOGA_MOBILE_DEV_DB=1
-
 # 1. Require this checkout's slot lease (docs/specs/12); never set one up on the fly.
 # shellcheck disable=SC1091
 source "$REPO_ROOT/scripts/worktree-lib.sh"
 boga_require_slot_lease "$REPO_ROOT" || exit 1
+
+# Main checkout: target the dedicated dev Supabase stack (BOGA-dev), not the
+# slot-0 gate stack, so running the gates never wipes this phone session's data.
+# The env-half and ensure-dev-baseline below both honor this flag. BOGA-dev is
+# main-checkout-only, so a linked worktree uses its own slot stack (which its
+# gates reset). See docs/specs/12.
+BASELINE_ARGS=()
+if boga_is_linked_git_worktree "$REPO_ROOT"; then
+  echo "[dev-remote] linked worktree: using this worktree's slot stack (BOGA-dev is main-checkout-only)"
+  BASELINE_ARGS=(--slot-stack)
+  unset BOGA_MOBILE_DEV_DB
+else
+  export BOGA_MOBILE_DEV_DB=1
+fi
 
 # 2. Ensure isolated mobile deps (never symlinked/shared between worktrees).
 if [[ ! -d "$MOBILE_DIR/node_modules" ]]; then
@@ -70,7 +79,7 @@ echo "[dev-remote] starting local Supabase and publishing it over the tailnet (H
 #     prerequisite still fails fast before any Docker work; reuses the running
 #     stack, so it never resets your local data. Fails loud on schema drift.
 echo "[dev-remote] ensuring dev DB baseline (no reset; seeds dev users)"
-"$REPO_ROOT/supabase/scripts/ensure-dev-baseline.sh"
+"$REPO_ROOT/supabase/scripts/ensure-dev-baseline.sh" ${BASELINE_ARGS[@]+"${BASELINE_ARGS[@]}"}
 
 # Resolve the MagicDNS name again for the Metro proxy + dev-client URL.
 if [[ -n "${BOGA_MOBILE_TS_HOST:-}" ]]; then

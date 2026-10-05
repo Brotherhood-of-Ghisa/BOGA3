@@ -286,7 +286,7 @@ run loop once that build is on the phone.
 
 ### One-stop: dev-lan.sh
 
-The single command that chains everything — boots this slot's local Supabase,
+The single command that chains everything — boots this checkout's local Supabase,
 points `apps/mobile/.env.local` at the Mac's LAN IP, and starts Expo/Metro over
 the LAN in `--dev-client` mode:
 
@@ -300,7 +300,7 @@ Notes:
   (scan the QR code Expo prints, or open the dev-client URL).
 - Extra args are forwarded to `expo start`, e.g. `./scripts/dev/dev-lan.sh --clear`.
 - Supabase containers persist after you Ctrl+C Expo. Stop them with
-  `./supabase/scripts/local-runtime-down.sh`.
+  `boga db dev-down` (main checkout) or `boga db down` (linked worktree).
 
 ### Outside the LAN (Tailscale): dev-remote.sh
 
@@ -490,13 +490,12 @@ if present).
 gates use — so **running `boga test *` never wipes your dev data or session.**
 They run the **dev DB baseline** on every start: reuse the dev stack **without
 resetting it** (your logged data survives), apply any pending migrations in
-place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, push the
-rich imported history into the `history@dev.local` account, and seed the
-`Dev crew` group (`npm run seed:dev-groups`): owned by `history@dev.local`, with
-`b@dev.local` as a member, both memberships backdated, and the last four weeks of
-sessions for both pushed so the group's stream and week board have content.
-`a@dev.local` stays near-blank. The full isolation
-contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
+place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, give
+`history@dev.local` rich imported history, and seed the `Dev crew` group
+(`history@dev.local` owner, `b@dev.local` member, four weeks of sessions).
+`a@dev.local` stays near-blank. `BOGA-dev` is main-checkout-only: from a linked
+worktree the launchers run the same baseline on its slot stack, which its gates
+reset. Contract: `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
 stack). Commands:
 
 ```bash

@@ -6,7 +6,8 @@
 # worktree's local stack:
 #   1. ensures this worktree has a generated Supabase config (slot/ports)
 #   2. ensures isolated mobile deps are installed (never shared across worktrees)
-#   3. boots THIS slot's local Supabase stack (Docker) via local-runtime-up.sh
+#   3. boots local Supabase (Docker): the BOGA-dev stack from the main checkout,
+#      this worktree's slot stack from a linked worktree (docs/specs/12)
 #   4. rewrites apps/mobile/.env.local to the Mac's LAN IP instead of 127.0.0.1
 #      (steps 3+4 are both done by use-local-mobile-lan-env.sh)
 #   4.5 ensures the dev DB baseline (ensure-dev-baseline.sh): applies pending
@@ -16,7 +17,7 @@
 # Notes:
 #   - Phone and Mac must be on the SAME network.
 #   - Supabase containers persist after you Ctrl+C Expo. Stop them with:
-#       ./supabase/scripts/local-runtime-down.sh
+#       ./boga db dev-down   (main checkout)  |  ./boga db down   (linked worktree)
 #   - Override LAN IP auto-detection (en0/en1) when needed:
 #       BOGA_MOBILE_LAN_HOST=192.168.1.42 ./scripts/dev-lan.sh
 #   - This is a dev-client app (custom native modules + scheme), so Expo starts
@@ -29,15 +30,24 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 MOBILE_DIR="$REPO_ROOT/apps/mobile"
 
-# Target the dedicated dev Supabase stack (BOGA-dev), not the slot-0 gate stack,
-# so running the gates never wipes this phone session's data. The env-half and
-# ensure-dev-baseline below both honor this flag. See docs/specs/12.
-export BOGA_MOBILE_DEV_DB=1
-
 # 1. Require this checkout's slot lease (docs/specs/12); never set one up on the fly.
 # shellcheck disable=SC1091
 source "$REPO_ROOT/scripts/worktree-lib.sh"
 boga_require_slot_lease "$REPO_ROOT" || exit 1
+
+# Main checkout: target the dedicated dev Supabase stack (BOGA-dev), not the
+# slot-0 gate stack, so running the gates never wipes this phone session's data.
+# The env-half and ensure-dev-baseline below both honor this flag. BOGA-dev is
+# main-checkout-only, so a linked worktree uses its own slot stack (which its
+# gates reset). See docs/specs/12.
+BASELINE_ARGS=()
+if boga_is_linked_git_worktree "$REPO_ROOT"; then
+  echo "[dev-lan] linked worktree: using this worktree's slot stack (BOGA-dev is main-checkout-only)"
+  BASELINE_ARGS=(--slot-stack)
+  unset BOGA_MOBILE_DEV_DB
+else
+  export BOGA_MOBILE_DEV_DB=1
+fi
 
 # 2. Ensure isolated mobile deps. Per the worktree contract these must be
 #    installed in-place and never symlinked/shared between worktrees.
@@ -57,7 +67,7 @@ echo "[dev-lan] starting local Supabase and pointing apps/mobile/.env.local at t
 #     (a@dev.local / b@dev.local). Reuses the stack the step above just started,
 #     so it never resets your local data. Fails loud on schema drift.
 echo "[dev-lan] ensuring dev DB baseline (no reset; seeds dev users)"
-"$REPO_ROOT/supabase/scripts/ensure-dev-baseline.sh"
+"$REPO_ROOT/supabase/scripts/ensure-dev-baseline.sh" ${BASELINE_ARGS[@]+"${BASELINE_ARGS[@]}"}
 
 # 5. Start Expo/Metro over the LAN. The env was rewritten in step 4 BEFORE this,
 #    so EXPO_PUBLIC_* values are bundled with the LAN URL. --host lan makes the
