@@ -3,7 +3,7 @@
 # groups-week-summary.sh — the group week summary read (a body of the
 # groups-leaderboards lane: it needs the evaluator's set facts and records).
 #
-# Contract: docs/specs/tech/groups-contract.md §2.9 (the facts' `working`), §4.7.
+# Contract: docs/specs/tech/groups-contract.md (the facts' `working`, the week summary).
 # Proves, against the real local stack (sync_push, group-eval, PostgREST):
 #
 #   - posture: the RPC is the only client-executable function; preamble,

@@ -11,7 +11,7 @@ service is required.
 - Exercise editor: [catalogue and editor](exercise-catalogue.md).
 - Logger/records: [exercise/session](exercise-session-v5.md).
 - Session/history structure: [View Session](view-session.md).
-- Group administration and boards: current [group recipes](../ux-rules.md).
+- Group administration and boards: [group competitions](group-competitions.md).
 - Behavior/calculation: [bodyweight contract](../../tech/bodyweight-load-contract.md).
 - Shared tokens, fields, sheets, lists and accessibility:
   [design language](../design-language.md), [UI rules](../ux-rules.md) and

@@ -169,7 +169,7 @@ unsaved input for Retry.
   server counterpart, so it is outside the drift checker like
   `sync_quarantine`. Guardrails: FK-free (local integrity rule 2), cleared by
   the sign-out / account-switch wipe, and evicted per group on `NOT_FOUND`
-  (`docs/specs/tech/groups-contract.md` §6.2).
+  (`docs/specs/tech/groups-contract.md`).
 - `exercise_session_facts`, `exercise_session_facts_stale`,
   `exercise_session_facts_state` — local-only, derived, rebuildable personal
   history facts (`apps/mobile/src/data/schema/exercise-session-facts.ts`,
@@ -373,7 +373,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
 ### Group domain (M22)
 
 - The earlier M18 group text is superseded (M18 is `outdated`).
-- Contract: `docs/specs/tech/groups-contract.md` §2.
+- Contract: `docs/specs/tech/groups-contract.md`
 - **As-built (M22-T01, `supabase/migrations/20260910120000_m22_groups_membership.sql`):**
   - `app_public.groups` — group header (`name`, `description`, `created_by`,
     timestamps, reserved `deleted_at`). Ownership is a membership role, not a
@@ -424,7 +424,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   posture (RLS on, no policies, no client grants, no `owner_user_id`, no FK
   into Sync v2 tables). Sync impact decision: `out of sync scope`; they are
   server-authoritative and written only by the group evaluator
-  (`docs/specs/tech/groups-contract.md` §2.11).
+  (`docs/specs/tech/groups-contract.md`).
 - **As-built (M25-T06, `supabase/migrations/20260916120000_m25_group_certification.sql`):**
   `app_public.group_certifications` (one row per certification of a member's
   record set: the certifier, the pinned fingerprint and raw values, and
@@ -432,7 +432,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   Same group posture (RLS on, no policies, no client grants, no `owner_user_id`,
   no FK into Sync v2 tables). Sync impact decision: `out of sync scope`; written
   only by the certification RPCs and the group evaluator
-  (`docs/specs/tech/groups-contract.md` §2.12).
+  (`docs/specs/tech/groups-contract.md`).
 
 - **Group calculation model:** `groups` stores
   `bodyweight_calculations_enabled` and `group_exercises` stores
@@ -449,7 +449,7 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   owner-private measurement internally. No group table stores the selected
   reading's value/date/identifier tuple; private dependency pins remain
   server-only, and public payloads expose neither the tuple nor its digest. See
-  [`tech/groups-contract.md` §11](tech/groups-contract.md#11-optional-bodyweight-aware-group-calculations).
+  [`tech/groups-contract.md`](tech/groups-contract.md).
   The additive competition installation also stores a service-only activation
   flag, revision representation versions and random per-score write tokens.
   Activated Volume/1RM rows carry explicit kg/percentage units; original kg

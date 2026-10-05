@@ -13,7 +13,7 @@ import {
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
- * Pure rules of the exercise page (`docs/specs/ui/ux-rules.md` §14a). The
+ * Pure rules of the exercise page. The
  * page edits one session exercise's set rows; every rule about what a row
  * *is* comes from `set-semantics.ts`, so this module only
  * decides presentation (the cursor, records, displayed values) and the edits
@@ -115,7 +115,7 @@ export const previewMetrics = (weightValue: string, repsValue: string, context: 
   return { oneRepMax, volume };
 };
 
-/** The session's blocks of this exercise, so the record is the session's (`ux-rules.md` §14a.4). */
+/** The session's blocks of this exercise, so the record is the session's. */
 export type SetRowSession = {
   blockId: string;
   blocks: readonly { id: string; sets: readonly ExercisePageSet[] }[];
@@ -281,7 +281,7 @@ export const toggleSetPerformed = (sets: ExercisePageSet[], setId: string): Exer
 };
 
 /**
- * Swipe-left drop (`ux-rules.md` §14a.3), for a row not yet performed:
+ * Swipe-left drop (`ux-rules.md` "Swipes on the exercise page"), for a row not yet performed:
  * - an ad-hoc row (no plan) is removed from the list;
  * - a planned row the lifter has touched returns to its pristine state —
  *   typed weight and reps clear and its actual effort goes back to blank, so
@@ -319,7 +319,7 @@ export const createLocalSetId = () =>
 
 /**
  * `+ Add set`: copies the last row's values and applies effort defaults, not
- * performed until ticked (`ux-rules.md` §5.11).
+ * performed until ticked.
  */
 export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(), displayEfforts?: readonly EffortChoice[]): ExercisePageSet[] => {
   const last = sets[sets.length - 1];

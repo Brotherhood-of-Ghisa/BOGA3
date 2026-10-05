@@ -9,7 +9,7 @@ import { canonicalizeWeightForReps, isWorkingSet, isVolumeSet } from '@/src/exer
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 
 /**
- * The exercise page's records panel (`ux-rules` §14a.4): the
+ * The exercise page's records panel: the
  * lifter's all-time 1RM, heaviest weight and best session volume for one
  * exercise, each with where it was set, and the sets of the previous session.
  * The records come from the exercise session facts (`ExerciseBests`); `Last`

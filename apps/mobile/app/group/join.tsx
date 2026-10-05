@@ -33,7 +33,7 @@ const firstParam = (value: string | string[] | undefined): string =>
   ((Array.isArray(value) ? value[0] : value) ?? '').trim();
 
 /**
- * Join a group (groups contract §6.3, card flow 3). `boga3://group/join?code=…`
+ * Join a group (groups contract). `boga3://group/join?code=…`
  * opens here with the code prefilled and previewed; a new link remounts the
  * screen with its own code. The code is a figure (a Plex Mono field); the
  * preview `Card`'s `Join group` is the screen's one `accent`.

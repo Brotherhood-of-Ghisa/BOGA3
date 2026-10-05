@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T10 certification wrappers (card AC1; groups contract §4, §4.6):
+ * certification wrappers (groups contract):
  * `group_certify`, `group_certification_withdraw`, `group_certification_cancel`
  * send every `p_*` arg and are shape-checked; `CONFLICT` maps from its token;
  * the `NOT_FOUND` message helpers tell the four cases apart. Supabase is mocked.
@@ -42,7 +42,7 @@ const certification: GroupCertification = {
   ended_by: null,
 };
 
-describe('certification api (M25-T10)', () => {
+describe('certification api', () => {
   const mockRpc = jest.fn();
   const mockSchema = jest.fn();
 

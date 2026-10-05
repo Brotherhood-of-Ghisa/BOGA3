@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# groups-contract.sh — M22 group domain contract.
+# groups-contract.sh — group domain contract.
 #
-# Contract: docs/specs/tech/groups-contract.md §2–§5, §8. Proves, against the
+# Contract: docs/specs/tech/groups-contract.md Proves, against the
 # real local Supabase stack through PostgREST:
 #
 #   - catalog ground rules: RLS on + no policies + no direct grants, no
@@ -14,17 +14,17 @@
 #     removal, ownership transfer;
 #   - invite normalization and regeneration;
 #   - non-member ≡ nonexistent (byte-identical NOT_FOUND bodies);
-#   - (M22-T02) the share rule, flow-through, the raw-set card and
+#   - the share rule, flow-through, the raw-set card and
 #     friend-session detail payloads, and stream order/dedupe/pagination/scope
 #     — all driven by real `sync_push` calls; share trigger failure isolation
 #     and self-heal;
 #   - AUTH_REQUIRED (anon) and AGENT_FORBIDDEN (client_id token) on every RPC;
 #   - direct PostgREST select/insert/update/delete denial on every group table;
-#   - (M25-T02) the persistent stream `group_events`: catalog posture, one item
+#   - the persistent stream `group_events`: catalog posture, one item
 #     per membership edge and per share, no duplicates on re-push, event
 #     trigger failure isolation and self-heal, and a backfill that rebuilds
 #     every user's stream byte-identical.
-#   - (M25-T01) group exercises: the shared ExerciseCore vectors
+#   - group exercises: the shared ExerciseCore vectors
 #     (apps/mobile/src/exercise-core/exercise-core-vectors.json) through
 #     group_exercise_create and the table CHECKs, the role matrix, targets,
 #     update, and the archive round trip.
@@ -628,7 +628,7 @@ check "soft-deleted group is not listed" '.groups == []'
 pass "soft-deleted groups are invisible"
 
 # =============================================================================
-# M22-T02: the group record (contract §2.4–§2.5, §4.2, §5)
+# The group record (groups contract)
 # =============================================================================
 
 # --- sync_push fixtures ----------------------------------------------------------
@@ -818,7 +818,7 @@ detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
 expect_ok "detail after undelete"
 pass "active/sets/completed/edit/tombstone/undelete all flow through"
 
-# --- detail (§4.2) -------------------------------------------------------------------
+# --- detail -------------------------------------------------------------------
 echo "[groups-contract] group_session_detail"
 
 detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
@@ -871,7 +871,7 @@ detail "${VIEWER_TOKEN}" "${MISSING_GROUP}" "${S1}"
 expect_error NOT_FOUND "detail with a nonexistent member"
 pass "detail: shape, raw live sets, no GPS, non-member ≡ nonexistent ≡ tombstoned ≡ unshared"
 
-# --- leave / push-after-leave / post-leave / rejoin (§2.5) ----------------------------
+# --- leave / push-after-leave / post-leave / rejoin ----------------------------
 echo "[groups-contract] share rule across leave and rejoin"
 
 LATE="${T}-late"
@@ -915,7 +915,7 @@ push "${ATHLETE_TOKEN}" "session after rejoining, plus a re-push of the gap sess
 [[ "$(shares_of "${AFTER}")" == "A" ]] || fail "a session started between periods stays unshared on its next write"
 pass "push-after-leave shared, post-leave not shared, earlier shares kept, rejoin shares again"
 
-# --- failure isolation + self-heal (§2.5) -----------------------------------------------
+# --- failure isolation + self-heal -----------------------------------------------
 echo "[groups-contract] share trigger failure isolation"
 
 FAILS="${T}-fail"
@@ -1076,7 +1076,7 @@ check "the owner sees the removal as a membership item" \
 pass "removed caller: NOT_FOUND for the group, All excludes it (AC11); removal item recorded"
 
 # =============================================================================
-# M25-T01: group exercises (contract §2.7, §4.4)
+# Group exercises (groups contract)
 # =============================================================================
 echo "[groups-contract] group exercises: shared ExerciseCore vectors (RPC and CHECKs)"
 
@@ -1487,7 +1487,7 @@ BODY=""
 pass "select/insert/update/delete denied (42501) for authenticated and anon on all five tables"
 
 # =============================================================================
-echo "[groups-contract] persistent stream: group_events (M25-T02)"
+echo "[groups-contract] persistent stream: group_events"
 # =============================================================================
 
 RUN_IDS_SQL="$(printf "'%s'::uuid," "${RUN_USER_IDS[@]}")"
@@ -1543,8 +1543,8 @@ RUN_GROUPS_SQL="select id from app_public.groups
      and t.tgattr::text = (select attnum::text from pg_attribute
                             where attrelid = 'app_public.group_memberships'::regclass and attname = 'ended_at');")" == "1" ]] ||
   fail "group_memberships_stream_event must be an enabled AFTER INSERT OR UPDATE OF ended_at row trigger"
-# The kind CHECK accepts the M25-T05 kinds, and each has a shape CHECK
-# (contract §2.11): a bare row of one fails that shape CHECK, never the kind
+# The kind CHECK accepts the board kinds, and each has a shape CHECK
+# (contract): a bare row of one fails that shape CHECK, never the kind
 # CHECK. Anything else fails the kind CHECK.
 for board_kind in record record_voided link unlink lead_change; do
   shape="${board_kind}"
@@ -1613,7 +1613,7 @@ check "the card sorts at the live started_at" \
   --arg k "${ATHLETE_UID}:${S_EV}" --argjson s "${S_EV_MOVED}"
 pass "a newly shared session writes one item per group; re-pushes never duplicate; started_at edits move it"
 
-# --- event trigger failure isolation + self-heal (§2.5 pattern) ---------------------------
+# --- event trigger failure isolation + self-heal ---------------------------
 echo "[groups-contract] stream event trigger failure isolation"
 
 S_EVF="${T}-evfail"

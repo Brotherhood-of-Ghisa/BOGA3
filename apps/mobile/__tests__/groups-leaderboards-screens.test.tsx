@@ -1,8 +1,8 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T09 leaderboards screens (card AC2–AC8; product E1.1–E1.3; groups
- * contract §4.5, §6.2, §6.3): the group screen's Leaderboards segment (podium
+ * leaderboards screens (product E1.1–E1.3; groups
+ * contract): the group screen's Leaderboards segment (podium
  * cards, cache-first under `boards:<groupId>`), the full board route (toggles,
  * empty Certified, paging, lost access, exercise missing, offline), and the
  * history route. The group RPCs are mocked; `group_cache` is the real table on
@@ -147,7 +147,7 @@ const cacheKeys = () =>
     .filter(entry=>!entry.cacheKey.startsWith('group-policy:')).map((entry) => entry.cacheKey)
     .sort();
 
-/** The board route also reads `group:<groupId>` for my role (M25-T10 row detail); board rows themselves are never cached. */
+/** The board route also reads `group:<groupId>` for my role (row detail); board rows themselves are never cached. */
 const cacheKeysBesidesGroup = () => cacheKeys().filter((key) => key !== groupCacheKeys.group(GROUP_ID) && key !== groupCacheKeys.groupExercises(GROUP_ID));
 
 const emitNetInfo = (isConnected: boolean) => {

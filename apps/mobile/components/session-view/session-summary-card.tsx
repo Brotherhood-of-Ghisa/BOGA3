@@ -18,7 +18,7 @@ type SessionSummaryCardProps = {
   times?: SessionTimesFieldsProps;
 };
 
-// Gym / Ex (exercises) / Sets / Volume, labels above values (`ux-rules` §14b.5);
+// Gym / Ex (exercises) / Sets / Volume, labels above values;
 // the elapsed time is in the top bar's title. Editing a completed session,
 // Start and End sit above the row.
 export function SessionSummaryCard({

@@ -42,7 +42,7 @@ export type CompletedSessionDetailExerciseInput = {
 export type CompletedSessionDetailCard = {
   id: string;
   name: string;
-  // The card's `<n> sets`: its working sets (`ux-rules.md` §5.11).
+  // The card's `<n> sets`: its working sets (`training-metrics-contract.md` "Counted set").
   setCount: number;
   rows: SessionViewSetRow[];
   // The card's `record` band when the exercise's record set is in it.

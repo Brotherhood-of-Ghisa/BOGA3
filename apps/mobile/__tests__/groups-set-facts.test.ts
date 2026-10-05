@@ -1,5 +1,5 @@
 /**
- * Group evaluator normalization (groups contract §2.9): the fact rows the
+ * Group evaluator normalization (groups contract): the fact rows the
  * `group-eval` Edge Function writes, and their agreement with the device's
  * card rule (`toGroupPerformedSet`), which delegates to the same core.
  */

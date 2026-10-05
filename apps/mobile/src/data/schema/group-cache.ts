@@ -1,7 +1,7 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Local-only, disposable cache of server-authoritative group RPC results
-// (`docs/specs/tech/groups-contract.md` §6.2). One row per cache key holds the
+// (`docs/specs/tech/groups-contract.md`). One row per cache key holds the
 // last successful RPC payload for the account that fetched it.
 //
 // This is NOT user data and never crosses the wire: no dirty bit, no monotonic

@@ -5,7 +5,7 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
 // One read-only set: type · weight × reps · 1RM · VOL. No control column — a
-// card of these rows is read, not edited (`ux-rules` §14b.4). Every
+// card of these rows is read, not edited (spec 08, "Read-only link card pattern"). Every
 // figure in a row shares the row's colour and weight; only the record set's
 // 1RM and Weight records stand out, in `record`, as on the exercise page
 // (decided on device 2026-09-23: per-column bests read as noise).

@@ -1,4 +1,4 @@
-// Runs one group write RPC (`docs/specs/tech/groups-contract.md` §6.1, §7).
+// Runs one group write RPC (`docs/specs/tech/groups-contract.md`).
 // Writes are online-only (C3.10.3, AC12): when the device is known to be
 // offline the action is refused immediately — no RPC, no cache change, nothing
 // queued. Failures come back as a mapped `GroupApiError` result; `run` never

@@ -21,7 +21,8 @@ Target record per `../ai-design-policy.md`. Accepted 2026-09-21.
   it is older styling, kept only because the exercise page links to it.
 
 The canvas governs the exercise page and the session view. Everything else in
-the app is governed by `../ux-rules.md` until it gets its own target.
+the app is governed by `../design-language.md` and `../ux-rules.md` until it
+gets its own target.
 
 ## Brief
 

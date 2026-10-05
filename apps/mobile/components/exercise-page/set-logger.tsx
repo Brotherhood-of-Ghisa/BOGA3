@@ -34,8 +34,8 @@ type SetLoggerProps = {
   onOpenEffort: () => void;
   onCommit: () => void;
   // The swipe-right equivalent, as the logger's `confirm` accessibility
-  // action (`ux-rules.md` §14a.3): the tick confirms without the swipe's
-  // last-set add-set continuation. Absent when the values are not a valid set.
+  // action (`ux-rules.md` "Swipes on the exercise page"):
+  // the tick confirms without the swipe's last-set add-set continuation. Absent when the values are not a valid set.
   onConfirm?: () => void;
   // The swipe-left equivalent, as the logger's `discard` accessibility action.
   // Absent when dropping would change nothing.
@@ -55,7 +55,8 @@ const actionsHint = (canConfirm: boolean, canDrop: boolean): string | undefined 
 };
 
 /**
- * The open set, expanded in place into the logger (`ux-rules` §14a.3):
+ * The open set, expanded in place into the logger (spec 08,
+ * "In-place row logger pattern"):
  * Weight · Reps · Effort · the commit tick, all fields one height.
  * The tick is the screen's one `accent` primary; it is disabled until the
  * values are a valid set.

@@ -1,9 +1,9 @@
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { isMetricStreamEvent, type CurrentGroupStreamItem as StreamItem, type GroupMetricStreamItemWire } from './metric-wire';
-// Pure presentation for the group stream (`docs/specs/tech/groups-contract.md`
-// §6.1): card status, card metrics (computed on the device, §5) and their kg
+// Pure presentation for the group stream (`docs/specs/tech/groups-contract.md`):
+// card status, card metrics (computed on the device) and their kg
 // formatting, membership sentences, record cards and record-removed / link
-// sentences (M25-T10), and filter chips. No React, no I/O.
+// sentences, and filter chips. No React, no I/O.
 
 import { formatCompactDuration } from '@/src/data/session-list';
 import { formatClockTime, formatLocalDateTime, formatMonthDayTime } from '@/src/utils/local-time';
@@ -98,7 +98,7 @@ export const formatStreamStartedAt = formatMonthDayTime;
 /** Local `YYYY-MM-DD HH:MM`, the View Session header shape (friend's session view). */
 export const formatGroupDateTime = formatLocalDateTime;
 
-/** Contract §7 offline marker: "Offline · last updated HH:MM" ("Offline" with nothing cached). */
+/** The groups contract offline marker: "Offline · last updated HH:MM" ("Offline" with nothing cached). */
 export const formatOfflineMarker = (lastUpdatedAtMs: number | null): string =>
   lastUpdatedAtMs === null ? 'Offline' : `Offline · last updated ${formatClockTime(lastUpdatedAtMs)}`;
 
@@ -217,7 +217,7 @@ const buildMembershipItem = (item: StreamMembershipItem): StreamMembershipViewMo
   groupName: item.group.name,
 });
 
-// ---- Record cards, record-removed and link items (M25-T10) ---------------------
+// ---- Record cards, record-removed and link items ---------------------
 
 export const YOU_NAME = 'You';
 // Display copy only: the metric key stays `e1rm` in params, RPCs and view keys.

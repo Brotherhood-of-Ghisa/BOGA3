@@ -38,11 +38,11 @@ This is the shortest operational summary. Use the "Further reading" section when
 14. Privileged application RPCs that bypass RLS, including `SECURITY DEFINER`
     developer helpers, must independently reject non-null OAuth `client_id`
     claims before executing any read or write body.
-15. Group domain authorization (M22 — `docs/specs/tech/groups-contract.md` §3; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
+15. Group domain authorization (`docs/specs/tech/groups-contract.md`; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
 16. **RLS recursion prevention.** Group membership and role lookups MUST use `SECURITY DEFINER` helpers with `SET search_path = app_public, pg_temp`. If a later phase adds RLS policies on group tables (for example for Realtime), those policies must call the helpers. Direct subqueries on `group_memberships` inside `group_memberships` policies are prohibited (Postgres `42P17`).
 17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the M21 agent access boundary: agent tokens get no group access.
 18. Group non-membership and nonexistence must be indistinguishable to the caller (`NOT_FOUND`). A member whose role disallows an action gets `FORBIDDEN`.
-19. **Certification authz (M25-T06 — `docs/specs/tech/groups-contract.md` §4.6).** Only a current member may certify, and never their own set (`VALIDATION`). The lifter must be a current member (`NOT_FOUND: member not found`), the group exercise must not be archived, and the set must be a record set (a current All entry or a non-voided record; otherwise `NOT_FOUND`). Only the certifier may withdraw a certification (`FORBIDDEN` for everyone else, admins included); only the owner or an admin may cancel one (`FORBIDDEN` for members). The evaluator, not a client, voids a certification whose set changed. Certifications are written only through these `SECURITY DEFINER` RPCs; `group_certifications` has no client privileges.
+19. **Certification authz (`docs/specs/tech/groups-contract.md`).** Only a current member may certify, and never their own set (`VALIDATION`). The lifter must be a current member (`NOT_FOUND: member not found`), the group exercise must not be archived, and the set must be a record set (a current All entry or a non-voided record; otherwise `NOT_FOUND`). Only the certifier may withdraw a certification (`FORBIDDEN` for everyone else, admins included); only the owner or an admin may cancel one (`FORBIDDEN` for members). The evaluator, not a client, voids a certification whose set changed. Certifications are written only through these `SECURITY DEFINER` RPCs; `group_certifications` has no client privileges.
 
 ## Practical guidance for API developers (backend)
 
@@ -54,12 +54,12 @@ This is the shortest operational summary. Use the "Further reading" section when
 - **Group domain (M22)**:
   - Encapsulate membership and role checks in `SECURITY DEFINER` helpers with `search_path = app_public, pg_temp`, which guards against schema injection. These helpers bypass RLS, so their callers must filter explicitly by the caller's active membership.
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
-  - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
+  - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md`).
 
 ## Optional bodyweight-aware group projections
 
 Group RPCs retain rules 15–19 and expected-revision checks described in
-[`groups-contract.md` §11](tech/groups-contract.md#11-optional-bodyweight-aware-group-calculations).
+[`groups-contract.md`](tech/groups-contract.md).
 Group preference/contribution rows, score projections, queues and internal
 certification dependency digests have no direct client privileges. The evaluator
 may resolve an applicable private reading only through a service-only helper and

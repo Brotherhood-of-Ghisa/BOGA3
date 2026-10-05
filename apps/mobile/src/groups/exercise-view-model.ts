@@ -1,5 +1,5 @@
-// Pure presentation rules for the group page's Exercises segment (M25-T08;
-// `docs/specs/tech/groups-contract.md` §4.4, §6.3): row order, my link status,
+// Pure presentation rules for the group page's Exercises segment
+// (`docs/specs/tech/groups-contract.md`): row order, my link status,
 // the owner/admin action matrix, archive wording, and the standard-exercise
 // search behind "Add exercise". The server stays the authority on who may
 // write; these rules only decide what the UI offers.
@@ -112,7 +112,7 @@ export const buildGroupExerciseRows = (
 export const groupExerciseLinkedMessage = (exerciseName: string, groupExerciseName: string): string =>
   `Linked ${exerciseName} to ${groupExerciseName}.`;
 
-// ---- Actions (contract §4.4: owner, admin) --------------------------------------
+// ---- Actions (contract: owner, admin) --------------------------------------
 
 export type GroupExerciseAction = 'rename' | 'archive' | 'unarchive';
 
@@ -161,7 +161,7 @@ export const describeGroupExerciseWriteError = (error: GroupApiError): string =>
 // ---- Standard catalogue (Add exercise → From catalogue) -------------------------
 
 export type StandardExerciseOption = {
-  /** The seed id sent as `p_source_exercise_id` (contract §2.7). */
+  /** The seed id sent as `p_source_exercise_id` (contract). */
   sourceExerciseId: string;
   name: string;
   loadInputMode: LoadInputMode;

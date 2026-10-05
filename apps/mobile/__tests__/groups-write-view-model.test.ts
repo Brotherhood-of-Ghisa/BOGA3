@@ -1,5 +1,5 @@
 /**
- * M22-T05 write rules (groups contract §4.3, §6.3): the role × target matrix
+ * write rules (groups contract): the role × target matrix
  * the UI offers (AC10 UI gating), form validation, the invite link / share
  * text, and the wording of write failures.
  */
@@ -22,7 +22,7 @@ import {
 const ME = 'me';
 const ROLES: GroupRole[] = ['owner', 'admin', 'member'];
 
-// Every (my role, target) pair, with exactly the §4.3 actions.
+// Every (my role, target) pair, with exactly the role-matrix actions.
 const MATRIX: { myRole: GroupRole; target: 'self' | GroupRole; actions: GroupMemberAction[] }[] = [
   { myRole: 'owner', target: 'self', actions: [] },
   { myRole: 'owner', target: 'admin', actions: ['remove-admin', 'transfer-ownership', 'remove'] },
@@ -37,7 +37,7 @@ const MATRIX: { myRole: GroupRole; target: 'self' | GroupRole; actions: GroupMem
   { myRole: 'member', target: 'member', actions: [] },
 ];
 
-describe('groupMemberActionsFor (§4.3 role matrix)', () => {
+describe('groupMemberActionsFor (role matrix)', () => {
   it.each(MATRIX)('$myRole → $target offers $actions', ({ myRole, target, actions }) => {
     const member =
       target === 'self' ? { user_id: ME, role: myRole } : { user_id: `other-${target}`, role: target };

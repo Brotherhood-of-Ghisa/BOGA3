@@ -23,7 +23,7 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
  * × reps · 1RM · VOL`. Read-only — NO owner actions (no edit, delete, append)
  * and no record band, since the friend's history is not on this device.
  * Performed sets only: the server returns every live set raw, and the device
- * selects the performed ones (contract §5).
+ * selects the performed ones (contract).
  */
 export function FriendSessionContent({ session }: { session: CompetitionSessionWire }) {
   const model = useMemo(() => buildCompetitionSession(session),[session]);

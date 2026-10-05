@@ -22,7 +22,7 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
 - `docs/specs/tech/bodyweight-load-contract.md`: Ordinary/optional bodyweight
   calculation policies, dated kg readings, migration, consumers and privacy.
-- `docs/specs/tech/groups-contract.md`: As-built (M22, M25) group domain contract — share-ledger schema, share rule, group RPCs, stream metrics, group exercises, the evaluator, boards, certification, mobile group client, and the M25 product rules (§10).
+- `docs/specs/tech/groups-contract.md`: Group domain rules — share ledger, stream, evaluator, boards, certification, comparisons, RPC conventions, mobile group client, and the rule IDs code cites.
 - `docs/specs/tech/sync-v2-server-contract.md`: Authoritative sync-v2 server contract — schema / LWW / RLS (Part A) and push/pull RPC wire contract (Part B).
 
 Planning docs (milestones, task cards, plans, and their templates) are not

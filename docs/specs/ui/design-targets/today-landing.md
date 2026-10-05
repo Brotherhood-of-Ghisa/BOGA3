@@ -27,7 +27,7 @@ runtime gallery of every state below on 2026-10-03.
   `View groups` (the Groups tab). Each section is one `Card`.
 - **Progress card, top: this week** (Mon–Sun, local). A `This week` micro-label
   with the date range in `ink-faint`, then three stacked figures: `Sessions`,
-  `Sets` (working sets, `ux-rules.md` §5.11) and `PRs` (the `record` figure
+  `Sets` (working sets, `../../tech/training-metrics-contract.md`) and `PRs` (the `record` figure
   with its up arrow). Under each figure a thin bar on the `viz` ramp shows this
   week as a share of **last week's total**, in laps of it: `viz2` up to the
   total, then `viz3` over it up to twice, then `viz4` up to three times, where
@@ -38,7 +38,7 @@ runtime gallery of every state below on 2026-10-03.
 - **Progress card, middle: the month.** `<Month> so far` with the month's
   working sets in Plex Mono 700, and on the right the signed absolute
   difference from the previous month at the same day (`+4`, `ahead of Sep's
-  pace`; counts never take a percentage, `ux-rules.md` §13.2). Then a
+  pace`; counts never take a percentage). Then a
   cumulative working-sets line by day of month: this month solid `ink` up to
   today with a `viz0` fill under it, the previous month dashed `ink-faint`
   across its whole length, a `ink-ghost` dotted projection from today to month

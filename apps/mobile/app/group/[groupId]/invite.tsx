@@ -39,7 +39,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 const MEMBERS_CANNOT_INVITE = 'Only the owner and admins can see and share the invite code.';
 
 /**
- * The invite (groups contract §6.3, card flow 2): owner and admins only
+ * The invite (groups contract): owner and admins only
  * (C7.4). The code is read online and never cached; Share uses React Native
  * core `Share.share`; Regenerate is confirmed because the old code stops working.
  * The code is a Plex Mono figure (T13-D3); `Share invite` is the one `accent`.

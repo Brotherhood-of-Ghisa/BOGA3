@@ -26,7 +26,13 @@ BOGA_DEV_WORKDIR="${REPO_ROOT}/.supabase-dev"
 
 # Render .supabase-dev/supabase/config.toml from the shared template with the dev
 # project_id + slot-100 ports, and (re)link migrations/seed/functions. Idempotent;
-# regenerates the config when missing or older than the template.
+# regenerates the config when missing or older than the template or this file.
+#
+# Every [functions.<name>] gets an entrypoint through the real supabase/ dir
+# (../../supabase/functions/<name>/index.ts), not the functions symlink: the
+# functions import shared app code by relative path (../../../apps/mobile/...),
+# which through the symlink resolves to .supabase-dev/apps — a path the Edge
+# runtime container never sees, so the workers fail to boot.
 generate_dev_supabase_config() {
   local template="${SUPABASE_DIR}/config.toml.template"
   local dev_supabase_dir="${BOGA_DEV_WORKDIR}/supabase"
@@ -42,7 +48,7 @@ generate_dev_supabase_config() {
   ln -sfn "${SUPABASE_DIR}/seed.sql" "${dev_supabase_dir}/seed.sql"
   ln -sfn "${SUPABASE_DIR}/functions" "${dev_supabase_dir}/functions"
 
-  if [[ -f "${config}" && "${config}" -nt "${template}" ]]; then
+  if [[ -f "${config}" && "${config}" -nt "${template}" && "${config}" -nt "${BASH_SOURCE[0]}" ]]; then
     return 0
   fi
 
@@ -66,6 +72,7 @@ generate_dev_supabase_config() {
     s/\{\{ANALYTICS_PORT\}\}/$ENV{ANALYTICS_PORT}/g;
     s/\{\{POOLER_PORT\}\}/$ENV{POOLER_PORT}/g;
     s/\{\{INSPECTOR_PORT\}\}/$ENV{INSPECTOR_PORT}/g;
+    s{^\[functions\.([A-Za-z0-9_-]+)\]\n\z}{$&entrypoint = "../../supabase/functions/$1/index.ts"\n};
   ' "${template}" >"${tmp_file}"
   mv "${tmp_file}" "${config}"
 }

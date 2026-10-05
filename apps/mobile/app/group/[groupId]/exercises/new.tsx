@@ -38,7 +38,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 /**
- * Add a group exercise (owner, admin; contract §4.4): copy a standard exercise
+ * Add a group exercise (owner, admin; contract): copy a standard exercise
  * (its seed id becomes `source_exercise_id`) or create a custom one, through
  * the shared `ExerciseCore` fields.
  */

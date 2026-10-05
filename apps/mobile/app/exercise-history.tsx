@@ -85,7 +85,7 @@ const formatOptionalOneRepMax = (value: number | null) =>
   value === null ? EMPTY_FIGURE : formatOneRepMax(value);
 
 
-// `ux-rules` §10.2: a deleted tag still filters, and says so in words.
+// A deleted tag still filters, and says so in words.
 const formatTagName = (tag: ExerciseHistoryTagOption) =>
   tag.deletedAt ? `${tag.name} (deleted)` : tag.name;
 
