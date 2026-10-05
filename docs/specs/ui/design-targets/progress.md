@@ -31,8 +31,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
 ## Brief
 
 - The landing's controls, muscle/contribution tables and quiet links follow
-  [Progress tables](progress-tables.md). Browse exercises retains the
-  `Breakdown` control, `SearchField` and sortable exercise table on `paper`.
+  [Progress tables](progress-tables.md). Its pinned By Exercise / By Muscle
+  switch opens retained exercise search and sortable rows on `paper`.
 - Deltas are Plex Mono `ink-muted` with their sign; `new` is `ink` (G3). Figures take the one display format (`tech/training-metrics-contract.md`
   §4) in Plex Mono, never `2.5k`.
 - The exercise table is a `Card`: a header row of micro-labels (the active sort
@@ -48,9 +48,11 @@ rule that comes with it: text on a `viz` ground is `ink`.
 
 ### History sheets and heatmaps
 
-- The two legacy overlays are one `HistorySheet` (`components/stats/`), a
-  `Sheet` over about three quarters of the screen with no close button: the
-  backdrop, Android back and the VoiceOver escape dismiss it (G5).
+- One `HistorySheet` (`components/stats/`) uses the full-height
+  [History popup](history-popup.md): handle/header drag, accessible dismiss,
+  Android back and VoiceOver escape; no visible close control. The older
+  three-quarter container/backdrop prescription is superseded; charts retain
+  the semantics below.
 - Eyebrow micro-label and the name in Archivo 800; a `Metric`
   `SegmentedControl` under its micro-label and a static saved view/window label;
   Daily/Weekly is chosen only in Settings; in Weekly a `rule-soft` banner with

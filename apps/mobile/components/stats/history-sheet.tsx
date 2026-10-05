@@ -3,12 +3,12 @@ import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { HistoryPopup } from './history-popup';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import {
   SegmentedControl,
-  Sheet,
   StatePanel,
   uiFonts,
   uiGeometry,
@@ -23,7 +23,7 @@ import type {
 } from '@/src/data';
 
 // The history of one exercise or one muscle on Progress: a
-// `Sheet` holding the metric control, saved view/window, week banner and daily
+// full-height popup holding the metric control, saved view/window, week banner and daily
 // or weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
@@ -55,10 +55,6 @@ export const MUSCLE_HISTORY_METRIC_OPTIONS: readonly HistoryMetricOption<MuscleH
   { value: 'totalVolume', label: METRIC_LABELS.totalVolume },
   { value: 'workingSetCount', label: METRIC_LABELS.workingSetCount },
 ];
-
-// The sheet's body takes this share of the window; with the handle and the
-// bottom inset the sheet covers about three quarters of the screen.
-const BODY_SHARE_OF_SCREEN = 0.7;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -245,8 +241,7 @@ export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   selectedWeekKey: string | null;
   onSelectWeek: (weekKey: string | null) => void;
-  // The backdrop, Android back and the VoiceOver escape; there is no close
-  // button (`design-language.md` §4).
+  // Called after the full-height popup has closed; no visible close button.
   onDismiss: () => void;
   onRetry?: () => void;
   todayDateKey?: string;
@@ -272,30 +267,25 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   onRetry,
   todayDateKey,
 }: HistorySheetProps<TMetric>) {
-  const { height } = useWindowDimensions();
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
 
   return (
-    <Sheet dismissLabel={`Dismiss ${kind} history`} onDismiss={onDismiss} testID={prefix} visible>
-      <View style={[styles.body, { height: Math.round(height * BODY_SHARE_OF_SCREEN) }]} testID={`${prefix}-overlay`}>
-        <View style={styles.header}>
+    <HistoryPopup dismissLabel={`Dismiss ${kind} history`} accessibilityLabel={`${eyebrow}: ${title}`}
+      onDismiss={onDismiss} testID={prefix}
+      header={<View style={styles.header}>
           <Text allowFontScaling={false} style={styles.eyebrow}>
             {eyebrow}
           </Text>
           <Text
             accessibilityRole="header"
-            adjustsFontSizeToFit
             allowFontScaling={false}
-            ellipsizeMode="clip"
-            minimumFontScale={0.82}
-            numberOfLines={2}
             style={styles.title}
             testID={`${prefix}-title`}>
             {title}
           </Text>
-        </View>
-
+        </View>}>
+      <View style={styles.body} testID={`${prefix}-overlay`}>
         <View style={styles.controls}>
           <Text allowFontScaling={false} style={styles.controlLabel} testID={`${prefix}-window`}>
             {view === 'daily' ? 'Daily' : 'Weekly'} · {lookbackWeeks} {lookbackWeeks === 1 ? 'week' : 'weeks'}
@@ -366,7 +356,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           </>}
         />
       </View>
-    </Sheet>
+    </HistoryPopup>
   );
 }
 
@@ -382,7 +372,7 @@ const microLabel = {
 
 const styles = StyleSheet.create({
   body: {
-    flexShrink: 1,
+    flex: 1,
   },
   header: {
     gap: uiSpace.xs,

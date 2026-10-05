@@ -55,6 +55,8 @@ the names of its Jest tests are the specification of that component.
 2. **No Cancel, no Close.** The backdrop, Android back and the VoiceOver escape
    dismiss a sheet and write nothing. A sheet may refuse dismissal only while
    its own write or capture is in flight.
+   Full-height Progress history uses header drag and an accessible dismiss
+   action; its reachable backdrop still dismisses (`components/stats/history-popup.tsx`).
 3. **Never stack sheets.** A choice made inside a sheet (an editor's muscle
    list) swaps the sheet's body, with a `chevron-left` back to the previous
    body. A confirmation that follows a sheet opens once the sheet has gone

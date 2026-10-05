@@ -11,7 +11,7 @@ import path from 'node:path';
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
-import { StyleSheet } from 'react-native';
+import { Modal, StyleSheet } from 'react-native';
 
 import {
   default as StatsRoute,
@@ -400,12 +400,15 @@ describe('StatsScreenShell', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-row-chest-now'));
     expect(onPressMuscleHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
-    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId('stats-contributions-title')).toHaveTextContent('Chest contributions');
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: true });
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityLabel', 'Hide Chest contributions');
+    expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
+    expect(screen.getByTestId('stats-contributions')).toBeTruthy();
     fireEvent.press(screen.getByTestId('stats-contributions-total'));
     expect(onPressMuscleHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
-    expect(screen.getByTestId('stats-contributions-title')).toHaveTextContent('Chest contributions');
+    expect(screen.queryByTestId('stats-contributions')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: false });
     fireEvent.press(screen.getByTestId('stats-muscle-history-chest'));
     expect(onPressMuscleHistory).toHaveBeenCalledWith({ muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' });
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveStyle({ width: 44, minHeight: 44 });
@@ -514,6 +517,7 @@ describe('StatsScreenShell', () => {
     expect(onSelectMuscleHistoryWeek).toHaveBeenCalledWith(null); // deselect since it's already selected
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
 
@@ -1089,7 +1093,51 @@ it('returns screen-reader focus to the retained exercise row that launched histo
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
   view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
   fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+  expect(focused).not.toHaveBeenCalled();
+  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   await act(async () => {});
   expect(focused).toHaveBeenLastCalledWith(77);
+  enabled.mockRestore(); focused.mockRestore();
+});
+
+
+it('retains the disclosure control when a wide contributor changes the row layout', () => {
+  const dimensions = ReactNative.Dimensions.get('window');
+  act(() => ReactNative.Dimensions.set({ window: { width: 430, height: 900, scale: 1, fontScale: 1 } }));
+  const summary = buildSummary();
+  const muscle = summary.muscles[0];
+  muscle.exercises = [{ ...muscle, exerciseDefinitionId: 'wide', displayName: 'Wide contributor', role: 'primary',
+    current: { ...muscle.current, workingSetCount: 1234567890123456 } }];
+  renderStatsScreenShell({ summary });
+  const disclosure = screen.getByTestId('stats-muscle-select-chest');
+  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'row' });
+  fireEvent.press(disclosure);
+  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'column' });
+  expect(screen.getByTestId('stats-muscle-select-chest')).toBe(disclosure);
+  fireEvent.press(disclosure);
+  expect(screen.getByTestId('stats-muscle-select-chest')).toBe(disclosure);
+  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'row' });
+  act(() => ReactNative.Dimensions.set({ window: dimensions }));
+});
+
+it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async action => {
+  let resolve!: (enabled: boolean) => void;
+  const enabled = jest.spyOn(ReactNative.AccessibilityInfo, 'isScreenReaderEnabled')
+    .mockImplementation(() => new Promise<boolean>(done => { resolve = done; }));
+  const focused = jest.spyOn(ReactNative.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
+  const props = buildShellProps({ viewMode: 'exercise', exerciseListItems: [
+    { id: 'lift', name: 'Lift', workingSetCount: 1, totalVolume: 100, estimatedOneRepMax: null, lastCompletedAt: null },
+  ] });
+  const view = render(<StatsScreenShell {...props} />);
+  const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
+  act(() => row.props.ref({ canonical: { nativeTag: 77 } }));
+  fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
+  view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
+  fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+  if (action === 'unmount') view.unmount();
+  else fireEvent.press(screen.getByTestId('stats-exercise-row-lift', { includeHiddenElements: true }));
+  await act(async () => resolve(true));
+  expect(focused).not.toHaveBeenCalled();
   enabled.mockRestore(); focused.mockRestore();
 });

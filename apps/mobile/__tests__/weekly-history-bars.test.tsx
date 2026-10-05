@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { FlatList, ScrollView, StyleSheet } from 'react-native';
+import { FlatList, Modal, ScrollView, StyleSheet } from 'react-native';
 
 import { WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { HistorySheet, EXERCISE_HISTORY_METRIC_OPTIONS } from '@/components/stats/history-sheet';
@@ -167,11 +167,12 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
     fireEvent.press(screen.getByTestId('stats-exercise-history-retry'));
     expect(retry).toHaveBeenCalledTimes(1);
   } else expect(screen.queryByTestId('stats-exercise-history-retry')).toBeNull();
-  // The existing modal escape/back callbacks are still wired to sheet dismissal.
-  fireEvent(screen.getByTestId('stats-exercise-history-modal'), 'requestClose');
+  // Back starts the exit; native completion closes once even after escape.
+  fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose');
+  expect(dismiss).not.toHaveBeenCalled();
+  fireEvent(screen.UNSAFE_getByType(Modal), 'accessibilityEscape');
+  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   expect(dismiss).toHaveBeenCalledTimes(1);
-  fireEvent(screen.getByTestId('stats-exercise-history'), 'accessibilityEscape');
-  expect(dismiss).toHaveBeenCalledTimes(2);
 });
 
 it('formats fractional Top weight averages to one decimal without floating-point noise', () => {

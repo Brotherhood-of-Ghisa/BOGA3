@@ -16,6 +16,7 @@
  */
 
 import * as mockReact from 'react';
+import { Modal } from 'react-native';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { uiRoles } from '@/components/ui';
 
@@ -193,6 +194,7 @@ describe('Stats over real data', () => {
     } else expect(panel.queryByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`)).toBeNull();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
   it('keeps a selected day within bounds and resets it to today when history is shortened', async () => {
@@ -210,6 +212,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
       .toHaveProp('accessibilityState', { selected: true });
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
   it('shows the empty state on an empty database', async () => {
@@ -322,6 +325,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
 
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
   });
 
@@ -352,6 +356,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
@@ -383,6 +388,7 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
     expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-/)).toHaveLength(1);
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
   });
@@ -449,8 +455,9 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent('Chest');
 
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
-    expect(screen.getByTestId('stats-browse-exercises')).toBeTruthy();
+    expect(screen.getByTestId('stats-view-mode-chip-exercise')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-row-chest')).toBeTruthy();
   });
 
@@ -463,6 +470,52 @@ describe('Stats over real data', () => {
   const select = (id: string) => fireEvent.press(screen.getByTestId(`stats-muscle-select-${id}`));
   const value = (id: string, column: string) => screen.getByTestId(`stats-muscle-row-${id}-${column}`);
   const total = (column: string) => screen.getByTestId(`stats-contributions-total-${column}`);
+
+  it('pins one switch outside either scroll, with Sessions last even for an empty search', async () => {
+    await renderMuscles();
+    const assertPinned = (scrollId: string) => {
+      expect(within(screen.getByTestId('stats-view-switch')).getAllByRole('tab')).toHaveLength(2);
+      expect(within(screen.getByTestId(scrollId)).queryByTestId('stats-view-mode-chip-exercise')).toBeNull();
+      expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
+      const content = within(screen.getByTestId(scrollId)).getAllByTestId(
+        /^stats-(muscle-table|exercise-list|exercise-list-empty|sessions-link)$/
+      );
+      expect(content.at(-1)).toHaveProp('testID', 'stats-sessions-link');
+    };
+    assertPinned('stats-scroll');
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
+    assertPinned('stats-exercise-list-scroll');
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'no matching exercise');
+    expect(screen.getByTestId('stats-exercise-list-empty')).toBeTruthy();
+    assertPinned('stats-exercise-list-scroll');
+    fireEvent.press(screen.getByTestId('stats-sessions-link'));
+    expect(mockPush).toHaveBeenCalledWith('/sessions');
+  });
+
+  it('discloses one block directly under its muscle and collapses on a repeated chevron', async () => {
+    await renderMuscles();
+    const order = () => within(screen.getByTestId('stats-muscle-table'))
+      .getAllByTestId(/^stats-muscle-row-[a-z_]+$|^stats-contributions$|^stats-family-header-/)
+      .map(node => node.props.testID as string);
+    const collapsed = order();
+    const expanded = (id: string) => {
+      const result = [...collapsed];
+      result.splice(result.indexOf(`stats-muscle-row-${id}`) + 1, 0, 'stats-contributions');
+      return result;
+    };
+    select('quads');
+    expect(order()).toEqual(expanded('quads'));
+    expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
+    select('chest');
+    expect(order()).toEqual(expanded('chest'));
+    expect(screen.getAllByTestId('stats-contributions')).toHaveLength(1);
+    expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: false });
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityLabel', 'Hide Chest contributions');
+    select('chest');
+    expect(order()).toEqual(collapsed);
+    expect(screen.queryByTestId('stats-contributions')).toBeNull();
+    expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
+  });
 
   it('defaults to the complete taxonomy table and reconciles repeated blocks in both periods', async () => {
     await renderMuscles();
@@ -486,7 +539,9 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
     expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent('Barbell Back Squat');
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
-    expect(screen.getByTestId('stats-contributions-title')).toHaveTextContent('Quads contributions');
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+    expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
+    expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
     expect(screen.getByTestId('stats-metric-chip-totalVolume')).toHaveProp('accessibilityState', { selected: true });
   });
 
@@ -549,7 +604,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-retry'));
     await waitFor(() => expect(total('now')).toHaveTextContent(String(next.muscles.find(row => row.muscleGroupId === 'quads')!.current.workingSetCount)));
-    expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
   });
 
   it('retains a same-context snapshot alongside a failed refocus, with an inline Retry', async () => {
@@ -576,6 +631,7 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(read).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
     fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
+    fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     await waitFor(() => expect(total('now')).toHaveTextContent(/^0$/));
     expect(value('quads', 'now')).toHaveTextContent(/^0$/);
   });
@@ -602,7 +658,7 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
     fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
     fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
-    fireEvent.press(screen.getByTestId('stats-browse-exercises'));
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-exercise'));
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
   });

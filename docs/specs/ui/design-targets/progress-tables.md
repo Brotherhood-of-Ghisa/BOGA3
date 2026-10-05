@@ -1,9 +1,11 @@
 # Accepted replacement target — Progress tables
 
-**Implemented and verified against the accepted direction.** On 2026-10-04 the user chose the first
+**Accepted direction, refined 2026-10-05.** On 2026-10-04 the user chose the first
 chevron proposal and asked to remove unnecessary subtitles. `/progress` now
 owns the table implementation and `/stats-history` re-exports it. Shipping PRs
-carry real-data Jest, native captures and the comparison against this target.
+carry real-data Jest, native captures and comparison against this target. The
+2026-10-05 brief pins the view switch and makes contributions a row accordion;
+these written rules supersede the image's placement and repeat-tap behavior.
 The retained palette, repository typography and native frame follow the written
 brief; the full taxonomy scrolls beyond the image's illustrative excerpt.
 Current rules live in this record, `../screen-map.md` and
@@ -19,16 +21,17 @@ Current rules live in this record, `../screen-map.md` and
   table. It illustrates hierarchy and separate hit targets, not a fixed row
   count, viewport fit, dataset or target-attainment palette.
 - This brief replaces the landing portion of [Progress](progress.md). Its
-  accepted history-sheet, Daily/Weekly heatmap, exercise-history route and
-  Sessions presentation remain the visual references for those surfaces.
+  Daily/Weekly heatmap, exercise-history route and Sessions presentation remain
+  references; [History popup](history-popup.md) owns its full-height container.
 - [Design language](../design-language.md), repository tokens, accessibility and
   [training metrics](../../tech/training-metrics-contract.md) govern production.
   The written rules below govern where illustrative images differ.
 
 ## Brief and copy
 
-- One `ScreenScroll` on `paper`, above the existing fixed `MainTabs`. Start with
-  the existing joined period control: configured `N weeks` / `This week`, or
+- One pinned `By Exercise` / `By Muscle` control above `ScreenScroll` on
+  `paper` and the existing fixed `MainTabs`. The scroll starts with the
+  joined period control: configured `N weeks` / `This week`, or
   only `This week` when N=1. The configured window remains the default. A second
   joined control offers `Working sets` / `Volume`, initially Working sets.
   Use one comparison label, `vs previous week` or `vs previous N weeks`; the
@@ -43,16 +46,16 @@ Current rules live in this record, `../screen-map.md` and
   separate selection button: right when unselected, down when selected. An ink
   left rule marks the selected row. Numeric cells are static. Selection is
   transient screen state; no new durable preference is needed.
-- The inline `<muscle> contributions` section follows the muscle table. Use
+- One contribution block expands directly beneath its muscle row, before the
+  next muscle/family, without a large contribution title. Use
   `Exercise | Now | Previous | Change`; individual exercise names open history.
   Optional Primary/Secondary captions explain involvement. `Total` is plain
   data, without a link, chevron or press action. Do not add `Working sets
   involving <muscle>`, `Name: history`, tap instructions or generic footnotes.
-- Keep `Browse exercises` and `Sessions` as quiet link rows below the content.
-  Browse exercises opens the retained exercise table in the same screen,
-  preserving its search, sort and exercise-name heatmap access; `By Muscle`
-  returns to the new landing. Sessions opens the existing `/sessions` route.
-  These controls need labels, not explanatory subtitles.
+- The pinned switch opens either view in-route, preserving exercise search,
+  sort, comparison metric, period and disclosure. Remove `Browse exercises`.
+  `Sessions` is the final scrolling link in both views (including empty/error),
+  opening `/sessions`; no fixed footer or explanatory subtitle.
 - Calculation choices remain in Settings. Do not assert unconditional warm-up
   exclusion or imply that Volume uses Working set eligibility. Add explanation
   only when needed to interpret unavailable data, coverage or an empty state.
@@ -63,23 +66,23 @@ Current rules live in this record, `../screen-map.md` and
 | Flow | Trigger and steps | Success | Failure / edge |
 | --- | --- | --- | --- |
 | Compare muscles | Open Progress; choose period or metric | All individual rows show both periods and the correct signed change | First load shows Loading; a failed read says `Could not load progress` with Retry, without raw database details; unknown values never become zero |
-| Inspect contributions | Press a muscle's chevron; bring the inline section into view | One selected muscle; exercise rows and Total reconcile with its row in both periods | Previous-only exercises remain; a successful all-zero read shows a metric-specific empty state; superseded reads cannot publish |
+| Inspect contributions | Press a muscle's chevron; press again to collapse, or select another | Zero or one expanded muscle, directly below its row; exercise rows and Total reconcile with its row in both periods | Previous-only exercises remain; a successful all-zero read shows a metric-specific empty state; superseded reads cannot publish |
 | Open individual history | Press a muscle or exercise name; dismiss its sheet | Exactly one muscle ID or exercise definition ID; previous selection, period, metric and scroll restored | Names never also select; families and Total are inert; history failure remains inline and retryable |
 | Respect Settings | Change the saved view, look-back or calculation choices; reopen/refocus | All projections use the durable active account choices; unset view opens Daily, valid saved Weekly still works | Failed writes keep the prior durable value and retry; account switches clear foreign state and ignore old responses |
-| Browse retained history | Open Browse exercises or Sessions; return | Existing exercise browsing/history and Sessions remain reachable | Legacy entry parameters adapt to this shared surface; no second landing implementation |
+| Browse retained history | Use the pinned view switch or Sessions; return | Existing exercise browsing/history and Sessions remain reachable | Legacy entry parameters adapt to this shared surface; no second landing implementation |
 
 ### Interaction and layout
 
 The name link and chevron are sibling press targets, each at least 44pt in both
 dimensions, with no pressable row enclosing them. Accessible labels are
-`Open <muscle> history` and `Show <muscle> contributions`; the chevron exposes
-selected state. Pressing the already-selected chevron keeps that selection.
+`Open <muscle> history` and `Show` / `Hide <muscle> contributions`; the chevron
+exposes `accessibilityState.expanded`. Repeating the chevron collapses it.
 Family headings have heading semantics and no action, including one-muscle
 families. Exercise links name the definition; totals have no button semantics.
 
 Default entry has no selected muscle and no contribution section. Selecting a
-chevron brings the inline contribution heading into view once laid out, with
-accessible focus on that heading when appropriate. Selection is independent
+chevron leaves focus on that button and expands the next block without an
+automatic scroll. Disclosure is independent
 of a history target and its metric/day/week selection. Dismissal returns focus
 to the launching name and preserves the underlying scroll offset. A newer
 selection, period, policy or account must never inherit an older result.
@@ -141,7 +144,8 @@ and the retained [history target](progress.md#history-sheets-and-heatmaps-dlm-t0
 | State | Required result |
 | --- | --- |
 | Default table | Working sets, configured calendar window, all taxonomy rows, no selection |
-| Selected contributions | Separate chevron/name actions; reconciled exercise rows and inert Total |
+| Expanded / collapsed contributions | Separate chevron/name actions; one block directly after its row, repeat tap collapses; reconciled rows and inert Total |
+| Pinned views / final Sessions | Switch visible over either scrolled body; retained search/sort; Sessions last, including empty/error |
 | Zero current / previous-only | Muscle 0 vs 3 → −3; its previous-only exercise remains explainable |
 | All-zero / no history | Keep muscle rows and name links; when the selected metric has no eligible contributors, say `No working sets for <muscle> in either period` or `No volume-included sets for <muscle> in either period` only after a successful read; included zero-load sets retain exercise rows with real zeros; retained empty history sheet remains available |
 | Volume-only / empty calculation column | Zero working sets can coexist with Volume; contributors and empty copy follow the selected metric; valid zero load is not missing data |
@@ -155,3 +159,12 @@ Implementation acceptance requires new native captures of relevant states at
 small and large widths, compared with this target, plus the agreed `./boga`
 gates and meaningful real-data Jest checks. Record captures and material
 differences in the shipping PR; retain Weekly coverage and all quality targets.
+
+## Rendered refinement verification
+
+Native 375pt/430pt captures show the pinned switch while scrolled, inline
+expansion/collapse/replacement, Sessions last in both views, empty contributors,
+long names and large/incomplete volume. The operator approved 375pt native
+evidence plus 320pt Jest layout checks because the installed runtime has no
+320pt iPhone. The written refinement governs switch/accordion placement;
+taxonomy, figures and active palette remain repository-driven.

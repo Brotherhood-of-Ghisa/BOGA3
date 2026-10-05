@@ -1,5 +1,5 @@
-import { Fragment, useRef, type ComponentRef, type RefObject } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { Fragment, useRef, type ComponentRef } from 'react';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Icon, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressComparison, ProgressExerciseComparison, ProgressMuscleComparison, ProgressPeriodValues } from '@/src/data';
 import { compactVolumeFigure } from '@/src/exercise-calculations/analytics';
@@ -23,11 +23,10 @@ type Props = {
   weeks: number; weeklyTarget: number; onSelect: (id: string) => void;
   onMuscleHistory: (row: ProgressMuscleComparison, target: ComponentRef<typeof View> | null) => void;
   onExerciseHistory: (row: ProgressExerciseComparison, target: ComponentRef<typeof View> | null) => void;
-  headingRef: RefObject<ComponentRef<typeof View> | null>; onContributionLayout: (event: LayoutChangeEvent) => void;
 };
 
 export function ProgressTables(props: Props) {
-  const { muscles, metric, selectedId, weeks, weeklyTarget, onSelect, onMuscleHistory, onExerciseHistory, headingRef, onContributionLayout } = props;
+  const { muscles, metric, selectedId, weeks, weeklyTarget, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasMetric(row, metric)) ?? [];
@@ -50,23 +49,21 @@ export function ProgressTables(props: Props) {
         <MuscleRow row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical}
           selected={row.muscleGroupId === selectedId} weeks={weeks} weeklyTarget={weeklyTarget}
           onSelect={onSelect} onHistory={onMuscleHistory} />
+        {row.muscleGroupId === selectedId && selected ? <View
+          testID="stats-contributions" style={styles.contributions}>
+          <Headers name="Exercise" columns={columns} stacked={stacked} vertical={vertical} metric={metric} />
+          {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
+            body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${selected.displayName} in either period`} /> : exercises.map(row =>
+            <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} columns={columns}
+              stacked={stacked} vertical={vertical} onHistory={onExerciseHistory} />)}
+          <View style={[styles.row, styles.dataRow, styles.total, stacked && styles.stacked]} testID="stats-contributions-total">
+            <Text allowFontScaling={false} style={[styles.name, styles.nameCell]}>Total</Text>
+            <Values row={selected} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix="stats-contributions-total" />
+            <RowCoverage row={selected} metric={metric} prefix="stats-contributions-total" />
+          </View>
+        </View> : null}
       </Fragment>)}
     </View>
-    {selected ? <View onLayout={onContributionLayout} testID="stats-contributions" style={styles.table}>
-      <View ref={headingRef} accessible accessibilityRole="header" accessibilityLabel={`${selected.displayName} contributions`}>
-        <Text allowFontScaling={false} style={styles.title} testID="stats-contributions-title">{selected.displayName} contributions</Text>
-      </View>
-      <Headers name="Exercise" columns={columns} stacked={stacked} vertical={vertical} metric={metric} />
-      {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
-        body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${selected.displayName} in either period`} /> : exercises.map(row =>
-        <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} columns={columns}
-          stacked={stacked} vertical={vertical} onHistory={onExerciseHistory} />)}
-      <View style={[styles.row, styles.dataRow, styles.total, stacked && styles.stacked]} testID="stats-contributions-total">
-        <Text allowFontScaling={false} style={[styles.name, styles.nameCell]}>Total</Text>
-        <Values row={selected} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix="stats-contributions-total" />
-        <RowCoverage row={selected} metric={metric} prefix="stats-contributions-total" />
-      </View>
-    </View> : null}
   </>;
 }
 
@@ -114,25 +111,24 @@ function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, w
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
   return <View style={[styles.row, styles.dataRow, stacked && styles.stacked, { backgroundColor: shade }, selected && styles.selected]}
     testID={prefix}>
-    <View style={[styles.nameActions, !stacked && styles.nameCell]}>
+    <View style={[styles.nameActions, !stacked && styles.nameCell, stacked && styles.stackedName]}>
       <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
         onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
         <Text allowFontScaling={false} style={[styles.name, styles.link]}>{row.displayName}</Text>
       </Pressable>
-      {stacked ? <Selection row={row} selected={selected} onSelect={onSelect} /> : null}
     </View>
     <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${metric === 'totalVolume' ? 'kg·reps per side. ' : 'Working sets. '}Colour: ${row.current.workingSetCount} of ${weeklyTarget * weeks} working sets; ${weeklyTarget} per week over ${weeks} weeks${metric === 'totalVolume' ? `. Now ${coverage(row.current) ?? 'complete volume'}. Previous ${coverage(row.previous) ?? 'complete volume'}` : ''}`}
       style={stacked ? styles.fullWidth : undefined}>
       <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={prefix} />
     </View>
-    {!stacked ? <Selection row={row} selected={selected} onSelect={onSelect} /> : null}
+    <Selection row={row} selected={selected} stacked={stacked} onSelect={onSelect} />
     <RowCoverage row={row} metric={metric} prefix={prefix} />
   </View>;
 }
 
-function Selection({ row, selected, onSelect }: { row: ProgressMuscleComparison; selected: boolean; onSelect: Props['onSelect'] }) {
-  return <Pressable accessibilityRole="button" accessibilityLabel={`Show ${row.displayName} contributions`}
-    accessibilityState={{ selected }} onPress={() => onSelect(row.muscleGroupId)} style={styles.chevron}
+function Selection({ row, selected, stacked, onSelect }: { row: ProgressMuscleComparison; selected: boolean; stacked: boolean; onSelect: Props['onSelect'] }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
+    accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={[styles.chevron, stacked && styles.stackedChevron]}
     testID={`stats-muscle-select-${row.muscleGroupId}`}>
     <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
   </Pressable>;
@@ -155,6 +151,7 @@ function ExerciseRow({ row, metric, columns, stacked, vertical, onHistory }: {
 
 const styles = StyleSheet.create({
   table: { gap: uiSpace.sm },
+  contributions: { gap: uiSpace.sm, paddingBottom: uiSpace.md },
   title: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xl,
     lineHeight: uiTypography.lineHeight.xl, color: uiRoles.ink, paddingVertical: uiSpace.sm },
   family: { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs,
@@ -170,6 +167,8 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
   nameCell: { flex: 1, minWidth: uiGeometry.tapTarget },
   nameActions: { flexDirection: 'row', alignItems: 'center' },
+  stackedName: { paddingRight: uiGeometry.tapTarget },
+  stackedChevron: { position: 'absolute', top: 0, right: uiSpace.xs },
   nameLink: { flex: 1, minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center', paddingVertical: uiSpace.sm },
   name: { fontFamily: uiFonts.display.family, fontWeight: '600', fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink },
