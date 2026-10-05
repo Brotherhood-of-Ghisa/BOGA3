@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.9
 
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
+import { AUTH_RETRY_AFTER_SECONDS, isTokenRejection } from './auth-upstream.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
@@ -88,6 +89,7 @@ class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
   }
@@ -171,17 +173,61 @@ const grantClientId = (grant: JsonObject): string | null => {
   return null;
 };
 
-const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> => {
-  const accessToken = extractBearerToken(request);
-  const authClient = createServerClient(getAnonKey());
-  const {
-    data: { user },
-    error,
-  } = await authClient.auth.getUser(accessToken);
+const authUnavailable = (step: string, status: unknown): ApiError => {
+  console.error('[agent-api] Supabase Auth unavailable', { step, status: status ?? null });
+  return new ApiError(
+    503,
+    'UPSTREAM_UNAVAILABLE',
+    'Authorization could not be verified. Try again shortly.',
+    AUTH_RETRY_AFTER_SECONDS,
+  );
+};
 
+const getValidatedUser = async (accessToken: string): Promise<{ id: string }> => {
+  let result;
+  try {
+    result = await createServerClient(getAnonKey()).auth.getUser(accessToken);
+  } catch {
+    throw authUnavailable('user', null);
+  }
+  const { data: { user }, error } = result;
+  if (error && !isTokenRejection(error.status)) {
+    throw authUnavailable('user', error.status);
+  }
   if (error || !user) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required.');
   }
+  return user;
+};
+
+const fetchActiveGrants = async (accessToken: string): Promise<JsonObject[]> => {
+  let response: Response;
+  try {
+    response = await fetch(`${getSupabaseUrl()}/auth/v1/user/oauth/grants`, {
+      headers: {
+        apikey: getAnonKey(),
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+  } catch {
+    throw authUnavailable('grants', null);
+  }
+  if (isTokenRejection(response.status)) {
+    throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
+  }
+  if (!response.ok) {
+    throw authUnavailable('grants', response.status);
+  }
+  try {
+    return normalizeGrantRows(await response.json());
+  } catch {
+    throw authUnavailable('grants', response.status);
+  }
+};
+
+const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> => {
+  const accessToken = extractBearerToken(request);
+  const user = await getValidatedUser(accessToken);
 
   // Decode claims only after Supabase Auth has validated the token and live
   // session. Identity still comes from the validated Auth user, never from an
@@ -202,16 +248,7 @@ const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> 
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
 
-  const grantResponse = await fetch(`${getSupabaseUrl()}/auth/v1/user/oauth/grants`, {
-    headers: {
-      apikey: getAnonKey(),
-      authorization: `Bearer ${accessToken}`,
-    },
-  });
-  if (!grantResponse.ok) {
-    throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
-  }
-  const grants = normalizeGrantRows(await grantResponse.json());
+  const grants = await fetchActiveGrants(accessToken);
   if (!grants.some((grant) => grantClientId(grant) === clientId)) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
@@ -410,6 +447,9 @@ const errorResponse = (requestId: string, error: unknown): Response => {
   const headers: Record<string, string> = apiError.status === 401
     ? { 'www-authenticate': 'Bearer realm="boga-agent-api"' }
     : {};
+  if (apiError.retryAfterSeconds !== undefined) {
+    headers['retry-after'] = String(apiError.retryAfterSeconds);
+  }
   return jsonResponse(
     requestId,
     apiError.status,
