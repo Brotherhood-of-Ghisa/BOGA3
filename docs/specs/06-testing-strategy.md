@@ -84,7 +84,7 @@ codebase areas/changes should trigger it — by path/area). Infrastructure value
 | `npm test` | Full Jest unit/integration suite. Bare `jest` — deliberately **no `--forceExit`** (see *Unit-test hang safety*). Excludes infra-dependent sync tests (they live behind `test:sync:infra`). | none | Any `apps/mobile/**` change. Part of the fast gate (`./boga test fast`) and CI. |
 | `npm run test:sync` | `jest __tests__/sync` — the sync-focused subset (still infra-free; the infra-dependent files in that dir fail fast without an endpoint and are normally run via `test:sync:infra`). | none | Targeted feedback while editing mobile sync code under `apps/mobile/__tests__/sync/**` or the sync runtime it covers. |
 | `npm run test:sync:infra` | Runs the **infra-dependent** sync tests by path, among them: `drift-check.test.ts` (shells out to `check:sync-drift --strict`), `cycle-round-trip.test.ts` (real push→server-LWW→pull→local-LWW round trip, incl. a wiped-client reinstall re-pull), `cycle-multidevice-lww.test.ts` (two local DBs sharing one server: end-to-end LWW collisions, multi-device convergence, future-clock-clamp reconciliation), `auth-required-envelope.test.ts` (unauthenticated cycle is a clean no-op), and `cycle-fresh-device-and-account-switch.test.ts` (a fresh device restores a multi-page account id-for-id; a device that held another account re-syncs as a new one with no sign-out, server rows ordered so stale cursors would fail the local FK check — dedicated `user_e`/`user_f`, server rows reset with the service role per test). | local Supabase + Docker. Reads `SYNC_TEST_SUPABASE_URL` / `SYNC_TEST_SUPABASE_ANON_KEY` (and `SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY` for fixture resets) — these normally point at **this worktree's own local stack** (`API_URL`/`ANON_KEY` from `supabase status -o env`); it is **runnable locally, not a deferred/remote lane**. | Changes to the mobile sync cycle, client Drizzle schemas, the migration bundle, or the wire contract under `apps/mobile/src/**` sync code and `apps/mobile/__tests__/sync/**`. |
-| `npm run test:handles` | Open-handle guard: `jest --detectOpenHandles --silent`, serial. Surfaces any leaked handle (unclosed connection, lingering timer, real Supabase transport) with a stack after tests pass. Can be scoped (e.g. `-- sync-cycle`). | none | Any change that touches timers, connections, async teardown, or test fixtures. Part of CI; **not** in any gate aggregate — run `./boga test handles` before opening a PR. |
+| `npm run test:handles` | Optional open-handle diagnostic: `jest --detectOpenHandles --silent`, serial. Reports lingering resources (unclosed connection, timer, real Supabase transport) with a stack after tests pass. Can be scoped (e.g. `-- sync-cycle`). | none | Run manually to investigate a Jest shutdown warning or hang (`./boga test handles`). Outside CI and every gate aggregate; not required before a PR. |
 | `npm run test:coverage` | `jest --coverage --silent`: the `npm test` suite instrumented with Babel/istanbul. Counts every `app/**`, `components/**` and `src/**` source file (`collectCoverageFrom` in `jest.config.js`), so an untested file reports 0% rather than dropping out. Prints totals; writes `coverage/coverage-summary.json` and the per-file HTML report `coverage/lcov-report/index.html`. Fails below the global floor of 80% branches / 80% lines (`coverageThreshold`; spec 02, "Quality targets"). | none | Once on the finished change, before the PR (spec 02, "Quality targets"); also whenever you want to see which lines/branches a change leaves untested. Not in CI and **not** in any gate aggregate — run by name (`./boga test jest-coverage`). |
 | `npm run db:generate` | `drizzle-kit generate` + `tsx scripts/bundle-migrations.ts`: regenerates `drizzle/*.sql` AND the committed runtime bundle `drizzle/migrations.generated.ts`. Idempotent. | none | Any schema change under `apps/mobile/src/data/**` / `apps/mobile/drizzle/**`. Run it and commit the regenerated artifacts. |
 | `npm run db:generate:canary` | Alias of `db:generate`. Intended as a migration-artifact drift canary: re-run it and confirm a clean working tree (no uncommitted diff) to prove the generated SQL/bundle match the schema. NOT wired into any gate or CI. | none | Same triggers as `db:generate`; use when you want to *verify* (rather than write) that the bundle is current. |
@@ -246,7 +246,7 @@ screenshots are the visual evidence.
   renames an id a flow taps fails on the PR even when that flow's lane was not
   required), installs the mobile workspace, runs
   mobile lint/typecheck/Jest, runs the locked `agent-auth-web` and `mcp-unit`
-  wrappers in their workspaces, then runs the mobile open-handle guard. These
+  wrappers in their workspaces. These
   are all infra-free lanes marked CI-enabled in the registry.
 - **Not in CI:** the iOS Maestro slow gates (`boga test frontend`) and the
   local-Supabase agent/sync/MCP contract suites (`boga test backend`) are local-only,
@@ -376,10 +376,13 @@ its own (sync, tombstones); otherwise the screen tests cover the query.
     `jest.config.js` `testTimeout` (15s) so it fails loudly instead of stalling;
   - a leaked handle that keeps the process alive AFTER tests pass (unclosed
     connection, lingering timer, real Supabase transport) is caught by the CI step
-    timeout (fast loud failure) and diagnosed by the open-handle guard.
-- Open-handle guard: `npm run test:handles` runs the suite serially with
-  `--detectOpenHandles`, surfacing any leaking handle with a stack. It is a
-  dedicated CI step and can be scoped locally (e.g. `npm run test:handles -- sync-cycle`).
+    timeout (fast loud failure). Parallel Jest may force-stop a leaking worker
+    and only warn; a passing run does not prove every worker shut down cleanly.
+- Optional open-handle diagnostic: `./boga test handles` runs the suite
+  serially with `--detectOpenHandles`, reporting lingering resources with a
+  stack. Use it manually to investigate shutdown warnings or hangs. It runs
+  outside CI and every gate aggregate and is not a PR requirement. It can be
+  scoped locally (e.g. `npm run test:handles -- sync-cycle`).
 - Safe-by-default mocking: `apps/mobile/jest.setup.ts` mocks
   `@supabase/supabase-js` `createClient` to an inert client (no socket, no GoTrue
   auto-refresh timer), so no suite can construct a real Supabase transport by
