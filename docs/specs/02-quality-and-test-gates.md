@@ -104,7 +104,7 @@ get from `./boga timings` or a run.
 | meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~32s |
 | agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~2.7s |
 | mcp-unit | `./boga test mcp-unit` | `boga test fast` (repo half) | ✅ | ~3.5s |
-| handles | `./boga test handles` | — (run by name) | ✅ | ~1.3m |
+| handles | `./boga test handles` | — (run by name) | ❌ | ~1.3m |
 | jest-sync | `./boga test jest-sync` | — (run by name) | ❌ | N/A |
 | jest-coverage | `./boga test jest-coverage` | — (run by name) | ❌ | ~22s |
 | complexity | `./boga test complexity` | — (run by name) | ❌ | ~13s |
@@ -139,10 +139,9 @@ get from `./boga timings` or a run.
 
 Two traps this table exists to kill:
 
-- **`test:handles` is the one CI lane outside every gate aggregate** (registry
-  gate `extra`), so a green local `boga test fast` is **not** the same as a green
-  CI run. Run `./boga test handles` yourself when you touch timers, sockets,
-  subscriptions, or async teardown.
+- **`test:handles` is an optional diagnostic** (registry gate `extra`). It
+  runs outside CI and every gate aggregate. Use `./boga test handles` when
+  investigating a Jest shutdown warning or hang; it is not a PR requirement.
 - **Two lanes cross the FE/BE line, and they are NOT interchangeable:**
   **sync-infra** is a mobile jest body driving the *real* `runSyncCycle` against a
   *real* Supabase endpoint — breadth coverage (LWW, multi-device, drift, a
@@ -306,12 +305,13 @@ opening the PR**, and lists all three in the PR's Tests table. All must be green
 CI (`.github/workflows/ci.yml`) runs every infra-free lane marked `CI? ✅`:
 mobile `lint`, `typecheck`, and `jest-full`; repository `docs-check` and
 `meta-tests` (including stubbed Android launcher/SDK regression fixtures);
-the consent-web `agent-auth-web` lane; the MCP `mcp-unit` lane;
-and the extra `handles` guard. It installs each workspace from its own lockfile.
-`test:handles` is `jest --detectOpenHandles`; CI runs it on every PR, so you only
-need it locally when you touched timers, sockets, subscriptions, or async
-teardown. `npm test` is deliberately bare `jest` (no `--forceExit`) so leaked
-handles surface — don't add it.
+the consent-web `agent-auth-web` lane; and the MCP `mcp-unit` lane.
+It installs each workspace from its own lockfile.
+`test:handles` is an optional local `jest --detectOpenHandles` diagnostic for
+shutdown warnings or hangs; CI does not rerun the suite with it. `npm test`
+remains bare `jest` (no `--forceExit`), with the CI step timeout bounding a
+process that hangs. Jest may force-stop a leaking worker and only warn, so
+investigate shutdown warnings with the optional diagnostic.
 
 **Everything else is local-only** (see the `CI?` column in the lane matrix). The
 backend/sync-v2 suites are CI-*able* but kept local by choice; the Maestro iOS

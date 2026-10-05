@@ -960,12 +960,16 @@ cd apps/mobile
 npm run lint
 npm run typecheck
 npm run test
-npm run test:handles   # serial --detectOpenHandles guard; fails (with a stack) on any leaked handle
 npm run test:coverage  # instrumented run; fails under 80% branches/lines; report in coverage/lcov-report/index.html
 npm run lint:complexity  # per-function complexity limits; pre-existing offenders grandfathered
 npm run lint:deps        # import-direction rules (dependency-cruiser); pre-existing violations grandfathered
 npm run db:generate:canary
 ```
+
+For a Jest shutdown warning or hang, optionally run `./boga test handles`
+from the repository root. This diagnostic reports lingering resources with
+their stacks; it runs outside CI and is not a PR requirement. To investigate
+one area, use `npm run test:handles -- sync-cycle` from `apps/mobile`.
 
 ### E2E / simulator runtime (apps/mobile)
 
