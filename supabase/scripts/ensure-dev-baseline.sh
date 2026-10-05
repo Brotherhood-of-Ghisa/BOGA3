@@ -94,6 +94,11 @@ fi
 
 apply_pending_local_migrations
 
+# Group boards, records and the stream are built by the group-eval worker; with
+# no kick URL its queue never drains (the gate baseline configures the same).
+echo "[dev-baseline] pointing the group-eval kick at this stack's Edge Function"
+"${SCRIPT_DIR}/group-eval-configure.sh"
+
 echo "[dev-baseline] seeding human development accounts (idempotent)"
 "${SCRIPT_DIR}/auth-provision-dev-accounts.sh"
 
@@ -114,5 +119,10 @@ fi
 # the recent sessions are pushed, so the share trigger puts them in the group.
 echo "[dev-baseline] seeding the Dev crew group (history@ owner, b@ member) and recent sessions (idempotent)"
 (cd "${SCRIPT_DIR}/../../apps/mobile" && npm run seed:dev-groups)
+
+# The app reads groups only through competition protocol 4, which migrations
+# install pending; activate it once (one-way, a no-op when already active).
+echo "[dev-baseline] activating group competitions (protocol 4; idempotent)"
+"${SCRIPT_DIR}/group-competitions-activate.sh"
 
 echo "[dev-baseline] dev baseline ready — dev data preserved, no reset performed"

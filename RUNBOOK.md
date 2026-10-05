@@ -495,6 +495,10 @@ rich imported history into the `history@dev.local` account, and seed the
 `Dev crew` group (`npm run seed:dev-groups`): owned by `history@dev.local`, with
 `b@dev.local` as a member, both memberships backdated, and the last four weeks of
 sessions for both pushed so the group's stream and week board have content.
+It also points the group-eval kick at the dev stack's Edge Function (boards and
+records are built by that worker) and activates group competitions (protocol
+4, which the app reads groups through and migrations install pending); both
+are idempotent, and activation is one-way except by `boga db dev-reset`.
 `a@dev.local` stays near-blank. The full isolation
 contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
 stack). Commands:
