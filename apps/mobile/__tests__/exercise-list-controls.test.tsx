@@ -5,12 +5,14 @@
  * screens' own tests cover what each does with a pick.
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
 import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
 
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
+  type FamilyExpansion,
+  useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
 import { uiFonts, uiRoles } from '@/components/ui';
 import {
@@ -32,12 +34,18 @@ const item = (id: string, name: string, overrides: Partial<ExerciseListItem> = {
 const bench = item('bench', 'Bench Press');
 const fly = item('fly', 'Cable Fly', { deletedAt: 1_700_000_000_000 as never });
 
+// A fixed open state: the families named are open; toggles are recorded.
+const expansion = (open: string[] = []): FamilyExpansion & { toggle: jest.Mock } => ({
+  isExpanded: (familyName) => open.includes(familyName),
+  toggle: jest.fn(),
+});
+
 const renderList = (props: Partial<Parameters<typeof ExerciseListContent>[0]> = {}) => {
-  const handlers = { onToggleFamily: jest.fn(), onPressExercise: jest.fn() };
+  const handlers = { onPressExercise: jest.fn() };
   render(
     <ExerciseListContent
       emptyText="No exercises match that filter."
-      expandedFamilies={new Set(['Chest'])}
+      familyExpansion={expansion(['Chest'])}
       items={[bench, fly]}
       sections={[{ familyName: 'Chest', count: 2, exercises: [bench, fly] }]}
       {...handlers}
@@ -105,7 +113,8 @@ describe('ExerciseListContent grouped', () => {
   ];
 
   it('heads each family with a disclosure row: count, chevron, expanded state', () => {
-    const { onToggleFamily } = renderList({ sections, expandedFamilies: new Set() });
+    const familyExpansion = expansion();
+    renderList({ sections, familyExpansion });
 
     const chest = screen.getByTestId('exercise-family-group-chest');
     expect(chest.props.accessibilityLabel).toBe('Chest exercises 1');
@@ -116,11 +125,11 @@ describe('ExerciseListContent grouped', () => {
     expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
 
     fireEvent.press(chest);
-    expect(onToggleFamily).toHaveBeenCalledWith('Chest');
+    expect(familyExpansion.toggle).toHaveBeenCalledWith('Chest');
   });
 
   it('lists an expanded family under its header', () => {
-    renderList({ expandedFamilies: new Set(['Chest']), sections });
+    renderList({ familyExpansion: expansion(['Chest']), sections });
 
     expect(screen.getByTestId('exercise-family-group-chest').props.accessibilityState).toMatchObject({
       expanded: true,
@@ -130,41 +139,113 @@ describe('ExerciseListContent grouped', () => {
 });
 
 describe('ExerciseListPreferenceControls', () => {
-  it('offers exactly two sorts with selected state and an accessible never-done toggle', () => {
+  it('lays Never-done, the host chips and Sort out in one row', () => {
+    render(
+      <ExerciseListPreferenceControls onChangePreferences={jest.fn()} preferences={DEFAULT_EXERCISE_LIST_PREFERENCES}>
+        <Text testID="host-chip">Groups</Text>
+      </ExerciseListPreferenceControls>,
+    );
+
+    const row = screen.getByTestId('exercise-list-controls');
+    expect(StyleSheet.flatten(row.props.style)).toMatchObject({ flexDirection: 'row' });
+    const order = row.props.children.flat().filter(Boolean).map((child: { props: { testID: string } }) => child.props.testID);
+    expect(order).toEqual(['exercise-list-never-done', 'host-chip', 'exercise-list-sort']);
+    // No section label or segmented control above the row any more.
+    expect(screen.queryByText('Sort')).toBeNull();
+    expect(screen.queryByText('Date range')).toBeNull();
+  });
+
+  it('Sort switches between the two orders; Never-done is a checkbox, ink while on', () => {
     const onChangePreferences = jest.fn();
     const view = render(<ExerciseListPreferenceControls onChangePreferences={onChangePreferences} preferences={DEFAULT_EXERCISE_LIST_PREFERENCES} />);
-    expect(screen.getByLabelText('Favourite').props.accessibilityState).toEqual({ selected: true });
-    fireEvent.press(screen.getByLabelText('Name A–Z'));
+
+    const sort = screen.getByLabelText('Sort: Favourite');
+    expect(sort).toHaveProp('accessibilityRole', 'button');
+    expect(sort).toHaveProp('accessibilityHint', 'Sorts by name A to Z');
+    fireEvent.press(sort);
     expect(onChangePreferences).toHaveBeenLastCalledWith({ sort: 'name' });
-    expect(screen.getByLabelText('Show never-done').props.accessibilityState).toEqual({ checked: true });
-    fireEvent.press(screen.getByLabelText('Show never-done'));
+
+    const neverDone = screen.getByLabelText('Show never-done');
+    expect(neverDone).toHaveProp('accessibilityState', { checked: true });
+    expect(within(neverDone).getByText('Never-done')).toBeTruthy();
+    expect(StyleSheet.flatten(neverDone.props.style)).toMatchObject({ backgroundColor: uiRoles.ink });
+    fireEvent.press(neverDone);
     expect(onChangePreferences).toHaveBeenLastCalledWith({ showNeverDone: false });
+
     view.rerender(<ExerciseListPreferenceControls onChangePreferences={onChangePreferences} preferences={{ ...DEFAULT_EXERCISE_LIST_PREFERENCES, sort: 'name', showNeverDone: false }} />);
-    expect(screen.getByLabelText('Name A–Z').props.accessibilityState).toEqual({ selected: true });
-    expect(screen.getByLabelText('Show never-done').props.accessibilityState).toEqual({ checked: false });
-    expect(screen.queryByText('Date range')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Sort: A–Z'));
+    expect(onChangePreferences).toHaveBeenLastCalledWith({ sort: 'favourite' });
+    expect(screen.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: false });
+    expect(StyleSheet.flatten(screen.getByLabelText('Show never-done').props.style)).toMatchObject({
+      backgroundColor: uiRoles.surface,
+    });
   });
 });
 
-it('reveals search matches without changing ordinary expansion and restores collapse on clear', () => {
-  const onToggleFamily = jest.fn();
-  const props = { items: [bench], sections: [{ familyName: 'Chest', count: 1, exercises: [bench] }], expandedFamilies: new Set<string>(), emptyText: 'No matches', onToggleFamily, onPressExercise: jest.fn() };
-  const view = render(<ExerciseListContent {...props} isSearching />);
+describe('useFamilyExpansion', () => {
+  it('browsing: families start closed and a tap opens one', () => {
+    const { result } = renderHook(() => useFamilyExpansion(false));
+    expect(result.current.isExpanded('Chest')).toBe(false);
+
+    act(() => result.current.toggle('Chest'));
+    expect(result.current.isExpanded('Chest')).toBe(true);
+    expect(result.current.isExpanded('Back')).toBe(false);
+    act(() => result.current.toggle('Chest'));
+    expect(result.current.isExpanded('Chest')).toBe(false);
+  });
+
+  it('searching: families start open, a tap closes one, and a new search opens them again', () => {
+    const { result, rerender } = renderHook(({ searching }: { searching: boolean }) => useFamilyExpansion(searching), {
+      initialProps: { searching: false },
+    });
+    act(() => result.current.toggle('Back'));
+
+    rerender({ searching: true });
+    expect(result.current.isExpanded('Chest')).toBe(true);
+    act(() => result.current.toggle('Chest'));
+    expect(result.current.isExpanded('Chest')).toBe(false);
+    expect(result.current.isExpanded('Back')).toBe(true);
+
+    // Clearing the search restores what was open while browsing.
+    rerender({ searching: false });
+    expect(result.current.isExpanded('Chest')).toBe(false);
+    expect(result.current.isExpanded('Back')).toBe(true);
+
+    rerender({ searching: true });
+    expect(result.current.isExpanded('Chest')).toBe(true);
+  });
+});
+
+it('a search match can be collapsed and reopened from its family header', () => {
+  const Harness = ({ searching }: { searching: boolean }) => (
+    <ExerciseListContent
+      emptyText="No matches"
+      familyExpansion={useFamilyExpansion(searching)}
+      items={[bench]}
+      onPressExercise={jest.fn()}
+      sections={[{ familyName: 'Chest', count: 1, exercises: [bench] }]}
+    />
+  );
+  const view = render(<Harness searching />);
   expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
+
   fireEvent.press(screen.getByTestId('exercise-family-group-chest'));
-  expect(onToggleFamily).not.toHaveBeenCalled();
-  view.rerender(<ExerciseListContent {...props} isSearching={false} />);
+  expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
+  fireEvent.press(screen.getByTestId('exercise-family-group-chest'));
+  expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
+
+  view.rerender(<Harness searching={false} />);
   expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
 });
 
 it('keeps empty families collapsed and disabled even when previously expanded', () => {
-  renderList({ items: [], sections: [{ familyName: 'Chest', count: 0, exercises: [] }], expandedFamilies: new Set(['Chest']) });
+  renderList({ items: [], sections: [{ familyName: 'Chest', count: 0, exercises: [] }], familyExpansion: expansion(['Chest']) });
   expect(screen.getByTestId('exercise-family-group-chest').props.accessibilityState).toMatchObject({ expanded: false, disabled: true });
 });
 
 it('replaces unknown history with loading or a retryable error, never Never done', () => {
   const onRetryHistory = jest.fn();
-  const props = { items: [bench], sections: [{ familyName: 'Chest', count: 1, exercises: [bench] }], expandedFamilies: new Set(['Chest']), emptyText: 'No matches', onToggleFamily: jest.fn(), onPressExercise: jest.fn(), onRetryHistory };
+  const props = { items: [bench], sections: [{ familyName: 'Chest', count: 1, exercises: [bench] }], familyExpansion: expansion(['Chest']), emptyText: 'No matches', onPressExercise: jest.fn(), onRetryHistory };
   const view = render(<ExerciseListContent {...props} historyStatus="loading" />);
   expect(screen.getByText('Loading exercise history…')).toBeTruthy();
   expect(screen.queryByText('Never done')).toBeNull();

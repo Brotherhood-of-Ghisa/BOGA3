@@ -1,11 +1,9 @@
-import { memo, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { ChipGroup } from '@/components/ui/chip-group';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { SegmentedControl } from '@/components/ui/segmented-control';
 import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
@@ -19,57 +17,124 @@ import type { ExerciseCatalogStatsCacheStatus } from '@/src/exercise-catalog/sta
 type PreferenceControlsProps = {
   preferences: ExerciseListPreferences;
   onChangePreferences: (patch: Partial<ExerciseListPreferences>) => void;
+  // Chips of the host's own between Never-done and Sort (the picker's Groups).
+  children?: ReactNode;
 };
 
-// One visible set of everyday controls on all three personal browsers.
-export function ExerciseListPreferenceControls({ preferences, onChangePreferences }: PreferenceControlsProps) {
+const SORT_LABELS = { favourite: 'Favourite', name: 'A–Z' } as const;
+
+// One row of everyday controls on all three personal browsers: the Never-done
+// filter, the host's own chips, and Sort, which switches between the two orders.
+export function ExerciseListPreferenceControls({ preferences, onChangePreferences, children }: PreferenceControlsProps) {
+  const nextSort = preferences.sort === 'favourite' ? 'name' : 'favourite';
   return (
-    <View style={styles.controlsRoot}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionLabel}>Sort</Text>
-      <SegmentedControl
-        onChange={(sort) => onChangePreferences({ sort })}
-        options={[{ value: 'favourite', label: 'Favourite' }, { value: 'name', label: 'Name A–Z' }]}
-        style={styles.preferenceControl}
-        testIDPrefix="exercise-list-sort"
-        value={preferences.sort}
+    <View style={styles.controlsRow} testID="exercise-list-controls">
+      <FilterChip
+        accessibilityLabel="Show never-done"
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: preferences.showNeverDone }}
+        label="Never-done"
+        on={preferences.showNeverDone}
+        onPress={() => onChangePreferences({ showNeverDone: !preferences.showNeverDone })}
+        testID="exercise-list-never-done"
       />
-      <ChipGroup
-        mode="multi"
-        onToggle={() => onChangePreferences({ showNeverDone: !preferences.showNeverDone })}
-        options={[{ value: 'never-done', label: 'Show never-done' }]}
-        style={styles.visibilityControl}
-        testIDPrefix="exercise-list-visibility"
-        values={preferences.showNeverDone ? ['never-done'] : []}
+      {children}
+      <FilterChip
+        accessibilityHint={`Sorts by ${nextSort === 'name' ? 'name A to Z' : 'favourite'}`}
+        accessibilityLabel={`Sort: ${SORT_LABELS[preferences.sort]}`}
+        accessibilityRole="button"
+        label={`Sort: ${SORT_LABELS[preferences.sort]}`}
+        on={false}
+        onPress={() => onChangePreferences({ sort: nextSort })}
+        testID="exercise-list-sort"
       />
     </View>
   );
 }
 
+type FilterChipProps = {
+  label: string;
+  on: boolean;
+  onPress: () => void;
+  testID: string;
+  accessibilityLabel: string;
+  accessibilityRole: 'button' | 'checkbox' | 'switch';
+  accessibilityState?: { checked: boolean };
+  accessibilityHint?: string;
+};
+
+// A pill one tap target tall; solid `ink` while on, so the state never rides
+// colour alone (the role and checked state carry it too). The picker's Groups
+// toggle draws the same pill.
+export function FilterChip({ label, on, onPress, testID, ...a11y }: FilterChipProps) {
+  return (
+    <Pressable
+      {...a11y}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
+      testID={testID}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipLabel, on ? styles.chipLabelOn : null]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+export type FamilyExpansion = {
+  isExpanded: (familyName: string) => boolean;
+  toggle: (familyName: string) => void;
+};
+
+const flip = (set: ReadonlySet<string>, familyName: string): ReadonlySet<string> => {
+  const next = new Set(set);
+  if (next.has(familyName)) next.delete(familyName);
+  else next.add(familyName);
+  return next;
+};
+
+// The muscle families' open state. Browsing, every family starts closed and a
+// tap opens it; searching, every family with matches starts open and a tap
+// closes it, until the search is cleared and started again.
+export function useFamilyExpansion(isSearching: boolean): FamilyExpansion {
+  const [openWhileBrowsing, setOpenWhileBrowsing] = useState<ReadonlySet<string>>(() => new Set());
+  const [closedWhileSearching, setClosedWhileSearching] = useState<ReadonlySet<string>>(() => new Set());
+  const [wasSearching, setWasSearching] = useState(isSearching);
+  if (wasSearching !== isSearching) {
+    setWasSearching(isSearching);
+    if (isSearching) setClosedWhileSearching(new Set());
+  }
+  return {
+    isExpanded: (familyName) =>
+      isSearching ? !closedWhileSearching.has(familyName) : openWhileBrowsing.has(familyName),
+    toggle: (familyName) =>
+      isSearching
+        ? setClosedWhileSearching((current) => flip(current, familyName))
+        : setOpenWhileBrowsing((current) => flip(current, familyName)),
+  };
+}
+
 type ExerciseListContentProps = {
-  isSearching?: boolean;
   historyStatus?: ExerciseCatalogStatsCacheStatus;
   onRetryHistory?: () => void;
   items: ExerciseListItem[];
   sections: ExerciseListSection[];
-  expandedFamilies: ReadonlySet<string>;
+  familyExpansion: FamilyExpansion;
   emptyText: string;
-  onToggleFamily: (familyName: string) => void;
   onPressExercise: (exercise: ExerciseListItem) => void;
   getExerciseAccessibilityLabel?: (exercise: ExerciseListItem) => string;
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
 };
 
-// The exercise list the catalogue, the session view's picker and the exercise
-// page's swap sheet share: one Card per muscle family with a disclosure row.
+// The exercise list the catalogue, the session's exercise picker and the
+// exercise page's swap sheet share: one Card per muscle family with a
+// disclosure row.
 export function ExerciseListContent({
-  isSearching = false,
   historyStatus = 'ready',
   onRetryHistory,
   items,
   sections,
-  expandedFamilies,
+  familyExpansion,
   emptyText,
-  onToggleFamily,
   onPressExercise,
   getExerciseAccessibilityLabel,
   renderActions,
@@ -98,7 +163,7 @@ export function ExerciseListContent({
       {items.length === 0 ? <StatePanel body={emptyText} fill={false} /> : null}
       {sections.map((section) => {
         const empty = section.count === 0;
-        const isExpanded = !empty && (isSearching || expandedFamilies.has(section.familyName));
+        const isExpanded = !empty && familyExpansion.isExpanded(section.familyName);
         return (
           <Card key={section.familyName}>
             <ListRow
@@ -109,7 +174,7 @@ export function ExerciseListContent({
               expanded={isExpanded}
               label={section.familyName}
               meta={<Text allowFontScaling={false} style={[styles.familyCount, empty ? styles.familyCountEmpty : null]}>{section.count}</Text>}
-              onPress={() => { if (!isSearching) onToggleFamily(section.familyName); }}
+              onPress={() => familyExpansion.toggle(section.familyName)}
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
                 <Icon
@@ -202,24 +267,38 @@ function getFamilyGroupTestId(familyName: string): string {
 }
 
 const styles = StyleSheet.create({
-  controlsRoot: {
+  // One row; on the narrowest phones the last chip wraps rather than scrolling.
+  controlsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: uiSpace.sm,
   },
-  preferenceControl: {
-    minHeight: uiGeometry.tapTarget + uiBorder.width * 2,
-  },
-  visibilityControl: {
+  chip: {
     minHeight: uiGeometry.tapTarget,
-    flexWrap: 'nowrap',
+    justifyContent: 'center',
+    paddingHorizontal: uiSpace.md,
+    backgroundColor: uiRoles.surface,
+    borderWidth: uiBorder.width,
+    borderColor: uiRoles.rule,
+    borderRadius: uiGeometry.radius.pill,
   },
-  sectionLabel: {
+  chipOn: {
+    backgroundColor: uiRoles.ink,
+    borderColor: uiRoles.ink,
+  },
+  chipPressed: {
+    backgroundColor: uiRoles.paper,
+  },
+  chipLabel: {
     fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
+    fontWeight: '600',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.ink,
+  },
+  chipLabelOn: {
+    color: uiRoles.surface,
   },
   sections: {
     gap: uiSpace.sm,

@@ -9,6 +9,11 @@ the DLM-T06 gallery on 2026-09-25.
 
 Behavior simplified by the user-agreed repo-native brief on 2026-09-25: mandatory families, two sorts and all-time row history. This intentionally replaces the earlier optional grouping, periods and Recents controls; typography, surfaces, row and disclosure styling are retained.
 
+Amended by the user on 2026-10-05: the picker leaves the in-route `Sheet` for
+its own route presented as an iOS page sheet (swipe down or Close); the
+everyday filters become one row of pills; a family opened by search can be
+closed; a pick closes the keyboard. The gallery states below were re-captured.
+
 ## Target
 
 - Vocabulary: `../design-language.md` and the app frame (`app-frame.md`).
@@ -22,24 +27,28 @@ Behavior simplified by the user-agreed repo-native brief on 2026-09-25: mandator
   (Archivo 600 `ink`), the muscles (`ink-muted`) and the stats line (Plex Mono
   `ink-muted`). A deleted exercise gets a faint `Deleted` `Tag` and faint text,
   never a warning hue (G3). The catalogue's row actions sit in the trailing slot.
-- Search is followed by a visible Sort `SegmentedControl` (`Favourite`,
-  `Name A–Z`) and checked `Show never-done` chip. No range, muscle filter,
-  grouping toggle or redundant status chips. Both preferences are local,
-  persistent and shared by catalogue, add and swap. Semantics: `ux-rules.md` §4.
+- Search is followed by one row of pills (`FilterChip`, one tap target tall):
+  `Never-done` (solid `ink` while on), the picker's `Groups`, and
+  `Sort: Favourite` / `Sort: A–Z`, which switches between the two orders. No
+  section label, range, muscle filter or redundant status chips. Both
+  preferences are local, persistent and shared by catalogue, add and swap, and
+  apply at once. Semantics: `ux-rules.md` §4.
 - The row history line is `Last: 23 Sep · 18 sessions`; include the year for
   prior-year dates, use singular `1 session`, and `Never done` without history.
   Favourite uses a fixed 180-day scoring window; history stays all-time.
-- Search expands matching families and hides empty ones; clearing restores
-  pre-search expansion. Empty results and history loading/failure have explicit
+- Search expands matching families and hides empty ones; a family's header
+  closes and reopens it while searching; clearing restores pre-search
+  expansion. Empty results and history loading/failure have explicit
   `StatePanel`s; failures offer Retry and never claim Never done.
-- The picker is a tall keyboard-aware `Sheet`: `Select Exercise` with Manage
-  (`list`) and Add new (`plus`) actions, Search and the separate `Groups` toggle
-  (solid `ink` while on), then the common browsing controls. The backdrop
-  dismisses it. Catalogue ⋮ contains management-only deleted visibility.
+- The picker is a full-height iOS page sheet on its own route: a grabber, then
+  `Select Exercise` with Manage (`list`), Add new (`plus`) and Close (`x`),
+  Search, then the filter row with `Groups`. Swiping it down closes it. A pick
+  closes the keyboard; dragging the list does too. Catalogue ⋮ contains
+  management-only deleted visibility.
 - Tapping an exercise opens its preselection `Card`: the name in Archivo 700,
   the plan's `From <date>` as a micro-label over its sets as set rows, faded as
   planned (T06-D2), and an action strip with `Add empty set` (outline) and
-  `Append plan`, the sheet's one `accent` (G6).
+  `Append plan`, the picker's one `accent` (G6).
 - `From your groups` is a micro-label over one `Card` of `ListRow`s per group,
   each saying its link state in words (`08` pattern 10). Loading, errors and
   empties are `StatePanel`s with the copy unchanged.
@@ -51,8 +60,9 @@ Device: iPhone simulator at 390pt width, light.
 
 | Screenshot (lane) | State |
 | --- | --- |
-| `picker-default` (`ios-session-view`) | the picker as it opens: grouped, every family collapsed |
-| `picker-options` (ad hoc) | visible sort and never-done controls |
+| `picker-default` (`ios-session-view`) | the picker as it opens: grouped, every family collapsed, the filter row |
+| `picker-search-collapsed` (ad hoc) | a search with one matching family closed from its header |
+| `picker-options` (ad hoc) | Never-done off and `Sort: A–Z`, applied in place |
 | `picker-preselection` (ad hoc) | a picked exercise with a plan from history |
 | `03-session-view-exercise-added` (`ios-session-view`) | the session view after `Add empty set` |
 | `exercise-swap-sheet` (ad hoc) | ⋮ → Swap exercise: the shared list in the swap sheet |
@@ -74,8 +84,8 @@ panels, and the `Groups`-only list.
 
 - The catalogue (`/exercise-catalog`) has the in-content title `Exercises`
   (T07-D1), then one row: a `SearchField`, `+` as an `accent` `IconButton` (the
-  screen's one primary, T07-D2) and ⋮. The shared Sort and Show never-done
-  controls stay beneath it. An outcome is a `Notice` above the list:
+  screen's one primary, T07-D2) and ⋮. The shared filter row stays beneath
+  it. An outcome is a `Notice` above the list:
   `Exercise created.` / `updated.` / `deleted.` / `restored.` with the
   `success` glyph (G3), and a failure in `danger`. Loading and error are
   `StatePanel`s. An empty list says why above its disabled family cards.

@@ -1,11 +1,13 @@
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ExerciseEditorModal, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-modal';
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
+  useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
 import { GroupExercisePickSheet, type GroupExercisePickTarget } from '@/components/groups/group-exercise-pick-sheet';
 import { pickInlineError } from '@/components/groups/group-state-view';
@@ -14,8 +16,8 @@ import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
+import { Notice } from '@/components/ui/notice';
 import { SearchField } from '@/components/ui/search-field';
-import { Sheet } from '@/components/ui/sheet';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { loadSuggestedExercisePlan, type ExerciseBlockHistorySuggestedPlan } from '@/src/data';
@@ -38,10 +40,6 @@ import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use
 import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
 
-// The picker is a tall sheet, so opening a preselection does not
-// resize it; with the keyboard up it shrinks to what is left.
-const PICKER_SHARE_OF_SCREEN = 0.8;
-
 export type ExercisePickerPreselectionState = {
   exercise: ExerciseListItem;
   status: 'loading' | 'ready' | 'error';
@@ -49,41 +47,37 @@ export type ExercisePickerPreselectionState = {
 };
 
 export type ExercisePickerProps = {
-  visible: boolean;
-  // Bumped by the host each time it opens the picker afresh; resets the search,
-  // preselection and Groups toggle and refreshes group links. Re-showing the
-  // picker without a bump (returning from Manage) keeps them.
-  openRequestId: number;
-  onDismiss: () => void;
+  onClose: () => void;
   onSelectExercise: (exerciseDefinitionId: string, exerciseName: string) => void;
   onAppendPlan: (
     exercise: { id: string; name: string },
     suggestion: ExerciseBlockHistorySuggestedPlan
   ) => void;
-  // The host hides the picker, navigates to the catalogue, and re-shows it on return.
+  // The host navigates to the catalogue; its back returns to the picker as left.
   onOpenManage: () => void;
+  // The host's failed add, shown above the list.
+  notice?: string | null;
 };
 
 /**
- * The session view's exercise picker, a tall `Sheet`: a filtered
- * catalogue list with shared list options, the add preselection (Add empty set
- * / Append plan), `From your groups` with its pick sheet (M25-T07), inline
- * create, and a Manage exit. It hides itself while one of its own editors or
- * sheets is open and returns when that closes.
+ * The session's exercise picker, the body of its own route
+ * (`app/session/[sessionId]/add-exercise.tsx`, an iOS page sheet: swipe down
+ * or Close to leave): a filtered catalogue list with the shared one-row
+ * filters, the add preselection (Add empty set / Append plan), `From your
+ * groups` with its pick sheet (M25-T07), inline create, and a Manage exit. A
+ * pick closes the keyboard, and scrolling the list does too.
  */
 export function ExercisePicker({
-  visible,
-  openRequestId,
-  onDismiss,
+  onClose,
   onSelectExercise,
   onAppendPlan,
   onOpenManage,
+  notice = null,
 }: ExercisePickerProps) {
   const groupLinkingUserId = useGroupLinkingUserId();
   const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
   const [searchValue, setSearchValue] = useState('');
   const [preselection, setPreselection] = useState<ExercisePickerPreselectionState | null>(null);
-  const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(() => new Set());
   const [groupsOnly, setGroupsOnly] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [groupPickTarget, setGroupPickTarget] = useState<GroupExercisePickTarget | null>(null);
@@ -92,10 +86,10 @@ export function ExercisePicker({
   const isMountedRef = useRef(true);
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
   const exerciseCatalog = useExerciseCatalog();
-  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const history = useExerciseCatalogStats('all');
   const { stats: exerciseCatalogStats, reload: reloadHistory } = history;
-  useEffect(() => { if (visible) reloadHistory(); }, [visible, reloadHistory]);
+  useEffect(() => { reloadHistory(); }, [reloadHistory]);
 
   const isCatalogLoading = exerciseCatalog.status === 'idle' || exerciseCatalog.status === 'loading';
   const catalogLoadError =
@@ -122,6 +116,7 @@ export function ExercisePicker({
       }),
     [exerciseOptions, exerciseCatalog.muscleGroups, exerciseCatalogStats, listPreferences, searchValue]
   );
+  const familyExpansion = useFamilyExpansion(listModel.isSearching);
   // "From your groups" (E0.1): only with search text or the Groups toggle on.
   const groupSections = useMemo(
     () =>
@@ -149,40 +144,9 @@ export function ExercisePicker({
     };
   }, []);
 
-  // A new open request starts from a clear picker, reset in the render that
-  // sees it; the effect below drops a pending preselection and reloads links.
-  const [shownOpenRequestId, setShownOpenRequestId] = useState(0);
-  if (shownOpenRequestId !== openRequestId) {
-    setShownOpenRequestId(openRequestId);
-    if (openRequestId !== 0) {
-      setGroupsOnly(false);
-      setSearchValue('');
-      setPreselection(null);
-    }
-  }
-
-  const { reloadLinks, refresh } = groupLinking;
-  useEffect(() => {
-    if (openRequestId === 0) {
-      return;
-    }
-    void reloadLinks();
-    void refresh();
-    preselectionRequestKeyRef.current = null;
-    // Only a new open request resets; the link loaders are stable per user.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openRequestId]);
-
   const clearPreselection = () => {
     setPreselection(null);
     preselectionRequestKeyRef.current = null;
-  };
-
-  const dismiss = () => {
-    setSearchValue('');
-    clearPreselection();
-    setGroupsOnly(false);
-    onDismiss();
   };
 
   const selectExercise = (exerciseDefinitionId: string, exerciseName: string) => {
@@ -195,7 +159,10 @@ export function ExercisePicker({
     setSearchValue(value);
   };
 
+  // A pick ends the search: the keyboard closes and the field loses focus, so
+  // the preselection's actions are in view.
   const selectListItem = (exercise: ExerciseListItem) => {
+    Keyboard.dismiss();
     const requestKey = `${exercise.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     preselectionRequestKeyRef.current = requestKey;
     setPreselection({ exercise, status: 'loading', suggestion: null });
@@ -225,24 +192,14 @@ export function ExercisePicker({
     onAppendPlan({ id: state.exercise.id, name: state.exercise.name }, suggestion);
   };
 
-  const toggleFamily = (familyName: string) => {
-    setExpandedFamilies((current) => {
-      const next = new Set(current);
-      if (next.has(familyName)) {
-        next.delete(familyName);
-      } else {
-        next.add(familyName);
-      }
-      return next;
-    });
-  };
-
   const openManage = () => {
+    Keyboard.dismiss();
     clearPreselection();
     onOpenManage();
   };
 
   const openInlineCreate = () => {
+    Keyboard.dismiss();
     clearPreselection();
     setIsCreateModalVisible(true);
   };
@@ -260,12 +217,12 @@ export function ExercisePicker({
   };
 
   const selectGroupRow = (row: PickerGroupRow) => {
+    Keyboard.dismiss();
     const selection = resolvePickerGroupSelection(row);
     if (selection.kind === 'add') {
       selectExercise(selection.exercise.id, selection.exercise.name);
       return;
     }
-    // Like the inline create editor: hide the picker while the sheet is open.
     clearPreselection();
     setGroupPickTarget({
       groupId: row.groupId,
@@ -318,68 +275,67 @@ export function ExercisePicker({
     selectExercise(exercise.id, exercise.name);
   };
 
-  const isChildOpen = isCreateModalVisible || groupPickTarget !== null || addAsNewTarget !== null;
-
-
   const appendDisabled = !preselection || preselection.status !== 'ready' || !preselection.suggestion;
   const noExercisesText = exerciseOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.';
 
   return (
     <>
-      <Sheet
-        dismissLabel="Dismiss exercise modal overlay"
-        headerActions={
-          <>
-            <IconButton
-              accessibilityLabel="Open exercise catalog manage flow"
-              name="list"
-              onPress={openManage}
-              testID="exercise-picker-manage-button"
-            />
-            <IconButton
-              accessibilityLabel="Open inline exercise create"
-              name="plus"
-              onPress={openInlineCreate}
-              testID="exercise-picker-create-button"
-            />
-          </>
-        }
-        keyboardAvoiding
-        onDismiss={dismiss}
-        testID="exercise-picker"
-        title="Select Exercise"
-        visible={visible && !isChildOpen}>
-        <View style={[styles.body, { height: height * PICKER_SHARE_OF_SCREEN }]}>
-          <View style={styles.searchRow}>
-            <View style={styles.search}>
-              <SearchField
-                accessibilityLabel="Exercise filter input"
-                autoCapitalize="none"
-                onChangeText={updateSearchValue}
-                placeholder="Search exercises or muscles"
-                testID="exercise-picker-search"
-                value={searchValue}
-              />
-            </View>
+      <View style={[styles.screen, { paddingBottom: insets.bottom }]} testID="exercise-picker">
+        {/* The page sheet's own grabber: swiping down closes it. */}
+        <View style={styles.handleArea}>
+          <View style={styles.handle} />
+        </View>
+        <View style={styles.header} testID="exercise-picker-header">
+          <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
+            Select Exercise
+          </Text>
+          <IconButton
+            accessibilityLabel="Open exercise catalog manage flow"
+            name="list"
+            onPress={openManage}
+            testID="exercise-picker-manage-button"
+          />
+          <IconButton
+            accessibilityLabel="Open inline exercise create"
+            name="plus"
+            onPress={openInlineCreate}
+            testID="exercise-picker-create-button"
+          />
+          <IconButton
+            accessibilityLabel="Close exercise picker"
+            name="x"
+            onPress={onClose}
+            testID="exercise-picker-close"
+          />
+        </View>
+        <View style={styles.controls}>
+          <SearchField
+            accessibilityLabel="Exercise filter input"
+            autoCapitalize="none"
+            onChangeText={updateSearchValue}
+            placeholder="Search exercises or muscles"
+            testID="exercise-picker-search"
+            value={searchValue}
+          />
+          <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences}>
             {groupLinkingUserId ? <PickerGroupsToggle active={groupsOnly} onToggle={toggleGroupsOnly} /> : null}
-          </View>
-          <View style={styles.optionsPanel}>
-            <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences} />
-          </View>
-          {/*
-            The filter input above keeps focus while the user picks a result.
-            With the ScrollView's default `keyboardShouldPersistTaps="never"`,
-            the first tap on a result row is consumed to dismiss the keyboard
-            instead of firing the row's `onPress`, so the exercise is never
-            selected and the sheet stays open. `"handled"` lets the tap reach
-            the row Pressables while still dismissing the keyboard on taps that
-            hit empty list space.
-          */}
-          <ScrollView
-            contentContainerStyle={styles.listContent}
-            keyboardShouldPersistTaps="handled"
-            style={styles.list}
-            testID="exercise-picker-list">
+          </ExerciseListPreferenceControls>
+          {notice ? <Notice live message={notice} testID="exercise-picker-notice" tone="danger" /> : null}
+        </View>
+        {/*
+          The filter input keeps focus while the user picks a result. With the
+          ScrollView's default `keyboardShouldPersistTaps="never"`, the first
+          tap on a result row is consumed to dismiss the keyboard instead of
+          firing the row's `onPress`. `"handled"` lets the tap reach the row,
+          which closes the keyboard itself; a drag of the list closes it too.
+        */}
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          contentContainerStyle={styles.listContent}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          style={styles.list}
+          testID="exercise-picker-list">
             {isCatalogLoading ? <StatePanel body="Loading exercises..." fill={false} kind="loading" /> : null}
             {!isCatalogLoading && catalogLoadError ? (
               <StatePanel body={catalogLoadError} fill={false} kind="error" testID="exercise-picker-error" />
@@ -455,14 +411,12 @@ export function ExercisePicker({
               ) : (
                 <>
                   <ExerciseListContent
-                    isSearching={listModel.isSearching}
                     historyStatus={history.status}
                     onRetryHistory={history.reload}
                     items={listModel.items}
                     sections={listModel.sections}
-                    expandedFamilies={expandedFamilies}
+                    familyExpansion={familyExpansion}
                     emptyText={noExercisesText}
-                    onToggleFamily={toggleFamily}
                     onPressExercise={selectListItem}
                   />
                   {/* After my own matches (E0.1); empty without search text. */}
@@ -470,9 +424,8 @@ export function ExercisePicker({
                 </>
               )
             ) : null}
-          </ScrollView>
-        </View>
-      </Sheet>
+        </ScrollView>
+      </View>
 
       <ExerciseEditorModal
         visible={isCreateModalVisible}
@@ -505,23 +458,41 @@ export function ExercisePicker({
 }
 
 const styles = StyleSheet.create({
-  // A tall body that shrinks with the sheet when the keyboard is up.
-  body: {
-    flexShrink: 1,
+  screen: {
+    flex: 1,
+    backgroundColor: uiRoles.surface,
   },
-  searchRow: {
+  handleArea: {
+    alignItems: 'center',
+    paddingTop: uiSpace.sm,
+    paddingBottom: uiSpace.sm,
+  },
+  handle: {
+    width: uiGeometry.sheetHandle.width,
+    height: uiGeometry.sheetHandle.height,
+    borderRadius: uiGeometry.radius.pill,
+    backgroundColor: uiRoles.rule,
+  },
+  // As the Sheet's title row: the controls bring their own 44pt targets.
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingLeft: uiSpace.lg,
+    paddingRight: uiSpace.sm,
+    paddingBottom: uiSpace.sm,
+  },
+  title: {
+    flex: 1,
+    fontFamily: uiFonts.display.family,
+    fontWeight: '800',
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
+    color: uiRoles.ink,
+  },
+  controls: {
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.md,
-  },
-  search: {
-    flex: 1,
-  },
-  optionsPanel: {
-    marginBottom: uiSpace.md,
-    paddingHorizontal: uiSpace.lg,
   },
   list: {
     flex: 1,

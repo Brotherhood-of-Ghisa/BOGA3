@@ -347,7 +347,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(accents).toHaveLength(1);
       expect(accents[0].props.testID).toBe('create-new-exercise-button');
 
-      expect(screen.getByLabelText('Favourite')).toHaveProp('accessibilityState', { selected: true });
+      expect(screen.getByLabelText('Sort: Favourite')).toBeTruthy();
       expect(screen.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: true });
       fireEvent.press(screen.getByLabelText('Exercise catalog options'));
       expect(await screen.findByTestId('exercise-catalog-management-sheet')).toBeTruthy();

@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import type { Session } from '@/components/session-recorder/types';
-import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import {
   SessionExerciseCard,
   SessionGymSheet,
@@ -18,16 +17,13 @@ import { ActionButton } from '@/components/ui/action-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
-import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
-import { sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
+import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { mainTabHref } from '@/src/navigation/main-tabs';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
 import { findNearbyGym } from '@/src/location/gym-location-reads';
 import { activeGymOptions, listGymDirectory, type SessionGymOption } from '@/src/session-recorder/gym-options';
 import {
   abandonActiveSession,
-  addExerciseToSession,
-  appendPlanToSession,
   completeActiveSession,
   loadActiveSessionGraph,
   loadEditableSessionGraph,
@@ -47,7 +43,6 @@ import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-s
 import { useSessionView } from '@/src/session-recorder/use-session-view';
 
 const TRAIN_ROUTE = mainTabHref('train');
-const EXERCISE_CATALOG_MANAGE_ROUTE = '/exercise-catalog?source=session&intent=manage' as Href;
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
@@ -120,8 +115,9 @@ export type SessionViewScreenProps = {
  * The session view (`ux-rules` §14b): the active session, read-only and
  * navigational. Each exercise card links to its exercise page, where editing
  * happens; Finish and Abandon run the session lifecycle
- * (`src/session-recorder/session-lifecycle.ts`), and Add exercise the
- * exercise picker. Every active-session entry in the app opens it.
+ * (`src/session-recorder/session-lifecycle.ts`), and Add exercise opens the
+ * exercise picker's route (`add-exercise`, a page sheet). Every
+ * active-session entry in the app opens it.
  *
  * A completed session opens here to be edited (History, completed-session
  * `Edit`): Start/End replace the elapsed Time, and Done — the
@@ -138,11 +134,9 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
   // has closed (or reopened) is dropped.
   const gymPickerGenerationRef = useRef(0);
   const restoreGymPickerOnFocusRef = useRef(false);
-  const [picker, setPicker] = useState({ visible: false, openRequestId: 0 });
   const [isFinishing, setIsFinishing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const restorePickerOnFocusRef = useRef(false);
 
   const completedTimes = useMemo(
     () =>
@@ -199,14 +193,9 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     setGymPicker(CLOSED_GYM_PICKER);
   };
 
-  // Back from Manage: the picker returns as it was left.
   // Back from the Gyms screen: the gym sheet reopens with the list reloaded.
   useFocusEffect(
     useCallback(() => {
-      if (restorePickerOnFocusRef.current) {
-        restorePickerOnFocusRef.current = false;
-        setPicker((current) => ({ ...current, visible: true }));
-      }
       if (restoreGymPickerOnFocusRef.current) {
         restoreGymPickerOnFocusRef.current = false;
         openGymPicker();
@@ -326,37 +315,6 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
     await reload();
   };
 
-  const hidePicker = () => setPicker((current) => ({ ...current, visible: false }));
-
-  const runPickerWrite = async (write: () => Promise<unknown>) => {
-    hidePicker();
-    setNotice(null);
-    try {
-      await write();
-    } catch {
-      setNotice("Couldn't add that exercise. Try again.");
-    }
-    await reload();
-  };
-
-  const addExercise = (exerciseDefinitionId: string, exerciseName: string) => {
-    if (!sessionId) return;
-    void runPickerWrite(() =>
-      addExerciseToSession(sessionId, { id: exerciseDefinitionId, name: exerciseName })
-    );
-  };
-
-  const appendPlan = (exercise: { id: string; name: string }, suggestion: ExerciseBlockHistorySuggestedPlan) => {
-    if (!sessionId) return;
-    void runPickerWrite(() => appendPlanToSession(sessionId, exercise, suggestion));
-  };
-
-  const openManage = () => {
-    restorePickerOnFocusRef.current = true;
-    hidePicker();
-    router.push(EXERCISE_CATALOG_MANAGE_ROUTE);
-  };
-
   let body: ReactNode;
   if (state.status === 'loading') {
     body = <StatePanel kind="loading" testID="session-view-loading" />;
@@ -410,7 +368,7 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         ))}
         <ActionButton
           label="+ Add exercise"
-          onPress={() => setPicker((current) => ({ visible: true, openRequestId: current.openRequestId + 1 }))}
+          onPress={() => router.push(sessionAddExerciseHref(data.sessionId))}
           testID="session-view-add-exercise"
           variant="outline"
         />
@@ -468,14 +426,6 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         selectedGymId={state.status === 'ready' ? state.data.gymId : null}
         suggestion={gymPicker.suggestion}
         visible={gymPicker.visible}
-      />
-      <ExercisePicker
-        onAppendPlan={appendPlan}
-        onDismiss={hidePicker}
-        onOpenManage={openManage}
-        onSelectExercise={addExercise}
-        openRequestId={picker.openRequestId}
-        visible={picker.visible}
       />
     </Screen>
   );

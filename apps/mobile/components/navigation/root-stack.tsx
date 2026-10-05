@@ -107,6 +107,12 @@ export function RootStack() {
           name="session/[sessionId]/exercise/[sessionExerciseId]"
           options={{ headerShown: false, title: 'Exercise' }}
         />
+        {/* The exercise picker: an iOS page sheet, closed by swiping down or its
+            own Close; it draws its own header. */}
+        <Stack.Screen
+          name="session/[sessionId]/add-exercise"
+          options={{ headerShown: false, presentation: 'modal', title: 'Select Exercise' }}
+        />
         <Stack.Screen name="session/[sessionId]/compare" options={{ title: 'Session vs history' }} />
       </Stack.Protected>
       {/* Dev/test only (self-gated). Reachable while first sync is pending too: it is

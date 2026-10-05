@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
-import { ExerciseListContent, ExerciseListPreferenceControls } from '@/components/exercise-catalog/exercise-list-controls';
+import { ExerciseListContent, ExerciseListPreferenceControls, useFamilyExpansion } from '@/components/exercise-catalog/exercise-list-controls';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -22,7 +22,6 @@ type ExerciseSwapSheetProps = {
 export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSelect, onDismiss }: ExerciseSwapSheetProps) {
   const { height } = useWindowDimensions();
   const [query, setQuery] = useState('');
-  const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(() => new Set());
   const [preferences, setPreferences] = useExerciseListPreferences();
   const catalog = useExerciseCatalog();
   const history = useExerciseCatalogStats('all');
@@ -33,6 +32,7 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
     exercises: options, muscleGroups: catalog.muscleGroups, stats: history.stats,
     preferences, query, includeDeleted: false,
   }) : null, [catalog.muscleGroups, options, preferences, query, history.stats, visible]);
+  const familyExpansion = useFamilyExpansion(model?.isSearching ?? false);
   const dismiss = () => { setQuery(''); onDismiss(); };
 
   return (
@@ -42,7 +42,7 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
           <SearchField accessibilityLabel="Search exercises" onChangeText={setQuery} placeholder="Search exercises or muscles" testID="exercise-swap-search" value={query} />
           <ExerciseListPreferenceControls preferences={preferences} onChangePreferences={setPreferences} />
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" style={styles.list} testID="exercise-swap-list">
+        <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={styles.list} testID="exercise-swap-list">
           {catalog.status === 'error' ? (
             <StatePanel body={catalog.lastError ?? 'Unable to load exercises.'} fill={false} kind="error" action={{ label: 'Retry', onPress: () => { void ensureExerciseCatalogLoaded(); } }} />
           ) : catalog.status !== 'ready' || !model ? (
@@ -50,18 +50,11 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
           ) : (
             <ExerciseListContent
               emptyText={options.length === 0 ? 'No other exercises available.' : 'No exercises match the current filters.'}
-              expandedFamilies={expandedFamilies}
+              familyExpansion={familyExpansion}
               items={model.items}
-              isSearching={model.isSearching}
               historyStatus={history.status}
               onRetryHistory={reload}
-              onPressExercise={(exercise) => { setQuery(''); onSelect(exercise); }}
-              onToggleFamily={(familyName) => setExpandedFamilies((current) => {
-                const next = new Set(current);
-                if (next.has(familyName)) next.delete(familyName);
-                else next.add(familyName);
-                return next;
-              })}
+              onPressExercise={(exercise) => { Keyboard.dismiss(); setQuery(''); onSelect(exercise); }}
               sections={model.sections}
             />
           )}
