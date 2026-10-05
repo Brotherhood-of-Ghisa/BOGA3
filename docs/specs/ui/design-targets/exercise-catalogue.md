@@ -32,7 +32,7 @@ closed; a pick closes the keyboard. The gallery states below were re-captured.
   `Sort: Favourite` / `Sort: A–Z`, which switches between the two orders. No
   section label, range, muscle filter or redundant status chips. Both
   preferences are local, persistent and shared by catalogue, add and swap, and
-  apply at once. Semantics: `ux-rules.md` §4.
+  apply at once. Semantics: `ux-rules.md` "Lists and rows".
 - The row history line is `Last: 23 Sep · 18 sessions`; include the year for
   prior-year dates, use singular `1 session`, and `Never done` without history.
   Favourite uses a fixed 180-day scoring window; history stays all-time.

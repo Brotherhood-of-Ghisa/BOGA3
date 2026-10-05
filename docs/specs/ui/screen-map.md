@@ -171,7 +171,7 @@ Brief entrypoint map of the current mobile screens.
   text. Retry retains history selection. No family heatmap action.
 - Notes: one `ScreenScroll` on paper over `MainTabs`, with Progress selected;
   the new landing is governed by `design-targets/progress-tables.md`, retained
-  history by `design-targets/progress.md` and `ux-rules.md` §12–§13.
+  history by `design-targets/progress.md`.
 
 4b. `/session/[sessionId]` (session view)
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in
@@ -282,7 +282,7 @@ Brief entrypoint map of the current mobile screens.
     (`settings-appearance-option-<id>`) with a decorative swatch of each, saved
     on tap, and a note that a new theme applies the next time BoGa opens; a
     failed save restores the previous choice and says nothing changed
-    (`settings-appearance-error`). Rules: `ux-rules.md` §9b
+    (`settings-appearance-error`). Rules: `design-language.md` "Presets"
   - Preferences card: date format (`settings-date-format-<format>`) and past-records
     gym filter (`settings-records-gym-<scope>`) are account-local on this device.
     Sign-out hides the choices and returning to the account restores them;
@@ -461,11 +461,11 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
 - Key states (high level):
-  - one `ScreenScroll` on `paper` over `MainTabs` (DLM-T10; `ux-rules` §13.14–16)
+  - one `ScreenScroll` on `paper` over `MainTabs` (`design-targets/progress.md`)
   - loading / error / detail, as `StatePanel`s in a `Card`
   - in-section empty state when no sessions match the active period/tag filter
   - a `Last 7 days` / `Last 30 days` / `All time` `SegmentedControl` and a
-    sideways-scrolling tag `ChipGroup` (`ux-rules` §10.2)
+    sideways-scrolling tag `ChipGroup`
   - a deleted exercise's `Notice`; the `All-time bests` card (`1RM`, `Top
     weight`, figures in `record`); one View Session exercise card per session
   - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
@@ -650,7 +650,7 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - one page per exercise of the active session, or of a completed session being edited from the session view, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise` — the last item in the scroll, after the set list, never a pinned footer
   - reached only from the session view; its domain lives in `src/session-recorder/**`
-  - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel counts only the sessions before it (`ux-rules` §14a.4)
+  - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel counts only the sessions before it
 - Key states (high level):
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped

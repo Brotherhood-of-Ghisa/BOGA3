@@ -246,7 +246,7 @@ describe('ExercisePageScreen', () => {
     await openPage();
 
     // The logger is the open cursor row; its accessibility actions are the
-    // non-gesture path of the swipes (`ux-rules.md` §14a.3), exposed on its
+    // non-gesture path of the swipes (`ux-rules.md` "Swipes on the exercise page"), exposed on its
     // accessible header.
     const header = screen.getByTestId('exercise-set-logger-header');
     expect(header).toHaveProp('accessible', true);
@@ -708,8 +708,8 @@ describe('ExercisePageScreen', () => {
     const sheet = await screen.findByTestId('exercise-options-sheet');
     fireEvent.press(within(sheet).getByText('Link to group exercise…'));
 
-    // The Link screen opens after the page's pending edits are written
-    // (`ux-rules.md` §14a.5), so the push resolves through the flush.
+    // The Link screen opens after the page's pending edits are written,
+    // so the push resolves through the flush.
     await waitFor(() =>
       expect(mockRouter.push).toHaveBeenCalledWith(`/exercise-link?exerciseDefinitionId=${BENCH_DEF}`)
     );
@@ -721,7 +721,7 @@ describe('ExercisePageScreen', () => {
     await openPage();
 
     // Typed values ride the autosave debounce; linking must not leave them
-    // behind (`ux-rules.md` §14a.5: the Link screen leaves the session untouched).
+    // behind (the Link screen leaves the session untouched).
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     fireEvent.press(await screen.findByTestId('exercise-options-link-group'));

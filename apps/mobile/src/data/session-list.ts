@@ -138,7 +138,7 @@ export type SessionListSetCountRow = {
   setType: string | null;
 };
 
-/** Each session's `Sets`: its working sets (`ux-rules.md` §5.11). */
+/** Each session's `Sets`: its working sets (`training-metrics-contract.md` "Counted set"). */
 export const countWorkingSessionSets = (
   setRows: SessionListSetCountRow[],
   sessionIdByExerciseId: ReadonlyMap<string, string>,

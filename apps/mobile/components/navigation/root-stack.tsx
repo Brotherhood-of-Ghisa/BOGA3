@@ -14,7 +14,7 @@ import { useRootRouteAccess } from '@/src/navigation/root-route-access';
 const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
   // One header style on every stack route, as the design-language top bars
-  // draw it (`ux-rules` §8, `navigation-contract.md` "Header titles"):
+  // draw it (`navigation-contract.md` "Header titles"):
   // `surface` over the page, an Archivo 700 `ink` title, an `ink` back arrow.
   headerStyle: { backgroundColor: uiRoles.surface },
   headerTitleStyle: {

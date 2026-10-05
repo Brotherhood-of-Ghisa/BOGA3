@@ -54,7 +54,7 @@ function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFiel
 
 /**
  * A completed session's Start and End in the summary card, in place of the
- * elapsed Time (the completed edit, `ux-rules` §14b.7).
+ * elapsed Time (the completed edit).
  */
 export function SessionTimesFields({
   text,
