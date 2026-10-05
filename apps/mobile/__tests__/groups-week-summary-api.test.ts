@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * The group week summary read (groups contract §4.7): `getGroupWeekSummary`
+ * The group week summary read (groups contract): `getGroupWeekSummary`
  * sends the caller's window, passes a well-formed payload through, rejects a malformed one as INTERNAL,
  * and maps server tokens and transport failures. Supabase is mocked; the wire
  * itself is proven by groups-api-live.

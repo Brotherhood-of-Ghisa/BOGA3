@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T09 board reads (card AC1; groups contract §4.5): `getGroupBoardPodiums`,
+ * board reads (groups contract): `getGroupBoardPodiums`,
  * `getGroupBoard`, and `getGroupBoardHistory` send every `p_*` arg with the
  * pinned defaults, reject malformed payloads as INTERNAL, map server tokens and
  * transport failures, and `isGroupExerciseNotFound` separates the two

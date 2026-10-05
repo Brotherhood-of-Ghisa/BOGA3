@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * `useGroupOnlinePages` (M25-T09 card AC5–AC7; groups contract §6.1, §7): the
+ * `useGroupOnlinePages` (groups contract): the
  * online-only paging behind the full board and its history. First page on
  * mount and on a view change, cursors sent verbatim, no request offline or at
  * the end, Retry after a failed page, first-seen dedupe, stale responses

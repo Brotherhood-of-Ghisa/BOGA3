@@ -8,7 +8,7 @@
 //   - sync_push of a session graph (the Sync v2 envelope; the share trigger
 //     then puts the session in the group record)
 //
-// Contract: docs/specs/tech/groups-contract.md §4 (RPC shapes) and §8.
+// Contract: docs/specs/tech/groups-contract.md (RPC conventions).
 // One file, several steps (runScript files cannot import each other). Every
 // call passes env STEP; `sign-in` also passes SUPABASE_URL / SUPABASE_ANON_KEY /
 // EMAIL / PASSWORD, `join` passes CODE, `latency` passes LABEL. State is carried
@@ -196,7 +196,7 @@ var steps = {
   },
 
   // One push: the live, active session. (That a pre-join session is never
-  // shared, §2.5, is groups-contract's.)
+  // shared is groups-contract's.)
   'push-active': function () {
     var cuam = nextClientUpdatedAt();
     var startedAt = Math.max(Date.now(), output.groupsJoinedAtMs + 1000);
@@ -252,7 +252,7 @@ var steps = {
   // user_d links its pushed Bench Press (total load) to the device's
   // active custom group exercise, Sled Push (per side), with a sync_push like
   // its own app would. Its completed sets from before the link then count as a
-  // link effect (contract §2.11). Waits until the evaluator has written the
+  // link effect (contract). Waits until the evaluator has written the
   // board, so the device's reads are deterministic: single-set Volume 256.25 kg·reps (102.5 total kg → 51.25 per-side kg × 5), uncertified.
   // Both ordinary scores convert from source distribution to the group target.
   'link-board': function () {

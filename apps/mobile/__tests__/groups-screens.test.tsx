@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M22-T04 group screens (groups contract §6.3, §7; task card flows 1–4): the
+ * group screens (groups contract): the
  * Groups tab, My groups, the group screen, and the friend's session view.
  * The four read RPCs are mocked; the cache is the real `group_cache` on the
  * shared in-memory SQLite fixture, so cache-first render, offline, and

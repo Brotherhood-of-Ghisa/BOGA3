@@ -1,4 +1,4 @@
-// The group stream feed (`docs/specs/tech/groups-contract.md` §4.2, §6.2, §7):
+// The group stream feed (`docs/specs/tech/groups-contract.md`):
 // the cache-first first page from `useGroupResource`, plus older pages loaded
 // online on demand (infinite scroll, FR 6). Older pages are never cached.
 //

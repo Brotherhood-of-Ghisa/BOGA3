@@ -12,7 +12,7 @@ import { ScreenScroll } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { createGroup, describeGroupWriteError, useGroupAction, type GroupDetailsInput } from '@/src/groups';
 
-/** Create a group (groups contract §6.3, card flow 1): the username gate, then the shared form. */
+/** Create a group (groups contract): the username gate, then the shared form. */
 export default function NewGroupRoute() {
   const { isConfigured, user } = useAuth();
   if (!isConfigured || !user) {

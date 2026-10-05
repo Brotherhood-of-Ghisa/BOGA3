@@ -25,7 +25,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 /**
- * The friend's session view (groups contract §6.3, C3.8): read-only, cache
+ * The friend's session view (groups contract): read-only, cache
  * first. `completed-session/[sessionId].tsx` is deliberately not reused; both
  * draw their exercises with `components/session-detail/`.
  */

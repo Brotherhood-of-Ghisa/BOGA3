@@ -1,4 +1,4 @@
-// The record set row detail (product E2, P10–P13; groups contract §4.5, §4.6):
+// The record set row detail (product E2, P10–P13; groups contract):
 // one model built from a board row or a stream record card, the certification
 // actions my relationship to the set allows, and the wording of every write
 // outcome. Pure: no React, no I/O.
@@ -40,7 +40,7 @@ export type RecordSetDetail = {
   groupId: string;
   groupExerciseId: string;
   groupExerciseName: string;
-  /** Known from a board payload; null from a stream item (the server refuses certify on archived, §4.6). */
+  /** Known from a board payload; null from a stream item (the server refuses certify on archived). */
   archived: boolean | null;
   /** The lifter. */
   member: GroupMemberRef;
@@ -127,7 +127,7 @@ export const RECORD_SET_ACTION_LABELS: Record<RecordSetAction, string> = {
 };
 
 /**
- * P10–P11, D3–D5, §4.6: `certify` for any member but the lifter on an
+ * P10–P11, D3–D5: `certify` for any member but the lifter on an
  * uncertified, standing record set of an active exercise and a current lifter;
  * `withdraw` for the certifier; `cancel` for the owner or an admin who is not the
  * certifier. The server enforces all of it regardless.
@@ -284,7 +284,7 @@ export const describeCertifySuccess = (
   return by.user_id === myUserId ? 'Already certified by you.' : `Already certified by ${formatStreamPersonName(by, myUserId)}.`;
 };
 
-/** A successful withdraw / cancel. An already-ended certification comes back unchanged (§4.6). */
+/** A successful withdraw / cancel. An already-ended certification comes back unchanged. */
 export const describeCertificationEndSuccess = (
   action: 'withdraw' | 'cancel',
   certification: GroupCertification,

@@ -1,6 +1,6 @@
 // Live online/offline for group screens. The sync status accessor
 // (`src/sync/sync-status.ts` → `getSchedulerStatus`) is a snapshot getter with
-// no subscription API, so per `docs/specs/tech/groups-contract.md` §6.1 groups
+// no subscription API, so per `docs/specs/tech/groups-contract.md` groups
 // keep their own NetInfo listener rather than changing `src/sync`. It applies
 // the scheduler's projection rule: online iff `isConnected === true`.
 

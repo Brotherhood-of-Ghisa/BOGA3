@@ -1,5 +1,5 @@
 // Drops a group's cached entries from this device after the user leaves it
-// (contract §6.2 access loss), so its stream and members do not linger until
+// (contract access loss), so its stream and members do not linger until
 // the next refresh.
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';

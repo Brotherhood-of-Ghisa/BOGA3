@@ -19,7 +19,7 @@ import { useAuth } from '@/src/auth';
 import { groupCacheKeys, listMyGroups, useGroupResource, type GroupListMineResult } from '@/src/groups';
 
 /**
- * My groups (groups contract §6.3): every active membership, sorted by name,
+ * My groups (groups contract): every active membership, sorted by name,
  * as one `Card` of rows, under Join (outline) and Create (the one `accent`). A
  * row opens the group's management page.
  */

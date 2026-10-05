@@ -1,10 +1,10 @@
 /* eslint-disable import/first */
 
 /**
- * The typed group RPC client (groups contract §4, §6.1): one wrapper per RPC
+ * The typed group RPC client (groups contract): one wrapper per RPC
  * called as `schema('app_public').rpc(name, p_* args)`, and error mapping —
  * every server token by prefix, transport failure → NETWORK, anything else →
- * INTERNAL. Supabase is mocked (the backend lands in M22-T01).
+ * INTERNAL. Supabase is mocked.
  */
 
 const mockGetRequiredSupabaseMobileClient = jest.fn();

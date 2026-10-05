@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# Two-user groups on a device (docs/specs/tech/groups-contract.md §8; lane
+# Two-user groups on a device (docs/specs/tech/groups-contract.md; lane
 # ios-groups-e2e). The device signs in as fixture user_c and drives the real
 # group UI against local Supabase; the counterparty, fixture user_d, is
 # scripted over HTTP from ../scripts/groups-counterparty.js (GoTrue sign-in,

@@ -594,7 +594,7 @@ expect_sql 'publication log contains only sanitized identifiers/SQLSTATE' "selec
   from public.app_logs where event='group.eval_failed' and context->>'group_exercise_id'='${GX}';" t
 pass 'activation fence, metric stale-result/lease fences and publication/Sync/certification failure isolation'
 
-# Week summary (§4.7): the latest session's records carry only the `record`
+# Week summary: the latest session's records carry only the `record`
 # values of the boards they took #1 on, one group record each. On a fresh
 # ordinary comparison R's 100 × 5 takes #1 on Volume and 1RM; A's later
 # 60 × 12 is A's own record on both, but #1 on Volume only (720 > 500;

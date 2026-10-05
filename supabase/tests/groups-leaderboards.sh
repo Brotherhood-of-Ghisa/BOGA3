@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# groups-leaderboards.sh — M25 group evaluator pipeline contract.
+# groups-leaderboards.sh — group evaluator pipeline contract.
 #
-# Contract: docs/specs/tech/groups-contract.md §2.8–§2.10, §8. Proves, against
+# Contract: docs/specs/tech/groups-contract.md Proves, against
 # the real local Supabase stack (PostgREST, the group-eval Edge Function, pg_net,
 # pg_cron):
 #
@@ -545,7 +545,7 @@ rpc "${OWNER_TOKEN}" group_exercise_unarchive "$(jq -nc --arg g "${GID}" --arg e
 expect_ok "unarchive GXA"
 push_b1 108
 drain_ok "after unarchive"
-# Unarchive also queues a catch-up target job per live link (M25-T05, contract §2.10).
+# Unarchive also queues a catch-up target job per live link (contract).
 expect_mine "after unarchive the link counts" \
   "[{key: \"${GXA}\", kind: \"target\", outcome: \"completed\", causes: [\"link\"], targets: [\"${GXA}\"]},
     {key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\", \"${GXA}\"]}]"
