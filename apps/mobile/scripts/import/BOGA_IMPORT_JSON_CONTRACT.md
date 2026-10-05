@@ -187,5 +187,5 @@ salt. That string is an identity namespace, not an accepted package schema, and
 prevents an already imported workout from being duplicated after an offline
 conversion. Reading IDs use a deterministic import namespace.
 
-Remote imports send `x-boga-sync-protocol: 3`; mismatched protocol requests are
+Remote imports send `x-boga-sync-protocol: 4`; mismatched protocol requests are
 rejected before writes.

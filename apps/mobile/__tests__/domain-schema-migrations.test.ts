@@ -128,10 +128,11 @@ describe('domain schema and runtime migrations', () => {
     // migrations append after it. The first follow-up is the local sync
     // quarantine table; planned set targets append after that; the local
     // group cache is m0004, m0005 empties it for the raw-set payload shape,
-    // exercise_group_links is m0006, the kg-only cutover is m0010, and the
+    // exercise_group_links is m0006, the kg-only cutover is m0010, the
     // derived exercise session facts are m0011 (tables) and m0012 (triggers),
-    // and the local store's owning account (`account_user_id`) is m0015.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(16);
+    // the local store's owning account (`account_user_id`) is m0015, and the
+    // session planning schema (0016) plus pull-cursor reset (0017) append after it.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(18);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -177,6 +178,8 @@ describe('domain schema and runtime migrations', () => {
       'm0013',
       'm0014',
       'm0015',
+      'm0016',
+      'm0017',
     ]);
   });
 

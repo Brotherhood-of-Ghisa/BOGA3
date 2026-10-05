@@ -18,16 +18,17 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
     {type: "body_weight_measurements", id: $reading, client_updated_at_ms: $ts,
      fields: {weight_kg: 79.83225712, measured_at: $ts, created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "sessions", id: $session, client_updated_at_ms: $ts,
-     fields: {gym_id: null, status: "completed", started_at: $ts, completed_at: ($ts+60000), duration_sec: 60,
+     fields: {gym_id: null, source_plan_id: null, status: "completed", started_at: $ts, completed_at: ($ts+60000), duration_sec: 60,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $def, client_updated_at_ms: $ts,
      fields: {name: "Pull-Up", load_input_mode: "total_load", bodyweight_contribution: 1,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercises", id: $sx, client_updated_at_ms: $ts,
-     fields: {session_id: $session, exercise_definition_id: $def, name: "Pull-Up", machine_name: null,
+     fields: {session_id: $session, exercise_definition_id: $def, source_plan_exercise_id: null,
+              name: "Pull-Up", machine_name: null,
               order_index: 0, created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_sets", id: $set, client_updated_at_ms: $ts,
-     fields: {session_exercise_id: $sx, order_index: 0, weight_value: "20", reps_value: "8", set_type: null,
+     fields: {session_exercise_id: $sx, source_plan_set_id: null, order_index: 0, weight_value: "20", reps_value: "8", set_type: null,
               planned_weight_value: "10", planned_reps_value: "10", planned_set_type: null,
               performance_status: null, created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
@@ -36,24 +37,42 @@ assert_status 200 "optional bodyweight initial push"
 assert_json_expr '.ok == true' "optional bodyweight initial ack"
 
 # Drain each layer because the shared fixture account can contain seeded rows.
+# Only THIS run's six rows matter, so every page is filtered to those ids
+# before being appended; otherwise a full 200-row page blows the OS argument
+# limit (ARG_MAX) when the accumulator is passed back through jq argv.
 bw_pull_layer() {
-  local layer="$1" cursor=null accumulated='[]' page guard=0
+  local layer="$1" cursor=null accumulated='[]' guard=0 selected file
+  file="$(mktemp)"
   while (( guard < 1000 )); do
     guard=$((guard + 1))
     http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${ANON_KEY}" app_public \
       "$(jq -nc --argjson layer "${layer}" --argjson cursor "${cursor}" '{layer:$layer,limit:200,cursor:$cursor}')"
     assert_status 200 "bodyweight pull layer ${layer}"
     assert_json_expr '.entities | type == "array"' "bodyweight valid pull page"
-    page="${REQUEST_BODY}"
-    accumulated="$(jq -nc --argjson previous "${accumulated}" --argjson page "${page}" '$previous + $page.entities')"
-    if [[ "$(printf '%s' "${page}" | jq -r '.has_more')" == false ]]; then
-      REQUEST_BODY="$(jq -nc --argjson entities "${accumulated}" '{entities:$entities}')"
-      return
+    printf '%s' "${REQUEST_BODY}" > "${file}"
+    selected="$(jq -c --arg setting "${BW_SETTING_ID}" --arg reading "${BW_ID}" \
+      --arg session "${BW_SESSION_ID}" --arg def "${BW_DEF_ID}" --arg sx "${BW_SX_ID}" --arg set "${BW_SET_ID}" '
+      [.entities[] | select(
+        (.type == "user_settings" and .id == $setting)
+        or (.type == "body_weight_measurements" and .id == $reading)
+        or (.type == "sessions" and .id == $session)
+        or (.type == "exercise_definitions" and .id == $def)
+        or (.type == "session_exercises" and .id == $sx)
+        or (.type == "exercise_sets" and .id == $set))]' "${file}")"
+    accumulated="$(jq -nc --argjson a "${accumulated}" --argjson b "${selected}" '$a + $b')"
+    if [[ "$(jq -r '.has_more' "${file}")" == false ]]; then
+      break
     fi
-    cursor="$(printf '%s' "${page}" | jq -c '.next_cursor')"
+    cursor="$(jq -c '.next_cursor' "${file}")"
   done
-  echo '[fail] bodyweight pull drain exceeded page guard' >&2
-  exit 1
+  rm -f "${file}"
+  if (( guard >= 1000 )); then
+    echo '[fail] bodyweight pull drain exceeded page guard' >&2
+    exit 1
+  fi
+  # The layer's own rows were selected out; the round-trip assertion compares
+  # each expected seed row against this filtered set.
+  REQUEST_BODY="$(jq -nc --argjson entities "${accumulated}" '{entities: ($entities | unique_by(.type, .id))}')"
 }
 
 for bw_layer in 0 1 2 3 4; do
@@ -61,10 +80,10 @@ for bw_layer in 0 1 2 3 4; do
   bw_expected_types='[]'
   case "${bw_layer}" in
     0) bw_expected_types='["user_settings","exercise_definitions"]' ;;
-    1) bw_expected_types='["sessions"]' ;;
-    2) bw_expected_types='["session_exercises"]' ;;
-    3) bw_expected_types='["exercise_sets"]' ;;
-    4) bw_expected_types='["body_weight_measurements"]' ;;
+    1) bw_expected_types='[]' ;;
+    2) bw_expected_types='["sessions"]' ;;
+    3) bw_expected_types='["session_exercises"]' ;;
+    4) bw_expected_types='["exercise_sets","body_weight_measurements"]' ;;
   esac
   assert_json_expr --argjson expected "${BW_BODY}" --argjson types "${bw_expected_types}" \
     '.entities as $rows | all($expected.entities[] | select(.type as $t | $types | index($t));
@@ -110,8 +129,9 @@ for projection in \
   assert_non_2xx "superseded column ${projection} is absent"
 done
 
-# Protocol 3 is the one shipping contract. Older clients fail before rows move.
-for old_protocol in "" 1 2 invalid; do
+# Protocol 4 is the one shipping contract. Older clients (including 3) fail
+# before rows move.
+for old_protocol in "" 1 2 3 invalid; do
   BOGA_TEST_SYNC_PROTOCOL="${old_protocol}" sync_push "${USER_A_TOKEN}" "${BW_BODY}"
   assert_non_2xx 'old client push rejected'
   assert_json_expr '.message | startswith("UPDATE_REQUIRED:")' 'actionable update-required push error'

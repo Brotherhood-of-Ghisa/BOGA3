@@ -3,7 +3,7 @@
 # Integration test — layered drain preserves client-FK closure (load-bearing).
 #
 # Pushes a fully-connected dataset for user A (one row in every FK-bearing
-# entity type, with the entire FK chain wired up), then drains layers 0→3
+# entity type, with the entire FK chain wired up), then drains layers 0→4
 # sequentially. The independent `user_settings` and
 # `body_weight_measurements` roots are covered by sync-bodyweight-contract.sh.
 # For every row emitted by the layer-N response, asserts that every FK parent
@@ -23,10 +23,11 @@
 # Also asserts the layer→type partition exactly matches the topological
 # FK-bearing portion of the mapping in the server contract ("Topological layers"):
 #   Layer 0: gyms, exercise_definitions, muscle_groups
-#   Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
+#   Layer 1: exercise_muscle_mappings, exercise_tag_definitions,
 #            exercise_group_links
-#   Layer 2: session_exercises
-#   Layer 3: exercise_sets, session_exercise_tags
+#   Layer 2: sessions
+#   Layer 3: session_exercises
+#   Layer 4: exercise_sets, session_exercise_tags
 
 set -euo pipefail
 
@@ -61,7 +62,7 @@ http_request() {
     curl_args+=(-H "Accept-Profile: ${profile}" -H "Content-Profile: ${profile}")
   fi
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -84,7 +85,7 @@ sign_in() {
   local payload
   payload="$(jq -nc --arg e "${email}" --arg p "${password}" '{email: $e, password: $p}')"
   REQUEST_STATUS="$(curl --silent --show-error \
-    -X POST -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -X POST -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -o "${response_file}" -w "%{http_code}" \
     --data "${payload}" \
     "${API_URL}/auth/v1/token?grant_type=password")"
@@ -158,14 +159,23 @@ FK_EDGES=(
   "session_exercise_tags|session_exercise_id|session_exercises"
   "session_exercise_tags|exercise_tag_definition_id|exercise_tag_definitions"
   "exercise_group_links|exercise_definition_id|exercise_definitions"
+  "session_plans|programme_id|training_programmes"
+  "session_plans|gym_id|gyms"
+  "session_plan_exercises|session_plan_id|session_plans"
+  "session_plan_exercises|exercise_definition_id|exercise_definitions"
+  "session_plan_sets|session_plan_exercise_id|session_plan_exercises"
+  "sessions|source_plan_id|session_plans"
+  "session_exercises|source_plan_exercise_id|session_plan_exercises"
+  "exercise_sets|source_plan_set_id|session_plan_sets"
 )
 
 # Per-layer expected type set per the server contract's topological layers.
 # Sorted lex so we can compare against `jq | unique | sort`.
 LAYER_TYPES_0='["exercise_definitions","gyms","muscle_groups"]'
-LAYER_TYPES_1='["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions","sessions"]'
-LAYER_TYPES_2='["session_exercises"]'
-LAYER_TYPES_3='["exercise_sets","session_exercise_tags"]'
+LAYER_TYPES_1='["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions"]'
+LAYER_TYPES_2='["sessions"]'
+LAYER_TYPES_3='["session_exercises"]'
+LAYER_TYPES_4='["exercise_sets","session_exercise_tags"]'
 
 # ---------------------------------------------------------------------------
 # Step 1 — push a fully-connected dataset (one of every FK-bearing entity
@@ -237,7 +247,7 @@ printf '%s' "${REQUEST_BODY}" | jq -e '.ok == true' >/dev/null \
   || fail "fully-connected push did not return ok=true: ${REQUEST_BODY}"
 
 # ---------------------------------------------------------------------------
-# Step 2 — drain layers 0..3 in order. Verify the layer→type partition AND
+# Step 2 — drain layers 0..4 in order. Verify the layer→type partition AND
 # maintain `seen_ids` to assert FK closure.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-pull-fk-closure] step 2 — drain + assert partition + FK closure via seen_ids set"
@@ -328,15 +338,16 @@ drain_layer_and_check 0 "${LAYER_TYPES_0}"
 drain_layer_and_check 1 "${LAYER_TYPES_1}"
 drain_layer_and_check 2 "${LAYER_TYPES_2}"
 drain_layer_and_check 3 "${LAYER_TYPES_3}"
+drain_layer_and_check 4 "${LAYER_TYPES_4}"
 
 # Final sanity: SEEN_IDS holds all ten FK-bearing seed rows.
 TOTAL_SEEN="$(printf '%s' "${SEEN_IDS}" | jq 'length')"
 if [[ "${TOTAL_SEEN}" != "10" ]]; then
-  fail "after draining all four FK-bearing layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 10"
+  fail "after draining all five FK-bearing layers SEEN_IDS holds ${TOTAL_SEEN} rows, expected 10"
 fi
 
 pass "FK closure — fully-connected dataset drained layer-by-layer with zero forward FK references"
-pass "FK closure — ten FK-bearing entity types partition exactly across layers 0–3"
+pass "FK closure — ten FK-bearing entity types partition exactly across layers 0–4"
 
 # ---------------------------------------------------------------------------
 # Step 3 — pull every layer one more time as a sanity check that the
@@ -347,8 +358,8 @@ pass "FK closure — ten FK-bearing entity types partition exactly across layers
 # from a different layer).
 # ---------------------------------------------------------------------------
 echo "[sync-v2-pull-fk-closure] step 3 — partition assertion on the full layer response (no filter)"
-ALL_LAYER_TYPES=( "${LAYER_TYPES_0}" "${LAYER_TYPES_1}" "${LAYER_TYPES_2}" "${LAYER_TYPES_3}" )
-for layer in 0 1 2 3; do
+ALL_LAYER_TYPES=( "${LAYER_TYPES_0}" "${LAYER_TYPES_1}" "${LAYER_TYPES_2}" "${LAYER_TYPES_3}" "${LAYER_TYPES_4}" )
+for layer in 0 1 2 3 4; do
   body="$(jq -nc --argjson layer "${layer}" '{layer: $layer, cursor: null, limit: 200}')"
   http_request POST "${API_URL}/rest/v1/rpc/sync_pull" "${USER_A_TOKEN}" "${body}"
   assert_status "200" "partition layer=${layer}"

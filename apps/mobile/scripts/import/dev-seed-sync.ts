@@ -112,7 +112,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
       accept: 'application/json',
       'accept-profile': 'app_public',
       'content-profile': 'app_public',
-      'x-boga-sync-protocol': '3',
+      'x-boga-sync-protocol': '4',
     },
     body: JSON.stringify({ entities: batch }),
   });
@@ -122,6 +122,8 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   }
 };
 
+// Layered for the five-layer topology. Only the types this seed emits are
+// listed; the plan entities and tag/link tables are not seeded here.
 const layerRank = (type: WireEntity['type']) => {
   switch (type) {
     case 'user_settings':
@@ -130,12 +132,12 @@ const layerRank = (type: WireEntity['type']) => {
     case 'muscle_groups':
       return 0;
     case 'exercise_muscle_mappings':
-    case 'sessions':
       return 1;
-    case 'session_exercises':
+    case 'sessions':
       return 2;
-    case 'exercise_sets':
+    case 'session_exercises':
       return 3;
+    case 'exercise_sets':
     case 'body_weight_measurements':
       return 4;
   }

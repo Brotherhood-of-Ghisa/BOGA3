@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 import { gyms } from './gyms';
+import { sessionPlans } from './session-plans';
 
 export const sessions = sqliteTable(
   'sessions',
@@ -11,6 +12,7 @@ export const sessions = sqliteTable(
       .notNull()
       .default(sql`(lower(hex(randomblob(16))))`),
     gymId: text('gym_id').references(() => gyms.id, { onDelete: 'set null' }),
+    sourcePlanId: text('source_plan_id').references(() => sessionPlans.id, { onDelete: 'set null' }),
     status: text('status', { enum: ['active', 'completed'] })
       .notNull()
       .default('active'),
@@ -29,8 +31,12 @@ export const sessions = sqliteTable(
   },
   (table) => ({
     statusIdx: index('sessions_status_idx').on(table.status),
+    sourcePlanIdx: index('sessions_source_plan_id_idx').on(table.sourcePlanId),
     completedAtIdx: index('sessions_completed_at_idx').on(table.completedAt),
     deletedAtIdx: index('sessions_deleted_at_idx').on(table.deletedAt),
+    sourcePlanUnique: uniqueIndex('sessions_owner_source_plan_unique')
+      .on(table.sourcePlanId)
+      .where(sql`${table.deletedAt} is null and ${table.sourcePlanId} is not null`),
     statusGuard: check(
       'sessions_status_guard',
       sql`${table.status} in ('active', 'completed')`

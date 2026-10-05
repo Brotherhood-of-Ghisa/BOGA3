@@ -51,14 +51,29 @@ export interface SyncFkEdge {
  * The local FK dependency graph for the syncable entities, keyed by child type.
  * Mirrors the `.references(...)` declarations in `src/data/schema/*` for every
  * edge whose parent is itself syncable. Entities with no syncable-parent FK
- * (`gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`) are simply absent.
+ * (`gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`,
+ * `training_programmes`) are simply absent.
  *
  * Kept in sync with the schema by the same review discipline as
  * `topo-order.ts`: a new cross-entity FK must be added here as well as to its
  * layer.
  */
 export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkEdge[]>> = {
-  sessions: [{ parentIdField: 'gym_id', parentType: 'gyms', required: false }],
+  session_plans: [
+    { parentIdField: 'programme_id', parentType: 'training_programmes', required: false },
+    { parentIdField: 'gym_id', parentType: 'gyms', required: false },
+  ],
+  session_plan_exercises: [
+    { parentIdField: 'session_plan_id', parentType: 'session_plans', required: true },
+    { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: false },
+  ],
+  session_plan_sets: [
+    { parentIdField: 'session_plan_exercise_id', parentType: 'session_plan_exercises', required: true },
+  ],
+  sessions: [
+    { parentIdField: 'gym_id', parentType: 'gyms', required: false },
+    { parentIdField: 'source_plan_id', parentType: 'session_plans', required: false },
+  ],
   exercise_tag_definitions: [
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: true },
   ],
@@ -74,9 +89,15 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
   session_exercises: [
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: false },
+    {
+      parentIdField: 'source_plan_exercise_id',
+      parentType: 'session_plan_exercises',
+      required: false,
+    },
   ],
   exercise_sets: [
     { parentIdField: 'session_exercise_id', parentType: 'session_exercises', required: true },
+    { parentIdField: 'source_plan_set_id', parentType: 'session_plan_sets', required: false },
   ],
   session_exercise_tags: [
     { parentIdField: 'session_exercise_id', parentType: 'session_exercises', required: true },
@@ -92,6 +113,10 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
 const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
+  training_programmes: schema.trainingProgrammes,
+  session_plans: schema.sessionPlans,
+  session_plan_exercises: schema.sessionPlanExercises,
+  session_plan_sets: schema.sessionPlanSets,
   gyms: schema.gyms,
   exercise_definitions: schema.exerciseDefinitions,
   muscle_groups: schema.muscleGroups,

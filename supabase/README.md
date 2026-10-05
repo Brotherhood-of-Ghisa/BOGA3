@@ -230,6 +230,24 @@ These enforce the shared runtime baseline first (`ensure-local-runtime-baseline.
 
 Coverage includes success read/write flows, validation failures, unauthenticated denial, and cross-user denial across all sync-domain entities, including session metadata parity fields (`session_exercises.exercise_definition_id`, `exercise_sets.set_type`).
 
+### Session-planning schema
+
+Migration `supabase/migrations/20261004120000_m23_session_planning.sql` adds four
+synced plan entities (`training_programmes`, `session_plans`,
+`session_plan_exercises`, `session_plan_sets`) and three performed-domain
+provenance columns (`sessions.source_plan_id`,
+`session_exercises.source_plan_exercise_id`, `exercise_sets.source_plan_set_id`),
+expanding Sync v2 from twelve to sixteen entities across five layers. It patches
+`sync_push` / `sync_pull` / `dev_wipe_my_data` in place and raises
+`require_sync_protocol()` to protocol 4, because the layer→type mapping changed
+(`sessions` L1→L2, `session_exercises` L2→L3, `exercise_sets` L3→L4). Deploy
+server-first: protocol-3 clients get `UPDATE_REQUIRED` before any row moves.
+Deferred triggers reject a source-derived set whose plan set is not under its
+card's source block, including when only a parent's source block changes. Local
+verification: `./boga db reset` then `./boga test sync-v2-schema`,
+`./boga test sync-push-contract`, `./boga test sync-pull-contract`,
+`./boga test dev-wipe-my-data`.
+
 Parallel-run note:
 
 - each initialized BOGA worktree gets readable Supabase `project_id`, slot-derived ports, containers, and database volume.

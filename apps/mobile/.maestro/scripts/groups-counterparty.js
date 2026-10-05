@@ -64,7 +64,7 @@ function signIn() {
 }
 
 function rpc(token, name, args) {
-  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '3', 'x-boga-group-contract': '4' });
+  return post('/rest/v1/rpc/' + name, token, args, { 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '4', 'x-boga-group-contract': '4' });
 }
 
 function rpcOk(token, name, args) {

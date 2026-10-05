@@ -77,6 +77,7 @@ const sessionEntity = (id: string, ms: number): WireEntity => ({
   client_updated_at_ms: ms,
   fields: {
     gym_id: null,
+    source_plan_id: null,
     status: 'completed',
     started_at: ms,
     completed_at: ms,
@@ -94,6 +95,7 @@ const sessionExerciseEntity = (id: string, sessionId: string, ms: number): WireE
   fields: {
     session_id: sessionId,
     exercise_definition_id: null,
+    source_plan_exercise_id: null,
     order_index: 0,
     name: 'Bench Press',
     machine_name: null,
@@ -103,10 +105,10 @@ const sessionExerciseEntity = (id: string, sessionId: string, ms: number): WireE
   },
 });
 
-/** Each account's server rows, by pull layer. */
+/** Each account's server rows, by pull layer (five-layer topology). */
 const SERVER_ROWS: Record<string, Record<number, WireEntity[]>> = {
-  [USER_A]: { 1: [sessionEntity('a-session', 100)], 2: [sessionExerciseEntity('a-sx', 'a-session', 100)] },
-  [USER_B]: { 1: [sessionEntity('b-session', 200)], 2: [sessionExerciseEntity('b-sx', 'b-session', 200)] },
+  [USER_A]: { 2: [sessionEntity('a-session', 100)], 3: [sessionExerciseEntity('a-sx', 'a-session', 100)] },
+  [USER_B]: { 2: [sessionEntity('b-session', 200)], 3: [sessionExerciseEntity('b-sx', 'b-session', 200)] },
 };
 
 /** The cursor the stub server hands back after a layer's snapshot. */

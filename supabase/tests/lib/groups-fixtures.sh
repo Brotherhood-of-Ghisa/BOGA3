@@ -41,7 +41,7 @@ rpc() {
   STATUS="$(curl --silent --show-error -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Content-Profile: app_public" \
     -o "${out}" -w "%{http_code}" \
     --data "${body}" \
@@ -62,7 +62,7 @@ rest() {
     -H "Prefer: return=representation"
     -o "${out}" -w "%{http_code}")
   if [[ -n "${body}" ]]; then
-    args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" --data "${body}")
+    args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
   fi
   STATUS="$(curl "${args[@]}" "${API_URL}/rest/v1/${table}?${query}")"
   BODY="$(cat "${out}")"
@@ -94,7 +94,7 @@ sign_in() {
   local email="$1" out
   out="$(mktemp)"
   STATUS="$(curl --silent --show-error -X POST \
-    -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-3}" -H "Content-Type: application/json" \
+    -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -o "${out}" -w "%{http_code}" \
     --data "$(jq -nc --arg e "${email}" --arg p "${PASSWORD}" '{email: $e, password: $p}')" \
     "${API_URL}/auth/v1/token?grant_type=password")"
