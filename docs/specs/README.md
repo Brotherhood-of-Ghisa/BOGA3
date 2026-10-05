@@ -20,11 +20,8 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/10-api-authn-authz-guidelines.md`: Minimal authN/authZ/API development and consumption rules for backend work.
 - `docs/specs/11-maestro-runtime-and-testing-conventions.md`: Authoritative Maestro iOS runtime/testing contract.
 - `docs/specs/12-worktree-config-and-isolation.md`: Slot-lease model, port derivation, per-worktree isolation, lifecycle command mechanism, and the removed cleanup mechanisms and why.
-- `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
-- `docs/specs/tech/bodyweight-load-contract.md`: Ordinary/optional bodyweight
-  calculation policies, dated kg readings, migration, consumers and privacy.
-- `docs/specs/tech/groups-contract.md`: Group domain rules — share ledger, stream, evaluator, boards, certification, comparisons, RPC conventions, mobile group client, and the rule IDs code cites.
-- `docs/specs/tech/sync-v2-server-contract.md`: Authoritative sync-v2 server contract — schema / LWW / RLS (Part A) and push/pull RPC wire contract (Part B).
+- `docs/specs/tech/README.md`: Index of the subsystem deep-dive contracts (sync, groups, metrics, bodyweight, session planning, competitions). Load it to find the one that owns your subsystem.
+- `docs/specs/ui/README.md`: Index of the UI docs and the maintenance trigger map. Load it when changing screens, components or routes.
 
 Planning docs (milestones, task cards, plans, and their templates) are not
 specs. They are optional and ephemeral and live under `docs/plans/` (see
