@@ -8,8 +8,10 @@ import {
   CHART_RIGHT_GUTTER,
   formatLatestFigures,
   formatPacePhrase,
+  formatPersonalRecordLead,
   formatSignedCount,
   formatWeekRange,
+  latestRecordLine,
   latestSessionAccessibilityLabel,
   monthChartAccessibilityLabel,
   monthChartGeometry,
@@ -17,7 +19,7 @@ import {
   toPolyline,
   weekShare,
 } from '@/components/today/progress-format';
-import type { LatestSessionSummary, ProgressCounts, TodayProgressMonth } from '@/src/progress-summary';
+import type { LatestSessionSummary, ProgressCounts, SessionPersonalRecord, TodayProgressMonth } from '@/src/progress-summary';
 import { localMonthWindow, localWeekWindow } from '@/src/utils/local-calendar';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
@@ -55,6 +57,9 @@ const month = (overrides: {
   };
 };
 
+const BENCH_1RM: SessionPersonalRecord = { kind: 'oneRepMax', exerciseName: 'Bench Press', value: 102.53, reps: null };
+const BENCH_WEIGHT: SessionPersonalRecord = { kind: 'weight', exerciseName: 'Bench Press', value: 90, reps: 5 };
+
 const latest = (overrides: Partial<LatestSessionSummary> = {}): LatestSessionSummary => ({
   id: 'session-1',
   startedAt: local(2026, 10, 15, 7, 12),
@@ -63,7 +68,7 @@ const latest = (overrides: Partial<LatestSessionSummary> = {}): LatestSessionSum
   gymName: 'Canal Street Gym',
   workingSets: 12,
   exerciseCount: 4,
-  prs: 2,
+  records: [BENCH_1RM, BENCH_WEIGHT],
   ...overrides,
 });
 
@@ -216,9 +221,28 @@ describe('the latest session row', () => {
   });
 
   it('leaves out a missing gym and a session without PRs', () => {
-    expect(latestSessionAccessibilityLabel(latest({ gymName: '  ', prs: 0, workingSets: 1, exerciseCount: 1 }))).toBe(
+    expect(latestSessionAccessibilityLabel(latest({ gymName: '  ', records: [], workingSets: 1, exerciseCount: 1 }))).toBe(
       'Completed session on 10/15 07:12, 1h 5m, 1 set, 1 exercise',
     );
-    expect(latestSessionAccessibilityLabel(latest({ gymName: null, prs: 1 }))).toContain('4 exercises, 1 PR');
+    expect(latestSessionAccessibilityLabel(latest({ gymName: null, records: [BENCH_1RM] })))
+      .toContain('4 exercises, Bench Press 1RM 102.5 · PR');
+  });
+});
+
+describe("the latest session's PRs", () => {
+  it('names each record kind with its figure, without a unit', () => {
+    expect(formatPersonalRecordLead(BENCH_1RM)).toBe('Bench Press 1RM 102.5');
+    expect(formatPersonalRecordLead(BENCH_WEIGHT)).toBe('Bench Press Weight 90.0 × 5');
+    expect(formatPersonalRecordLead({ ...BENCH_WEIGHT, value: 92.5, reps: null })).toBe('Bench Press Weight 92.5');
+    expect(formatPersonalRecordLead({ kind: 'volume', exerciseName: ' Deadlift ', value: 4199.6, reps: null }))
+      .toBe('Deadlift Volume 4200');
+  });
+
+  it('names one PR and only counts several, one per record kind', () => {
+    expect(latestRecordLine(latest({ records: [] }))).toBeNull();
+    expect(latestRecordLine(latest({ records: [BENCH_WEIGHT] })))
+      .toEqual({ kind: 'one', lead: 'Bench Press Weight 90.0 × 5', note: 'PR' });
+    // One exercise taking 1RM and Weight is two PRs.
+    expect(latestRecordLine(latest())).toEqual({ kind: 'many', count: '2 PRs' });
   });
 });

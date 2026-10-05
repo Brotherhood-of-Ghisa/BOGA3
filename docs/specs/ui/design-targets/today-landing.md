@@ -47,27 +47,38 @@ runtime gallery of every state below on 2026-10-03.
   operator review of the phone build (2026-10-03).
 - **Progress card, bottom: latest session.** A `Latest session` micro-label
   with `All sessions` (caps text button → the Sessions list), then the most
-  recent completed session as one link row: the session summary line (stamp ·
-  duration @ gym), `<n> sets · <n> exercises`, its PR count in `record` and a
-  `Tag` per group it was shared to. No exercise names, as on the group stream
-  session card. Opens the completed session. No in-progress state: an active
-  workout is reached from Train.
+  recent completed session as one link row, the **session summary row** both
+  cards share: the session summary line (stamp · duration @ gym), `<n> sets ·
+  <n> exercises`, then its PRs as a `record` line, and a `Tag` per group it
+  was shared to. No exercise names beyond a single PR's, as on the group
+  stream session card. Opens the completed session. No in-progress state: an
+  active workout is reached from Train.
 - **Group card, top: this week's board.** A `ChipGroup` switcher only when the
   user belongs to more than one group; with one group the board's micro-label
   names it (`<group> · this week`). The board is the top three members by
   working sets this week: rank, member (`You` in Source Sans 600 on `paper`),
   a `viz` bar (the leader one step darker), `Sets` and `PRs` columns. The
-  card's `PRs` are **group records** (the member took #1 on a group board),
-  not personal PRs, so they need not match the Progress card's. When the
+  card's `PRs` are **group records** (the member took #1 on a group board,
+  one per board taken), not personal PRs, so they need not match the Progress
+  card's. When the
   user is outside the top three, a `You · <rank>` line with their figures
   closes the board.
 - **Group card, bottom: latest activity.** A `Latest activity` micro-label,
-  then one link row: one member training now (the `set-current` ring and
-  `Training now`, start · gym, `<n> sets · <n> exercises`; opens the group
-  session); else the most recent completed session (`Completed · <duration>`,
-  its group record as a `record` line; opens the group session). When several
-  members are training now, the row is `<n> training now`, their names and
-  gyms, and opens the Groups tab.
+  then one link row: one member training now, else the most recent completed
+  session, each the Progress card's session summary row under a header naming
+  the member (Archivo 700 `lg`) with, while training, the `set-current` ring
+  and `Training now` beside it. Training now reads `Started 07:40 @ gym` (no
+  duration yet) and has no PR line; a completed session's PRs are its group
+  records. Both open the group session. When several members are training
+  now, the row is `<n> training now`, their names and gyms, and opens the
+  Groups tab.
+- **The PR line** (both cards). `record` `arrow-up`, then a single PR named
+  in `record` Plex Mono with its noun in `ink-muted` (`Bench Press 1RM 102.5 ·
+  PR`, `Deadlift 1RM 213.3 kg · group record`), or several only counted
+  (`3 PRs`, `2 group records`). A session's PRs are one per record kind
+  (`../../tech/training-metrics-contract.md` §3); its group records one per
+  board taken. The week `PRs` figure stays one number, with no breakdown by
+  kind.
 - **Emphasis.** No `accent` anywhere on Today: it has no primary action. The
   only colour beyond the neutrals and the `viz` ramp is `record` for PRs.
 - **States.** A user with no sessions sees a `StatePanel` in the Progress card
@@ -105,9 +116,12 @@ Where the build departs from the canvas or settles what the brief left open:
 - **The latest completed row** stamps its start as the Progress card does
   (`10/16 06:10 · Iron Works`); a training-now start is the clock time today
   (`Started 07:40`), else the date and time.
-- **The record line** leads with the first group record, 1RM before Weight:
-  the figure (`Deadlift 1RM 213.3`) in `record` Plex Mono, then
-  `· group record` in `ink-muted` body (`· <n> group records` with more).
+- **One row for both cards** (operator direction, 2026-10-05, from a mock of
+  the shared row). The Group card's completed session dropped its muted
+  `date · gym` line and `Completed · <duration>` status for the Progress
+  summary line, and its figures took the Progress card's muted `detail`
+  style. Its record line no longer leads with a record when there are
+  several; it only counts them.
 - **No live or completed session** in the group: one muted line, `No sessions
   shared to this group yet.`
 - **Offline** keeps the cached week under the offline `Notice`; the cached
@@ -132,6 +146,15 @@ committed flow asserts Today beyond `today-screen` in `smoke-launch.yaml`
 | `today-group-03-one-group-training` | one group, one member training now | no switcher; the group-named board; the live row |
 | `today-group-04-several-training` | several training now, the user outside the top three | the switcher; `You · <rank>`; the collapsed row |
 | `today-group-01-auth-unavailable-bottom` | an unconfigured build | the no-account group panel (signed out never reaches Today) |
+| `g1-one-pr-one-group-record-progress` / `-group` | own latest set one PR; a member's latest took #1 on one board | the shared row; a single PR and a single group record named |
+| `g2-several-prs-several-group-records-progress` / `-group` | own latest set two PRs; a member's latest took #1 on two boards | several only counted; the week `PRs` one number |
+| `g3-training-now-group` | one member training now | the member header with the training-now mark; `Started <time>`, no PR line |
+| `g4-several-training-group` | several training now | the collapsed row, unchanged |
+
+The `g*` captures (2026-10-05, the shared row) come from a scratch flow over a
+signed-in device user on the slot stack with group competitions activated;
+the other members' sessions were pushed through `sync_push` and the evaluator
+drained between states.
 
 Offline, the error states and Retry are Jest-only (`today-group-card.test.tsx`).
 No target screenshots are committed; runtime captures stay in the gitignored

@@ -1,9 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { LatestSessionSummary, TodayProgress } from '@/src/progress-summary';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
@@ -11,9 +10,10 @@ import { MonthPace } from './month-pace';
 import {
   formatLatestDuration,
   formatLatestFigures,
-  formatPrCount,
+  latestRecordLine,
   latestSessionAccessibilityLabel,
 } from './progress-format';
+import { SessionSummaryRow } from './session-summary-row';
 import { todayText } from './text-styles';
 import { WeekFigures } from './week-figures';
 
@@ -28,43 +28,18 @@ export type TodayProgressCardProps = {
 // The most recent completed session as one link row. No in-progress state:
 // an active workout is reached from Train.
 function LatestSessionRow({ latest, onPress }: { latest: LatestSessionSummary; onPress: () => void }) {
-  const gym = latest.gymName?.trim();
   return (
-    <Pressable
+    <SessionSummaryRow
       accessibilityHint="Opens the completed session"
       accessibilityLabel={latestSessionAccessibilityLabel(latest)}
-      accessibilityRole="button"
+      duration={formatLatestDuration(latest)}
+      figures={formatLatestFigures(latest)}
+      gym={latest.gymName}
       onPress={onPress}
-      style={({ pressed }) => [styles.latestRow, pressed ? styles.pressed : null]}
-      testID="today-latest-session">
-      <View style={styles.latestCopy}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.summaryLine}>
-          <Text allowFontScaling={false} style={styles.summaryFigure} testID="today-latest-session-start">
-            {formatMonthDayTime(latest.startedAt.getTime())}
-          </Text>
-          <Text allowFontScaling={false} style={styles.separator}> · </Text>
-          <Text allowFontScaling={false} style={styles.summaryFigure}>{formatLatestDuration(latest)}</Text>
-          {gym ? (
-            <>
-              <Text allowFontScaling={false} style={styles.separator}> @ </Text>
-              <Text allowFontScaling={false} style={styles.gym}>{gym}</Text>
-            </>
-          ) : null}
-        </Text>
-        <Text allowFontScaling={false} style={todayText.detailFigure} testID="today-latest-session-figures">
-          {formatLatestFigures(latest)}
-        </Text>
-        {latest.prs > 0 ? (
-          <View style={styles.prRow} testID="today-latest-session-prs">
-            <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-            <Text allowFontScaling={false} style={[todayText.record, styles.prText]}>
-              {formatPrCount(latest.prs)}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
-    </Pressable>
+      record={latestRecordLine(latest)}
+      stamp={formatMonthDayTime(latest.startedAt.getTime())}
+      testID="today-latest-session"
+    />
   );
 }
 
@@ -106,45 +81,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: -uiSpace.sm,
-  },
-  latestRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.md,
-    minHeight: uiGeometry.tapTarget,
-  },
-  // A pressed row takes the `paper` ground, as `ListRow` does.
-  pressed: {
-    backgroundColor: uiRoles.paper,
-  },
-  latestCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: uiSpace.xs,
-  },
-  summaryLine: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  summaryFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-  },
-  separator: {
-    color: uiRoles.inkFaint,
-  },
-  gym: {
-    fontWeight: '600',
-  },
-  prRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  prText: {
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
   },
 });

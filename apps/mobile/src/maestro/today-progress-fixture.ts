@@ -13,7 +13,8 @@ const HOUR_MS = 60 * 60 * 1000;
  *   one this morning when `now` is past 09:00, so the month runs ahead of the
  *   previous one's pace.
  * - Each session is a bench, squat and row block of three working sets
- *   (nine in all). Bench climbs 2.5 every fourth session, a PR each time.
+ *   (nine in all). Bench climbs 2.5 every fourth session: three PRs each
+ *   time (1RM, Weight and Volume).
  *
  * Written through the session repository, so the facts table derives its PRs
  * exactly as it would for logged sessions.

@@ -116,10 +116,12 @@ target and contract.
      elapsed day, today included, times the month's days; the chart draws it
      (and its spoken label states it). No summary line sits under the chart.
    - Each week figure's caption is `vs <n> last wk`.
-   - A PR is a 1RM record (`tech/training-metrics-contract.md` §3), at most
-     one per exercise per session.
+   - A PR is one record kind an exercise took in a session: 1RM, Weight or
+     Volume (`tech/training-metrics-contract.md` §3), so one exercise adds up
+     to three. The week's `PRs` is one number with no breakdown by kind.
    - The latest completed session is one row; full history is the Sessions
-     list (`All sessions`). The row carries no group tags: which groups a
+     list (`All sessions`). Its PR line names a single PR (exercise, kind,
+     figure) and only counts several. The row carries no group tags: which groups a
      session was shared to is decided on the server, and the device does not
      know it.
    - With no completed session, the card is `Your week starts here` with
@@ -130,15 +132,18 @@ target and contract.
    - The board is this local week's top three members by working sets
      (completed sessions shared to the group), each with a `viz` bar as a
      share of the leader's (the leader in the darker step) and `PRs`. On the
-     group card a PR is a **group record** (the member took #1 on a board), not
-     a personal PR, so the two cards' PR counts follow different rules. Ranks
+     group card a PR is a **group record**, one per board the member took #1
+     on, not a personal PR, so the two cards' PR counts follow different rules.
+     Ranks
      tie; when the user is outside the three rows, a `You · <rank>` line
      closes the board.
    - The latest activity is one row: one member training now opens their
      session; several collapse into `<n> training now` with their names and
      gyms and open the Groups screen; otherwise the latest completed session
-     (at any time) with its group record line opens that session. A group
-     with neither says so in one muted line.
+     (at any time) with its group record line opens that session. One
+     member's session is the Progress card's row under the member's name (and
+     the training-now mark while training). A group with neither says so in
+     one muted line.
    - No group: `Train with friends` with `Find a group` (My groups). Offline,
      the cached week stays under the offline `Notice`; a cached earlier week is
      never shown as this one.

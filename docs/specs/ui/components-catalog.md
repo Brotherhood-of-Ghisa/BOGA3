@@ -561,10 +561,18 @@ Brief entrypoint inventory of the current reusable UI component set.
 - Purpose (target `design-targets/today-landing.md`; semantics `ux-rules.md` §7):
   - `TodayProgressCard` — one `Card`: `WeekFigures`, a `rule-soft` hairline,
     `MonthPace`, a hairline, then `Latest session` with its `All sessions`
-    text button and the latest-session link row (summary line, `sets ·
-    exercises`, a `record` PR count when it has one; no exercise names).
+    text button and the latest-session `SessionSummaryRow`.
     testIDs `today-progress-card`, `today-all-sessions-button`,
-    `today-latest-session` (`-start`, `-figures`, `-prs`)
+    `today-latest-session` (`-start`, `-figures`, `-record`)
+  - `SessionSummaryRow` (`session-summary-row.tsx`) — one session as a link
+    row, shared by both Today cards: an optional member header (Archivo 700
+    `lg`, with `TrainingNowMark` — the `set-current` ring and `Training now`
+    — while training; the Group card only), the summary line (stamp ·
+    duration @ gym, Plex Mono 500 figures), `sets · exercises` in muted
+    `detail` Plex Mono, then the PR line (`record` `arrow-up`; one PR named in
+    `record` Plex Mono with its noun in `ink-muted`, several only counted;
+    `src/session-insights/record-line.ts`). testIDs `<id>` (`-member`,
+    `-training-now`, `-start`, `-figures`, `-record`)
   - `WeekFigures` — `This week` with the Mon–Sun range in `ink-faint`, then
     `Sessions`, `Sets` and `PRs` (Plex Mono 700; a non-zero PR count in
     `record` with its `arrow-up`), each over a `ShareBar` and `vs <n> last wk`.

@@ -75,8 +75,9 @@ const logSession = async (id: string, startedAt: Date, benchKg: number) => {
   await completeSessionDraft(id, { completedAt, now: completedAt });
 };
 
-// September: one session before the 16th, one after (a PR). October: Tue 6
-// and Thu 8 last week (Thu a PR), Thu 15 this week (a PR, the latest).
+// September: one session before the 16th, one after (a bench climb). October:
+// Tue 6 and Thu 8 last week (Thu a climb), Thu 15 this week (a climb, the
+// latest). Each climb beats bench's 1RM, Weight and Volume: three PRs.
 const logHistory = async () => {
   await logSession('sep-03', local(2026, 9, 3, 9), 100);
   await logSession('sep-20', local(2026, 9, 20, 9), 105);
@@ -151,10 +152,10 @@ describe('Today: the Progress card over real data', () => {
     expect(workingSets.value).toHaveTextContent('6');
     expect(workingSets.previous).toHaveTextContent('vs 12 last wk');
 
-    // Thu 15's bench beat Thu 8's: one PR, matching last week's one — a full bar.
+    // Thu 15's bench beat Thu 8's: three PRs (one per record kind), matching last week's three — a full bar.
     const prs = figure('prs');
-    expect(prs.value).toHaveTextContent('1');
-    expect(prs.previous).toHaveTextContent('vs 1 last wk');
+    expect(prs.value).toHaveTextContent('3');
+    expect(prs.previous).toHaveTextContent('vs 3 last wk');
     expect(prs.fill).toHaveStyle({ width: '100%' });
   });
 
@@ -163,7 +164,7 @@ describe('Today: the Progress card over real data', () => {
     await logHistory();
     await renderToday();
 
-    // October: 3 sessions, 18 working sets, 2 PRs. September to the 16th: 1, 6, 0; all of it: 2, 12, 1.
+    // October: 3 sessions, 18 working sets, 6 PRs. September to the 16th: 1, 6, 0; all of it: 2, 12, 3.
     expect(screen.getByText('October so far')).toBeTruthy();
     expect(text('today-progress-month-working-sets')).toHaveTextContent('18 sets');
     expect(text('today-progress-month-difference')).toHaveTextContent('+12');
@@ -186,14 +187,16 @@ describe('Today: the Progress card over real data', () => {
     const row = text('today-latest-session');
     expect(row).toHaveProp(
       'accessibilityLabel',
-      'Completed session on 10/15 07:12, 1h, 6 sets, 2 exercises, at Iron House, 1 PR',
+      'Completed session on 10/15 07:12, 1h, 6 sets, 2 exercises, at Iron House, 3 PRs',
     );
     expect(text('today-latest-session-start')).toHaveTextContent('10/15 07:12');
     expect(text('today-latest-session-figures')).toHaveTextContent('6 sets · 2 exercises');
     // A count, not the names: the row matches the group stream session card.
     expect(screen.queryByTestId('today-latest-session-exercises')).toBeNull();
     expect(screen.queryByText(/Barbell Bench Press/)).toBeNull();
-    expect(text('today-latest-session-prs')).toHaveTextContent('1 PR');
+    // Several PRs are only counted; no member header on your own session.
+    expect(text('today-latest-session-record')).toHaveTextContent('3 PRs');
+    expect(screen.queryByTestId('today-latest-session-member')).toBeNull();
 
     fireEvent.press(row);
     fireEvent.press(text('today-all-sessions-button'));
@@ -234,7 +237,8 @@ describe('Today: the today-progress harness fixture', () => {
 
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('3');
     expect(text('today-progress-week-sessions-previous')).toHaveTextContent('vs 4 last wk');
-    expect(text('today-progress-week-prs-value')).toHaveTextContent('1');
+    // One bench climb this week: its 1RM, Weight and Volume.
+    expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
     expect(text('today-progress-month-difference')).toHaveTextContent('+36');
     expect(text('today-latest-session-start')).toHaveTextContent('10/16 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('9 sets · 3 exercises');

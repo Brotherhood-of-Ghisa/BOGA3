@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { GroupFilterChips } from '@/components/groups/group-filter-chips';
@@ -16,6 +15,7 @@ import {
 } from '@/src/groups';
 
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
+import { SessionSummaryRow, TrainingNowMark } from './session-summary-row';
 import { todayText } from './text-styles';
 
 export type TodayGroupCardProps = {
@@ -123,19 +123,29 @@ function WeekBoard({ board, title, onPress }: { board: WeekBoardViewModel; title
   );
 }
 
-function TrainingNowMark({ children }: { children: ReactNode }) {
-  return (
-    <View style={styles.liveMark}>
-      <Icon name="set-current" size="xs" />
-      {children}
-    </View>
-  );
-}
+const ACTIVITY_HINTS: Record<LatestActivityViewModel['kind'], string> = {
+  training: 'Opens their session',
+  several: 'Opens the group',
+  completed: 'Opens their session',
+};
 
-function LatestActivityContent({ activity }: { activity: LatestActivityViewModel }) {
-  if (activity.kind === 'several') {
-    return (
-      <>
+// Several members training now: one row naming them, which opens the group.
+function SeveralTrainingRow({
+  activity,
+  onPress,
+}: {
+  activity: Extract<LatestActivityViewModel, { kind: 'several' }>;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={ACTIVITY_HINTS.several}
+      accessibilityLabel={activity.accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.latestRow, pressed ? styles.pressed : null]}
+      testID="today-group-latest-several">
+      <View style={styles.latestCopy}>
         <TrainingNowMark>
           <Text allowFontScaling={false} style={styles.member} testID="today-group-latest-title">
             <Text allowFontScaling={false} style={styles.memberFigure}>{activity.count}</Text> training now
@@ -149,56 +159,11 @@ function LatestActivityContent({ activity }: { activity: LatestActivityViewModel
             {activity.gyms}
           </Text>
         ) : null}
-      </>
-    );
-  }
-
-  const status =
-    activity.kind === 'training' ? (
-      <TrainingNowMark>
-        <Text allowFontScaling={false} style={styles.liveText}>
-          Training now
-        </Text>
-      </TrainingNowMark>
-    ) : (
-      <Text allowFontScaling={false} style={todayText.mutedLine}>
-        {activity.status}
-      </Text>
-    );
-  return (
-    <>
-      <View style={styles.latestHeader}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[styles.member, styles.shrink]}>
-          {activity.name}
-        </Text>
-        <View testID="today-group-latest-status">{status}</View>
       </View>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={todayText.mutedLine}>
-        {activity.context}
-      </Text>
-      <Text allowFontScaling={false} style={[todayText.detailFigure, styles.inkFigure]}>
-        {activity.figures}
-      </Text>
-      {activity.kind === 'completed' && activity.record ? (
-        <View style={styles.recordLine} testID="today-group-latest-record">
-          <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={styles.recordText}>
-            <Text allowFontScaling={false} style={todayText.record}>
-              {activity.record.lead}
-            </Text>
-            <Text allowFontScaling={false} style={styles.muted}>{` · ${activity.record.note}`}</Text>
-          </Text>
-        </View>
-      ) : null}
-    </>
+      <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
+    </Pressable>
   );
 }
-
-const ACTIVITY_HINTS: Record<LatestActivityViewModel['kind'], string> = {
-  training: 'Opens their session',
-  several: 'Opens the group',
-  completed: 'Opens their session',
-};
 
 function LatestActivity({
   activity,
@@ -216,21 +181,21 @@ function LatestActivity({
       </Text>
     );
   }
-  const onPress =
-    activity.kind === 'several' ? onOpenGroup : () => onOpenSession(activity.memberUserId, activity.sessionId);
+  if (activity.kind === 'several') return <SeveralTrainingRow activity={activity} onPress={onOpenGroup} />;
+  // One member's session: the Progress card's row, under the member's name.
   return (
-    <Pressable
+    <SessionSummaryRow
       accessibilityHint={ACTIVITY_HINTS[activity.kind]}
       accessibilityLabel={activity.accessibilityLabel}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.latestRow, pressed ? styles.pressed : null]}
-      testID={`today-group-latest-${activity.kind}`}>
-      <View style={styles.latestCopy}>
-        <LatestActivityContent activity={activity} />
-      </View>
-      <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
-    </Pressable>
+      duration={activity.duration}
+      figures={activity.figures}
+      gym={activity.gym}
+      member={{ name: activity.name, trainingNow: activity.kind === 'training' }}
+      onPress={() => onOpenSession(activity.memberUserId, activity.sessionId)}
+      record={activity.record}
+      stamp={activity.stamp}
+      testID={`today-group-latest-${activity.kind}`}
+    />
   );
 }
 
@@ -265,7 +230,11 @@ export function TodayGroupCard({
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
           Latest activity
         </Text>
-        <LatestActivity activity={activity} onOpenGroup={openGroup} onOpenSession={(memberId,sessionId) => onOpenSession(memberId,sessionId,selectedGroupId)} />
+        <LatestActivity
+          activity={activity}
+          onOpenGroup={openGroup}
+          onOpenSession={(memberId, sessionId) => onOpenSession(memberId, sessionId, selectedGroupId)}
+        />
       </View>
     </Card>
   );
@@ -409,15 +378,6 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
-  latestHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-  },
-  shrink: {
-    flexShrink: 1,
-  },
   member: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
@@ -429,36 +389,10 @@ const styles = StyleSheet.create({
     fontFamily: uiFonts.figure.family,
     fontWeight: '700',
   },
-  liveMark: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  liveText: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
   names: {
     fontFamily: uiFonts.body.family,
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
-  },
-  inkFigure: {
-    color: uiRoles.ink,
-  },
-  recordLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  recordText: {
-    flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
   },
 });

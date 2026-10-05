@@ -11,7 +11,7 @@
 #   - the evaluator stores the app's working-set rule (every set but a warm-up);
 #     an exercise counts once it has a working set (warm-up-only adds none);
 #   - the board: working sets (working, performed, live, rows present)
-#     and group records (non-voided, #1 on a board) over completed, live,
+#     and group records (non-voided, one per board taken #1) over completed, live,
 #     shared sessions started in [start, end); every current member ranked,
 #     ties sharing a rank; provisional, voided, own-best-only and out-of-window
 #     records excluded; a record on an unlinked exercise kept;
@@ -390,8 +390,9 @@ expect_sql "a fact with working null counts as working everywhere, and is not a 
    rollback;" \
   "4/1|4|t
 5/1|5|f"
-# M1: 130 × 1 takes #1 on Weight (a group record).
-sess "${MEMBER_TOKEN}" "${T}-m1" completed "$(at 3)" "${T}-m-bench" m1:130:1:rir_0
+# M1: 105 × 1 takes #1 on Weight only (one group record): heavier than R1's
+# 100, but its 1RM stays under R1's 100 × 5.
+sess "${MEMBER_TOKEN}" "${T}-m1" completed "$(at 3)" "${T}-m-bench" m1:105:1:rir_0
 drain "M1"
 # R2: a group record whose set is then deleted: voided.
 sess "${RIVAL_TOKEN}" "${T}-r2" completed "$(at 4)" "${T}-r-bench" r2:140:1:rir_0
@@ -421,12 +422,13 @@ sess "${MEMBER_TOKEN}" "${T}-edge-in" completed "${WS}" "${T}-m-edge" ei:50:1:ri
 drain "edge in"
 sess "${MEMBER_TOKEN}" "${T}-edge-out" completed "${WE}" "${T}-m-edge" eo:60:1:rir_0
 drain "edge out"
-# A2: a provisional group record (active session, 120 × 5 leads 1RM).
+# A2: a provisional group record (active session, 120 × 5 leads 1RM and
+# Weight: two boards).
 sess "${ATHLETE_TOKEN}" "${T}-a2" active "$(at 10)" "${T}-a-bench" a2s:120:5:rir_0
 drain "A2"
 expect_sql "A2's record is provisional and a group record" \
   "select count(*) from app_public.group_events e, jsonb_array_elements(e.payload -> 'boards') b
-    where e.kind = 'record' and e.set_id = '${T}-a2s' and (b ->> 'group_record')::boolean;" "1"
+    where e.kind = 'record' and e.set_id = '${T}-a2s' and (b ->> 'group_record')::boolean;" "2"
 for spec in "r1a:${RIVAL_UID}:1" "a1:${ATHLETE_UID}:0" "m1:${MEMBER_UID}:1" "a3r:${ATHLETE_UID}:1" "r3:${RIVAL_UID}:1" \
             "ei:${MEMBER_UID}:1" "eo:${MEMBER_UID}:1"; do
   IFS=: read -r set uid want <<<"${spec}"
@@ -436,17 +438,26 @@ for spec in "r1a:${RIVAL_UID}:1" "a1:${ATHLETE_UID}:0" "m1:${MEMBER_UID}:1" "a3r
         and exists (select 1 from jsonb_array_elements(e.payload -> 'boards') b where (b ->> 'group_record')::boolean);" "${want}"
 done
 
+expect_sql "M1 takes #1 on Weight only; R1 on both boards" \
+  "select string_agg(replace(e.set_id, '${T}-', '') || '=' || b.metric, ',' order by e.set_id, b.metric)
+     from app_public.group_events e,
+          lateral (select x ->> 'metric' as metric from jsonb_array_elements(e.payload -> 'boards') x
+                    where (x ->> 'group_record')::boolean) b
+    where e.kind = 'record' and e.set_id in ('${T}-m1', '${T}-r1a');" "m1=weight,r1a=e1rm,r1a=weight"
+
 expect_sql "both record pipelines are covered (Edge contract 1, Squat contract 2)" \
   "select string_agg(distinct replace(set_id, '${T}-', '') || '=' || contract_version, ',')
      from app_public.group_events where kind = 'record' and set_id in ('${T}-ei', '${T}-r3');" "ei=1,r3=2"
 
 summary "${OWNER_TOKEN}"
 expect_ok "the board"
-# R 5 W/S (r1a, r1b, r1d, r1e, r3), 2 records (R1, R3; R2 voided). A 6 W/S
-# (a1, a2, a6, a8, a9, a3r), 1 record (A3, unlinked; A1 an own best only, A2
-# provisional). M 2 W/S (m1, ei), 2 records (M1, edge in; edge out is
-# outside). O, X nothing; L has not joined yet.
-expect_board "A=1/6/1,R=2/5/2,M=3/2/2,X=4/0/0,O=4/0/0" "the board"
+# Group records count one per board taken (#1 on Weight and on 1RM is two).
+# R 5 W/S (r1a, r1b, r1d, r1e, r3), 4 records (R1 and R3 each #1 on both
+# boards; R2 voided). A 6 W/S (a1, a2, a6, a8, a9, a3r), 2 records (A3 on both,
+# unlinked; A1 an own best only, A2 provisional). M 2 W/S (m1, ei), 3 records
+# (M1 on Weight only, edge in on both; edge out is outside). O, X nothing; L
+# has not joined yet.
+expect_board "A=1/6/2,R=2/5/4,M=3/2/3,X=4/0/0,O=4/0/0" "the board"
 check "a board row's exact keys" '.members[0] | keys == ["group_records", "member", "rank", "working_sets"]'
 check "a board member's exact keys" '.members[0].member | keys == ["user_id", "username"]'
 
@@ -454,27 +465,27 @@ check "a board member's exact keys" '.members[0].member | keys == ["user_id", "u
 run_psql "delete from app_public.exercise_sets where owner_user_id = '${ATHLETE_UID}' and id = '${T}-a6';" >/dev/null
 summary "${ATHLETE_TOKEN}"
 expect_ok "after a hard delete"
-expect_board "R=1/5/2,A=2/5/1,M=3/2/2,X=4/0/0,O=4/0/0" "a hard-deleted set; A and R tie on W/S, records break it"
+expect_board "R=1/5/4,A=2/5/2,M=3/2/3,X=4/0/0,O=4/0/0" "a hard-deleted set; A and R tie on W/S, records break it"
 # A tombstone counts at once, before any drain: the Row record set leaves A's
 # working sets and group records; restoring it brings both back.
 next_cuam
 push "${ATHLETE_TOKEN}" "tombstone a3r" "$(e_set2 "${T}-a3r" "${T}-a3-se" 0 80 5 rir_2 "" "${CUAM}" "${CUAM}")"
 summary "${ATHLETE_TOKEN}"
 expect_ok "after a tombstone, undrained"
-expect_board "R=1/5/2,A=2/4/0,M=3/2/2,X=4/0/0,O=4/0/0" "a tombstoned set and its record stop counting before the evaluator runs"
+expect_board "R=1/5/4,A=2/4/0,M=3/2/3,X=4/0/0,O=4/0/0" "a tombstoned set and its record stop counting before the evaluator runs"
 next_cuam
 push "${ATHLETE_TOKEN}" "restore a3r" "$(e_set2 "${T}-a3r" "${T}-a3-se" 0 80 5 rir_2 "" "${CUAM}")"
 summary "${ATHLETE_TOKEN}"
 expect_ok "after the restore"
-expect_board "R=1/5/2,A=2/5/1,M=3/2/2,X=4/0/0,O=4/0/0" "a restored set counts again"
+expect_board "R=1/5/4,A=2/5/2,M=3/2/3,X=4/0/0,O=4/0/0" "a restored set counts again"
 drain "a3r tombstone and restore"
 summary "${ATHLETE_TOKEN}" "$(( WS + 1 ))" "${WE}"
 expect_ok "a window starting after the edge session"
-expect_board "R=1/5/2,A=2/5/1,M=3/1/1,X=4/0/0,O=4/0/0" "the start is inclusive"
+expect_board "R=1/5/4,A=2/5/2,M=3/1/1,X=4/0/0,O=4/0/0" "the start is inclusive"
 summary "${ATHLETE_TOKEN}" "${WS}" "$(( WE + 1 ))"
 expect_ok "a window ending after the edge-out session"
-expect_board "R=1/5/2,A=2/5/1,M=3/3/3,X=4/0/0,O=4/0/0" "the end is exclusive"
-pass "working sets by the app rule, performed, live and present; group records non-voided, #1, completed; ranks, ties, edges"
+expect_board "R=1/5/4,A=2/5/2,M=3/3/5,X=4/0/0,O=4/0/0" "the end is exclusive"
+pass "working sets by the app rule, performed, live and present; group records non-voided, one per #1 board, completed; ranks, ties, edges"
 
 # The late member: a session that started before their join is never shared.
 sleep 2
@@ -490,7 +501,7 @@ expect_sql "the pre-join session is not shared" \
   "select count(*) from app_public.group_session_shares where member_user_id = '${LATE_UID}';" "0"
 summary "${OWNER_TOKEN}"
 expect_ok "after the late member's pre-join session"
-expect_board "R=1/5/2,A=2/5/1,M=3/2/2,L=4/0/0,X=4/0/0,O=4/0/0" "an unshared session counts nothing"
+expect_board "R=1/5/4,A=2/5/2,M=3/2/3,L=4/0/0,X=4/0/0,O=4/0/0" "an unshared session counts nothing"
 pass "only sessions shared to the group count"
 
 # =============================================================================
@@ -524,7 +535,7 @@ check_args "R4's gym" --arg s "${T}-r4" '.training_now[] | select(.session_id ==
 check_args "A2 has no gym" --arg s "${T}-a2" '.training_now[] | select(.session_id == $s) | .gym_name == null'
 check_args "started_at_ms is the live start" --arg s "${T}-r4" --argjson t "$(at 11)" \
   '.training_now[] | select(.session_id == $s) | .started_at_ms == $t'
-expect_board "R=1/5/2,A=2/5/1,M=3/2/2,L=4/0/0,X=4/0/0,O=4/0/0" "active sessions add nothing to the board"
+expect_board "R=1/5/4,A=2/5/2,M=3/2/3,L=4/0/0,X=4/0/0,O=4/0/0" "active sessions add nothing to the board"
 
 # A fresh set write brings the stale session back.
 next_cuam
@@ -585,12 +596,12 @@ sess "${LEAVER_TOKEN}" "${T}-x3" completed "$(at 14)" "${T}-x-free" x3a:60:5:rir
 drain "X3"
 summary "${OWNER_TOKEN}"
 expect_ok "before removal"
-expect_board "R=1/5/2,A=2/5/1,M=3/2/2,X=4/2/0,L=5/0/0,O=5/0/0" "X on the board"
+expect_board "R=1/5/4,A=2/5/2,M=3/2/3,X=4/2/0,L=5/0/0,O=5/0/0" "X on the board"
 rpc "${OWNER_TOKEN}" group_remove_member "$(jq -nc --arg g "${GID}" --arg u "${LEAVER_UID}" '{p_group_id: $g, p_user_id: $u}')"
 expect_ok "remove X"
 summary "${OWNER_TOKEN}"
 expect_ok "after removal"
-expect_board "R=1/5/2,A=2/5/1,M=3/2/2,L=4/0/0,O=4/0/0" "a removed member leaves the board"
+expect_board "R=1/5/4,A=2/5/2,M=3/2/3,L=4/0/0,O=4/0/0" "a removed member leaves the board"
 expect_training "M:mst:1:1,R:r4:2:1,A:a2:1:1" "a removed member stops training now"
 expect_latest "r5" "a removed member's session is not the latest"
 summary "${LEAVER_TOKEN}"

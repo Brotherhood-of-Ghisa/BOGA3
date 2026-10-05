@@ -5,6 +5,7 @@ export {
   type LatestSessionSummary,
   type ProgressCounts,
   type ProgressSession,
+  type SessionPersonalRecord,
   type TodayProgress,
   type TodayProgressInput,
   type TodayProgressMonth,
@@ -15,6 +16,6 @@ export {
   createTodayProgressRepository,
   loadTodayProgress,
   type LatestCompletedSessionRow,
-  type PrE1rmFact,
+  type PersonalRecordFact,
   type ProgressSummaryStore,
 } from './repository';

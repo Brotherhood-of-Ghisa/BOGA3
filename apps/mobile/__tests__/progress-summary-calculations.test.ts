@@ -26,7 +26,7 @@ const LATEST: LatestSessionSummary = {
   gymName: 'Home',
   workingSets: 12,
   exerciseCount: 3,
-  prs: 1,
+  records: [{ kind: 'oneRepMax', exerciseName: 'Bench Press', value: 102.5, reps: null }],
 };
 
 const session = (id: string, completedAt: Date, workingSets: number): ProgressSession => ({ id, completedAt, workingSets });

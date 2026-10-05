@@ -1,9 +1,17 @@
 // The Progress card's words and chart geometry (pure). The figures come from
 // `src/progress-summary`; this file only says them (`ux-rules.md` §7, §13).
 
-import type { LatestSessionSummary, TodayProgressMonth } from '@/src/progress-summary';
+import type { LatestSessionSummary, SessionPersonalRecord, TodayProgressMonth } from '@/src/progress-summary';
 import type { LocalWindow } from '@/src/utils/local-calendar';
 import { formatCompactDuration } from '@/src/data/session-list';
+import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
+import type { RecordKind } from '@/src/exercise-calculations/records';
+import {
+  buildSessionRecordLine,
+  PERSONAL_RECORD_NOUN,
+  sessionRecordLineText,
+  type SessionRecordLine,
+} from '@/src/session-insights/record-line';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -88,7 +96,21 @@ export const monthChartAccessibilityLabel = (month: TodayProgressMonth): string 
   ].join(' ');
 };
 
-export const formatPrCount = (count: number): string => plural(count, 'PR', 'PRs');
+const RECORD_KIND_LABELS: Record<RecordKind, string> = { oneRepMax: '1RM', weight: 'Weight', volume: 'Volume' };
+
+const formatRecordValue = (record: SessionPersonalRecord): string => {
+  if (record.kind === 'oneRepMax') return formatOneRepMax(record.value);
+  if (record.kind === 'volume') return formatVolume(record.value);
+  return record.reps === null ? formatWeight(record.value) : `${formatWeight(record.value)} × ${record.reps}`;
+};
+
+/** `Bench Press 1RM 102.5`, `Squat Weight 140.0 × 5`, `Deadlift Volume 4200`: figures carry no unit. */
+export const formatPersonalRecordLead = (record: SessionPersonalRecord): string =>
+  [record.exerciseName.trim(), RECORD_KIND_LABELS[record.kind], formatRecordValue(record)].filter(Boolean).join(' ');
+
+/** The latest session's PRs: the one PR named, else only counted. */
+export const latestRecordLine = (latest: LatestSessionSummary): SessionRecordLine | null =>
+  buildSessionRecordLine(latest.records, formatPersonalRecordLead, PERSONAL_RECORD_NOUN);
 
 /** `12 sets · 4 exercises`: the working sets (`ux-rules.md` §5.11). */
 export const formatLatestFigures = (latest: LatestSessionSummary): string =>
@@ -105,7 +127,7 @@ export const latestSessionAccessibilityLabel = (latest: LatestSessionSummary): s
     plural(latest.workingSets, 'set', 'sets'),
     plural(latest.exerciseCount, 'exercise', 'exercises'),
     gym ? `at ${gym}` : null,
-    latest.prs > 0 ? formatPrCount(latest.prs) : null,
+    sessionRecordLineText(latestRecordLine(latest)),
   ]
     .filter((part): part is string => part !== null)
     .join(', ');

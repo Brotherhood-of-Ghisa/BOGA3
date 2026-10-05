@@ -4,6 +4,7 @@ import {
   compareWeightRecord,
   createRecordBook,
   pickSessionRecordSet,
+  sessionRecordKinds,
   type RecordEntry,
 } from '@/src/exercise-calculations/records';
 
@@ -81,6 +82,23 @@ describe('the record book', () => {
       const top = Math.max(0, ...oneRepMaxes);
       expect(book.holders.oneRepMax).toBe(top > 0 ? history[oneRepMaxes.indexOf(top)].oneRepMax : null);
     }
+  });
+});
+
+describe("a session's PRs", () => {
+  it('counts one per record kind an exercise took, so one exercise adds up to three', () => {
+    expect(sessionRecordKinds({ oneRepMax: false, weight: false, volume: false })).toEqual([]);
+    expect(sessionRecordKinds({ oneRepMax: true, weight: false, volume: false })).toEqual(['oneRepMax']);
+    expect(sessionRecordKinds({ oneRepMax: true, weight: true, volume: false })).toEqual(['oneRepMax', 'weight']);
+    expect(sessionRecordKinds({ oneRepMax: false, weight: false, volume: true })).toEqual(['volume']);
+    expect(sessionRecordKinds({ oneRepMax: true, weight: true, volume: true })).toEqual(['oneRepMax', 'weight', 'volume']);
+  });
+
+  it('counts the kinds the record book returns for a session', () => {
+    const book = createRecordBook<RecordEntry>();
+    book.add({ oneRepMax: { value: 100 }, weight: { weight: 90, reps: 5 }, volume: { value: 1000 } });
+    expect(sessionRecordKinds(book.add({ oneRepMax: { value: 105 }, weight: { weight: 95, reps: 5 }, volume: { value: 1200 } })))
+      .toHaveLength(3);
   });
 });
 

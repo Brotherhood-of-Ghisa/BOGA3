@@ -59,6 +59,7 @@ import {
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { localWeekWindow } from '@/src/utils/local-calendar';
+import { competitionEvent } from './helpers/competition-fixtures';
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 
@@ -229,13 +230,44 @@ describe('Today: the group card', () => {
     expect(getLastViewedGroupId()).toBe('g1');
   });
 
+  it('draws the latest completed session as the Progress row, naming one group record and counting several', async () => {
+    const boardValue = (metric: 'e1rm' | 'weight', value: number) =>
+      ({ role: 'record' as const, metric, unit: 'kg', value, unavailable: false, member: null });
+    const deadlift = { ...competitionEvent, visibility: 'ordinary' as const, group_exercise: { group_exercise_id: 'gx-dl', name: 'Deadlift' } };
+    const latest = summary().latest_completed!;
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValueOnce(summary({
+      latest_completed: { ...latest, group_records: [{ ...deadlift, values: [boardValue('e1rm', 213.3)] }] },
+    }));
+    const view = await renderToday();
+
+    await waitFor(() => expect(byId('today-group-latest-completed')).toBeTruthy());
+    expect(byId('today-group-latest-completed-member')).toHaveTextContent('dave');
+    expect(screen.queryByTestId('today-group-latest-completed-training-now')).toBeNull();
+    expect(byId('today-group-latest-completed-figures')).toHaveTextContent('18 sets · 4 exercises');
+    expect(byId('today-group-latest-completed-record')).toHaveTextContent('Deadlift 1RM 213.3 kg · group record');
+    view.unmount();
+
+    // One set #1 on Weight and on 1RM: two group records, only counted.
+    api.getCompetitionWeek.mockResolvedValueOnce(summary({
+      latest_completed: { ...latest, group_records: [{ ...deadlift, values: [boardValue('weight', 200), boardValue('e1rm', 213.3)] }] },
+    }));
+    await renderToday();
+    await waitFor(() => expect(byId('today-group-latest-completed-record')).toHaveTextContent('2 group records'));
+    expect(screen.queryByText(/Deadlift/)).toBeNull();
+  });
+
   it('opens one member training now on their session, and several on the group', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
     api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: [live('maria')] }));
     const view = await renderToday();
 
     await waitFor(() => expect(byId('today-group-latest-training')).toBeTruthy());
-    expect(within(byId('today-group-latest-status')).getByText('Training now')).toBeTruthy();
+    // The shared session row, under the member's name and the training-now mark.
+    expect(byId('today-group-latest-training-member')).toHaveTextContent('maria');
+    expect(within(byId('today-group-latest-training-training-now')).getByText('Training now')).toBeTruthy();
+    expect(byId('today-group-latest-training-start')).toHaveTextContent(/^Started \d\d:\d\d$/);
+    expect(screen.queryByTestId('today-group-latest-training-record')).toBeNull();
     fireEvent.press(byId('today-group-latest-training'));
     expect(mockPush).toHaveBeenLastCalledWith('/group-session/maria/maria-live?groupId=g1');
     view.unmount();
