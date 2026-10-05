@@ -63,7 +63,7 @@ Realtime in M22.
 | Copy the session graph into per-group projection tables on every push | Every autosave re-pushes the whole graph, so this needs diffing and N copies. #18 requires propagating edits anyway, so a copy duplicates rows the ledger can point at. Phase 5 certification pins its own attested value and does not need copies either. |
 | The client pushes a separate group projection | A second write path with its own offline retry. It risks personal sync, and the server already holds every row. |
 | Assemble the stream by querying members' sessions by membership window | Rejected by #16. The ledger also gives the stream a stable index. |
-| Make group rows Sync v2 entities | Sync v2 is per-owner LWW under `owner_user_id = auth.uid()` (contract §A.1). Multi-reader, server-authoritative rows do not fit it (contract §B.11). |
+| Make group rows Sync v2 entities | Sync v2 is per-owner LWW under `owner_user_id = auth.uid()` (sync contract). Multi-reader, server-authoritative rows do not fit it. |
 | An Edge Function group API (the M21 pattern) to reuse the TS calc module | It adds a deploy surface and a service-role boundary where authorization lives in app code. SQL RPCs keep authorization in the database (spec 10 rule 2). The TS calc module is reused on the viewing device instead (§5). |
 
 ## 2. Server schema (`app_public`)
@@ -71,10 +71,10 @@ Realtime in M22.
 Ground rules for every group table:
 
 1. **No column named `owner_user_id`.** The drift checker derives Sync v2
-   entity tables as "every `app_public` table with `owner_user_id`" (contract
-   §A.7.3), so such a column would be misread as an unsynced entity. Group
+   entity tables as "every `app_public` table with `owner_user_id`" (sync
+   contract), so such a column would be misread as an unsynced entity. Group
    tables use `user_id`, `member_user_id`, and `created_by` instead.
-2. **No FK into the Sync v2 tables.** This keeps the §A.7.7 topological
+2. **No FK into the Sync v2 tables.** This keeps the topological-layer
    assertion scoped to entity tables. Reads inner-join the live session rows,
    so a dangling ledger row (session hard-deleted by `dev_wipe_my_data` or
    account deletion) is invisible.
@@ -425,7 +425,7 @@ commits.
 | `exercise_group_links_group_eval_enqueue` | `AFTER INSERT OR UPDATE` | target jobs for the new and, if moved, the old target (`link`) |
 
 - **Inert link values.** Link `group_id` / `group_exercise_id` are plain text
-  (sync §A.2.10) and pass through `group_eval_try_uuid`. A target job is
+  (sync contract) and pass through `group_eval_try_uuid`. A target job is
   written only when the group exercise exists in that group. A non-uuid,
   unknown, or foreign target is therefore skipped silently: no job and no
   failure row.
@@ -433,7 +433,7 @@ commits.
   deletion) leave facts that consumers never see. The session's next
   evaluation drops facts for sets that vanished.
 - **The evaluator reads links and never writes them.** A server-written row
-  that breaks the id form would stall the member's pull (sync §A.2.10). The
+  that breaks the id form would stall the member's pull (sync contract). The
   lane asserts that only `sync_push` and `dev_wipe_my_data` write the table.
 
 **Invocation.**
@@ -885,7 +885,7 @@ catalog.
 The client calls `getRequiredSupabaseMobileClient().schema('app_public').rpc(name,
 args)`. Arguments are named `p_*`. Every function returns `jsonb`.
 
-**Errors** use the `sync_push` transport (contract §B.2.2):
+**Errors** use the `sync_push` transport (sync contract):
 `raise exception '<TOKEN>: <message>' using errcode = 'P0001'`. The client
 matches the token prefix.
 
@@ -1731,7 +1731,7 @@ E0.1–E0.3).
 - **Soft-deleted exercises** are never offered: the catalogue item is disabled,
   the pick sheet lists live exercises only, and the Link screen shows "Restore
   this exercise to link it" (unlink still works). The repository stays
-  permissive (sync contract §A.2.10).
+  permissive: pulled rows apply as-is.
 - **Evidence.** Jest: `groups-link-view-model.test.ts`,
   `groups-exercise-link-screen.test.tsx`, the picker's group cases in
   `exercise-picker.test.tsx` (`picker: group exercises (E0.1)`, `pick sheet (E0.2)`, `signed out`),
@@ -2308,7 +2308,7 @@ group screen, and Today details above where they differ. No server change.
 - **Out of scope (P19):** group gyms and gym filters, time-windowed boards,
   metrics other than Weight and 1RM, member proposals for group exercises,
   disputes, and push notifications.
-- Phases 3 (links, §2.7, `sync-v2-server-contract.md` A.2.10), 4 (boards,
+- Phases 3 (links, §2.7, `sync-v2-server-contract.md`), 4 (boards,
   §2.10–§2.11), and 5 (certification, §2.12, §4.6) shipped in M25.
 
 ## 10. Product rules (M25)
@@ -2325,7 +2325,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | # | Rule |
 | --- | --- |
 | P1 | Owners and admins add group exercises (a copy of a standard exercise, or custom: name + weight entry), rename, and archive them. Archived: links and boards kept read-only, no new links (§2.7, §4.4). |
-| P2 | A set counts for a group exercise only through a link from the exercise it was logged under. Several of my exercises may link to one group exercise; each of mine links to at most one per group (`sync-v2-server-contract.md` A.2.10). |
+| P2 | A set counts for a group exercise only through a link from the exercise it was logged under. Several of my exercises may link to one group exercise; each of mine links to at most one per group (`sync-v2-server-contract.md`). |
 | P3 | Group exercises never appear in the default picker or catalogue lists: only in search, the Link screen, and the group page (E0). |
 | P4 | Links are retroactive: every shared set of the exercise counts; unlinking removes them. Links survive leaving and are inactive until rejoin. |
 | P5 | The group page is for managing the group: its header and Exercises; Members sits behind the header's member count. The stream and leaderboards are the Groups screen's Stream · Leaderboards, one group at a time (amended post-M25; was Stream · Exercises · Leaderboards). |
@@ -2386,7 +2386,7 @@ contract. The narrative sketches and design trade-offs are in git history
 | # | Decision | Where |
 | --- | --- | --- |
 | T1 | Group exercises are a separate `group_exercises` store sharing the TS domain type (`ExerciseCore`) with personal exercises | §2.7, §6.1 |
-| T2 | Links are the Sync v2 entity `exercise_group_links` with a deterministic id | `sync-v2-server-contract.md` A.2.10 |
+| T2 | Links are the Sync v2 entity `exercise_group_links` with a deterministic id | `sync-v2-server-contract.md` |
 | T3 | The maths runs in the `group-eval` Edge Function, reusing the app's TS; records appear after sync | §2.10, `03` |
 | T4 | Invocation: a `pg_net` kick from the enqueue trigger, backed by a `pg_cron` sweep | §2.8, §2.10, `03` |
 | T5 | The stream is one persistent `group_events` table; session cards read their content live | §2.6, §4.2 |
@@ -2397,7 +2397,7 @@ contract. The narrative sketches and design trade-offs are in git history
 
 **Design sections → contract.** "M25 design §N" in comments and migrations
 maps to: §0 overview → §1 and §2.6–§2.12; §1 group exercises → §2.7, §4.4;
-§2 links → A.2.10, §6.1; §3 evaluator runtime → §2.8–§2.10; §4 stream →
+§2 links → §6.1; §3 evaluator runtime → §2.8–§2.10; §4 stream →
 §2.6, §4.2, §6.3 (M25-T10); §5 boards, edits, deletes → §2.11 and the
 change table below; §6 certification → §2.12, §4.6; §7
 mobile → §6.2, §6.3; §8 evaluator testing → §8; §9 decisions → the T table

@@ -12,7 +12,7 @@
 #     is a no-op (ack ok:true, stored row unchanged).
 #   - Future-clock clamp: pushing an inflated client_updated_at_ms results
 #     in the stored value being <= now()+5min and strictly less than the
-#     sent value (server contract §A.1).
+#     sent value (server contract, "Ground rules").
 #   - FK closure failure: an orphan-child push (session_exercises whose
 #     session_id is neither in the batch nor on the server) returns the
 #     FK_VIOLATION error envelope and no rows from the batch land.
@@ -449,7 +449,7 @@ assert_jq 'length == 0' "step 5 orphan row absent from server"
 
 # ---------------------------------------------------------------------------
 # Step 6 — exercise_group_links lifecycle. Unlink is a tombstone and relink
-# undeletes the SAME deterministic id (server contract §A.1.1.3); the group
+# undeletes the SAME deterministic id (server contract, "LWW and undelete"); the group
 # columns carry no FK; the exercise_definition_id FK is enforced.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-push-roundtrip] step 6 — exercise_group_links tombstone, undelete, FK"

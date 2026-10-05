@@ -3,13 +3,13 @@
 # Sync v2 — sync_pull RPC contract tests.
 #
 # Asserts the wire contract of POST /rest/v1/rpc/sync_pull per
-# docs/specs/tech/sync-v2-server-contract.md §B.4.
+# docs/specs/tech/sync-v2-server-contract.md ("`sync_pull`").
 #
 # Scenarios covered:
 #   1. Snapshot pull (cursor=null)
 #   2. Paginated drain (limit=2 over 5 rows)
 #   3. Layer→type mapping integrity (all four layers, all ten entities;
-#      asserts the §B.4.4 partition: pairwise disjoint, union = all 10)
+#      asserts the topological-layer partition: pairwise disjoint, union = all 10)
 #   4. RLS isolation (user_a vs user_b)
 #   5. Tombstones included (rows with deleted_at != null appear in the pull)
 #   6. Empty page after drain (next_cursor echoes the input cursor)
@@ -368,7 +368,7 @@ cleanup_run_rows
 # Seed at least one row of EVERY entity type for user A, with a fully-
 # connected FK chain. Drain each FK-bearing layer (0..3) in pages so rows
 # left by other local suites cannot push our fixture beyond the first page.
-# Assert each layer's response `type` set equals exactly the §B.4.4 mapping;
+# Assert each layer's response `type` set equals exactly the topological-layer mapping;
 # union = all ten; pairwise disjoint.
 # -----------------------------------------------------------------------------
 
@@ -386,8 +386,8 @@ run_psql_sql "
   -- Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
   -- exercise_group_links.
   -- exercise_tag_definitions lives here (not Layer 0) per the corrected
-  -- partition in docs/specs/tech/sync-v2-server-contract.md §B.3.4.1: it FKs
-  -- into exercise_definitions (Layer 0), so §A.7.7's no-intra-layer-FK rule
+  -- partition in docs/specs/tech/sync-v2-server-contract.md ("Topological layers"): it FKs
+  -- into exercise_definitions (Layer 0), so the no-intra-layer-FK rule
   -- forces it into a strictly later layer.
   insert into app_public.sessions (owner_user_id, id, gym_id, started_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, 'pull-${RUN_TAG}-l1-s', 'pull-${RUN_TAG}-l0-gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
@@ -432,9 +432,9 @@ collect_fixture_types_for_layer() {
 }
 
 # Layer 0 should yield exactly {gyms, exercise_definitions, muscle_groups} per
-# the corrected partition in docs/specs/tech/sync-v2-server-contract.md
-# §B.3.4.1: exercise_tag_definitions FKs into exercise_definitions, so the
-# §A.7.7 "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
+# the partition in docs/specs/tech/sync-v2-server-contract.md
+# ("Topological layers"): exercise_tag_definitions FKs into exercise_definitions, so the
+# "no intra-layer FK" invariant forces it into Layer 1, not Layer 0.
 collect_fixture_types_for_layer 0
 L0_TYPES="${LAYER_TYPES}"
 [[ "${L0_TYPES}" == '["exercise_definitions","gyms","muscle_groups"]' ]] \
@@ -478,7 +478,7 @@ UNIQUE_COUNT="$(printf '%s' "${UNION_AND_DISJOINT}" | jq -r '.unique_count')"
 [[ "${UNIQUE_COUNT}" == "10" ]] \
   || fail "scenario 3 disjoint: expected 10 unique entity types (pairwise-disjoint), got ${UNIQUE_COUNT}"
 
-pass "scenario 3: layer→type mapping integrity (topological partition per the server contract §B.4.4)"
+pass "scenario 3: layer→type mapping integrity (topological partition per the server contract)"
 
 cleanup_run_rows
 
@@ -522,7 +522,7 @@ cleanup_run_rows
 
 echo "[sync-pull-contract] scenario 5: tombstones included"
 # The owner-immutability trigger refuses any UPDATE when auth.uid() is NULL
-# (docs/specs/tech/sync-v2-server-contract.md §A.6.3). To soft-delete a row via
+# (docs/specs/tech/sync-v2-server-contract.md, "RLS and owner immutability"). To soft-delete a row via
 # direct SQL we set the JWT-claim GUC for
 # the duration of the UPDATE so auth.uid() resolves to USER_A_UUID. This
 # matches the path service_role and the push RPC take.

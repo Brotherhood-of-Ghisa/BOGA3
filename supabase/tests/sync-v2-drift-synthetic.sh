@@ -17,7 +17,7 @@
 #        - the literal string `notes`
 #        - the fix-flow template
 #          `alter table app_public.exercise_sets add column notes`
-#      (per the server contract §A.7.4).
+#      (per the drift checker's fix template).
 #   5. Restores the original schema file (idempotent — re-runs leave the
 #      working tree clean).
 #
@@ -127,7 +127,7 @@ fi
 if ! grep -q "alter table app_public.exercise_sets" "${OUTPUT_FILE}"; then
   fail "drift checker output missing fix-flow template 'alter table app_public.exercise_sets'"
 fi
-# The full fix-flow line per the server contract §A.7.4 reads
+# The full fix-flow line in the drift checker reads
 #   alter table app_public.exercise_sets
 #     add column notes
 # which our `add column notes` substring catches even if the checker line-

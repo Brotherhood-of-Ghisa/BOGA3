@@ -15,9 +15,9 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 // Local repository for a member's exercise → group-exercise links (Sync v2
-// entity `exercise_group_links`, contract §A.2.10). Links are the member's own
+// entity `exercise_group_links`, sync-v2 contract "Per-entity rules"). Links are the member's own
 // synced rows, so linking works offline and reaches the server on the next
-// cycle. Every write dirties the row in the same transaction (§B.7.2).
+// cycle. Every write dirties the row in the same transaction (contract "Dirty-bit lifecycle").
 //
 // The repository accepts any local exercise, soft-deleted ones included: pulled
 // rows and LWW undeletes must apply as-is, and such a link is inert on the
@@ -43,7 +43,7 @@ const requireId = (value: string, label: string): string => {
 /**
  * The deterministic link id: one row per (group, personal exercise), so a
  * personal exercise links to at most one group exercise per group. Relinking
- * reuses this id, which is the contract's undelete path (§A.1.1.3). Inputs are
+ * reuses this id, which is the contract's undelete path ("LWW and undelete"). Inputs are
  * trimmed, matching what `linkExercise` stores.
  */
 export const exerciseGroupLinkId = (groupId: string, exerciseDefinitionId: string): string =>

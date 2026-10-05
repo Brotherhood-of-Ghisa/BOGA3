@@ -4,7 +4,7 @@ import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-cor
 import { exerciseDefinitions } from './exercise-definitions';
 
 // A member's link from one of their own exercises to a group exercise (Sync v2
-// entity, contract §A.2.10). `group_id` / `group_exercise_id` are plain text
+// entity, sync-v2 contract "Per-entity rules"). `group_id` / `group_exercise_id` are plain text
 // with no FK: group tables are server-side and not synced parents. The id is
 // deterministic (`<group_id>:<exercise_definition_id>`), which enforces "one
 // group exercise per personal exercise per group"; unlink tombstones the row and

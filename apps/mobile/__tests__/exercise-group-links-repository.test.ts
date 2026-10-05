@@ -4,7 +4,7 @@
  * Outcome: a member's exercise → group-exercise links are local synced rows
  * with a deterministic id, so "one group exercise per personal exercise per
  * group" holds without a server constraint and relinking reuses the same id —
- * the Sync v2 undelete path (contract §A.1.1.3).
+ * the Sync v2 undelete path (sync-v2 contract, "LWW and undelete").
  *
  * Driver: a real in-memory SQLite built from the shipped migration bundle (FK
  * enforcement on, like the production handle), with `bootstrapLocalDataLayer`
