@@ -7,13 +7,6 @@ import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCer
   CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
-import { validateGroupExerciseRules, type GroupExerciseRules, type GroupMetric } from './metric-contract';
-import { isGroupMetricBoardWire, isGroupMetricCertificationWire, isGroupMetricExerciseWire,
-  isGroupMetricHistoryWire, isGroupMetricPodiumWire, isGroupMetricRevisionWire,
-  isGroupMetricStreamCursor, isGroupMetricStreamItem, isRenderedGroupMetricStreamKind } from './metric-wire-guards';
-import type { GroupMetricBoardWire, GroupMetricCertificationResultWire, GroupMetricExerciseListWire,
-  GroupMetricExerciseWriteWire, GroupMetricHistoryWire, GroupMetricPodiumWire, GroupMetricRevisionsWire,
-  GroupMetricStreamWire, GroupMetricStreamCursor } from './metric-wire';
 
 // The typed group RPC client (`docs/specs/tech/groups-contract.md`).
 // It is the ONLY code that calls Supabase for groups. Every failure leaves this
@@ -26,23 +19,13 @@ import type { GroupMetricBoardWire, GroupMetricCertificationResultWire, GroupMet
 //     → `INTERNAL`.
 
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
-import { validateExerciseCore, type ExerciseCore } from '@/src/exercise-core';
+import type { ExerciseCore } from '@/src/exercise-core';
 
 import {
   GROUP_SERVER_ERROR_CODES,
-  type GroupBoardCursor,
-  type GroupBoardHistoryCursor,
-  type GroupBoardHistoryResult,
-  type GroupBoardMetric,
-  type GroupBoardPodiumsResult,
-  type GroupBoardResult,
-  type GroupCertificationEndResult,
-  type GroupCertifyResult,
   type GroupCreateResult,
   type GroupErrorCode,
   type GroupExercise,
-  type GroupExerciseListResult,
-  type GroupExerciseWriteResult,
   type GroupGetResult,
   type GroupInviteCodeResult,
   type GroupInvitePreviewResult,
@@ -51,12 +34,7 @@ import {
   type GroupListMineResult,
   type GroupMemberWriteResult,
   type GroupServerErrorCode,
-  type GroupSessionDetailResult,
-  type GroupStreamResult,
   type GroupUpdateResult,
-  type GroupWeekSummaryResult,
-  type StreamCursor,
-  type StreamItem,
 } from './types';
 
 export class GroupApiError extends Error {
@@ -118,8 +96,6 @@ export const mapGroupRpcError = (error: RpcErrorLike, status: number | null | un
 export type GroupRpcName =
   | 'group_list_mine'
   | 'group_get'
-  | 'group_stream'
-  | 'group_session_detail'
   | 'group_invite_preview'
   | 'group_create'
   | 'group_update'
@@ -130,31 +106,6 @@ export type GroupRpcName =
   | 'group_remove_member'
   | 'group_set_role'
   | 'group_transfer_ownership'
-  | 'group_exercise_list'
-  | 'group_exercise_create'
-  | 'group_exercise_update'
-  | 'group_exercise_archive'
-  | 'group_exercise_unarchive'
-  | 'group_board_podiums'
-  | 'group_board'
-  | 'group_board_history'
-  | 'group_certify'
-  | 'group_certification_withdraw'
-  | 'group_certification_cancel'
-  | 'group_week_summary'
-  | 'group_stream_v2'
-  | 'group_exercise_list_v2'
-  | 'group_exercise_create_v2'
-  | 'group_exercise_update_v2'
-  | 'group_exercise_archive_v2'
-  | 'group_exercise_unarchive_v2'
-  | 'group_metric_board'
-  | 'group_metric_podiums'
-  | 'group_metric_revisions'
-  | 'group_metric_history'
-  | 'group_metric_certify'
-  | 'group_metric_certification_get'
-  | 'group_metric_certification_end'
   | 'group_competition_contract'
   | 'group_competition_board'
   | 'group_competition_podiums'
@@ -173,8 +124,8 @@ export type GroupRpcName =
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
-// Shared membership/settings RPCs remain public-safe. Legacy score readers keep
-// their original protocol and are rejected by the server after activation.
+// Shared membership/settings RPCs remain public-safe and send the contract-4
+// header like the competition readers.
 const PUBLIC_GROUP_RPCS = new Set<GroupRpcName>(['group_list_mine','group_get','group_invite_preview',
   'group_create','group_update','group_invite_get','group_invite_regenerate','group_join','group_leave',
   'group_remove_member','group_set_role','group_transfer_ownership']);
@@ -219,84 +170,12 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 
 // ---- Reads --------------------------------------------------------------------
 
-export const GROUP_STREAM_DEFAULT_LIMIT = 20;
-
 export const listMyGroups = async (): Promise<GroupListMineResult> =>
   expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v5:mine',r));
 
 export const getGroup = async (groupId: string): Promise<GroupGetResult> =>
   expectShape('group_get', await callGroupRpc('group_get', { p_group_id: groupId }), (r) =>
     isCompetitionCachePayload(`group:v5:${groupId}`,r),
-  );
-
-export type GroupStreamRequest = {
-  /** One group; the app never reads the server's all-groups stream (`p_group_id` null). */
-  groupId: string;
-  /** Null = first page. */
-  before?: StreamCursor | null;
-  /** `1..50`; defaults to 20. */
-  limit?: number;
-};
-
-/** The stream item kinds this build renders (all five); a later server may send more. */
-const RENDERED_STREAM_KINDS: ReadonlySet<string> = new Set<StreamItem['kind']>([
-  'session',
-  'membership',
-  'record',
-  'record_voided',
-  'link',
-]);
-
-/**
- * One stream page. Items of a kind this build does not know are dropped here,
- * so no screen or cache ever sees them; `next_cursor` is the server's, so paging
- * still walks past them. Items of a known kind are trusted as typed (the server
- * shapes are asserted by `groups-leaderboards`).
- */
-export const getGroupStream = async ({
-  groupId,
-  before = null,
-  limit = GROUP_STREAM_DEFAULT_LIMIT,
-}: GroupStreamRequest): Promise<GroupStreamResult> => {
-  const page = expectShape<GroupStreamResult>(
-    'group_stream',
-    await callGroupRpc('group_stream', { p_group_id: groupId, p_before: before, p_limit: limit }),
-    (r) => Array.isArray(r.items) && typeof r.has_more === 'boolean',
-  );
-  return { ...page, items: page.items.filter((item) => RENDERED_STREAM_KINDS.has(item.kind)) };
-};
-
-export const getGroupSessionDetail = async (memberUserId: string, sessionId: string): Promise<GroupSessionDetailResult> =>
-  expectShape(
-    'group_session_detail',
-    await callGroupRpc('group_session_detail', { p_member_user_id: memberUserId, p_session_id: sessionId }),
-    (r) => isRecord(r.session),
-  );
-
-export type GroupWeekSummaryRequest = {
-  groupId: string;
-  /** The window's local start and end (Monday 00:00 to the next), epoch ms; the device owns the time zone. */
-  windowStartMs: number;
-  windowEndMs: number;
-};
-
-/** One group's week (contract): its board, who is training now and the latest completed session. */
-export const getGroupWeekSummary = async ({
-  groupId,
-  windowStartMs,
-  windowEndMs,
-}: GroupWeekSummaryRequest): Promise<GroupWeekSummaryResult> =>
-  expectShape(
-    'group_week_summary',
-    await callGroupRpc('group_week_summary', {
-      p_group_id: groupId,
-      p_window_start_ms: windowStartMs,
-      p_window_end_ms: windowEndMs,
-    }),
-    (r) =>
-      Array.isArray(r.members) &&
-      Array.isArray(r.training_now) &&
-      (r.latest_completed === null || isRecord(r.latest_completed)),
   );
 
 export const previewGroupInvite = async (code: string): Promise<GroupInvitePreviewResult> =>
@@ -388,76 +267,7 @@ export const groupExerciseCore = (exercise: GroupExercise): ExerciseCore => ({
   loadInputMode: exercise.load_input_mode,
 });
 
-/**
- * Runs the shared validator before any network call; a rejection is a local
- * `VALIDATION` with the validator's message. Sends the normalized (trimmed) name.
- */
-const requireExerciseCore = (core: ExerciseCore): ExerciseCore => {
-  const result = validateExerciseCore(core);
-  if (!result.ok) {
-    throw new GroupApiError('VALIDATION', result.message);
-  }
-  return result.value;
-};
-
-const isExerciseWritePayload = (r: Record<string, unknown>): boolean =>
-  isRecord(r.exercise) && isString(r.exercise.group_exercise_id);
-
-// All current catalogue consumers use the versioned reader, including legacy exercises.
-export const listGroupExercises = async (groupId: string): Promise<GroupExerciseListResult> =>
-  listGroupComparisons(groupId);
-
-export type CreateGroupExerciseInput = ExerciseCore & {
-  /** The standard-catalogue id this copies (its name and load mode come from the client's seed data); null = custom. */
-  sourceExerciseId: string | null;
-};
-
-export const createGroupExercise = async (
-  groupId: string,
-  { sourceExerciseId, ...core }: CreateGroupExerciseInput,
-): Promise<GroupExerciseWriteResult> => {
-  const { name, loadInputMode } = requireExerciseCore(core);
-  return expectShape(
-    'group_exercise_create',
-    await callGroupRpc('group_exercise_create', {
-      p_group_id: groupId,
-      p_name: name,
-      p_load_input_mode: loadInputMode,
-      p_source_exercise_id: sourceExerciseId,
-    }),
-    isExerciseWritePayload,
-  );
-};
-
-/** Rename and/or change the load mode (full replacement of both). Archived exercises are read-only server-side. */
-export const updateGroupExercise = async (
-  groupId: string,
-  groupExerciseId: string,
-  core: ExerciseCore,
-): Promise<GroupExerciseWriteResult> => {
-  const { name, loadInputMode } = requireExerciseCore(core);
-  return expectShape(
-    'group_exercise_update',
-    await callGroupRpc('group_exercise_update', {
-      p_group_id: groupId,
-      p_exercise_id: groupExerciseId,
-      p_name: name,
-      p_load_input_mode: loadInputMode,
-    }),
-    isExerciseWritePayload,
-  );
-};
-
-export const archiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
-  archiveGroupComparison(groupId, groupExerciseId);
-
-export const unarchiveGroupExercise = async (groupId: string, groupExerciseId: string): Promise<GroupExerciseWriteResult> =>
-  unarchiveGroupComparison(groupId, groupExerciseId);
-
-// ---- Boards (contract) --------------------------------------------
-
-export const GROUP_BOARD_DEFAULT_LIMIT = 50;
-export const GROUP_BOARD_HISTORY_DEFAULT_LIMIT = 20;
+// ---- Errors -------------------------------------------------------------------
 
 const isNotFoundMessage = (error: unknown, message: string): boolean =>
   isGroupApiError(error) && error.code === 'NOT_FOUND' && error.message.trim().toLowerCase() === message;
@@ -472,226 +282,8 @@ export const isGroupExerciseNotFound = (error: unknown): boolean => isNotFoundMe
 /** `NOT_FOUND: group not found`: the caller is not (or no longer) a member. The only `NOT_FOUND` that evicts. */
 export const isGroupNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group not found');
 
-/** `NOT_FOUND: record set not found`: the set is not, or no longer, a record set. */
-export const isRecordSetNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'record set not found');
-
-/** `NOT_FOUND: certification not found`. */
-export const isCertificationNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'certification not found');
-
 /** `NOT_FOUND: member not found`: the lifter is no longer a current member. */
 export const isGroupMemberNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'member not found');
-
-/** The podium page: every group exercise on Certified · 1RM. */
-export const getGroupBoardPodiums = async (groupId: string): Promise<GroupBoardPodiumsResult> =>
-  expectShape(
-    'group_board_podiums',
-    await callGroupRpc('group_board_podiums', { p_group_id: groupId, p_metric: 'e1rm', p_certified: true }),
-    (r) => Array.isArray(r.exercises),
-  );
-
-export type GroupBoardView = {
-  groupId: string;
-  groupExerciseId: string;
-  metric: GroupBoardMetric;
-  certified: boolean;
-};
-
-export type GroupBoardRequest = GroupBoardView & {
-  /** Null = first page; otherwise the previous page's `next_cursor`, verbatim. */
-  after?: GroupBoardCursor | null;
-  /** `1..100`; defaults to 50. */
-  limit?: number;
-};
-
-export const getGroupBoard = async ({
-  groupId,
-  groupExerciseId,
-  metric,
-  certified,
-  after = null,
-  limit = GROUP_BOARD_DEFAULT_LIMIT,
-}: GroupBoardRequest): Promise<GroupBoardResult> =>
-  expectShape(
-    'group_board',
-    await callGroupRpc('group_board', {
-      p_group_id: groupId,
-      p_group_exercise_id: groupExerciseId,
-      p_metric: metric,
-      p_certified: certified,
-      p_after: after,
-      p_limit: limit,
-    }),
-    (r) => isRecord(r.exercise) && Array.isArray(r.rows) && typeof r.has_more === 'boolean',
-  );
-
-export type GroupBoardHistoryRequest = GroupBoardView & {
-  /** Null = newest page; otherwise the previous page's `next_cursor`, verbatim. */
-  before?: GroupBoardHistoryCursor | null;
-  /** `1..50`; defaults to 20. */
-  limit?: number;
-};
-
-export const getGroupBoardHistory = async ({
-  groupId,
-  groupExerciseId,
-  metric,
-  certified,
-  before = null,
-  limit = GROUP_BOARD_HISTORY_DEFAULT_LIMIT,
-}: GroupBoardHistoryRequest): Promise<GroupBoardHistoryResult> =>
-  expectShape(
-    'group_board_history',
-    await callGroupRpc('group_board_history', {
-      p_group_id: groupId,
-      p_group_exercise_id: groupExerciseId,
-      p_metric: metric,
-      p_certified: certified,
-      p_before: before,
-      p_limit: limit,
-    }),
-    (r) => Array.isArray(r.items) && typeof r.has_more === 'boolean',
-  );
-
-// ---- Certification (contract) --------------------------------------
-
-const isCertificationPayload = (r: Record<string, unknown>): boolean =>
-  isRecord(r.certification) && isString(r.certification.certification_id);
-
-export type CertifyGroupSetInput = {
-  groupId: string;
-  groupExerciseId: string;
-  /** The lifter. */
-  memberUserId: string;
-  setId: string;
-};
-
-/** Certify a record set (P10). Any current member except the lifter; idempotent (`created: false`). */
-export const certifyGroupSet = async ({
-  groupId,
-  groupExerciseId,
-  memberUserId,
-  setId,
-}: CertifyGroupSetInput): Promise<GroupCertifyResult> =>
-  expectShape(
-    'group_certify',
-    await callGroupRpc('group_certify', {
-      p_group_id: groupId,
-      p_group_exercise_id: groupExerciseId,
-      p_member_user_id: memberUserId,
-      p_set_id: setId,
-    }),
-    (r) => isCertificationPayload(r) && typeof r.created === 'boolean',
-  );
-
-/** The certifier removes their own certification (P11). */
-export const withdrawGroupCertification = async (
-  groupId: string,
-  certificationId: string,
-): Promise<GroupCertificationEndResult> =>
-  expectShape(
-    'group_certification_withdraw',
-    await callGroupRpc('group_certification_withdraw', { p_group_id: groupId, p_certification_id: certificationId }),
-    isCertificationPayload,
-  );
-
-/** The owner or an admin cancels any certification (P11, D5). */
-export const cancelGroupCertification = async (
-  groupId: string,
-  certificationId: string,
-): Promise<GroupCertificationEndResult> =>
-  expectShape(
-    'group_certification_cancel',
-    await callGroupRpc('group_certification_cancel', { p_group_id: groupId, p_certification_id: certificationId }),
-    isCertificationPayload,
-  );
-
-
-// Versioned comparisons: no ratio/reps value passes through a kg-only reader.
-const checkedMetricRulesArgs = (input: GroupExerciseRules) => {
-  const result = validateGroupExerciseRules(input);
-  if (!result.ok) throw new GroupApiError('VALIDATION', result.message);
-  const rule = result.value;
-  return { p_name: rule.name, p_load_input_mode: rule.loadInputMode,
-    p_bodyweight_contribution: rule.bodyweightContribution, p_default_metric: rule.defaultMetric };
-};
-const isMetricExerciseWrite = (value: Record<string, unknown>) =>
-  value.contract_version === 3 && isGroupMetricExerciseWire(value.exercise);
-const isMetricCertificationResult = (value: Record<string, unknown>) =>
-  value.contract_version === 3 && isGroupMetricCertificationWire(value.certification);
-
-export const listGroupComparisons = async (groupId: string): Promise<GroupMetricExerciseListWire> =>
-  expectShape('group_exercise_list_v2', await callGroupRpc('group_exercise_list_v2', { p_group_id: groupId }),
-    value => value.contract_version === 3 && Array.isArray(value.exercises) && value.exercises.every(isGroupMetricExerciseWire));
-export const createGroupComparison = async (
-  groupId: string, input: GroupExerciseRules & { sourceExerciseId: string | null },
-): Promise<GroupMetricExerciseWriteWire> => expectShape('group_exercise_create_v2',
-  await callGroupRpc('group_exercise_create_v2', { p_group_id: groupId,
-    ...checkedMetricRulesArgs(input), p_source_exercise_id: input.sourceExerciseId }), isMetricExerciseWrite);
-export const updateGroupComparison = async (
-  groupId: string, exerciseId: string, expectedRevision: number, input: GroupExerciseRules,
-): Promise<GroupMetricExerciseWriteWire> => expectShape('group_exercise_update_v2',
-  await callGroupRpc('group_exercise_update_v2', { p_group_id: groupId, p_exercise_id: exerciseId,
-    p_expected_revision: expectedRevision, ...checkedMetricRulesArgs(input) }), isMetricExerciseWrite);
-export const archiveGroupComparison = async (groupId: string, exerciseId: string): Promise<GroupMetricExerciseWriteWire> =>
-  expectShape('group_exercise_archive_v2', await callGroupRpc('group_exercise_archive_v2', {
-    p_group_id: groupId, p_exercise_id: exerciseId }), isMetricExerciseWrite);
-export const unarchiveGroupComparison = async (groupId: string, exerciseId: string): Promise<GroupMetricExerciseWriteWire> =>
-  expectShape('group_exercise_unarchive_v2', await callGroupRpc('group_exercise_unarchive_v2', {
-    p_group_id: groupId, p_exercise_id: exerciseId }), isMetricExerciseWrite);
-
-export type GroupMetricView = {
-  groupId: string; groupExerciseId: string; metric: GroupMetric; certified: boolean; revision?: number | null;
-};
-export const getGroupMetricBoard = async (view: GroupMetricView & { after?: string | null; limit?: number }): Promise<GroupMetricBoardWire> =>
-  expectShape('group_metric_board', await callGroupRpc('group_metric_board', {
-    p_group_id: view.groupId, p_group_exercise_id: view.groupExerciseId, p_metric: view.metric,
-    p_certified: view.certified, p_revision: view.revision ?? null, p_after: view.after ?? null, p_limit: view.limit ?? 50,
-  }), value => isGroupMetricBoardWire(value) && value.exercise.group_exercise_id === view.groupExerciseId &&
-    value.metric === view.metric && value.certified === view.certified && (view.revision == null || value.rules_revision === view.revision));
-export const getGroupMetricPodiums = async (groupId: string, certified = true): Promise<GroupMetricPodiumWire> =>
-  expectShape('group_metric_podiums', await callGroupRpc('group_metric_podiums', { p_group_id: groupId, p_certified: certified }), isGroupMetricPodiumWire);
-export const getGroupMetricHistory = async (view: GroupMetricView & { before?: string | null; limit?: number }): Promise<GroupMetricHistoryWire> =>
-  expectShape('group_metric_history', await callGroupRpc('group_metric_history', {
-    p_group_id: view.groupId, p_group_exercise_id: view.groupExerciseId, p_metric: view.metric,
-    p_certified: view.certified, p_revision: view.revision ?? null, p_before: view.before ?? null, p_limit: view.limit ?? 20,
-  }), value => isGroupMetricHistoryWire(value) && isRecord(value.exercise) && isRecord(value.revision) && isRecord(value.revision.rules) &&
-    value.exercise.group_exercise_id === view.groupExerciseId && value.metric === view.metric && value.certified === view.certified &&
-    (view.revision == null || value.revision.rules.rules_revision === view.revision));
-export const getGroupMetricRevisions = async (groupId: string, exerciseId: string): Promise<GroupMetricRevisionsWire> =>
-  expectShape('group_metric_revisions', await callGroupRpc('group_metric_revisions', { p_group_id: groupId, p_group_exercise_id: exerciseId }),
-    value => value.contract_version === 3 && isGroupMetricExerciseWire(value.exercise) && value.exercise.group_exercise_id === exerciseId &&
-      Array.isArray(value.revisions) && value.revisions.every(isGroupMetricRevisionWire));
-
-export const certifyGroupMetric = async (input: GroupMetricView & {
-  memberUserId: string; setId: string; expectedRevision: number; expectedFingerprint: string;
-}): Promise<GroupMetricCertificationResultWire> => expectShape('group_metric_certify',
-  await callGroupRpc('group_metric_certify', { p_group_id: input.groupId, p_group_exercise_id: input.groupExerciseId,
-    p_member_user_id: input.memberUserId, p_set_id: input.setId, p_metric: input.metric,
-    p_expected_revision: input.expectedRevision, p_expected_fingerprint: input.expectedFingerprint }),
-  value => isMetricCertificationResult(value) && isGroupMetricCertificationWire(value.certification) &&
-    value.certification.metric === input.metric && value.certification.performance.set_id === input.setId);
-export const getGroupMetricCertification = async (groupId: string, certificationId: string, metric?: GroupMetric): Promise<GroupMetricCertificationResultWire> =>
-  expectShape('group_metric_certification_get', await callGroupRpc('group_metric_certification_get', {
-    p_group_id: groupId, p_certification_id: certificationId, ...(metric ? { p_metric: metric } : {}) }), value => isMetricCertificationResult(value) &&
-    isGroupMetricCertificationWire(value.certification) && value.certification.certification_id === certificationId &&
-    (metric === undefined || value.certification.metric === metric));
-export const endGroupMetricCertification = async (
-  groupId: string, certificationId: string, action: 'withdraw' | 'cancel',
-): Promise<GroupMetricCertificationResultWire> => expectShape('group_metric_certification_end',
-  await callGroupRpc('group_metric_certification_end', { p_group_id: groupId,
-    p_certification_id: certificationId, p_action: action }), value => isMetricCertificationResult(value) &&
-    isGroupMetricCertificationWire(value.certification) && value.certification.certification_id === certificationId);
-
-
-export const getGroupMetricStream = async ({ groupId, before = null, limit = GROUP_STREAM_DEFAULT_LIMIT }:
-  Omit<GroupStreamRequest, 'before'> & { before?: GroupMetricStreamCursor | null }): Promise<GroupMetricStreamWire> => {
-  const raw = await callGroupRpc('group_stream_v2', { p_group_id: groupId, p_before: before, p_limit: limit });
-  const page = expectShape<GroupMetricStreamWire>('group_stream_v2', raw, value =>
-    value.contract_version === 3 && typeof value.has_more === 'boolean' && isGroupMetricStreamCursor(value.next_cursor) &&
-    Array.isArray(value.items) && value.items.every(item => isRecord(item) &&
-      (!isRenderedGroupMetricStreamKind(item.kind) || isGroupMetricStreamItem(item))));
-  return { ...page, items: page.items.filter(item => isRenderedGroupMetricStreamKind(item.kind)) };
-};
 
 // Protocol 4 stays dormant until negotiation is active; UI activation is separate.
 // Headers belong to the request, never mutable client-wide auth/config.

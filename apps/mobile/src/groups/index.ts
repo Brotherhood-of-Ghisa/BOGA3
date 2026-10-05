@@ -1,32 +1,16 @@
 export * from './types';
 export {
-  GROUP_BOARD_DEFAULT_LIMIT,
-  GROUP_BOARD_HISTORY_DEFAULT_LIMIT,
-  GROUP_STREAM_DEFAULT_LIMIT,
   GroupApiError,
-  archiveGroupExercise,
-  cancelGroupCertification,
-  certifyGroupSet,
   createGroup,
-  createGroupExercise,
   getGroup,
-  getGroupBoard,
-  getGroupBoardHistory,
-  getGroupBoardPodiums,
   getGroupInviteCode,
-  getGroupSessionDetail,
-  getGroupStream,
-  getGroupWeekSummary,
   groupExerciseCore,
   isGroupApiError,
-  isCertificationNotFound,
   isGroupExerciseNotFound,
   isGroupMemberNotFound,
   isGroupNotFound,
-  isRecordSetNotFound,
   joinGroup,
   leaveGroup,
-  listGroupExercises,
   listMyGroups,
   mapGroupRpcError,
   matchGroupErrorToken,
@@ -36,20 +20,10 @@ export {
   setGroupMemberRole,
   toGroupApiError,
   transferGroupOwnership,
-  unarchiveGroupExercise,
   updateGroup,
-  updateGroupExercise,
-  withdrawGroupCertification,
-  type CertifyGroupSetInput,
-  type CreateGroupExerciseInput,
-  type GroupBoardHistoryRequest,
-  type GroupBoardRequest,
-  type GroupBoardView,
   type GroupDetailsInput,
   type GroupUpdateInput,
   type GroupRpcName,
-  type GroupStreamRequest,
-  type GroupWeekSummaryRequest,
 } from './api';
 export {
   deleteGroupCacheEntry,
@@ -61,7 +35,6 @@ export {
   type GroupCacheDatabase,
   type GroupCacheEntry,
 } from './cache';
-export * from './session-metrics';
 export * from './set-facts';
 export * from './stream-view-model';
 export * from './last-viewed-group';

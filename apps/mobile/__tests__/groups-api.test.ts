@@ -16,17 +16,15 @@ jest.mock('@/src/auth/supabase', () => ({
 import {
   GROUP_SERVER_ERROR_CODES,
   GroupApiError,
-  archiveGroupExercise,
   createGroup,
-  createGroupExercise,
   getGroup,
   getGroupInviteCode,
-  getGroupSessionDetail,
-  getGroupStream,
+  isGroupExerciseNotFound,
+  isGroupMemberNotFound,
+  isGroupNotFound,
   groupExerciseCore,
   joinGroup,
   leaveGroup,
-  listGroupExercises,
   listMyGroups,
   previewGroupInvite,
   regenerateGroupInviteCode,
@@ -34,9 +32,7 @@ import {
   setGroupMemberRole,
   toGroupApiError,
   transferGroupOwnership,
-  unarchiveGroupExercise,
   updateGroup,
-  updateGroupExercise,
   type GroupErrorCode,
 } from '@/src/groups';
 
@@ -57,10 +53,6 @@ const groupExercise = {
   source_exercise_id: null,
   archived_at_ms: null,
 };
-
-const comparison = { ...groupExercise, legacy: true, bodyweight_calculations_enabled: false,
-  bodyweight_contribution: 0, default_metric: 'e1rm' as const,
-  rules_revision: 1, published_revision: 1, rebuilding: false };
 
 describe('groups api client', () => {
   const mockRpc = jest.fn();
@@ -93,26 +85,6 @@ describe('groups api client', () => {
     }
   };
 
-  it('keeps record, record_voided, and link items; drops a kind this build does not know, keeping the server cursor', async () => {
-    const session = { kind: 'session', key: 'u:s', sort_at_ms: 9 };
-    const record = { kind: 'record', key: 'e1', sort_at_ms: 9 };
-    const voided = { kind: 'record_voided', key: 'e2', sort_at_ms: 8 };
-    const membership = { kind: 'membership', key: 'm:joined', sort_at_ms: 7, event: 'joined' };
-    const link = { kind: 'link', key: 'e3', sort_at_ms: 5, event: 'link' };
-    const cursor = { sort_at_ms: 4, kind: 'future_kind', key: 'e4' };
-    respond({
-      items: [record, session, voided, membership, link, { kind: 'future_kind', key: 'e4', sort_at_ms: 4 }],
-      next_cursor: cursor,
-      has_more: true,
-    });
-
-    await expect(getGroupStream({ groupId: 'g1' })).resolves.toEqual({
-      items: [record, session, voided, membership, link],
-      next_cursor: cursor,
-      has_more: true,
-    });
-  });
-
   describe('one typed wrapper per RPC', () => {
     const cases: {
       rpc: string;
@@ -128,28 +100,6 @@ describe('groups api client', () => {
         args: { p_group_id: 'g1' },
         data: { group: summary, members: [] },
         expected: { group: summary, members: [] },
-      },
-      {
-        rpc: 'group_stream',
-        invoke: () => getGroupStream({ groupId: 'g1' }),
-        args: { p_group_id: 'g1', p_before: null, p_limit: 20 },
-        data: { items: [], next_cursor: null, has_more: false },
-        expected: { items: [], next_cursor: null, has_more: false },
-      },
-      {
-        rpc: 'group_stream',
-        invoke: () =>
-          getGroupStream({ groupId: 'g1', before: { sort_at_ms: 5, kind: 'session', key: 'u:s' }, limit: 50 }),
-        args: { p_group_id: 'g1', p_before: { sort_at_ms: 5, kind: 'session', key: 'u:s' }, p_limit: 50 },
-        data: { items: [], next_cursor: null, has_more: false },
-        expected: { items: [], next_cursor: null, has_more: false },
-      },
-      {
-        rpc: 'group_session_detail',
-        invoke: () => getGroupSessionDetail('u2', 's1'),
-        args: { p_member_user_id: 'u2', p_session_id: 's1' },
-        data: { session: { session_id: 's1' } },
-        expected: { session: { session_id: 's1' } },
       },
       {
         rpc: 'group_invite_preview',
@@ -221,58 +171,6 @@ describe('groups api client', () => {
         args: { p_group_id: 'g1', p_user_id: 'u2' },
         data: groupGetPayload,
         expected: groupGetPayload,
-      },
-      {
-        rpc: 'group_exercise_list_v2',
-        invoke: () => listGroupExercises('g1'),
-        args: { p_group_id: 'g1' },
-        data: { contract_version: 3, exercises: [comparison] },
-        expected: { contract_version: 3, exercises: [comparison] },
-      },
-      {
-        rpc: 'group_exercise_create',
-        invoke: () => createGroupExercise('g1', { name: '  Bench \t', loadInputMode: 'total_load', sourceExerciseId: null }),
-        args: { p_group_id: 'g1', p_name: 'Bench', p_load_input_mode: 'total_load', p_source_exercise_id: null },
-        data: { exercise: groupExercise },
-        expected: { exercise: groupExercise },
-      },
-      {
-        rpc: 'group_exercise_create',
-        invoke: () =>
-          createGroupExercise('g1', {
-            name: 'Barbell Back Squat',
-            loadInputMode: 'per_side_load',
-            sourceExerciseId: 'seed_barbell_back_squat',
-          }),
-        args: {
-          p_group_id: 'g1',
-          p_name: 'Barbell Back Squat',
-          p_load_input_mode: 'per_side_load',
-          p_source_exercise_id: 'seed_barbell_back_squat',
-        },
-        data: { exercise: groupExercise },
-        expected: { exercise: groupExercise },
-      },
-      {
-        rpc: 'group_exercise_update',
-        invoke: () => updateGroupExercise('g1', 'ge1', { name: ' Bench (comp) ', loadInputMode: 'per_side_load' }),
-        args: { p_group_id: 'g1', p_exercise_id: 'ge1', p_name: 'Bench (comp)', p_load_input_mode: 'per_side_load' },
-        data: { exercise: groupExercise },
-        expected: { exercise: groupExercise },
-      },
-      {
-        rpc: 'group_exercise_archive_v2',
-        invoke: () => archiveGroupExercise('g1', 'ge1'),
-        args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
-        data: { contract_version: 3, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
-        expected: { contract_version: 3, exercise: { ...comparison, archived_at_ms: 1757500000000 } },
-      },
-      {
-        rpc: 'group_exercise_unarchive_v2',
-        invoke: () => unarchiveGroupExercise('g1', 'ge1'),
-        args: { p_group_id: 'g1', p_exercise_id: 'ge1' },
-        data: { contract_version: 3, exercise: comparison },
-        expected: { contract_version: 3, exercise: comparison },
       },
     ];
 
@@ -359,7 +257,7 @@ describe('groups api client', () => {
       await expectRejectsWith(listMyGroups(), 'INTERNAL', 'group_list_mine returned an unexpected payload.');
 
       respond(null);
-      await expectRejectsWith(getGroupStream({ groupId: 'g1' }), 'INTERNAL');
+      await expectRejectsWith(getGroup('g1'), 'INTERNAL');
 
       respond({ group_id: 'g1' });
       await expectRejectsWith(joinGroup('ABCD2345'), 'INTERNAL');
@@ -381,41 +279,29 @@ describe('groups api client', () => {
   });
 
   describe('group exercises', () => {
-    it.each([
-      [
-        'a blank name',
-        () => createGroupExercise('g1', { name: ' \t\u00a0', loadInputMode: 'total_load', sourceExerciseId: null }),
-        'Exercise name is required',
-      ],
-      [
-        'an unknown load mode',
-        () => updateGroupExercise('g1', 'ge1', { name: 'Bench', loadInputMode: 'kg' as never }),
-        'Weight entry must be total load or per side',
-      ],
-    ])('rejects %s through the shared validator as a local VALIDATION, without calling rpc', async (_label, invoke, message) => {
-      await expectRejectsWith(invoke(), 'VALIDATION', message);
-      expect(mockRpc).not.toHaveBeenCalled();
-    });
-
     it('maps a group exercise back to its ExerciseCore', () => {
       expect(groupExerciseCore({ ...groupExercise, load_input_mode: 'per_side_load' })).toEqual({
         name: 'Bench',
         loadInputMode: 'per_side_load',
       });
     });
+  });
 
-    it('fails loud with INTERNAL when an exercise payload is missing its contract keys', async () => {
-      respond({ exercises: null });
-      await expectRejectsWith(listGroupExercises('g1'), 'INTERNAL', 'group_exercise_list_v2 returned an unexpected payload.');
-
-      respond({ exercise: {} });
-      await expectRejectsWith(archiveGroupExercise('g1', 'ge1'), 'INTERNAL', 'group_exercise_archive_v2 returned an unexpected payload.');
-
-      respond({ group_exercise_id: 'ge1' });
-      await expectRejectsWith(
-        createGroupExercise('g1', { name: 'Bench', loadInputMode: 'total_load', sourceExerciseId: null }),
-        'INTERNAL',
-      );
+  describe('NOT_FOUND messages', () => {
+    it('tells them apart; only "group not found" is a group loss', () => {
+      const notFound = (message: string) => new GroupApiError('NOT_FOUND', message);
+      const cases = [
+        ['group not found', isGroupNotFound],
+        ['group exercise not found', isGroupExerciseNotFound],
+        ['member not found', isGroupMemberNotFound],
+      ] as const;
+      for (const [message, matches] of cases) {
+        for (const [other, otherMatches] of cases) {
+          expect(otherMatches(notFound(message))).toBe(other === message);
+        }
+        expect(matches(new GroupApiError('VALIDATION', message))).toBe(false);
+        expect(matches(new Error(message))).toBe(false);
+      }
     });
   });
 

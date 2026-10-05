@@ -71,8 +71,6 @@ describe('training-metric rules have one implementation', () => {
       // The group evaluator stores the effort half as `working` on each fact.
       'apps/mobile/src/groups/set-facts.ts',
       'apps/mobile/src/groups/metric-evaluation.ts',
-      // Performed sets only (`selectGroupPerformedExercises`).
-      'apps/mobile/src/groups/session-metrics.ts',
       // The competition scorer already admits only performed projections.
       'apps/mobile/src/groups/competition-evaluation.ts',
       // The public session view admits performed reps before counting effort; normalized load stays private.

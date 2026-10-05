@@ -53,20 +53,16 @@ jest.mock('expo-router', () => ({
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
-jest.mock('@/src/groups/api', () => {
-  const streamRead = jest.fn();
-  return {
+jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   getGroup: jest.fn(),
-  getGroupStream: streamRead,
-  getGroupMetricStream: streamRead,
+  getCompetitionStream: jest.fn(),
   listCompetitionExercises: jest.fn(),
-  getGroupBoardPodiums: jest.fn(),
+  getCompetitionPodiums: jest.fn(),
   createCompetitionExercise: jest.fn(),
   updateCompetitionExercise: jest.fn(),
   archiveCompetitionExercise: jest.fn(),
-  };
-});
+}));
 
 // Link writes are the real repository on the fixture; only the sync nudge and
 // the Add-as-new graph write (covered by exercise-group-links-add-as-new.test.ts) are stubbed.
@@ -205,7 +201,6 @@ beforeEach(() => {
   mockParams = { groupId: GROUP_ID };
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
   api.getGroup.mockResolvedValue(detailFor('owner'));
-  api.getGroupStream.mockResolvedValue({ items: [], next_cursor: null, has_more: false });
   api.listCompetitionExercises.mockResolvedValue(LIST);
   __resetExerciseCatalogCacheForTests();
 });
@@ -220,8 +215,8 @@ describe('Group page (D10, D14)', () => {
     expect(screen.getByTestId('group-screen-exercises-title')).toBeTruthy();
     expect(await screen.findByTestId('group-exercises-list')).toBeTruthy();
     expect(screen.queryByTestId('group-screen-segment-row')).toBeNull();
-    expect(api.getGroupStream).not.toHaveBeenCalled();
-    expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
+    expect(api.getCompetitionStream).not.toHaveBeenCalled();
+    expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
   });
 
   // G6: Invite is the one accent; Add exercise, in the list or the empty state, is an outline.

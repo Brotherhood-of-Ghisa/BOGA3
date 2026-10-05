@@ -1,17 +1,19 @@
 /**
  * Group evaluator normalization (groups contract): the fact rows the
  * `group-eval` Edge Function writes, and their agreement with the device's
- * card rule (`toGroupPerformedSet`), which delegates to the same core.
+ * session card rule (`buildCompetitionSession`, ordinary visibility).
  */
 
 import { isWorkingSetType } from '@/src/exercise-calculations/set-semantics';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
+import { formatWeight } from '@/src/exercise-calculations/format';
 import {
   GROUP_EVAL_RULES_VERSION,
   normalizeGroupSetFacts,
-  toGroupPerformedSet,
   type GroupEvalSetRow,
 } from '@/src/groups';
+import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
+import { competitionSession } from './helpers/competition-fixtures';
 
 const STARTED_AT_MS = 1_757_500_000_000;
 
@@ -33,7 +35,7 @@ const row = (setId: string, weight: string, reps: string, overrides: Partial<Gro
 const factOf = (set: GroupEvalSetRow) =>
   normalizeGroupSetFacts({ session_id: 'session-1', started_at_ms: STARTED_AT_MS, sets: [set] })[0];
 
-// The raw-set cases of groups-session-metrics.test.ts: [weight, reps, status].
+// Raw-set cases across the parser's edges: [weight, reps, status].
 const METRICS_FIXTURES: [string, string, string | null][] = [
   [' 102.5 ', '5 ', null],
   ['', '8', null],
@@ -51,24 +53,25 @@ const METRICS_FIXTURES: [string, string, string | null][] = [
 ];
 
 describe('group evaluator set facts', () => {
-  it('agrees with the device card rule on every metrics fixture', () => {
+  it('agrees with the device session card rule on every fixture', () => {
+    const [exercise] = competitionSession.session.exercises;
     for (const [weight, reps, status] of METRICS_FIXTURES) {
       const fact = factOf(row('s1', weight, reps, { performance_status: status }));
-      const device = toGroupPerformedSet({
-        set_id: 's1',
-        order_index: 0,
-        weight_value: weight,
-        reps_value: reps,
-        set_type: 'working',
-        performance_status: status,
+      const card = buildCompetitionSession({
+        ...competitionSession.session,
+        exercises: [{
+          ...exercise,
+          visibility: 'ordinary',
+          sets: [{ set_id: 's1', order_index: 0, weight_value: weight, reps_value: reps, set_type: 'working', performance_status: status }],
+        }],
       });
-      expect({ weight, reps, status, performed: fact.performed, weightKg: fact.weight_kg, reps_: fact.reps }).toEqual({
+      const shown = card.cards[0]?.rows[0]?.weightReps ?? null;
+      expect({ weight, reps, status, performed: fact.performed, shown }).toEqual({
         weight,
         reps,
         status,
-        performed: device !== null,
-        weightKg: device?.weightKg ?? null,
-        reps_: device?.reps ?? null,
+        performed: shown !== null,
+        shown: fact.performed ? `${formatWeight(fact.weight_kg ?? NaN)} × ${fact.reps}` : null,
       });
     }
   });
