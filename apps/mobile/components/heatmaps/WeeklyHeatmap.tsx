@@ -1,11 +1,9 @@
-// WeeklyHeatmap.tsx — "Weekly heatmap" (Direction B), React Native.
-// One bar = one week · height = selected-metric value · color = intensity.
-// 12-week average baseline · selection lifted to the history sheet's week banner.
+// Newest-first weekly rows. Length uses a shared zero origin; colour retains
+// the adapter's independent intensity/target meaning. The sheet owns this list.
+import React, { useMemo, useState, type ReactNode } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import React, { useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, ScrollView, type ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
-
-import { Icon, uiGeometry, uiRoles, uiSpace } from '@/components/ui';
+import { Icon, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import { HEAT_MARK, heatmapStyles } from './heatmap-style';
@@ -13,234 +11,162 @@ import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MAXH = 78;
+const DATE_WIDTH = 96;
 
 interface Props {
   data: HeatmapData;
   selectedWeekKey: string | null;
   onSelectWeek: (weekStartDateKey: string | null) => void;
   testIDPrefix: string;
-  // The metric's display format, as the daily grid takes it.
   formatValue: (value: number) => string;
+  formatAverageValue?: (value: number) => string;
+  metricLabel?: string;
   legendLabel?: string;
+  // Inline history states share the list's scroll, never a nested ScrollView.
+  header?: ReactNode;
 }
 
-// The current week is a 1px `ink` ring and the selected week a 2px `ink`
-// border, the daily grid's today and selected marks (DLM-T09-D3).
+const isKnownTraining = (week: WeekCell) => !week.unavailable && (week.hasTraining ?? week.value > 0);
+
+const weekLabel = (week: WeekCell): string => {
+  const start = week.monday;
+  const end = new Date(start.getTime() + 6 * 86400000);
+  const first = `${start.getUTCDate()}${start.getUTCMonth() === end.getUTCMonth() ? '' : ` ${MONTHS[start.getUTCMonth()]}`}`;
+  return `${first} – ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]}`;
+};
+
+const weekValue = (week: WeekCell, formatValue: Props['formatValue']) => {
+  if (week.unavailable) return '?';
+  return isKnownTraining(week) ? formatValue(week.value) : 'Rest';
+};
+
 const barBorder = (week: WeekCell, selected: boolean) => {
   if (selected) return { borderWidth: HEAT_MARK.selectedWidth, borderColor: HEAT_MARK.color };
   if (week.isCurrentWeek) return { borderWidth: HEAT_MARK.todayWidth, borderColor: HEAT_MARK.color };
   return null;
 };
 
-export function WeeklyHeatmap({
-  data,
-  selectedWeekKey,
-  onSelectWeek,
-  testIDPrefix,
-  formatValue,
-  legendLabel = 'Intensity (per week)',
-}: Props) {
-  const weeks = data.weekly;
-  const [chartW, setChartW] = useState(0);
-  const scrollRef = useRef<ScrollViewInstance>(null);
-  const GAP = 4;
-  // Bar width is keyed to a ~3-month viewport (~13 week columns fill the visible width),
-  // matching the daily view; older history is reachable by scrolling horizontally.
-  const WEEKS_VISIBLE = 13;
-  const MIN_CELL = 14;
+// Discrete vertical dashes render consistently on iOS, including at zero.
+function AverageRule({ position, testID }: { position: number; testID?: string }) {
+  return <View pointerEvents="none" style={[styles.average, { left: `${position}%` }]} testID={testID}>
+    {Array.from({ length: 5 }, (_, index) => <View key={index} style={styles.dash} />)}
+  </View>;
+}
 
-  const maxValue = Math.max(1, ...weeks.map((w) => w.value));
-  // Bar heights + the average baseline are normalized across the *observed* activity
-  // band [min, max], matching the color scale. Without this, high-floor metrics (1RM,
-  // top weight) pin every bar to the top and the avg line lands off-screen above them.
-  const activeValues = weeks.filter((w) => !w.unavailable && (w.hasTraining ?? w.value > 0)).map((w) => w.value);
-  const minValue = activeValues.length ? Math.min(...activeValues) : 0;
-  const span = maxValue - minValue;
-  const BAR_FLOOR = MAXH * 0.12; // keep the smallest logged bar (and the avg line) visible
-  const barHeight = (v: number): number => {
-    if (v <= 0) return 2;
-    const t = span > 0 ? (v - minValue) / span : 1;
-    return BAR_FLOOR + t * (MAXH - BAR_FLOOR);
-  };
-
-  // Average over known training weeks, including a genuine zero-resistance workout.
-  // Rest weeks and unavailable metrics do not contribute observations.
-  // Only meaningful with enough observations, so require at least 6 active weeks.
-  const MIN_AVG_WEEKS = 6;
-  const recentActive = weeks.slice(-12).filter((w) => !w.unavailable && (w.hasTraining ?? w.value > 0));
-  const showAvg = recentActive.length >= MIN_AVG_WEEKS;
-  const avg = recentActive.reduce((mean, w, index) => mean + (w.value - mean) / (index + 1), 0);
-  const avgY = MAXH - barHeight(avg);
-
-  const cell = chartW > 0 ? Math.max(MIN_CELL, chartW / WEEKS_VISIBLE - GAP) : MIN_CELL;
-  const colW = cell + GAP;
-  const contentW = weeks.length * colW;
-  // Dash segments for the 12-wk avg rule, sized to span the scrollable content width.
-  const dashCount = Math.max(2, Math.floor(contentW / 9));
-
-  const monthMarks = weeks.map((w, i) => {
-    const m = w.monday.getUTCMonth();
-    const prev = i ? weeks[i - 1].monday.getUTCMonth() : -1;
-    return m !== prev ? MONTHS[m] : null;
-  });
-
-  const selectedIndex = useMemo(
-    () => weeks.findIndex((w) => w.weekStartDateKey === selectedWeekKey),
-    [weeks, selectedWeekKey]
-  );
-
-  const heatmapTestID = `${testIDPrefix}-heatmap`;
-  const onLayout = (e: LayoutChangeEvent) => setChartW(e.nativeEvent.layout.width);
-
-  return (
-    <View style={heatmapStyles.wrap} testID={heatmapTestID}>
-      <View style={heatmapStyles.headerRow}>
-        <Text allowFontScaling={false} style={heatmapStyles.title}>Weekly training load</Text>
-      </View>
-
-      {/* horizontally scrollable chart + month axis */}
-      <View onLayout={onLayout}>
-        <ScrollView
-          ref={scrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
-          {/* paddingTop leaves room for the selected-week marker (top: -14) above the bars */}
-          <View style={{ width: contentW, paddingTop: uiSpace.lg }}>
-            {/* chart */}
-            <View style={{ height: MAXH }}>
-              <View style={styles.bars}>
-                {weeks.map((w) => {
-                  const h = barHeight(w.value);
-                  const on = w.weekStartDateKey === selectedWeekKey;
-                  return (
-                    <Pressable
-                      key={w.weekStartDateKey}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Week of ${w.weekStartDateKey}, ${w.unavailable ? 'metric unavailable or incomplete' : w.hasTraining || w.value > 0 ? `value ${formatValue(w.value)}` : 'Rest week'}${w.targetAttainment === undefined ? '' : `, ${Math.round(w.targetAttainment * 100)}% of weekly muscle target${data.targetLegend?.includes('average') ? ', averaged across muscles' : ''}`}`}
-                      accessibilityState={{ selected: on }}
-                      onPress={() => onSelectWeek(on ? null : w.weekStartDateKey)}
-                      testID={`${heatmapTestID}-cell-${w.weekStartDateKey}`}
-                      style={[styles.column, { width: colW }]}>
-                      {w.unavailable ? <Text allowFontScaling={false} style={heatmapStyles.legendText}
-                        testID={`${heatmapTestID}-bar-${w.weekStartDateKey}`}>?</Text> : <View
-                        style={[
-                          styles.bar,
-                          { width: cell, height: h, backgroundColor: HEAT_RAMP[w.level] },
-                          barBorder(w, on),
-                        ]}
-                        testID={`${heatmapTestID}-bar-${w.weekStartDateKey}`}
-                      />}
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {/* 12-wk average baseline — only when there is activity to average over the
-                  last 12 weeks. Drawn after the bars so the dashed line and its label sit
-                  on top of them. Rendered as discrete dash segments (not a zero-height
-                  dashed border, which renders unreliably on iOS) and snapped to a whole
-                  pixel. When near the top, the label flips below the line. */}
-              {showAvg ? (
-                <>
-                  <View style={[styles.baseline, { top: Math.round(avgY) }]}
-                    accessibilityLabel={`12-week average ${formatValue(avg)}`}
-                    testID={`${heatmapTestID}-average`}>
-                    {Array.from({ length: dashCount }).map((_, i) => (
-                      <View key={i} style={styles.dash} />
-                    ))}
-                  </View>
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      heatmapStyles.legendText,
-                      styles.baseLabel,
-                      { top: avgY < 14 ? Math.round(avgY) + 2 : Math.round(avgY) - 14 },
-                    ]}>
-                    12-wk avg
-                  </Text>
-                </>
-              ) : null}
-
-              {/* the selected week's marker: a filled `ink` caret above its bar */}
-              {selectedIndex >= 0 ? (
-                <View
-                  style={[styles.marker, { left: (selectedIndex + 0.5) * colW - 16 }]}
-                  testID={`${heatmapTestID}-selected-marker`}>
-                  <Icon color={HEAT_MARK.color} name="caret-down" size="xs" />
-                </View>
-              ) : null}
-            </View>
-
-            {/* month axis — labels overflow their column so they aren't clipped */}
-            <View style={[styles.axis, { width: contentW }]}>
-              {monthMarks.map((m, i) =>
-                m ? (
-                  <Text
-                    allowFontScaling={false}
-                    key={i}
-                    numberOfLines={1}
-                    style={[heatmapStyles.legendText, styles.axisLabel, { left: i * colW }]}>
-                    {m}
-                  </Text>
-                ) : null
-              )}
-            </View>
-          </View>
-        </ScrollView>
-      </View>
-
-      <HeatmapLegend label={legendLabel} />
-      {data.targetLegend ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>{data.targetLegend}. Full colour at 100%.</Text> : null}
-      {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-        ?: unavailable or incomplete load; excluded from the average
-      </Text> : null}
+function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetLegend, max, averagePosition, valueWidth, currentYear, testID }: {
+  week: WeekCell; selected: boolean; onPress: () => void; formatValue: Props['formatValue']; metricLabel: string;
+  targetLegend?: string; max: number; averagePosition: number | null; valueWidth: number; currentYear: number; testID: string;
+}) {
+  const year = week.monday.getUTCFullYear();
+  const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
+  const value = weekValue(week, formatValue);
+  const description = week.unavailable ? `${metricLabel} unavailable or incomplete` : value === 'Rest' ? 'Rest week' : `${metricLabel} ${value}`;
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected }}
+    accessibilityLabel={`Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetLegend?.includes('average') ? ', averaged across muscles' : ''}`}`}
+    onPress={onPress} testID={`${testID}-cell-${week.weekStartDateKey}`} style={styles.row}>
+    <View style={styles.date}>
+      {selected ? <View style={styles.marker} testID={`${testID}-selected-marker`}><Icon color={HEAT_MARK.color} name="caret-down" size="xs" /></View> : null}
+      <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week)}</Text>
+      {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
+      {year !== currentYear || year !== endYear ? <Text allowFontScaling={false} style={styles.year}>{year === endYear ? year : `${year}–${endYear}`}</Text> : null}
     </View>
-  );
+    <View style={styles.plot}>
+      <View style={styles.track}>
+        {/* A missing value has no filled length. Zero/rest still get an outline
+            when current or selected, so both marks remain visible. */}
+        <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
+          { width: `${max > 0 && !week.unavailable ? week.value / max * 100 : 0}%`,
+            backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' },
+          barBorder(week, selected),
+          (week.unavailable || week.value === 0) && (selected || week.isCurrentWeek) ? styles.emptyMark : null]} />
+      </View>
+      {averagePosition !== null ? <AverageRule position={averagePosition} /> : null}
+    </View>
+    <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
+  </Pressable>;
+}
+
+export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
+  formatAverageValue = formatValue, metricLabel = 'Value', legendLabel = 'Intensity (per week)', header }: Props) {
+  // Never reverse the adapter array: its tail owns the recent-12 average.
+  const weeks = useMemo(() => [...data.weekly].reverse(), [data.weekly]);
+  const max = data.weekly.reduce((largest, week) => week.unavailable ? largest : Math.max(largest, week.value), 0);
+  const recent = data.weekly.slice(-12).filter(isKnownTraining);
+  const average = recent.reduce((mean, week, index) => mean + (week.value - mean) / (index + 1), 0);
+  // Six genuine zero observations are valid, but an all-zero scale cannot
+  // carry a meaningful reference. Never substitute an artificial full bar.
+  const showAverage = recent.length >= 6 && max > 0;
+  const averagePosition = showAverage ? average / max * 100 : null;
+  const averageLabel = formatAverageValue(average);
+  const valueWidth = Math.min(96, Math.max(36, ...weeks.map(week => weekValue(week, formatValue).length * uiTypography.size.base * 0.6)));
+  const testID = `${testIDPrefix}-heatmap`;
+  const [plotWidth, setPlotWidth] = useState(0);
+  const labelWidth = (`Avg ${averageLabel}`).length * uiTypography.size.sm * 0.6;
+  const labelLeft = Math.max(0, Math.min(plotWidth - labelWidth, (averagePosition ?? 0) / 100 * plotWidth - labelWidth / 2));
+
+  return <FlatList
+    testID={testID} style={styles.list} contentContainerStyle={styles.content}
+    data={weeks} keyExtractor={week => week.weekStartDateKey}
+    initialNumToRender={12} windowSize={5} showsVerticalScrollIndicator={false}
+    extraData={selectedWeekKey}
+    ListHeaderComponent={<View>{header}<>
+      <Text allowFontScaling={false} style={[heatmapStyles.title, styles.title]}>Weekly training load</Text>
+      <Text allowFontScaling={false} style={styles.note}>{metricLabel}{metricLabel === 'Volume' ? ' (kg·reps)' : metricLabel === '1RM' || metricLabel === 'Top weight' ? ' (kg)' : ''} per week</Text>
+      {showAverage ? <View style={styles.averageRow}>
+        <View style={styles.date} />
+        <View style={styles.axisPlot} onLayout={event => setPlotWidth(event.nativeEvent.layout.width)}>
+          <Text allowFontScaling={false} style={[styles.averageLabel, { marginLeft: labelLeft }]} accessibilityLabel={`12-week average ${averageLabel}`} testID={`${testID}-average-label`}>Avg {averageLabel}</Text>
+        </View>
+        <View style={{ width: valueWidth }} />
+      </View> : null}
+      <View style={styles.axisRow}>
+        <View style={styles.date} />
+        <View style={styles.axis} testID={`${testID}-axis`}>
+          {(max > 0 ? [0, 0.5, 1] : [0]).map(fraction => <Text key={fraction} allowFontScaling={false} style={[styles.axisLabel, { textAlign: fraction === 0 ? 'left' : fraction === 1 ? 'right' : 'center' }]}>{formatValue(max * fraction)}</Text>)}
+          {averagePosition !== null ? <View testID={`${testID}-average`} style={[styles.axisAverage, { left: `${averagePosition}%` }]} /> : null}
+        </View>
+        <View style={{ width: valueWidth }} />
+      </View>
+    </></View>}
+    renderItem={({ item }) => <WeeklyRow week={item} selected={item.weekStartDateKey === selectedWeekKey}
+      onPress={() => onSelectWeek(item.weekStartDateKey === selectedWeekKey ? null : item.weekStartDateKey)}
+      formatValue={formatValue} metricLabel={metricLabel} targetLegend={data.targetLegend}
+      max={max} averagePosition={averagePosition} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
+    ListFooterComponent={<View style={styles.footer}>
+      <Text allowFontScaling={false} style={styles.note}>Current week is in progress.</Text>
+      {showAverage ? <Text allowFontScaling={false} style={styles.note}>12-week average: {averageLabel} {metricLabel === 'Sets' ? 'sets' : metricLabel}.</Text> : null}
+      <HeatmapLegend label={legendLabel} />
+      {data.targetLegend ? <Text allowFontScaling={false} style={styles.note}>{data.targetLegend}. Full colour at 100%.</Text> : null}
+      {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={styles.note}>?: unavailable or incomplete load; excluded from the average</Text> : null}
+    </View>}
+  />;
 }
 
 const styles = StyleSheet.create({
-  bars: { flexDirection: 'row', alignItems: 'flex-end', height: '100%' },
-  column: { alignItems: 'center', justifyContent: 'flex-end', height: '100%' },
-  bar: { borderRadius: uiGeometry.radius.control },
-  baseline: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1.5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  dash: {
-    width: 5,
-    height: 1.5,
-    marginRight: uiSpace.xs,
-    backgroundColor: uiRoles.inkFaint,
-  },
-  // On `surface` so it reads over a bar as well as over the ground.
-  baseLabel: {
-    position: 'absolute',
-    right: 0,
-    color: uiRoles.inkMuted,
-    backgroundColor: uiRoles.surface,
-    paddingHorizontal: uiSpace.xs,
-  },
-  marker: {
-    position: 'absolute',
-    top: -14,
-    width: 32,
-    alignItems: 'center',
-  },
-  axis: {
-    position: 'relative',
-    marginTop: uiSpace.xs,
-    height: 22,
-    borderTopWidth: 1,
-    borderColor: uiRoles.rule,
-  },
-  axisLabel: { position: 'absolute', top: 4, width: 32 },
+  list: { flex: 1 },
+  content: { padding: uiSpace.lg },
+  title: { marginTop: uiSpace.xs, marginBottom: uiSpace.md },
+  row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, paddingVertical: uiSpace.sm },
+  date: { width: DATE_WIDTH },
+  dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
+  note: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xs, lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
+  year: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
+  marker: { position: 'absolute', left: -uiSpace.lg, top: uiSpace.xs, transform: [{ rotate: '-90deg' }] },
+  plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
+  track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
+  bar: { height: '100%', borderRadius: uiGeometry.radius.control },
+  emptyMark: { width: '100%' },
+  value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, textAlign: 'right' },
+  average: { position: 'absolute', top: -uiSpace.sm, bottom: -uiSpace.sm, width: 1, justifyContent: 'space-around' },
+  dash: { width: 1, flex: 1, maxHeight: 5, marginBottom: uiSpace.xs, backgroundColor: uiRoles.inkMuted },
+  averageLabel: heatmapStyles.caption,
+  averageRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.md },
+  axisPlot: { flex: 1 },
+  axisAverage: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
+  axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.sm },
+  axis: { flex: 1, flexDirection: 'row', paddingBottom: uiSpace.sm },
+  axisLabel: { ...heatmapStyles.legendText, flex: 1, flexShrink: 1 },
+  footer: { gap: uiSpace.xs, paddingTop: uiSpace.lg },
 });
 
 export default WeeklyHeatmap;

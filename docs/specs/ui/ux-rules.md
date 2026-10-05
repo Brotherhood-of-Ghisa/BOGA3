@@ -600,21 +600,29 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
 1. Dates are local, in Monday-start weeks. The daily grid has seven weekday rows
    labelled `M`, `W` and `F` in a fixed gutter, and one column per week under a
    month axis; gutter, axis and legend are Archivo micro-labels in `ink-faint`.
-2. The daily grid spans all loaded history (at least 52 weeks), sized so about
+2. The daily grid spans the saved look-back (1–520 weeks), sized so about
    13 week columns fill the width, and opens scrolled to its right edge, where
-   today is; older weeks are reached by scrolling left. The weekly view is one
-   bar per week over the same span, bar height and colour both scaled to the
-   window's logged range, with a dashed `ink-faint` 12-week average once at
-   least 6 of the last 12 weeks logged training.
+   today is; older weeks are reached by scrolling left. Weekly uses horizontal
+   bars stacked newest first over the same saved span: dates in a left gutter,
+   zero-based proportional lengths in one plot, formatted values on the right.
+   Its single vertical list virtualizes long windows. A dashed vertical average
+   shares the scale once at least six of the latest twelve weeks have known
+   training; include genuine zero training, exclude rest and unavailable weeks.
+   Label averages as whole volume or one decimal for Sets/1RM/Top weight,
+   using the shared figure formatters. An empty/all-zero scale has no average
+   reference. Colour retains its independent bucket/target meaning; aggregation is unchanged.
 3. Buckets are min–max over the window's positive values: the lightest logged
    day is `viz1`, the heaviest `viz4`. Zero-effort days are `viz0` with a `rule`
    hairline, and stay visible, tappable and accessible.
 4. The ramp says only "more". Colour is never the only channel: the day detail
-   and the week banner state the value.
+   and the weekly value column/banner state the value. Rest reads `Rest`, known
+   zero training reads numeric zero, and unknown/incomplete load reads `?` with
+   explicit availability copy; none gets a filled bar.
 5. **Today and selected are distinct marks** (DLM-T09-D3). Today (the current
    week in the weekly view) is a 1px `ink` ring; the selected day or week is a
    2px `ink` border and exposes the selected accessibility state. The selected
-   week also gets a filled `ink` `caret-down` above its bar.
+   week also gets a filled `ink` caret beside its date. `Current week` remains
+   visible even when that week is selected; zero/rest/unknown rows retain the marks.
 6. The daily view owns its selection: it starts on today, and a tap selects that
    day and shows its detail `Card` (a `Today` or weekday kicker, the date, a
    `viz` swatch and `<metric>: <value>` in Plex Mono, or `Rest day`). The weekly
@@ -644,10 +652,11 @@ on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
    loading. An error offers Retry for the same entity and saved look-back.
    Heatmaps stay mounted during reloads to preserve selection and
    scroll; under the no-history panel the empty heatmap still renders.
-5. In `Weekly` a `rule-soft` band sits above the chart: `Tap a week to see
-   details`, or the selected week's range (Source Sans `ink-muted`) and
+5. In `Weekly` a `rule-soft` band appears above the chart only for a selected
+   week: its full range (Source Sans `ink-muted`) and
    `<metric>: <value>` with the value in Plex Mono `ink`. `Daily` has no band;
-   its day detail is inside the chart (§11.6).
+   its day detail is inside the chart (§11.6). Clearing selection removes the
+   band entirely; there is no tap-instruction text or navigation on selection.
 6. Values follow the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`; a missing
    1RM or top weight is `—`.
 7. Muscle volume is the per-side, role-weighted aggregate across the selected

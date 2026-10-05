@@ -357,6 +357,36 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
   });
 
+  it('selects and clears a weekly row over real data and returns to the same search/sort', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 8 }));
+    await renderStats();
+    await screen.findByTestId(SQUAT_ROW);
+    fireEvent.press(screen.getByTestId('stats-exercise-sort-volume'));
+    fireEvent.changeText(screen.getByTestId('stats-search-input'), 'Squat');
+    fireEvent.press(screen.getByTestId(SQUAT_ROW));
+    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
+    fireEvent.press(screen.getByTestId('stats-exercise-history-metric-chip-workingSetCount'));
+    const current = localDateKey(calendarWeekBounds(1).start);
+    const row = screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`);
+    // The existing successful-load selection starts on the current week.
+    fireEvent.press(row);
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
+    fireEvent.press(row);
+    const expected = (await exerciseAnalytics.computeSelectedExerciseWeeklyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT }))
+      .find(week => week.weekStartDateKey === current)!;
+    expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent(`Sets: ${expected.workingSetCount}`);
+    fireEvent.press(row);
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
+    expect(screen.queryByText(/Tap a week/)).toBeNull();
+    await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
+    await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
+    expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-/)).toHaveLength(1);
+    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
+    expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
+  });
+
   it('keeps seeded families inert and opens only an individual muscle', async () => {
     await renderSeededStats();
 

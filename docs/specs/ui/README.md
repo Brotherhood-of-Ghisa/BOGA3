@@ -47,7 +47,7 @@ drifted from the code and predated several UI milestones. Git history has them.)
     required before closeout
 - `design-targets/weekly-history-bars.md`
   - accepted weekly-history redesign: horizontal bars stacked newest first,
-    with visible values and an average reference; awaiting implementation
+    with visible values and an average reference; implemented with runtime comparison
 - `design-targets/group-competitions.md`
   - accepted group Volume/1RM target, public percentage units, rules review and
     safe record/session context; replaces the older group Weight examples
