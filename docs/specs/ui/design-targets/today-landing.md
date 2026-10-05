@@ -146,6 +146,15 @@ committed flow asserts Today beyond `today-screen` in `smoke-launch.yaml`
 | `today-group-03-one-group-training` | one group, one member training now | no switcher; the group-named board; the live row |
 | `today-group-04-several-training` | several training now, the user outside the top three | the switcher; `You · <rank>`; the collapsed row |
 | `today-group-01-auth-unavailable-bottom` | an unconfigured build | the no-account group panel (signed out never reaches Today) |
+| `g1-one-pr-one-group-record-progress` / `-group` | own latest set one PR; a member's latest took #1 on one board | the shared row; a single PR and a single group record named |
+| `g2-several-prs-several-group-records-progress` / `-group` | own latest set two PRs; a member's latest took #1 on two boards | several only counted; the week `PRs` one number |
+| `g3-training-now-group` | one member training now | the member header with the training-now mark; `Started <time>`, no PR line |
+| `g4-several-training-group` | several training now | the collapsed row, unchanged |
+
+The `g*` captures (2026-10-05, the shared row) come from a scratch flow over a
+signed-in device user on the slot stack with group competitions activated;
+the other members' sessions were pushed through `sync_push` and the evaluator
+drained between states.
 
 Offline, the error states and Retry are Jest-only (`today-group-card.test.tsx`).
 No target screenshots are committed; runtime captures stay in the gitignored
