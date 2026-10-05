@@ -160,7 +160,10 @@ Brief entrypoint map of the current mobile screens.
   open exactly one muscle ID; exercise names open definition history. Each
   `HistorySheet` uses the saved look-back and Settings-owned Daily/Weekly view,
   with Daily for unset/invalid choices and valid Weekly retained. Both views
-  remain mounted; Retry retains history selection. No family heatmap action.
+  remain mounted; Weekly is one virtualized vertical list of horizontal bars,
+  newest first, with date/value columns and a zero-based average reference.
+  Tapping a week selects/clears its full-range banner in place, with no helper
+  text. Retry retains history selection. No family heatmap action.
 - Notes: one `ScreenScroll` on paper over `MainTabs`, with Progress selected;
   the new landing is governed by `design-targets/progress-tables.md`, retained
   history by `design-targets/progress.md` and `ux-rules.md` §12–§13.

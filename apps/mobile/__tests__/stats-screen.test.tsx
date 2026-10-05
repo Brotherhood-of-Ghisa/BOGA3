@@ -680,7 +680,7 @@ describe('StatsScreenShell', () => {
     );
   });
 
-  it('shows a placeholder in the banner when no week is selected', () => {
+  it('omits the banner and instruction when no week is selected', () => {
     renderStatsScreenShell({
       selectedMuscle: {
         muscleGroupIds: ['front_delts'] as [string],
@@ -691,8 +691,8 @@ describe('StatsScreenShell', () => {
       selectedMuscleHistoryWeekKey: null,
     });
 
-    expect(screen.getByTestId('stats-muscle-history-week-banner')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-week-banner-placeholder')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
+    expect(screen.queryByText(/Tap a week/)).toBeNull();
   });
 });
 

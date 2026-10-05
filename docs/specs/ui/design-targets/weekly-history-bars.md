@@ -1,11 +1,11 @@
 # Accepted target — weekly history bars
 
 Target record per [AI-assisted design policy](../ai-design-policy.md).
-**Accepted; awaiting implementation.** The operator selected Product Design
+**Accepted target; implemented and runtime-compared on 2026-10-05.** The operator selected Product Design
 option 3 on 2026-10-05, retained Settings as the Daily/Weekly selector, and
 approved the revised selected-week state after removing the tap-instruction
-sentence. This record guides the weekly redesign; current runtime behavior
-remains documented in `../ux-rules.md` until the implementation ships.
+sentence. This record and `../ux-rules.md` describe the integrated weekly chart;
+operator review happens in the implementation PR.
 
 ## Target
 
@@ -86,3 +86,29 @@ Capture the integrated selected state at the target viewport and compare the
 reference and runtime image together. Runtime captures remain in the ignored
 `apps/mobile/artifacts/maestro/` tree and are linked as PR evidence. Record
 material differences here when the implementation is accepted.
+
+
+### Integrated comparison
+
+The running iOS app uses the production `HistorySheet`/`WeeklyHeatmap`, rendered
+with deterministic loaded-history fixtures. The selected state was compared
+side by side at **390 × 844pt**, with additional **375 × 667pt** and
+**440 × 956pt** captures. Exercise Sets matches the reference values (current
+12, selected 54, maximum 60, recent-twelve average 44.4). Runtime evidence stays
+in `apps/mobile/artifacts/maestro/weekly-history-bars/comparison/`; the PR links
+the comparison and state captures.
+
+The integration intentionally retains the saved `Weekly · 12 weeks` caption,
+actual Progress background, existing approximately three-quarter-height sheet
+and production type/colour tokens. These consume more space than the mock,
+so fewer rows are initially visible, especially on the small phone; older rows
+remain in the sheet's vertical list. The brief remains authoritative for these
+differences. Other metrics retain their canonical row formats and units;
+averages use whole volume or one decimal for Sets/1RM/Top weight.
+
+Additional runtime states cover unselected/current-selected, muscle target
+colour, rest/known-zero/incomplete load, loading/error/empty, saved Daily, other
+metrics, long formatted values and the 1/520-week limits. The maximum window's
+native list was also programmatically scrolled to its oldest rows. Selection,
+clearing, retry, dismissal and parent-state preservation have Jest integration
+coverage; no new Maestro scenario was introduced.

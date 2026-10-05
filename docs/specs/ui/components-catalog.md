@@ -356,11 +356,13 @@ Brief entrypoint inventory of the current reusable UI component set.
   `apps/mobile/components/stats/history-sheet.tsx`
 - Purpose:
   - `DailyHeatmap` / `WeeklyHeatmap` — daily-cell and weekly-bar views over one
-    `HeatmapData`, horizontally scrollable over the loaded history, in the
+    `HeatmapData`: Daily scrolls horizontally; Weekly virtualizes a vertical
+    newest-first list with proportional horizontal lengths, date/value columns
+    and a dashed vertical average on a shared zero-based scale. Both use the
     design language (DLM-T09): cells and bars on the `viz0`–`viz4` ramp
     (`HEAT_RAMP`), an empty day `viz0` with a `rule` hairline; **today (or the
     current week) a 1px `ink` ring, the selected cell a 2px `ink` border** plus
-    the selected state, and a filled `ink` `caret-down` over the selected week
+    the selected state, and a filled `ink` caret beside the selected week
     (`<prefix>-heatmap-selected-marker`). The daily view's detail is a `Card`
     with a Plex Mono value; gutter, axis and the Less…More `HeatmapLegend` are
     `ink-faint` micro-labels. testIDs `<prefix>-heatmap`,
@@ -371,13 +373,13 @@ Brief entrypoint inventory of the current reusable UI component set.
     `Metric` `SegmentedControl` and a static saved view/window label;
     Settings owns Daily/Weekly, with Daily for unset/invalid choices and valid
     saved Weekly retained; a `rule-soft`
-    week banner in Weekly; inline `StatePanel`s for loading, error (Retry
+    week banner only while a week is selected, with no tap instruction; inline `StatePanel`s for loading, error (Retry
     for the same entity/window) and no history; both heatmap views kept mounted, the inactive one transparent,
     inert and hidden from accessibility. `kind` (`muscle` | `exercise`) names
     the testIDs: `stats-<kind>-history` (the `Sheet`; `-backdrop`, labelled
     `Dismiss <kind> history`), `-overlay` (the body), `-title`,
     `-metric-chip-<metric>`, `-retry`, `-week-banner` (`-range`,
-    `-value`, `-placeholder`), `-loading`, `-error`, `-empty`, `-scroll`,
+    `-value`), `-loading`, `-error`, `-empty`, `-scroll`,
     `-heatmap-panel-<view>`. Semantics: `ux-rules.md` §12. Target:
     `design-targets/progress.md`
 

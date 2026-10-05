@@ -11,7 +11,7 @@ Two heatmap views for the exercise and muscle history sheets on Progress
 | `heatmap-style.ts`  | The shared look: the `ink` today / selected marks (`HEAT_MARK`) and the title, caption and micro-label styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — 7 weekday rows × one column per week, one square per day, today at the right; owns its day selection and detail card. |
-| `WeeklyHeatmap.tsx` | **Weekly** — one bar per week, height and colour = the selected metric, 12-wk average baseline; selection lifted to the host. |
+| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, vertical 12-wk average; selection lifted to the host. |
 
 ## Data flow
 
@@ -47,7 +47,8 @@ zero muscles. Daily and weekly cells use that same target, independent of look-b
 legends and accessible labels report the target share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
-(max). The weekly bar heights include known zero training in the observed band.
+(max). Weekly lengths share a zero origin and the known window maximum;
+unknown load never gets a filled length, rest reads `Rest`, and known zero reads `0`.
 Only known training weeks contribute to the 12-week average (including zeros);
 rest and unavailable weeks do not. Incomplete volume is never plotted as a full
 total: daily cells are dashed, weekly cells show `?`, and details label coverage.
@@ -70,7 +71,9 @@ The two views select differently:
   selectedWeekKey={selectedWeekKey}     // string | null
   onSelectWeek={onSelectWeek}           // (weekStartDateKey | null) => void
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap-cell-<weekStartDateKey>", "-bar-<key>"
-  formatValue={formatValue}             // the metric's display format, for screen readers
+  formatValue={formatValue}             // rows, axis and accessible values
+  formatAverageValue={formatAverageValue} // optional; defaults to formatValue
+  metricLabel="Sets"
 />
 ```
 
@@ -78,7 +81,8 @@ The two views select differently:
   day and shows the detail card (`<prefix>-heatmap-day-detail`). It does not
   call the host.
 - **Weekly** lifts selection to the host, so the sheet's week banner can show
-  the week's value. A second tap on the selected week clears it.
+  the full range/value. A second tap clears it and removes the band. No instruction
+  is displayed. Current and selected marks remain visible for zero/rest/unknown rows.
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -104,7 +108,13 @@ to today/current week; in-range selection survives look-back edits.
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
   a chart rebuild when the saved view changes while preserving view-local selection
   and scroll state.
-- **No new dependencies.** Pure RN primitives (`View`, `Text`, `Pressable`,
-  `ScrollView`) and the `Icon` / `Card` primitives.
-- The weekly 12-wk average is drawn as discrete dash segments (a zero-height
-  dashed border renders unreliably on iOS).
+- **One active vertical scroller.** The weekly `FlatList` owns the sheet body;
+  Daily has its own outer `ScrollView` and horizontal grid. Inline loading/error/empty
+  states share the active body. Row targets are at least 44pt; old-year labels
+  disambiguate multi-year windows and value columns cap their width and wrap.
+- **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
+- The weekly average uses discrete vertical dashes on the same scale, plus
+  a formatted label. At least six known training weeks among the latest twelve
+  are required; an all-zero scale has no misleading reference. Averages use whole
+  volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row
+  values retain the selected metric format.
