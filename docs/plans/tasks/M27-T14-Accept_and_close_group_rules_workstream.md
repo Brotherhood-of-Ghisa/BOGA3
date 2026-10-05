@@ -1,6 +1,6 @@
 # M27-T14 — Human acceptance and group workstream closeout
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: existing #411 task (completed), T13 (completed), T15 (completed; milestone D4), T08 (completed), T09 (completed), T10 (completed)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
@@ -70,3 +70,26 @@ this change. Read test READMEs before any integration regression-test edits.
    explicit decision to abandon that scope.
 5. After PR merge, follow `./boga worktree release` for this session's worktree
    and stack. Do not merge the PR without the human's instruction.
+
+## Current execution evidence (2026-10-05)
+
+The operator confirmed in the execution session: “The member flows are accepted.”
+This accepts the six flows above; T10 runtime captures remain linked from PR #521.
+The operator named hosted `boga-dev` (connected project `BOGA_DEV`,
+`onluhhnvvmknqzdxgntl`) in response to the deployment request.
+The operator confirmed `boga-dev` is linked to the prod build, then directed
+local database testing and Preview/TestFlight first. Hosted writes and activation
+are on hold; none have been performed. Combined local closeout gates and the
+preview release sweep are in progress. Do not claim hosted completion.
+
+Fresh local backend and fast aggregates passed. The persistent `BOGA-dev` local
+database is activated on protocol 4 and Metro serves its LAN endpoint. An
+activated database exposed the development group seeder's missing protocol
+header; the header and a fetch-level Jest assertion now cover that path.
+The initial release sweep exposed the live competition test's 90-second poll
+being shorter than the configured five-minute sweep for rules-only rebuilds.
+The poll now allows one full interval plus processing; its corrected lane
+passed without weakening assertions. Fast passed 230 suites / 3043 tests;
+coverage passed with 85.35% branches and 93.25% lines; complexity and dependency
+checks passed. The independent review reported no findings. Preview delivery
+still requires completion of the release sweep and the actual build/submission.

@@ -1,7 +1,7 @@
 # M27 — Bodyweight load and group comparisons
 
 - Milestone ID: `M27`
-- Status: `in_progress` (implementation complete; human acceptance and hosted activation pending)
+- Status: `in_progress` (implementation and human acceptance complete; local database and Preview validation in progress; hosted rollout on hold)
 - Created: 2026-09-25; reconciled: 2026-10-04
 - Planning baseline: `b997e2f4` on `origin/main`
 - Workstream: [#420 — Stabilize group metric rebuilds and certifications](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
@@ -19,8 +19,9 @@ a bodyweight exercise whose competitive strength results use bodyweight
 percentages when the group switch is On. Off uses ordinary Volume and 1RM
 rankings, as the user clarified in the same session. The versioned server
 publication and compatible mobile UI now implement that target; certification
-persistence and zero-contribution no-op behavior are complete. Hosted activation
-and integrated human acceptance remain pending.
+persistence and zero-contribution no-op behavior are complete. The user accepted
+the member flows on 2026-10-05 and requested local database testing and Preview
+delivery before hosted rollout. Hosted activation remains on hold.
 
 This consolidation replaces the old group requirements in this milestone and
 T08–T10. Their revised implementation scope is complete; historical checkpoints
@@ -290,15 +291,16 @@ and compatible clients in the documented order with explicit hosted authority.
 | M27-T08 — Group percentage contracts | Single-set Volume, versioned units, allowlists and pending negotiation; owning representation contract | T15 | completed |
 | M27-T09 — Evaluate private percentage scores | Normalized worker/SQL publication and all group reader privacy; installation stays pending until authorized activation | T08, T13, existing #411 task | completed |
 | M27-T10 — Group percentage UI | Group rules, %BW boards, details, certification copy and safe caches | T09 | completed |
-| [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
+| [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | in_progress |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T14's actual human flow acceptance; T10, T08, T09, T15, T13 and the
+Ready now: T14's local database and Preview validation; T10, T08, T09, T15, T13 and the
 existing #411 task are complete. Formula, switch, Volume and reading-correction
 decisions are recorded. Versioned runtime publication/privacy and compatible UI
 are implemented with pending installation. T14's combined aggregate pass follows
-human acceptance; hosted activation/smoke also needs an explicit target and
-deployment authority. Automated captures are not that acceptance.
+human acceptance, which the user has now provided. The hosted target is BOGA_DEV
+(`onluhhnvvmknqzdxgntl`); deployment and activation are on hold while local
+database and Preview validation run. Automated captures are separate evidence.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
 
