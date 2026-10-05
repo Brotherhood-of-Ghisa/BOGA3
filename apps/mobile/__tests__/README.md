@@ -142,7 +142,10 @@ logger, rows, records, exercise/muscle/catalogue/weekly projections and session
 models. Retain aggregate overflow and independent zero/count distinctions.
 `bodyweight-analytics-data.test.ts` must use real migrated SQLite to prove repository
 context parity (including malformed-row fallback), later-reading isolation and refresh
-after reading/preference/contribution changes. Existing History/Stats/heatmap,
+after reading/preference/contribution changes.
+`bodyweight-analytics-formatting.test.ts` must keep extreme-but-finite volumes from
+rendering an infinite or nonsensical percentage, across the stats-history delta, the
+completion comparison card and `formatVolume`. Existing History/Stats/heatmap,
 completion and share tests must prove Top weight remains raw and missing personal
 reading never creates an unavailable state.
 

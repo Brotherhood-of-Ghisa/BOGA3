@@ -60,5 +60,6 @@ Gates install `apps/mobile` dependencies when they are missing (isolated per
 worktree — never symlink or share `node_modules`). For iOS/Maestro, build the
 shared dev client once: `./boga ios build-client` (when to rebuild: `02`).
 
-Slot and port formulas, lease rules, every flag, and the removed mechanisms live
-in `12-worktree-config-and-isolation.md`.
+Slot and port formulas, lease rules, isolation, and the removed mechanisms live
+in `12-worktree-config-and-isolation.md`. For flags, run
+`./boga worktree <sub> --help`.

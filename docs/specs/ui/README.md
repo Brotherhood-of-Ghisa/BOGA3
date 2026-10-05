@@ -27,11 +27,14 @@ drifted from the code. Git history has them.)
 - `ux-rules.md`
   - authoritative semantic UI rules and guardrails grounded in current behavior
 - `screen-map.md`
-  - current route-by-route screen purpose, sections, states, and entry/exit points
+  - the route inventory (route, purpose, owning file) and the screen rules a
+    route file will not state
 - `navigation-contract.md`
-  - route paths, params, query behavior, and allowed transitions for current mobile flows
+  - route access and guards, params with a non-trivial rule, and the allowed
+    transitions for current mobile flows
 - `components-catalog.md`
-  - current UI tokens/primitives and specialized shared components, with pending primitives tracked separately
+  - which component to reach for, where a new one belongs, and the rules the
+    component files do not state
 - `design-language.md`
   - the screen-agnostic visual/interaction language: colour roles, type,
     surfaces, emphasis and data presentation
@@ -69,13 +72,14 @@ This section is the canonical trigger map for UI docs maintenance.
 Task templates/task cards may summarize these triggers for convenience, but should defer to this section if wording drifts.
 
 1. Route files added/removed/renamed:
-   - Update `screen-map.md`
+   - Update `screen-map.md` — it owns the route inventory (route, purpose, file)
+   - Update `navigation-contract.md` only if a param, guard or transition changed too
+2. Route params/query behavior, route access or transition behavior changed:
    - Update `navigation-contract.md`
-2. Route params/query behavior or transition behavior changed:
-   - Update `navigation-contract.md`
-   - Update `screen-map.md` if screen entry/exit behavior changes
+   - Update `screen-map.md` if the screen's purpose changes
 3. Reusable component/primitives API or variants changed:
-   - Update `components-catalog.md`
+   - Update the component file; it is the source for props and variants
+   - Update `components-catalog.md` only if which component to reach for changes
 4. UI semantics/pattern expectations changed (buttons, lists, states, error handling, modal conventions):
    - Update `ux-rules.md`
    - Update `docs/specs/08-ux-delivery-standard.md` only if the change is a cross-task/process-level UX rule

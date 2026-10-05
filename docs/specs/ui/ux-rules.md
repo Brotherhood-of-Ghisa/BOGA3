@@ -17,7 +17,7 @@ the names of its Jest tests are the specification of that component.
 | --- | --- |
 | A route's purpose, sections, states, entry and exit | `screen-map.md` |
 | Route params, query values, transitions, header titles | `navigation-contract.md` |
-| A primitive or shared component's API and variants | `components-catalog.md`, then the component file |
+| A primitive or shared component's API and variants | the component file; `components-catalog.md` says which component to reach for |
 | Colour roles, type, surfaces, emphasis, figure formatting | `design-language.md` |
 | A screen with an accepted design target | its record under `design-targets/` |
 | What counts as a working set, a counted session or a record; figure formats | `docs/specs/tech/training-metrics-contract.md` |

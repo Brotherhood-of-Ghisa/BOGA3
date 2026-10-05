@@ -12,13 +12,14 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/01-worktree-and-environment.md`: The agent-owned worktree lifecycle — open, PR, release (quickref; `12` is the deep contract).
 - `docs/specs/02-quality-and-test-gates.md`: **[always-load]** Quality/test gate ladder, what's mandatory, and how to run each lane (quickref; `06` is the deep companion).
 - `docs/specs/03-technical-architecture.md`: **[always-load]** Top-level architecture decisions and rationale.
-- `docs/specs/05-data-model.md`: Canonical data model boundaries, sync scope, and ownership invariants.
-- `docs/specs/06-testing-strategy.md`: Per-test-entry-point catalog (purpose/infra/when) and coverage policies; deep companion to `02`.
+- `docs/specs/05-data-model.md`: Canonical data model boundaries, sync scope, ownership invariants, and the client schema drift rule.
+- `docs/specs/06-testing-strategy.md`: Which test layer a claim belongs in, per-lane purpose, and coverage policies; deep companion to `02`.
+- `docs/specs/writing-tests.md`: How to write a test once you know which layer it belongs in — fixtures, config and framework gotchas. Load when writing or changing a test.
 - `docs/specs/08-ux-delivery-standard.md`: Standard UX contract, iteration loop, and evidence requirements for UI work.
 - `docs/specs/09-project-structure.md`: **[always-load]** Canonical repo/project structure and path conventions (current state + agreed additions).
 - `docs/specs/10-api-authn-authz-guidelines.md`: Minimal authN/authZ/API development and consumption rules for backend work.
-- `docs/specs/11-maestro-runtime-and-testing-conventions.md`: Authoritative Maestro iOS runtime/testing contract and documentation ownership model.
-- `docs/specs/12-worktree-config-and-isolation.md`: Slot-lease model, port derivation, per-worktree isolation, and the agent-owned lifecycle contract (with the removed cleanup mechanisms and why).
+- `docs/specs/11-maestro-runtime-and-testing-conventions.md`: Authoritative Maestro iOS runtime/testing contract.
+- `docs/specs/12-worktree-config-and-isolation.md`: Slot-lease model, port derivation, per-worktree isolation, lifecycle command mechanism, and the removed cleanup mechanisms and why.
 - `docs/specs/tech/README.md`: Index of subsystem-level technical deep-dive docs.
 - `docs/specs/tech/bodyweight-load-contract.md`: Ordinary/optional bodyweight
   calculation policies, dated kg readings, migration, consumers and privacy.

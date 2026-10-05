@@ -31,7 +31,7 @@ This folder is the backend root (`Supabase` local-first development and testing)
   - used by `supabase functions serve --env-file ...`
 - Hosted placeholders (no secrets committed): `supabase/.env.hosted`
   - setup links this to `~/.config/boga/supabase/env.hosted`
-  - detailed hosted env/deployment command path is owned by `RUNBOOK.md`
+  - detailed hosted env/deployment command path is owned by `docs/runbook-hosted-operations.md`
 
 ## One-command local startup path
 
@@ -321,7 +321,7 @@ Standard hosted enablement on a fresh project:
 2. `supabase db push --linked --include-all` to apply every checked-in migration.
 3. Keep `app_public` listed in Dashboard **Project Settings -> API -> Data API Settings -> Exposed schemas**.
 
-Reset hosted to a known-good clean slate (when there is no data worth preserving): use Dashboard **Database -> Reset**, or `supabase db reset --linked --yes`. Both reapply `supabase/migrations/*.sql` in order against a fresh DB. See `RUNBOOK.md` for the operator-facing checklist.
+Reset hosted to a known-good clean slate (when there is no data worth preserving): use Dashboard **Database -> Reset**, or `supabase db reset --linked --yes`. Both reapply `supabase/migrations/*.sql` in order against a fresh DB. See `docs/runbook-hosted-operations.md` for the operator-facing checklist.
 
 Historical note: `supabase/hosted-hotfix-relax-session-exercise-definition-fk.sql` was a one-off hotfix retained for archival. The FK it relaxed no longer exists after the sync redesign, so the file is inert against the current schema.
 
@@ -355,13 +355,3 @@ It does **not** lock the final sync API surface choice (`Edge Functions` vs `Pos
 - `Supabase-local` integration/contract tests: required for auth/RLS/API tasks
 - hosted smoke validation: manual by default until CI exists
 - cross-stack `E2E`: strategy only; repo-root `e2e/` reserved for later implementation
-
-## Optional bodyweight-calculation cutover
-
-The accepted forward migration adds synced private settings and group enablement,
-renames contributions, converts retained lb values to kg, removes retired
-unit/mode/movement/loading/hydration fields and requires sync protocol 3 before
-removed-column access. Release an update-required compatibility client first,
-then the reviewed migration, matching functions and protocol-3 client. Follow
-[RUNBOOK](../RUNBOOK.md#optional-bodyweight-calculation-cutover) for hosted
-checks and forward repair; local gates do not deploy.
