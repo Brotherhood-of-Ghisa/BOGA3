@@ -196,7 +196,7 @@ local Supabase for that session:
 | Ports | reserved **slot 100** via the port formula (API `65431`, DB `65422`, …) | slot 0 (`55431`, …) |
 | Config + workdir | `.supabase-dev/supabase/config.toml` (gitignored), migrations/seed/functions **symlinked** to `supabase/` | `supabase/config.toml` |
 | Run mechanism | `supabase --workdir .supabase-dev …` (concurrent with slot 0) | default workdir |
-| Lifecycle | `boga db dev` (baseline: up + migrate + seed dev users, no reset), `boga db dev-up\|dev-down\|dev-reset` | `boga db up\|down\|reset\|baseline` |
+| Lifecycle | `boga db dev` (baseline: up, migrate, eval kick, seed, activate groups; no reset), `boga db dev-up\|dev-down\|dev-reset` | `boga db up\|down\|reset\|baseline` |
 | Used by | `dev-lan.sh` / `dev-remote.sh` (they `export BOGA_MOBILE_DEV_DB=1`) | the gates and `boga test *` |
 
 Slot 100 is outside the leasable `0..99` range, so its ports never collide with a

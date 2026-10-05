@@ -19,7 +19,7 @@ budget	docs/specs/03-technical-architecture.md	2500
 budget	docs/specs/09-project-structure.md	2500
 budget	*	3000
 exempt	docs/specs/ui/design-targets/
-ceiling	RUNBOOK.md	6308
+ceiling	RUNBOOK.md	6292
 ceiling	docs/specs/02-quality-and-test-gates.md	3597
 ceiling	docs/specs/03-technical-architecture.md	4086
 ceiling	docs/specs/05-data-model.md	5930
