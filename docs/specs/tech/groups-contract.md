@@ -2416,7 +2416,9 @@ the diff plus the cause (T7; rules in §2.11).
 
 ## 11. Optional bodyweight-aware group calculations
 
-> **Status: current contract.**
+> **Status: protocol-3 behavior while competition activation is pending.**
+> The activated publication/readers override below is owned by §12 and the
+> [competition contract](group-competition-contract.md).
 
 The calculation equation is owned by
 [`training-metrics-contract.md` §4](training-metrics-contract.md#4-calculations),
@@ -2639,13 +2641,55 @@ rules revision, never the selected reading or its internal digest. The migration
 enqueues all active comparisons and clears disposable caches; archived/former
 member and unarchive/rejoin reconciliation remain unchanged.
 
-## 12. Pending Volume/percentage competition transition
+## 12. Versioned Volume/percentage competition publication
 
 [group-competition-contract.md](group-competition-contract.md) owns the accepted
 protocol-4 representation, delegated single-set Volume/correction decisions,
 private/public split, witness aliases, reader inventory and activation order.
-Its negotiation RPC, pure scorer, allowlist decoder and cache eviction are
-implemented; existing group publication/readers/UI still use §11's protocol-3
-kg Weight/1RM behavior. Schema/public-reader cutover and UI activation are pending.
-Never treat pending negotiation as permission to serve percentages through kg
-fields or disclose private/absolute counterparts from legacy endpoints.
+The worker, schema, safe public readers, witness aliases and allowlist client APIs
+are implemented. Installation leaves negotiation pending and preserves §11's
+kg Weight/1RM behavior. Service-only `group_competition_activate(4)` atomically
+enables the safe reader boundary before any percentage publication, changes
+legacy Weight defaults to Volume on a new revision and queues active comparisons.
+Compatible UI and authorized hosted activation are separate release steps.
+
+The activated worker uses `competition-evaluation.ts` and the shared scorer;
+publication retains full kernel precision, checks the versioned source graph,
+generation/claim/lease and rules revision, and commits one coherent comparison.
+The shared/exclusive activation fence precedes group, advisory and queue locks.
+Readers hold shared group locks through disclosure; source workers keep retries
+and sanitized failure isolation from Sync and certification commits.
+
+| Activated RPC family | Boundary |
+| --- | --- |
+| `group_competition_exercise_list/create/update/archive` | Exact catalogue metadata, revision checks, owner/admin writes |
+| `group_competition_board/podiums` | Single-set Volume/1RM, explicit ordinary/normalized units, random write tokens, empty rebuilding state |
+| `group_competition_revisions/history` | Saved revision/metric labels and clocks; unavailable absolute history has null value, original unit |
+| `group_competition_stream/session_detail/week_summary` | Authorized group scope; safe events/raw reps/counts, no normalized kg or aggregate subtraction total |
+| `group_competition_certify/certification_get/certification_end` | Live source/token fencing, exact witness identity/time, generic terminal state without observed audit/private pins |
+
+Unsafe old RPCs return `UPDATE_REQUIRED` once active, including callers forging
+the current header. App authentication, OAuth denial and active membership/role
+remain independent checks. Private helpers and source/projection tables stay
+inaccessible directly. The current group policy also governs retired, archived
+and former-member history and every same-group source association; moving or
+unlinking a source cannot expose its absolute counterpart before reconciliation.
+Unrelated ordinary session kg and all live raw reps remain readable.
+
+Rule-only changes preserve exact immutable witnesses and recalculate their
+eligible Certified entries. Both already-bound normalized metrics end on a
+changed selected reading tuple; raw Weight legacy origins stay active. Off/zero
+never calls the resolver, retains established pins and detects intervening
+corrections on reactivation. Exact historic missing-context sentinels are cleared
+on installation so a never-bound witness can bind its first valid reading.
+Legacy Weight witnesses supply distinct Volume aliases after raw validation;
+no observed Volume score is fabricated. Manual root withdrawal/cancellation ends
+all aliases; ended projections never reopen. Frozen entries cross cutover only
+with compatible mode/unit/dependency state and their original membership period.
+
+`groups-competitions.sh`, in `groups-leaderboards`, resets only the leased local
+stack to the prior schema, populates it through Sync and actual Edge drains,
+installs the migration, activates locally and checks actual RPC responses with
+mobile guards. It restores the installed pending schema on exit so the retained
+protocol-3 group fixtures remain independent. Pure graph and reader/API Jest
+suites cover service dispatch, privacy allowlists and request-scoped headers.

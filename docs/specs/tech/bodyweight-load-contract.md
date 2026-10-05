@@ -40,9 +40,11 @@ bodyweight-aware math only while the applicable preference is enabled.
 `loadInputMode` (`total_load` or `per_side_load`) describes the exercise's
 entered Weight distribution, not bodyweight semantics.
 
-All Weight values, planned Weight values, readings, group rules/results,
+All Weight values, planned Weight values, readings, group rules,
 imports/exports and coaching payloads are kg. Exactly `1 lb = 0.45359237 kg`
 for migration. Display formatting never mutates stored precision.
+Activated group competition results use the explicit units in §10; raw values
+and private calculation inputs remain kg.
 
 ## 2. Calculation policies
 
@@ -230,12 +232,17 @@ kg history, conditional contribution fields, ordinary/bodyweight-aware logging,
 numeric zero, historical refresh and group administration. The UI target
 is [the bodyweight design target](../ui/design-targets/bodyweight.md).
 
-## 10. Pending public competition units
+## 10. Versioned public competition units
 
 The accepted [competition contract](group-competition-contract.md) adds best
 single-set Volume and effective total-load 1RM percentages for enabled positive
 group contributions. Internal workout/readings/coaching arithmetic stays kg and
 uses the same dated B for numerator and denominator. Its additive negotiation
-reports pending activation; current group publication remains protocol-3 kg.
+reports pending after additive installation. The versioned worker, safe readers
+and witness migration are implemented; service-only activation publishes the
+new representation after unsafe old readers are blocked. Compatible UI and
+authorized hosted activation remain release work. Normalization uses the same
+selected valid tuple for numerator and denominator; Off/zero guarantees lazy
+SQL/TypeScript resolution and never queries the private reading helper.
 The future public-reader cutover suppresses raw/absolute counterparts and keeps
 immutable audit server-side; it changes no personal missing-reading fallback.

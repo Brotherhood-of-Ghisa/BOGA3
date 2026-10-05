@@ -113,3 +113,10 @@ export {
   type RecordSetWriteNotice,
   type WrittenCertification,
 } from './use-record-set-certification';
+export {
+  archiveCompetitionExercise, certifyCompetition, createCompetitionExercise, endCompetitionCertification,
+  getCompetitionBoard, getCompetitionCertification, getCompetitionContract, getCompetitionHistory,
+  getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionStream,
+  getCompetitionWeek, listCompetitionExercises, updateCompetitionExercise,
+} from './api';
+export type * from './competition-wire';

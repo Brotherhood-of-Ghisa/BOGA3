@@ -446,9 +446,16 @@ to deduplicate per device, so idempotency falls out of per-row LWW.
   scores without treating a rule change as a delayed performance correction. Sync impact
   decision: `out of sync scope`; these are multi-reader, server-authoritative
   rows and never become owner-LWW entities. The evaluator may read an applicable
-  owner-private measurement internally, but no group table or public payload
-  stores or exposes that value, date, identifier or dependency digest. See
+  owner-private measurement internally. No group table stores the selected
+  reading's value/date/identifier tuple; private dependency pins remain
+  server-only, and public payloads expose neither the tuple nor its digest. See
   [`tech/groups-contract.md` §11](tech/groups-contract.md#11-optional-bodyweight-aware-group-calculations).
+  The additive competition installation also stores a service-only activation
+  flag, revision representation versions and random per-score write tokens.
+  Activated Volume/1RM rows carry explicit kg/percentage units; original kg
+  witness audit is retained through a separate Volume provenance reference.
+  These projections remain outside Sync v2. Installation alone does not activate
+  the new readers/client; see the [competition contract](tech/group-competition-contract.md).
 
 ## Ownership and identity invariants
 

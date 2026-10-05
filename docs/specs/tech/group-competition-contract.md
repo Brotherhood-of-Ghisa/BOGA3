@@ -1,9 +1,9 @@
 # Group competition representation and cutover
 
-> **Status:** accepted representation contract; negotiation, pure scorer,
-> allowlist decoders and cache eviction are implemented. Runtime publication,
-> group-reader redaction and compatible UI activation are pending. Current
-> group RPCs still serve protocol-3 kg Weight/1RM. This is not a release claim.
+> **Status:** representation, versioned worker/publication, safe readers,
+> witness migration and cache eviction are implemented. Installation remains
+> pending until service-only activation. Compatible UI and authorized hosted
+> activation/acceptance remain separate release work; this is not a hosted claim.
 
 Owns competitive metric meanings and the protocol-4 transition. Authorization,
 queues, coherent publication and current certification storage remain in
@@ -165,7 +165,7 @@ metric projections of a witnessed single set, not aggregate attestations.
 | Group exercise list/create/update/archive/unarchive, legacy writes and `group_update` | Versioned metric defaults and coherent effective changes; c=0 toggles stay no-ops with preserved history/certificates |
 | `group_cache`, stream/podium/catalogue/week/session keys | Generation 5, group-bound session keys, exact decoding before cache writes/reads; evict all account group projections on upgrade/normalized mode transition |
 
-This delivering contract migration adds only `group_competition_contract(group)`.
+The negotiation RPC is `group_competition_contract(group)`.
 It checks app user, OAuth denial and active membership, then requires the exact
 `x-boga-group-contract: 4` header. It returns protocol/unit/cache metadata with
 `activation_state: pending`. Unsupported/missing/malformed versions get
@@ -173,10 +173,47 @@ It checks app user, OAuth denial and active membership, then requires the exact
 Anonymous callers have no execute grant. There is no bodyweight or performance
 read and no new Sync v2 entity, snapshot, reading schema or stored achievement.
 
-Schema/publication and the other version-4 RPC implementations above remain
-pending until the reader cutover. Protocol-3 production behavior is deliberately
-unchanged by negotiation. A pending response cannot activate percentage UI;
+The additive publication migration leaves the server pending and preserves
+protocol-3 evaluation/readers until `group_competition_activate(4)` commits.
+Its service-only activation waits for in-flight group operations, blocks every
+unsafe legacy reader/write, retires published revisions, preserves compatible
+frozen entries without arithmetic and enqueues active comparisons. Negotiation
+reports active only after that transaction commits. A pending response cannot activate percentage UI;
 unknown contract/unit/cache versions fail closed, without a legacy kg fallback.
+
+`competition-evaluation.ts` dispatches legacy pending graphs to the existing
+metric worker and version-4 graphs to the shared competition scorer. SQL checks
+the evaluation contract, claim/generation, revision and complete source token
+before publishing unrounded scores in one transaction. Source enqueue, source
+completion and metric publication take the same shared activation fence before
+their group/queue locks; activation takes its exclusive side first. Readers take
+shared group locks so a policy change cannot split authorization and disclosure.
+
+Current boards, podiums, catalogue writes, revisions, history, stream, group-bound
+session detail, week summaries and certification writes/metadata use
+`group_competition_*` RPCs and exact client guards. Private helpers and all renamed
+legacy implementations have no client/service execute grants. Old unsafe RPCs
+reject even a forged version-4 header once active. Safe group membership/settings
+operations also require the exact capability header. Random score tokens change
+on replacement; certify additionally refreshes the live source fingerprint.
+
+Disclosure retains immutable historical source associations and extends them
+through stored ranked set IDs to a moved current exercise. Unlink, archive,
+identity edits or a delayed worker cannot expose a kg counterpart to a saved
+percentage. Unrelated ordinary session context keeps its logged kg; unbound
+exercises retain reps and conservatively omit kg in an enabled positive group.
+Historical values preserve original units and carry `unavailable` with null
+value when current disclosure suppresses them. Full-session and week totals
+contain no absolute volume field that could recover a redacted contribution.
+
+The migration clears only exact active missing-context dependency sentinels
+(both historic object shapes). Genuine selected-reading pins, pending-correction
+sentinels and ended rows are untouched. First binding requires a valid selected
+reading. Legacy Weight projections supply distinct Volume aliases with null
+observed Volume audit and an explicit witness reference; original audit stays
+at the root. Terminal aliases cannot be imported again. Compatible inactive
+1RM entries keep exact saved values and their original membership period;
+incompatible units/dependency states are omitted, never rescored at cutover.
 
 ## 5. Activation order and evidence
 
