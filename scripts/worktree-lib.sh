@@ -386,7 +386,11 @@ boga_pr_states() {
 # deps (supabase/cli#5678). Older CLIs import deno.land on every edge container
 # start, so `supabase start` fails its health check with "Error status 502"
 # whenever deno.land is unreachable.
-BOGA_SUPABASE_CLI_DEFAULT_VERSION="2.109.1"
+#
+# Default: 2.112.0 ships GoTrue v2.195.0, the first Auth that advertises and
+# accepts `offline_access` (supabase/auth#2630), as hosted does; mcp-smoke
+# requires it. It keeps Postgres 17.6 and PostgREST v14, matching hosted.
+BOGA_SUPABASE_CLI_DEFAULT_VERSION="2.112.0"
 BOGA_SUPABASE_CLI_MIN_VERSION="2.108.0"
 
 # The CLI caps `project_id` at this length and silently rewrites a longer one

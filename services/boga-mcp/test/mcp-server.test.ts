@@ -9,6 +9,7 @@ import request from 'supertest';
 
 import { BogaAgentApi } from '../src/api-client.js';
 import type { BogaMcpConfig } from '../src/config.js';
+import { UPSTREAM_RETRY_AFTER_SECONDS } from '../src/auth.js';
 import { BOGA_OAUTH_SCOPES, createBogaMcpApp } from '../src/server.js';
 
 const token = 'integration-access-token';
@@ -79,6 +80,26 @@ const envelopeResponse = (data: Record<string, unknown>): Response =>
       request_id: 'request-123',
     },
   });
+
+const validSession = responses['/functions/v1/agent-api/v1/agent/session'];
+
+const sessionApi = (fetchImplementation: typeof fetch): BogaAgentApi =>
+  new BogaAgentApi({
+    baseUrl: config.agentApiBaseUrl,
+    fetchImplementation,
+    timeoutMs: config.requestTimeoutMs,
+  });
+
+const initializeRequest = {
+  id: 1,
+  jsonrpc: '2.0',
+  method: 'initialize',
+  params: {
+    capabilities: {},
+    clientInfo: { name: 'test', version: '1' },
+    protocolVersion: '2025-11-25',
+  },
+};
 
 const startMcp = async () => {
   const requests: URL[] = [];
@@ -260,6 +281,107 @@ describe('BoGa MCP server', () => {
     });
     expect(unauthorized.status).toBe(401);
     expect(unauthorized.headers['www-authenticate']).toContain('resource_metadata=');
+    expect(unauthorized.headers['www-authenticate']).toContain('scope="openid profile"');
+  });
+
+  it('advertises offline_access in metadata and the challenge when the issuer supports it', async () => {
+    const app = await createBogaMcpApp({
+      api: sessionApi(async () => envelopeResponse(validSession)),
+      config,
+      oauthMetadata: {
+        ...oauthMetadata,
+        scopes_supported: ['openid', 'profile', 'email', 'phone', 'offline_access'],
+      },
+    });
+
+    const metadata = await request(app).get('/.well-known/oauth-protected-resource/mcp');
+    expect(metadata.body.scopes_supported).toEqual(['openid', 'profile', 'offline_access']);
+
+    const unauthorized = await request(app).post('/mcp').send(initializeRequest);
+    expect(unauthorized.status).toBe(401);
+    expect(unauthorized.headers['www-authenticate']).toContain(
+      'scope="openid profile offline_access"',
+    );
+  });
+
+  it.each([
+    ['revoked or invalid', 401],
+    ['not an agent token', 403],
+  ])('answers a %s token with 401 and a challenge so clients refresh', async (_label, status) => {
+    const app = await createBogaMcpApp({
+      api: sessionApi(async () => Response.json(
+        { error: { code: 'UNAUTHORIZED', message: 'Authentication required.' } },
+        { status },
+      )),
+      config,
+      oauthMetadata,
+    });
+
+    const response = await request(app)
+      .post('/mcp')
+      .set('authorization', 'Bearer stale-token')
+      .send(initializeRequest);
+
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({ error: 'invalid_token' });
+    expect(response.headers['www-authenticate']).toMatch(/^Bearer error="invalid_token"/);
+    expect(response.headers['www-authenticate']).toContain('scope="openid profile"');
+    expect(response.headers['www-authenticate']).toContain(
+      'resource_metadata="http://127.0.0.1:8787/.well-known/oauth-protected-resource/mcp"',
+    );
+  });
+
+  it('answers a session past its expiry with 401', async () => {
+    const app = await createBogaMcpApp({
+      api: sessionApi(async () => envelopeResponse({ ...validSession, expires_at: 1_000 })),
+      config,
+      oauthMetadata,
+    });
+
+    const response = await request(app)
+      .post('/mcp')
+      .set('authorization', 'Bearer expired-token')
+      .send(initializeRequest);
+
+    expect(response.status).toBe(401);
+    expect(response.headers['www-authenticate']).toContain('Token has expired');
+  });
+
+  it.each([
+    ['an upstream outage', async () => Response.json({ error: {} }, { status: 500 })],
+    ['an unreachable upstream', async () => { throw new TypeError('fetch failed'); }],
+    ['upstream rate limiting', async () => Response.json({ error: {} }, { status: 429 })],
+  ])('answers %s with 503 and Retry-After, not a token challenge', async (_label, fetchImplementation) => {
+    const app = await createBogaMcpApp({
+      api: sessionApi(fetchImplementation as typeof fetch),
+      config,
+      oauthMetadata,
+    });
+
+    const response = await request(app)
+      .post('/mcp')
+      .set('authorization', 'Bearer valid-token')
+      .send(initializeRequest);
+
+    expect(response.status).toBe(503);
+    expect(response.headers['retry-after']).toBe(String(UPSTREAM_RETRY_AFTER_SECONDS));
+    expect(response.headers['www-authenticate']).toBeUndefined();
+  });
+
+  it('answers an unexpected upstream client error with 500, not a token challenge', async () => {
+    const app = await createBogaMcpApp({
+      api: sessionApi(async () => Response.json({ error: {} }, { status: 404 })),
+      config,
+      oauthMetadata,
+    });
+
+    const response = await request(app)
+      .post('/mcp')
+      .set('authorization', 'Bearer valid-token')
+      .send(initializeRequest);
+
+    expect(response.status).toBe(500);
+    expect(response.headers['www-authenticate']).toBeUndefined();
   });
 
   it('has no database, SQL, or Supabase runtime dependency', async () => {
@@ -271,7 +393,7 @@ describe('BoGa MCP server', () => {
     expect(Object.keys(packageJson.dependencies)).not.toContain('@supabase/supabase-js');
     expect(Object.keys(packageJson.dependencies)).not.toContain('postgres');
 
-    const sourcePaths = ['api-client.ts', 'config.ts', 'index.ts', 'server.ts', 'tools.ts'];
+    const sourcePaths = ['api-client.ts', 'auth.ts', 'config.ts', 'index.ts', 'server.ts', 'tools.ts'];
     const source = (
       await Promise.all(
         sourcePaths.map((name) =>
