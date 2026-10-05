@@ -230,7 +230,7 @@ export function ExerciseHistoryScreenShell({
 }
 
 // The exercise's all-time bests: two rows that open the session holding each.
-// The figures are in `record`, the one superlative (T10-D2).
+// The figures are in `record`, the one superlative.
 function BestCard({
   best,
   onPressSession,
@@ -302,7 +302,7 @@ function BestRow({
   );
 }
 
-// One session's sets of this exercise: View Session's card and rows (T10-D1),
+// One session's sets of this exercise: View Session's card and rows,
 // with the session's summary figures above the rows. The card opens View
 // Session.
 function SessionCard({

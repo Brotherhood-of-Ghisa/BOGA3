@@ -12,7 +12,7 @@ export type SegmentedControlOption<TValue extends string | number> = {
 // segments sized to their labels (a selector inside a card's header). `fit`:
 // across the row, each segment its label's width plus an equal share of the
 // rest, for a row whose longest label outgrows an equal share (the exercise
-// history's four metrics, DLM-T09).
+// history's four metrics).
 export type SegmentedControlLayout = 'fill' | 'inline' | 'fit';
 
 export type SegmentedControlProps<TValue extends string | number> = {

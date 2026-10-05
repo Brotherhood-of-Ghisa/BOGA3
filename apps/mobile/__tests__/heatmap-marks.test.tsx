@@ -7,7 +7,7 @@ import type { DailyEffortMetrics } from '@/src/data';
 
 // Today and the selected day (or week) are marked differently: today a 1px
 // `ink` ring, the selected cell a 2px `ink` border plus the selected state
-// (DLM-T09-D3). They used to be drawn identically.
+// They used to be drawn identically.
 
 const TODAY = '2026-05-13'; // a Wednesday
 const PREFIX = 'history';

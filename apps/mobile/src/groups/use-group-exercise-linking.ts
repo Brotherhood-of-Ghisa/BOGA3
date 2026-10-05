@@ -11,7 +11,7 @@
 //   - It never throws into render; a null `userId` (signed out or auth
 //     unconfigured) disables everything, NetInfo included.
 //
-// Group code never runs inside the sync cycle (C3.10.5).
+// Group code never runs inside the sync cycle.
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect,useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';

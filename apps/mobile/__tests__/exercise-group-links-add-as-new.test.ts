@@ -1,9 +1,9 @@
 /* eslint-disable import/first */
 
 /**
- * Outcome (M25-T07 AC1): "Add as new" writes a personal exercise, its muscle
+ * "Add as new" writes a personal exercise, its muscle
  * links, and its group link in ONE local transaction, with one write nudge. A
- * failure in either write leaves neither row. `linkExercise` keeps its T03
+ * failure in either write leaves neither row. `linkExercise` keeps its
  * behaviour (covered by exercise-group-links-repository.test.ts).
  *
  * Driver: a real in-memory SQLite built from the shipped migration bundle (FK

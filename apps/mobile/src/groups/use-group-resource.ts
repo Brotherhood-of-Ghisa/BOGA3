@@ -8,7 +8,7 @@
 //     `evictGroupIdOnNotFound` is set) and surfaces `lostAccess`;
 //   - it never throws into render: every failure is a typed `error` state.
 //
-// Group code never runs inside the sync cycle (C3.10.5): this hook only reads
+// Group code never runs inside the sync cycle: this hook only reads
 // NetInfo and the local cache and calls the group RPC it is given.
 
 import { useFocusEffect } from 'expo-router';

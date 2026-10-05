@@ -1,8 +1,7 @@
 # Accepted target — Train (repo-native brief)
 
-Target record per `../ai-design-policy.md`, for DLM-T03 of the design-language
-migration. Chosen by the user on 2026-09-24 (plan decision G1 (a)): a brief plus
-the gallery states the user accepts. **Pending acceptance** in the DLM-T03
+Target record per `../ai-design-policy.md`. Chosen by the user on 2026-09-24:
+a brief plus the gallery states the user accepts. **Pending acceptance** in the
 gallery.
 
 Today's half of this record was replaced by `today-landing.md` (accepted
@@ -21,7 +20,7 @@ Today's half of this record was replaced by `today-landing.md` (accepted
   "Continue your active session", with no green. `Resume workout` is the
   screen's one `accent`.
 - Train shows one `accent` at a time. When a plan is ready, `Start planned
-  workout` is the primary and `Start empty workout` is an outline (T03-D1).
+  workout` is the primary and `Start empty workout` is an outline.
 - Loading, empty, error and unavailable states are `StatePanel`s inside cards,
   with their copy kept, including "Watch this space 👀".
 

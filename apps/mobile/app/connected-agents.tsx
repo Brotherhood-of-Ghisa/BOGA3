@@ -112,7 +112,7 @@ export default function ConnectedAgentsScreen() {
     );
   };
 
-  // The native header carries the title (G4, T05-D1); the intro stays.
+  // The native header carries the title (G4); the intro stays.
   return (
     <ScreenScroll contentInsetAdjustmentBehavior="automatic" testID="connected-agents-screen">
       <Text allowFontScaling={false} style={styles.intro}>

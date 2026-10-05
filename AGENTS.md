@@ -173,7 +173,8 @@ when it ships the decision.
 **Never reference a plan from code or docs**: no `docs/plans/...` path and no
 task/milestone ID (`M<n>-T<nn>`, `T-<YYYYMMDD>-<nn>`) in code, tests, flows,
 migrations, specs, or other docs — state the rule itself in the owning spec.
-Commit messages and PR bodies may cite them. `docs-check` enforces the path half.
+Commit messages and PR bodies may cite them. `docs-check` enforces both halves;
+already-applied migrations are exempt (`scripts/plan-ref-exempt.txt`).
 
 **Task protocol.** When the user wants to plan multi-PR work together, or hands
 you a task card to execute, offer the task protocol in

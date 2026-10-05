@@ -1,4 +1,4 @@
-// Stream board-kind items (groups contract §4.2, M25-T05/T06) for the M25-T10
+// Stream board-kind items (groups contract §4.2) for the
 // stream, row detail, and certification tests.
 
 import type {

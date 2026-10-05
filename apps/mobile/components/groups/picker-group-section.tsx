@@ -7,8 +7,7 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
 /**
- * The exercise picker's "From your groups" section (M25-T07; product E0.1,
- * D13): group exercises matching the search, listed after my own matches,
+ * The exercise picker's "From your groups" section (E0.1, D13): group exercises matching the search, listed after my own matches,
  * one card per group. Status is text ("linked: …" / "not linked"), not color.
  */
 export function PickerGroupSectionList({

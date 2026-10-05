@@ -73,7 +73,7 @@ export default function ExerciseCatalogScreen() {
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
-  // Signed in only: linking needs my groups' exercises (M25-T07).
+  // Signed in only: linking needs my groups' exercises.
   const groupLinkingUserId = useGroupLinkingUserId();
 
   const catalog = useExerciseCatalog();
@@ -321,7 +321,7 @@ export default function ExerciseCatalogScreen() {
         </View>
       </Sheet>
 
-      {/* A row's actions. Delete does not confirm (T07-D4): it is a soft delete,
+      {/* A row's actions. Delete does not confirm: it is a soft delete,
           undone from this same sheet with Undelete once Show deleted is on. */}
       <Sheet
         dismissLabel="Dismiss exercise action menu overlay"
@@ -345,7 +345,7 @@ export default function ExerciseCatalogScreen() {
         {groupLinkingUserId ? (
           <ListRow
             accessibilityLabel="Link to group exercise from actions"
-            // A soft-deleted exercise is never linked from the UI (M25-T07 (b)).
+            // A soft-deleted exercise is never linked from the UI.
             disabled={isActionTargetDeleted}
             label="Link to group exercise…"
             leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="link" size="md" />}

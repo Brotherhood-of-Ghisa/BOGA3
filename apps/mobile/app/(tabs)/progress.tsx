@@ -203,7 +203,7 @@ export const sortExerciseListItems = (
   });
 
 // Full figures in Plex Mono, never `2.5k`: the numbers are the point
-// (`design-language.md` §6, DLM-T08-D2).
+// (`design-language.md` §6).
 const formatTotalWeight = (value: number | null): string => value === null ? '— · incomplete' : formatVolume(value);
 
 export type StatsScreenShellProps = {
@@ -690,7 +690,7 @@ const microLabel = {
   color: uiRoles.inkMuted,
 } as const;
 
-// The screen body, in the design language (DLM-T08).
+// The screen body, in the design language.
 const styles = StyleSheet.create({
   comparison: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },

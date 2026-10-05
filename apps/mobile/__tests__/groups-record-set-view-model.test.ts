@@ -1,6 +1,5 @@
 /**
- * Record set row detail (wording; product E2, P10–P13,
- * D3–D5; groups contract): the detail built from a board row or a stream
+ * Record set row detail (E2, P10–P13, D3–D5; groups contract): the detail built from a board row or a stream
  * record, the action matrix for every relationship × state, the sheet's lines,
  * and the wording of every write outcome.
  */

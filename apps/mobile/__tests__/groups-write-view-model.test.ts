@@ -1,6 +1,6 @@
 /**
- * write rules (groups contract): the role × target matrix
- * the UI offers (AC10 UI gating), form validation, the invite link / share
+ * Write rules (groups contract): the role × target matrix
+ * the UI offers (UI gating), form validation, the invite link / share
  * text, and the wording of write failures.
  */
 
@@ -54,7 +54,7 @@ describe('groupMemberActionsFor (role matrix)', () => {
     }
   });
 
-  it('gates Invite/Edit to owner and admins and Leave to non-owners (C7.4, C3.6.5)', () => {
+  it('gates Invite/Edit to owner and admins and Leave to non-owners', () => {
     expect(ROLES.map(canManageGroup)).toEqual([true, true, false]);
     expect(ROLES.map(canLeaveGroup)).toEqual([false, true, true]);
   });

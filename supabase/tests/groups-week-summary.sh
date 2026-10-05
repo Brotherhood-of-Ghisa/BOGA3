@@ -390,10 +390,10 @@ expect_sql "a fact with working null counts as working everywhere, and is not a 
    rollback;" \
   "4/1|4|t
 5/1|5|f"
-# M1: 105 × 1 takes #1 on Weight only (one group record): heavier than R1's
+# m1: 105 × 1 takes #1 on Weight only (one group record): heavier than R1's
 # 100, but its 1RM stays under R1's 100 × 5.
 sess "${MEMBER_TOKEN}" "${T}-m1" completed "$(at 3)" "${T}-m-bench" m1:105:1:rir_0
-drain "M1"
+drain "m1"
 # R2: a group record whose set is then deleted: voided.
 sess "${RIVAL_TOKEN}" "${T}-r2" completed "$(at 4)" "${T}-r-bench" r2:140:1:rir_0
 drain "R2"
@@ -438,7 +438,7 @@ for spec in "r1a:${RIVAL_UID}:1" "a1:${ATHLETE_UID}:0" "m1:${MEMBER_UID}:1" "a3r
         and exists (select 1 from jsonb_array_elements(e.payload -> 'boards') b where (b ->> 'group_record')::boolean);" "${want}"
 done
 
-expect_sql "M1 takes #1 on Weight only; R1 on both boards" \
+expect_sql "m1 takes #1 on Weight only; R1 on both boards" \
   "select string_agg(replace(e.set_id, '${T}-', '') || '=' || b.metric, ',' order by e.set_id, b.metric)
      from app_public.group_events e,
           lateral (select x ->> 'metric' as metric from jsonb_array_elements(e.payload -> 'boards') x
@@ -455,7 +455,7 @@ expect_ok "the board"
 # R 5 W/S (r1a, r1b, r1d, r1e, r3), 4 records (R1 and R3 each #1 on both
 # boards; R2 voided). A 6 W/S (a1, a2, a6, a8, a9, a3r), 2 records (A3 on both,
 # unlinked; A1 an own best only, A2 provisional). M 2 W/S (m1, ei), 3 records
-# (M1 on Weight only, edge in on both; edge out is outside). O, X nothing; L
+# (m1 on Weight only, edge in on both; edge out is outside). O, X nothing; L
 # has not joined yet.
 expect_board "A=1/6/2,R=2/5/4,M=3/2/3,X=4/0/0,O=4/0/0" "the board"
 check "a board row's exact keys" '.members[0] | keys == ["group_records", "member", "rank", "working_sets"]'

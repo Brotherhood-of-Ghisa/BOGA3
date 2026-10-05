@@ -52,7 +52,7 @@ export const groupMemberActionsFor = (
 /** Invite, Edit (contract: members never see the invite). */
 export const canManageGroup = (role: GroupRole): boolean => role === 'owner' || role === 'admin';
 
-/** The owner — including a sole owner — must transfer before leaving (C3.6.5). */
+/** The owner — including a sole owner — must transfer before leaving. */
 export const canLeaveGroup = (role: GroupRole): boolean => role !== 'owner';
 
 export const OWNER_LEAVE_NOTICE = 'Transfer ownership before leaving';
@@ -141,7 +141,7 @@ export const buildGroupInviteShareMessage = (groupName: string | null, code: str
 export const INVITE_INVALID_MESSAGE = "This invite code isn't valid.";
 export const GROUP_WRITE_UNREACHABLE_MESSAGE = "Couldn't reach the server. Nothing was changed — try again when you're online.";
 
-/** How a failed write reads on screen. Every write is online-only and changes nothing on failure (C3.10.3). */
+/** How a failed write reads on screen. Every write is online-only and changes nothing on failure. */
 export const describeGroupWriteError = (error: GroupApiError): string => {
   switch (error.code) {
     case 'NETWORK':

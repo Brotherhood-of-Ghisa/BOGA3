@@ -17,7 +17,7 @@ const IN_PROGRESS_LABEL = 'In progress';
 const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
 
 /**
- * The friend's session body (C3.8), in the design language and on the cards
+ * The friend's session body, in the design language and on the cards
  * View Session uses (`components/session-detail/`): the member, the session's
  * facts, then one card per exercise with its performed sets as `type · weight
  * × reps · 1RM · VOL`. Read-only — NO owner actions (no edit, delete, append)

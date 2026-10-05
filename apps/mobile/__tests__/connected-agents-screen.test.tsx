@@ -47,7 +47,7 @@ describe('Connected agents screen', () => {
     expect(screen.queryByText(/email|billing/i)).toBeNull();
   });
 
-  it('leaves the title to the native header and keeps the intro (T05-D1)', async () => {
+  it('leaves the title to the native header and keeps the intro', async () => {
     render(<ConnectedAgentsScreen />);
 
     await screen.findByTestId('connected-agent-client-a');

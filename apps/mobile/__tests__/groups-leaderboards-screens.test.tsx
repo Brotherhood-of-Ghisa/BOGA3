@@ -1,9 +1,8 @@
 /* eslint-disable import/first */
 
 /**
- * leaderboards screens (product E1.1–E1.3; groups
- * contract): the group screen's Leaderboards segment (podium
- * cards, cache-first under `boards:<groupId>`), the full board route (toggles,
+ * Leaderboards screens (E1.1–E1.3; groups contract): the
+ * group screen's Leaderboards segment (podium cards, cache-first under `boards:<groupId>`), the full board route (toggles,
  * empty Certified, paging, lost access, exercise missing, offline), and the
  * history route. The group RPCs are mocked; `group_cache` is the real table on
  * the in-memory SQLite fixture.
@@ -277,7 +276,7 @@ describe('Full board (E1.2)', () => {
     expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
-    // My row sits on paper, the others on the card's surface (DLM-T12-D1).
+    // My row sits on paper, the others on the card's surface.
     expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(uiRoles.paper);
     expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(uiRoles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');

@@ -240,7 +240,7 @@ var steps = {
     console.log(TAG + ' completed and edited session ' + output.groupsSessionId + ' (1513 kg)');
   },
 
-  // AC4: the time from the last sync_push to the card showing on the device.
+  // The time from the last sync_push to the card showing on the device.
   // Called right after the flow's wait for the card succeeds, so it includes
   // the pull-to-refresh round trip and Maestro's own polling.
   latency: function () {

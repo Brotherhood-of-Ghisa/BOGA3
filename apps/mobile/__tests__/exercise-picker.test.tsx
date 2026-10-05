@@ -538,7 +538,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
 
     expect(await screen.findByTestId('exercise-picker-plan-source')).toHaveTextContent('From 2026-06-10 18:42');
-    // The set row (T06-D2): type · weight × reps · 1RM · VOL, faded as planned.
+    // The set row: type · weight × reps · 1RM · VOL, faded as planned.
     expect(screen.getByTestId('exercise-picker-plan-set-row-1')).toHaveTextContent(/W-Up/);
     expect(screen.getByTestId('exercise-picker-plan-set-row-1-values')).toHaveTextContent('0.0 × 10');
     expect(screen.getByTestId('exercise-picker-plan-set-row-2')).toHaveTextContent(/RIR 1/);

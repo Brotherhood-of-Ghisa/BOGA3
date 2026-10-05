@@ -13,7 +13,7 @@
 //   - `NOT_FOUND: group exercise not found` sets `exerciseMissing`; any other
 //     `NOT_FOUND` evicts the group's cache and sets `lostAccess`.
 //
-// Group code never runs inside the sync cycle (C3.10.5).
+// Group code never runs inside the sync cycle.
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';

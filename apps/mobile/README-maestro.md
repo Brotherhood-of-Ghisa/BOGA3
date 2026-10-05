@@ -132,14 +132,14 @@ npm run start:ios:dev-client
 Cold-start smoke lane:
 
 ```bash
-TASK_ID=T-20260301-05 npm run test:e2e:ios:smoke
+TASK_ID=ad-hoc npm run test:e2e:ios:smoke
 ```
 
 Data-runtime smoke lane (data-runtime smoke, completion share sheet,
 exercise catalogue create — three flows sharing one sim + Metro):
 
 ```bash
-TASK_ID=T-20260301-05 npm run test:e2e:ios:data-smoke
+TASK_ID=ad-hoc npm run test:e2e:ios:data-smoke
 ```
 
 Session view lane (infra-free; two flows sharing one sim +

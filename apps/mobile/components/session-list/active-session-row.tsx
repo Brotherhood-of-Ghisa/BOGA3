@@ -17,7 +17,7 @@ export type ActiveSessionRowProps = {
 /**
  * The active session as a card: its summary (resume), a check (review and
  * complete) and ⋮, which opens a sheet with Delete. Discarding an active
- * session cannot be undone, so Delete asks first (T10-D4).
+ * session cannot be undone, so Delete asks first.
  */
 export function ActiveSessionRow({
   session,

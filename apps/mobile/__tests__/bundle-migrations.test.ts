@@ -96,7 +96,7 @@ describe('bundle-migration runtime loop', () => {
     fixture.close();
   });
 
-  it('ships the M19 load-mode and M27 bodyweight migrations in order', () => {
+  it('ships the load-mode and bodyweight migrations in order', () => {
     expect(BUNDLE_MIGRATIONS.map(migration => migration.appVersion)).toEqual([2, 3]);
   });
 

@@ -100,7 +100,7 @@ to today/current week; in-range selection survives look-back edits.
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
-- **Today and selected differ** (DLM-T09-D3): today (the current week) is a 1px
+- **Today and selected differ**: today (the current week) is a 1px
   `ink` ring, the selected cell a 2px `ink` border with the selected
   accessibility state; the selected week also gets a filled `ink` caret.
   `__tests__/heatmap-marks.test.tsx` holds this.

@@ -59,8 +59,8 @@ cannot run their gates there). Never merge a PR yourself unless asked.
   ships or abandons its work. There is no archive; git history keeps it.
 - **Never referenced.** Code, tests, flows, migrations, specs, and other docs
   never cite a plan path or a task/milestone ID. Commit messages and PR bodies
-  may. `docs-check` fails on `docs/plans/<file>` paths outside `docs/plans/**`
-  and `docs/brainstorms/**`.
+  may. `docs-check` fails on a `docs/plans/<file>` path or a milestone/task ID
+  outside `docs/plans/**` and `docs/brainstorms/**`.
 - **Graduate durable decisions.** Anything that must stay true after the plan
   is gone goes into the owning `docs/specs/**` doc, such as a product decision,
   an architecture choice, the data model, an auth rule, or a technical contract.

@@ -87,16 +87,15 @@ Brief entrypoint inventory of the current reusable UI component set.
     bold `record` (the only emphasis — `design-language.md` §5);
     `kind="text"` for a non-figure value; a stacked `rank="secondary"` is a
     figure in a list row (Plex Mono 600 `base`, Progress muscle rows), and
-    `ground="viz"` turns the legend `ink` on a data-viz ground (DLM-T08); `spokenLabel`
+    `ground="viz"` turns the legend `ink` on a data-viz ground; `spokenLabel`
     reads an abbreviated legend in full to VoiceOver
   - `ListRow` — `[leading][label or children][meta][trailing]`, the trailing
     control always in a fixed tap-target-wide column so controls share one
     vertical axis; `density` `sheet` (option rows) or `list` (dense rows in a
     card, e.g. the set row); `selected` (`accent-wash`), `tone="danger"`,
     `divider`; pressable as one row only when given `onPress`. The trailing
-    control is a slot, so the row carries no icon dependency. `expanded`
-    (DLM-T06) announces a disclosure row's state: the exercise list's family
-    headers. DLM-T14 added `checked` (a radio row, announced checked with no
+    control is a slot, so the row carries no icon dependency. `expanded` announces a disclosure row's state: the exercise list's family
+    headers. Also `checked` (a radio row, announced checked with no
     ground change; the caller's `leading` glyph shows it), `accessible` (a row
     with no `onPress` read as one element) and `ref` (the host view, to move
     focus back to it)
@@ -104,12 +103,12 @@ Brief entrypoint inventory of the current reusable UI component set.
     38×4 handle, optional title; the backdrop tap, Android back and the
     VoiceOver escape gesture dismiss it — there is no Cancel button. It never
     grows past the top of the screen; a taller body shrinks to fit while leaving
-    a full 44pt dismissal target below the status bar. DLM-T06
-    added `headerActions` (controls on the title's row, `<testID>-header`) and
+    a full 44pt dismissal target below the status bar. It
+    takes `headerActions` (controls on the title's row, `<testID>-header`) and
     `keyboardAvoiding` (lifts the panel above the keyboard), first for the
-    exercise picker, which became a page-sheet route on 2026-10-05. DLM-T07 added `headerLeading` (one control before the title): the
+    exercise picker, which became a page-sheet route on 2026-10-05. `headerLeading` (one control before the title): the
     exercise editor's `chevron-left` `Back to exercise` from its muscle list.
-    DLM-T14 added `onDismissed`, called once the sheet has gone (the iOS
+    `onDismissed` is called once the sheet has gone (the iOS
     modal's `onDismiss`, or at once on Android), so a native `Alert` can follow
     a choice made in the sheet (the unlink chooser); `<testID>-modal` is on the
     native modal
@@ -117,11 +116,11 @@ Brief entrypoint inventory of the current reusable UI component set.
     `outline` (`ink` hairline) or `text` (caps label); `tone="danger"` recolours
     an outline or text button. Control radius, 44pt tall, Archivo caps label.
     Replaced the session view's `OutlineButton` and the Gyms screen's
-    `GymButton` (View Session was its third consumer). DLM-T10 added `checked`
+    `GymButton` (View Session was its third consumer). `checked` is
     for a text button that toggles a view (Sessions' `Show deleted`)
   - covered by `apps/mobile/__tests__/ui-design-primitives.test.tsx`
 
-3. Design-language primitives, second set (DLM-T01, 2026-09-24)
+3. Design-language primitives, second set
 - Files: `apps/mobile/components/ui/icon-button.tsx`, `state-panel.tsx`,
   `screen.tsx`, `form-field.tsx`, `search-field.tsx`, `segmented-control.tsx`,
   `chip-group.tsx`, `tag.tsx`, `notice.tsx`
@@ -130,71 +129,69 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `IconButton` — a labelled 44pt icon-only control; `tone` `default` (`ink`),
     `muted`, `danger`, or `accent` (a filled square: the screen's one primary as
     an icon). Every top bar's back and ⋮, View Session's card ⋮, and the
-    exercise picker's Manage / Add new / Close (DLM-T06), and the catalogue's `accent`
-    `+`, ⋮ and row ⋮ and the editor's back and remove controls (DLM-T07)
+    exercise picker's Manage / Add new / Close, and the catalogue's `accent`
+    `+`, ⋮ and row ⋮ and the editor's back and remove controls
   - `StatePanel` — a loading / message / error state: optional spinner, title
     (Archivo), body (`ink-muted`), one outline action and optional children;
     `fill` (centred in its space, the default) or inline. The session view's,
     exercise page's and View Session's non-content states; the catalogue's
-    and the exercise editor's loading and error (DLM-T07); Progress's
-    loading, error and empty states (DLM-T08) and the history sheets' (inline,
-    DLM-T09); every group state panel, wrapped by `GroupStateView` and friends
-    (DLM-T11)
+    and the exercise editor's loading and error; Progress's
+    loading, error and empty states and the history sheets' (inline); every group state panel, wrapped by `GroupStateView` and friends
   - `Screen` / `ScreenScroll` — the `paper` ground; the scroll body (accepting the native scroll ref for feature focus/scroll restoration) with the page
     gutter (`lg`, or `md` for the exercise page) and the `md` card gap, passing
     other `ScrollView` props through (refresh, keyboard insets). Used by the
     session view, exercise page, View Session, Gyms and the group session view;
-    the Groups tab (`ScreenScroll` with `refreshControl`, DLM-T11)
+    the Groups tab (`ScreenScroll` with `refreshControl`)
   - `FormField` — a micro-label inside a field one `fieldHeight` tall, `rule`
     turning `danger` while invalid, the error below (`<testID>-error` or
     `errorTestID`), an optional hint or counter; `face` `figure` (Plex Mono) or
     `text`. The completed edit's Start / End (`session-times-fields`), and the
-    credential and profile fields of Sign in and Profile (DLM-T05), and the
-    exercise name in `ExerciseCoreFields` (DLM-T07)
+    credential and profile fields of Sign in and Profile, and the
+    exercise name in `ExerciseCoreFields`
   - `SearchField` — search glyph, text, and a clear control while there is text;
     `accessibilityLabel` required. The swap sheet's search, the exercise
-    picker's filter (DLM-T06), the Progress filter (DLM-T08) and the
-    catalogue's filter (DLM-T07)
+    picker's filter, the Progress filter and the
+    catalogue's filter
   - `SegmentedControl` — one choice from a few, joined in a `rule` frame,
     the selected segment solid `ink`; `layout` `fill` (equal width), `inline`,
     or `fit` (across the row, label-sized segments sharing the rest: the
-    exercise history's four metrics, DLM-T09);
+    exercise history's four metrics);
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs the retired `SegmentedChips` used. The records panel's `Records` | `Last`,
-    Settings' date format (DLM-T04), Progress's period and table Metric, retained browsing Breakdown, and history Metric
+    Settings' date format, Progress's period and table Metric, retained browsing Breakdown, and history Metric
     (`stats-<kind>-history-metric-chip-*`); Settings owns the history View, and
     `ExerciseCoreFields`' weight entry
-    (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
+    (`<prefix>-load-mode-*`, with `disabled` for the group
     exercise form's pending state), and the Groups tab's `Stream` |
-    `Leaderboards` (`groups-segment-*`, DLM-T11)
+    `Leaderboards` (`groups-segment-*`)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
-    labels. Logs' level filter (DLM-T04),
+    labels. Logs' level filter,
     the catalogue's Show deleted control (`multi`), and the Groups tab's group
-    chips (`single`, `groups-stream-filter-*`, DLM-T11). DLM-T10 added a
+    chips (`single`, `groups-stream-filter-*`). Also a
     per-option `faint` (a deleted tag) and `single` mode's `clearValue`
     (pressing the selected chip selects the clear value: exercise history's
     tag filter, where tapping the selected tag returns to `All tags`)
   - `Tag` — a static micro-label pill naming a state (`Archived`, `Deleted`, a
-    role); `neutral` or `faint`. Connected agents' `AI` tag (DLM-T05), the
-    exercise list's `Deleted` (`faint`, DLM-T06), and a group record card's
-    boards (DLM-T11)
+    role); `neutral` or `faint`. Connected agents' `AI` tag, the
+    exercise list's `Deleted` (`faint`), and a group record card's
+    boards
   - `Notice` — a `paper` band on a `rule` hairline: optional glyph, words,
     optional action; `neutral` or `danger` (`alert`); `live` announces it. There
     is no success or warning hue: the glyph and words carry the state. An
     optional `title` (Archivo 700, a `header`) names a message that is a reason
-    ("Sign-in unavailable"). Settings' developer-tool outcomes (DLM-T04);
-    Sign-in, the first-sync gate and Profile (DLM-T05); the catalogue's outcome
-    and the exercise editor's save failure (DLM-T07); the group offline marker,
-    write notice and inline error (DLM-T11)
-  - `PageHeader` / `SectionHeader` (`page-header.tsx`, DLM-T03) — a tab
+    ("Sign-in unavailable"). Settings' developer-tool outcomes;
+    Sign-in, the first-sync gate and Profile; the catalogue's outcome
+    and the exercise editor's save failure; the group offline marker,
+    write notice and inline error
+  - `PageHeader` / `SectionHeader` (`page-header.tsx`) — a tab
     screen's in-content title (Archivo 800 `xxl`) and optional `ink-muted`
     intro; a section's heading (Archivo 700 `lg`) with an optional caps text
-    action. Today and Train; `PageHeader` also More and Settings (DLM-T04),
-    Sign in (DLM-T05) and Groups (DLM-T11)
-  - `ListRow` also takes an `accessibilityHint` for a pressable row (DLM-T03),
+    action. Today and Train; `PageHeader` also More and Settings,
+    Sign in and Groups
+  - `ListRow` also takes an `accessibilityHint` for a pressable row,
     and a `description` (a wrapping `ink-muted` second line) and
-    `accessibilityRole="link"` for a row that opens the browser (DLM-T04: the
+    `accessibilityRole="link"` for a row that opens the browser (the
     More and Settings destinations)
   - covered by `apps/mobile/__tests__/ui-design-primitives.test.tsx`
 
@@ -256,7 +253,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `Progress`, and `More`, driven by the single declarative model in
     `apps/mobile/src/navigation/main-tabs.ts`
   - the body of `MainTabBar`
-  - design language (DLM-T02): one `Card`-recipe strip (`surface`, `rule`,
+  - design language: one `Card`-recipe strip (`surface`, `rule`,
     card radius) of plain Archivo labels; the active tab is `ink` 700 over a
     2pt `ink` underline (`<tab testID>-indicator`), the others `ink-muted` 600;
     never `accent`
@@ -275,14 +272,14 @@ Brief entrypoint inventory of the current reusable UI component set.
 - File: `apps/mobile/components/exercise-catalog/exercise-editor-modal.tsx`
 - Purpose:
   - shared create/edit exercise editor reused by `exercise-catalog`, the exercise picker's `Add new` and group `Add as new`, the exercise page and the group exercises page
-  - optional `prefill` (name, weight entry, muscles for a new exercise), `onSave` (replaces the default save; a rejection shows inline), and `title` (M25-T07: the picker's group `Add as new` prefills from the group exercise and saves through `createExerciseWithGroupLink`); the fields are unchanged
-  - in the design language (DLM-T07): a tall `Sheet` (`keyboardAvoiding`, testID `exercise-editor`, backdrop `Dismiss exercise editor overlay`, no Cancel) holding `ExerciseCoreFields`, a field-framed `ListRow` for the primary muscle (`exercise-editor-primary-muscle-trigger`), the secondary muscles as `ListRow`s in a `Card` with a `danger` `x` each, an outline `Add secondary muscle` (`exercise-editor-secondary-muscle-trigger`), and `Save Exercise`, the sheet's one `accent`. The muscle list is a panel swap in the same sheet (T07-D3): the title changes, `headerLeading` is a `chevron-left` `Back to exercise` (`exercise-editor-muscle-selector-back`), and the rows are `ListRow`s (`exercise-editor-muscle-option-<id>`, `radio-on` / `radio-off` for the primary, `plus` for a secondary) in `exercise-editor-muscle-selector-list`. Target: `design-targets/exercise-catalogue.md`
+  - optional `prefill` (name, weight entry, muscles for a new exercise), `onSave` (replaces the default save; a rejection shows inline), and `title` (the picker's group `Add as new` prefills from the group exercise and saves through `createExerciseWithGroupLink`); the fields are unchanged
+  - in the design language: a tall `Sheet` (`keyboardAvoiding`, testID `exercise-editor`, backdrop `Dismiss exercise editor overlay`, no Cancel) holding `ExerciseCoreFields`, a field-framed `ListRow` for the primary muscle (`exercise-editor-primary-muscle-trigger`), the secondary muscles as `ListRow`s in a `Card` with a `danger` `x` each, an outline `Add secondary muscle` (`exercise-editor-secondary-muscle-trigger`), and `Save Exercise`, the sheet's one `accent`. The muscle list is a panel swap in the same sheet: the title changes, `headerLeading` is a `chevron-left` `Back to exercise` (`exercise-editor-muscle-selector-back`), and the rows are `ListRow`s (`exercise-editor-muscle-option-<id>`, `radio-on` / `radio-off` for the primary, `plus` for a secondary) in `exercise-editor-muscle-selector-list`. Target: `design-targets/exercise-catalogue.md`
 
 5. `ExerciseListContent` / `ExerciseListPreferenceControls`
 - File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
 - Purpose:
   - shared exercise list row/header rendering and the shared filter row for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
-  - in the design language (DLM-T06): hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are one row of `FilterChip`s (pills one tap target tall, solid `ink` while on; `exercise-list-controls`): `Never-done` (a checkbox, `exercise-list-never-done`), the host's own chips as `children` (the picker's `Groups`), and `Sort: Favourite` / `Sort: A–Z` (a button that switches the order, `exercise-list-sort`). `useFamilyExpansion(isSearching)` holds a surface's open families: closed until tapped while browsing, open until tapped while searching. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion, and a family's header still toggles it; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
+  - in the design language: hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are one row of `FilterChip`s (pills one tap target tall, solid `ink` while on; `exercise-list-controls`): `Never-done` (a checkbox, `exercise-list-never-done`), the host's own chips as `children` (the picker's `Groups`), and `Sort: Favourite` / `Sort: A–Z` (a button that switches the order, `exercise-list-sort`). `useFamilyExpansion(isSearching)` holds a surface's open families: closed until tapped while browsing, open until tapped while searching. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion, and a family's header still toggles it; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
   - covered by `apps/mobile/__tests__/exercise-list-controls.test.tsx`
   - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so all three surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
 
@@ -331,22 +328,22 @@ Brief entrypoint inventory of the current reusable UI component set.
   - shared two-line summary row (date/duration/gym + sets/exercises) reused by
     `ActiveSessionRow`, `HistoryList`, and Progress history
   - figures in Plex Mono (`ink` for the start and duration, `ink-muted` for the
-    counts), the gym in Source Sans, `·` separators in `ink-faint` (DLM-T03)
+    counts), the gym in Source Sans, `·` separators in `ink-faint`
 
 8. `ActiveSessionRow`
 - File: `apps/mobile/components/session-list/active-session-row.tsx`
 - Purpose:
-  - the active session on `/sessions` as a `Card` (DLM-T10): a `ListRow` with
+  - the active session on `/sessions` as a `Card`: a `ListRow` with
     the `set-current` glyph and `SessionSummaryLine` (resume), then `check`
     (review and complete) and ⋮ `IconButton`s
   - ⋮ opens a `Sheet` with one `danger` `Delete`, which confirms in an `Alert`
-    before discarding (T10-D4)
+    before discarding
 
 9. `HistoryList`
 - File: `apps/mobile/components/session-list/history-list.tsx`
 - Purpose:
   - the completed-session history on `/sessions`, rendered inside its host's
-    scroll (DLM-T10): a `History` micro-label with the `Show deleted` / `Hide
+    scroll: a `History` micro-label with the `Show deleted` / `Hide
     deleted` text `ActionButton` (`checked`), the rows as `ListRow`s in one
     `Card` (a deleted row faded, with a `Deleted` `Tag`), and `StatePanel`s for
     loading, the load error (`Retry`) and the empties
@@ -363,7 +360,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `HeatmapData`: Daily scrolls horizontally; Weekly virtualizes a vertical
     newest-first list with proportional horizontal lengths, date/value columns
     and a dashed vertical average on a shared zero-based scale. Both use the
-    design language (DLM-T09): cells and bars on the `viz0`–`viz4` ramp
+    design language: cells and bars on the `viz0`–`viz4` ramp
     (`HEAT_RAMP`), an empty day `viz0` with a `rule` hairline; **today (or the
     current week) a 1px `ink` ring, the selected cell a 2px `ink` border** plus
     the selected state, and a filled `ink` caret beside the selected week
@@ -373,7 +370,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `-heatmap-cell-<dateKey | weekStartDateKey>`, `-heatmap-bar-<weekStartDateKey>`,
     `-heatmap-day-detail` (`-date`, `-value`). Semantics:
     `components/heatmaps/README.md`
-  - `HistorySheet` — the Progress history of one exercise definition or one muscle ID (DLM-T09-D2, which merged the two legacy overlays): a `Sheet` at
+  - `HistorySheet` — the Progress history of one exercise definition or one muscle ID (which merged the two legacy overlays): a `Sheet` at
     about three quarters of the screen, no close button (G5); eyebrow and name;
     `Metric` `SegmentedControl` and a static saved view/window label;
     Settings owns Daily/Weekly, with Daily for unset/invalid choices and valid
@@ -388,47 +385,47 @@ Brief entrypoint inventory of the current reusable UI component set.
     `-heatmap-panel-<view>`. Target:
     `design-targets/progress.md`
 
-11. Group components (M22)
+11. Group components
 - Folder: `apps/mobile/components/groups/` (barrel `index.ts`); data comes from `@/src/groups` hooks and the pure view model
 - Purpose:
-  - `GroupStreamSessionCard` — the stream card, a `Card` link (design language DLM-T11): member (Archivo 700), status in words (`Training now` beside the `set-current` ring, `Completed · 45m` in `ink-muted`), start · gym, sets · kg · exercises computed on the device in Plex Mono, the `N records` label in `record` (M25-T10, `-records`), group names in All; one press target
+  - `GroupStreamSessionCard` — the stream card, a `Card` link: member (Archivo 700), status in words (`Training now` beside the `set-current` ring, `Completed · 45m` in `ink-muted`), start · gym, sets · kg · exercises computed on the device in Plex Mono, the `N records` label in `record` (`-records`), group names in All; one press target
   - `GroupStreamMembershipItem` — "X joined / left the group / was removed" light row behind a `rule` hairline, `ink-muted` (`streamRowStyles`, shared with `GroupStreamSentenceItem`); pressable only where it opens another screen
   - `GroupFilterChips` — a single `ChipGroup` with one chip per group, exactly one selected (no `All`), wrapping rather than scrolling sideways; the Groups screen's group selector
-  - `GroupStreamList` — `FlatList` on `groupScreenStyles` with `RefreshControl`, online older-page loading, and an inline `StatePanel` Retry footer; (M25-T10) it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
-  - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): a `Card` whose `record` band (`-band`) carries the title (`dave — group record` / `— PR`), then the group exercise and its value in bold `record` Plex Mono (`140.0 × 1 · 1RM 142.5`), board `Tag`s, `Session in progress`, the status via `GroupCertificationStatus` (`Not certified yet` / `Certified by …` / `Voided · set …`), and its group where names are shown (Today). A voided card has no band, fades to `ink-faint` and puts its status first (DLM-T11-D2). The summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and an outline `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-band`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
-  - `GroupStreamSentenceItem` (M25-T10) — a record-removed or link item: a light row with one sentence behind a `rule` hairline, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
-  - `GroupMetricRecordSheet` (M25-T10; a `Sheet` since DLM-T11) — the row detail (E2) shared by record cards and board rows, titled with the lifter and the exercise: the set and 1RM as `record` `Stat`s, then the logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, `Certify` (the sheet's one `accent`), `Remove my certification` / `Cancel certification` as `danger` `ListRow`s (confirmed with `Alert.alert`), and `View full session` as a `ListRow` with a chevron. No Close: the backdrop (`Close set details`) dismisses it (G5). Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-backdrop`, `-header` (the title), `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`
+  - `GroupStreamList` — `FlatList` on `groupScreenStyles` with `RefreshControl`, online older-page loading, and an inline `StatePanel` Retry footer; it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
+  - `GroupStreamRecordCard` — a record card under its session card (indented): a `Card` whose `record` band (`-band`) carries the title (`dave — group record` / `— PR`), then the group exercise and its value in bold `record` Plex Mono (`140.0 × 1 · 1RM 142.5`), board `Tag`s, `Session in progress`, the status via `GroupCertificationStatus` (`Not certified yet` / `Certified by …` / `Voided · set …`), and its group where names are shown (Today). A voided card has no band, fades to `ink-faint` and puts its status first. The summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and an outline `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-band`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
+  - `GroupStreamSentenceItem` — a record-removed or link item: a light row with one sentence behind a `rule` hairline, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
+  - `GroupMetricRecordSheet` (a `Sheet`) — the row detail (E2) shared by record cards and board rows, titled with the lifter and the exercise: the set and 1RM as `record` `Stat`s, then the logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, `Certify` (the sheet's one `accent`), `Remove my certification` / `Cancel certification` as `danger` `ListRow`s (confirmed with `Alert.alert`), and `View full session` as a `ListRow` with a chevron. No Close: the backdrop (`Close set details`) dismisses it (G5). Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-backdrop`, `-header` (the title), `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`
   - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker: a neutral `Notice` with the `offline` glyph, live (08 pattern 7)
-  - `GroupMemberRow`, `GroupSummaryRow` (design language DLM-T13) — dense `ListRow`s inside one `Card` (`divider` on every row but the first). `GroupMemberRow`: the name (+ "(you)") and the role as a `Tag` (`group-member-role-<userId>`); it takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron, the control column staying empty otherwise so the tags align. `GroupSummaryRow`: the name in Archivo 600, the description (two lines) in `ink-muted`, member count · my role as a micro-label, a chevron; the My groups `FlatList` draws the card with `cardListItemStyles`
-  - `GroupHeaderCard` (DLM-T13) — the group and Members screens' header: one `Card` with the name in Archivo 700, the description and an optional meta line in `ink-muted`, then its children (the group screen's `Members` `ListRow`)
-  - `GroupMemberActionSheet` (M22-T05) — `GroupActionSheet` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin`, `Transfer ownership` / `Remove from group` (`danger`; the caller confirms with `Alert.alert`). testIDs `group-member-actions-sheet` (+ `-backdrop`), `group-member-action-<action>`
-  - `GroupActionSheet` (M25-T08; a `Sheet` since DLM-T13) — behind both action sheets (members, group exercises): the title, an optional `ink-muted` subtitle, one `ListRow` per action (`tone="danger"` when destructive). No Cancel: the backdrop dismisses it (G5, DLM-T13-D2). testIDs `<prefix>-sheet`, `<prefix>-sheet-backdrop` and `<actionPrefix>-<key>`
-  - `GroupExercisesPage` (M25-T08) — the group screen's Exercises section: the `Exercises` micro-label (`group-screen-exercises-title`) with owner/admin `Add exercise` as an outline beside it (T13-D1), outcome `Notice`s, a failed links read as a `danger` `Notice` with an outline `Retry` (`group-exercises-links-retry`), the rows as one `Card` (`group-exercises-list`), empty and missing-data `StatePanel`s, and the exercise sheet (`Rename` / `Archive` / `Unarchive`). Target: `design-targets/groups.md` (DLM-T14)
-  - `GroupExerciseRow` (M25-T08) — a dense `ListRow` slice of the section's `Card`: the name (Archivo 600), weight entry and my link status (`Linked: …` / `Not linked`) in `ink-muted`, and an `Archived` `Tag`; pressable with a chevron for owner/admin only; optional `Link your exercise` (outline) and `Unlink…` (`danger` text) buttons (`group-exercise-link-button-<id>` / `group-exercise-unlink-button-<id>`) sit outside that press target; `personalLinks` retains stable IDs and labels, and unlink pending disables repeat taps
+  - `GroupMemberRow`, `GroupSummaryRow` — dense `ListRow`s inside one `Card` (`divider` on every row but the first). `GroupMemberRow`: the name (+ "(you)") and the role as a `Tag` (`group-member-role-<userId>`); it takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron, the control column staying empty otherwise so the tags align. `GroupSummaryRow`: the name in Archivo 600, the description (two lines) in `ink-muted`, member count · my role as a micro-label, a chevron; the My groups `FlatList` draws the card with `cardListItemStyles`
+  - `GroupHeaderCard` — the group and Members screens' header: one `Card` with the name in Archivo 700, the description and an optional meta line in `ink-muted`, then its children (the group screen's `Members` `ListRow`)
+  - `GroupMemberActionSheet` — `GroupActionSheet` for one member offering exactly `groupMemberActionsFor(myRole, me, member)` (contract §4.3): `Make admin` / `Remove admin`, `Transfer ownership` / `Remove from group` (`danger`; the caller confirms with `Alert.alert`). testIDs `group-member-actions-sheet` (+ `-backdrop`), `group-member-action-<action>`
+  - `GroupActionSheet` (a `Sheet`) — behind both action sheets (members, group exercises): the title, an optional `ink-muted` subtitle, one `ListRow` per action (`tone="danger"` when destructive). No Cancel: the backdrop dismisses it (G5). testIDs `<prefix>-sheet`, `<prefix>-sheet-backdrop` and `<actionPrefix>-<key>`
+  - `GroupExercisesPage` — the group screen's Exercises section: the `Exercises` micro-label (`group-screen-exercises-title`) with owner/admin `Add exercise` as an outline beside it, outcome `Notice`s, a failed links read as a `danger` `Notice` with an outline `Retry` (`group-exercises-links-retry`), the rows as one `Card` (`group-exercises-list`), empty and missing-data `StatePanel`s, and the exercise sheet (`Rename` / `Archive` / `Unarchive`). Target: `design-targets/groups.md`
+  - `GroupExerciseRow` — a dense `ListRow` slice of the section's `Card`: the name (Archivo 600), weight entry and my link status (`Linked: …` / `Not linked`) in `ink-muted`, and an `Archived` `Tag`; pressable with a chevron for owner/admin only; optional `Link your exercise` (outline) and `Unlink…` (`danger` text) buttons (`group-exercise-link-button-<id>` / `group-exercise-unlink-button-<id>`) sit outside that press target; `personalLinks` retains stable IDs and labels, and unlink pending disables repeat taps
   - `GroupExerciseUnlinkSheet` — a `Sheet` (`Your linked exercises`, testID `group-unlink-chooser`, backdrop `Dismiss your linked exercises`, no Cancel) for multiple personal links: the target/group context in `ink-muted`, then a `ListRow` per link with a `danger` text `Unlink` (`group-unlink-choice-<id>`), duplicate/missing names identified; the host confirms from `Sheet.onDismissed`, once the sheet has gone, then restores focus to the row
-  - `GroupExerciseForm` (M25-T08) — the add / edit group-exercise form: a `Card` over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the copy note in `ink-muted`, the write's failure as a `danger` `Notice` above the submit, and the submit as the screen's one `accent`
-  - `StandardExercisePicker` (M25-T08) — a micro-label, a `SearchField` and one `Card` of radio `ListRow`s (`radio-on` in `ink` on the pick, no ground change; the weight entry as `meta`) over the bundled standard exercises to copy into a group, and `Showing N of M`
-  - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
-  - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09; design language DLM-T12) — the Groups screen's Leaderboards segment: one link `Card` per group exercise (the name in Archivo 700, the view label as a micro-label, an `Archived` `Tag`, up to three podium rows with rank, value and date in Plex Mono and my row's `You` in bold, the empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
+  - `GroupExerciseForm` — the add / edit group-exercise form: a `Card` over `ExerciseCoreFields`, validated by `validateExerciseCore`, with the copy note in `ink-muted`, the write's failure as a `danger` `Notice` above the submit, and the submit as the screen's one `accent`
+  - `StandardExercisePicker` — a micro-label, a `SearchField` and one `Card` of radio `ListRow`s (`radio-on` in `ink` on the pick, no ground change; the weight entry as `meta`) over the bundled standard exercises to copy into a group, and `Showing N of M`
+  - `GroupLostAccessState` — the shared "You're no longer a member of this group" panel
+  - `GroupLeaderboardsPage`, `GroupPodiumCard` — the Groups screen's Leaderboards segment: one link `Card` per group exercise (the name in Archivo 700, the view label as a micro-label, an `Archived` `Tag`, up to three podium rows with rank, value and date in Plex Mono and my row's `You` in bold, the empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
   - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `GroupMetricRecordSheet` and `GroupBoardRow`
-  - `GroupBoardRow` (M25-T09; design language DLM-T12) — one full-board row, a dense `ListRow` in the board's one card (`cardListItemStyles` in `screen-styles.ts` draws the card across the `FlatList`'s cells), as a single accessibility element: rank and value in Plex Mono, the member in Source Sans with the 1RM's set below it in `ink-muted`, the date, the certification mark on All; my row on `paper` reading `You` (DLM-T12-D1); (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
-  - `GroupBoardHistoryItem` (M25-T09; design language DLM-T12) — one lead change, a row of the history's one card: the date in small Plex Mono, then the sentence in Source Sans. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
-  - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: an inline `StatePanel`, loading, or the failure with an outline `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
-  - `UsernameGate` + `useUsernameGate(userId)` (M22-T05) — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`): a `Card` with the reason, a `FormField` and `Save username` (`accent`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
-  - `GroupDetailsForm` (M22-T05) — the shared create / edit form: name (1–50) and optional description (≤280) as two `FormField`s, the counter (`n/280`, `group-form-description-counter`) in Plex Mono under the description, inline validation, the write's failure as a `danger` `Notice` above the submit (`accent`)
-  - `GroupWriteNotice` (M22-T05) — inline outcome of a group write: a `danger` `Notice`, or a neutral one with the `success` glyph (08 pattern 9)
-  - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` (the screen's one primary) / `Join with a code` (outline) buttons
+  - `GroupBoardRow` — one full-board row, a dense `ListRow` in the board's one card (`cardListItemStyles` in `screen-styles.ts` draws the card across the `FlatList`'s cells), as a single accessibility element: rank and value in Plex Mono, the member in Source Sans with the 1RM's set below it in `ink-muted`, the date, the certification mark on All; my row on `paper` reading `You`; a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
+  - `GroupBoardHistoryItem` — one lead change, a row of the history's one card: the date in small Plex Mono, then the sentence in Source Sans. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
+  - `GroupPagesFooter` — the footer of an online paged list: an inline `StatePanel`, loading, or the failure with an outline `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
+  - `UsernameGate` + `useUsernameGate(userId)` — the inline username field shown before create / join when the profile username is blank (`loadUserProfile` / `saveUsername`): a `Card` with the reason, a `FormField` and `Save username` (`accent`); errors inline under the field; `require(notice)` re-opens it on a server `USERNAME_REQUIRED`; a profile that fails to load does not block the form
+  - `GroupDetailsForm` — the shared create / edit form: name (1–50) and optional description (≤280) as two `FormField`s, the counter (`n/280`, `group-form-description-counter`) in Plex Mono under the description, inline validation, the write's failure as a `danger` `Notice` above the submit (`accent`)
+  - `GroupWriteNotice` — inline outcome of a group write: a `danger` `Notice`, or a neutral one with the `success` glyph (08 pattern 9)
+  - `GroupsEmptyActions` — the empty state's `Create group` (the screen's one primary) / `Join with a code` (outline) buttons
   - `FriendSessionContent` — the friend's session body on View Session's cards (`components/session-detail/`): a `SessionFactsCard` headed by the member and status, then an `ExerciseSetsCard` per exercise (rows `group-session-set-row-<setId>`), read-only, no record band
-  - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07; design language DLM-T06) — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch in the filter row, a `FilterChip` solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
-  - `GroupExercisePickSheet` (M25-T07) — a `Sheet` (DLM-T14; keyboard-avoiding, backdrop `Dismiss group exercise pick sheet`, no Cancel) for an unlinked group exercise, its options radio `ListRow`s (`radio-on` / `radio-off` in `ink`, unavailable choices `ink-faint`) and its confirm the sheet's one `accent`: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (M25-T08 group page) confirms with `Link` and adds nothing to a session
-  - `GroupStateView`, `GroupLoadingState`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels, thin wrappers over `StatePanel` (inline; the sign-in panel centres on the page) since DLM-T11, so their call sites did not change; `GroupInlineError` is a `danger` `Notice` with an outline `Retry`
-  - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll` (DLM-T11).
-  - `usePullToRefresh`, `groupScreenStyles` — pull spinner state, and the shared page shell and action row (`groupFormStyles` was deleted in DLM-T14, once nothing used it)
+  - `PickerGroupSectionList`, `PickerGroupsToggle` — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch in the filter row, a `FilterChip` solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
+  - `GroupExercisePickSheet` — a `Sheet` (keyboard-avoiding, backdrop `Dismiss group exercise pick sheet`, no Cancel) for an unlinked group exercise, its options radio `ListRow`s (`radio-on` / `radio-off` in `ink`, unavailable choices `ink-faint`) and its confirm the sheet's one `accent`: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (group page) confirms with `Link` and adds nothing to a session
+  - `GroupStateView`, `GroupLoadingState`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels, thin wrappers over `StatePanel` (inline; the sign-in panel centres on the page); `GroupInlineError` is a `danger` `Notice` with an outline `Retry`
+  - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll`.
+  - `usePullToRefresh`, `groupScreenStyles` — pull spinner state, and the shared page shell and action row
 
-12. Exercise core fields (M25)
+12. Exercise core fields
 - File: `apps/mobile/components/exercise-core/exercise-core-fields.tsx`
 - Purpose:
-  - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`). In the design language (DLM-T07): a `FormField` (`face="text"`) for the name and a micro-labelled `SegmentedControl` (`<prefix>-load-mode`, `disabled` while not editable) for the weight entry, each segment labelled `<label> weight entry`
+  - `ExerciseCoreFields` — the exercise-name input and the `Total load` / `Per side` weight-entry control (labels from `LOAD_INPUT_MODE_LABELS`), shared by the personal exercise editor (`exercise-catalog/exercise-editor-modal.tsx`) and the group exercise form; both validate with `validateExerciseCore`. testIDs `<prefix>-name-input`, `<prefix>-name-error`, `<prefix>-load-mode-<mode>` (the editor keeps `exercise-editor-*`). In the design language: a `FormField` (`face="text"`) for the name and a micro-labelled `SegmentedControl` (`<prefix>-load-mode`, `disabled` while not editable) for the weight entry, each segment labelled `<label> weight entry`
 
 13. Exercise page
 - Folder: `apps/mobile/components/exercise-page/`; rules in `apps/mobile/src/session-recorder/exercise-page-model.ts`, records in `exercise-records.ts`, persistence in `session-exercise-draft.ts` + `use-session-exercise-draft.ts`
@@ -503,7 +500,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `accessory` (the session view's chevron) or a 44pt `control` (View Session's
     ⋮), the set rows and the `record` band (`record`, a `RecordBand`). Given
     `onPress` the whole card is one link. testID `<prefix>-count`, `-set-<n>`
-    (or the caller's `rowTestID`), `-record`. DLM-T10 added `nameFace="figure"`
+    (or the caller's `rowTestID`), `-record`. Also `nameFace="figure"`
     (a date as the name, in Plex Mono) and a `summary` slot under the header
     (exercise history's gym, tags and session `Stat`s)
   - `SessionFactsCard` — `Card` with an optional header slot, a finished

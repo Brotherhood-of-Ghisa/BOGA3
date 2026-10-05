@@ -21,7 +21,8 @@
 #      - every relative .md link in curated docs resolves,
 #      - every numbered spec carries the Owns/Not here/Load when header,
 #      - no file outside docs/plans/** and docs/brainstorms/** references a
-#        plan file (plans are ephemeral; AGENTS.md "Planning").
+#        plan file or names a milestone/task ID (plans are ephemeral;
+#        AGENTS.md "Planning"; exemptions: scripts/plan-ref-exempt.txt).
 #      - no tracked or new text file holds a merge-conflict marker line
 #        (`<<<<<<< `, `||||||| `, `>>>>>>> `),
 #      - every repo path cited in a persistent doc exists, never at a line,
@@ -263,6 +264,41 @@ for fname in sorted(os.listdir(os.path.join(root, "docs/specs"))):
 #    trees. Matches docs/plans/…, ../plans/…, ./plans/… and plans/… (relative
 #    from docs/); placeholders like docs/plans/tasks/<task-id>.md pass.
 PLAN_REF = re.compile(r"(?<![A-Za-z0-9_-])plans/((?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.[A-Za-z0-9]+)\b")
+# 4b. ...nor named: no milestone, task, task-decision, acceptance-criterion
+#     or plan-section ID (`M<n>`, `<PLAN>-T<nn>` such as `M<n>-T<nn>`,
+#     `T<nn>-D<n>`, `T-<YYYYMMDD>-<nn>`, `AC<n>`, `C<n>.<n>`)
+#     outside the working-notes trees. A bare `M<n>` followed by a number is
+#     SVG path data (`M12 4`, `M2.18`), not a milestone; rule keys a spec
+#     defines (`T1`, `D14`, `E0.3`) are not plan IDs. scripts/plan-ref-exempt.txt lists applied migrations (history,
+#     left as they are) and files still being cleaned (that list only shrinks).
+PLAN_ID = re.compile(r"(?<![A-Za-z0-9_-])(?:[A-Z][A-Z0-9]{0,4}-T\d{2}(?:-D\d+)?|T\d{2}-D\d+|T-20\d{6}-\d{2}|AC\d{1,2}\b|C\d{1,2}(?:\.\d+)+\b"
+                     r"|M\d{1,3}(?! ?\d|\.\d|[A-Za-z0-9_]))")
+plan_id_exempt, plan_id_applied, plan_id_hits = set(), [], set()
+PLAN_ID_EXEMPT = os.path.join(root, "scripts/plan-ref-exempt.txt")
+with open(PLAN_ID_EXEMPT) if os.path.exists(PLAN_ID_EXEMPT) else open(os.devnull) as f:
+    for line in f:
+        parts = line.split()
+        if not parts or parts[0].startswith("#"):
+            continue
+        if parts[0] == "applied" and len(parts) == 3:
+            plan_id_applied.append((parts[1], parts[2]))
+        elif parts[0] == "derived" and len(parts) == 2:
+            plan_id_applied.append((parts[1], None))
+        elif len(parts) == 1:
+            plan_id_exempt.add(parts[0])
+        else:
+            problems.append(f"scripts/plan-ref-exempt.txt: malformed row: {line.rstrip()!r}")
+
+def plan_id_history(rel):
+    """An applied migration (named at or before its folder's last applied one)
+    or a file derived from them."""
+    for prefix, last in plan_id_applied:
+        if last is None and rel == prefix:
+            return True
+        if last is not None and rel.startswith(prefix) and "/" not in rel[len(prefix):] \
+                and rel[len(prefix):] <= last:
+            return True
+    return False
 try:
     listed = subprocess.run(
         ["git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
@@ -289,6 +325,12 @@ for rel in listed:
         problems.append(f"{rel}:{ln}: merge-conflict marker '{m.group(0).strip()}' — resolve the conflict")
     if rel.startswith(("docs/plans/", "docs/brainstorms/")) or os.path.getsize(path) > 2_000_000:
         continue
+    for m in PLAN_ID.finditer(text):
+        plan_id_hits.add(rel)
+        if rel not in plan_id_exempt and not plan_id_history(rel):
+            ln = text.count("\n", 0, m.start()) + 1
+            problems.append(f"{rel}:{ln}: names milestone/task '{m.group(0)}' — plans are ephemeral; "
+                            "state the rule or behaviour itself")
     if "plans/" not in text:
         continue
     for ln, line in enumerate(text.splitlines(), 1):
@@ -297,6 +339,9 @@ for rel in listed:
             if target == "README.md" or target.startswith("templates/"):
                 continue
             problems.append(f"{rel}:{ln}: references plan file {m.group(0)} — plans are ephemeral; cite the owning spec instead")
+
+for rel in sorted(plan_id_exempt - plan_id_hits):
+    problems.append(f"scripts/plan-ref-exempt.txt: '{rel}' names no milestone or task any more — remove its row")
 
 # 6. repo paths cited in persistent docs exist. A path is an inline-code
 #    token or link target with a `/` whose first segment exists under one of

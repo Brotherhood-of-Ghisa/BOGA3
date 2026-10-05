@@ -24,7 +24,7 @@ import type {
 
 // The history of one exercise or one muscle on Progress: a
 // `Sheet` holding the metric control, saved view/window, week banner and daily
-// or weekly heatmap (DLM-T09). One component for the muscle and the exercise
+// or weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
 export type HistoryKind = 'muscle' | 'exercise';

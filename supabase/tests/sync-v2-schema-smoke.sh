@@ -15,7 +15,7 @@
 #     (<table>_touch_server_received_at, <table>_owner_user_id_immutable).
 #   - The ten cross-entity FKs are present with condeferrable=true,
 #     condeferred=true, and the expected on-delete actions.
-#   - Only the M19 load-input-mode CHECK exists; all other entity CHECKs are absent.
+#   - Only the load-input-mode CHECK exists; all other entity CHECKs are absent.
 #
 # Run via `./boga test sync-v2-schema` (run-suite.sh ensures the local
 # runtime is up + baseline applied before this script runs). For local
@@ -308,6 +308,6 @@ for entity in "${ENTITIES[@]}"; do
     fail "app_public.${entity} CHECK constraints '${names}'; expected '${expected}' per docs/specs/tech/sync-v2-server-contract.md (Ground rules)"
   fi
 done
-pass "only the M19 load-input-mode CHECK is present across v2 entity tables"
+pass "only the load-input-mode CHECK is present across v2 entity tables"
 
 echo "[sync-v2-smoke] all assertions passed"

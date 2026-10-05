@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# groups-certification.sh — M25 certification contract (the third body of the
+# groups-certification.sh — certification contract (the third body of the
 # groups-leaderboards lane; groups-boards.sh proves the All boards).
 #
 # Contract: docs/specs/tech/groups-contract.md

@@ -36,7 +36,7 @@ trap 'rm -f "${PROBE}"' EXIT
 printf '%s\n' 'ok: docs/plans/README.md docs/plans/templates/x.md docs/plans/tasks/<task-id>.md docs/plans/**' > "${PROBE}"
 "${GD}" check >/dev/null 2>&1 || fail "plan README/template/placeholder references must pass"
 # Built at runtime so this test file itself holds no plan path.
-printf 'bad: docs/plans/tasks/%s.md\n' 'M99-T01-Probe' > "${PROBE}"
+printf 'bad: docs/plans/tasks/%s%s.md\n' 'M' '99-T01-Probe' > "${PROBE}"
 if out="$("${GD}" check 2>&1)"; then
   fail "a concrete docs/plans/ file reference must fail the check"
 fi
@@ -59,6 +59,34 @@ grep -q "gen-docs-plan-ref-probe.txt:2: merge-conflict marker" <<<"${out}" \
 grep -q "gen-docs-plan-ref-probe.txt:6: merge-conflict marker" <<<"${out}" \
   || fail "conflict-marker failure must name the closing line: ${out}"
 rm -f "${PROBE}"
+
+# Milestone and task IDs fail anywhere outside the plan trees; SVG path data
+# does not. Applied migrations (named at or before the cutoff in
+# scripts/plan-ref-exempt.txt) are history; a newer one is checked. IDs are
+# built at runtime so this file itself names none.
+M="M"; T="T"; C="C"
+printf 'ok: <path d="%s12 4L%s2.18 3"/> %s<n>-%s<nn>; rule keys T1 D14 E0.3 P5 R10\n' "$M" "$M" "$M" "$T" > "${PROBE}"
+"${GD}" check >/dev/null 2>&1 || fail "SVG path data, placeholders and rule keys must pass: $("${GD}" check 2>&1)"
+printf 'a (%s25-%s07)\nb %s-20261005-01\nc as built in %s22.\nd DLM-%s10-D2, %s13-D1 (A%s6)\n' \
+  "$M" "$T" "$T" "$M" "$T" "$T" "$C" > "${PROBE}"
+if out="$("${GD}" check 2>&1)"; then
+  fail "a milestone or task ID must fail the check"
+fi
+for hit in "1: names milestone/task '${M}25-${T}07'" "2: names milestone/task '${T}-20261005-01'" "3: names milestone/task '${M}22'" \
+  "4: names milestone/task 'DLM-${T}10-D2'" "4: names milestone/task '${T}13-D1'" "4: names milestone/task 'A${C}6'"; do
+  grep -q "gen-docs-plan-ref-probe.txt:${hit}" <<<"${out}" || fail "plan-ID failure must name file, line and ID (${hit}): ${out}"
+done
+rm -f "${PROBE}"
+OLD_MIG="${REPO_ROOT}/supabase/migrations/00000000000000_gen_docs_probe.sql"
+NEW_MIG="${REPO_ROOT}/supabase/migrations/99999999999999_gen_docs_probe.sql"
+trap 'rm -f "${PROBE}" "${OLD_MIG}" "${NEW_MIG}"' EXIT
+printf -- '-- %s25 history\n' "$M" > "${OLD_MIG}"
+"${GD}" check >/dev/null 2>&1 || fail "an applied migration may name a milestone: $("${GD}" check 2>&1)"
+printf -- '-- %s25 new\n' "$M" > "${NEW_MIG}"
+out="$("${GD}" check 2>&1)" && fail "a migration after the applied cutoff must fail the check"
+grep -q "99999999999999_gen_docs_probe.sql:1: names milestone/task" <<<"${out}" || fail "new-migration failure must name it: ${out}"
+grep -q "00000000000000_gen_docs_probe.sql" <<<"${out}" && fail "an applied migration must stay exempt: ${out}"
+rm -f "${OLD_MIG}" "${NEW_MIG}"
 
 # Cited repo paths must exist. The probe is an untracked persistent doc (check
 # scans new files too). Missing paths fail with file:line; non-paths, globs,
@@ -147,6 +175,13 @@ out="$(bgd check)" && fail "a ceiling on a doc that fits its budget must fail th
 grep -q "fits its 10-word budget" <<<"${out}" || fail "fits-budget failure must say so: ${out}"
 bgd gen >/dev/null || fail "gen must drop the ceiling of a doc that fits"
 [ -z "$(ceilings)" ] || fail "gen must drop the ceiling of a doc that fits: $(ceilings)"
+
+# An exempt-list row for a file that names no milestone any more is stale.
+printf 'docs/a.md\n' > "${BFIX}/scripts/plan-ref-exempt.txt"
+out="$(bgd check)" && fail "a stale plan-ref-exempt row must fail the check"
+grep -q "'docs/a.md' names no milestone or task any more" <<<"${out}" || fail "stale-row failure must name it: ${out}"
+printf '%s7 history\n' "M" >> "${BFIX}/docs/a.md"
+bgd check >/dev/null || fail "an exempt file may still name a milestone: $(bgd check)"
 
 # Median rule, on a fixture repo + timing store (never the real ones).
 FIX="$(mktemp -d)"

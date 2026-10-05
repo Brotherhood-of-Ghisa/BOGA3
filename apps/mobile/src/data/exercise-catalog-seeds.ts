@@ -57,7 +57,7 @@ export type SystemExerciseDefinitionSeed = {
   loadInputMode: 'total_load' | 'per_side_load';
 };
 
-// M6 seeds intentionally avoid stabilizer tagging to reduce false precision.
+// Seeds intentionally avoid stabilizer tagging to reduce false precision.
 export type ExerciseMuscleRole = 'primary' | 'secondary';
 
 export type SystemExerciseMuscleMappingSeed = {
@@ -571,7 +571,7 @@ const SYSTEM_EXERCISE_DEFINITION_INPUTS: Omit<SystemExerciseDefinitionSeed, 'loa
   { id: 'seed_standing_lunge_stretch_at_wall', name: 'Standing Lunge Stretch at Wall' },
 ];
 
-// M19 prunes the starter bundle for fresh installs and explicit dev wipes.
+// The starter bundle is pruned for fresh installs and explicit dev wipes.
 // Existing-client tombstone/rename migrations are intentionally separate, so
 // this slice does not bump CURRENT_APP_VERSION.
 const M19_STARTER_EXERCISE_KEEP_IDS = new Set<string>([
@@ -2180,28 +2180,28 @@ const SYSTEM_EXERCISE_SEED_DOCUMENTATION_INPUTS: SeedExerciseDocumentation[] = [
   {
     exerciseDefinitionId: 'seed_dumbbell_lateral_raise',
     sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Lateral raise is mapped to lateral delts only in M6 to keep the starter catalog focused on clear primary-target logging defaults.',
+    rationale: 'Lateral raise is mapped to lateral delts only to keep the starter catalog focused on clear primary-target logging defaults.',
   },
   {
     exerciseDefinitionId: 'seed_lat_pulldown',
     sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Pulldown is lats-primary with upper back and biceps as secondary contributors; grip support is intentionally omitted in M6 seed defaults.',
+    rationale: 'Pulldown is lats-primary with upper back and biceps as secondary contributors; grip support is intentionally omitted in seed defaults.',
   },
   {
     exerciseDefinitionId: 'seed_seated_cable_row',
     sourceReferenceIds: ['exrx-resistance-exercise-directory'],
-    rationale: 'Cable row is upper-back-primary with lats/rear delts/biceps as secondary contributors; grip support is intentionally omitted in M6 seed defaults.',
+    rationale: 'Cable row is upper-back-primary with lats/rear delts/biceps as secondary contributors; grip support is intentionally omitted in seed defaults.',
   },
   {
     exerciseDefinitionId: 'seed_barbell_back_squat',
     sourceReferenceIds: ['exrx-resistance-exercise-directory', 'escamilla-squat-biomechanics-2001'],
     rationale:
-      'Back squat starts with quads primary plus glutes/adductors/erectors secondary, while bracing musculature is intentionally omitted to reduce false precision in M6 defaults.',
+      'Back squat starts with quads primary plus glutes/adductors/erectors secondary, while bracing musculature is intentionally omitted to reduce false precision in seed defaults.',
   },
   {
     exerciseDefinitionId: 'seed_romanian_deadlift',
     sourceReferenceIds: ['exrx-resistance-exercise-directory', 'escamilla-deadlift-sumo-conventional-2002'],
-    rationale: 'RDL is seeded as hamstrings and glute-max primary co-drivers with spinal erectors secondary; grip support is intentionally omitted in M6 defaults.',
+    rationale: 'RDL is seeded as hamstrings and glute-max primary co-drivers with spinal erectors secondary; grip support is intentionally omitted in seed defaults.',
   },
   {
     exerciseDefinitionId: 'seed_leg_extension',
@@ -4233,7 +4233,7 @@ const validateMuscleGroups = (muscleGroups: MuscleGroupSeed[]): SectionResult =>
     }
     if (isEditable !== 0) {
       issues.push(
-        seedIssue('invalid_muscle_group_is_editable', `Muscle group ${id} must be non-editable (isEditable=0) in M6 seeds`)
+        seedIssue('invalid_muscle_group_is_editable', `Muscle group ${id} must be non-editable (isEditable=0) in system seeds`)
       );
     }
     if (!Number.isInteger(sortOrder) || sortOrder < 0) {
@@ -4368,7 +4368,7 @@ const mappingRowIssues = (
     issues.push(
       seedIssue(
         'invalid_mapping_role',
-        `Mapping ${pairKey} has invalid role ${role}; M6 seeds allow only primary|secondary`
+        `Mapping ${pairKey} has invalid role ${role}; system seeds allow only primary|secondary`
       )
     );
   }
@@ -4447,7 +4447,7 @@ export const assertValidSystemExerciseCatalogSeeds = (
   }
 
   throw new Error(
-    `Invalid M6 system exercise catalog seeds (${issues.length} issue${issues.length === 1 ? '' : 's'}): ${issues
+    `Invalid system exercise catalog seeds (${issues.length} issue${issues.length === 1 ? '' : 's'}): ${issues
       .map((issue) => issue.message)
       .join(' | ')}`
   );
@@ -4752,7 +4752,7 @@ export const listSeededMuscleGroups = async (database: LocalDatabase): Promise<S
 export type SeededExerciseMappingRecord = {
   muscleGroupId: string;
   weight: number;
-  // Schema allows `stabilizer` even though M6 seed fixtures intentionally do not use it.
+  // Schema allows `stabilizer` even though seed fixtures intentionally do not use it.
   role: 'primary' | 'secondary' | 'stabilizer' | null;
 };
 

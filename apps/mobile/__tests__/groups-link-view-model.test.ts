@@ -1,5 +1,5 @@
 /**
- * Outcome (M25-T07 AC3): the linking rules are pure and fully decided here —
+ * The linking rules are pure and fully decided here —
  * soft-deleted exercises are never offered, one link per group shows as
  * unavailable, archived group exercises are not offered but existing links to
  * them render, the suggestion order and exclusions, inactive links for groups

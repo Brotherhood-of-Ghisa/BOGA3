@@ -64,7 +64,7 @@ export type ExercisePickerProps = {
  * (`app/session/[sessionId]/add-exercise.tsx`, an iOS page sheet: swipe down
  * or Close to leave): a filtered catalogue list with the shared one-row
  * filters, the add preselection (Add empty set / Append plan), `From your
- * groups` with its pick sheet (M25-T07), inline create, and a Manage exit. A
+ * groups` with its pick sheet, inline create, and a Manage exit. A
  * pick closes the keyboard, and scrolling the list does too.
  */
 export function ExercisePicker({
@@ -209,7 +209,7 @@ export function ExercisePicker({
     selectExercise(exercise.id, exercise.name);
   };
 
-  // ---- M25-T07: group exercises in the picker (E0.1) and the pick sheet (E0.2).
+  // ---- Group exercises in the picker (E0.1) and the pick sheet (E0.2).
 
   const toggleGroupsOnly = () => {
     clearPreselection();

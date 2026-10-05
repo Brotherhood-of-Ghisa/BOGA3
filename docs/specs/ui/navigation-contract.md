@@ -25,8 +25,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Every root route file must be declared in the root stack: Expo Router appends an undeclared one outside every `Stack.Protected` group (`__tests__/root-stack-routes.test.ts` fails on one).
 - `/maestro-harness` (dev/test self-gated) is declared last and exists at every level except `sign-in`: it is what lifts the first-sync block in tests, and it must never be where the router lands.
 - Tab roots live inside the `(tabs)` route group at `apps/mobile/app/(tabs)/` and share a tab layout at `apps/mobile/app/(tabs)/_layout.tsx`. The group name is parenthesised so it does not appear in URLs (e.g. `/stats-history` resolves to `app/(tabs)/stats-history.tsx`).
-- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the M22 group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the M25-T08 routes `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and the M25-T09 `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior (except `completed-session/[sessionId]`, which draws its own top bar).
-- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `GYMS_ROUTE`, and the M25 `exerciseLinkHref(id)`), not a full typed route layer.
+- Tab roots have `headerShown: false`; detail screens (`exercise-history`, `profile`, `completed-session/[sessionId]`, `maestro-harness`, and the group routes `group/mine`, `group/new`, `group/join`, `group/[groupId]`, `group/[groupId]/edit`, `group/[groupId]/invite`, `group-session/[memberId]/[sessionId]`, `exercise-link`, `group/[groupId]/members`, `group/[groupId]/exercises/new`, `group/[groupId]/exercises/[exerciseId]/edit`, and `group/[groupId]/leaderboards/[exerciseId]` and `…/history`) remain outside `(tabs)/` and keep their existing native header behavior (except `completed-session/[sessionId]`, which draws its own top bar).
+- Navigation is mostly string-path based; `apps/mobile/src/navigation/routes.ts` holds a few route constants and builders (`SIGN_IN_ROUTE`, `GYMS_ROUTE`, and `exerciseLinkHref(id)`), not a full typed route layer.
 - The production shell is the typed four-tab model in
   `apps/mobile/src/navigation/main-tabs.ts`: `Today / Train / Progress / More`.
   `MainTabBar` (`MainTabs` on the `paper` ground) renders exactly those
@@ -245,7 +245,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - a completed row pushes `/completed-session/<sessionId>`;
     its overflow Edit pushes `/session/<sessionId>` (transition 3)
   - the row and active-session action menus are in-route `Sheet`s, not
-    navigation; the active `Delete` confirms before discarding (DLM-T10)
+    navigation; the active `Delete` confirms before discarding
 
 10. `/completed-session/[sessionId]`
 - File: `apps/mobile/app/completed-session/[sessionId].tsx`
@@ -282,13 +282,13 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - period and tag chip changes reload the summary in place; the route does not update its URL query string when these change
   - missing/invalid `exerciseDefinitionId` shows the in-screen error state and does not crash
   - the bests rows and each session card push `/completed-session/<sessionId>`
-    (transition 23); the period and tag controls push nothing (DLM-T10)
+    (transition 23); the period and tag controls push nothing
   - it draws its own back arrow (`exercise-history-back`, label `Back`) in place
     of the native back item, which can stop dispatching on iOS 26.4 when the
     screen is reached from an active session; Back pops the stack, or replaces
     with `/progress` when nothing is below it
 
-12. `/groups` (M22)
+12. `/groups`
 - File: `apps/mobile/app/(tabs)/groups.tsx`
 - Query params:
   - `groupId` (optional): selects that group when it is in My groups
@@ -318,12 +318,12 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
     behind the header member count. The stream and leaderboards live on
     `/groups`
 
-15. `/group/new` (M22-T05)
+15. `/group/new`
 - File: `apps/mobile/app/group/new.tsx`
 - Params:
   - none
 
-16. `/group/join` (M22-T05)
+16. `/group/join`
 - File: `apps/mobile/app/group/join.tsx`
 - Query params:
   - `code` (optional): prefills the code field and runs the preview once the username gate is satisfied
@@ -332,17 +332,17 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - a new link while the screen is open remounts it with the new code
   - known limitation: opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (no return-to); reopening the link works
 
-17. `/group/[groupId]/edit` and `/group/[groupId]/invite` (M22-T05)
+17. `/group/[groupId]/edit` and `/group/[groupId]/invite`
 - Files: `apps/mobile/app/group/[groupId]/edit.tsx`, `apps/mobile/app/group/[groupId]/invite.tsx`
 - Path params:
   - `groupId` (required dynamic segment)
 
-17a. `/group/[groupId]/members` (M25-T08)
+17a. `/group/[groupId]/members`
 - File: `apps/mobile/app/group/[groupId]/members.tsx`
 - Path params:
   - `groupId` (required dynamic segment; a missing value renders the lost-access state)
 
-17b. `/group/[groupId]/exercises/new` and `/group/[groupId]/exercises/[exerciseId]/edit` (M25-T08)
+17b. `/group/[groupId]/exercises/new` and `/group/[groupId]/exercises/[exerciseId]/edit`
 - Files: `apps/mobile/app/group/[groupId]/exercises/new.tsx`, `apps/mobile/app/group/[groupId]/exercises/[exerciseId]/edit.tsx`
 - Path params:
   - `groupId` (required dynamic segment)
@@ -350,7 +350,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Behavior:
   - the add screen's `From catalogue` / `Custom` choice is in-route state
 
-17c. `/group/[groupId]/leaderboards/[exerciseId]` and `/group/[groupId]/leaderboards/[exerciseId]/history` (M25-T09)
+17c. `/group/[groupId]/leaderboards/[exerciseId]` and `/group/[groupId]/leaderboards/[exerciseId]/history`
 - Files: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/index.tsx`, `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/history.tsx`
 - Path params:
   - `groupId`, `exerciseId` (the `group_exercise_id`; required; a missing value renders the lost-access state)
@@ -366,7 +366,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Path params:
   - `memberId`, `sessionId` (both required; a missing value renders "This session is no longer available")
 
-19. `/exercise-link` (M25-T07)
+19. `/exercise-link`
 - File: `apps/mobile/app/exercise-link.tsx`
 - Query params:
   - `exerciseDefinitionId` (required; one of my exercises. Missing or unknown renders "This exercise isn't available" instead of crashing). Built by `exerciseLinkHref(id)` (`apps/mobile/src/navigation/routes.ts`)
@@ -506,21 +506,21 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - after a successful leave (`router.dismissTo('/groups')`); the tab's focus refresh drops the group from the chips
 36. (external) `boga3://group/join?code=…` -> `/group/join?code=…`
    - the invite link
-37. `/exercise-catalog` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+37. `/exercise-catalog` -> `/exercise-link?exerciseDefinitionId=<id>`
    - Exercise Actions `⋮` `Link to group exercise…` (`router.push`; signed in only, disabled for a deleted exercise)
-38. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-link?exerciseDefinitionId=<id>` (M25-T07)
+38. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-link?exerciseDefinitionId=<id>`
    - the exercise page's ⋮ `Link to group exercise…` (the sheet closes, then `router.push`; signed in only); the open session is untouched
 39. `/exercise-link` -> previous route
    - native back only
-40. `/group/<groupId>` -> `/group/<groupId>/members` (M25-T08)
+40. `/group/<groupId>` -> `/group/<groupId>/members`
    - the header's member-count line (`router.push`); Back returns to the group screen
-41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit` (M25-T08)
+41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit`
    - owner/admin `Add exercise` and the exercise sheet's `Rename` (`router.push`); both return with `router.back()` after saving, and the Exercises segment refreshes on focus
-42. `/groups` -> `/group/<groupId>/leaderboards/<exerciseId>` (M25-T09)
+42. `/groups` -> `/group/<groupId>/leaderboards/<exerciseId>`
    - a podium card on the Groups screen's Leaderboards segment (`router.push`, no query: comparison default · Certified)
-43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=` (M25-T09)
+43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=`
    - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
-44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>?groupId=<groupId>` (M25-T10)
+44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>?groupId=<groupId>`
    - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
 45. `/today` -> `/groups?groupId=<groupId>`, `/group/mine`
    - `View groups`, the week board or the `<n> training now` row (the selected group); `Find a group` with no group
@@ -567,9 +567,9 @@ Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
 - The exercise picker's `Add new` opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
-- The picker's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too, presented over the picker, which stays as it was.
+- The picker's group pick sheet and its `Add as new` editor are in-route modals too, presented over the picker, which stays as it was.
 - The exercise page's effort, options and swap sheets, the shared exercise editor it opens from `Edit exercise`, and its Complete / Remove confirmations (`Alert`) are in-route state.
-- The record set row detail sheet (M25-T10) is an in-route modal on the Groups screen's Stream and the full board; certification writes and their confirmation `Alert`s stay on the same route.
+- The record set row detail sheet is an in-route modal on the Groups screen's Stream and the full board; certification writes and their confirmation `Alert`s stay on the same route.
 
 ## Header titles (current, high level)
 
@@ -577,18 +577,18 @@ Note:
   titles in `apps/mobile/app/(tabs)/_layout.tsx` are declared for completeness.
   The visible shell is `MainTabBar`. `exercise-history` keeps its native stack header and
   renders the same `MainTabBar` with Progress selected.
-- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/components/navigation/root-stack.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron's hidden label depends on the iOS runtime — "Back" on iOS 27, the previous route's title on iOS 26 (hence the `(tabs)` group's "Back" title) — so Maestro flows tap it by UIKit's `BackButton` id rather than by label. The same `screenOptions` give every native header one design-language style (DLM-T02): a `surface` background, an Archivo 700 `ink` title at `xl`, and an `ink` back arrow (`headerTintColor`).
+- Detail screens registered in the root stack (`exercise-history`, `sessions`, `profile`, `connected-agents`, `gyms`, `maestro-harness`) keep their native stack header behavior; titles are declared in `apps/mobile/components/navigation/root-stack.tsx`. The root stack's `screenOptions` give every detail screen an arrow-only back affordance (`headerBackButtonDisplayMode: 'minimal'`, no custom `headerBackTitle`, which react-native-screens would render as a custom item that ignores the display mode and morphs its label in during the push); the system chevron's hidden label depends on the iOS runtime — "Back" on iOS 27, the previous route's title on iOS 26 (hence the `(tabs)` group's "Back" title) — so Maestro flows tap it by UIKit's `BackButton` id rather than by label. The same `screenOptions` give every native header one design-language style: a `surface` background, an Archivo 700 `ink` title at `xl`, and an `ink` back arrow (`headerTintColor`).
 - `completed-session/[sessionId]` sets its title inside the route file (`View Session` or `Session complete`); all presentations hide the native header and draw their own top bar (`back · View Session · ⋮ · Edit` or `Session complete · Done`), so the title is only the back label of what the detail pushes
 - `exercise-history` sets its title inside the route file to the resolved exercise name (falls back to `Exercise History` when the summary is not yet available)
-- M22 group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/components/navigation/root-stack.tsx`; the group screen replaces `Group` with the group's name once loaded
+- Group routes declare `My groups`, `New group`, `Join group`, `Group`, `Edit group`, `Invite`, and `Session` in `apps/mobile/components/navigation/root-stack.tsx`; the group screen replaces `Group` with the group's name once loaded
 - `session/[sessionId]/index` has no native header (`headerShown: false`); its
   own top bar reads `Session`, or `Edit session` for a completed session. The exercise page likewise draws its own. Their
   stack titles (`Session`, `Exercise`) are only the back label VoiceOver reads
   on the screens they push (`Gyms`, `Link exercise`)
 - `body-weight` declares `Body weight` in `apps/mobile/components/navigation/root-stack.tsx`
 - `gyms` declares `Gyms` in `apps/mobile/components/navigation/root-stack.tsx`
-- `exercise-link` (M25-T07) declares `Link exercise` in `apps/mobile/components/navigation/root-stack.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
-- M25-T08 adds `Members`, `Add exercise`, and `Edit exercise` for the group routes in `apps/mobile/components/navigation/root-stack.tsx`
+- `exercise-link` declares `Link exercise` in `apps/mobile/components/navigation/root-stack.tsx` and replaces it with `Link "<exercise name>"` once the exercise resolves
+- Group routes also declare `Members`, `Add exercise`, and `Edit exercise` in `apps/mobile/components/navigation/root-stack.tsx`
 
 ## Group calculation navigation
 

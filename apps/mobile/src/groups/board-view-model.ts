@@ -1,5 +1,5 @@
-// Pure presentation rules for group leaderboards (product P6–P9,
-// E1.1–E1.3; `docs/specs/tech/groups-contract.md`): podium cards,
+// Pure presentation rules for group leaderboards (P6–P9, E1.1–E1.3;
+// `docs/specs/tech/groups-contract.md`): podium cards,
 // full-board rows, history sentences, the board's route params, and the
 // ordinal / date / value formatting they share. Values arrive converted to the
 // group exercise's weight entry (D6); nothing here re-ranks or re-sorts.

@@ -1,10 +1,9 @@
 # Accepted target — the app frame (repo-native brief)
 
-Target record per `../ai-design-policy.md`, for DLM-T02 of the design-language
-migration. Chosen by the user on 2026-09-24 (plan decision G1 (a)): a brief in
-this repository plus the gallery states the user accepts, because the frame is
+Target record per `../ai-design-policy.md`. Chosen by the user on 2026-09-24:
+a brief in this repository plus the gallery states the user accepts, because the frame is
 built from the vocabulary `exercise-session-v5.md` already governs.
-**Pending acceptance** in the DLM-T02 gallery.
+**Pending acceptance** in the gallery.
 
 ## Target
 

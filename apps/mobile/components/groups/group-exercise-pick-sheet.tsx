@@ -59,14 +59,13 @@ type GroupExercisePickSheetProps = {
 );
 
 /**
- * The pick sheet (M25-T07; product E0.2): picking an unlinked group exercise
+ * The pick sheet (E0.2): picking an unlinked group exercise
  * while logging asks which of my exercises it is — the suggestion, another of
  * my live exercises, or a new one — then links (a local write, so it works
  * offline) and adds my exercise to the session. A `Sheet` with no Cancel
  * (G5): the backdrop dismisses it. Its confirm is the sheet's one `accent`.
  *
- * `purpose="link-only"` (M25-T08; product E0.4, the group page's "Link your
- * exercise") confirms with `Link`: the caller only links, and nothing is added
+ * `purpose="link-only"` (E0.4, the group page's "Link your exercise") confirms with `Link`: the caller only links, and nothing is added
  * to a session. The target is always `mode: 'link'` there.
  */
 export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
@@ -241,7 +240,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
               </Text>
             ) : null}
             {error ? <Notice message={error} testID="group-pick-sheet-error" tone="danger" /> : null}
-            {/* The sheet's one `accent` (G6, T14-D3). */}
+            {/* The sheet's one `accent` (G6). */}
             <ActionButton
               disabled={pending || (option.kind !== 'add-new' && !chosen)}
               label={option.kind === 'add-new' ? 'Create exercise…' : purpose === 'link-only' ? 'Link' : 'Link and add'}

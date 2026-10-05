@@ -95,7 +95,7 @@ const membershipItem = (overrides: Partial<StreamMembershipItem> = {}): StreamMe
 });
 
 describe('group stream view model', () => {
-  describe('session status (C7.2)', () => {
+  describe('session status', () => {
     it('reads "Training now" for an active session regardless of age', () => {
       const now = Date.now();
       const statuses = [0, 1, 30].map((daysAgo) =>
@@ -132,7 +132,7 @@ describe('group stream view model', () => {
     });
   });
 
-  describe('membership sentences (C7.3)', () => {
+  describe('membership sentences', () => {
     it('uses the contract wording for each event', () => {
       expect(formatMembershipSentence('joined', 'dana')).toBe('dana joined');
       expect(formatMembershipSentence('left', 'dana')).toBe('dana left the group');

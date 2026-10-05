@@ -1,0 +1,13 @@
+# Files allowed to name a milestone or task ID (docs-check rule 4b in
+# scripts/gen-docs.sh; the rule itself: AGENTS.md "Planning is optional and
+# ephemeral").
+#
+# applied <folder>/ <last-file>  migrations up to <last-file> are applied
+#                                history and stay as they are; any newer
+#                                migration in <folder> must be clean
+# derived <file>                 generated from the applied migrations above
+# <file>                         still being cleaned. This list only shrinks:
+#                                docs-check fails on a row whose file is clean.
+applied supabase/migrations/ 20261005120000_group_week_records_per_board.sql
+applied apps/mobile/drizzle/ 0015_local_data_owner.sql
+derived apps/mobile/drizzle/migrations.generated.ts

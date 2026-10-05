@@ -99,7 +99,7 @@ const cloneSeedBundle = (
   })),
 });
 
-describe('M6 exercise catalog seeds', () => {
+describe('exercise catalog seeds', () => {
   it('assigns explicit load semantics to every starter exercise', () => {
     for (const exercise of SYSTEM_EXERCISE_DEFINITION_SEEDS) {
       expect(['total_load', 'per_side_load']).toContain(exercise.loadInputMode);
@@ -166,7 +166,7 @@ describe('M6 exercise catalog seeds', () => {
     expect(SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS.every((mapping) => [1, 0.5].includes(mapping.weight))).toBe(true);
   });
 
-  it('ships the M19-pruned starter list while preserving every current incline seed', () => {
+  it('ships the pruned starter list while preserving every current incline seed', () => {
     const exerciseIds = new Set(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise) => exercise.id));
     const exerciseNames = new Set(SYSTEM_EXERCISE_DEFINITION_SEEDS.map((exercise) => exercise.name));
     const mappingExerciseIds = new Set(
@@ -243,7 +243,7 @@ describe('M6 exercise catalog seeds', () => {
   it('reports every issue code, in section order, with its message', () => {
     expect(validateSystemExerciseCatalogSeeds(everyIssueBundle()).map((issue) => [issue.code, issue.message])).toEqual([
       ['duplicate_muscle_group_id', 'Duplicate muscle group id: chest'],
-      ['invalid_muscle_group_is_editable', 'Muscle group back must be non-editable (isEditable=0) in M6 seeds'],
+      ['invalid_muscle_group_is_editable', 'Muscle group back must be non-editable (isEditable=0) in system seeds'],
       ['invalid_muscle_group_sort_order', 'Muscle group back has invalid sortOrder -1'],
       ['invalid_muscle_group_sort_order', 'Muscle group legs has invalid sortOrder 1.5'],
       ['duplicate_exercise_definition_id', 'Duplicate exercise definition id: ex_a'],
@@ -265,7 +265,7 @@ describe('M6 exercise catalog seeds', () => {
       ['invalid_mapping_weight', 'Mapping ghost_ex::ghost_mg has invalid weight 0'],
       [
         'invalid_mapping_role',
-        'Mapping ghost_ex::ghost_mg has invalid role stabilizer; M6 seeds allow only primary|secondary',
+        'Mapping ghost_ex::ghost_mg has invalid role stabilizer; system seeds allow only primary|secondary',
       ],
       ['undocumented_granular_weight', 'Mapping ghost_ex::ghost_mg uses non-default weight 0 without a granular rationale'],
       ['undocumented_granular_weight', 'Mapping ex_a::back uses non-default weight 0.75 without a granular rationale'],
@@ -278,7 +278,7 @@ describe('M6 exercise catalog seeds', () => {
   it('throws one error listing every issue, in order', () => {
     const bundle = everyIssueBundle();
     expect(() => assertValidSystemExerciseCatalogSeeds(bundle)).toThrow(
-      /^Invalid M6 system exercise catalog seeds \(24 issues\): Duplicate muscle group id: chest \| Muscle group back must be non-editable/,
+      /^Invalid system exercise catalog seeds \(24 issues\): Duplicate muscle group id: chest \| Muscle group back must be non-editable/,
     );
     bundle.muscleGroups = bundle.muscleGroups.slice(0, 1);
     bundle.exerciseDefinitions = bundle.exerciseDefinitions.slice(0, 1);
@@ -287,7 +287,7 @@ describe('M6 exercise catalog seeds', () => {
     bundle.granularWeightRationales = bundle.granularWeightRationales.slice(0, 1);
     bundle.mappings = bundle.mappings.slice(0, 1).map((mapping) => ({ ...mapping, weight: 0.4 }));
     expect(() => assertValidSystemExerciseCatalogSeeds(bundle)).toThrow(
-      'Invalid M6 system exercise catalog seeds (1 issue): Mapping ex_a::chest uses non-default weight 0.4 without a granular rationale',
+      'Invalid system exercise catalog seeds (1 issue): Mapping ex_a::chest uses non-default weight 0.4 without a granular rationale',
     );
   });
 });

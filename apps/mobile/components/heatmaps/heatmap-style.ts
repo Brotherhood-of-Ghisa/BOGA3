@@ -1,5 +1,5 @@
 // heatmap-style.ts — the look shared by the Daily and Weekly heatmaps, in the
-// design language (DLM-T09): the `viz` ramp and its marks, and the type of the
+// design language: the `viz` ramp and its marks, and the type of the
 // title, legends and axes.
 
 import { StyleSheet } from 'react-native';

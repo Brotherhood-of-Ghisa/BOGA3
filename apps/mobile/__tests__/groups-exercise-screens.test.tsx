@@ -3,7 +3,7 @@
 /**
  * group page (groups contract): the Stream ·
  * Exercises · Leaderboards segments, the Exercises page (link status from the
- * local T03 link rows, owner/admin actions), and the add / edit exercise
+ * local link rows, owner/admin actions), and the add / edit exercise
  * routes. The group RPCs are mocked; `group_cache`, `exercise_definitions`,
  * and `exercise_group_links` are the real tables on the in-memory SQLite
  * fixture. Every write's offline attempt is refused with no RPC.
@@ -224,7 +224,7 @@ describe('Group page (D10, D14)', () => {
     expect(api.getGroupBoardPodiums).not.toHaveBeenCalled();
   });
 
-  // G6, T13-D1: Invite is the one accent; Add exercise, in the list or the empty state, is an outline.
+  // G6: Invite is the one accent; Add exercise, in the list or the empty state, is an outline.
   it.each<GroupRole>(['owner', 'admin', 'member'])('%s: at most one accent, and only Invite', async (role) => {
     await openExercisesAs(role);
     expect(primaryGrounds()).toEqual(role === 'member' ? [] : ['group-screen-invite-button']);
@@ -302,7 +302,7 @@ describe('Exercises page (E0.4)', () => {
     api.listCompetitionExercises.mockResolvedValue({ contract_version: 4,exercises: [] });
     await openGroupAs('owner');
     const empty = await screen.findByTestId('group-exercises-empty');
-    // One Add exercise, an outline beside the section's micro-label (T13-D1), not repeated in the panel.
+    // One Add exercise, an outline beside the section's micro-label, not repeated in the panel.
     expect(within(empty).queryByTestId('group-exercises-add-button')).toBeNull();
     expect(screen.getAllByTestId('group-exercises-add-button')).toHaveLength(1);
   });
@@ -567,7 +567,7 @@ describe('Edit exercise route', () => {
   });
 });
 
-describe('Every exercise write: offline refusal and server failure (AC6)', () => {
+describe('Every exercise write: offline refusal and server failure', () => {
   const pickBench = () => {
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
     fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
@@ -1093,7 +1093,7 @@ describe('Unlink from the group exercise list', () => {
   });
 });
 
-describe('Design language (DLM-T14)', () => {
+describe('Design language', () => {
   type TestNode = typeof screen.UNSAFE_root;
   /** testIDs of the host views drawn on the `accent` ground (G6: at most one per screen or sheet). */
   const accentGrounds = (root: TestNode): string[] =>
@@ -1102,7 +1102,7 @@ describe('Design language (DLM-T14)', () => {
       .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent)
       .map((node: TestNode) => String(node.props.testID));
 
-  it('the Exercises section draws no accent: Add exercise is an outline (T13-D1), Archived a Tag', async () => {
+  it('the Exercises section draws no accent: Add exercise is an outline, Archived a Tag', async () => {
     await openExercisesAs('owner');
     const section = screen.getByTestId('group-screen-exercises');
     expect(accentGrounds(section)).toEqual([]);
@@ -1113,7 +1113,7 @@ describe('Design language (DLM-T14)', () => {
     expect(screen.getByTestId('group-exercise-archived-ge-old')).toHaveTextContent('Archived');
   });
 
-  it('the pick sheet has one accent, its confirm (T14-D3), and radio rows with no ground change', async () => {
+  it('the pick sheet has one accent, its confirm, and radio rows with no ground change', async () => {
     addMyExercise('seed_barbell_bench_press', 'Barbell Bench Press');
     await openExercisesAs('member');
     fireEvent.press(await screen.findByTestId('group-exercise-link-button-ge-bench'));

@@ -6,7 +6,7 @@ import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 
 import { groupScreenStyles } from './screen-styles';
 
-/** Signed out or auth-unconfigured (C3.2.5): groups need an account. The panel centres on the page. */
+/** Signed out or auth-unconfigured: groups need an account. The panel centres on the page. */
 export function GroupsSignInRequired({
   isConfigured,
   leading,
