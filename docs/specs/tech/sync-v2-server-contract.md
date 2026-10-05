@@ -42,10 +42,9 @@ written only through `sync_push`.
   - Domain columns are nullable wherever the client may write NULL. Only the
     structural columns (PK, `owner_user_id`, `client_updated_at_ms`) are
     NOT NULL.
-  - No content-validating triggers, except the planning provenance trigger
-    (`exercise_sets_source_plan_provenance`, see "Per-entity rules"): Sync v2's
-    other triggers are the two structural ones (group triggers follow "Out of
-    scope").
+  - No content-validating triggers, except the planning provenance triggers
+    (see "Per-entity rules"): Sync v2's other triggers are the two structural
+    ones (group triggers follow "Out of scope").
   - No uniqueness beyond the PK, except the three planning provenance guards
     (`sessions_owner_source_plan_unique`,
     `session_exercises_owner_source_block_unique`,
@@ -125,10 +124,10 @@ listed here:
   provenance columns (`sessions.source_plan_id`,
   `session_exercises.source_plan_exercise_id`,
   `exercise_sets.source_plan_set_id`). The columns, wire shapes and lifecycle
-  are owned by `docs/specs/tech/session-planning-contract.md`; this doc adds the
-  server rules: the three partial-unique guards and a DEFERRABLE constraint
-  trigger `exercise_sets_source_plan_provenance` rejecting a source-derived set
-  whose `source_plan_set_id` is not under its card's source block.
+  are owned by `docs/specs/tech/session-planning-contract.md`; this doc adds:
+  the three partial-unique guards and DEFERRABLE triggers
+  rejecting a source-derived set whose `source_plan_set_id` is not under its
+  card's source block, or a parent block change that would strand one.
 
 ## Deferrable foreign keys
 

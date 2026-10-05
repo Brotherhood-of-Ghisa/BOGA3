@@ -93,12 +93,12 @@ create table app_public.session_plans (
   constraint session_plans_programme_fk
     foreign key (owner_user_id, programme_id)
     references app_public.training_programmes (owner_user_id, id)
-    on delete set null
+    on delete set null (programme_id)
     deferrable initially deferred,
   constraint session_plans_gym_fk
     foreign key (owner_user_id, gym_id)
     references app_public.gyms (owner_user_id, id)
-    on delete set null
+    on delete set null (gym_id)
     deferrable initially deferred
 );
 create index session_plans_owner_received_idx
@@ -165,7 +165,7 @@ create table app_public.session_plan_exercises (
   constraint session_plan_exercises_exercise_definition_fk
     foreign key (owner_user_id, exercise_definition_id)
     references app_public.exercise_definitions (owner_user_id, id)
-    on delete set null
+    on delete set null (exercise_definition_id)
     deferrable initially deferred
 );
 create index session_plan_exercises_owner_received_idx
@@ -268,7 +268,7 @@ alter table app_public.sessions add column source_plan_id text;
 alter table app_public.sessions add constraint sessions_source_plan_fk
   foreign key (owner_user_id, source_plan_id)
   references app_public.session_plans (owner_user_id, id)
-  on delete set null
+  on delete set null (source_plan_id)
   deferrable initially deferred;
 create index sessions_source_plan_id_idx on app_public.sessions (source_plan_id);
 create unique index sessions_owner_source_plan_unique
@@ -279,7 +279,7 @@ alter table app_public.session_exercises add column source_plan_exercise_id text
 alter table app_public.session_exercises add constraint session_exercises_source_plan_exercise_fk
   foreign key (owner_user_id, source_plan_exercise_id)
   references app_public.session_plan_exercises (owner_user_id, id)
-  on delete set null
+  on delete set null (source_plan_exercise_id)
   deferrable initially deferred;
 create index session_exercises_source_plan_exercise_id_idx
   on app_public.session_exercises (source_plan_exercise_id);
@@ -291,7 +291,7 @@ alter table app_public.exercise_sets add column source_plan_set_id text;
 alter table app_public.exercise_sets add constraint exercise_sets_source_plan_set_fk
   foreign key (owner_user_id, source_plan_set_id)
   references app_public.session_plan_sets (owner_user_id, id)
-  on delete set null
+  on delete set null (source_plan_set_id)
   deferrable initially deferred;
 create index exercise_sets_source_plan_set_id_idx
   on app_public.exercise_sets (source_plan_set_id);
@@ -353,6 +353,95 @@ create constraint trigger exercise_sets_source_plan_provenance
   deferrable initially deferred
   for each row
   execute function app_public.enforce_source_plan_set_provenance();
+
+-- The set-side check above only fires when the set changes. A newer push can
+-- instead change a parent — the card's source block, or a plan set's parent
+-- block — and leave an existing source-derived set across two different blocks.
+-- These two deferred triggers re-check the dependents on such a parent change,
+-- so an invalid graph can never commit.
+
+create or replace function app_public.enforce_card_source_plan_provenance()
+returns trigger
+language plpgsql
+set search_path = app_public, pg_temp
+as $func$
+declare
+  _orphan text;
+begin
+  select es.id
+    into _orphan
+    from app_public.exercise_sets es
+    join app_public.session_plan_sets sps
+      on sps.owner_user_id = es.owner_user_id
+     and sps.id = es.source_plan_set_id
+   where es.owner_user_id = new.owner_user_id
+     and es.session_exercise_id = new.id
+     and es.deleted_at is null
+     and es.source_plan_set_id is not null
+     and sps.session_plan_exercise_id is distinct from new.source_plan_exercise_id
+   limit 1;
+
+  if _orphan is not null then
+    raise exception
+      'PROVENANCE_VIOLATION: session_exercises.source_plan_exercise_id % would orphan source-derived set %',
+      coalesce(new.source_plan_exercise_id, '<null>'), _orphan
+      using errcode = 'P0001';
+  end if;
+
+  return null;
+end;
+$func$;
+
+comment on function app_public.enforce_card_source_plan_provenance() is
+  'Sync v2 session planning: deferred constraint trigger rejecting a card source-block change that would leave an existing source-derived set across two blocks.';
+
+create constraint trigger session_exercises_source_plan_provenance
+  after update on app_public.session_exercises
+  deferrable initially deferred
+  for each row
+  when (old.source_plan_exercise_id is distinct from new.source_plan_exercise_id)
+  execute function app_public.enforce_card_source_plan_provenance();
+
+create or replace function app_public.enforce_plan_set_source_plan_provenance()
+returns trigger
+language plpgsql
+set search_path = app_public, pg_temp
+as $func$
+declare
+  _orphan text;
+begin
+  select es.id
+    into _orphan
+    from app_public.exercise_sets es
+    join app_public.session_exercises se
+      on se.owner_user_id = es.owner_user_id
+     and se.id = es.session_exercise_id
+   where es.owner_user_id = new.owner_user_id
+     and es.source_plan_set_id = new.id
+     and es.deleted_at is null
+     and se.source_plan_exercise_id is distinct from new.session_plan_exercise_id
+   limit 1;
+
+  if _orphan is not null then
+    raise exception
+      'PROVENANCE_VIOLATION: session_plan_sets.session_plan_exercise_id change would orphan source-derived set %',
+      _orphan
+      using errcode = 'P0001';
+  end if;
+
+  return null;
+end;
+$func$;
+
+comment on function app_public.enforce_plan_set_source_plan_provenance() is
+  'Sync v2 session planning: deferred constraint trigger rejecting a plan-set reparent that would leave an existing source-derived set across two blocks.';
+
+create constraint trigger session_plan_sets_source_plan_provenance
+  after update on app_public.session_plan_sets
+  deferrable initially deferred
+  for each row
+  when (old.session_plan_exercise_id is distinct from new.session_plan_exercise_id)
+  execute function app_public.enforce_plan_set_source_plan_provenance();
 
 -- -----------------------------------------------------------------------------
 -- 4. Protocol 4. The layer→type mapping changed, so an un-upgraded client must

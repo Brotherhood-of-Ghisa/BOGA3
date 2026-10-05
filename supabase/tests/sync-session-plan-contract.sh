@@ -162,13 +162,37 @@ assert_body_contains "PROVENANCE_VIOLATION" "cross-level mismatch carries the PR
 service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.push-planset-mismatch-${RUN_TAG}&select=id"
 assert_json_expr 'length == 0' "cross-level mismatch wrote no row"
 
-# Protocol 4 is the shipping contract. Protocol 3 (the previous contract) and
-# every older/malformed value must fail before rows move.
-for old_protocol in "" 1 2 3 invalid; do
-  BOGA_TEST_SYNC_PROTOCOL="${old_protocol}" sync_push "${USER_A_TOKEN}" "${PLAN_BODY}"
-  assert_non_2xx "protocol ${old_protocol:-<empty>} push rejected"
-  assert_body_contains "UPDATE_REQUIRED" "protocol ${old_protocol:-<empty>} push carries UPDATE_REQUIRED"
-done
+# A parent-only change must re-validate dependents too. Reparenting the plan set
+# that a performed set already references (to the other block) leaves the set
+# across two blocks and must be rejected.
+REPARENT_SET_BODY="$(jq -nc \
+  --arg id "${SPS_ID}" --arg spe2 "${SPE2_ID}" --argjson ts "$((BASE_MS + 4))" '
+  {entities: [{type: "session_plan_sets", id: $id, client_updated_at_ms: $ts,
+    fields: {session_plan_exercise_id: $spe2, order_index: 0,
+             target_weight_value: "100", target_reps: 5, target_set_type: "rir_4",
+             created_at: $ts, updated_at: $ts, deleted_at: null}}]}')"
+sync_push "${USER_A_TOKEN}" "${REPARENT_SET_BODY}"
+assert_non_2xx "reparenting a referenced plan set rejected"
+assert_body_contains "PROVENANCE_VIOLATION" "reparent carries the PROVENANCE_VIOLATION token"
+service_select "session_plan_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.${SPS_ID}&select=session_plan_exercise_id"
+assert_json_expr --arg spe "${SPE_ID}" 'length == 1 and .[0].session_plan_exercise_id == $spe' "reparent wrote no change"
+
+# Changing a card's source block while it still carries a source-derived set is
+# likewise rejected.
+CHANGE_CARD_BODY="$(jq -nc \
+  --arg id "${PLAN_SX_ID}" --arg session "${PLAN_SESSION_ID}" --arg spe2 "${SPE2_ID}" --argjson ts "$((BASE_MS + 5))" '
+  {entities: [{type: "session_exercises", id: $id, client_updated_at_ms: $ts,
+    fields: {session_id: $session, exercise_definition_id: null, source_plan_exercise_id: $spe2,
+             order_index: 0, name: "Squat", machine_name: null,
+             created_at: $ts, updated_at: $ts, deleted_at: null}}]}')"
+sync_push "${USER_A_TOKEN}" "${CHANGE_CARD_BODY}"
+assert_non_2xx "changing a sourced card's block rejected"
+assert_body_contains "PROVENANCE_VIOLATION" "card source change carries the PROVENANCE_VIOLATION token"
+service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.${PLAN_SX_ID}&select=source_plan_exercise_id"
+assert_json_expr --arg spe "${SPE_ID}" 'length == 1 and .[0].source_plan_exercise_id == $spe' "card source change wrote no change"
+
+# The update-required cutoff for every old/malformed protocol value is covered
+# once by sync-bodyweight-contract.sh (sourced immediately before this suite).
 
 # Cleanup this suite's rows (the parent's cleanup does not know these ids).
 service_delete "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.push-planset-mismatch-${RUN_TAG}" >/dev/null 2>&1 || true

@@ -748,13 +748,13 @@ CREATE TABLE \`training_programmes\` (
 );
 --> statement-breakpoint
 CREATE INDEX \`training_programmes_deleted_at_idx\` ON \`training_programmes\` (\`deleted_at\`);--> statement-breakpoint
-ALTER TABLE \`exercise_sets\` ADD \`source_plan_set_id\` text REFERENCES session_plan_sets(id);--> statement-breakpoint
+ALTER TABLE \`exercise_sets\` ADD \`source_plan_set_id\` text REFERENCES session_plan_sets(id) ON DELETE SET NULL;--> statement-breakpoint
 CREATE INDEX \`exercise_sets_source_plan_set_id_idx\` ON \`exercise_sets\` (\`source_plan_set_id\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`exercise_sets_owner_source_set_unique\` ON \`exercise_sets\` (\`source_plan_set_id\`) WHERE "exercise_sets"."deleted_at" is null and "exercise_sets"."source_plan_set_id" is not null;--> statement-breakpoint
-ALTER TABLE \`session_exercises\` ADD \`source_plan_exercise_id\` text REFERENCES session_plan_exercises(id);--> statement-breakpoint
+ALTER TABLE \`session_exercises\` ADD \`source_plan_exercise_id\` text REFERENCES session_plan_exercises(id) ON DELETE SET NULL;--> statement-breakpoint
 CREATE INDEX \`session_exercises_source_plan_exercise_id_idx\` ON \`session_exercises\` (\`source_plan_exercise_id\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`session_exercises_owner_source_block_unique\` ON \`session_exercises\` (\`source_plan_exercise_id\`) WHERE "session_exercises"."deleted_at" is null and "session_exercises"."source_plan_exercise_id" is not null;--> statement-breakpoint
-ALTER TABLE \`sessions\` ADD \`source_plan_id\` text REFERENCES session_plans(id);--> statement-breakpoint
+ALTER TABLE \`sessions\` ADD \`source_plan_id\` text REFERENCES session_plans(id) ON DELETE SET NULL;--> statement-breakpoint
 CREATE INDEX \`sessions_source_plan_id_idx\` ON \`sessions\` (\`source_plan_id\`);--> statement-breakpoint
 CREATE UNIQUE INDEX \`sessions_owner_source_plan_unique\` ON \`sessions\` (\`source_plan_id\`) WHERE "sessions"."deleted_at" is null and "sessions"."source_plan_id" is not null;`,
   m0017: `-- reset the per-layer pull cursors for the 16-entity / five-layer Sync v2

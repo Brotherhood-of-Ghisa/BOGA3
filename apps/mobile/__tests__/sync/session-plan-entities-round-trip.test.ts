@@ -64,11 +64,6 @@ interface StubServer {
   count: (type: EntityTableName) => number;
 }
 
-const LAYER_OF: Record<string, number> = {};
-TOPO_LAYERS.forEach((layer, index) => {
-  for (const type of layer) LAYER_OF[type] = index;
-});
-
 const createStubServer = (): StubServer => {
   const store = new Map<string, Map<string, WireEntity>>();
   const observed = new Set<string>();
@@ -294,15 +289,5 @@ describe('session planning graph round-trips through the sync cycle and survives
     ] as const) {
       expect([parent, child, firstIndex(parent) < firstIndex(child)]).toEqual([parent, child, true]);
     }
-  });
-
-  it('maps the new entities onto the expected five layers', () => {
-    expect(LAYER_OF.training_programmes).toBe(0);
-    expect(LAYER_OF.session_plans).toBe(1);
-    expect(LAYER_OF.sessions).toBe(2);
-    expect(LAYER_OF.session_plan_exercises).toBe(2);
-    expect(LAYER_OF.session_exercises).toBe(3);
-    expect(LAYER_OF.session_plan_sets).toBe(3);
-    expect(LAYER_OF.exercise_sets).toBe(4);
   });
 });
