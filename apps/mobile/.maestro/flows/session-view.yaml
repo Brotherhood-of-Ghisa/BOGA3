@@ -10,8 +10,8 @@ appId: com.dinoderek.mobile
 #   3. the Gym stat's sheet → Manage gyms pushes the Gyms screen; a gym typed
 #      there is saved, and the native back returns to the session view with
 #      the sheet reopened and the new gym listed, ready to pick;
-#   4. `+ Add exercise` opens the picker sheet; a keyboard search and
-#      `Add empty set` add a card;
+#   4. `+ Add exercise` opens the picker's page-sheet route; a keyboard
+#      search and `Add empty set` add a card and close it;
 #   5. Finish's cleanup prompt leads to the completion screen, and its Done
 #      to Stats;
 #   6. ⋮ → Abandon asks for confirmation, then lands on Train with Start and
@@ -20,7 +20,7 @@ appId: com.dinoderek.mobile
 #   1., 2. and 6. root-stack and tab navigation;
 #   3. a stack push from a sheet, the keyboard, the native back, and the sheet
 #      re-presented on focus;
-#   4. a real sheet and the keyboard;
+#   4. a native page-sheet route over the session view, and the keyboard;
 #   5. the stack replace after Finish and a native alert.
 # Jest counterpart: __tests__/session-view-screen.test.tsx (summary and
 #   cards, record band, live comparison, ⋮ sheet, gym picking and
@@ -123,7 +123,7 @@ appId: com.dinoderek.mobile
       text: "Gym Canal Street Gym"
     timeout: 10000
 
-# --- 4. + Add exercise, through the exercise picker ---
+# --- 4. + Add exercise, through the exercise picker's page sheet ---
 - scrollUntilVisible:
     element:
       id: "session-view-add-exercise"

@@ -208,10 +208,10 @@ Brief entrypoint map of the current mobile screens.
     and weight, and — the one highlight — a brass record 1RM and `record` band with the
     1RM when a done set beats the exercise's completed history
     (`deriveExercisePersonalRecord`)
-  - `+ Add exercise` opens the shared exercise picker with Search, Favourite/Name A–Z and Show never-done, a tall `Sheet`
-    (`components/session-recorder/exercise-picker.tsx`), and writes the new
-    exercise (one empty set) or appended plan straight to the draft. Design
-    target: `design-targets/exercise-catalogue.md`
+  - `+ Add exercise` opens the exercise picker's route
+    (`/session/<id>/add-exercise`, 21c), which writes the new exercise (one
+    empty set) or appended plan straight to the draft and closes; the view
+    reloads on focus. Design target: `design-targets/exercise-catalogue.md`
   - ⋮ opens the `Session` menu sheet: `Session vs history` (opens
     `/session/<id>/compare`) and `Abandon session` (danger), which confirms
     before its soft delete
@@ -232,8 +232,7 @@ Brief entrypoint map of the current mobile screens.
   - back to where the edit was opened (History, the completed session) after
     `Done`; `/completed-session/<sessionId>` when there is nothing to go back to
   - `/train` after Abandon, or any tab from the bottom bar (`dismissTo`)
-  - `/exercise-catalog?source=session&intent=manage` from the picker's
-    Manage; the picker returns on focus
+  - `/session/<sessionId>/add-exercise` from `+ Add exercise`
   - `/gyms` from the gym sheet's `Manage gyms`; on return the sheet reopens
     with the gyms reloaded
 - Notes:
@@ -250,16 +249,17 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - in the design language (DLM-T07; target `design-targets/exercise-catalogue.md`):
     the in-content title `Exercises`, then the filter field, the `accent` `+`
-    (the screen's one primary) and management ⋮ on one row, Sort and Show never-done
-    below it, and an outcome `Notice` (`Exercise created.` …)
+    (the screen's one primary) and management ⋮ on one row, the one-row
+    `Never-done` · `Sort` filters below it, and an outcome `Notice`
+    (`Exercise created.` …)
   - loading / error as a `StatePanel`, or the content
-  - shared exercise browser with mandatory taxonomy-ordered muscle families, visible Favourite/Name A–Z and Show never-done controls (shared local preferences); search expands matching families and clearing restores prior expansion. Rows show last performed and all-time session count; history loading/error states never imply Never done
+  - shared exercise browser with mandatory taxonomy-ordered muscle families, visible `Never-done` and `Sort: Favourite` / `Sort: A–Z` chips (shared local preferences, applied at once to every open browser); search opens matching families, a tap on a family header closes or reopens it while searching, and clearing restores prior expansion. Rows show last performed and all-time session count; history loading/error states never imply Never done
   - the management sheet (⋮): catalogue-only deleted visibility (`Show deleted` / `Hide deleted`); everyday browsing controls stay on the page
   - the row `⋮` actions sheet, titled with the exercise's name, offers `Edit`, `Link to group exercise…` (M25-T07; signed in only, disabled for a deleted exercise), and `Delete` (`danger`, no confirmation) / `Undelete`
   - the exercise editor sheet (create / edit), with its muscle list shown in the same sheet
 - Key exits:
-  - back to the session view (`router.back()`) after save when opened with
-    `source=session` (the session view picker's Manage)
+  - back to the exercise picker (`router.back()`) after save when opened with
+    `source=session` (the picker's Manage)
   - `/exercise-link?exerciseDefinitionId=<id>` (`⋮` `Link to group exercise…`)
   - explicit `Back to More` when opened with `source=more`
   - the preserved route is owned by More in the shared `MainTabBar`
@@ -654,7 +654,7 @@ Brief entrypoint map of the current mobile screens.
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
   - the effort sheet (W-Up / None / descending RIR from the file-configured maximum, default 3) and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
-  - Swap exercise: the same Search, Favourite/Name A–Z and Show never-done controls and family list as the catalogue; excludes the current/deleted exercise, reveals search matches, and handles loading/error/empty history explicitly
+  - Swap exercise: the same Search, one-row `Never-done` · `Sort` filters and family list as the catalogue; excludes the current/deleted exercise, reveals search matches, and handles loading/error/empty history explicitly
   - a missing session or exercise, or a deleted session: an inline message
 - Key exits:
   - back (top bar) → the previous screen; `Complete exercise` → the previous screen after resolving the sets still waiting; `Remove from session` → the previous screen; `History` → `/exercise-history`; ⋮ `Link to group exercise…` → `/exercise-link?exerciseDefinitionId=<id>`
@@ -671,6 +671,28 @@ Brief entrypoint map of the current mobile screens.
   loading, retryable error, or `This session is no longer active.` state.
 - Entry: the session view's ⋮ `Session vs history`. Exit: the native header's
   Back.
+
+21c. `/session/[sessionId]/add-exercise` (exercise picker)
+- File: `apps/mobile/app/session/[sessionId]/add-exercise.tsx`; the body is
+  `components/session-recorder/exercise-picker.tsx`
+- Purpose: choose an exercise to add to the session — the catalogue's
+  browser in select mode, with the add preselection, group exercises and
+  inline create.
+- Presentation: an iOS page sheet (root stack `presentation: 'modal'`) with
+  its own grabber and title row (`Select Exercise` · Manage · Add new ·
+  Close); swiping it down or Close returns to the session with nothing
+  added.
+- Key states: Search; one filter row (`Never-done` · `Groups`, signed in only
+  · `Sort: Favourite` / `Sort: A–Z`); the family list (closed while browsing,
+  open while searching, each header toggles); a tapped exercise's preselection
+  (`Add empty set` / `Append plan`); `From your groups` with its pick sheet;
+  the inline editor; a failed add as a `danger` `Notice` (`Couldn't add that
+  exercise. Try again.`), the picker left open. A pick closes the keyboard and
+  blurs the search; dragging the list or the keyboard's Search key closes it
+  too.
+- Exits: back to the session view after a successful add, Close or a swipe;
+  `/exercise-catalog?source=session&intent=manage` from Manage (a second page
+  sheet; swiping it down or saving returns to the picker as left).
 
 22. `/gyms` (Gyms screen)
 - File: `apps/mobile/app/gyms.tsx` (composition in `apps/mobile/components/gyms/`)
@@ -705,7 +727,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the root stack in the restore guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which shows a neutral loading view instead of the navigator while the session restore is in flight (boot only)
   - the root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under one `Stack.Protected` group per access level — `sign-in`, `sync-setup`, the app — and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one at a time, so login-on-start and the first-sync block are enforced by the navigator without unmounting it; see `navigation-contract.md` "Router baseline"
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page), and `session/[sessionId]/compare` with the native header `Session vs history`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page), the header-less page sheet `session/[sessionId]/add-exercise` (exercise picker), and `session/[sessionId]/compare` with the native header `Session vs history`)
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only

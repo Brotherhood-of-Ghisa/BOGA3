@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
 /**
@@ -53,21 +54,20 @@ export function PickerGroupSectionList({
 }
 
 /**
- * The Groups toggle beside the picker search: narrows the list to group
- * exercises only (D13). A chip, solid `ink` while on, as `ChipGroup` draws one;
- * a switch to assistive tech.
+ * The Groups chip in the picker's filter row: narrows the list to group
+ * exercises only (D13). Solid `ink` while on; a switch to assistive tech.
  */
 export function PickerGroupsToggle({ active, onToggle }: { active: boolean; onToggle: () => void }) {
   return (
-    <Pressable
+    <FilterChip
       accessibilityLabel="Show group exercises only"
       accessibilityRole="switch"
       accessibilityState={{ checked: active }}
+      label="Groups"
+      on={active}
       onPress={onToggle}
-      style={({ pressed }) => [styles.toggle, active ? styles.toggleOn : null, pressed && !active ? styles.pressed : null]}
-      testID="exercise-picker-groups-toggle">
-      <Text allowFontScaling={false} style={[styles.toggleLabel, active ? styles.toggleLabelOn : null]}>Groups</Text>
-    </Pressable>
+      testID="exercise-picker-groups-toggle"
+    />
   );
 }
 
@@ -105,31 +105,5 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.inkMuted,
-  },
-  toggle: {
-    minHeight: uiGeometry.tapTarget,
-    justifyContent: 'center',
-    paddingHorizontal: uiSpace.md,
-    backgroundColor: uiRoles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    borderRadius: uiGeometry.radius.pill,
-  },
-  toggleOn: {
-    backgroundColor: uiRoles.ink,
-    borderColor: uiRoles.ink,
-  },
-  pressed: {
-    backgroundColor: uiRoles.paper,
-  },
-  toggleLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
-  toggleLabelOn: {
-    color: uiRoles.surface,
   },
 });

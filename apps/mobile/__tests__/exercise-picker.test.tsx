@@ -22,7 +22,7 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
-import { StyleSheet, type ViewStyle } from 'react-native';
+import { Keyboard, StyleSheet, type ViewStyle } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -221,7 +221,7 @@ const liveExercisesNamed = (name: string) =>
 // ---- Harness
 
 type PickerCallbacks = {
-  onDismiss: jest.Mock;
+  onClose: jest.Mock;
   onSelectExercise: jest.Mock;
   onAppendPlan: jest.Mock;
   onOpenManage: jest.Mock;
@@ -234,12 +234,12 @@ const renderPicker = async (seed: () => Promise<void>, expandFamilies = true) =>
   await seed();
   await bootLocalApp();
   callbacks = {
-    onDismiss: jest.fn(),
+    onClose: jest.fn(),
     onSelectExercise: jest.fn(),
     onAppendPlan: jest.fn(),
     onOpenManage: jest.fn(),
   };
-  const result = render(<ExercisePicker visible openRequestId={1} {...callbacks} />);
+  const result = render(<ExercisePicker {...callbacks} />);
   unmountPicker = result.unmount;
   await act(async () => {});
   if (expandFamilies) {
@@ -430,20 +430,19 @@ describe('pick sheet (E0.2)', () => {
   });
 
   it('with no suggestion, Add as new is preselected; dismissing returns to the picker', async () => {
-    const { onSelectExercise, onDismiss } = await openGroupRows();
+    const { onSelectExercise, onClose } = await openGroupRows();
     fireEvent.press(screen.getByTestId('exercise-picker-group-row-gx-row'));
 
     expect(await screen.findByTestId('group-pick-sheet-option-add-new')).toHaveProp('accessibilityState', { checked: true });
     expect(screen.queryByTestId('group-pick-sheet-option-suggested')).toBeNull();
-    // The picker hides while its sheet is open.
-    expect(screen.queryByTestId('exercise-picker-groups-toggle')).toBeNull();
 
-    // No Cancel (G5): the backdrop dismisses the sheet.
+    // No Cancel (G5): the backdrop dismisses the sheet; the picker stays put
+    // under it (a route, not a second sheet).
     fireEvent.press(screen.getByTestId('group-pick-sheet-backdrop', { includeHiddenElements: true }));
     expect(screen.queryByTestId('group-pick-sheet')).toBeNull();
-    expect(screen.getByTestId('exercise-picker-groups-toggle')).toBeTruthy();
+    expect(screen.getByTestId('exercise-picker-groups-toggle')).toHaveProp('accessibilityState', { checked: true });
     expect(onSelectExercise).not.toHaveBeenCalled();
-    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('Add as new opens the prefilled editor and creates the exercise and its link together', async () => {
@@ -582,10 +581,38 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
   // The filter input keeps focus while a result is tapped: with the default
   // `never`, iOS spends that first tap dismissing the keyboard and the row never
   // fires (fireEvent cannot see the keyboard, so pin the prop).
-  it('lets a result tap through while the search keyboard is up', async () => {
+  it('lets a result tap through while the search keyboard is up, and a drag of the list closes it', async () => {
     await openInteractions();
 
-    expect(await screen.findByTestId('exercise-picker-list')).toHaveProp('keyboardShouldPersistTaps', 'handled');
+    const list = await screen.findByTestId('exercise-picker-list');
+    expect(list).toHaveProp('keyboardShouldPersistTaps', 'handled');
+    expect(list).toHaveProp('keyboardDismissMode', 'on-drag');
+    // The keyboard's key reads Search; a single-line field closes it on submit.
+    expect(screen.getByLabelText('Exercise filter input')).toHaveProp('returnKeyType', 'search');
+  });
+
+  it('a pick closes the keyboard and takes focus off the search', async () => {
+    const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss');
+    await openInteractions();
+    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'squat');
+    expect(dismissKeyboard).not.toHaveBeenCalled();
+
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
+  });
+
+  it('a family with search matches can be collapsed while searching', async () => {
+    await openInteractions(false);
+    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'press');
+    expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('exercise-family-group-chest'));
+
+    expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
+    // Other families keep their matches open.
+    expect(screen.getByLabelText('Select exercise Overhead Press')).toBeTruthy();
   });
 
   it('filters exercise picker by all query words across names and primary muscles only', async () => {
@@ -680,44 +707,52 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(onSelectExercise).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps shared sort and visibility controls visible below search', async () => {
+  it('keeps the shared filters in one row below search, and they apply while open', async () => {
     await openInteractions();
     const header = within(screen.getByTestId('exercise-picker-header'));
     expect(header.getByRole('header', { name: 'Select Exercise' })).toBeTruthy();
-    for (const label of ['Open exercise catalog manage flow', 'Open inline exercise create']) {
+    for (const label of ['Open exercise catalog manage flow', 'Open inline exercise create', 'Close exercise picker']) {
       expect(header.getByRole('button', { name: label })).toBeTruthy();
     }
-    expect(screen.getByLabelText('Favourite')).toHaveProp('accessibilityState', { selected: true });
-    fireEvent.press(screen.getByLabelText('Name A–Z'));
-    expect(screen.getByLabelText('Name A–Z')).toHaveProp('accessibilityState', { selected: true });
+    expect(within(screen.getByTestId('exercise-list-controls')).getByLabelText('Show never-done')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Sort: Favourite'));
+    expect(screen.getByLabelText('Sort: A–Z')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Show never-done'));
     expect(screen.getByText('No exercises match that filter.')).toBeTruthy();
   });
 
+  it('shows the host\'s failed add above the list', async () => {
+    mockUserId = null;
+    await seedCatalog(INTERACTION_FIXTURE_EXERCISES);
+    await bootLocalApp();
+    const result = render(<ExercisePicker {...callbacks} notice="Couldn't add that exercise. Try again." />);
+    unmountPicker = result.unmount;
+
+    expect(await screen.findByTestId('exercise-picker-notice')).toHaveTextContent("Couldn't add that exercise. Try again.");
+  });
+
   it('routes Manage to exercise catalog', async () => {
-    const { onOpenManage, onSelectExercise, onDismiss } = await openInteractions();
+    const { onOpenManage, onSelectExercise, onClose } = await openInteractions();
     expect(await screen.findByLabelText('Select exercise Barbell Squat')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Open exercise catalog manage flow'));
 
-    // The host hides the picker and navigates; the picker itself never routes.
+    // The host navigates; the picker itself never routes.
     expect(onOpenManage).toHaveBeenCalledTimes(1);
     expect(mockPush).not.toHaveBeenCalled();
     expect(onSelectExercise).not.toHaveBeenCalled();
-    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('dismisses from the overlay without picking anything', async () => {
-    const { onDismiss, onSelectExercise } = await openInteractions();
+  it('Close leaves without picking anything', async () => {
+    const { onClose, onSelectExercise } = await openInteractions();
     fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
     expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText('Dismiss exercise modal overlay', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByLabelText('Close exercise picker'));
 
-    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSelectExercise).not.toHaveBeenCalled();
-    // Dismiss clears the preselection, so a re-show starts on the list.
-    expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
   });
 });
 
@@ -726,12 +761,12 @@ it('shares sort/never-done edits across Add and Swap while retaining independent
   await renderPicker(() => seedCatalog(GROUP_FIXTURE_EXERCISES));
   const picker = within(screen.getByTestId('exercise-picker'));
   fireEvent.changeText(picker.getByLabelText('Exercise filter input'), 'bench');
-  fireEvent.press(picker.getByLabelText('Name A–Z'));
+  fireEvent.press(picker.getByLabelText('Sort: Favourite'));
   fireEvent.press(picker.getByLabelText('Show never-done'));
   const swap = render(<ExerciseSwapSheet visible currentExerciseDefinitionId="seed_barbell_bench_press" onSelect={jest.fn()} onDismiss={jest.fn()} />);
   const swapUI = within(swap.getByTestId('exercise-swap-sheet'));
   await waitFor(() => expect(swapUI.getByText('No exercises match the current filters.')).toBeTruthy());
-  expect(swapUI.getByLabelText('Name A–Z')).toHaveProp('accessibilityState', { selected: true });
+  expect(swapUI.getByLabelText('Sort: A–Z')).toBeTruthy();
   expect(swapUI.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: false });
   expect(swapUI.getByLabelText('Search exercises')).toHaveProp('value', '');
   fireEvent.press(swapUI.getByLabelText('Show never-done'));

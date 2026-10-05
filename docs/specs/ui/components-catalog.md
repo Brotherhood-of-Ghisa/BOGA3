@@ -105,8 +105,8 @@ Brief entrypoint inventory of the current reusable UI component set.
     grows past the top of the screen; a taller body shrinks to fit while leaving
     a full 44pt dismissal target below the status bar. DLM-T06
     added `headerActions` (controls on the title's row, `<testID>-header`) and
-    `keyboardAvoiding` (lifts the panel above the keyboard), for the exercise
-    picker. DLM-T07 added `headerLeading` (one control before the title): the
+    `keyboardAvoiding` (lifts the panel above the keyboard), first for the
+    exercise picker, which became a page-sheet route on 2026-10-05. DLM-T07 added `headerLeading` (one control before the title): the
     exercise editor's `chevron-left` `Back to exercise` from its muscle list.
     DLM-T14 added `onDismissed`, called once the sheet has gone (the iOS
     modal's `onDismiss`, or at once on Android), so a native `Alert` can follow
@@ -129,7 +129,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `IconButton` — a labelled 44pt icon-only control; `tone` `default` (`ink`),
     `muted`, `danger`, or `accent` (a filled square: the screen's one primary as
     an icon). Every top bar's back and ⋮, View Session's card ⋮, and the
-    exercise picker's ⋮ / Manage / Add new (DLM-T06), and the catalogue's `accent`
+    exercise picker's Manage / Add new / Close (DLM-T06), and the catalogue's `accent`
     `+`, ⋮ and row ⋮ and the editor's back and remove controls (DLM-T07)
   - `StatePanel` — a loading / message / error state: optional spinner, title
     (Archivo), body (`ink-muted`), one outline action and optional children;
@@ -160,8 +160,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     exercise history's four metrics, DLM-T09);
     `tablist` / `tab` / `selected` and the `<prefix>-row` / `<prefix>-<value>`
     testIDs the retired `SegmentedChips` used. The records panel's `Records` | `Last`,
-    Settings' date format (DLM-T04), the exercise list's Favourite/Name A–Z
-    (`exercise-list-sort-*`), Progress's period and table Metric, retained browsing Breakdown, and history Metric
+    Settings' date format (DLM-T04), Progress's period and table Metric, retained browsing Breakdown, and history Metric
     (`stats-<kind>-history-metric-chip-*`); Settings owns the history View, and
     `ExerciseCoreFields`' weight entry
     (`<prefix>-load-mode-*`, DLM-T07, which added `disabled` for the group
@@ -169,7 +168,7 @@ Brief entrypoint inventory of the current reusable UI component set.
     `Leaderboards` (`groups-segment-*`, DLM-T11)
   - `ChipGroup` — wrapping pills, `single` (a tab list, `selected`) or `multi`
     (checkboxes, `checked`), the same testID contract, per-chip accessibility
-    labels. Logs' level filter (DLM-T04), the exercise list's `Show never-done` (`multi`, `exercise-list-visibility-*`),
+    labels. Logs' level filter (DLM-T04),
     the catalogue's Show deleted control (`multi`), and the Groups tab's group
     chips (`single`, `groups-stream-filter-*`, DLM-T11). DLM-T10 added a
     per-option `faint` (a deleted tag) and `single` mode's `clearValue`
@@ -281,8 +280,8 @@ Brief entrypoint inventory of the current reusable UI component set.
 5. `ExerciseListContent` / `ExerciseListPreferenceControls`
 - File: `apps/mobile/components/exercise-catalog/exercise-list-controls.tsx`
 - Purpose:
-  - shared exercise list row/header rendering and shared Favourite/Name A–Z and Show never-done controls for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
-  - in the design language (DLM-T06): hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are a Sort `SegmentedControl` (Favourite/Name A–Z) and a checked Show never-done `ChipGroup`. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
+  - shared exercise list row/header rendering and the shared filter row for `exercise-catalog`, the exercise picker and the exercise page's `ExerciseSwapSheet`
+  - in the design language (DLM-T06): hairline `ListRow`s in one `Card` per muscle family, headed by a disclosure row (count in Plex Mono, `chevron-right` / `chevron-down`, `expanded`, testID `exercise-family-group-<slug>`); a row is the name, the muscles and the Plex Mono stats line, a deleted one a faint `Deleted` `Tag` with faint text; `renderActions` fills the trailing slot beside the row's own target. The visible controls are one row of `FilterChip`s (pills one tap target tall, solid `ink` while on; `exercise-list-controls`): `Never-done` (a checkbox, `exercise-list-never-done`), the host's own chips as `children` (the picker's `Groups`), and `Sort: Favourite` / `Sort: A–Z` (a button that switches the order, `exercise-list-sort`). `useFamilyExpansion(isSearching)` holds a surface's open families: closed until tapped while browsing, open until tapped while searching. The compact history line shows Last performed plus all-time session count (or Never done). Search expands nonempty matching families without mutating saved expansion, and a family's header still toggles it; initial history loading/failure replaces personal rows with a `StatePanel` and Retry on failure. Target: `design-targets/exercise-catalogue.md`
   - covered by `apps/mobile/__tests__/exercise-list-controls.test.tsx`
   - composes the non-visual list model/preference modules under `apps/mobile/src/exercise-catalog/` so all three surfaces share grouping, filtering, sorting, row stats, collapsed-group state behavior, and local-only preference behavior while each route keeps its surface-specific actions
 
@@ -418,7 +417,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupWriteNotice` (M22-T05) — inline outcome of a group write: a `danger` `Notice`, or a neutral one with the `success` glyph (08 pattern 9)
   - `GroupsEmptyActions` (M22-T05) — the empty state's `Create group` (the screen's one primary) / `Join with a code` (outline) buttons
   - `FriendSessionContent` — the friend's session body on View Session's cards (`components/session-detail/`): a `SessionFactsCard` headed by the member and status, then an `ExerciseSetsCard` per exercise (rows `group-session-set-row-<setId>`), read-only, no record band
-  - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07; design language DLM-T06) — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch beside the filter, a chip solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
+  - `PickerGroupSectionList`, `PickerGroupsToggle` (M25-T07; design language DLM-T06) — the exercise picker's `From your groups` section, a micro-label over one `Card` of `ListRow`s per group (rows `exercise-picker-group-row-<groupExerciseId>`, status text "linked: …" / "not linked"), and the `Groups` switch in the filter row, a `FilterChip` solid `ink` while on (`exercise-picker-groups-toggle`); 08 pattern 10
   - `GroupExercisePickSheet` (M25-T07) — a `Sheet` (DLM-T14; keyboard-avoiding, backdrop `Dismiss group exercise pick sheet`, no Cancel) for an unlinked group exercise, its options radio `ListRow`s (`radio-on` / `radio-off` in `ink`, unavailable choices `ink-faint`) and its confirm the sheet's one `accent`: suggestion, `Choose another of your exercises…` (search; exercises already linked in the group are disabled with the reason), `Add "<name>" as a new exercise`, the retroactivity and weight-entry notes, `Link and add` with an inline error; in `choose-linked` mode it lists my linked exercises to add. testIDs `group-pick-sheet`, `group-pick-sheet-option-*`, `group-pick-sheet-choice-<id>`, `group-pick-sheet-confirm`; `purpose="link-only"` (M25-T08 group page) confirms with `Link` and adds nothing to a session
   - `GroupStateView`, `GroupLoadingState`, `GroupsEmptyState` (children slot for `GroupsEmptyActions`), `GroupMissingDataState`, `GroupInlineError`, `GroupsSignInRequired` — feature-scoped state panels, thin wrappers over `StatePanel` (inline; the sign-in panel centres on the page) since DLM-T11, so their call sites did not change; `GroupInlineError` is a `danger` `Notice` with an outline `Retry`
   - `groupScreenStyles` (`screen-styles.ts`) — the group routes' page shell: `paper`, the `lg` gutter and `md` between blocks, as `Screen` / `ScreenScroll`, for the `FlatList`s and the routes not yet on `ScreenScroll` (DLM-T11).
@@ -445,18 +444,18 @@ Brief entrypoint inventory of the current reusable UI component set.
 14. Exercise picker
 - File: `apps/mobile/components/session-recorder/exercise-picker.tsx`
 - Purpose:
-  - the session view's exercise picker (`+ Add exercise`), its only consumer:
-    a tall `Sheet` (`exercise-picker`, keyboard-avoiding; backdrop label
-    `Dismiss exercise modal overlay`) titled `Select Exercise` with Manage /
-    Add new `IconButton`s,
-    search and visible shared Sort/Show never-done controls, the add preselection (`Add empty set`
-    outline / `Append plan`, the sheet's one `accent`; the plan's sets as
-    planned `SetSummaryRow`s), `From your groups` with its pick sheet, inline create and
-    Manage (`/exercise-catalog?source=session&intent=manage`). It only adds —
+  - the body of the Add exercise route (`app/session/[sessionId]/add-exercise.tsx`,
+    an iOS page sheet), its only consumer: a grabber and `Select Exercise`
+    with Manage / Add new / Close `IconButton`s (`exercise-picker-header`),
+    search, the shared filter row with `Groups`, the add preselection
+    (`Add empty set` outline / `Append plan`, its one `accent`; the plan's
+    sets as planned `SetSummaryRow`s), `From your groups` with its pick sheet,
+    inline create and Manage (`/exercise-catalog?source=session&intent=manage`).
+    A pick closes the keyboard; the list closes it on drag. It only adds —
     there is no replace mode (the exercise page swaps through
     `ExerciseSwapSheet`). It owns its own state and reports a choice
-    (`onSelectExercise` / `onAppendPlan` / `onOpenManage`); the host bumps
-    `openRequestId` for a fresh open and applies the choice
+    (`onSelectExercise` / `onAppendPlan` / `onOpenManage` / `onClose`); the
+    route writes it, goes back, and shows a failed add through `notice`
   - covered by `apps/mobile/__tests__/exercise-picker.test.tsx`
 
 15. Session view components

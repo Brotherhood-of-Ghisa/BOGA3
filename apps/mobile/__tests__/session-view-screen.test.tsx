@@ -2,7 +2,8 @@
 
 /**
  * The session view over real data: the production screen, session lifecycle,
- * draft repository, gym directory, exercise picker and catalog caches over the
+ * draft repository, gym directory, the Add exercise route's picker and catalog
+ * caches over the
  * migrated in-memory SQLite database, seeded through the Maestro harness with
  * the `session-view` fixture (helpers/local-data.ts): an active session at the
  * block-history gym (Bench 3/5 with a new 1RM record, Incline 3/3, Cable Flys
@@ -75,6 +76,7 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
   useGroupLinkingUserId: () => null,
 }));
 
+import { AddExerciseScreen } from '../app/session/[sessionId]/add-exercise';
 import { SessionCompareScreen } from '../app/session/[sessionId]/compare';
 import { SessionViewScreen } from '../app/session/[sessionId]/index';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
@@ -87,6 +89,7 @@ import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import * as insightsRepository from '@/src/session-insights/repository';
+import * as sessionLifecycle from '@/src/session-recorder/session-lifecycle';
 import {
   bootLocalApp,
   closeLocalData,
@@ -158,6 +161,36 @@ const openGymSheet = async () => {
   });
 };
 
+// Plays the root stack for the Add exercise page sheet: a push of its route
+// shows the real route over the session view, and back closes it, after which
+// the session view comes back into focus.
+const addExerciseRoute = { sessionId: null as string | null, listeners: new Set<() => void>() };
+const setAddExerciseRoute = (sessionId: string | null) => {
+  addExerciseRoute.sessionId = sessionId;
+  addExerciseRoute.listeners.forEach((listener) => listener());
+};
+const WithAddExerciseRoute = ({ children }: { children: mockReact.ReactNode }) => {
+  const sessionId = mockReact.useSyncExternalStore(
+    (listener) => {
+      addExerciseRoute.listeners.add(listener);
+      return () => addExerciseRoute.listeners.delete(listener);
+    },
+    () => addExerciseRoute.sessionId,
+  );
+  return (
+    <>
+      {children}
+      {sessionId ? <AddExerciseScreen sessionId={sessionId} /> : null}
+    </>
+  );
+};
+const renderSessionView = (sessionId: string) =>
+  render(
+    <WithAddExerciseRoute>
+      <SessionViewScreen sessionId={sessionId} />
+    </WithAddExerciseRoute>,
+  );
+
 // The real picker: find the exercise, open its preselection, add one empty set.
 const addExerciseThroughPicker = async (name: string) => {
   fireEvent.press(screen.getByTestId('session-view-add-exercise'));
@@ -167,12 +200,22 @@ const addExerciseThroughPicker = async (name: string) => {
   await act(async () => {
     fireEvent.press(addEmptySet);
   });
+  await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
+  await replayFocus();
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
   resetLocalData();
   mockFocusCallbacks.clear();
+  setAddExerciseRoute(null);
+  mockPush.mockImplementation((href: string) => {
+    const match = /^\/session\/([^/]+)\/add-exercise$/.exec(href);
+    if (match) setAddExerciseRoute(decodeURIComponent(match[1]));
+  });
+  mockBack.mockImplementation(() => {
+    if (addExerciseRoute.sessionId) setAddExerciseRoute(null);
+  });
   mockCanGoBack.mockReturnValue(true);
   location.getCurrentForegroundPositionLazy.mockResolvedValue({ status: 'permission_denied', canAskAgain: true });
 });
@@ -185,7 +228,7 @@ afterEach(() => {
 
 describe('Session view', () => {
   const renderReady = async () => {
-    render(<SessionViewScreen sessionId={SESSION} />);
+    renderSessionView(SESSION);
     await screen.findByLabelText(BENCH_LABEL);
   };
 
@@ -344,17 +387,89 @@ describe('Session view', () => {
     expect(await screen.findByLabelText('Lat Pulldown, 0 of 1 sets done')).toBeTruthy();
   });
 
-  it("opens the catalogue from the picker's Manage and shows the picker again on return", async () => {
+  it('Add exercise opens the picker route; closing it adds nothing', async () => {
+    await openSession();
+    const before = await exerciseNames(SESSION);
+
+    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+
+    expect(mockPush).toHaveBeenCalledWith(`/session/${SESSION}/add-exercise`);
+    fireEvent.press(await screen.findByLabelText('Close exercise picker'));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('exercise-picker')).toBeNull();
+    expect(await exerciseNames(SESSION)).toEqual(before);
+  });
+
+  it("opens the catalogue from the picker's Manage, over the picker", async () => {
     await openSession();
 
     fireEvent.press(screen.getByTestId('session-view-add-exercise'));
     fireEvent.press(await screen.findByTestId('exercise-picker-manage-button'));
 
-    expect(mockPush).toHaveBeenCalledWith('/exercise-catalog?source=session&intent=manage');
-    expect(screen.queryByTestId('exercise-picker-search')).toBeNull();
+    expect(mockPush).toHaveBeenLastCalledWith('/exercise-catalog?source=session&intent=manage');
+    // The picker stays where it was; the catalogue's back returns to it.
+    expect(screen.getByTestId('exercise-picker-search')).toBeTruthy();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
 
-    await replayFocus();
-    expect(await screen.findByTestId('exercise-picker-search')).toBeTruthy();
+  it("appends an exercise's last session as planned sets through the picker route, then closes it", async () => {
+    await openSession();
+    const squat = EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseName;
+
+    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+    fireEvent.changeText(await screen.findByLabelText('Exercise filter input'), squat);
+    fireEvent.press(await screen.findByLabelText(`Select exercise ${squat}`));
+    await screen.findByTestId('exercise-picker-plan-source');
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText(`Append historical plan for ${squat}`));
+    });
+    await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
+
+    const added = (await readSession(SESSION))!.exercises.at(-1)!;
+    expect(added.name).toBe(squat);
+    expect(added.sets.length).toBeGreaterThan(0);
+    expect(added.sets.every((row) => row.performanceStatus === 'planned')).toBe(true);
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes one add at a time: a second pick while the first saves is ignored', async () => {
+    await openSession();
+    let finishFirst!: () => void;
+    const addSpy = jest.spyOn(sessionLifecycle, 'addExerciseToSession').mockImplementationOnce(
+      () => new Promise((resolve) => { finishFirst = () => resolve(undefined as never); }),
+    );
+    const pick = async (name: string) => {
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), name);
+      fireEvent.press(await screen.findByLabelText(`Select exercise ${name}`));
+      fireEvent.press(await screen.findByLabelText(`Add empty set for ${name}`));
+    };
+
+    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+    await screen.findByLabelText('Exercise filter input');
+    await pick(EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseName);
+    await pick(EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseName);
+
+    expect(addSpy).toHaveBeenCalledTimes(1);
+    await act(async () => finishFirst());
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed add keeps the picker open and says nothing changed', async () => {
+    await openSession();
+    const before = await exerciseNames(SESSION);
+    jest.spyOn(sessionLifecycle, 'addExerciseToSession').mockRejectedValueOnce(new Error('disk full'));
+
+    fireEvent.press(screen.getByTestId('session-view-add-exercise'));
+    const name = EXERCISE_BLOCK_HISTORY_FIXTURE.noHistoryExerciseName;
+    fireEvent.changeText(await screen.findByLabelText('Exercise filter input'), name);
+    fireEvent.press(await screen.findByLabelText(`Select exercise ${name}`));
+    await act(async () => {
+      fireEvent.press(await screen.findByLabelText(`Add empty set for ${name}`));
+    });
+
+    expect(await screen.findByTestId('exercise-picker-notice')).toHaveTextContent("Couldn't add that exercise. Try again.");
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(await exerciseNames(SESSION)).toEqual(before);
   });
 
   it('picks the gym from the gym sheet by tapping the Gym stat', async () => {
@@ -619,7 +734,7 @@ describe('Session view: editing a completed session', () => {
       await sessionDrafts.completeSessionDraft(DONE, { completedAt: COMPLETED_AT, now: COMPLETED_AT });
       await afterSeed?.();
     });
-    render(<SessionViewScreen sessionId={DONE} />);
+    renderSessionView(DONE);
   };
 
   const renderCompleted = async (exercises?: StoredExercise[]) => {
