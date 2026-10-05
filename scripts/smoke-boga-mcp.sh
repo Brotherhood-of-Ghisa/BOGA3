@@ -197,7 +197,12 @@ if [[ -n "${USER_UUID}" ]]; then
   ACCESS_TOKEN="$(jq -er '.accessToken' "${TOKEN_FILE}")"
   APP_ACCESS_TOKEN="$(jq -er '.appAccessToken' "${TOKEN_FILE}")"
   AGENT_CLIENT_ID="$(jq -er '.clientId' "${TOKEN_FILE}")"
-  echo "[boga-mcp-smoke] OAuth scope from the MCP challenge: $(jq -er '.scope' "${TOKEN_FILE}")"
+  OAUTH_SCOPE="$(jq -er '.scope' "${TOKEN_FILE}")"
+  echo "[boga-mcp-smoke] OAuth scope from the MCP challenge: ${OAUTH_SCOPE}"
+  # Claude needs offline_access to refresh; hosted Auth advertises it, and the
+  # pinned local CLI (BOGA_SUPABASE_CLI_DEFAULT_VERSION) must too.
+  [[ " ${OAUTH_SCOPE} " == *" offline_access "* ]] ||
+    fail "local Auth does not advertise offline_access; check the Supabase CLI pin (./boga doctor)"
 fi
 
 echo "[boga-mcp-smoke] discovering and calling all four tools"

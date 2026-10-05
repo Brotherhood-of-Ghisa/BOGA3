@@ -91,10 +91,11 @@ As built:
     empty scope, so it still fails closed.
   - Retrying Supabase metadata at boot. Render already restarts a crashed
     process.
-- Hosted Supabase advertises `offline_access`, but local Auth (v2.192.0) does
-  not. The smoke therefore requests whatever the challenge advertises, which
-  is `openid profile` locally. Unit tests cover the `offline_access` branch;
-  the live checks in step 6 cover it on hosted.
+- The local Supabase CLI pin moved from 2.109.1 to 2.112.0 (GoTrue v2.192.0
+  → v2.195.0). Local Auth now advertises and accepts `offline_access` as
+  hosted does, and `mcp-smoke` requires it end to end. supabase/auth#2820
+  (consent details failing with `resource` + `offline_access` + a public
+  client) does not reproduce on v2.195.0.
 
 Keep Supabase as the AS and remove our own defects. Every client can then
 connect through DCR, with no CIMD needed.
