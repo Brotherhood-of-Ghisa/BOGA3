@@ -391,6 +391,19 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - root-stack screen with the native header `Session vs history`; native Back returns to the session view
   - built by `sessionCompareHref` (`apps/mobile/src/navigation/active-session-entry.ts`)
 
+20c. `/session/[sessionId]/add-exercise`
+- File: `apps/mobile/app/session/[sessionId]/add-exercise.tsx`
+- Path params:
+  - `sessionId` (required; the session the view has open, active or a
+    completed one being edited)
+- Behavior:
+  - no query params; search, filters, preselection and every sheet are in-route state
+  - root-stack screen with `presentation: 'modal'` (an iOS page sheet) and
+    `headerShown: false`: it draws its own title row with Close. Swipe-down or
+    Close returns with `router.back()`; a successful add writes the draft, then
+    `router.back()`; a failed add stays
+  - built by `sessionAddExerciseHref` (`apps/mobile/src/navigation/active-session-entry.ts`)
+
 21. `/gyms`
 - File: `apps/mobile/app/gyms.tsx`
 - Query params:
@@ -520,8 +533,8 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
    - Finish after its cleanup prompts and the completion write (`router.replace`)
 48. `/session/<sessionId>` -> `/train` or another tab
    - Abandon session after its confirmation, or the bottom bar (`router.dismissTo`)
-49. `/session/<sessionId>` -> `/exercise-catalog?source=session&intent=manage`
-   - the picker's Manage; native back or the catalogue's post-save `router.back()` returns, and the picker reopens
+49. `/session/<sessionId>/add-exercise` -> `/exercise-catalog?source=session&intent=manage`
+   - the picker's Manage (`router.push`, presented as a second page sheet over the picker, headerless); swipe-down or the catalogue's post-save `router.back()` returns to the picker as it was left
 50. `/session/<sessionId>` -> `/session/<sessionId>/exercise/<sessionExerciseId>`
    - the session view's exercise card (`router.push`). Back, `Complete exercise` and `Remove from session` return with `router.back()`, and the session view reloads the draft on focus; with no history (a deep link) they `router.replace('/train')`
 51. `/session/<sessionId>/exercise/<sessionExerciseId>` -> `/exercise-history?exerciseDefinitionId=<id>`
@@ -546,12 +559,15 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
      `useOpenMainTab`): `router.push` from the tab bar and `exercise-history`,
      `router.dismissTo` from a completed session view; on the session view of
      the workout in progress the Train tab does nothing
+58. `/session/<sessionId>` -> `/session/<sessionId>/add-exercise`
+   - `+ Add exercise` (`router.push`); the picker returns with `router.back()`
+     after an add, Close or a swipe down, and the session view reloads on focus
 
 Note:
 
 - Modal opens/closes are in-route UI state transitions, not route transitions.
-- The session view's exercise picker `Add new` opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
-- The picker's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too: the picker hides while either is open and returns on cancel.
+- The exercise picker's `Add new` opens an in-route exercise editor modal rather than navigating to `/exercise-catalog`.
+- The picker's group pick sheet (M25-T07) and its `Add as new` editor are in-route modals too, presented over the picker, which stays as it was.
 - The exercise page's effort, options and swap sheets, the shared exercise editor it opens from `Edit exercise`, and its Complete / Remove confirmations (`Alert`) are in-route state.
 - The record set row detail sheet (M25-T10) is an in-route modal on the Groups screen's Stream and the full board; certification writes and their confirmation `Alert`s stay on the same route.
 

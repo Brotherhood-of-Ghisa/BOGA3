@@ -7,6 +7,7 @@ import { MoreHubBackButton } from '@/components/navigation/more-hub-back-button'
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
+  useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
 import { ChipGroup } from '@/components/ui/chip-group';
 import { Icon } from '@/components/ui/icon';
@@ -69,7 +70,6 @@ export default function ExerciseCatalogScreen() {
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [exerciseSearchValue, setExerciseSearchValue] = useState('');
-  const [expandedExerciseFamilies, setExpandedExerciseFamilies] = useState<Set<string>>(() => new Set());
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [listPreferences, setListPreferences] = useExerciseListPreferences();
@@ -112,6 +112,7 @@ export default function ExerciseCatalogScreen() {
       showDeleted,
     ]
   );
+  const familyExpansion = useFamilyExpansion(exerciseListModel.isSearching);
 
   const openEditorForExercise = useCallback((exercise: ExerciseCatalogExercise) => {
     setEditorExerciseTarget(exercise);
@@ -152,18 +153,6 @@ export default function ExerciseCatalogScreen() {
     ),
     [handlePressRowActions]
   );
-
-  const toggleExerciseFamily = useCallback((familyName: string) => {
-    setExpandedExerciseFamilies((current) => {
-      const next = new Set(current);
-      if (next.has(familyName)) {
-        next.delete(familyName);
-      } else {
-        next.add(familyName);
-      }
-      return next;
-    });
-  }, []);
 
   const startNewExercise = () => {
     setEditorExerciseTarget(null);
@@ -293,16 +282,15 @@ export default function ExerciseCatalogScreen() {
         contentInsetAdjustmentBehavior="automatic"
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={styles.content}
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled">
         <ExerciseListContent
-          isSearching={exerciseListModel.isSearching}
           historyStatus={statsResult.status}
           onRetryHistory={reloadStats}
           items={exerciseListModel.items}
           sections={exerciseListModel.sections}
-          expandedFamilies={expandedExerciseFamilies}
+          familyExpansion={familyExpansion}
           emptyText={emptyListText}
-          onToggleFamily={toggleExerciseFamily}
           onPressExercise={handlePressEditRow}
           getExerciseAccessibilityLabel={(exercise) => `Edit exercise definition ${exercise.name}`}
           renderActions={renderExerciseActions}

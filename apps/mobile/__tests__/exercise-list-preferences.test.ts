@@ -17,6 +17,9 @@ import {
 } from '@/src/preferences/migration';
 import { DEFAULT_EXERCISE_LIST_PREFERENCES as defaults, DEFAULT_ACCOUNT_LOCAL_PREFERENCES as allDefaults } from '@/src/preferences/model';
 import { preferenceKey } from '@/src/preferences/storage';
+import { act, renderHook } from '@testing-library/react-native';
+import { updatePreferences } from '@/src/preferences/hooks';
+import { requireWithReactCompiler } from './helpers/react-compiler';
 
 const nativeWrite = Storage.setItemSync;
 let read: jest.SpyInstance;
@@ -78,6 +81,28 @@ it('persists ordered partial edits across reload, preserves unrelated values and
   await select('A');
   expect(values()).toEqual({ sort: 'name', showNeverDone: false,
     dateFormat: 'YYYY-MM-DD', pastRecordsGymScope: 'current-gym' });
+});
+
+// On device the hook runs compiled: a mounted browser (the exercise page's swap
+// sheet stays mounted with its page; the picker while it is open) must see each
+// edit, not the value it first rendered.
+it('a mounted browser sees each edit through the React Compiler, as on device', async () => {
+  await select('A');
+  const compiled = requireWithReactCompiler<typeof import('@/src/exercise-catalog/list-preferences')>(
+    'src/exercise-catalog/list-preferences.ts',
+  );
+  const { result } = renderHook(() => compiled.useExerciseListPreferences()[0]);
+  expect(result.current).toEqual(defaults);
+
+  act(() => update({ sort: 'name' }));
+  expect(result.current.sort).toBe('name');
+  act(() => update({ showNeverDone: false }));
+  expect(result.current).toEqual({ ...defaults, sort: 'name', showNeverDone: false });
+
+  // Another preference leaves the browsing values the same object.
+  const before = result.current;
+  act(() => updatePreferences({ weeklyWorkingSetTarget: 12 }));
+  expect(result.current).toBe(before);
 });
 
 it('keeps edits during the legacy read, preserving unrelated migrated fields', async () => {
