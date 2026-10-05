@@ -1,19 +1,21 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { uiRoles } from '@/components/ui/tokens';
 
-import {
-  BottomTray,
-  TrayVisibilityProvider,
-} from '@/components/navigation/bottom-tray';
+jest.mock('expo-router', () => ({
+  Tabs: Object.assign(() => null, { Screen: () => null }),
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
+import { TabsBar } from '../app/(tabs)/_layout';
+import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { MainTabs } from '@/components/navigation/main-tabs';
 import {
   MAIN_TAB_DEFINITIONS,
   MAIN_TAB_KEYS,
   mainTabHref,
   resolveMainTab,
-  shouldShowMainNavigation,
 } from '@/src/navigation/main-tabs';
 
 describe('M26 main tab model', () => {
@@ -50,38 +52,35 @@ describe('M26 main tab model', () => {
   it('returns no selection for an unknown route instead of guessing', () => {
     expect(resolveMainTab(['(tabs)', 'unknown'])).toBeNull();
     expect(resolveMainTab([])).toBeNull();
-    expect(shouldShowMainNavigation(['group', 'group-1'])).toBe(false);
-  });
-
-  it('shows the tab bar on tab-owned routes', () => {
-    expect(shouldShowMainNavigation(['(tabs)', 'today'])).toBe(true);
-    expect(shouldShowMainNavigation(['(tabs)', 'session-recorder'])).toBe(false);
   });
 });
 
-describe('BottomTray', () => {
-  it('collapses to the accessible peek handle and expands again from it', () => {
-    jest.useFakeTimers();
-    const view = render(
-      <TrayVisibilityProvider>
-        <BottomTray>
-          <Text>Tabs</Text>
-        </BottomTray>
-      </TrayVisibilityProvider>,
-    );
+describe('MainTabBar', () => {
+  it('is the tabs on the paper ground, with no collapsible tray handle', () => {
+    const onSelect = jest.fn();
+    render(<MainTabBar activeTab="train" onSelect={onSelect} />);
 
-    fireEvent.press(screen.getByLabelText('Collapse navigation tray'));
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-    fireEvent.press(screen.getByLabelText('Expand navigation tray'));
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
+    expect(StyleSheet.flatten(screen.getByTestId('main-tab-bar').props.style).backgroundColor).toBe(uiRoles.paper);
+    expect(screen.getByLabelText('Open Train').props.accessibilityState.selected).toBe(true);
+    expect(screen.queryByTestId('bottom-tray-handle')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Open More'));
+    expect(onSelect).toHaveBeenCalledWith('more');
+  });
+});
 
-    expect(screen.getByLabelText('Collapse navigation tray')).toBeTruthy();
-    view.unmount();
-    jest.useRealTimers();
+describe('TabsBar', () => {
+  it("selects the tab navigator's focused route, so a screen pushed over the tabs never hides it", () => {
+    render(<TabsBar routeName="train" />);
+    expect(screen.getByLabelText('Open Train').props.accessibilityState.selected).toBe(true);
+    screen.unmount();
+
+    render(<TabsBar routeName="stats-history" />);
+    expect(screen.getByLabelText('Open Progress').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('draws nothing for a route no tab owns', () => {
+    render(<TabsBar routeName="unknown" />);
+    expect(screen.queryByTestId('main-tab-bar')).toBeNull();
   });
 });
 

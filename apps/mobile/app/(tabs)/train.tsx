@@ -2,13 +2,6 @@ import { useIsFocused, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  DEFAULT_SESSION_LIST_DATA_CLIENT,
-  DEFAULT_SESSION_LIST_ITEMS,
-  useSessionListData,
-  type SessionListDataClient,
-  type SessionListItem,
-} from '@/components/session-list';
 import { StartDisc } from '@/components/train';
 import {
   ActionButton,
@@ -23,6 +16,7 @@ import {
 } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
+  loadActiveSessionId as loadActiveSessionIdFromDatabase,
   type PlannedSessionMaterializer,
   type SessionEntryCoordinator,
   type SessionEntryResult,
@@ -43,54 +37,88 @@ export type TrainPlanningState =
     };
 
 export type TrainScreenProps = {
-  dataClient?: SessionListDataClient;
-  initialSessions?: SessionListItem[];
   isFocused?: boolean;
+  loadActiveSessionId?: () => Promise<string | null>;
   planningState?: TrainPlanningState;
   sessionEntry?: SessionEntryCoordinator;
 };
 
 type LaunchKind = 'empty' | 'planned';
 
+type ActiveCheck =
+  | { status: 'checking' }
+  | { status: 'error'; message: string }
+  | { status: 'done'; activeSessionId: string | null };
+
+/**
+ * Whether a workout is in progress, read again on every focus as one row
+ * (`findActiveSessionId`), never the whole history. A focus marks the check
+ * pending in the same render, so a workout abandoned since the last read is
+ * never acted on.
+ */
+function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: () => Promise<string | null>) {
+  const [check, setCheck] = useState<ActiveCheck>({ status: 'checking' });
+  const [attempt, setAttempt] = useState(0);
+  const [checkedFocus, setCheckedFocus] = useState(isFocused);
+  if (checkedFocus !== isFocused) {
+    setCheckedFocus(isFocused);
+    if (isFocused) setCheck({ status: 'checking' });
+  }
+
+  useEffect(() => {
+    if (!isFocused) return;
+    let current = true;
+    loadActiveSessionId().then(
+      (activeSessionId) => {
+        if (current) setCheck({ status: 'done', activeSessionId });
+      },
+      (error: unknown) => {
+        if (current) setCheck({ status: 'error', message: error instanceof Error ? error.message : 'Unable to read sessions' });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [attempt, isFocused, loadActiveSessionId]);
+
+  const retry = () => {
+    setCheck({ status: 'checking' });
+    setAttempt((value) => value + 1);
+  };
+  return { check, retry };
+}
+
 /**
  * Train, the way into personal training: one large disc that starts an empty
  * workout, and no title (the tab names the page), with the planning section
  * beneath it once planning is available. While a workout is in progress Train
  * is that workout: the Train tab opens it (`mainTabDestination`), and Train
- * reached any other way replaces itself with it. A started workout replaces
- * Train too, so going back from it never lands here.
+ * reached any other way opens it too. The session view blocks the back
+ * gesture while the workout is in progress, so this cannot loop.
  */
 export function TrainScreen({
-  dataClient,
-  initialSessions = DEFAULT_SESSION_LIST_ITEMS,
   isFocused = true,
+  loadActiveSessionId = loadActiveSessionIdFromDatabase,
   planningState = { status: 'unavailable' },
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
 }: TrainScreenProps) {
   const router = useRouter();
   const launchInFlightRef = useRef(false);
-  const [launchKind, setLaunchKind] = useState<LaunchKind | null>(null);
   const [launchError, setLaunchError] = useState<{
     kind: LaunchKind;
     message: string;
   } | null>(null);
-  const { sessions, isLoadingSessions, loadErrorMessage, reloadSessions } = useSessionListData({
-    dataClient,
-    initialSessions,
-    showDeletedSessions: false,
-    isFocused,
-  });
-
-  const activeSessionId = sessions.find(
-    (session) => session.status === 'active' && session.deletedAt === null,
-  )?.id;
+  const { check, retry } = useActiveSessionCheck(isFocused, loadActiveSessionId);
+  const activeSessionId = check.status === 'done' ? check.activeSessionId : null;
 
   useEffect(() => {
-    if (isFocused && !isLoadingSessions && activeSessionId) {
-      router.replace(sessionViewHref(activeSessionId));
+    if (isFocused && activeSessionId) {
+      router.push(sessionViewHref(activeSessionId));
     }
-  }, [activeSessionId, isFocused, isLoadingSessions, router]);
+  }, [activeSessionId, isFocused, router]);
 
+  // Nothing on screen changes while a workout starts: the press is simply
+  // ignored until the session view opens (or the start fails).
   const openRecorder = async (
     kind: LaunchKind,
     launch: () => Promise<SessionEntryResult>,
@@ -100,11 +128,10 @@ export function TrainScreen({
     }
 
     launchInFlightRef.current = true;
-    setLaunchKind(kind);
     setLaunchError(null);
     try {
       const entry = await launch();
-      router.replace(sessionViewHref(entry.sessionId));
+      router.push(sessionViewHref(entry.sessionId));
     } catch {
       setLaunchError({
         kind,
@@ -115,40 +142,21 @@ export function TrainScreen({
       });
     } finally {
       launchInFlightRef.current = false;
-      setLaunchKind(null);
     }
   };
 
   const content = () => {
-    if (isLoadingSessions || activeSessionId) {
-      // New-session actions wait until the app knows no workout is in progress;
-      // a workout in progress is being opened instead.
-      return (
-        <View style={styles.stage}>
-          <StartDisc
-            accessibilityLabel="Checking for a workout in progress"
-            disabled
-            label="Start"
-            onPress={() => undefined}
-            testID="train-session-loading"
-          />
-        </View>
-      );
-    }
-
-    if (loadErrorMessage) {
+    if (check.status === 'error') {
       return (
         <View style={styles.stage}>
           <Card style={styles.stretch}>
             <StatePanel
               action={{
                 label: 'Retry',
-                onPress: () => {
-                  void reloadSessions();
-                },
+                onPress: retry,
                 testID: 'train-session-error-retry',
               }}
-              body={loadErrorMessage}
+              body={check.message}
               fill={false}
               kind="error"
               testID="train-session-error"
@@ -159,14 +167,18 @@ export function TrainScreen({
       );
     }
 
+    // New-session actions wait until the app knows no workout is in progress
+    // (a workout in progress is being opened instead), without the disc
+    // changing while they wait.
+    const ready = check.status === 'done' && !activeSessionId;
     return (
       <>
         <View style={styles.stage} testID="train-start-section">
           <StartDisc
             accessibilityLabel="Start workout"
-            compact={planningState.status === 'ready'}
-            disabled={launchKind !== null}
-            label={launchKind === 'empty' ? 'Starting…' : 'Start'}
+            busy={!ready}
+            compact={ready && planningState.status === 'ready'}
+            label="Start"
             onPress={() => {
               void openRecorder('empty', sessionEntry.startEmptyOrResume);
             }}
@@ -178,17 +190,17 @@ export function TrainScreen({
             </Text>
           ) : null}
         </View>
-        <TrainPlanning
-          disabled={launchKind !== null}
-          isStarting={launchKind === 'planned'}
-          launchError={launchError?.kind === 'planned' ? launchError.message : null}
-          onStart={(materialize) => {
-            void openRecorder('planned', () =>
-              sessionEntry.startPlannedOrResume(materialize),
-            );
-          }}
-          planningState={planningState}
-        />
+        {ready ? (
+          <TrainPlanning
+            launchError={launchError?.kind === 'planned' ? launchError.message : null}
+            onStart={(materialize) => {
+              void openRecorder('planned', () =>
+                sessionEntry.startPlannedOrResume(materialize),
+              );
+            }}
+            planningState={planningState}
+          />
+        ) : null}
       </>
     );
   };
@@ -206,14 +218,10 @@ export function TrainScreen({
 // Beneath the disc, only once planning has something to say: nothing while it
 // is unavailable or loading.
 function TrainPlanning({
-  disabled,
-  isStarting,
   launchError,
   onStart,
   planningState,
 }: {
-  disabled: boolean;
-  isStarting: boolean;
   launchError: string | null;
   onStart: (materialize: PlannedSessionMaterializer) => void;
   planningState: TrainPlanningState;
@@ -262,8 +270,7 @@ function TrainPlanning({
         </View>
         <ActionButton
           accessibilityLabel={`Start ${planningState.title}`}
-          disabled={disabled}
-          label={isStarting ? 'Starting…' : 'Start'}
+          label="Start"
           onPress={() => onStart(planningState.materialize)}
           testID="train-start-planned-button"
           variant="outline"
@@ -276,7 +283,6 @@ function TrainPlanning({
       ) : null}
       <View style={styles.planningLink}>
         <ActionButton
-          disabled={disabled}
           label="Manage planning"
           onPress={planningState.openManager}
           testID="train-manage-planning-button"
@@ -289,12 +295,7 @@ function TrainPlanning({
 
 export default function TrainRoute() {
   const isFocused = useIsFocused();
-  return (
-    <TrainScreen
-      dataClient={DEFAULT_SESSION_LIST_DATA_CLIENT}
-      isFocused={isFocused}
-    />
-  );
+  return <TrainScreen isFocused={isFocused} />;
 }
 
 const styles = StyleSheet.create({

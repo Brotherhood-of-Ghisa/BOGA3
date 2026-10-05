@@ -71,7 +71,7 @@ target and contract.
      - remove destructive menu actions
 4. Tab actions (`MainTabs`) are navigation controls, not generic primary actions.
    - They use tab semantics (`accessibilityRole="tab"` / tablist), active-state
-     visuals, and equal-width flex targets across the available tray width.
+     visuals, and equal-width flex targets across the available bar width.
    - The active tab is marked by weight and an `ink` underline, never by
      colour alone and never in `accent` (which is the screen's one primary).
 5. Persistent navigation contains exactly Today, Train, Progress, and More.
@@ -145,9 +145,10 @@ target and contract.
 8. Train is the personal-training entry hub, while the session view remains
    focused on performing one workout.
    - A workout in progress is Train: the Train tab opens it directly, and
-     Train reached another way replaces itself with it. There is no Resume
-     button. Train has no title and no explanatory copy: one start disc
-     (`design-targets/train-page.md`).
+     Train reached another way opens it. There is no Resume button, and the
+     workout blocks the back gesture (it is left by the tab bar). Train has no
+     title and no explanatory copy: one start disc that never changes while
+     it checks or starts (`design-targets/train-page.md`).
    - Active-session detection must succeed before Train exposes any new-session
      action; a detection error is retryable and does not assume that no draft
      exists.
@@ -198,11 +199,10 @@ target and contract.
 1. Current user-facing screens use vertical layouts with no horizontal scrolling on phone widths.
 2. Page backgrounds are muted light surfaces (`surfacePage`-like behavior), with card/panel surfaces layered on top.
 3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
-4. Bottom tab navigation (`BottomTray` composing `MainTabs`) remains visible on
-   canonical roots (`today`, `train`, `progress`, `more`) and recognized
-   preserved roots. No route collapses the tray on entry; the lifter drags it
-   to its always-visible peek handle. `exercise-history` renders the same
-   `MainTabs` directly and selects Progress.
+4. Bottom tab navigation (`MainTabBar`) remains visible on canonical roots
+   (`today`, `train`, `progress`, `more`) and recognized preserved roots. It
+   is one fixed bar, identical wherever it shows: the session view and
+   `exercise-history` (which selects Progress) render the same `MainTabBar`.
 
 ### 4. List and row interaction conventions
 

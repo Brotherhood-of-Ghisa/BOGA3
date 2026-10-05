@@ -10,7 +10,8 @@ replaces the Train layout of the design-language move (a `PageHeader`, one
 - Canvas: <https://claude.ai/artifact/NTREbQVX7HGfeEKz15zay4> (2026-10-05).
   Artboards: `Train · idle (disc)`, `Train · plan ready`, `Train · planning,
   nothing planned`, and the states `checking for a workout`, `check failed`,
-  `start failed`. A full-width slab (declined) and a Resume disc (rejected:
+  `start failed` (the greyed `checking` board is superseded: the disc never
+  changes). A full-width slab (declined) and a Resume disc (rejected:
   no resume button) were removed.
 - Vocabulary: `../design-language.md`. The plan name, exercise count and start
   time on the canvas are invented.
@@ -32,12 +33,13 @@ replaces the Train layout of the design-language move (a `PageHeader`, one
 - **A workout in progress is Train.** There is no Resume button. Pressing the
   Train tab opens that session view directly, from any screen with the tab
   strip; on the session view of that workout the Train tab does nothing. Train
-  reached any other way (a link, Today's `Open Train`) replaces itself with
-  the session view once its read finds the workout. Start (and a planned
-  start) replaces Train with the new session view, so going back from a
-  workout never lands on Train.
-- **States.** Checking for a workout (and while a found workout opens): the
-  disc greyed to `ink-ghost` and disabled. Check failed: the `Couldn't check your workouts` `StatePanel` with
+  reached any other way (a link, Today's `Open Train`) opens the session view
+  once its one-row read finds the workout. A workout in progress blocks the
+  back gesture: it is left by the tab bar, so Train never bounces back into
+  it.
+- **States.** Checking for a workout, starting one, or opening a found one:
+  the disc does not change (no greying, no relabel; changed on operator
+  review, 2026-10-05: it flickered); presses are ignored and announced busy. Check failed: the `Couldn't check your workouts` `StatePanel` with
   Retry. Start failed: one `danger` line under the disc, `Couldn't start. Try
   again.`
 

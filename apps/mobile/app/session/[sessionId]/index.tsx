@@ -1,9 +1,9 @@
-import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MainTabs } from '@/components/navigation/main-tabs';
+import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import type { Session } from '@/components/session-recorder/types';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
@@ -17,7 +17,7 @@ import {
 import { ActionButton } from '@/components/ui/action-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import { sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { mainTabHref } from '@/src/navigation/main-tabs';
@@ -427,6 +427,10 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
 
   return (
     <Screen testID="session-view-screen">
+      {/* A workout in progress is left by the tab bar, not the back gesture:
+          Train opens the workout in progress, so going back to it would only
+          come straight back here. */}
+      <Stack.Screen options={{ gestureEnabled: isCompleted }} />
       {state.status === 'ready' ? (
         isCompleted ? (
           <SessionTopBar doneDisabled={isSavingEdit} mode="completed" onDone={() => void saveEdit()} />
@@ -442,14 +446,12 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
         <View style={[styles.statusSpacer, { paddingTop: insets.top }]} />
       )}
       {body}
-      <View style={[styles.tabs, { paddingBottom: Math.max(uiSpace.sm, insets.bottom) }]}>
-        {/* A completed session is history, which lives under Progress. */}
-        {/* Train while this workout is in progress is this screen: nothing to open. */}
-        <MainTabs
-          activeTab={isCompleted ? 'progress' : 'train'}
-          onSelect={(tab) => (tab === 'train' && !isCompleted ? undefined : openMainTab(tab))}
-        />
-      </View>
+      {/* A completed session is history, which lives under Progress. */}
+      {/* Train while this workout is in progress is this screen: nothing to open. */}
+      <MainTabBar
+        activeTab={isCompleted ? 'progress' : 'train'}
+        onSelect={(tab) => (tab === 'train' && !isCompleted ? undefined : openMainTab(tab))}
+      />
 
       <SessionOptionsSheet
         onAbandon={() => void abandon()}
@@ -493,9 +495,5 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.danger,
-  },
-  tabs: {
-    paddingHorizontal: uiSpace.sm,
-    paddingTop: uiSpace.sm,
   },
 });

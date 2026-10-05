@@ -238,12 +238,16 @@ Brief entrypoint inventory of the current reusable UI component set.
 
 ### Specialized shared components (reusable, not generic primitives)
 
-1. `BottomTray`
-- File: `apps/mobile/components/navigation/bottom-tray.tsx`
+1. `MainTabBar`
+- File: `apps/mobile/components/navigation/main-tab-bar.tsx`
 - Purpose:
-  - collapsible bottom navigation tray that wraps `MainTabs`; exposes a drag handle (React Native `PanResponder` + `Animated`) to collapse to a peek strip and `useTrayVisibility()` hook plus `TrayVisibilityProvider` so screens can imperatively expand/collapse
-  - snap math lives in the pure helper `apps/mobile/src/navigation/tray-snap.ts` so it can be unit-tested without gesture plumbing
-  - the handle is the sheet handle's recipe (38×4, `rule`, `radius.pill`; DLM-T02)
+  - the one bottom bar: `MainTabs` on the `paper` ground with the page gutter,
+    above the home indicator; the tab layout, the session view and
+    `exercise-history` all draw it, so the bar never changes between them.
+    Fixed (the collapsible `BottomTray` was removed 2026-10-05). testID
+    `main-tab-bar`
+  - presses go through `useOpenMainTab` (`use-open-main-tab.ts`), so Train
+    opens a workout in progress
 
 2. `MainTabs`
 - File: `apps/mobile/components/navigation/main-tabs.tsx`
@@ -251,8 +255,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - token-backed, accessible four-tab presentation for `Today`, `Train`,
     `Progress`, and `More`, driven by the single declarative model in
     `apps/mobile/src/navigation/main-tabs.ts`
-  - production navigation body inside `BottomTray` and the matching direct
-    navigation strip on the session view and the `exercise-history` detail screen
+  - the body of `MainTabBar`
   - design language (DLM-T02): one `Card`-recipe strip (`surface`, `rule`,
     card radius) of plain Archivo labels; the active tab is `ink` 700 over a
     2pt `ink` underline (`<tab testID>-indicator`), the others `ink-muted` 600;

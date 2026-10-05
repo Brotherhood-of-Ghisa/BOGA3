@@ -262,7 +262,7 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
   and a 38×4 `rule` handle. **Tapping outside dismisses; sheets carry no
   Cancel button.**
-- Tap targets ≥44. The iOS status bar and the tab tray are never redrawn in
+- Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`** (`apps/mobile/components/ui/tokens.ts`,
   added 2026-09-22): the card and sheet radii, the 44pt tap target, the 38pt

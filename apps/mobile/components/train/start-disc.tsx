@@ -14,7 +14,9 @@ export type StartDiscProps = {
   label: string;
   // A step smaller, to leave room for the planning section beneath it.
   compact?: boolean;
-  disabled?: boolean;
+  // Presses are ignored (and announced busy) without the disc changing, so
+  // nothing flickers while Train checks for a workout or opens one.
+  busy?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
   testID: string;
@@ -27,12 +29,12 @@ const RING_GAP = 16;
 
 /**
  * Train's one action: an `accent` disc inside a thin ring, the screen's only
- * primary (`design-language.md` §5). Disabled, it greys to `ink-ghost`.
+ * primary (`design-language.md` §5).
  */
 export function StartDisc({
   label,
   compact = false,
-  disabled = false,
+  busy = false,
   onPress,
   accessibilityLabel,
   testID,
@@ -46,14 +48,14 @@ export function StartDisc({
       <Pressable
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="button"
-        accessibilityState={{ disabled }}
-        disabled={disabled}
-        onPress={onPress}
+        accessibilityState={{ busy }}
+        onPress={() => {
+          if (!busy) onPress();
+        }}
         style={({ pressed }) => [
           styles.disc,
           { width: disc, height: disc },
-          disabled ? styles.discDisabled : null,
-          pressed && !disabled ? styles.discPressed : null,
+          pressed && !busy ? styles.discPressed : null,
         ]}
         testID={testID}>
         <Icon color={uiRoles.surface} name="play" size="lg" />
@@ -79,9 +81,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.accent,
-  },
-  discDisabled: {
-    backgroundColor: uiRoles.inkGhost,
   },
   // As the primary button: depth is never an elevation.
   discPressed: {

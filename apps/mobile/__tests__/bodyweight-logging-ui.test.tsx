@@ -23,6 +23,7 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
   useRouter: () => ({ back: jest.fn(), canGoBack: () => true, push: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),
   useNavigation: () => ({ addListener: () => () => undefined, dispatch: jest.fn() }),
   useLocalSearchParams: () => ({}),

@@ -39,6 +39,7 @@ const mockNavigation = {
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 
 jest.mock('expo-router', () => ({
+  Stack: { Screen: () => null },
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
       mockFocusCallbacks.add(callback);

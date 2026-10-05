@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
-import { MainTabs } from '@/components/navigation/main-tabs';
+import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import {
   Card,
@@ -224,7 +224,7 @@ export function ExerciseHistoryScreenShell({
         ) : null}
       </ScreenScroll>
 
-      <MainTabs activeTab={activeMainTab} onSelect={onSelectMainTab} />
+      <MainTabBar activeTab={activeMainTab} onSelect={onSelectMainTab} />
     </Screen>
   );
 }
