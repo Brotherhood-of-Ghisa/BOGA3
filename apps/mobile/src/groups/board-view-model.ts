@@ -1,5 +1,5 @@
-// Pure presentation rules for group leaderboards (M25-T09; product P6–P9,
-// E1.1–E1.3; `docs/specs/tech/groups-contract.md` §2.11, §4.5): podium cards,
+// Pure presentation rules for group leaderboards (P6–P9, E1.1–E1.3;
+// `docs/specs/tech/groups-contract.md`): podium cards,
 // full-board rows, history sentences, the board's route params, and the
 // ordinal / date / value formatting they share. Values arrive converted to the
 // group exercise's weight entry (D6); nothing here re-ranks or re-sorts.
@@ -202,7 +202,7 @@ export const NO_SETS_LABEL = 'No sets yet';
 export const formatEmptyBoardLabel = (certified: boolean, allEntryCount: number): string =>
   certified && allEntryCount > 0 ? `No certified sets yet · ${allEntryCount} uncertified` : NO_SETS_LABEL;
 
-/** One card per group exercise, in the server's order (archived last, §4.5). */
+/** One card per group exercise, in the server's order (archived last). */
 export const buildPodiumCards = (
   payload: GroupBoardPodiumsResult,
   myUserId: string | null,

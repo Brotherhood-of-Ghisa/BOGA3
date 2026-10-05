@@ -8,7 +8,7 @@
 # `body_weight_measurements` roots are covered by sync-bodyweight-contract.sh.
 # For every row emitted by the layer-N response, asserts that every FK parent
 # of that row has already appeared in a layer-M response with M ≤ N (or in
-# the same layer-N response — though the FK graph (server contract §A.5) has no
+# the same layer-N response — though the FK graph (declared by the sync-v2 migrations) has no
 # intra-layer references).
 #
 # Method: simulate a client SQLite by maintaining a `seen_ids` set keyed by
@@ -21,7 +21,7 @@
 # SQLite.
 #
 # Also asserts the layer→type partition exactly matches the topological
-# FK-bearing portion of the mapping in the server contract §B.4.4:
+# FK-bearing portion of the mapping in the server contract ("Topological layers"):
 #   Layer 0: gyms, exercise_definitions, muscle_groups
 #   Layer 1: sessions, exercise_muscle_mappings, exercise_tag_definitions,
 #            exercise_group_links
@@ -136,7 +136,7 @@ trap cleanup_on_exit EXIT
 
 BASE_MS="$(($(date +%s) * 1000))"
 
-# Per the FK graph (server contract §A.5). Used by the seen_ids check below to
+# Per the FK graph (declared by the sync-v2 migrations). Used by the seen_ids check below to
 # discover the parents of any row given its type and field set.
 #
 # Format: "<type>|<fk_field_name>|<parent_type>"
@@ -160,7 +160,7 @@ FK_EDGES=(
   "exercise_group_links|exercise_definition_id|exercise_definitions"
 )
 
-# Per-layer expected type set per the server contract §B.4.4 partition.
+# Per-layer expected type set per the server contract's topological layers.
 # Sorted lex so we can compare against `jq | unique | sort`.
 LAYER_TYPES_0='["exercise_definitions","gyms","muscle_groups"]'
 LAYER_TYPES_1='["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions","sessions"]'
@@ -271,7 +271,7 @@ drain_layer_and_check() {
   # For each row in OURS we read its FK columns from `fields`, look up the
   # `(parent_type, parent_id)` pair in SEEN_IDS, and fail if absent.
   # After all rows in this layer pass, we add them ALL to SEEN_IDS — only
-  # then, because in the FK graph (server contract §A.5) there are NO
+  # then, because in the FK graph (declared by the sync-v2 migrations) there are NO
   # intra-layer FKs, so a layer-N row cannot legitimately reference a sibling
   # in the same layer.
   # If that invariant ever breaks (intra-layer FK introduced) this check
@@ -298,7 +298,7 @@ drain_layer_and_check() {
       parent_id="$(printf '%s' "${row_fields}" | jq -r --arg col "${fk_col}" '.[$col] // null')"
       if [[ "${parent_id}" == "null" || -z "${parent_id}" ]]; then
         # Nullable FK is fine — sessions.gym_id, session_exercises.exercise_definition_id
-        # both can be null per the entity schema (server contract §A.2).
+        # both can be null per the entity schema (the Drizzle schema and migrations).
         continue
       fi
       # Is (parent_type, parent_id) in SEEN_IDS?
@@ -342,7 +342,7 @@ pass "FK closure — ten FK-bearing entity types partition exactly across layers
 # Step 3 — pull every layer one more time as a sanity check that the
 # partition assertion holds against ALL rows for user A (not only our
 # run-tagged subset). I.e. for any layer L the response, restricted to types
-# in the §B.4.4 set for L, must equal exactly that set or a subset (other
+# in the topological-layer set for L, must equal exactly that set or a subset (other
 # tests may not have seeded every type but the response cannot include types
 # from a different layer).
 # ---------------------------------------------------------------------------

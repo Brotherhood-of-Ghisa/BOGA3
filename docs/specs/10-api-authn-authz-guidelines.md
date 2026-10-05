@@ -1,4 +1,4 @@
-# API AuthN/AuthZ Guidelines (M5 Baseline)
+# API AuthN/AuthZ Guidelines
 
 > **Owns:** authN/authZ and API development/consumption rules. **Not here:** backend local-dev runbook → `supabase/README.md`; sync RPC contract → `tech/sync-v2-server-contract.md`. **Load when:** auth, RLS, or backend API work.
 
@@ -13,36 +13,36 @@ This is the shortest operational summary. Use the "Further reading" section when
 
 ## Status / scope
 
-- Applies to the current M5 backend baseline (`Supabase`).
+- Applies to the current backend baseline (`Supabase`).
 - Captures the agreed design baseline for auth/authz and API usage.
-- Includes the M11 mobile auth bootstrap/session baseline as it affects API consumers.
+- Includes the mobile auth bootstrap/session baseline as it affects API consumers.
 
 ## Minimal rules (must know)
 
 1. Backend auth/authz stack is `Supabase Auth + Postgres RLS`.
 2. Authorization must be backend-enforced (`RLS` / DB constraints), never FE-only.
-3. M5 auth method is `email + password` only.
+3. Auth method is `email + password` only.
 4. Public self-signup is disabled.
 5. User creation is controlled/admin-provisioned only (script or dashboard admin flow).
-6. User-owned app rows normally use direct ownership linkage to `auth.users(id)` via `owner_user_id`; the M11 `user_profiles` table is the explicit exception and uses `id = auth.users.id`.
+6. User-owned app rows normally use direct ownership linkage to `auth.users(id)` via `owner_user_id`; the `user_profiles` table is the explicit exception and uses `id = auth.users.id`.
 7. MVP sync-domain tables are user-private (including `gyms` for now).
 8. Child tables also carry redundant `owner_user_id` and must enforce ownership consistency with parent rows (constraints/FKs).
 9. `RLS` must be enabled on all user-owned tables with deny-by-default posture.
 10. Normal app access uses `anon` key + user JWT; never use `service_role` from mobile/client code.
 11. `service_role` is server-only/admin-only (provisioning, maintenance, tightly scoped backend tasks).
 12. API changes must include negative-path tests for unauthorized and cross-user access denial.
-13. Supabase OAuth tokens carry `client_id`. M21 agent tokens are read-only:
+13. Supabase OAuth tokens carry `client_id`. Agent tokens are read-only:
     direct domain-table access and sync/profile/log writes require
     `client_id IS NULL`; agent training reads go only through the dedicated
     BoGa3 agent API.
 14. Privileged application RPCs that bypass RLS, including `SECURITY DEFINER`
     developer helpers, must independently reject non-null OAuth `client_id`
     claims before executing any read or write body.
-15. Group domain authorization (M22 — `docs/specs/tech/groups-contract.md` §3; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
+15. Group domain authorization (`docs/specs/tech/groups-contract.md`; as-built and proven by `./boga test groups-contract`) is DB-enforced through `SECURITY DEFINER` RPCs. Group tables have RLS enabled with no permissive client policies and no direct client privileges. Every read and write goes through an `app_public.group_*` RPC that derives the caller from `auth.uid()` and checks active membership and role inside the function. Private source entities (`exercise_definitions`, `sessions`, …) keep their owner-only RLS unchanged. Co-members read a member's shared sessions only through those RPCs.
 16. **RLS recursion prevention.** Group membership and role lookups MUST use `SECURITY DEFINER` helpers with `SET search_path = app_public, pg_temp`. If a later phase adds RLS policies on group tables (for example for Realtime), those policies must call the helpers. Direct subqueries on `group_memberships` inside `group_memberships` policies are prohibited (Postgres `42P17`).
-17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the M21 agent access boundary: agent tokens get no group access.
+17. Every group RPC and `SECURITY DEFINER` group helper must independently reject non-null OAuth `client_id` claims (rule 14; error `AGENT_FORBIDDEN`), which preserves the agent access boundary: agent tokens get no group access.
 18. Group non-membership and nonexistence must be indistinguishable to the caller (`NOT_FOUND`). A member whose role disallows an action gets `FORBIDDEN`.
-19. **Certification authz (M25-T06 — `docs/specs/tech/groups-contract.md` §4.6).** Only a current member may certify, and never their own set (`VALIDATION`). The lifter must be a current member (`NOT_FOUND: member not found`), the group exercise must not be archived, and the set must be a record set (a current All entry or a non-voided record; otherwise `NOT_FOUND`). Only the certifier may withdraw a certification (`FORBIDDEN` for everyone else, admins included); only the owner or an admin may cancel one (`FORBIDDEN` for members). The evaluator, not a client, voids a certification whose set changed. Certifications are written only through these `SECURITY DEFINER` RPCs; `group_certifications` has no client privileges.
+19. **Certification authz (`docs/specs/tech/groups-contract.md`).** Only a current member may certify, and never their own set (`VALIDATION`). The lifter must be a current member (`NOT_FOUND: member not found`), the group exercise must not be archived, and the set must be a record set (a current All entry or a non-voided record; otherwise `NOT_FOUND`). Only the certifier may withdraw a certification (`FORBIDDEN` for everyone else, admins included); only the owner or an admin may cancel one (`FORBIDDEN` for members). The evaluator, not a client, voids a certification whose set changed. Certifications are written only through these `SECURITY DEFINER` RPCs; `group_certifications` has no client privileges.
 
 ## Practical guidance for API developers (backend)
 
@@ -51,15 +51,15 @@ This is the shortest operational summary. Use the "Further reading" section when
 - Validate custom API inputs at the boundary (Edge Function/server handler) and rely on DB constraints for invariants.
 - Do not expose `auth` schema via API surfaces.
 - Treat `owner_user_id` as immutable after insert unless a task explicitly defines a safe migration/admin path.
-- **Group domain (M22)**:
+- **Group domain**:
   - Encapsulate membership and role checks in `SECURITY DEFINER` helpers with `search_path = app_public, pg_temp`, which guards against schema injection. These helpers bypass RLS, so their callers must filter explicitly by the caller's active membership.
   - Group tables must not carry an `owner_user_id` column. The Sync v2 drift checker treats every such `app_public` table as a synced entity.
-  - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md` §4–§5).
+  - Group reads return a shared session's live set rows raw (planned and skipped included; "performed sets only" is a display rule on the device) and never GPS columns (`docs/specs/tech/groups-contract.md`).
 
 ## Optional bodyweight-aware group projections
 
 Group RPCs retain rules 15–19 and expected-revision checks described in
-[`groups-contract.md` §11](tech/groups-contract.md#11-optional-bodyweight-aware-group-calculations).
+[`groups-contract.md`](tech/groups-contract.md).
 Group preference/contribution rows, score projections, queues and internal
 certification dependency digests have no direct client privileges. The evaluator
 may resolve an applicable private reading only through a service-only helper and
@@ -110,7 +110,7 @@ semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/REA
 - Persist and restore the normal `Supabase Auth` session; do not invent an app-specific long-lived token format.
 - Assume all user data access is scoped to the authenticated user by backend policy.
 - Never assume the client can override ownership (`owner_user_id`) for another user.
-- For M11 profile work, read/write `app_public.user_profiles` as the authenticated user and lazily create the row on first profile load/save if it does not exist yet.
+- For profile work, read/write `app_public.user_profiles` as the authenticated user and lazily create the row on first profile load/save if it does not exist yet.
 - Email and password updates stay on the `Supabase Auth` user object (`auth.updateUser`), not in `app_public.user_profiles`.
 - Keep auth/profile failures route-local and inline; sign-in/sign-out/profile errors must not block local-only tracker routes or imply hidden sync side effects.
 - Handle auth failures and `RLS` denials as expected runtime outcomes (not exceptional backend bugs by default).
@@ -183,9 +183,9 @@ flowchart TD
 - Use deterministic fixture identities (`user_a`, `user_b`) for ownership tests.
 - Prefer real local Supabase Auth sign-in flows for auth tests (success/failure), not only mocked tokens.
 - For mobile auth bootstrap/session work, cover the no-session, stored-session, and sign-out/session-clear paths before moving to profile UI tasks.
-- For M11 profile changes, add local-Supabase contract coverage for `user_profiles` owner read/update/insert behavior plus mobile tests for username/email/password mutation states.
-- For final M11 auth/profile proof, run the real iOS simulator happy path against local Supabase using the deterministic fixture credentials exposed by `supabase/scripts/auth-fixture-constants.sh`.
-- For group-domain changes (M22), extend `./boga test groups-contract`
+- For profile changes, add local-Supabase contract coverage for `user_profiles` owner read/update/insert behavior plus mobile tests for username/email/password mutation states.
+- For final auth/profile proof, run the real iOS simulator happy path against local Supabase using the deterministic fixture credentials exposed by `supabase/scripts/auth-fixture-constants.sh`.
+- For group-domain changes, extend `./boga test groups-contract`
   (`supabase/tests/groups-contract.sh`). It provisions its own per-run users
   rather than `user_a`/`user_b`, and covers the role matrix, non-member ≡
   nonexistent `NOT_FOUND`, `AUTH_REQUIRED`/`AGENT_FORBIDDEN` on every RPC, and
@@ -199,7 +199,7 @@ flowchart TD
 
 - Never log passwords, JWTs, refresh tokens, `Authorization` headers, or service-role keys.
 - Keep auth error responses generic where user enumeration risk exists.
-- Use Supabase built-in auth rate limiting/config hardening for M5 baseline (no custom rate limiter required unless scoped by a task).
+- Use Supabase built-in auth rate limiting/config hardening (no custom rate limiter required unless scoped by a task).
 
 ## Further reading (load when needed)
 

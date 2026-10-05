@@ -7,7 +7,7 @@
 #
 #   1. hard-deletes, with the service role, every group either user created or
 #      has any membership period in (memberships, invites, share-ledger rows,
-#      and the M25 group exercises, events, boards, and certifications go with
+#      and the group exercises, events, boards, and certifications go with
 #      it by `on delete cascade`);
 #   2. hard-deletes both users' Sync v2 rows (the tables `dev_wipe_my_data`
 #      covers, child-first because each REST call is its own transaction), so
@@ -19,7 +19,7 @@
 #   3. clears user_c's profile row (the create screen's username gate must
 #      prompt) and sets user_d's username (group_join requires one).
 #
-# Contract: docs/specs/tech/groups-contract.md §8 (Maestro lane);
+# Contract: docs/specs/tech/groups-contract.md (Maestro lane);
 # docs/specs/11-maestro-runtime-and-testing-conventions.md (fixture users).
 # Called by apps/mobile/scripts/maestro-run-lane.sh (lane groups-e2e) after the
 # local runtime baseline (which provisions the users) is ensured.

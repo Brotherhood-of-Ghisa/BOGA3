@@ -2,8 +2,8 @@
 
 > **Owns:** the visual and interaction language of the mobile UI — colour roles,
 > type, surface rules, emphasis, and how data is presented. Screen-agnostic.
-> **Not here:** how a particular screen is laid out → `screen-map.md` /
-> `ux-rules.md` (§14a/§14b for the session screens); component inventory →
+> **Not here:** how a particular screen is laid out → `screen-map.md` and its
+> design target; cross-screen semantics → `ux-rules.md`; component inventory →
 > `components-catalog.md`; design-source policy → `ai-design-policy.md`.
 > **Load when:** building or reviewing any screen.
 
@@ -12,7 +12,7 @@ screen was moved onto it by 2026-09-26. It is the app's one styling vocabulary:
 the tokens in `apps/mobile/components/ui/tokens.ts` (`uiRoles`, `uiFonts`,
 `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`) and the
 primitives in `components-catalog.md`. The retired legacy vocabulary is blocked
-by a guardrail (`ux-rules.md` §9a).
+by a guardrail (`ux-rules.md` "Styling guardrails").
 
 First accepted target: `design-targets/exercise-session-v5.md`.
 
@@ -150,7 +150,7 @@ from a mock of six candidates on the exercise page, one per hue family:
 - **Chosen per device, applied at launch.** `tokens.ts` resolves the stored
   preset id to seeds when it first evaluates (`theme-launch.ts`, read
   synchronously from `expo-sqlite/kv-store`); an unknown id or an unreadable
-  store falls back to Warm and is logged. Behaviour: `ux-rules.md` §9b.
+  store falls back to Warm and is logged.
 
 Gated by `ui-theme.test.ts`: every preset passes the generator rules above and
 these floors, and Warm is the default seeds.
@@ -160,7 +160,7 @@ these floors, and Warm is the default seeds.
 **Decided 2026-10-05.** Or one hue on a ring: `seedsFromHue`
 (`apps/mobile/components/ui/theme-hue.ts`) fixes every seed's L\* and chroma,
 so the floors above hold at all 360 hues (gated in `ui-theme.test.ts`). A hue
-near `danger`'s is allowed.
+near `danger`'s is allowed. Stored as `hue:<deg>` with the preset id.
 
 ### Data visualisation
 
@@ -175,7 +175,7 @@ Progress failure-intensity rows, all use it.
 | `viz3` | `#BCA18A` | 68 | |
 | `viz4` | `#A4866B` | 58 | the strongest intensity |
 
-**Picked on device 2026-09-25** (DLM-T08, "B2", from a gallery of a teal, a
+**Picked on device 2026-09-25** ("B2", from a gallery of a teal, a
 warm monochrome and a green, then three warmer takes on the monochrome): a
 bronze taupe at LCh hue 68, chroma 9–20. It sits between `accent` (hue 47,
 chroma 73) and `record` (hue 81, chroma 47) but at a fraction of their chroma
@@ -189,7 +189,7 @@ steps are even in lightness (L* 87 / 78 / 68 / 58) so each bucket reads as
 - Colour is never the only channel: counts and accessibility labels still say
   how much.
 - Marks on a `viz` cell are `ink`: today a 1px ring, selected a 2px border
-  (G2; the heatmaps, DLM-T09). An empty `viz0` cell takes a `rule` hairline,
+  (G2; the heatmaps). An empty `viz0` cell takes a `rule` hairline,
   since `viz0` is only 1.18:1 against `surface`.
 
 Gated by `ui-design-tokens.test.ts`: the steps darken monotonically with
@@ -198,7 +198,7 @@ Gated by `ui-design-tokens.test.ts`: the steps darken monotonically with
 `record`.
 
 **Light only.** No dark variants; `app.config.ts` pins
-`userInterfaceStyle: "light"`. See `ux-rules.md` §9a.
+`userInterfaceStyle: "light"` (`ux-rules.md` "Appearance").
 
 ## 3. Typography
 
@@ -237,8 +237,9 @@ target's other sizes snap onto rungs that already exist — `15→16`, `17→18`
 right call independently: 8px body-adjacent text was poor for accessibility.
 
 These are the *target's drawn sizes* snapping onto the shipped scale, which is a
-different operation from the 2026-09-19 collapse of the old scale recorded in
-`ux-rules.md` §9a.1 (where `15` folded into `14` and `17` into `16`). The two
+different operation from the 2026-09-19 collapse of the old scale, which kept
+`base` at 14 (density over gym-floor legibility) and folded `15` into `14` and
+`17` into `16`. The two
 lists disagree on purpose: one maps a design onto today's rungs, the other
 records how today's rungs were arrived at.
 
@@ -300,7 +301,7 @@ other figure takes its row's colour and
 weight — **no screen bolds the best value in the current context.** Decided on
 device 2026-09-23: per-column bold "best today" figures read as noise, first on
 the session view, then aligned on the exercise page; `Stat` no longer offers a
-`best` emphasis (`ux-rules.md` §14a.4, §14b.4). Only the session's record set
+`best` emphasis. Only the session's record set
 is highlighted, never every qualifying row (2026-10-01); which set that is, and
 what beats a record, is `tech/training-metrics-contract.md` §3.
 
@@ -322,7 +323,7 @@ additionally render faded (§6).
   every screen (`tech/training-metrics-contract.md` §4, `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
-  Mono column (decided for Progress, DLM-T08-D2).
+  Mono column (decided for Progress).
 - **No unit suffix inside an input.** The unit belongs in the field label.
 - **Show a figure wherever it can be computed**, including for values that are
   not yet realised — a planned set shows its projected 1RM and volume faded:
@@ -331,4 +332,5 @@ additionally render faded (§6).
 - **Warm-ups are presented exactly like working sets**, including a real 1RM.
   That 1RM and volume describe the warm-up row alone: a warm-up is never a
   record (brass) and feeds no record, PR or best (decided 2026-10-02).
-  The full rule is `ux-rules.md` §5.11 (`isWorkingSet`).
+  The full rule is `tech/training-metrics-contract.md` "Counted set"
+  (`isWorkingSet`).

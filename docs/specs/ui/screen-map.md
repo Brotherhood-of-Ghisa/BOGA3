@@ -73,8 +73,8 @@ Brief entrypoint map of the current mobile screens.
     failure
   - planning unavailable/loading: nothing beneath the disc; empty: `Plan a
     workout`; ready: one plan row with its own Start and `Manage planning`;
-    error: a retryable `StatePanel`. Production is unavailable until M23
-    supplies a plan read/materialization and management interface
+    error: a retryable `StatePanel`. Production is unavailable until a plan
+    read/materialization and management interface exists
 - Presentation: `design-targets/train-page.md`. No title; the `accent` disc
   (`StartDisc`) is the screen's only primary, a step smaller when a plan row
   sits beneath it
@@ -113,7 +113,7 @@ Brief entrypoint map of the current mobile screens.
     disabling the hub
   - Library & account links to existing exercise-database management and
     Settings/account
-- Presentation (design language, DLM-T04): `paper` ground under a
+- Presentation (design language): `paper` ground under a
   `PageHeader`. Each section is an `ink-muted` micro-label over one `Card` of
   `ListRow`s: a leading `ink-muted` glyph (no badge), the label and its
   description, and a trailing chevron, or `arrow-up-right` for the external
@@ -130,7 +130,7 @@ Brief entrypoint map of the current mobile screens.
 - Key states (high level):
   - configured signed-out email/password form with inline auth error feedback (reuses the `/profile` signed-out credential pattern)
   - auth-unconfigured disabled-reason message instead of a form
-- Presentation (design language, DLM-T05): `paper`, centred, no header. A
+- Presentation (design language): `paper`, centred, no header. A
   `PageHeader` over one `Card` of `FormField`s with `Sign in` as the one
   `accent`; a failure is a `danger` `Notice`, and an auth-unconfigured build a
   `Notice` with the `warning` glyph ("Sign-in unavailable") instead of the form
@@ -145,7 +145,7 @@ Brief entrypoint map of the current mobile screens.
   - in-progress: a phase label plus an advancing activity/progress indicator ("layer K of N", "N items") that visibly moves while work happens
   - offline: an offline message instead of an indefinite spinner, shown only once NetInfo has reported `isConnected === false`; before NetInfo's first determined report the network is unknown and the block shows the in-progress state, never the offline copy
   - error: a single error message and a single Retry button (fires exactly one cycle) on a non-`AUTH_REQUIRED` cycle error
-- Presentation (design language, DLM-T05): one `Card` centred on `paper`; the
+- Presentation (design language): one `Card` centred on `paper`; the
   phase in `ink`, an `ink-muted` spinner, the activity line in Plex Mono
   `ink-muted`; offline is a `Notice` with the `offline` glyph; the error is
   `danger` text above `Retry`, the gate's one `accent`
@@ -171,7 +171,7 @@ Brief entrypoint map of the current mobile screens.
   text. Retry retains history selection. No family heatmap action.
 - Notes: one `ScreenScroll` on paper over `MainTabs`, with Progress selected;
   the new landing is governed by `design-targets/progress-tables.md`, retained
-  history by `design-targets/progress.md` and `ux-rules.md` §12–§13.
+  history by `design-targets/progress.md`.
 
 4b. `/session/[sessionId]` (session view)
 - File: `apps/mobile/app/session/[sessionId]/index.tsx` (components in
@@ -248,7 +248,7 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - exercise catalog management (create/edit/soft-delete/undelete exercises, load-entry mode, and muscle mappings)
 - Key states (high level):
-  - in the design language (DLM-T07; target `design-targets/exercise-catalogue.md`):
+  - in the design language (target `design-targets/exercise-catalogue.md`):
     the in-content title `Exercises`, then the filter field, the `accent` `+`
     (the screen's one primary) and management ⋮ on one row, the one-row
     `Never-done` · `Sort` filters below it, and an outcome `Notice`
@@ -256,7 +256,7 @@ Brief entrypoint map of the current mobile screens.
   - loading / error as a `StatePanel`, or the content
   - shared exercise browser with mandatory taxonomy-ordered muscle families, visible `Never-done` and `Sort: Favourite` / `Sort: A–Z` chips (shared local preferences, applied at once to every open browser); search opens matching families, a tap on a family header closes or reopens it while searching, and clearing restores prior expansion. Rows show last performed and all-time session count; history loading/error states never imply Never done
   - the management sheet (⋮): catalogue-only deleted visibility (`Show deleted` / `Hide deleted`); everyday browsing controls stay on the page
-  - the row `⋮` actions sheet, titled with the exercise's name, offers `Edit`, `Link to group exercise…` (M25-T07; signed in only, disabled for a deleted exercise), and `Delete` (`danger`, no confirmation) / `Undelete`
+  - the row `⋮` actions sheet, titled with the exercise's name, offers `Edit`, `Link to group exercise…` (signed in only, disabled for a deleted exercise), and `Delete` (`danger`, no confirmation) / `Undelete`
   - the exercise editor sheet (create / edit), with its muscle list shown in the same sheet
 - Key exits:
   - back to the exercise picker (`router.back()`) after save when opened with
@@ -276,9 +276,11 @@ Brief entrypoint map of the current mobile screens.
   - Account routes to `/profile`, showing the signed-in email when available or
     concise signed-out guidance otherwise
   - Preferences: an `Appearance` row (`settings-appearance-row`) naming the
-    chosen theme, opening a sheet (`settings-appearance-sheet`) of preset radio
-    rows (`settings-appearance-option-<id>`) with swatches, saved on tap, and a
-    `Custom colour` row opening `/theme-colour`. Rules: `ux-rules.md` §9b
+    theme (`<Preset> from next launch` until the app reopens), opening
+    a sheet (`settings-appearance-sheet`) of preset radio rows
+    (`settings-appearance-option-<id>`), saved on tap, and a
+    `Custom colour` row opening `/theme-colour`; a failed save says nothing
+    changed (`settings-appearance-error`). Rules: `design-language.md` "Presets"
   - Preferences card: date format (`settings-date-format-<format>`) and past-records
     gym filter (`settings-records-gym-<scope>`) are account-local on this device.
     Sign-out hides the choices and returning to the account restores them;
@@ -311,7 +313,7 @@ Brief entrypoint map of the current mobile screens.
   - available from the Settings row under More regardless of auth state; the
     row adds `source=more` and an explicit `Back to More`; the direct
     `/settings` path remains valid without it
-- Presentation (design language, DLM-T04): as More, under `Back to More` and a
+- Presentation (design language): as More, under `Back to More` and a
   `PageHeader`. The date format is a `SegmentedControl`; the signed-out sync
   guidance a `StatePanel` in a `Card`; About a `Card` of text rows. The sync
   panel is a `Card` of `ListRow`s with Plex Mono values: offline is the
@@ -339,7 +341,7 @@ Brief entrypoint map of the current mobile screens.
   - inline load/revoke error with Retry; grant revocation remains usable if
     optional last-access metadata cannot be loaded
   - destructive confirmation before revocation and an in-flight disabled state
-- Presentation (design language, DLM-T05): the native header carries the
+- Presentation (design language): the native header carries the
   title (no in-content title) above the `ink-muted` intro. Signed-out, loading,
   empty and error states are `StatePanel`s in a `Card`. Each grant is a `Card`
   with an `AI` `Tag`, `ListRow`s for the two dates (Plex Mono) and `Revoke
@@ -360,7 +362,7 @@ Brief entrypoint map of the current mobile screens.
   - lazy profile load/provision state for `username`
   - inline unified profile-update success/failure (including pending email-confirmation messaging)
   - sign-out failure feedback that stays on the same route
-- Presentation (design language, DLM-T05): `paper`. View mode is one `Card`
+- Presentation (design language): `paper`. View mode is one `Card`
   of `Stat kind="text"` rows in `ink` over `Edit` (outline) and `Sign out`
   (outline in `danger`), with no `accent`. Edit stays inline: a `Card` of
   `FormField`s with `Cancel` (text) and `Update` (the `accent`). Outcomes are
@@ -375,7 +377,7 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - stack-based complete session list reached from the Stats Sessions card
 - Key states (high level):
-  - one `ScreenScroll` on `paper` (DLM-T10): an `Active` micro-label over the
+  - one `ScreenScroll` on `paper`: an `Active` micro-label over the
     active session's `Card` (the `set-current` glyph, its summary line, then
     `check` and ⋮ `IconButton`s), then a `History` micro-label with the
     `Show deleted` / `Hide deleted` text button (`checked`), and the completed
@@ -386,9 +388,8 @@ Brief entrypoint map of the current mobile screens.
     `Append`, `Delete` (`danger`, no confirm) or `Undelete`; a deleted row is
     faded and carries a `Deleted` `Tag`
   - the active ⋮ opens a `Sheet` with `Delete`, confirmed by an `Alert`
-    (`Cancel` / `Discard`, T10-D4)
-  - `StatePanel`s: `Loading sessions…`; `Could not load sessions` with `Retry`
-    (T10-D6); `No completed sessions`; `No sessions yet`
+    (`Cancel` / `Discard`)
+  - `StatePanel`s: `Loading sessions…`; `Could not load sessions` with `Retry`; `No completed sessions`; `No sessions yet`
   - active Resume and review/complete affordances both open the session view
     so draft state and the shared cleanup rules remain authoritative
 - Key exits:
@@ -457,11 +458,11 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - per-exercise performance history view (progression signals + per-tag drill-down for a single `exercise_definitions` row)
 - Key states (high level):
-  - one `ScreenScroll` on `paper` over `MainTabs` (DLM-T10; `ux-rules` §13.14–16)
+  - one `ScreenScroll` on `paper` over `MainTabs` (`design-targets/progress.md`)
   - loading / error / detail, as `StatePanel`s in a `Card`
   - in-section empty state when no sessions match the active period/tag filter
   - a `Last 7 days` / `Last 30 days` / `All time` `SegmentedControl` and a
-    sideways-scrolling tag `ChipGroup` (`ux-rules` §10.2)
+    sideways-scrolling tag `ChipGroup`
   - a deleted exercise's `Notice`; the `All-time bests` card (`1RM`, `Top
     weight`, figures in `record`); one View Session exercise card per session
   - dynamic stack title set inside the route file to the resolved exercise name (falls back to `Exercise History`)
@@ -470,20 +471,20 @@ Brief entrypoint map of the current mobile screens.
   - Today / Train / Progress / More via the shared `MainTabs`; Progress is
     selected for this analytics detail context
 
-12. `/groups` (M22)
+12. `/groups`
 - File: `apps/mobile/app/(tabs)/groups.tsx`
 - Purpose:
   - preserved More-owned route: one group at a time, chosen with the group
     chips (no `All`; `?groupId=`, else the group last shown, else the first),
     with a joined `Stream` / `Leaderboards` segment
   - Stream: a newest-first stream of the group's sessions, records, and
-    membership events; (M25-T10) record cards sit directly below their session
+    membership events; record cards sit directly below their session
     card, whose `N records` label counts them; record-removed and link items
     are light rows; a record card opens the row detail sheet and offers
     `Certify` inline
-  - Leaderboards (M25-T09): the group's podium cards (see the group screen
+  - Leaderboards: the group's podium cards (see the group screen
     history below for their states)
-- Presentation (design language, DLM-T11; `design-targets/groups.md`): a
+- Presentation (design language; `design-targets/groups.md`): a
   `ScreenScroll` on `paper` (the stream a `FlatList` on the same shell), the
   `Groups` `PageHeader` with `My groups` a caps text button beside it, the
   group chips a single `ChipGroup`, and `Stream` | `Leaderboards` a
@@ -507,7 +508,7 @@ Brief entrypoint map of the current mobile screens.
 13. `/group/mine`
 - File: `apps/mobile/app/group/mine.tsx`
 - Purpose:
-  - My groups: `Join group` (outline) / `Create group` (the one `accent`), then the active memberships as one `Card` of rows (name in Archivo, description in `ink-muted`, member count · my role as a micro-label, a chevron; design language DLM-T13); the way into a group's management page
+  - My groups: `Join group` (outline) / `Create group` (the one `accent`), then the active memberships as one `Card` of rows (name in Archivo, description in `ink-muted`, member count · my role as a micro-label, a chevron); the way into a group's management page
 - Key states (high level):
   - sign-in-required / empty (with `Create group` / `Join with a code` instead of the action row) / offline / error states as on the tab; pull-to-refresh
 - Key exits:
@@ -516,11 +517,11 @@ Brief entrypoint map of the current mobile screens.
 14. `/group/[groupId]`
 - File: `apps/mobile/app/group/[groupId]/index.tsx`
 - Purpose:
-  - the group screen, for managing the group: the header `Card` (name, description, and a `Members` row with the member count · my role, which opens Members), owner/admin `Invite` (the screen's one `accent`, DLM-T13-D1) + `Edit` (outline), then the group's `Exercises` under a micro-label, whose `Add exercise` is an outline (product D14). The stream and leaderboards moved to the Groups screen
+  - the group screen, for managing the group: the header `Card` (name, description, and a `Members` row with the member count · my role, which opens Members), owner/admin `Invite` (the screen's one `accent`) + `Edit` (outline), then the group's `Exercises` under a micro-label, whose `Add exercise` is an outline (D14). The stream and leaderboards moved to the Groups screen
 - Key states (high level):
   - loading / offline / error
-  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the M25-T07 pick sheet, link-only); a linked row offers `Unlink…` independently of role, selecting one personal ID through `Your linked exercises` when several exist, then confirming; local read failures hide actions/status and offer retry; owner/admin `Add exercise` (an outline beside the `Exercises` micro-label, DLM-T14) and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; the rows are one `Card`, and the pick sheet and the unlink chooser are `Sheet`s with no Cancel; "No group exercises yet" when empty; each write's outcome as an inline notice
-  - Leaderboards podium states (M25-T09, now on the Groups screen): one podium card per group exercise on `Certified · 1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
+  - Exercises: active exercises, then archived ones marked `Archived`, each with its weight entry and my local link status (`Linked: …` / `Not linked`); an active row none of mine is linked to offers `Link your exercise` to every member (the pick sheet, link-only); a linked row offers `Unlink…` independently of role, selecting one personal ID through `Your linked exercises` when several exist, then confirming; local read failures hide actions/status and offer retry; owner/admin `Add exercise` (an outline beside the `Exercises` micro-label) and a row sheet (`Rename`, `Archive` with confirmation, or `Unarchive`), which members never see; the rows are one `Card`, and the pick sheet and the unlink chooser are `Sheet`s with no Cancel; "No group exercises yet" when empty; each write's outcome as an inline notice
+  - Leaderboards podium states (on the Groups screen): one podium card per group exercise on `Certified · 1RM` (top 3 with `You` on my row, `You: Nth` below the podium, `You: not ranked`, `No certified sets yet · N uncertified` / `No sets yet`), archived exercises last marked `Archived`; "No group exercises yet" when empty; cached, so it shows offline
   - lost access after `NOT_FOUND` on the group or its exercises: "You're no longer a member of this group", with cached data hidden
 - Key exits:
   - `/group/<groupId>/members` (member count), `/group/<groupId>/invite`, `/group/<groupId>/edit`
@@ -528,10 +529,10 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - sets its stack title to the group name once loaded
 
-14a. `/group/[groupId]/members` (M25-T08)
+14a. `/group/[groupId]/members`
 - File: `apps/mobile/app/group/[groupId]/members.tsx`
 - Purpose:
-  - the member list behind the group header's member count (D14): the header `Card` (name, count · my role), then members in server order (owner, admins, members, then username) as one `Card` of rows, the role a `Tag` (design language DLM-T13)
+  - the member list behind the group header's member count (D14): the header `Card` (name, count · my role), then members in server order (owner, admins, members, then username) as one `Card` of rows, the role a `Tag`
 - Key states (high level):
   - a member row with actions for my role (§4.3) shows a chevron and opens the member action `Sheet` (no Cancel: the backdrop dismisses it); Remove / Transfer confirm first
   - under the list: `Leave group`, an outline in `danger` (admin, member, confirmed) or, for the owner, "Transfer ownership before leaving"
@@ -540,16 +541,16 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - back to `/group/<groupId>`; after a successful leave, `/groups`
 
-14b. `/group/[groupId]/exercises/new` (M25-T08)
+14b. `/group/[groupId]/exercises/new`
 - File: `apps/mobile/app/group/[groupId]/exercises/new.tsx`
 - Purpose:
-  - owner/admin add a group exercise: `From catalogue` (search the bundled standard exercises and pick one, which prefills the form) or `Custom` (a `SegmentedControl`), through the shared name + weight-entry fields in a `Card` whose submit is the screen's one primary; the picked standard exercise is the `radio-on` row (DLM-T14)
+  - owner/admin add a group exercise: `From catalogue` (search the bundled standard exercises and pick one, which prefills the form) or `Custom` (a `SegmentedControl`), through the shared name + weight-entry fields in a `Card` whose submit is the screen's one primary; the picked standard exercise is the `radio-on` row
 - Key states (high level):
   - inline "Exercise name is required"; the write's failure above `Add exercise`, nothing created, draft kept; members see "You can't add exercises"
 - Key exits:
   - back to `/group/<groupId>` (Exercises, refreshed on focus) after adding
 
-14c. `/group/[groupId]/exercises/[exerciseId]/edit` (M25-T08)
+14c. `/group/[groupId]/exercises/[exerciseId]/edit`
 - File: `apps/mobile/app/group/[groupId]/exercises/[exerciseId]/edit.tsx`
 - Purpose:
   - owner/admin rename a group exercise or change its weight entry, prefilled from the cached list
@@ -558,7 +559,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - back to `/group/<groupId>` after saving
 
-14d. `/group/[groupId]/leaderboards/[exerciseId]` (M25-T09)
+14d. `/group/[groupId]/leaderboards/[exerciseId]`
 - File: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/index.tsx`
 - Purpose:
   - a group exercise's full board (E1.2): `Volume | 1RM` and `Certified | All` toggles that switch in place, rows in rank order in one card (rank, `You` / name, `(former)`, value, date; a check icon, or a ring icon and `uncertified`, on All only)
@@ -566,14 +567,14 @@ Brief entrypoint map of the current mobile screens.
   - `Archived · read-only` above the toggles (the name is the header title); empty Certified: "No certified sets yet" with `See all sets`; empty All: "No sets yet"
   - rows read online and paged (never cached): offline with nothing loaded shows the offline empty state, loaded rows stay with the offline marker, a failed next page shows `Retry`
   - lost access (group `NOT_FOUND`); "This exercise isn't in this group" (exercise `NOT_FOUND`)
-  - (M25-T10) a row opens the row detail sheet: value (with the 1RM), the as-logged value when converted, date and gym, `Logged as "…"`, the certification line, and `Certify` / `Remove my certification` / `Cancel certification` as my relationship allows; a write refetches the first page
+  - a row opens the row detail sheet: value (with the 1RM), the as-logged value when converted, date and gym, `Logged as "…"`, the certification line, and `Certify` / `Remove my certification` / `Cancel certification` as my relationship allows; a write refetches the first page
 - Key exits:
   - `History` → `/group/<groupId>/leaderboards/<exerciseId>/history`; back to the group screen
   - the sheet's `View full session` → `/group-session/<memberId>/<sessionId>?groupId=<groupId>`
 - Notes:
   - sets its stack title to the exercise name once loaded
 
-14e. `/group/[groupId]/leaderboards/[exerciseId]/history` (M25-T09)
+14e. `/group/[groupId]/leaderboards/[exerciseId]/history`
 - File: `apps/mobile/app/group/[groupId]/leaderboards/[exerciseId]/history.tsx`
 - Purpose:
   - the board's lead changes for the toggles it was opened with (E1.3), newest first, each a date and a sentence
@@ -582,7 +583,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - back to the board
 
-15. `/group/new` (M22-T05)
+15. `/group/new`
 - File: `apps/mobile/app/group/new.tsx`
 - Purpose:
   - create a group: the inline username gate first when the username is blank (a `Card` with a `FormField` and `Save username`), then the shared name / description form (two `FormField`s, the description's counter in Plex Mono, the submit the one `accent`)
@@ -591,7 +592,7 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `/group/<newGroupId>` (replaces the form) as owner
 
-16. `/group/join` (M22-T05)
+16. `/group/join`
 - File: `apps/mobile/app/group/join.tsx`
 - Purpose:
   - join by code: the username gate if needed, the code field (a Plex Mono `FormField`) and `Find group` (outline), a preview `Card` (name, member count), then `Join group` (the one `accent`)
@@ -600,14 +601,14 @@ Brief entrypoint map of the current mobile screens.
 - Key exits:
   - `/group/<groupId>` (replaces the join screen) after joining or when already a member
 
-17. `/group/[groupId]/invite` (M22-T05)
+17. `/group/[groupId]/invite`
 - File: `apps/mobile/app/group/[groupId]/invite.tsx`
 - Purpose:
-  - owner/admin invite: the code (Plex Mono 700 at `xxl`, letter-spaced, selectable, testID `group-invite-code`; DLM-T13-D3) and its `boga3://` link in `ink-muted`, `Share invite` (the one `accent`; core `Share.share`), and `Regenerate code` (an outline in `danger`) behind a confirmation, whose success reads "New code ready…" in a neutral `Notice` with the `success` glyph
+  - owner/admin invite: the code (Plex Mono 700 at `xxl`, letter-spaced, selectable, testID `group-invite-code`) and its `boga3://` link in `ink-muted`, `Share invite` (the one `accent`; core `Share.share`), and `Regenerate code` (an outline in `danger`) behind a confirmation, whose success reads "New code ready…" in a neutral `Notice` with the `success` glyph
 - Key states (high level):
   - the code loads online only (never cached); members, or a server `FORBIDDEN`, see "Invites are for admins"; a failed regenerate keeps the old code
 
-18. `/group/[groupId]/edit` (M22-T05)
+18. `/group/[groupId]/edit`
 - File: `apps/mobile/app/group/[groupId]/edit.tsx`
 - Purpose:
   - owner/admin edit of name and description with the shared form, prefilled from the cached group
@@ -626,16 +627,16 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - no edit, delete, or append; `completed-session/[sessionId]` is not reused, only its cards
 
-20. `/exercise-link` (M25-T07)
+20. `/exercise-link`
 - File: `apps/mobile/app/exercise-link.tsx`
 - Purpose:
-  - the Link screen for one of my exercises: link it to my groups' exercises or unlink it (product E0.3)
+  - the Link screen for one of my exercises: link it to my groups' exercises or unlink it (E0.3)
 - Key states (high level):
   - sign-in-required when signed out; "This exercise isn't available" for a missing/unknown id
   - `Linked` (my links, from the local synced table: `Unlink` confirms first; a link into a group I left reads `inactive — not a member`, one to an archived group exercise `archived`; missing cache entries show `Group exercise` / `A group`), then a search over group exercises only, `Suggested` (same standard exercise, then name matches), and `All group exercises` by group; one link per group, so the rest of that group shows `already linked in <group>`; archived group exercises are never offered
   - `Link` and `Unlink` are local writes (work offline); link success repeats the retroactivity note; unlink uses the same contextual confirmation and preservation wording as the group row, then names the removed mapping (plus reconnect/sync wording offline); failed local reads have a separate retry and never imply a write failed; the load-mode note shows when weight entry differs
   - a deleted exercise shows "Restore this exercise to link it" (links still listed and unlinkable); offline with nothing cached shows "Connect once to load your groups' exercises"; offline marker and pull-to-refresh as on the group screens
-  - in the design language (DLM-T14): outcomes are `Notice`s (neutral with the `success` glyph, or `danger`); `Linked`, `Suggested` and `All group exercises` are micro-labels over `Card`s of rows, `Unlink` a `danger` text button and `Link` an outline; a `SearchField`; no primary
+  - in the design language: outcomes are `Notice`s (neutral with the `success` glyph, or `danger`); `Linked`, `Suggested` and `All group exercises` are micro-labels over `Card`s of rows, `Unlink` a `danger` text button and `Link` an outline; a `SearchField`; no primary
 - Key exits:
   - back to the catalogue or the exercise page (native back)
 - Notes:
@@ -646,11 +647,11 @@ Brief entrypoint map of the current mobile screens.
 - Purpose:
   - one page per exercise of the active session, or of a completed session being edited from the session view, in the design language (`design-language.md`; accepted target `design-targets/exercise-session-v5.md`): top bar (back · exercise name · ⋮), the collapsible records panel, one ordered set list whose current set expands in place into the logger, `+ Add set`, and `Complete exercise` — the last item in the scroll, after the set list, never a pinned footer
   - reached only from the session view; its domain lives in `src/session-recorder/**`
-  - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel counts only the sessions before it (`ux-rules` §14a.4)
+  - a completed session's exercise is edited with the same rules (logger, ticks, `Complete exercise`) and written back as completed with its times, every row kept; its records panel counts only the sessions before it
 - Key states (high level):
   - records panel collapsed (`1RM` / `Max` / `Vol` of the selected view: the records, or the last session), expanded on `Records` (each record's date and set) or on `Last` (the previous completed session's sets); `Records` | `Last` and `History` are present in both, and switching views keeps the panel collapsed or expanded
   - performed, current and planned rows (glyph `set-done` / `set-current` / `set-planned`); the logger (Weight · Reps · Effort · the `accent` tick) on the first set not performed, or on the row tapped
-  - the effort sheet (W-Up / None / descending RIR from the file-configured maximum, default 3) and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
+  - the effort sheet (long press; a tap cycles) of the Display efforts in `apps/mobile/src/exercise-calculations/effort-policy.ts` order and the ⋮ sheet (Edit exercise / Swap exercise / `Link to group exercise…`, signed in only / Remove from session)
   - Swap exercise: the same Search, one-row `Never-done` · `Sort` filters and family list as the catalogue; excludes the current/deleted exercise, reveals search matches, and handles loading/error/empty history explicitly
   - a missing session or exercise, or a deleted session: an inline message
 - Key exits:
@@ -718,9 +719,8 @@ Brief entrypoint map of the current mobile screens.
 
 24. `/theme-colour` (Custom colour)
 - File: `apps/mobile/app/theme-colour.tsx`; composition: `components/appearance/`
-- A hue ring (`theme-colour-ring`), a live preview of its theme
+- A hue ring (`theme-colour-ring`), a live preview
   (`theme-colour-preview`) and `Use this colour` (`theme-colour-apply`).
-  Rules: `ux-rules.md` §9b
 
 ## Route shell (not a user-facing screen)
 
@@ -730,7 +730,7 @@ Brief entrypoint map of the current mobile screens.
 - Notes:
   - wraps the root stack in the restore guard (`apps/mobile/components/navigation/auth-route-guard.tsx`), which shows a neutral loading view instead of the navigator while the session restore is in flight (boot only)
   - the root stack (`apps/mobile/components/navigation/root-stack.tsx`) declares every root route under one `Stack.Protected` group per access level — `sign-in`, `sync-setup`, the app — and `useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) enables one at a time, so login-on-start and the first-sync block are enforced by the navigator without unmounting it; see `navigation-contract.md` "Router baseline"
-  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, the M22 `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, the M25 `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page), the header-less page sheet `session/[sessionId]/add-exercise` (exercise picker), and `session/[sessionId]/compare` with the native header `Session vs history`)
+  - tab roots live inside the `(tabs)` route group (`apps/mobile/app/(tabs)/_layout.tsx`) with `headerShown: false`; the root stack registers the `(tabs)` group itself plus the `sign-in` and `sync-setup` screens and the detail screens (`exercise-history`, `sessions`, `profile`, `connected-agents`, `maestro-harness`, `completed-session/[sessionId]`, `group/mine`, `group/[groupId]/index`, `group-session/[memberId]/[sessionId]`, `exercise-link`, the `gyms` screen, and the header-less redesign screens `session/[sessionId]/index` (session view) and `session/[sessionId]/exercise/[sessionExerciseId]` (exercise page), the header-less page sheet `session/[sessionId]/add-exercise` (exercise picker), and `session/[sessionId]/compare` with the native header `Session vs history`)
   - the root stack gives every detail screen the native minimal back-button
     display mode (no custom back title), preserving normal platform back
     behavior while hiding the previous route-group title; the arrow-only

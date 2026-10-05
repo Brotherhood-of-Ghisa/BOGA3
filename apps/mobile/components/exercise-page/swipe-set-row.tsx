@@ -50,16 +50,17 @@ const activeOffsetFor = ({ left, right }: SwipeDirections): number | [number, nu
 type SwipeSetRowProps = {
   children: ReactNode;
   // Each side is offered only when its move would change the row
-  // (`ux-rules.md` §14a.3): without a handler the row cannot be dragged that
-  // way and the side's symbol never shows.
+  // (`ux-rules.md` "Swipes on the exercise page"):
+  // without a handler the row cannot be dragged that way and the side's
+  // symbol never shows.
   onSwipeRight?: () => void;
   onSwipeLeft?: () => void;
   testID?: string;
 };
 
 /**
- * The swipe shell of the open set (`ux-rules.md` §14a.3): drag the row right
- * to confirm it and move on, left to drop it. The shell only animates and
+ * The swipe shell of the open set (`ux-rules.md` "Swipes on the exercise page"):
+ * drag the row right to confirm it and move on, left to drop it. The shell only animates and
  * reports the direction — the semantics live in the screen's handlers, so
  * nothing here can navigate or change set state. Vertical scrolling wins
  * before activation; the tap controls (the glyph, the logger's tick) keep

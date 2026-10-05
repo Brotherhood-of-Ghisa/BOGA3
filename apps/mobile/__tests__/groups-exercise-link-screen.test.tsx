@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T07 Link screen (`/exercise-link`, product E0.3; card AC2, AC5, AC6).
+ * Link screen (`/exercise-link`, E0.3).
  * Group reads are mocked; the local database is the shared in-memory SQLite
  * fixture, so link / unlink are the real repository writes, `group_cache` is
  * the real cache, and offline behaviour runs through the production hook.
@@ -300,7 +300,7 @@ describe('Link screen', () => {
     expect(screen.queryByTestId('exercise-link-link-gx-bench')).toBeNull();
   });
 
-  it('losing access to a group evicts its cached exercises but never my links (AC6)', async () => {
+  it('losing access to a group evicts its cached exercises but never my links', async () => {
     warmCache();
     await linkExercise('seed_barbell_bench_press', 'g-tue', 'gx-tue-bench');
     api.listCompetitionExercises.mockImplementation(async (groupId: string) => {

@@ -1,6 +1,6 @@
 # Session Planning and Programmes Technical Contract
 
-> **Status: authoritative technical contract for Milestone 23.**  
+> **Status: authoritative technical contract.**  
 > **Owns:** data model, schema, Sync v2 expansion (12 → 16 entities), materialization algorithms, block-level consumption and resolution lifecycle, set reordering invariants, agent authorization and write API, and MCP tool specifications.  
 > **Complements:** [00-product](../00-product.md), [03-technical-architecture](../03-technical-architecture.md), [05-data-model](../05-data-model.md), [sync-v2-server-contract](sync-v2-server-contract.md), [10-api-authn-authz-guidelines](../10-api-authn-authz-guidelines.md), [08-ux-delivery-standard](../08-ux-delivery-standard.md).
 
@@ -170,7 +170,7 @@ create table public.agent_plan_write_receipts (
 
 ## 3. Sync v2 Topology and Layer Migration
 
-With M23, Sync v2 expands from **twelve to sixteen** user-owned entity types.
+Sync v2 expands from **twelve to sixteen** user-owned entity types.
 
 ### 3.1 Five-Layer Topological Order (`TOPO_LAYERS`)
 
@@ -288,8 +288,8 @@ Two offline devices can attach the same plan block to two different unsourced ca
 
 - **`/sessions` (Planning Hub):**
   - Divided into 4 distinct sections: **Active**, **Upcoming** (scheduled plans sorted by date), **Unscheduled** (unscheduled plans and programmes sorted by updated time), and **Completed** (performed workout history).
-  - Integrates with the **Today tab** (M29): Today surfaces the next upcoming scheduled workout or next programme block as a primary card with a direct Start action. Full queue management and authoring live in `/sessions`.
-- **`/session-plan/new`:** Authoring a one-off plan. Target loads display load input mode indicators (`per_side_load` vs. `total_load`) per M19.
+  - Integrates with the **Today tab**: Today surfaces the next upcoming scheduled workout or next programme block as a primary card with a direct Start action. Full queue management and authoring live in `/sessions`.
+- **`/session-plan/new`:** Authoring a one-off plan. Target loads display load input mode indicators (`per_side_load` vs. `total_load`).
 - **`/session-plan/[planId]`:** View/edit plan. Offers Start all, Duplicate, Delete (for unused/eligible plans), and Add block. Consumed blocks are read-only and link to their performed session.
 - **`/programme/new`:** Authoring an ordered programme (minimum 2 child plans).
 - **`/programme/[programmeId]`:** Programme detail showing overall progress, the next unresolved block in sequence, and child plan summaries.

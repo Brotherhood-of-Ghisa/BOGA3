@@ -86,7 +86,7 @@
 
 - Applies to the one token vocabulary in `apps/mobile/components/ui/tokens.ts`
   (`uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`,
-  `uiBorder`; `docs/specs/ui/design-language.md` §2–§4, `ux-rules.md` §9a).
+  `uiBorder`; `docs/specs/ui/design-language.md` §2–§4).
 - `ui-design-tokens.test.ts` asserts, by whole-object equality: the eight type
   rungs and their line-heights, the colour roles named in §2, the geometry of
   §4 and the embedded faces of §3; and that `record !== accent` and `record`

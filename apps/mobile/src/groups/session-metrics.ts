@@ -29,7 +29,7 @@ export type GroupPerformedExercise = {
   sets: GroupPerformedSet[];
 };
 export type GroupSessionMetrics = {
-  /** `Sets`: the performed working sets (`ux-rules.md` §5.11). */
+  /** `Sets`: the performed working sets (`training-metrics-contract.md` "Counted set"). */
   workingSets: number;
   /** Working sets only; null only when a working row is invalid. */
   totalVolumeKg: number | null;

@@ -1,6 +1,6 @@
 appId: com.dinoderek.mobile
 ---
-# The session view (`ux-rules` §14b) on the session-view fixture
+# The session view (`app/session/[sessionId]/index.tsx`) on the session-view fixture
 # (src/maestro/session-view-fixture.ts; ios-session-view lane, infra-free).
 #
 # Proves:

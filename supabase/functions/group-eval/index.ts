@@ -1,4 +1,4 @@
-// group-eval — the M25 group evaluator (docs/specs/tech/groups-contract.md §2.10).
+// group-eval — the group evaluator (docs/specs/tech/groups-contract.md).
 //
 // Drains app_public.group_eval_queue. The pg_net kick (one per enqueuing
 // transaction) and the pg_cron sweep POST here with the Vault-held

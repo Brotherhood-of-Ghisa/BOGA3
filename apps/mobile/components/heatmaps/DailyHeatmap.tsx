@@ -34,7 +34,7 @@ const formatDayTitle = (dateKey: string): string => {
 };
 
 // Today is a 1px `ink` ring and the selected day a 2px `ink` border, so the two
-// never look alike (DLM-T09-D3); an empty day keeps a `rule` hairline.
+// never look alike; an empty day keeps a `rule` hairline.
 const cellBorder = (day: DayCell, selected: boolean) => {
   if (selected) return { borderWidth: HEAT_MARK.selectedWidth, borderColor: HEAT_MARK.color };
   if (day.isToday) return { borderWidth: HEAT_MARK.todayWidth, borderColor: HEAT_MARK.color };

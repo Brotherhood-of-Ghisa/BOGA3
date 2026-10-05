@@ -128,7 +128,7 @@ appId: com.dinoderek.mobile
     visible:
       id: "session-completion-presentation"
     timeout: 30000
-# M24 makes completion a mandatory post-submit presentation. Exercise the
+# Completion is a mandatory post-submit presentation. Exercise the
 # explicit Done exit before continuing this lane's history persistence checks.
 - tapOn:
     id: "session-completion-done"

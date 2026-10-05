@@ -95,6 +95,7 @@ scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs g
 scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/doc-budgets.tsv	docs-check	doc word budgets
+scripts/plan-ref-exempt.txt	docs-check	plan-ID exemptions
 scripts/test-for.sh	meta-tests	trigger matcher
 scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
 scripts/lane-timing.sh	meta-tests	lane-timing recorder (lane-timing meta-test)

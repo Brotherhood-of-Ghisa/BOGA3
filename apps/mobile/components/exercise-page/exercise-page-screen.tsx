@@ -80,7 +80,7 @@ const LOAD_ERROR_MESSAGES = {
 const FALLBACK_BACK_ROUTE = '/train' as Href;
 
 /**
- * The exercise page (`ux-rules` §14a): one page per session
+ * The exercise page: one page per session
  * exercise, the set list with the in-place logger, and two exits — Back leaves
  * set states untouched, `Complete exercise` resolves the sets still waiting.
  * The same page edits an exercise of a completed session (opened from the
@@ -202,13 +202,13 @@ export function ExercisePageScreen({
     const added = next[next.length - 1];
     updateSets(() => next, 'structural');
     setOpenSetId(added?.id ?? null);
-    // Ready to overwrite the copied weight (`ux-rules.md` §5.11).
+    // Ready to overwrite the copied weight.
     requestAnimationFrame(() => weightInputRef.current?.focus());
   };
 
   /**
-   * Swipe right on the in-progress set (`ux-rules.md` §14a.3): confirm it and
-   * move on — the same write as the tick. On the last set, the deterministic
+   * Swipe right on the in-progress set (`ux-rules.md` "Swipes on the exercise page"):
+   * confirm it and move on — the same write as the tick. On the last set, the deterministic
    * continuation is Add set: the fresh row opens in the logger with the
    * copied values and the weight focused. Invalid values change nothing.
    */
@@ -231,10 +231,10 @@ export function ExercisePageScreen({
   };
 
   /**
-   * Swipe left on the open set (`ux-rules.md` §14a.3): drop it (`dropSet`) —
-   * an ad-hoc row is removed and the logger falls back to the cursor; a
-   * touched planned row reads as its plan again and stays open. Never
-   * navigates.
+   * Swipe left on the open set (`ux-rules.md` "Swipes on the exercise page"):
+   * drop it (`dropSet`) — an ad-hoc row is removed and the logger falls back
+   * to the cursor; a touched planned row reads as its plan again and stays
+   * open. Never navigates.
    */
   const onSwipeLeft = (setId: string) => {
     Keyboard.dismiss();
@@ -436,7 +436,7 @@ export function ExercisePageScreen({
                 setOpenSheet('none');
                 // Pending edits are written before the Link screen opens, so
                 // linking mid-session cannot race the autosave debounce and
-                // the session is left exactly as it reads (`ux-rules.md` §14a.5).
+                // the session is left exactly as it reads.
                 void draft.flush().then((saved) => {
                   if (saved) router.push(exerciseLinkHref(exercise.exerciseDefinitionId));
                 });

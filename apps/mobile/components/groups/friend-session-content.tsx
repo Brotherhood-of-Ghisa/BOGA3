@@ -17,13 +17,13 @@ const IN_PROGRESS_LABEL = 'In progress';
 const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
 
 /**
- * The friend's session body (C3.8), in the design language and on the cards
+ * The friend's session body, in the design language and on the cards
  * View Session uses (`components/session-detail/`): the member, the session's
  * facts, then one card per exercise with its performed sets as `type · weight
  * × reps · 1RM · VOL`. Read-only — NO owner actions (no edit, delete, append)
  * and no record band, since the friend's history is not on this device.
  * Performed sets only: the server returns every live set raw, and the device
- * selects the performed ones (contract §5).
+ * selects the performed ones (contract).
  */
 export function FriendSessionContent({ session }: { session: CompetitionSessionWire }) {
   const model = useMemo(() => buildCompetitionSession(session),[session]);

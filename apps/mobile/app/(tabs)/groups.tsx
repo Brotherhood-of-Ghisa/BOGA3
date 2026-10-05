@@ -43,7 +43,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 /**
- * The Groups screen (groups contract §6.3): one group at a time, picked with
+ * The Groups screen (groups contract): one group at a time, picked with
  * the group chips, showing its Stream or Leaderboards. Managing groups (join,
  * create, the group page) lives behind My groups. `?groupId=` preselects a
  * group.
@@ -96,7 +96,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
     evictGroupIdOnNotFound: selectedGroupId,
   });
 
-  // Lost access to the selected group (C3.6.8): refresh My groups so its chip goes
+  // Lost access to the selected group: refresh My groups so its chip goes
   // and the selection moves to another group.
   const refreshMine = mine.refresh;
   const lostAccess = stream.lostAccess || boards.lostAccess;

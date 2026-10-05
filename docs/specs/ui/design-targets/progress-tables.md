@@ -6,8 +6,8 @@ owns the table implementation and `/stats-history` re-exports it. Shipping PRs
 carry real-data Jest, native captures and the comparison against this target.
 The retained palette, repository typography and native frame follow the written
 brief; the full taxonomy scrolls beyond the image's illustrative excerpt.
-Current rules live in `../ux-rules.md`
-§13, `../screen-map.md` and `../navigation-contract.md`.
+Current rules live in this record, `../screen-map.md` and
+`../navigation-contract.md`.
 
 ## Target
 

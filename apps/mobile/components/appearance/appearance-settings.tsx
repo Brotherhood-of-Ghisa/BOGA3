@@ -28,7 +28,7 @@ import {
 import { logEvent } from '@/src/logging';
 import { THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 
-// Settings → Preferences → Appearance (`docs/specs/ui/ux-rules.md` §9b): a row
+// Settings → Preferences → Appearance (`docs/specs/ui/design-language.md` "Presets"): a row
 // naming the chosen theme, and a sheet listing the presets. A choice is saved
 // at once and applies on the next launch; the app cannot restart itself. The
 // last row opens the custom colour picker.

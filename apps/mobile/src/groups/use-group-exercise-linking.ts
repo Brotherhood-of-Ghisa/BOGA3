@@ -1,4 +1,4 @@
-// Data for the linking UI (M25-T07; design §7): my groups' exercise
+// Data for the linking UI: my groups' exercise
 // catalogues, cache-first, plus my live links from the local synced table.
 //
 //   - Links come from `exercise_group_links` (`listLinks()`), so linked-state
@@ -11,7 +11,7 @@
 //   - It never throws into render; a null `userId` (signed out or auth
 //     unconfigured) disables everything, NetInfo included.
 //
-// Group code never runs inside the sync cycle (C3.10.5).
+// Group code never runs inside the sync cycle.
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect,useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';

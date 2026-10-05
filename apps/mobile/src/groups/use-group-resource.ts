@@ -1,4 +1,4 @@
-// Cache-first group read hook (`docs/specs/tech/groups-contract.md` §6.1, §7).
+// Cache-first group read hook (`docs/specs/tech/groups-contract.md`).
 //
 //   - renders the cached payload for (user, cacheKey) first;
 //   - refreshes on focus, every 30 s while focused, and on `refresh()`;
@@ -8,7 +8,7 @@
 //     `evictGroupIdOnNotFound` is set) and surfaces `lostAccess`;
 //   - it never throws into render: every failure is a typed `error` state.
 //
-// Group code never runs inside the sync cycle (C3.10.5): this hook only reads
+// Group code never runs inside the sync cycle: this hook only reads
 // NetInfo and the local cache and calls the group RPC it is given.
 
 import { useFocusEffect } from 'expo-router';

@@ -1,986 +1,207 @@
-# UX Rules (Authoritative Current UI Semantics)
-
-## Purpose
-
-Document app-specific UI semantics and guardrails for the current mobile app.
-
-- This doc is a reality-based source of truth for current behavior and conventions.
-- It complements (does not replace) `docs/specs/08-ux-delivery-standard.md`, which defines cross-task UX process requirements.
-
-## Sources
-
-- UI docs index: `docs/specs/ui/README.md`
-- Screen map: `docs/specs/ui/screen-map.md`
-- Navigation contract: `docs/specs/ui/navigation-contract.md`
-- Components catalog: `docs/specs/ui/components-catalog.md`
-
-## Current behavior
-
-### Optional bodyweight calculations
-
-Settings owns a `Bodyweight calculations` row with an always-visible On/Off
-control and a separate, always-visible `Body weight log` row beneath it.
-Toggling works offline and hides/ignores calculation contributions without
-deleting them or any readings. `Body weight log` opens the kg-only dated history
-with add/edit/delete, inline validation and retryable writes; reading management
-never depends on whether calculations are enabled.
-
-Session/workout surfaces keep the ordinary session facts and logging controls.
-Personal calculations select the latest valid reading at/before the exact
-session start internally. Missing reading silently uses zero;
-reading/value/date/delete/restore and session-start changes refresh derived
-views without rewriting raw sets.
-
-While the private preference is enabled, the personal exercise editor adds only
-`Bodyweight contribution (%)` with decimal 0–100 validation and a short hint.
-When disabled, it hides the field and preserves its value. The in-place logger
-keeps one kg `Weight` field, reps, effort and confirmation; bodyweight arithmetic
-stays internal. Rows and analytics say `Weight`, `Top weight`, `1RM` and
-`Volume`; missing personal context never makes them unavailable. Valid zero
-renders as `0` and earns no record state (`tech/training-metrics-contract.md` §3).
-
-Groups own an independent admin toggle and conditional group contribution.
-Strict group calculation may omit a dependent score, but group surfaces use
-generic unavailable/ended copy. Normalized sets retain reps/effort and omit
-raw/absolute loads and aggregate subtraction totals. They
-never reveal a member reading value, date, identifier, source, history or
-dependency digest. The group visual target is
-`design-targets/group-competitions.md`; the group contract is
-`../tech/group-competition-contract.md`. Personal surfaces retain the bodyweight
-target and contract.
-
-### 1. Action semantics
-
-1. Primary actions are filled/high-emphasis actions used for the main next step in a section/screen.
-   - Examples:
-     - `Resume workout`, `Start empty workout` / `Start planned workout`
-     - `Finish` / `Done` / `Save Changes`
-     - `New Exercise`
-   - In the design language a primary is the screen's one `accent` button
-     (`ui/design-language.md` §5). Train shows both starts when a plan is
-     ready: the planned start is the primary and the empty start is an outline.
-2. Secondary actions are neutral/outline actions used for non-destructive alternatives or dismiss/close flows.
-   - Examples:
-     - `Cancel`
-     - `Done`
-     - `Reopen` (when enabled)
-3. Danger actions are explicitly destructive and visually distinct.
-   - Examples:
-     - delete session
-     - soft-delete exercise
-     - remove destructive menu actions
-4. Tab actions (`MainTabs`) are navigation controls, not generic primary actions.
-   - They use tab semantics (`accessibilityRole="tab"` / tablist), active-state
-     visuals, and equal-width flex targets across the available bar width.
-   - The active tab is marked by weight and an `ink` underline, never by
-     colour alone and never in `accent` (which is the screen's one primary).
-5. Persistent navigation contains exactly Today, Train, Progress, and More.
-   - Settings is an internal row under More, not a fifth tab or utility button.
-   - More and Settings remain available while logged out so account access never
-     blocks the local-first tracker entry routes.
-6. Settings and More distinguish internal destinations from public setup links.
-   - Internal rows use button/navigation semantics and stay in the app.
-   - `Connect an AI coach` visibly carries an external indicator, uses link
-     semantics plus an external-browser accessibility hint, and opens only the
-     configured first-party `/connect` page with no OAuth or session state.
-   - A failed browser launch leaves the current screen usable, shows concise inline
-     feedback beside the link, and keeps the same action retryable.
-   - More groups real destinations under Community, Tools, and Library &
-     account; account-bound rows are omitted without a user and
-     developer-only rows use `isDevMode()`.
-   - Each More row's accessible name includes its visible description. The
-     Exercise Catalog, Settings and Gyms rows carry `source=more` and show an
-     explicit `Back to More` action; direct routes and non-More origins do not
-     claim that history. Groups looks the same however it is opened. Gyms sits
-     under Tools; it is also reached from the session view's `Gym` sheet.
-   - Settings Preferences holds device-local choices shown as a single-select
-     `SegmentedControl` (`tablist` / `tab` + `selected`): the date format.
-     There is no screen choice: every active-session entry opens the session
-     view (`/session/<id>`).
-7. Today is a bounded landing page, not a second full feed or history screen.
-   It starts and resumes nothing: Train owns both.
-   - Progress counts working sets (§5.11), never volume, and places every
-     session, working set and PR by the session's `completed_at`. Its
-     sessions are counted sessions (`tech/training-metrics-contract.md` §2):
-     a session with no working set is not one. A week is
-     Monday 00:00 to Sunday 24:00 local; a month is the local calendar month.
-   - The week shows this week's sessions, working sets and PRs so far, each
-     with a bar against last week's whole total, never a signed delta. The
-     bar fills in laps of last week's total, one `viz` step darker per lap:
-     `viz2` up to it, then `viz3` over a full `viz2` up to twice it, then
-     `viz4` over a full `viz3` up to three times, where it stops full. With
-     no last week, any figure is a full `viz3` bar.
-   - The month compares its working sets so far with the previous month up to
-     the same day of month (its last day when shorter), as a signed absolute
-     count (`+4`, `−3`, `±0`; §13.2). The projection is linear: so far per
-     elapsed day, today included, times the month's days; the chart draws it
-     (and its spoken label states it). No summary line sits under the chart.
-   - Each week figure's caption is `vs <n> last wk`.
-   - A PR is one record kind an exercise took in a session: 1RM, Weight or
-     Volume (`tech/training-metrics-contract.md` §3), so one exercise adds up
-     to three. The week's `PRs` is one number with no breakdown by kind.
-   - The latest completed session is one row; full history is the Sessions
-     list (`All sessions`). Its PR line names a single PR (exercise, kind,
-     figure) and only counts several. The row carries no group tags: which groups a
-     session was shared to is decided on the server, and the device does not
-     know it.
-   - With no completed session, the card is `Your week starts here` with
-     `Open Train`.
-   - Group activity shows one group at a time: the group chips appear only
-     with more than one group, and the selected group is the Groups screen's
-     (last viewed, else the first), so a pick on either screen moves both.
-   - The board is this local week's top three members by working sets
-     (completed sessions shared to the group), each with a `viz` bar as a
-     share of the leader's (the leader in the darker step) and `PRs`. On the
-     group card a PR is a **group record**, one per board the member took #1
-     on, not a personal PR, so the two cards' PR counts follow different rules.
-     Ranks
-     tie; when the user is outside the three rows, a `You · <rank>` line
-     closes the board.
-   - The latest activity is one row: one member training now opens their
-     session; several collapse into `<n> training now` with their names and
-     gyms and open the Groups screen; otherwise the latest completed session
-     (at any time) with its group record line opens that session. One
-     member's session is the Progress card's row under the member's name (and
-     the training-now mark while training). A group with neither says so in
-     one muted line.
-   - No group: `Train with friends` with `Find a group` (My groups). Offline,
-     the cached week stays under the offline `Notice`; a cached earlier week is
-     never shown as this one.
-8. Train is the personal-training entry hub, while the session view remains
-   focused on performing one workout.
-   - A workout in progress is Train: the Train tab opens it directly, and
-     Train reached another way opens it. There is no Resume button, and the
-     workout blocks the back gesture (it is left by the tab bar). Train has no
-     title and no explanatory copy: one start disc that never changes while
-     it checks or starts (`design-targets/train-page.md`).
-   - Active-session detection must succeed before Train exposes any new-session
-     action; a detection error is retryable and does not assume that no draft
-     exists.
-   - An active draft replaces empty and planned start actions; Train opens
-     the draft instead of offering them.
-   - Every session entry goes through one session-entry coordinator. It
-     rechecks the active draft at press time and serializes competing requests
-     so an empty or planned action cannot create a second concurrent session.
-   - Empty start persists one blank active draft through the session
-     repository (`src/session-recorder/`) before opening it in the session
-     view. A failed write stays inline and retryable.
-   - Planning loading/error/empty/ready/unavailable states are explicit. Until
-     the planning dependency ships, production is unavailable and shows
-     nothing beneath the disc; it does not guess a management route or plan.
-   - Exercise selection remains contextual inside the session view (its
-     exercise picker). Exercise-database administration remains owned by More,
-     not Train.
-
-### 2. Modal and overlay semantics
-
-1. Most secondary workflows in current screens use in-route modal/overlay UI state instead of route changes.
-   - Examples:
-     - the Sessions list's row and active-session action sheets
-     - the exercise catalogue's management and row Actions sheets and the exercise editor
-     - the session view's `Gym` sheet and ⋮ menu, and the exercise picker's inline exercise creation editor
-2. The exercise picker (the session view's `+ Add exercise`; `components/session-recorder/exercise-picker.tsx`) is its own route, `/session/<id>/add-exercise`, presented as a full-height iOS page sheet rather than an in-route `Sheet`: a grabber, then `Select Exercise` with `Manage`, `Add new` and `Close` (`x`) `IconButton`s on the title's row. Swiping the sheet down or Close leaves without adding. Search sits under the title and the filters on one row beneath it (§4.6). A pick closes the keyboard and takes focus off the search; dragging the list or the keyboard's Search key closes it too. Its inline editor and group pick sheet present over it, and it stays as it was under them. A failed add keeps it open with a `danger` `Notice`.
-3. The exercise catalogue (DLM-T07) puts its options in design-language `Sheet`s with no Cancel or Done; the backdrop dismisses them. ⋮ opens `Manage exercises` with the catalogue-only Show deleted control; shared browsing controls remain on the page. A row's ⋮ opens a sheet titled with the exercise's name: `Edit`, `Link to group exercise…` (signed in only), and `Delete` in `danger`, or `Undelete` for a deleted exercise. Delete does not confirm: it is a soft delete, undone from the same sheet (T07-D4). Opening either sheet dismisses the filter's keyboard first, so a sheet never opens under it.
-4. The shared exercise editor (`ExerciseEditorModal`: the catalogue, the picker's `Add new` and group `Add as new`, the exercise page and the group exercises page) is a tall `Sheet` that lifts above the keyboard; the backdrop dismisses it except while it saves, and it has no Cancel. `Save Exercise` is its one `accent`. Choosing a primary or secondary muscle swaps the sheet's body for the muscle list in the same sheet (T07-D3): the title names the choice, and a `chevron-left` `Back to exercise` returns without choosing. A second, stacked sheet is not used.
-5. In the exercise picker, tapping an exercise opens an in-place preselection panel instead of immediately adding:
-   - `Add empty set` (an outline) is always available and adds the exercise with one blank set.
-   - `Append plan` is the picker's one primary; its plan's sets preview as the set row, faded as planned.
-   - `Append plan` remains visible but disabled while completed-history suggestion data loads or when no valid completed-history plan exists; the disabled state has no inline error copy.
-   - Changing the search text dismisses the preselection panel and returns to the filtered list without changing grouped-list expansion state.
-   - The picker only adds; replacing an exercise is the exercise page's `Swap exercise` (§14a.5), which keeps the sets.
-6. Modal open/close is treated as state within the current route and should not be documented as a navigation transition.
-   - `/sessions` (DLM-T10): a completed row's ⋮ opens a `Sheet` titled with the
-     session's start stamp: `Edit`, `Append`, and `Delete` in `danger`, or
-     `Undelete` for a deleted session. Completed Delete does not confirm: it is
-     a soft delete, undone from the same sheet. The active session's ⋮ opens a
-     `Sheet` with one `Delete` in `danger`, which confirms in an `Alert`
-     (`Discard this workout?`, `Cancel` / destructive `Discard`) because
-     discarding an active session cannot be undone (T10-D4); `Cancel` keeps
-     the session. Neither sheet has a Cancel; the backdrop dismisses it.
-7. Dismiss overlays via backdrop press are common and expected when the flow is not destructive-final.
-
-### 3. Screen layout and spacing conventions (current app behavior)
-
-1. Current user-facing screens use vertical layouts with no horizontal scrolling on phone widths.
-2. Page backgrounds are muted light surfaces (`surfacePage`-like behavior), with card/panel surfaces layered on top.
-3. Spacing rhythm is already close to 8pt increments (common values cluster around `8/10/12/14/16/20`) and should remain consistent.
-4. Bottom tab navigation (`MainTabBar`) remains visible on canonical roots
-   (`today`, `train`, `progress`, `more`) and recognized preserved roots. It
-   is one fixed bar, identical wherever it shows: the session view and
-   `exercise-history` (which selects Progress) render the same `MainTabBar`.
-
-### 4. List and row interaction conventions
-
-1. Pressable list rows commonly separate:
-   - main row press target (open/edit primary action)
-   - trailing kebab/icon action for secondary actions
-2. This split interaction pattern is used in `exercise-catalog` and in the shared `HistoryList` / `ActiveSessionRow` building blocks on `/sessions`, and should be preserved during refactors unless behavior intentionally changes. On `/sessions` the controls are 44pt `IconButton`s (`check`, ⋮); a deleted completed row is faded and carries a `Deleted` `Tag`, and the `Show deleted` / `Hide deleted` toggle is a text `ActionButton` exposing `checked` (T10-D5).
-3. Deleted/archived visibility is controlled via toggles and state hints, not separate routes.
-4. In `exercise-catalog`, deleted exercises remain in list history when deleted visibility is enabled, show explicit `Deleted` state, and expose `Undelete` from row actions.
-5. `exercise-catalog` is titled `Exercises`. Its top row is Search, `+` (create, the one `accent` action) and ⋮ (management); the filter row (§4.6) remains visible below search. Deleted visibility lives in the management sheet.
-6. The catalogue, add picker and swap picker share one personal exercise browser:
-   - always group by primary-muscle family in taxonomy order (`Chest`, `Shoulders`, `Back`, `Arms`, `Core`, `Legs`, `Lower Legs`, `Other`), preserving the primary-mapping fallback; without search, empty families remain disabled/collapsed,
-   - the everyday filters are one row of pills below search: `Never-done` (a checkbox, solid `ink` while on), the add picker's `Groups` (signed in only), and `Sort: Favourite` / `Sort: A–Z`, one button that switches between the two orders. A change applies at once to every open browser,
-   - Sort offers exactly `Favourite` (default) and name A–Z, within each family; family order never changes,
-   - Favourite sums working sets (§5.11) from completed sessions in the last 180 days with the existing 60-day half-life; only the selected personal working efforts score. Ties use latest qualifying use inside that window, then name. Active, unperformed, invalid and tombstoned rows do not score. The window never filters visibility,
-   - row history is all-time and reads working sets: `Last: 23 Sep · 18 sessions` (singular `1 session`); include the year outside the device's current local calendar year, e.g. `Last: 23 Sep 2025`. Count a completed session once even across multiple sets or repeated exercise blocks, and only when it holds a working set of the exercise. No counted history reads `Never done`; history failures show a retryable error, never a fabricated never-done result,
-   - persist and share Sort and `Show never-done` (default on) per account on this device across all three browsers and launches. Sign-out hides the active choices; returning to the same account restores them. Local-only builds use a separate profile. Failed preference reads/saves retain durable choices and unsaved input; report them centrally in Settings' Data & Sync Error row, including while signed out. Its existing Refresh action retries preference storage and, when signed in, nudges sync. Preference controls add no error boxes or Retry buttons. Off hides only exercises never performed across all history. Migrate legacy `recentsOnTop` true/false to Favourite/Name A–Z; ignore obsolete grouping/period settings and retain the separate detail date-format preference,
-   - search reveals matching families expanded and omits zero-match families; a tap on a family header closes it (and reopens it) while searching, until the search is cleared and started again; clearing restores each surface's pre-search expansion state. Search and ordinary expansion are surface-local. Empty results have an explicit message with controls still available,
-   - refresh/reopen recomputes ranking and date labels against current time, without polling. Volume and 1RM remain on detail/history surfaces,
-   - add/swap hide deleted exercises; swap excludes the current exercise. The add picker's separate `Groups` toggle and `From your groups` linking flow remain independent of personal never-done filtering.
-7. Exercise picker historical preselection plans are sourced from completed workout history only, independent of Favourite's window. The plan uses the most recent completed session with valid performed set rows for the selected exercise; duplicate same-exercise blocks inside that session are combined in session order, and preview rows are numbered continuously. Valid plan rows require a non-negative numeric weight and a positive integer rep count; `0kg` is valid.
-
-### 5. Forms and validation conventions
-
-1. Text inputs, picker triggers, and read-only fields are visually similar but currently implemented in multiple screen-local styles.
-2. The exercise editor uses explicit field labels and inline validation: a `FormField` for the name (error below it), a field-framed `Primary muscle` row that turns `danger` when the choice is missing, a duplicate-secondary message under the secondary list, and a save failure as a `danger` `Notice` under `Save Exercise`.
-3. Editing a completed session (the session view, §14b.7) validates Start/End (`YYYY-MM-DD HH:mm`, End not before Start) and shows an autosave-paused notice while they are invalid.
-4. Validation/error feedback should remain near the relevant field/control whenever possible.
-5. The exercise picker and `exercise-catalog` list include a text filter that:
-   - trims and collapses extra whitespace in user input,
-   - matches case-insensitively,
-   - matches when every typed word appears in the exercise name or primary muscle display/family terms.
-   - keeps family headers, expands matches during search and omits empty families; clearing restores the pre-search expansion state.
-6. The M11 profile sign-in form keeps auth failure messaging inline inside the same card as the email/password inputs.
-7. When auth config is unavailable, the profile route shows an unavailable notice (the `warning` glyph and words, no warning hue) and disables sign-in rather than failing only after submit.
-8. The M11 profile sign-in form performs basic client-side email-shape validation before attempting the auth request.
-9. The signed-in profile route defaults to a view-only summary with row-based account values and one bottom action row (`Edit` + `Sign out`, both outlines, `Sign out` in `danger`), with no extra title/help copy. `Sign out` has no confirmation: it loses no data (DLM-T05-D4).
-10. Entering profile edit mode reveals `username`, `new email`, and `new password` fields in place (not a sheet), plus `Cancel` (text) and a single `Update` submit action, the screen's one `accent`; update failures stay inline and successful updates return to view mode.
-11. Set semantics, shared by the exercise page (§14a) and the session view (§14b) through `src/session-recorder/` (presentation is theirs; set numeric validation uses visual cues only, no inline validation text):
-    - `Weight` accepts decimal numeric input and must be a non-negative number. `Reps` accepts integer numeric input and must be a positive integer. A nonblank weight retains the entered scalar; blank weight with positive integer reps commits and persists as `0`.
-    - Effort is Warm-up, Unspecified (`null`), RIR-4 through RIR-0, Technique, or Cooldown; logging choices use the saved Display selection. Historical canonical RIR labels outside the fixed picker remain valid. It is persisted separately from performance confirmation and planned volume; a planned row's matched/modified classification compares prescribed volume only (`Weight` + `Reps`), not effort.
-    - `W-Up` marks warm-up effort. Eligibility lives in `tech/training-metrics-contract.md` (§1–§2). Personal Working set choices control strength records, working-set heatmaps, favourites, `Last:`, “done”, counted sessions and comparison observations. Volume choices independently control volume totals, coverage (`Known subtotal from X of Y included sets`), muscle load and Volume records. A volume-only session may have a Volume record or heatmap cell with zero working sets and zero counted sessions. Per-set 1RM and volume remain visible for every performed row. An unqualified set count is working sets, labelled `Sets`; only non-statistic row counts (the session view card's `n of m sets done` and the remove-exercise alert's `its N sets`) count every row.
-    - The first new ad-hoc set defaults to the first Display choice (Warm-up by default). Adding a set copies `Weight` and `Reps`, with Unspecified after Warm-up when displayed, and a visible inherited effort otherwise. A hidden RIR uses the next harder visible RIR; without one it uses Unspecified or the first displayed choice. New rows have their own identity and unconfirmed status. These defaults never rewrite existing sets or prescriptions. Copied values remain unperformed until ticked; adding after an untouched plan leaves that plan unperformed. The added `Weight` input takes focus and selects copied text for replacement.
-    - Active and completed-edit autosave preserve every set row, including fully blank, partial, valid unconfirmed, and planned rows, with stable identity, values, effort, confirmation status, and order across input blur, tab/route navigation, hydration, sync, and restore. Legacy persisted `skipped` planned rows hydrate as untouched planned rows. Blank or invalid reps remain incomplete; valid unconfirmed rows remain excluded from performed semantics.
-    - Final active-session submit and completed-edit save persist completed workout history as confirmed actual sets only. Completion uses separate explicit cleanup decisions for entered-but-unconfirmed rows (a specific discard prompt) and incomplete rows (§14b.2); untouched planned rows are actual-only omissions, and exercises left empty use the same cleanup prompt. The `/sessions` active-session completion affordance opens the session view, so it cannot bypass this cleanup.
-12. Session comparisons are shared across active sessions, completion and View Session Summary. An active session's live comparison body is its own screen, `Session vs history`, opened from the session view's ⋮ (§14b.3), not a section of the view; logging stays usable while history loads or fails.
-13. The shared exercise editor dismisses the text keyboard before opening primary/secondary muscle selectors, and selector lists remain keyboard-aware so all muscle-group options stay reachable on iOS. The primary list marks the current choice with `radio-on`; the secondary list offers only muscles not already chosen, each with `plus`. Secondary muscles are `ListRow`s in a `Card`, each removed by a `danger` `x`. It exposes a two-choice `Total load` / `Per side` `SegmentedControl`, preselects the stored value while editing, and defaults new custom exercises to total load.
-14. GPS gym detection is quiet assistance, and it **suggests only** (decided
-    2026-09-23):
-    - opening the session view's `Gym` sheet runs one foreground location read
-      (a 1.5 s budget; the permission prompt, when due, first appears here);
-      exactly one confident match against the unarchived gyms with a saved
-      location shows as the sheet's first row, `Nearby · <gym>`, and one tap
-      selects it; the sheet never selects it for the lifter, and it is not
-      shown for the gym the session already has,
-    - starting a session never preselects a gym (every start goes through
-      `src/session-entry/coordinator.ts` with `gymId: null`), and there is no
-      long-press retry,
-    - permission denial, services off, low accuracy, no match, a tie, a read
-      failure and no fix within the budget show no suggestion row and leave the
-      gym unchanged; the list below is usable at once,
-    - manual selection and `No gym` are always authoritative.
-15. The session view's `Gym` sheet includes `No gym` as a null session-gym
-    option:
-    - it maps to nullable `session.locationId` / persisted `gym_id`,
-    - it is not a `gyms` row and is not editable, archived, synced, or shown on
-      the Gyms screen,
-    - null gym state displays as `No gym`, not as an unresolved choose prompt,
-    - the sheet lists the unarchived gyms (the seeded gyms, then the local ones
-      by name) with the current one marked, and its `Manage gyms` footer row
-      opens `/gyms`; back on the session view the sheet reopens with the gyms
-      reloaded.
-16. Gym management lives on the Gyms screen (`/gyms`), with private
-    coordinate controls in the gym's own editor:
-    - each gym shows only location presence (`Location saved` / `No location
-      saved`), never latitude/longitude precision,
-    - a row opens its editor in place (like the exercise page's logger); the
-      editor holds the name, the location controls and `Archive` /
-      `Unarchive`; list rows carry no location or archive action,
-    - `Save current location` reads foreground location and saves only a fix
-      accurate enough to match later; a new gym's location is staged and saved
-      with `Add gym`, and adding a gym never reads the location unless asked
-      (`/gyms` is not necessarily where the gym is),
-    - `Replace` and `Clear` each confirm inline first,
-    - permission denial, services off, low accuracy and write failures stay
-      inline in the editor and leave the saved location unchanged,
-    - clearing a location removes the gym from GPS suggestion until one is
-      saved again,
-    - `Archive` is the synced soft delete (`gyms.deleted_at`): the gym leaves
-      the sheet and GPS suggestion, keeps naming its past sessions, and returns
-      with `Unarchive` from `Show archived`; there is no hard delete.
-17. Retired (2026-09-23): the per-card `Past Records` panel is gone. An exercise's history is the exercise page's records panel (§14a.4) and its `History` link.
-
-### 6. Loading, empty, error, and feedback state handling
-
-1. Whole-screen loading/error states are used when route data cannot render meaningful content yet.
-   - `exercise-catalog`: a `StatePanel` (loading or error) + More-selected bottom tabs remain visible
-   - `completed-session/[sessionId]`: centered state variants on `paper`; the detail keeps its top bar's back, the completion its one safe exit
-2. In-section state panels (`StatePanel` in a `Card`) are used inside the shared `HistoryList` on `/sessions`: `Loading sessions…`, the load error titled `Could not load sessions` with an outline `Retry` that reloads through the same load as a focus refresh (T10-D6), `No completed sessions`, and `No sessions yet`. Exercise history uses the same recipe for `Loading exercise history…`, `Could not load history` and `No sessions in this view`.
-3. Inline helper/success/error text is used for form feedback and post-action feedback (a failed write on the completed-session detail). `exercise-catalog` reports an action's outcome as a `Notice` above the list: `Exercise created.` / `updated.` / `deleted.` / `restored.` with the `success` glyph, a failure in `danger`.
-4. State presentation style varies by screen today; refactors may unify visuals, but the semantic distinction (whole-screen vs in-section vs inline) should remain explicit.
-5. The profile route uses:
-   - an inline loading state panel during auth bootstrap,
-   - an inline unavailable notice when auth config is missing,
-   - inline `danger` notices for sign-in/sign-out failures,
-   - inline success (`success` glyph, no success hue) / `danger` notices for unified profile update submits,
-   - explicit email-change pending-confirmation messaging instead of assuming immediate completion,
-   - password field clearing after each authenticated password submit,
-   - in-place signed-out/signed-in rerendering instead of a redirect loop.
-6. The `/sessions` list uses route focus as its single automatic refresh
-   trigger: the first focused presentation loads once, each later blur-to-focus
-   transition loads once, and filter or mutation refreshes remain explicit.
-   Superseded and unmounted requests cannot replace the newest visible result.
-
-### 7. Completed-session detail screen semantics
-
-1. The detail (View Session) is in the design language, like the session view
-   it opens: `paper` ground, its own top bar `back · View Session · ⋮ · Edit`,
-   with `Edit` the screen's one `accent` action (it pushes the session view on
-   the session, §14b.7, whose `Done` sits in the same place). The session ⋮
-   opens a `Session` sheet with `Delete session` (danger), or `Undelete session`
-   while the session is deleted; neither confirms, since each undoes the other.
-   A deleted session shows a `Deleted · hidden from history` band and no `Edit`,
-   because the session view edits only a live session. A failed write shows
-   inline in `danger` and changes nothing.
-2. Appending is rare, so it sits behind each exercise card's ⋮: `Append to
-   current session` copies that one exercise block as planned target rows into
-   the active session (a new one when none is active) and opens it in the
-   session view. The cards themselves are not links.
-3. `intent=edit` on the completed-session route is a redirect behavior, not a separate screen.
-4. The summary card shows `Start` and `End` as `YYYY-MM-DD HH:mm` (the layout of
-   the completed edit's fields, read-only), then `Duration`, `Gym`, `Sets` and
-   `Volume`. `Sets` counts the working sets (§5.11); `Volume` is
-   the independently included volume (§5.11) under the current private policy, with
-   invalid/overflow coverage and no thousands separator. Below it, `Summary | Sets` defaults to
-   Summary for every historical entry. Switching stays in place and retains the
-   chart grouping; Edit → Done retains both selections while reloading facts,
-   sets and insights. A different session starts at Summary / By exercise.
-5. Each exercise card in Sets shows its name, `n sets` (its working sets) and one row per confirmed set
-   with valid values — the session view's row, `type · weight × reps · 1RM ·
-   VOL` (`W-Up`, `RIR n` for any valid stored RIR, `—` for none). An exercise
-   with no such set is left out. There are no tags, no collapse and no set
-   numbers.
-6. A card holding the exercise's record set against every completed session
-   before this one (`tech/training-metrics-contract.md` §3: 1RM, else Weight)
-   shows the figures it beat in `record` and earns a `record` band. This is
-   the same derivation, and the same card, as the session view's completed edit
-   (§14b.4, §14b.7), so the `Edit`/`Done` loop shows one card on both sides.
-   History is optional enrichment: while it loads, or if it fails, no record
-   shows.
-7. `presentation=completion` is a post-submit presentation of the stored
-   completed session, not durable celebration state, in the design language
-   (`components/session-complete/`). Its own top bar reads `Session complete` ·
-   `Done` (`accent`, where the session view's Finish sat); then the summary
-   card, every `Personal records` card when present (one per exercise holding
-   a record set, contract §3), one `Exercise volume` card
-   per performed exercise, and `Share session` (an outline). The summary card
-   shows `Duration`, `Exercises`, `Sets` (working sets, §5.11) and `Gym` as
-   stacked figures, then `Sets by muscle` (a header, Archivo 700 at `md` in
-   `ink`): a non-interactive table, one row per muscle — `Muscle`,
-   `Pri` and `Sec` (physical working sets mapping to it as primary /
-   secondary; none is `—` in `ink-ghost`) and `Sets`, primary + ½ secondary,
-   the sort key — with no formula footnote. It never links to muscle
-   analytics. Personal-record/comparison history is optional enrichment: its
-   loading or failure never blocks stored context or exits, and current
-   exercise rows still render with an explicit no-history state.
-8. A personal record is shown in the language's one superlative: a `record`
-   band (`New 1RM record · <1RM>`, or `New top weight · <weight> × <reps>`),
-   the exercise and its set (`185.0 × 8`), and the figures it beat in bold
-   `record`. A Weight record's 1RM stays in `ink`, and there is no `kg` and no
-   "est.". The share image heads its list `<n> new records`, and each line names
-   its kind in words (`1RM` or `Top weight`). Exercise-volume cards show the
-   exercise name with its smaller working-set count (`3 sets`), the session's `Vol`
-   figure (no separator, no unit) versus the historical median, and a
-   horizontal P5–P95 range with median/current markers when a distribution
-   exists. Single/equal baselines and no-history rows use explicit
-   non-distribution states; range bars are descriptive context, never targets
-   or readiness guidance, so they use no `accent`. The local `By exercise` /
-   `By muscle` control defaults to exercise when a summary opens. Muscle rows
-   use per-side role-weighted volume, count the mapped working sets, and
-   retain zero-load observations. Every
-   comparison requires a working set (§5.11) to observe the exercise or muscle;
-   current and historical volumes, median and P5–P95 range use the independent
-   Volume selection. A scope with no working set is neither compared nor a baseline. Each row
-   compares only with the same muscle in eligible earlier completed sessions;
-   historical review uses its persisted completion time. Unmapped work and
-   failed/loading history have explicit states. Historical comparison failure
-   is never labelled as absent history and does not fabricate zero values;
-   facts, Sets and actions remain available. Completed Edit has no comparison
-   charts; active-session charts remain below Add exercise.
-9. `Share session` opens a `Sheet` previewing the exact session-summary image;
-   `Share image` is its one action, and the backdrop closes it (there is no
-   Cancel; it cannot close while an image is being prepared). The captured PNG
-   contains session/date/count totals (one `sets` count), every PR, and every
-   exercise comparison; it excludes gym/location data. Nothing is uploaded or
-   published by BOGA. Native-sheet cancellation is silent, capture/launch
-   failure is inline and retryable, and temporary image cleanup cannot turn a
-   completed share into an error.
-10. Completion hides edit/delete/append. Done and Android back replace to
-    Progress, and the back gesture is off. Its missing, deleted or failed target
-    keeps one safe Progress exit. Every personal historical entry (History,
-    Today, exercise history and legacy `presentation=summary` links) opens View
-    Session's Summary. Back returns to its origin, or Progress with no history.
-    Summary shares the existing comparison body, working-set breakdown, records
-    and Share; top-bar Edit and local Sets replace the former bottom navigation
-    buttons. Deleted targets retain the band and Undelete without Edit in both
-    sections. Share always captures exercise comparisons regardless of grouping.
-
-### 8. Navigation/query semantics (UI-facing rule)
-
-1. Route mode/state changes that affect screen behavior (for example the session view editing a completed session) must be documented in `docs/specs/ui/navigation-contract.md`.
-2. Route alias behavior (`/` -> `/today`) should be treated as a navigation
-   entry alias, not a unique screen design. `/stats-history` remains a preserved
-   Progress-owned path rather than a second tab.
-3. `exercise-catalog` supports session-entry query semantics (`source=session`, `intent=manage`) for the exercise picker's `Manage` flow (back returns to the picker as it was left), while the picker's `Add new` uses the same exercise editor inside the picker's route.
-4. Stats / History accepts validated initial `period=7|30` and
-   `breakdown=exercise|muscle` values. `period=7` selects This week; `30`, absent
-   or invalid values select the configured target window. By Exercise remains
-   the default; in-screen range/breakdown changes remain volatile state.
-
-### 9. UI guardrail enforcement (current enforced rules)
-
-Enforced by `apps/mobile/scripts/check-ui-guardrails.js`, which runs as the
-`ui-guardrails` lane of `boga test fast` and as a CI step. The colour and
-ratchet rules scan `apps/mobile/app/**/*.tsx` and
-`apps/mobile/components/**/*.tsx`; the legacy-vocabulary rule scans wider
-(below). All exclude tests, snapshots and stories.
-
-**Zero-tolerance rules (block on sight):**
-
-1. Do not add raw color literals (`#hex`, `rgb(...)`, `rgba(...)`) directly in screen/component `.tsx` files.
-2. Use UI tokens from `apps/mobile/components/ui/tokens.ts` directly or through primitives in `apps/mobile/components/ui/`.
-3. Temporary exceptions require an explicit allowlist entry and rationale in `apps/mobile/scripts/ui-guardrails.config.js`.
-4. No file holds a raw-color allowlist exception (`allowlistedFiles` is empty for every rule).
-
-**Legacy-vocabulary rule (`legacyVocabulary`, blocks on sight):** the styling
-vocabulary retired on 2026-09-26 — `uiColors`, `uiRadius`, `uiElevation`,
-`UiText`, `UiSurface`, `UiButton`, `SegmentedChips`, their types, and
-`uiTokens.colors|radius|elevation` — fails the check as a whole word anywhere
-in `apps/mobile/{app,components,src}` (`.ts` and `.tsx`). It has no budget and
-no allowlist. Use `uiRoles`, `uiGeometry.radius` and `Card` / `Stat` /
-`ListRow` / `ActionButton` / `SegmentedControl` / `ChipGroup` instead. The
-identifier list lives in `ui-guardrails.config.js` and only grows.
-
-**Ratchet rules — all now at budget `0`:**
-
-5. `rawFontSize`, `rawSpacing` and `rawRadius` flag numeric literals for
-   `fontSize`, the `padding`/`margin`/`gap` family, and the `borderRadius`
-   family. Use `uiTypography.size.*`, `uiSpace.*` and `uiGeometry.radius.*` instead.
-6. Each carries a `budget` in `apps/mobile/scripts/ui-guardrails.config.js`.
-   They started at 196 / 416 / 130 and reached **0**, so in practice all four
-   rules are now zero-tolerance. The mechanism stays: the check fails when a
-   change goes **over** budget, and equally when it drops **under** budget
-   without lowering the number.
-7. **Raising a budget is never the fix for a failure.** If a screen genuinely
-   needs a value the scale does not have, that is a case for changing the
-   scale in `tokens.ts` — not for reintroducing a literal.
-8. `0` is not counted for spacing or radius: it is the absence of the value, not
-   a point on the scale.
-
-Guardrail commands (run from `apps/mobile/`):
-
-- `npm run lint:ui-guardrails`
-- Audit mode (colour): `npm run lint:ui-guardrails -- --include-allowlisted`
-- Per-violation detail for the ratchet rules: `npm run lint:ui-guardrails -- --verbose`
-- Lower budgets after a cleanup: `npm run lint:ui-guardrails -- --update-budgets`
-
-### 9a. The token scales (current, enforced)
-
-Every value below is what `apps/mobile/components/ui/tokens.ts` holds, and the
-guardrail keeps screens on them. It is the app's one styling vocabulary
-(`ui/design-language.md`); every screen uses it:
-
-- **`uiRoles`** — the colour roles of `ui/design-language.md` §2, including the
-  data-visualisation ramp `viz0`…`viz4`, generated from four seed colours by
-  `generateRoles` (`components/ui/theme.ts`; §2 "Derivation").
-- **`uiFonts`** — the three embedded typefaces of `ui/design-language.md` §3
-  and the weights of each that ship.
-- **`uiGeometry`** — the radii (`card 6 · sheet 16 · control 4 · pill 999`),
-  the 44pt tap target, the 38pt metric column, the sheet handle, the 50pt
-  labelled-field height and micro-label tracking (`ui/design-language.md` §4).
-- **`uiSpace`**, **`uiTypography`**, **`uiIconSize`** and **`uiBorder`** —
-  rules 1–4 below, and §9c.
-
-1. **Type: 8 sizes.**
-   `xxs 10 · xs 11 · sm 12 · md 13 · base 14 · lg 16 · xl 18 · xxl 24`.
-   Down from the 14 distinct sizes that used to ship. `base` stays at **14px**
-   by decision (2026-09-19): density was chosen over gym-floor legibility. `15` folded up into `14`, `17` into `16`, `20` into
-   `18`, and `22`/`26` into `24`. **`xxs` (10) was added 2026-09-22** for
-   micro-labels — legends, units, tertiary labels — which the accepted design
-   target drew at 8/9px; both lift to 10 rather than earning rungs of their own,
-   since 8px body-adjacent text was poor for accessibility — so `9` now folds up
-   into `10` rather than into `11`.
-   No other rung moved when `xxs` was added; the design-language screens use it
-   for micro-labels, and `apps/mobile/__tests__/ui-design-tokens.test.ts`
-   holds all eight rungs and their line-heights. Reasoning:
-   `ui/design-language.md` §3.
-2. **Every size has a line-height**, in `uiTypography.lineHeight`, keyed to the
-   same names: `14 · 15 · 16 · 18 · 20 · 22 · 24 · 30`. Text styles set the
-   pair together, so vertical rhythm does not depend on the platform font's own
-   leading.
-3. **Uppercase is two roles.** Reserve `textTransform: 'uppercase'` for
-   micro-labels (`xxs`, 10) and for control labels (Archivo 700 at `xs` or
-   `sm`: `ActionButton`, the exercise page's selector); do not apply it to
-   body or figure text.
-4. **Spacing: 6 steps.** `xs 4 · sm 8 · md 12 · lg 16 · xl 24 · xxl 32`. The
-   old scale interleaved `2 / 10 / 14 / 20` with the 4/8/12/16 rhythm, which
-   made every value on-scale and the scale non-constraining. The retired
-   `xxs` (2) and `screen` (20) keys are gone — page gutters use `xl`. (Spacing
-   has no `xxs`; the `xxs` in rule 1 is a *type* rung and a different scale.)
-5. **Radius: 4 values**, in `uiGeometry.radius`: `card 6`, `sheet 16`,
-   `control 4`, `pill 999`. If two radii sit side by side and the difference
-   cannot be named, there is only one radius.
-6. **No elevation.** There is no elevation token: depth is a hairline plus a
-   ground change (`ui/design-language.md` §4), and no screen draws a shadow.
-6a. **Colour: one value per role.** As with radii, if two colour roles sit
-   side by side and the difference cannot be named, there is only one role. No
-   two roles share a value, the neutrals share one hue, and a wash is a tint of
-   its role (`ui/design-language.md` §2, rationalised 2026-09-27;
-   `ui-design-tokens.test.ts`).
-
-7. **Fixed font sizes.** App-owned text and inputs do not follow the device's
-   text-size setting (decided 2026-09-25). Every React Native `Text` and
-   `TextInput` sets `allowFontScaling={false}` after any spread props;
-   `FormField` and `SearchField` enforce this for their callers.
-   Existing fit-to-width behaviour is preserved. Native system dialogs remain
-   OS-controlled. `__tests__/ui-font-scaling.test.tsx` guards coverage and
-   prop precedence; the visual target is the existing default-size layout at
-   both default and accessibility text sizes.
-
-### 9b. Appearance: light themes, chosen in Settings
-
-1. Every theme is **light**. Dark mode is explicitly not a product goal
-   (decided 2026-09-19), and `uiRoles` carries no dark variants: the presets
-   differ in hue, never in the lightness ladder (`design-language.md` §2,
-   "Presets").
-2. `app.config.ts` therefore pins `userInterfaceStyle: "light"`. It must not be
-   set back to `"automatic"` while every theme is light: `"automatic"`
-   hands the OS-owned chrome — `Alert.alert` dialogs, the keyboard, native
-   pickers — a dark appearance over light app content.
-3. `app/_layout.tsx` keeps `<StatusBar style="dark" />` (dark glyphs on the
-   light surface), which is consistent with the above. Neither it nor the
-   splash (a fixed white, `app.config.ts`) reads a role. The stack header
-   takes `surface` (white in every theme) and `ink`, whose hue follows the
-   preset; like every role it is read once at launch, so it matches the
-   screens beneath it.
-4. The user picks a theme from a few curated presets in Settings → Preferences
-   → `Appearance`, or one hue on the `Custom colour` ring, whose preview
-   repaints live. Both are gated in CI, so nothing is corrected at runtime
-   (`design-language.md` §2).
-5. The choice is **per device** (not synced to the account) and **applies on
-   the next launch**: about a hundred modules bake `uiRoles` into a
-   module-scope `StyleSheet`, and a release build cannot restart itself
-   (`expo-updates` is not installed). The sheet saves on tap and says so
-   ("Slate applies the next time you open BoGa. Close BoGa fully, then open it
-   again."); the Settings row reads `<Preset> from next launch` until then.
-   A development build reloads on save instead.
-6. A stored choice this build cannot use — an unknown preset id or hue, or a store
-   that cannot be read — opens the app in the default theme and is logged
-   (`theme.unknown_preset` warn, `theme.read_failed` error), never silent. A
-   failed save warns too (`theme.save_failed`), and with an unusable choice
-   stored, choosing the default again re-saves it, clearing the warning.
-
-### 9c. Icons
-
-1. Controls and indicators draw their glyph from `Icon`
-   (`apps/mobile/components/ui/icon.tsx`), never from a Unicode character set
-   in `Text`. Chevron `›` → `chevron-right`, kebab `⋮` → `more-vertical`,
-   external `↗` → `arrow-up-right`, and so on. Characters that belong to the
-   data stay text: `×` in `100 kg × 5`, the minus in `−12%`, `·` and `•`
-   separators. `__tests__/ui-icon.test.tsx` fails on a retired glyph anywhere
-   in `app/`, `components/` or `src/` outside comments; no file is exempt.
-2. An icon-only control carries an `accessibilityLabel` naming the action; the
-   `Icon` inside it stays decorative. An icon never carries state alone: the
-   certification marks sit beside words (`Certified by …`, `uncertified`) or
-   inside a row whose accessibility label says them.
-3. Icon colour is a `uiRoles` role (`ink` when omitted); size is a
-   `uiIconSize` key.
-   An icon-only control is an `IconButton` (44pt, labelled).
-4. The set-state glyphs (`set-done` / `set-current` / `set-planned`) exist for
-   design-language §5; the exercise page (§14a) is their first user.
-
-### 10. Exercise-tag semantics
-
-1. Exercise tags are read-only in the app (tag editing was dropped 2026-09-23): there is no `#`, attach, create, rename, delete or manage UI. The synced tag tables and existing assignments stay.
-2. Exercise history offers the tags used on that exercise as filter chips: a
-   single-select `ChipGroup` on one line that scrolls sideways, `All tags` plus
-   one chip per tag as `<name> · <session count>`. Tapping the selected tag
-   returns to `All tags`. A deleted tag reads `<name> (deleted)` on a faint chip
-   (words, not a warning hue), and the same wording marks it as a `Tag` on a
-   session card (DLM-T10).
-
-### 11. Calendar heatmap semantics
-
-The two views of `components/heatmaps/` (`DailyHeatmap`, `WeeklyHeatmap`), both
-on the data-viz ramp `viz0`–`viz4` (`design-language.md` §2) and fed by one
-`HeatmapData` (DLM-T09).
-
-1. Dates are local, in Monday-start weeks. The daily grid has seven weekday rows
-   labelled `M`, `W` and `F` in a fixed gutter, and one column per week under a
-   month axis; gutter, axis and legend are Archivo micro-labels in `ink-faint`.
-2. The daily grid spans the saved look-back (1–520 weeks), sized so about
-   13 week columns fill the width, and opens scrolled to its right edge, where
-   today is; older weeks are reached by scrolling left. Weekly uses horizontal
-   bars stacked newest first over the same saved span: dates in a left gutter,
-   zero-based proportional lengths in one plot, formatted values on the right.
-   Its single vertical list virtualizes long windows. A dashed vertical average
-   shares the scale once at least six of the latest twelve weeks have known
-   training; include genuine zero training, exclude rest and unavailable weeks.
-   Label averages as whole volume or one decimal for Sets/1RM/Top weight,
-   using the shared figure formatters. An empty/all-zero scale has no average
-   reference. Colour retains its independent bucket/target meaning; aggregation is unchanged.
-   Keep current-week wording beside its row and the average label above the
-   reference, without repeating either as a footer sentence.
-3. Buckets are min–max over the window's positive values: the lightest logged
-   day is `viz1`, the heaviest `viz4`. Zero-effort days are `viz0` with a `rule`
-   hairline, and stay visible, tappable and accessible.
-4. The ramp says only "more". Colour is never the only channel: the day detail
-   and the weekly value column/banner state the value. Rest reads `Rest`, known
-   zero training reads numeric zero, and unknown/incomplete load reads `?` with
-   explicit availability copy; none gets a filled bar.
-5. **Today and selected are distinct marks** (DLM-T09-D3). Today (the current
-   week in the weekly view) is a 1px `ink` ring; the selected day or week is a
-   2px `ink` border and exposes the selected accessibility state. The selected
-   week also gets a filled `ink` caret beside its date. `Current week` remains
-   visible even when that week is selected; zero/rest/unknown rows retain the marks.
-6. The daily view owns its selection: it starts on today, and a tap selects that
-   day and shows its detail `Card` (a `Today` or weekday kicker, the date, a
-   `viz` swatch and `<metric>: <value>` in Plex Mono, or `Rest day`). The weekly
-   view's selection is lifted to its host (a tap selects a week, a second tap
-   clears it), which shows the week banner (§12.5).
-
-### 12. Stats history sheet semantics
-
-1. In `Stats / History`, By Muscle: each individual muscle row opens exactly
-   one muscle ID (`Muscle History`). Every family heading is inert, including
-   families with only one muscle; that muscle retains its own row. Legacy
-   empty or multi-muscle targets cannot open a sheet. By Exercise: a table row
-   opens the exercise definition's history (`Exercise History`).
-2. The history is one `HistorySheet` (`components/stats/history-sheet.tsx`,
-   DLM-T09-D2), a design-language `Sheet` (G5): in-route state, not navigation;
-   about three quarters of the screen over the `scrim`; modal to assistive tech.
-   The backdrop, Android back and the VoiceOver escape dismiss it; there is no
-   close button.
-3. Under the eyebrow and name, the `Metric` `SegmentedControl` offers `Volume`
-   and `Sets`; exercise history adds `1RM` and `Top weight`. Volume is the
-   default. A static label names the saved view and look-back. Settings owns
-   the sole Daily/Weekly choice, default Daily for missing or invalid choices;
-   a valid saved Weekly choice is retained. No view selector is offered
-   in Progress. Saving the preference refreshes mounted history sheets.
-4. Loading, error and no-history are inline `StatePanel`s in the sheet's scroll
-   body. No-history appears only after a successful empty read, never while
-   loading. An error offers Retry for the same entity and saved look-back.
-   Heatmaps stay mounted during reloads to preserve selection and
-   scroll; under the no-history panel the empty heatmap still renders.
-5. In `Weekly` a `rule-soft` band appears above the chart only for a selected
-   week: its full range (Source Sans `ink-muted`) and
-   `<metric>: <value>` with the value in Plex Mono `ink`. `Daily` has no band;
-   its day detail is inside the chart (§11.6). Clearing selection removes the
-   band entirely; there is no tap-instruction text or navigation on selection.
-6. Values follow the one display format (`tech/training-metrics-contract.md` §4), never `2.5k`; a missing
-   1RM or top weight is `—`.
-7. Muscle volume is the per-side, role-weighted aggregate across the selected
-   muscle ID; 1RM and top weight are exercise-level and not offered for muscles.
-8. The saved history look-back H (1–520 whole weeks, default 52) controls both query and
-   grid bounds: the current local Monday-start week and preceding H−1 weeks,
-   through today, using calendar arithmetic across DST. A shorter choice
-   reduces the grid; longer choices load older available history. Dates beyond
-   today are unavailable. Saving H reloads open history, preserving selections
-   in range and resetting others to today/current week; superseded window or
-   account responses are ignored. Empty copy names the selected week count.
-9. Daily and weekly trees stay mounted while a sheet is open. The inactive tree
-   is transparent, non-interactive, and hidden from accessibility, so a saved view change
-   reuses the already-laid-out chart and preserves its local selection and
-   scroll state instead of drawing it again.
-10. Dismissing closes the transient target; the screen's controls, sort, search
-    and scroll stay as they were, and nothing is written. Opening another
-    individual resets its history selection and ignores the previous read.
-
-### 13. Stats exercise/muscle history semantics
-
-1. Progress defaults to `Work by muscle`, on one `ScreenScroll` over the fixed
-   tabs. Joined controls offer the configured `N weeks` / `This week` (N=1 has
-   one choice) and `Working sets` / `Volume` (initially Working sets). Use one
-   `vs previous week` / `vs previous N weeks` label; accessible wording states
-   the same elapsed calendar span. Monday-start windows include this week
-   through now and compare the corresponding span in the preceding window,
-   across DST. Targets are not prorated. No Time range/Breakdown subtitles,
-   landing heatmaps, family totals or large summary cards.
-2. Both periods, individual muscle rows and exercise contributions derive from
-   one local graph and durable account-policy snapshot. Refocus refreshes them
-   and an open history sheet. A failed same-context refresh may retain prior
-   table figures beside an inline error and Retry. A changed window, policy or
-   account hides older figures; superseded responses cannot publish. Retry keeps
-   the controls and muscle selection. Account changes reset transient state.
-3. `Muscle | Now | Previous | Change` includes every taxonomy muscle, including
-   zero-current and previous-only rows. Family headings are static, in taxonomy
-   order, with heading semantics. Names are underlined history links; separate
-   sibling chevron buttons select contributions (right unselected, down selected,
-   with an ink left rule). Each target is at least 44pt in both dimensions.
-   Numbers and families have no press action; no row encloses both in a pressable.
-4. Selecting a chevron brings `<muscle> contributions` into view, focusing its
-   heading for a screen reader. Selecting it again keeps the selection. Its
-   `Exercise | Now | Previous | Change` table combines repeated blocks by
-   definition ID and retains contributors from either period. Primary/Secondary
-   captions explain involvement. An exercise name opens whole-exercise history.
-   The inert `Total` reconciles to the muscle for each period; percentages are
-   calculated independently, never added. Opening/dismissing either history
-   preserves the selected muscle, table metric, period and scroll, and returns
-   accessible focus to the launching name. History metric/day/week is separate.
-5. Working set comparisons count physical eligible sets once per muscle at
-   primary/secondary involvement, with signed absolute changes. Volume uses its
-   independent eligibility and existing per-side/bodyweight/role arithmetic;
-   its change is a percentage, `new` over zero, `—` for zero-to-zero, or
-   `Incomplete` for an unknown baseline. Volume headers identify kg·reps;
-   accessible labels identify per-side allocation. Counts overlap across muscles
-   and must never be summed into an overall workout total.
-6. Contribution emptiness follows the selected metric only after a successful
-   read: `No working sets for <muscle> in either period` or `No volume-included
-   sets for <muscle> in either period`. Volume-only and included zero-load sets
-   remain explainable; unavailable Volume retains a known subtotal and coverage,
-   never a fabricated total or percentage. Calculation choices live in Settings;
-   avoid unconditional warm-up-exclusion copy and instructional subtitles.
-7. Full figures use Plex Mono and ink, neutral signed deltas, no `k`, thousands
-   separators, reduced font sizes or split digits. Names wrap. If figures cannot
-   fit beside name/actions, put three aligned numeric cells on a full-width
-   second line with matching headers; if extreme figures exceed that budget too,
-   use labelled full-width Now/Previous/Change lines. Incomplete Volume coverage
-   uses full-width lines beneath the figures, labelled Now/Previous. No
-   horizontal table scroll. Selection differs from target shading: working
-   counts use the saved quota × selected weeks, capped at 100%, in `viz1`–`viz4`.
-   Text on a viz ground is ink; accessible values explain the quota and count.
-8. Quiet `Browse exercises` and `Sessions` rows follow the content. Browse
-   exercises opens the retained table in place; `By Muscle` returns to the
-   landing. Search and sort survive that switch. Sessions opens `/sessions`.
-9. Retained browsing shows exercises with eligible Working set or Volume
-   contributions in the selected window, including Volume-only rows. Its shared
-   `Exercise | Sets | Vol | 1RM` headers retain their existing sort controls:
-   Exercise cycles most/least recent, Sets and Vol high/low, initially Sets
-   high-to-low. Recency uses all-time completed performance; missing dates sort
-   last, ties use name then ID. Active headers reserve an indicator slot;
-   `1RM` is static. Sort and search remain volatile mounted-screen state.
-10. Exercise browsing rows open the shared `HistorySheet`, with the saved
-    look-back and Settings-owned Daily/Weekly choice (§12). The sheet retains
-    four exercise metrics, or only Volume/Sets for exactly one muscle ID;
-    family targets are rejected. No in-sheet view toggle or new route is added.
-11. Both canonical `/progress` and legacy `/stats-history` render one
-    implementation. `period=7` chooses This week; missing/other/invalid values
-    use the configured window. `breakdown=exercise` opens browsing; all other
-    values, including missing, open the muscle table. Initial query choices do
-    not rewrite the URL when controls change.
-12. Muscle history Sets grade day/week counts against the shared weekly quota,
-    independent of look-back length; Volume and exercise metrics retain their
-    observed scaling. Exercise history is whole-exercise Volume, with no
-    muscle-role weighting, under the current private calculation policy.
-13. The accepted landing target is `design-targets/progress-tables.md`; retained
-    history sheets and the exercise-history route use `design-targets/progress.md`.
-
-14. The `/exercise-history` route (opened from the exercise page's `History`)
-    is one `ScreenScroll` on `paper` over the `MainTabs` strip (Progress
-    selected), in the design language (DLM-T10): a `Last 7 days` / `Last 30
-    days` / `All time` `SegmentedControl` (default `Last 30 days`), the tag
-    chips (§10.2), then the content. A deleted exercise shows a `Notice` with the
-    `warning` glyph, `This exercise has been deleted. Historical data remains
-    available.`
-15. `All-time bests` is a `Card` of two `ListRow`s, `1RM` and `Top weight`, each
-    with its figure in bold Plex Mono `record` (brass: the all-time best, the
-    one superlative, T10-D2) over its date in Plex Mono `ink-muted`; a row
-    opens the session that holds it. A missing best is `—` in `ink-faint` and
-    opens nothing. The label is `1RM`, never `Est. 1RM` (G7). The bests are
-    all-time whatever the period or tag, scoped by the gym filter (`No gym`
-    included), and read from the exercise session facts (spec 05); a best tied
-    across sessions belongs to the earliest session.
-16. Each session in view is View Session's exercise card (`ExerciseSetsCard`,
-    T10-D1), a link to View Session: the header is the completion stamp
-    (`YYYY-MM-DD HH:mm`, Plex Mono) and `<n> sets` (working sets); under it
-    the gym (`No gym` when none), the session's tags as `Tag`s, and a row of
-    stacked `Stat`s (`1RM`, `Top set`, `Vol`, `Sets`); then one `SetSummaryRow` per set,
-    `type · weight × reps · 1RM · VOL`. Warm-ups are shown like working sets,
-    named by their type column (`W-Up`); there is no set-number column. Figures
-    use the one display format (`tech/training-metrics-contract.md` §4), no unit
-    suffix.
-
-### 14. Group screens: freshness, pull-to-refresh, and the offline marker (M22)
-
-1. Pull-to-refresh (`RefreshControl`, first used in M22) is the explicit refresh on the Groups screen, My groups, the group screen, and the friend's session view. Only a user pull shows the spinner; the on-focus and 30 s poll refreshes run silently (`components/groups/use-pull-to-refresh.ts`).
-2. Group data renders cache-first. When the device is offline or the last refresh failed with `NETWORK`, a neutral `Notice` with the `offline` glyph reads `Offline · last updated HH:MM` above the still-visible cached data (no warning hue, G3). With nothing cached, the area shows an offline empty state (`StatePanel`) rather than a spinner.
-3. A non-network failure shows inline as a `danger` `Notice` with an outline `Retry` beside data that is still shown, or as a whole-area `StatePanel` with an outline `Retry` when nothing is cached. The group routes' state panels (`GroupStateView` and friends) are thin wrappers over `StatePanel`. `NOT_FOUND` is lost access, not an error: the group screen reads `You're no longer a member of this group` and the friend view `This session is no longer available`, and cached data is hidden.
-4. Stream session cards are collapsed summaries with no expand, drawn as a `Card` link; the whole card opens the friend's session view. `Training now` sits beside the `set-current` ring and `Completed · 45m` reads in `ink-muted`; the metrics are Plex Mono, and `N records` is `record`. Membership items are light rows that do not navigate on the Groups screen (it already shows their group); on Today they open the Groups screen on their group. The Groups screen always shows exactly one group: its chips (no `All`) wrap onto more lines rather than scrolling sideways, and managing a group is reached only through `My groups`. (M25-T10) A record card sits directly below its session card (the session card reads `N records`); where its session card is not loaded it stays in stream order. Record-removed and link items are light rows behind a `rule` hairline that never navigate. A standing record card carries the `record` band with its title (`dave — group record`) and its value in bold `record` Plex Mono with explicit units such as `1RM 145.7 %BW`; a voided card loses the band, fades to `ink-faint` and puts its status first. Its boards are `Tag`s and `Certify` is an outline. Record state is text: `Group record · Volume`, `Group record · 1RM`, `Session in progress`, `Not certified yet`, `Certified by …`, `Certification ended`. A ring icon (`ink-muted`) sits before `Not certified yet` and a check icon (`ink`) before `Certified by …` (`GroupCertificationStatus`); the words carry the state, the icon only echoes it, and there is no success hue.
-5. The friend's session view is read-only (no edit, delete, append or collapse), in the design language on View Session's cards (§7.5), and an active session reads `In progress`. It shows no record band: the friend's history is not on this device.
-6. Signed-out or auth-unconfigured builds show a sign-in-required `StatePanel`, centred on the page, on every group route, and no group RPC runs.
-7. Group writes are online-only (M22-T05; contract §7, C3.10.3). Every write — create, edit, join, regenerate, promote / demote, transfer, remove, leave, and the gate's username save — goes through `useGroupAction`: when NetInfo reports offline it is refused before any request with `You're offline. Connect to the internet and try again.`; a transport failure reads `Couldn't reach the server. Nothing was changed — try again when you're online.` Nothing is queued or retried, and the screen's data is unchanged. The message shows inline beside the action (form: above the submit button; group screen / invite: a notice under the header).
-8. Role gating follows contract §4.3 exactly (`groupMemberActionsFor`): members see no Invite, Edit, or member actions; admins can remove members only; the owner can promote, demote, transfer, and remove anyone else, and sees "Transfer ownership before leaving" instead of Leave. Remove, Transfer, Leave, and Regenerate ask for confirmation (`Alert.alert`, destructive style); promote and demote do not. A server `FORBIDDEN` / `NOT_FOUND` on a member write shows inline and refreshes the group. The member and group-exercise action sheets are design-language `Sheet`s (DLM-T13-D2): one row per action, `danger` when destructive, and no Cancel; the backdrop dismisses them.
-9. Create and join run the inline username gate first when the username is blank; a server `USERNAME_REQUIRED` re-opens it with a notice and keeps the entered form values. The gate, the create / edit form and the join form each have one `accent` (`Save username`, the submit, `Join group`); `Find group` is an outline, and the invite code is a figure (Plex Mono), in the join field and on the invite screen (DLM-T13-D3).
-10. The group screen is for managing the group: the header, then its `Exercises` (no segments). For owners and admins `Invite` is its one `accent`; `Edit` and `Add exercise` are outlines (DLM-T13-D1). The stream and leaderboards are the Groups screen's `Stream` / `Leaderboards` segment. Members open from the header's member-count line (a press target with a chevron), not a segment.
-11. On Exercises every member sees each group exercise's weight entry and their own link status, read from their local links so it shows offline (`Linked: …` / `Not linked`); archived exercises sit at the bottom marked `Archived`. An active exercise none of theirs is linked to offers `Link your exercise`: the pick sheet with a `Link` confirm, which adds nothing to a session and works offline (a local write). The pick sheet and the unlink chooser are `Sheet`s with no Cancel: the backdrop, Android back and the VoiceOver escape dismiss them and write nothing (G5, DLM-T14). Only the owner and admins see `Add exercise` (an outline beside the section's micro-label, rule 10) and the row sheet (`Rename`, `Archive`, or `Unarchive` on an archived row). Archive confirms first (`Alert.alert`, destructive style); rename and unarchive do not. Exercise writes follow rule 7. A server `FORBIDDEN` / `NOT_FOUND` / `VALIDATION` shows inline; the Exercises page and the edit screen then refresh the group and the list, and the add screen refreshes the group (the list refreshes when the group screen regains focus).
-   - Linked rows also offer `Unlink…` to every member, independently of admin row actions. One personal mapping confirms directly; multiple mappings open `Your linked exercises` with individually labelled actions and distinguishable IDs for duplicate/missing names. Never unlink all mappings implicitly. Dismiss the chooser before confirmation (the confirmation opens from `Sheet.onDismissed`, once the sheet has gone); restore focus to the launching row, wrap long names, and use 44 pt minimum unlink targets.
-   - Group-row and Link-screen confirmations share `describeUnlinkConfirm`: identify the personal exercise, group exercise and group; explain All/Certified eligibility after sync and preservation of past activity and existing certifications. Archived/inactive targets explain unarchive/rejoin conditions, including both when known. Existing record-card certification eligibility is unchanged; unlink never requires or creates a new certification.
-   - Unlink uses the guarded local repository write, including offline, with a reconnect/sync notice. Cancellation writes nothing; a stale target refreshes without mutation; failed writes keep the link and permit retry; pending writes disable repeat taps. Loading/failed local reads offer no link actions or false `Not linked`; failed reads have a retry independent of server refresh. A successful write followed by a failed read retains success alongside the unknown-status read error.
-12. Leaderboards (M25-T09). The segment shows one podium card per group exercise on `Certified · 1RM`, cached like the other group screens (rule 2); the whole card opens the full board. State is text, never color alone: my rows read `You` (in bold on a podium; on a board also on `paper`, DLM-T12-D1), a former member `(former)`, archived exercises an `Archived` `Tag`, and on All each row a check icon (certified, `ink`) or a ring icon with `uncertified`; the row's accessibility label says `certified` / `uncertified`. The metric reads `1RM`, never `e1RM`, and a value is a Plex Mono figure with no unit (`142.5`, `140.0 × 1`); a history sentence is prose and keeps `kg` (DLM-T12-D2). An empty Certified podium reads `No certified sets yet · N uncertified`; an empty Certified board offers `See all sets` (an outline).
-13. Full boards and their history are online-only reads, each drawn as one `Card` of rows (the board's under its `Volume` | `1RM` and `Certified` | `All` `SegmentedControl`s and a `History` text button): never cached, no 30 s poll (they refresh on open, a toggle change, focus, and pull), paged on end-of-list with a `Retry` footer after a failed page. With nothing loaded offline they show the offline empty state; rows already loaded stay with the offline marker. A missing group exercise reads "This exercise isn't in this group" and is not lost access.
-14. Certification (M25-T10). A record card and a full-board row open the same row detail `Sheet` (08 pattern 11), titled with the lifter and the exercise, with no Close: the backdrop dismisses it. Its figures (the set, the 1RM) are `record` Plex Mono `Stat`s; `Certify` is its one `accent`, `Remove my certification` / `Cancel certification` are `danger` rows, and `View full session` is a row with a chevron. `Certify` shows for any member but the lifter on a standing, uncertified record set of an active exercise whose lifter is still a member; `Remove my certification` for the certifier; `Cancel certification` for the owner or an admin who is not the certifier. Certify does not confirm; Remove and Cancel confirm first (`Alert.alert`, destructive style). The writes follow rule 7 (offline refused before any request, nothing queued); their outcome shows inline in the sheet or on the card. `CONFLICT`, a set that is no longer a record, a certification or lifter that is gone, `FORBIDDEN`, and `VALIDATION` say nothing changed and re-read the board or stream; a group `NOT_FOUND` evicts and shows lost access. After a certify the sheet reads `Certified. Certified boards update in a few seconds.`
-
-#### Optional bodyweight-aware group calculations
-
-The group settings surface shows the admin-controlled `Bodyweight calculations`
-toggle. While enabled, the group exercise editor shows only `Bodyweight
-contribution (%)`; hiding it preserves the value. A preference/contribution
-change publishes one coherent revision, and `rebuilding` shows no mixed old/new
-rows. Linking preserves independent personal and group settings.
-
-Volume/1RM board and certification recipes retain explicit unit-bearing values.
-Strict missing scores use `Score unavailable`; ended projections use
-`Certification ended`. Normalized record/full-session context omits raw and
-absolute loads, private audit and aggregate volume. Historical values retain
-original units. Rule changes preserve unchanged witnesses; selected private
-input corrections can end dependent projections, and restoring inputs never
-reopens them. Copy must not imply the witness verified bodyweight. Owners/admins
-review effective scoring changes before Apply; c=0 preference toggles promise
-no rebuild. Certification transport uncertainty requires refresh/review before
-retry; a confirmed write remains successful even if the following read fails.
-
-### 14a. Exercise page
-
-The page lives at
-`/session/[sessionId]/exercise/[sessionExerciseId]` and edits one exercise of
-the active session (or of a completed session being edited, §14b.7) through the session repository and autosave
-(`src/session-recorder/`), so the rules of §5.11 about what a set *is* hold
-unchanged. What differs is presentation:
-
-1. **One ordered list, no mode.** Performed, current and planned rows share one
-   list; a row carries its planned triple and its actuals, and
-   `performanceStatus` decides which is real. The row shows its actuals once
-   performed or once the lifter has typed, and its plan otherwise. Planned vs
-   ad hoc is not a mode either: following a plan and logging ad hoc mix freely
-   in one session, and `Append plan` adds planned rows in both cases.
-2. **State is the glyph** (`set-done` / `set-current` / `set-planned`), a
-   checkbox in the row's 44pt control column. Tapping it performs a row with
-   valid values (typed, else planned) or un-performs a performed row — back to
-   `planned` when it came from a plan, else `unperformed`. A row with nothing
-   valid to perform opens in the logger instead.
-3. **The logger is the open row.** It sits on the first set not performed, or on
-   the row whose body was tapped; one at a time. Typing is saved as it is typed
-   (the autosave text debounce); the tick — the screen's one `accent` primary,
-   disabled until the values are a valid set — performs it and moves the logger
-   on. Tapping effort cycles the Display choices in fixed order: Warm-up → Unspecified → RIR-4–0 → Technique → Cooldown; long press opens the same choices in a scrolling sheet. Settings offers three independent columns: Display, Working set (personal counts, sessions and strength records), and Volume (personal volume totals and records). All labels default displayed; only Unspecified/RIR default included in both calculations. There is no Add control. At least one Display choice is required; calculation columns may be empty. Display changes preserve recorded and prescribed effort and its figures; explicitly cycling a hidden label starts at the first displayed choice. Calculation edits recalculate personal history without rewriting workouts. Groups retain the shared default rule and show no effort settings. Untouched planned rows show prescribed effort; choosing blank explicitly clears actual effort. New ad-hoc rows follow §5.11 defaults.
-   The open row — the logger, and only it — also answers swipes (2026-10-01;
-   revised 2026-10-04): right confirms it exactly like the tick and moves on —
-   confirming the last set then adds one, the fresh row open in the logger with
-   the copied values; left drops it. Dropping an ad-hoc row removes it and the
-   logger falls back to the cursor; dropping a planned row the lifter has
-   touched clears the typed weight and reps and its effort, so it reads as its
-   plan again, and it stays open (a plan is never deleted by a swipe). Each
-   side is offered only when its move would change the row: an untouched
-   planned row cannot be swiped left, a row whose values are not a valid set
-   cannot be swiped right, and a side not offered neither drags nor shows its
-   symbol. Both swipes dismiss the keyboard. Swipes never navigate — they
-   cannot go to the previous set or screen — and the logger's accessibility
-   actions (`Confirm set` / `Drop set`), offered under the same conditions, are
-   the non-gesture path for the same two moves.
-4. **Numbers everywhere.** Every row, planned included, shows its 1RM and
-   volume; planned values `ink-faint`, legends `ink-ghost`. Warm-ups show a 1RM
-   like any set. Every figure in a row shares the row's colour and weight —
-   there is no per-column bold for today's bests, matching the session view
-   (§14b.4; aligned 2026-09-23). The one highlight, in `record` (brass), is the
-   session's record set (`tech/training-metrics-contract.md` §3: the highest
-   1RM beating the record, else the heaviest Weight, across every block of the
-   exercise in the session; one superlative per exercise, `design-language.md`
-   §5). Only the selected working sets compete (§5.11); Volume has no record set, since its
-   record is a whole session's. That best set earns the set list the `record` band, in the
-   session view's card words: `New 1RM record · <1RM>`, or
-   `New top weight · <weight> × <reps>` when only the Weight beat the baseline. The records panel counts working
-   sets only (§5.11): records, their baseline and the `Last` summary read working
-   sets, `Last` is the newest session with a working set, and its set list still
-   shows that session's warm-up lines. Records and `Last` read the exercise
-   session facts (spec 05) under the record rules (contract §3). The current-gym
-   filter scopes both. A completed session being edited (§14b.7) counts only
-   the sessions before it, the session view's live record rule (spec 05, "Live
-   record markers"), so `Last` is the session before it. `Records` | `Last` chooses what the
-   panel shows and never expands or collapses it; only the chevron does.
-   Collapsed, its `1RM` / `Max` / `Vol` row sums up the chosen view: the
-   all-time records, or the previous session's best 1RM, heaviest weight and
-   volume.
-5. **Two exits.** Back leaves every set as it is. `Complete exercise` asks first
-   when sets are waiting: planned sets still waiting are marked `unperformed`
-   (never deleted — their plan stays), and ad-hoc sets never ticked are removed;
-   the alert names both counts. `Remove from session` (⋮, danger) confirms, then
-   removes the exercise; `Swap exercise` keeps the sets and replaces the
-   exercise definition. Signed in, the ⋮ also offers `Link to group
-   exercise…`, which opens the Link screen for the exercise (product E0.3) after
-   the page's pending edits are written, so linking mid-session leaves the
-   session exactly as it reads; signed out it is absent.
-6. **Sheets** are the design-language `Sheet`: backdrop, Android back and the
-   VoiceOver escape dismiss; no Cancel.
-
-### 14b. Session view
-
-1. The session view is read-only and navigational: the whole exercise card is
-   one link to the exercise page, with no controls inside it. Editing happens
-   only on the exercise page; add lives on the session view (`+ Add
-   exercise`), remove in the exercise's own ⋮. The one control in the summary
-   card is the Gym stat: tapping it opens a `Gym` sheet (a `Nearby · <gym>`
-   suggestion when one gym confidently matches, then `No gym` and the gyms, the
-   current one marked; §14–§15) and choosing writes the session's gym. Adding
-   and managing gyms is the Gyms screen's, through the sheet's `Manage gyms`
-   (§16).
-2. `Finish` (top bar, `accent`) is the screen's one primary. It asks the
-   cleanup questions of §5.11 (the one rule set in `session-model.ts`) as
-   native alerts: entered-but-unconfirmed sets first, on their own; then
-   **one** prompt that removes the incomplete sets and the exercises left with
-   no sets together (`Remove incomplete sets and empty exercises?` · `Remove
-   and submit`; single-kind copy when only one applies). Declining any writes
-   nothing. Invalid set values block it with an alert naming the exercises to
-   fix.
-3. ⋮ is a menu sheet: `Session vs history` (a chevron row that opens the
-   session's live comparisons, §12.12), then `Abandon session`, `danger` and
-   confirms (`Abandon session?` · `Keep session` / `Abandon`) before the same
-   soft delete as the Sessions list's delete; the sheet's backdrop, Android
-   back and the VoiceOver escape dismiss it.
-4. A card row shows every set: done rows in `ink`, everything else faded
-   (values `inkFaint`, legends `inkGhost`), a planned row showing its
-   prescription. Every figure in a row shares the row's colour and weight —
-   there is no per-column bold for today's bests (tried on device 2026-09-23:
-   too noisy). The one highlight is the exercise's record set
-   (`tech/training-metrics-contract.md` §3: 1RM, else Weight, across every
-   block of the exercise) against the completed sessions before this one (all
-   of them while it is active). The figures it beat are shown in `record`, and
-   its card earns the exercise page's `record` band (§14a.4). It comes from the
-   same derivation (`deriveExercisePersonalRecord`) as the completion screen's
-   record cards (§7.7).
-5. The active top bar's title is `<Time of day> training · <elapsed>`: the
-   time of day from the session's local start hour (`Morning` 05–11,
-   `Afternoon` 12–16, `Evening` 17–20, else `Night`) and the elapsed time since
-   its start, ticking (`m:ss`, `h:mm:ss` from an hour); a title too long for
-   the bar shrinks to fit rather than truncating the time. The summary reads
-   Gym / Ex / Sets / Volume: `Ex` (spoken `Exercises`) counts the session's
-   exercises (an untouched one included); `Sets` counts the performed working sets
-   (§5.11; a performed warm-up adds nothing); its `Volume` is their calculated
-   volume under the current private policy (§5.11), and an incomplete Volume's
-   note reads `Known subtotal from X of Y working sets`.
-6. The persistent four-tab bar stays at the bottom with Train selected; it is
-   the way back out, and returns to the tab rather than stacking it.
-7. **A completed session is edited here**. The top bar reads
-   `Edit session` · `Done`, with no ⋮ (there is nothing to abandon), and
-   Progress is selected in the tab bar. The summary card's Time becomes two
-   fields, `Start` and `End` (`YYYY-MM-DD HH:mm`, End not before Start); a
-   field's error shows once it is left. Edits autosave losslessly — sets on
-   the exercise page (the same rules as §14a, written back as completed), the
-   gym, added exercises and valid times — and while either time is invalid
-   autosave pauses with `Autosave paused until Start/End times are valid.`
-   A field still showing its stored minute keeps its stored instant. `Done`
-   reveals invalid times and writes nothing; otherwise it asks §14b.2's
-   questions with completed-edit labels (`… and save changes`), saves the
-   confirmed rows only, and goes back where the edit was opened. It never
-   replays completion. Records compare against the completed sessions before
-   it, never the session itself or later ones.
-
-### 15. Documentation maintenance rule (UI semantics)
-
-1. If a task changes current UI semantics (action roles, state treatment, modal conventions, list interactions, validation behavior), update this file in the same task/session.
-2. If the change is route-path/param/transition related, update `navigation-contract.md` in the same task.
-3. If the change is component/primitives API related, update `components-catalog.md` in the same task.
-
-## Personal bodyweight analytics
-
-Personal figures use the same `Top weight`, `1RM` and `Volume` labels for every
-exercise. Set rows show only entered kg Weight/reps/effort; records never expose
-the contribution, reading or calculated-load breakdown. Missing personal
-reading uses the zero fallback and is not an unavailable/incomplete state.
-Valid zero is displayed numerically and is never a record or rank (`tech/training-metrics-contract.md` §3).
-
-Reading, preference, contribution and session-time changes refresh History,
-Stats, heatmaps, records, completion and share projections. Raw logged rows and
-Top weight do not change. Invalid raw input or arithmetic overflow may still
-produce the normal unavailable/retry treatment; read failures never fabricate
-records.
+# UX Rules (Cross-Screen UI Semantics)
+
+> **Owns:** the UI semantics every screen shares: actions and emphasis, sheets,
+> lists, states and feedback, how sets and figures read, styling guardrails,
+> and the few screen rules no other source states. **Not here:** a screen's
+> own behaviour, which its route entry, components and tests state.
+> **Load when:** a task creates or changes UI.
+
+This doc complements `docs/specs/08-ux-delivery-standard.md` (process, UX
+contract, reusable UX patterns). It states a rule once, here or in the source
+below that owns it, and never restates code: a component's header comment and
+the names of its Jest tests are the specification of that component.
+
+## Where screen behaviour lives
+
+| If you are changing… | Load or read |
+| --- | --- |
+| A route's purpose, sections, states, entry and exit | `screen-map.md` |
+| Route params, query values, transitions, header titles | `navigation-contract.md` |
+| A primitive or shared component's API and variants | `components-catalog.md`, then the component file |
+| Colour roles, type, surfaces, emphasis, figure formatting | `design-language.md` |
+| A screen with an accepted design target | its record under `design-targets/` |
+| What counts as a working set, a counted session or a record; figure formats | `docs/specs/tech/training-metrics-contract.md` |
+| Optional bodyweight calculations, personal or group | `docs/specs/tech/bodyweight-load-contract.md` |
+| Group screens, group writes, boards and certification | `docs/specs/tech/groups-contract.md`, `docs/specs/tech/group-competition-contract.md` |
+| A reusable interaction pattern (stream card, offline marker, online-only write, row logger, link card) | `docs/specs/08-ux-delivery-standard.md` "UX patterns" |
+| Device-local preferences (browser sort, look-back, effort columns) | `docs/specs/05-data-model.md` "Device-local preferences" |
+
+## Actions and emphasis
+
+1. **One primary per screen**, the screen's one `accent` action
+   (`design-language.md` "Emphasis"): `Finish`, `Done`, `Edit`, `Save
+   Exercise`, a start disc. Train with a ready plan shows the planned start as
+   the primary and the empty start as an outline.
+2. **Everything else is an outline or a text button.** Dismissal is never a
+   button inside a sheet (see Sheets).
+3. **Destructive actions are `danger`** and visually distinct from the
+   primary: a `danger` row in a sheet, a `danger` outline, or the destructive
+   style of a native `Alert`.
+4. **Tabs are navigation, not actions.** `MainTabs` uses tab semantics, marks
+   the active tab by weight and an `ink` underline, and never uses `accent`.
+   There are exactly four tabs (Today, Train, Progress, More); Settings is a
+   row under More, and More and Settings work while signed out.
+5. **A workout in progress is never offered as a Resume button.** Train opens
+   it directly, and every session start goes through the session-entry
+   coordinator (`src/session-entry/coordinator.ts`), so no action can create a
+   second concurrent session.
+
+## Sheets
+
+1. **A sheet is state within its route, not navigation.** Secondary workflows
+   (row actions, management options, pickers of one value, editors) open a
+   design-language `Sheet` over the current screen. Do not document opening one
+   as a route transition.
+2. **No Cancel, no Close.** The backdrop, Android back and the VoiceOver escape
+   dismiss a sheet and write nothing. A sheet may refuse dismissal only while
+   its own write or capture is in flight.
+3. **Never stack sheets.** A choice made inside a sheet (an editor's muscle
+   list) swaps the sheet's body, with a `chevron-left` back to the previous
+   body. A confirmation that follows a sheet opens once the sheet has gone
+   (`Sheet.onDismissed`).
+4. **The keyboard closes before a sheet opens**, so a sheet never opens under
+   it, and a sheet holding fields lifts above the keyboard.
+5. **Confirm what cannot be undone, not what can.** A soft delete (exercise,
+   completed session, gym archive) does not confirm: the same sheet offers
+   `Undelete` / `Unarchive`. Discarding an active session, removing an
+   exercise from a session, and destructive group writes confirm first in a
+   native `Alert` with a destructive button.
+6. **The exception is the exercise picker**, a route
+   (`/session/<id>/add-exercise`) presented as a full-height iOS page sheet,
+   because it hosts its own editor and pick sheets. Swiping it down leaves
+   without adding.
+
+## Lists and rows
+
+1. **A row has one main target and, when it has secondary actions, one
+   trailing ⋮** (`IconButton`, 44pt). The main target opens or edits the item;
+   the ⋮ opens a sheet titled with the item's name.
+2. **Deleted and archived items stay in their list behind a toggle** (`Show
+   deleted`, `Show archived`), never a separate route: faded, marked with a
+   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet.
+3. **A summary card that opens a destination is one link** with no controls
+   inside it and an accessibility label that states its summary (spec 08,
+   "Read-only link card pattern"). Editing and removal live on the destination.
+4. **A list's sort, filter and search are the list's state.** Changing them
+   never navigates and never rewrites the URL; which of them persist is a
+   device-local preference (spec 05), not a screen decision.
+
+## States and feedback
+
+1. **Three levels, kept distinct.** A whole-screen state (`StatePanel` filling
+   the screen) when the route has nothing meaningful to show yet; an in-section
+   state (`StatePanel` in a `Card`) when one area cannot render; an inline
+   `Notice` or field message for the outcome of an action. A screen keeps a
+   safe exit (back, a tab, or one named exit) in every state.
+2. **Feedback sits next to its cause.** A field's validation shows under the
+   field; a failed action shows beside the action, and the
+   screen's data and form input stay as they were.
+3. **Success is a glyph and words, never a hue.** An outcome `Notice` uses the
+   `success` glyph in a neutral tone; a failure is `danger`. Warnings and
+   offline state also use a glyph and words, not a warning hue
+   (`design-language.md` "Colour roles").
+4. **A failure never fabricates data.** A failed or loading read shows no zero,
+   no `Never done`, no "no history" and no record; empty states appear only
+   after a successful empty read. Optional enrichment (history, comparisons,
+   records) that fails leaves the stored content and the exits usable.
+5. **Retry repeats the same read**, with the same entity and window, through
+   the same load the screen uses on focus.
+6. **The newest request wins.** A screen refreshes on focus (and on explicit
+   pull or Retry); a superseded or unmounted request never replaces the newest
+   visible result, and a changed account, window or policy hides older figures
+   instead of showing them as current.
+
+## Sets and figures
+
+What a set *is* (valid values, confirmed performed, working set,
+volume-included set, counted session, record) is
+`docs/specs/tech/training-metrics-contract.md`; how the session recorder
+keeps, defaults and cleans up rows is `src/session-recorder/session-model.ts`
+and spec 05's session invariants. The UI adds:
+
+1. **An unqualified `Sets` is working sets**, on every screen and in the share
+   image. Only plain row counts count every row: the session view card's
+   `n of m sets done` and the remove-exercise alert's `its N sets`.
+2. **Set inputs show validity by visual cues only** (field frame, a disabled
+   commit control); there is no inline validation text inside a set row.
+3. **A planned row is matched or modified by its prescribed Weight and Reps
+   only**; changing effort does not make it modified.
+4. **Every row shows every figure it can compute**, planned and warm-up rows
+   included, faded when not performed (`design-language.md` "Presenting
+   data"). The only highlight is the exercise's one record set in `record`,
+   with the `record` band on its card or set list (`design-language.md`
+   "Emphasis"; which set, training-metrics "Records").
+5. **One vocabulary and one format.** `Weight`, `Top weight`, `1RM`,
+   `Volume`; the formats of training-metrics "Calculations", never `k`, never
+   a thousands separator, `—` only for a missing value.
+
+## Styling guardrails
+
+`apps/mobile/scripts/check-ui-guardrails.js` runs as the `ui-guardrails` lane
+of `boga test fast` and in CI; its rules, budgets and remedies are stated in
+the header of `apps/mobile/scripts/ui-guardrails.config.js`, and the token
+values in `apps/mobile/components/ui/tokens.ts`. In short: no raw colour
+literals, no retired styling vocabulary, and no raw `fontSize`, spacing or
+radius literal in `app/` or `components/` (every budget is 0).
+
+1. **Raising a budget is never the fix.** A value the scale lacks is a case
+   for changing the scale in `tokens.ts` and `design-language.md`, agreed as a
+   design decision.
+2. **Uppercase has two roles only:** micro-labels (`xxs`, 10) and control
+   labels (Archivo 700 at `xs` or `sm`: `ActionButton`, the exercise page's
+   selector). Body and figure text are never uppercase.
+3. **Font sizes are fixed** (decided 2026-09-25). App-owned text and inputs do
+   not follow the device's text-size setting: every `Text` and `TextInput`
+   sets `allowFontScaling={false}` after any spread props, and `FormField` and
+   `SearchField` enforce it for their callers. Native system dialogs stay
+   OS-controlled. `__tests__/ui-font-scaling.test.tsx` holds coverage and prop
+   precedence.
+4. **Icons come from `Icon`**, never from a Unicode character in `Text`;
+   characters that belong to the data stay text (`×`, `−`, `·`).
+   `__tests__/ui-icon.test.tsx` fails on a retired glyph. An icon-only control
+   is a labelled `IconButton`, and an icon never carries state alone: the
+   words or the row's accessibility label say it.
+
+Guardrail commands (from `apps/mobile/`): `npm run lint:ui-guardrails`, with
+`--verbose` for each ratchet violation, `--include-allowlisted` for the colour
+audit, and `--update-budgets` after a cleanup.
+
+## Appearance
+
+Every theme is light; the presets, their seeds and why the choice applies at
+next launch are `design-language.md` "Presets" and the decision register in
+`docs/specs/03-technical-architecture.md`. Outside the roles: `app/_layout.tsx`
+keeps `<StatusBar style="dark" />`; the splash is a fixed white
+(`app.config.ts`); neither reads a role. The stack header takes `surface`
+and `ink`, read once at launch like every role, so it matches the screen
+beneath it.
+
+## Screen rules no other source states
+
+### Exercise tags are read-only
+
+Tag editing was dropped 2026-09-23: there is no attach, create, rename, delete
+or manage UI. The synced tag tables and existing assignments stay, and
+exercise history filters by them.
+
+### Swipes on the exercise page
+
+Decided 2026-10-01, revised 2026-10-04. Only the open row, the logger,
+answers swipes. Right confirms it exactly like the tick and moves on;
+confirming the last set adds one, opened with the copied values. Left drops
+it: an ad-hoc row is removed; a touched planned row loses its typed values and
+effort and reads as its plan again, still open (a swipe never deletes a plan).
+A side is offered only when its move would change the row: no left swipe on an
+untouched planned row, no right swipe without a valid set; a side not offered
+neither drags nor shows its symbol. Both swipes dismiss the keyboard, and
+neither navigates. The `Confirm set` / `Drop set` accessibility actions are
+the non-gesture path, under the same conditions. Code:
+`components/exercise-page/swipe-set-row.tsx`, `canDropSet` and `dropSet` in
+`src/session-recorder/exercise-page-model.ts`.
+
+## Maintenance
+
+When a change alters a rule above, update this doc in the same change; for
+everything else follow `docs/specs/ui/README.md` "Maintenance rules". Do not
+add per-screen behaviour here: state it in the component and its tests, and in
+the route's `screen-map.md` entry when it changes entry, exit or states.

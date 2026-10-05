@@ -519,7 +519,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
     expect(readLink()?.deletedAt).not.toBeNull();
     expect((await listLinks()).some((link) => link.id === linkId)).toBe(false);
 
-    // 3. Relink → the same id is undeleted server-side (LWW, contract §A.1.1.3).
+    // 3. Relink → the same id is undeleted server-side (LWW, sync-v2 contract "LWW and undelete").
     await linkExercise(ids.exerciseDefinition, ids.group, 'gx-2');
     await runSyncCycle();
     wipeLocalStore();

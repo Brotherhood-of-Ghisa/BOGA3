@@ -39,9 +39,9 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 /**
- * The group screen (groups contract §6.3; product D10, D14), for managing the
+ * The group screen (groups contract; product D10, D14), for managing the
  * group: the header card with the member count, which opens the Members
- * screen; the role-gated Invite (the screen's one `accent`, T13-D1) and Edit;
+ * screen; the role-gated Invite (the screen's one `accent`) and Edit;
  * then the group's Exercises. The stream and leaderboards live on the Groups
  * screen.
  */
@@ -90,7 +90,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
   );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
 
-  // C3.6.8: after removal, hide everything cached (the hooks already evicted it).
+  // After removal, hide everything cached (the hooks already evicted it).
   if (group.lostAccess || exercises.lostAccess) {
     return <LostAccessState />;
   }
@@ -134,7 +134,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       </GroupHeaderCard>
       {canManageGroup(summary.my_role) ? (
         <View style={groupScreenStyles.actionRow}>
-          {/* Invite is the prominent action for owners and admins (C3.3.2); members never see it (C7.4). */}
+          {/* Invite is the prominent action for owners and admins; members never see it. */}
           <View style={groupScreenStyles.actionRowItem}>
             <ActionButton
               label="Invite"

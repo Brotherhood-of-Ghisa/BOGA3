@@ -1,13 +1,11 @@
 # Accepted target — Progress (brief + data-viz palette)
 
-Target record per `../ai-design-policy.md`, for DLM-T08, DLM-T09 and DLM-T10
-of the design-language migration. Chosen by the user on 2026-09-24
-(plan decision G1 (c)): a brief for the tables and controls, plus a data-viz
+Target record per `../ai-design-policy.md`. Chosen by the user on 2026-09-24:
+a brief for the tables and controls, plus a data-viz
 palette picked from on-device renders. **Palette accepted** by the user on
-2026-09-25 (`B2`). **Accepted** by the user in the DLM-T08 screen gallery on
-2026-09-25; the history sheets and heatmaps **accepted** in the DLM-T09 gallery
-on 2026-09-26; exercise history and Sessions **accepted** in the DLM-T10
-gallery on 2026-09-26.
+2026-09-25 (`B2`). **Accepted** by the user in the screen gallery on
+2026-09-25; the history sheets, heatmaps, exercise history and Sessions
+**accepted** on 2026-09-26.
 
 The landing portion is superseded by [Progress tables](progress-tables.md).
 This record continues to own the palette and retained exercise browsing,
@@ -35,9 +33,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - The landing's controls, muscle/contribution tables and quiet links follow
   [Progress tables](progress-tables.md). Browse exercises retains the
   `Breakdown` control, `SearchField` and sortable exercise table on `paper`.
-- Deltas are Plex Mono `ink-muted` with their sign; `new` is `ink` (G3,
-  T08-D4). Figures take the one display format (`tech/training-metrics-contract.md`
-  §4) in Plex Mono, never `2.5k` (T08-D2).
+- Deltas are Plex Mono `ink-muted` with their sign; `new` is `ink` (G3). Figures take the one display format (`tech/training-metrics-contract.md`
+  §4) in Plex Mono, never `2.5k`.
 - The exercise table is a `Card`: a header row of micro-labels (the active sort
   in `ink` with an `arrow-up` / `arrow-down`, `Recent` for the Exercise sort,
   no wash; inactive indicators keep their width, transparent), then
@@ -49,11 +46,11 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - Loading, error and empty states use inline `StatePanel`s; the table's Retry
   and metric-specific contribution emptiness follow the replacement brief.
 
-### History sheets and heatmaps (DLM-T09)
+### History sheets and heatmaps
 
 - The two legacy overlays are one `HistorySheet` (`components/stats/`), a
   `Sheet` over about three quarters of the screen with no close button: the
-  backdrop, Android back and the VoiceOver escape dismiss it (G5, T09-D1/D2).
+  backdrop, Android back and the VoiceOver escape dismiss it (G5).
 - Eyebrow micro-label and the name in Archivo 800; a `Metric`
   `SegmentedControl` under its micro-label and a static saved view/window label;
   Daily/Weekly is chosen only in Settings; in Weekly a `rule-soft` banner with
@@ -63,23 +60,23 @@ rule that comes with it: text on a `viz` ground is `ink`.
 - Cells and bars are on `viz0`…`viz4`; an empty day is `viz0` with a `rule`
   hairline. **Today (the current week) is a 1px `ink` ring; the selected day or
   week a 2px `ink` border** with the selected state, and the selected week has a
-  filled `ink` caret above it (T09-D3).
+  filled `ink` caret above it.
 - Titles are Archivo 700; gutter, month axis, legend and the `12-wk avg` label
   are Archivo micro-labels (`ink-faint`; the average label `ink-muted` on
   `surface`, since it sits over bars). The average line is `ink-faint` dashes.
 - The day detail is a `Card`: a `Today` / weekday kicker, the date, a `viz`
   swatch and `<metric>: <value>` in Plex Mono `ink`, or `Rest day`.
 
-### Exercise history and Sessions (DLM-T10)
+### Exercise history and Sessions
 
 - Exercise history is one `ScreenScroll` over `MainTabs`: the period
   `SegmentedControl`, the tag `ChipGroup` on one sideways-scrolling line (a
   deleted tag a faint `<name> (deleted)` chip), a deleted exercise's `Notice`
   (`warning` glyph), then the cards.
 - `All-time bests` is a `Card` of two `ListRow` links, `1RM` and `Top weight`:
-  the figure in bold Plex Mono `record` (brass, T10-D2) over its date in Plex
+  the figure in bold Plex Mono `record` (brass) over its date in Plex
   Mono `ink-muted`. `1RM`, never `Est. 1RM` (G7).
-- Each session is View Session's `ExerciseSetsCard` as a link (T10-D1): the
+- Each session is View Session's `ExerciseSetsCard` as a link: the
   completion stamp in Plex Mono and `<n> sets` (working sets); the gym, `Tag`s
   and stacked `Stat`s (`1RM`, `Top set`, `Vol`, `Sets`); then `SetSummaryRow`s
   (`type · weight × reps · 1RM · VOL`), warm-ups like working sets.
@@ -89,8 +86,8 @@ rule that comes with it: text on a `viz` ground is `ink`.
   `Deleted` `Tag`; `Show deleted` / `Hide deleted` a text button (`checked`).
 - Row menus are `Sheet`s dismissed by the backdrop: completed `Edit` /
   `Append` / `Delete` (`danger`) or `Undelete`, titled with the start stamp;
-  active `Delete`, which confirms in an `Alert` (T10-D4).
-- Loading, error (`Retry` on Sessions, T10-D6) and empty states are
+  active `Delete`, which confirms in an `Alert`.
+- Loading, error (`Retry` on Sessions) and empty states are
   `StatePanel`s in a `Card`, with `…` for the ellipsis.
 
 One shared weekly working-set target grades each muscle against quota × selected
@@ -138,8 +135,8 @@ holds the flow steps that reached them.
 Absent from committed regression flows: the loading and error states (the
 screen's and the history sheets'), a filtered list with no match, the shade and delta
 colours (`__tests__/stats-screen.test.tsx`), and the today and selected
-marks on every cell kind (`__tests__/heatmap-marks.test.tsx`). For
-DLM-T10: the bests in `record`, the tag chips, the deleted-exercise notice and
+marks on every cell kind (`__tests__/heatmap-marks.test.tsx`);
+the bests in `record`, the tag chips, the deleted-exercise notice and
 exercise history's states (`__tests__/exercise-history-screen.test.tsx`);
 the active session, the `Deleted` tag, the discard confirm and the `Retry`
 (`__tests__/sessions-screen.test.tsx`).

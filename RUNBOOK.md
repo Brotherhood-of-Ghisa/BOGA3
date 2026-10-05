@@ -286,7 +286,7 @@ run loop once that build is on the phone.
 
 ### One-stop: dev-lan.sh
 
-The single command that chains everything — boots this slot's local Supabase,
+The single command that chains everything — boots this checkout's local Supabase,
 points `apps/mobile/.env.local` at the Mac's LAN IP, and starts Expo/Metro over
 the LAN in `--dev-client` mode:
 
@@ -300,7 +300,7 @@ Notes:
   (scan the QR code Expo prints, or open the dev-client URL).
 - Extra args are forwarded to `expo start`, e.g. `./scripts/dev/dev-lan.sh --clear`.
 - Supabase containers persist after you Ctrl+C Expo. Stop them with
-  `./supabase/scripts/local-runtime-down.sh`.
+  `boga db dev-down` (main checkout) or `boga db down` (linked worktree).
 
 ### Outside the LAN (Tailscale): dev-remote.sh
 
@@ -479,24 +479,22 @@ and no gate, CI lane, or seed touches them.
 
 ### Provision the dev accounts
 
-The dev accounts are auth users on whichever Supabase you target. A fresh local
-stack and `supabase db reset` both wipe `auth.users`, so re-run this after a
-reset — it is idempotent (creates the accounts if missing, resets their passwords
-if present).
+The dev accounts are auth users on whichever Supabase you target. A fresh stack
+or reset wipes `auth.users`; re-run this after one (idempotent).
 
 **Automatic (the usual path):** the phone launchers `scripts/dev/dev-lan.sh` and
 `scripts/dev/dev-remote.sh` target a **dedicated dev Supabase stack**
 (`project_id BOGA-dev`, API `65431`) that is isolated from the slot-0 stack the
 gates use — so **running `boga test *` never wipes your dev data or session.**
 They run the **dev DB baseline** on every start: reuse the dev stack **without
-resetting it** (your logged data survives), apply any pending migrations in
-place, seed `a@dev.local` / `b@dev.local` / `history@dev.local`, push the
-rich imported history into the `history@dev.local` account, and seed the
-`Dev crew` group (`npm run seed:dev-groups`): owned by `history@dev.local`, with
-`b@dev.local` as a member, both memberships backdated, and the last four weeks of
-sessions for both pushed so the group's stream and week board have content.
-`a@dev.local` stays near-blank. The full isolation
-contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
+resetting it**, apply pending migrations in place, point the group-eval kick
+at it, seed `a@dev.local` (near-blank) / `b@dev.local` / `history@dev.local`
+(rich imported history), seed the `Dev crew` group (`npm run seed:dev-groups`;
+`history@` owns, `b@` joins, both backdated, four recent weeks of sessions
+each), and activate group competitions once (one-way until `boga db dev-reset`).
+`BOGA-dev` is main-checkout-only: in a linked worktree the launchers run this
+baseline on its slot stack (`./boga db reset` before its groups gates).
+Contract: `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
 stack). Commands:
 
 ```bash
@@ -506,8 +504,8 @@ boga db dev-down     # stop it (data persists)
 boga db dev-reset    # rebuild it — DROPS ALL DEV DATA
 ```
 
-On real schema drift the baseline **fails loud** rather than wiping — it tells
-you to run `boga db dev-reset` explicitly. Use that only for a clean rebuild.
+On real schema drift the baseline **fails loud** rather than wiping; rebuild
+explicitly with `boga db dev-reset`.
 
 Local Docker/Colima Supabase, provisioning the accounts by themselves:
 
@@ -524,8 +522,7 @@ set -a; source supabase/.env.hosted; set +a        # SUPABASE_URL + legacy JWT s
 ```
 
 Hosted provisioning needs the **legacy JWT `service_role`** key (not a
-`sb_publishable_...` / `sb_secret_...` key) — same requirement as the other auth
-scripts. The fixture users have their own provisioner
+`sb_publishable_...` / `sb_secret_...` key). The fixture users have their own provisioner
 (`./supabase/scripts/auth-provision-local-fixtures.sh`), which the test baseline
 runs automatically; you do not need it for manual dev.
 
@@ -797,7 +794,7 @@ Exact build/configuration details live in `apps/agent-auth-web/README.md`,
 
 ### Group evaluator (hosted)
 
-The M25 group evaluator (`docs/specs/tech/groups-contract.md` §2.10) needs one
+The group evaluator (`docs/specs/tech/groups-contract.md`) needs one
 deploy and one setting per hosted project:
 
 1. Apply the migration chain. It enables `pg_net` and `pg_cron`, schedules
@@ -910,8 +907,8 @@ NOT update in place.
 
 - Expo/dev-client logs: terminal where `npm run start:ios:dev-client` or `npx expo start --dev-client` is running.
 - Production diagnostic rows: Supabase Dashboard / SQL Editor query against `public.app_logs`. Mobile clients can insert rows only; use operator credentials for inspection.
-  - Group triage. Filter on `source = 'database'` with `event = 'group.share_failed'` or `event = 'group.event_failed'`. `group.share_failed` means the share trigger failed and `group.event_failed` means the stream-item trigger failed. In both cases the session write committed. `context` is `{session_id, sqlstate}` and `user_id` is the session owner. The session's next accepted write heals both. For an `event_failed` session that won't be written again, run `select app_public.group_events_backfill();` in the SQL Editor. It is idempotent and inserts only missing items (`docs/specs/tech/groups-contract.md` §2.6).
-  - **Group evaluator triage** (`docs/specs/tech/groups-contract.md` §2.10). Filter `source = 'database'` on these events; `user_id` is the member.
+  - Group triage. Filter on `source = 'database'` with `event = 'group.share_failed'` or `event = 'group.event_failed'`. `group.share_failed` means the share trigger failed and `group.event_failed` means the stream-item trigger failed. In both cases the session write committed. `context` is `{session_id, sqlstate}` and `user_id` is the session owner. The session's next accepted write heals both. For an `event_failed` session that won't be written again, run `select app_public.group_events_backfill();` in the SQL Editor. It is idempotent and inserts only missing items (`docs/specs/tech/groups-contract.md`).
+  - **Group evaluator triage** (`docs/specs/tech/groups-contract.md`). Filter `source = 'database'` on these events; `user_id` is the member.
     - `group.eval_enqueue_failed`: an enqueue trigger failed, and the sync write committed. `context` is `{table, row_id, sqlstate}`. The member's next accepted write of that session or link re-enqueues it.
     - `group.eval_kick_failed`: the pg_net kick failed. The `group-eval-sweep` cron job (every 5 minutes) retries it.
     - `group.eval_failed`: a job failed and stays queued with backoff. `context` is `{job_id, kind, sqlstate}`. Inspect `app_public.group_eval_queue` (`attempts`, `last_sqlstate`) for a job that keeps failing.

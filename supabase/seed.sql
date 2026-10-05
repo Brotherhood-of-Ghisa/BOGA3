@@ -1,4 +1,4 @@
--- Deterministic local fixtures for M5 backend development.
+-- Deterministic local fixtures for backend development.
 -- `db reset` recreates the database, but we still make inserts explicit and stable.
 
 truncate table public.dev_fixture_principals;
@@ -44,5 +44,5 @@ values
 insert into public.local_runtime_bootstrap_markers (marker, details)
 values (
   'm5_local_runtime_seed_v1',
-  'Baseline schema + deterministic fixtures seeded for T-20260220-08'
+  'Baseline schema + deterministic fixtures'
 );

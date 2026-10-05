@@ -21,7 +21,8 @@ Target record per `../ai-design-policy.md`. Accepted 2026-09-21.
   it is older styling, kept only because the exercise page links to it.
 
 The canvas governs the exercise page and the session view. Everything else in
-the app is governed by `../ux-rules.md` until it gets its own target.
+the app is governed by `../design-language.md` and `../ux-rules.md` until it
+gets its own target.
 
 ## Brief
 
@@ -55,6 +56,6 @@ ambiguous without them. Runtime comparison captures stay in the gitignored
    **Resolved 2026-09-22:** both ship in the binary; the faces are embedded
    by the `expo-font` config plugin. See `../design-language.md` §3.
 3. ~~The History page is stale relative to this target and is linked from the
-   accepted exercise page.~~ **Resolved 2026-09-26 (DLM-T10):** exercise
+   accepted exercise page.~~ **Resolved 2026-09-26:** exercise
    history is in the design language, drawing each session with View Session's
    exercise card (`progress.md`).

@@ -1,5 +1,5 @@
 /**
- * Device-side group metrics (groups contract §5): the session's performed-set
+ * Device-side group metrics (groups contract): the session's performed-set
  * rule and parsers applied to the raw set rows the group reads return.
  */
 

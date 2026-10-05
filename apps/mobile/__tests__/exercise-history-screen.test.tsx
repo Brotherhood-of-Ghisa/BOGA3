@@ -480,7 +480,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
   });
 });
 
-describe('ExerciseHistoryScreenShell — design language (DLM-T10)', () => {
+describe('ExerciseHistoryScreenShell — design language', () => {
   const renderShell = (overrides: Partial<ExerciseHistoryScreenShellProps> = {}) =>
     render(
       <ExerciseHistoryScreenShell

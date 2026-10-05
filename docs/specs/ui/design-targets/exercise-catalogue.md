@@ -1,11 +1,10 @@
 # Accepted target — the exercise list, picker and catalogue (repo-native brief)
 
-Target record per `../ai-design-policy.md`, for DLM-T06 (the shared exercise
-list, the session view's exercise picker and the exercise page's swap sheet)
-of the design-language migration, extended by DLM-T07 with the catalogue and
-the exercise editor. Chosen by the user on 2026-09-24 (plan decision G1 (a)): a
-brief plus the gallery states the user accepts. **Accepted** by the user in
-the DLM-T06 gallery on 2026-09-25.
+Target record per `../ai-design-policy.md` for the shared exercise list, the
+session view's exercise picker, the exercise page's swap sheet, the catalogue
+and the exercise editor. Chosen by the user on 2026-09-24: a brief plus the
+gallery states the user accepts. **Accepted** by the user in the gallery on
+2026-09-25.
 
 Behavior simplified by the user-agreed repo-native brief on 2026-09-25: mandatory families, two sorts and all-time row history. This intentionally replaces the earlier optional grouping, periods and Recents controls; typography, surfaces, row and disclosure styling are retained.
 
@@ -32,7 +31,7 @@ closed; a pick closes the keyboard. The gallery states below were re-captured.
   `Sort: Favourite` / `Sort: A–Z`, which switches between the two orders. No
   section label, range, muscle filter or redundant status chips. Both
   preferences are local, persistent and shared by catalogue, add and swap, and
-  apply at once. Semantics: `ux-rules.md` §4.
+  apply at once. Semantics: `ux-rules.md` "Lists and rows".
 - The row history line is `Last: 23 Sep · 18 sessions`; include the year for
   prior-year dates, use singular `1 session`, and `Never done` without history.
   Favourite uses a fixed 180-day scoring window; history stays all-time.
@@ -47,12 +46,12 @@ closed; a pick closes the keyboard. The gallery states below were re-captured.
   management-only deleted visibility.
 - Tapping an exercise opens its preselection `Card`: the name in Archivo 700,
   the plan's `From <date>` as a micro-label over its sets as set rows, faded as
-  planned (T06-D2), and an action strip with `Add empty set` (outline) and
+  planned, and an action strip with `Add empty set` (outline) and
   `Append plan`, the picker's one `accent` (G6).
 - `From your groups` is a micro-label over one `Card` of `ListRow`s per group,
   each saying its link state in words (`08` pattern 10). Loading, errors and
   empties are `StatePanel`s with the copy unchanged.
-- The swap sheet on the exercise page renders the same list (T06-D3).
+- The swap sheet on the exercise page renders the same list.
 
 ## States
 
@@ -76,15 +75,14 @@ Jest coverage also includes a deleted row (the picker and swap sheet hide
 deleted exercises; the catalogue shows them from T07), the loading and error
 panels, and the `Groups`-only list.
 
-## The catalogue and the exercise editor (DLM-T07)
+## The catalogue and the exercise editor
 
-**Accepted** by the user in the DLM-T07 gallery on 2026-09-25.
+**Accepted** by the user in the gallery on 2026-09-25.
 
 ### Brief
 
-- The catalogue (`/exercise-catalog`) has the in-content title `Exercises`
-  (T07-D1), then one row: a `SearchField`, `+` as an `accent` `IconButton` (the
-  screen's one primary, T07-D2) and ⋮. The shared filter row stays beneath
+- The catalogue (`/exercise-catalog`) has the in-content title `Exercises`, then one row: a `SearchField`, `+` as an `accent` `IconButton` (the
+  screen's one primary) and ⋮. The shared filter row stays beneath
   it. An outcome is a `Notice` above the list:
   `Exercise created.` / `updated.` / `deleted.` / `restored.` with the
   `success` glyph (G3), and a failure in `danger`. Loading and error are
@@ -94,7 +92,7 @@ panels, and the `Groups`-only list.
 - **A row's ⋮** opens a `Sheet` titled with the exercise's name: `Edit`
   (`pencil`), `Link to group exercise…` (`link`, signed in only) and `Delete` in
   `danger` (`trash`). A deleted exercise gets `Undelete` instead of `Delete`,
-  and `Edit` and `Link` are disabled. Delete does not confirm (T07-D4).
+  and `Edit` and `Link` are disabled. Delete does not confirm.
 - **The exercise editor** is a tall `Sheet` that lifts above the keyboard, with
   no Cancel. The name is a `FormField`. The weight entry is a micro-labelled
   `SegmentedControl`. The primary muscle is a `ListRow` framed like a field,
@@ -102,7 +100,7 @@ panels, and the `Groups`-only list.
   Secondary muscles are `ListRow`s in a `Card`, each with a `danger` `x`, over
   an outline `Add secondary muscle`. `Save Exercise` is the sheet's one
   `accent` (G6); a save failure is a `danger` `Notice` under it.
-- **Choosing a muscle** swaps the sheet's body for the muscle list (T07-D3):
+- **Choosing a muscle** swaps the sheet's body for the muscle list:
   the title names the choice, and a `chevron-left` `Back to exercise` sits
   before it. Rows carry `radio-on` / `radio-off` (primary) or `plus` (a
   secondary not yet chosen), with the family on the right in `ink-muted`.

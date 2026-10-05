@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * M22-T04 group screens (groups contract §6.3, §7; task card flows 1–4): the
+ * group screens (groups contract): the
  * Groups tab, My groups, the group screen, and the friend's session view.
  * The four read RPCs are mocked; the cache is the real `group_cache` on the
  * shared in-memory SQLite fixture, so cache-first render, offline, and
@@ -398,7 +398,7 @@ describe('Groups tab', () => {
     expect(api.listMyGroups).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps the cached stream under the offline marker when the refresh fails with NETWORK (AC12)', async () => {
+  it('keeps the cached stream under the offline marker when the refresh fails with NETWORK', async () => {
     seed(groupCacheKeys.mine, { groups: [GROUP_A] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
     api.listMyGroups.mockRejectedValue(networkError());
@@ -525,7 +525,7 @@ describe('Group screen', () => {
     expect(screen.getByText('Unnamed member')).toBeTruthy();
   });
 
-  it("shows \"You're no longer a member\" after removal, hiding and evicting cached data (C3.6.8)", async () => {
+  it("shows \"You're no longer a member\" after removal, hiding and evicting cached data", async () => {
     seed(groupCacheKeys.group('group-a'), GROUP_A_DETAIL);
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
     seed(groupCacheKeys.session('group-a','friend-1', 's-1'), sessionDetail());
@@ -555,7 +555,7 @@ describe("Friend's session view", () => {
     mockParams = { groupId: 'group-a',memberId: 'friend-1',sessionId: 's-1' };
   });
 
-  it('renders exercises with performed sets (weight × reps, effort, 1RM, volume) and no owner actions (AC6)', async () => {
+  it('renders exercises with performed sets (weight × reps, effort, 1RM, volume) and no owner actions', async () => {
     render(<GroupSessionRoute />);
     // The session view's row, from the shared session-detail cards.
     const warmUp = within(await screen.findByTestId('group-session-set-row-set-1'));

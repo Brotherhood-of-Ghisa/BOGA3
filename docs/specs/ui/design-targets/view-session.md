@@ -1,7 +1,7 @@
 # Accepted target — View Session (repo-native brief)
 
-Target record per `../ai-design-policy.md`. Chosen by the user on 2026-09-23
-(task card `T-20260923-02`, decision V1): a brief in this repository rather than
+Target record per `../ai-design-policy.md`. Chosen by the user on 2026-09-23:
+a brief in this repository rather than
 new artboards, because View Session is built almost entirely from primitives
 the `exercise-session-v5.md` target already governs. **The detail's states
 below were accepted by the user on 2026-09-24** (gallery iteration 1); the

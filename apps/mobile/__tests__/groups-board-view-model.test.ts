@@ -1,5 +1,5 @@
 /**
- * M25-T09 board view model (card AC3, AC4, AC8; product E1.1–E1.3, P7): the
+ * Board view model (E1.1–E1.3, P7): the
  * ordinal and date formats, route params, podium cards ("You: Nth", the empty
  * Certified label, archived), full-board rows (metric values, former, certified / uncertified on
  * All only), and every history sentence.

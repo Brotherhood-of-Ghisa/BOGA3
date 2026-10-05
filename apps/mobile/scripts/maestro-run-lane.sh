@@ -133,7 +133,7 @@ case "$lane" in
     run_flow full "First-run log and remote round-trip" sync-first-run-log-and-roundtrip.yaml
     ;;
 
-  # The two-user groups e2e lane (M22; docs/specs/tech/groups-contract.md §8):
+  # The two-user groups e2e lane (docs/specs/tech/groups-contract.md):
   # the device signs in as user_c and drives the real group UI, while the flow
   # scripts the counterparty user_d over HTTP (runScript
   # .maestro/scripts/groups-counterparty.js: join, sync_push, removed-member

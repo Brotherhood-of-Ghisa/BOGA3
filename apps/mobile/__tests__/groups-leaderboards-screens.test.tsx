@@ -1,9 +1,8 @@
 /* eslint-disable import/first */
 
 /**
- * M25-T09 leaderboards screens (card AC2–AC8; product E1.1–E1.3; groups
- * contract §4.5, §6.2, §6.3): the group screen's Leaderboards segment (podium
- * cards, cache-first under `boards:<groupId>`), the full board route (toggles,
+ * Leaderboards screens (E1.1–E1.3; groups contract): the
+ * group screen's Leaderboards segment (podium cards, cache-first under `boards:<groupId>`), the full board route (toggles,
  * empty Certified, paging, lost access, exercise missing, offline), and the
  * history route. The group RPCs are mocked; `group_cache` is the real table on
  * the in-memory SQLite fixture.
@@ -147,7 +146,7 @@ const cacheKeys = () =>
     .filter(entry=>!entry.cacheKey.startsWith('group-policy:')).map((entry) => entry.cacheKey)
     .sort();
 
-/** The board route also reads `group:<groupId>` for my role (M25-T10 row detail); board rows themselves are never cached. */
+/** The board route also reads `group:<groupId>` for my role (row detail); board rows themselves are never cached. */
 const cacheKeysBesidesGroup = () => cacheKeys().filter((key) => key !== groupCacheKeys.group(GROUP_ID) && key !== groupCacheKeys.groupExercises(GROUP_ID));
 
 const emitNetInfo = (isConnected: boolean) => {
@@ -277,7 +276,7 @@ describe('Full board (E1.2)', () => {
     expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
-    // My row sits on paper, the others on the card's surface (DLM-T12-D1).
+    // My row sits on paper, the others on the card's surface.
     expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(uiRoles.paper);
     expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(uiRoles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');

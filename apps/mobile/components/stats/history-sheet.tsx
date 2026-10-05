@@ -24,7 +24,7 @@ import type {
 
 // The history of one exercise or one muscle on Progress: a
 // `Sheet` holding the metric control, saved view/window, week banner and daily
-// or weekly heatmap (DLM-T09). One component for the muscle and the exercise
+// or weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
 export type HistoryKind = 'muscle' | 'exercise';
@@ -43,7 +43,7 @@ const METRIC_LABELS: Record<CalendarHeatmapMetric, string> = {
 };
 
 // Every entered-load metric. Muscle history has no 1RM or top weight: those
-// are exercise-level (`ux-rules.md` §12.7).
+// are exercise-level.
 export const EXERCISE_HISTORY_METRIC_OPTIONS: readonly HistoryMetricOption<CalendarHeatmapMetric>[] = [
   { value: 'totalVolume', label: METRIC_LABELS.totalVolume },
   { value: 'workingSetCount', label: METRIC_LABELS.workingSetCount },
@@ -192,7 +192,7 @@ function HistoryHeatmap({
 
   // Both trees stay mounted so a switch reuses the laid-out chart and keeps its
   // selection and scroll; the inactive one is transparent, inert and hidden
-  // from assistive tech (`ux-rules.md` §12.9).
+  // from assistive tech.
   return (
     <View style={styles.heatmapLayers}>
       <View

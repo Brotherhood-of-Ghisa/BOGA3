@@ -39,10 +39,10 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 const MEMBERS_CANNOT_INVITE = 'Only the owner and admins can see and share the invite code.';
 
 /**
- * The invite (groups contract §6.3, card flow 2): owner and admins only
- * (C7.4). The code is read online and never cached; Share uses React Native
+ * The invite (groups contract): owner and admins only. The code is read
+ * online and never cached; Share uses React Native
  * core `Share.share`; Regenerate is confirmed because the old code stops working.
- * The code is a Plex Mono figure (T13-D3); `Share invite` is the one `accent`.
+ * The code is a Plex Mono figure; `Share invite` is the one `accent`.
  */
 export default function GroupInviteRoute() {
   const { isConfigured, user } = useAuth();
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.inkMuted,
   },
-  // A figure (T13-D3): Plex Mono 700, spaced so each character reads apart.
+  // A figure: Plex Mono 700, spaced so each character reads apart.
   code: {
     paddingVertical: uiSpace.md,
     fontFamily: uiFonts.figure.family,

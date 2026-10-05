@@ -1,5 +1,5 @@
-// Pure presentation rules for the group write flows (M22-T05;
-// `docs/specs/tech/groups-contract.md` §4.3, §6.3): the role matrix the UI
+// Pure presentation rules for the group write flows
+// (`docs/specs/tech/groups-contract.md`): the role matrix the UI
 // offers, form validation, the invite link and share text, and the
 // user-facing wording for write failures. The server stays the authority —
 // these rules only decide what the UI offers and how a refusal reads.
@@ -9,7 +9,7 @@ import { formatMemberName } from './stream-view-model';
 import type { GroupMember, GroupRole } from './types';
 import { GROUP_OFFLINE_ACTION_MESSAGE } from './use-group-action';
 
-// ---- Role matrix (contract §4.3) -------------------------------------------
+// ---- Role matrix (contract) -------------------------------------------
 
 export type GroupMemberAction = 'make-admin' | 'remove-admin' | 'transfer-ownership' | 'remove';
 
@@ -24,7 +24,7 @@ export const GROUP_MEMBER_ACTION_LABELS: Record<GroupMemberAction, string> = {
 export const DESTRUCTIVE_GROUP_MEMBER_ACTIONS: ReadonlySet<GroupMemberAction> = new Set(['transfer-ownership', 'remove']);
 
 /**
- * Exactly the §4.3 writes my role allows against `target`:
+ * Exactly the writes my role allows against `target`:
  *
  * - owner → admin: Remove admin (`group_set_role` member), Transfer, Remove;
  * - owner → member: Make admin, Transfer, Remove;
@@ -49,10 +49,10 @@ export const groupMemberActionsFor = (
   return [];
 };
 
-/** Invite, Edit (contract §4.3; C7.4: members never see the invite). */
+/** Invite, Edit (contract: members never see the invite). */
 export const canManageGroup = (role: GroupRole): boolean => role === 'owner' || role === 'admin';
 
-/** The owner — including a sole owner — must transfer before leaving (C3.6.5). */
+/** The owner — including a sole owner — must transfer before leaving. */
 export const canLeaveGroup = (role: GroupRole): boolean => role !== 'owner';
 
 export const OWNER_LEAVE_NOTICE = 'Transfer ownership before leaving';
@@ -95,7 +95,7 @@ export const groupMemberActionSuccessMessage = (action: GroupMemberAction, targe
   }
 };
 
-// ---- Group details form (contract §2.1) --------------------------------------
+// ---- Group details form (contract) --------------------------------------
 
 export const GROUP_NAME_MAX_LENGTH = 50;
 export const GROUP_DESCRIPTION_MAX_LENGTH = 280;
@@ -126,7 +126,7 @@ export const validateGroupDetails = (name: string, description: string): GroupDe
   };
 };
 
-// ---- Invite (contract §6.3) ---------------------------------------------------
+// ---- Invite (contract) ---------------------------------------------------
 
 /** The deep link `app/group/join.tsx` opens prefilled (`boga3://group/join?code=…`). */
 export const groupInviteLink = (code: string): string => `boga3://group/join?code=${encodeURIComponent(code)}`;
@@ -141,7 +141,7 @@ export const buildGroupInviteShareMessage = (groupName: string | null, code: str
 export const INVITE_INVALID_MESSAGE = "This invite code isn't valid.";
 export const GROUP_WRITE_UNREACHABLE_MESSAGE = "Couldn't reach the server. Nothing was changed — try again when you're online.";
 
-/** How a failed write reads on screen. Every write is online-only and changes nothing on failure (C3.10.3). */
+/** How a failed write reads on screen. Every write is online-only and changes nothing on failure. */
 export const describeGroupWriteError = (error: GroupApiError): string => {
   switch (error.code) {
     case 'NETWORK':

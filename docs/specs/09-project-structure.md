@@ -23,9 +23,9 @@ Define the canonical repository structure, path ownership, and placement convent
       app/                       # Expo Router routes/screens only (no tests: every file is a route)
       __tests__/                 # Jest suites (+ sync/, helpers/, colocated READMEs)
       components/                # UI components
-        ui/                      # Canonical UI tokens + primitives foundation (M8+)
+        ui/                      # Canonical UI tokens + primitives foundation
       src/                       # Non-route app code (domain/data/helpers)
-        auth/                    # Shared mobile auth client/session/provider modules (M11+)
+        auth/                    # Shared mobile auth client/session/provider modules
         session-insights/        # Pure session muscle-load/PR derivation, adapters, and sharing
       drizzle/                   # Mobile local DB schema/migrations artifacts
       .maestro/                  # Maestro flows + sample config
@@ -33,7 +33,7 @@ Define the canonical repository structure, path ownership, and placement convent
       artifacts/maestro/         # Maestro output artifacts, runtime state, and logs
   services/
     boga-mcp/                    # Public read-only MCP protocol/API adapter
-  supabase/                      # Supabase backend root (M5 local runtime + backend assets)
+  supabase/                      # Supabase backend root (local runtime + backend assets)
     config.toml.template         # Checked-in Supabase local config template
     config.toml                  # Generated per-worktree local config (gitignored)
     migrations/                  # Postgres migrations
@@ -43,8 +43,8 @@ Define the canonical repository structure, path ownership, and placement convent
     tests/                       # Backend-local smoke/integration test entrypoints
   docs/
     specs/                       # Source of truth: product, architecture, testing, and technical specs
-      ui/                        # Canonical UI discovery/audit/guardrail docs (M8+)
-      tech/                      # Subsystem-level technical deep-dive docs (M13+)
+      ui/                        # Canonical UI discovery/audit/guardrail docs
+      tech/                      # Subsystem-level technical deep-dive docs
     procedures/                  # Step-by-step procedures any agent harness follows
     plans/                       # Optional, ephemeral planning docs (any shape; deleted when shipped)
     brainstorms/                 # Working notes and brainstorming docs
@@ -64,11 +64,11 @@ Define the canonical repository structure, path ownership, and placement convent
   - must never own database/Supabase data clients, SQL, a database URL, or a
     service-role credential.
 - `apps/mobile/components/ui/`
-  - owns the canonical mobile UI tokens + primitive components introduced in M8 for reuse across route screens and specialized shared components.
-- `apps/mobile/src/groups/` (M22)
-  - owns the non-UI group client: wire types, the typed group RPC client (the only mobile code that calls Supabase for groups), `group_cache` access, the pure stream view model, the group NetInfo hook, and the resource/action hooks screens use (`docs/specs/tech/groups-contract.md` §6.1).
+  - owns the canonical mobile UI tokens + primitive components for reuse across route screens and specialized shared components.
+- `apps/mobile/src/groups/`
+  - owns the non-UI group client: wire types, the typed group RPC client (the only mobile code that calls Supabase for groups), `group_cache` access, the pure stream view model, the group NetInfo hook, and the resource/action hooks screens use (`docs/specs/tech/groups-contract.md`).
   - group screens under `app/**` consume it through `@/src/groups`; group code never runs inside the sync cycle and must not modify `src/sync/**` beyond the `group_cache` delete in the account wipe.
-  - `set-facts.ts` (M25) is the one implementation of the group set rules, shared with the `group-eval` Edge Function, which loads it by relative path: it may import only by relative `.ts` specifier (never `@/`), and only modules that follow the same rule.
+  - `set-facts.ts` is the one implementation of the group set rules, shared with the `group-eval` Edge Function, which loads it by relative path: it may import only by relative `.ts` specifier (never `@/`), and only modules that follow the same rule.
   - `metric-contract.ts`, `performance-score.ts` and `metric-evaluation.ts`
     own group Weight/1RM rules and the strict optional-bodyweight graph scorer
     shared with that worker.
@@ -80,10 +80,10 @@ Define the canonical repository structure, path ownership, and placement convent
     protocol-4 scoring/worker dispatch; competition wire guards own its exact
     safe reader shapes at the same API boundary. They follow the same `.ts`
     relative-import rule where shared with the Edge worker.
-- `apps/mobile/src/exercise-core/` (M25)
+- `apps/mobile/src/exercise-core/`
   - owns `ExerciseCore` (`{ name, loadInputMode }`), the load-mode list, and `validateExerciseCore`: the one rule set that personal exercises (`src/data/exercise-catalog.ts`) and group exercises (`src/groups/api.ts`) share. It also owns `exercise-core-vectors.json`, which `groups-contract` runs against the server as well.
   - imports nothing, so an Edge Function can load it by relative path.
-  - its editor fields (`ExerciseCoreFields`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form (M25-T08).
+  - its editor fields (`ExerciseCoreFields`) live in `apps/mobile/components/exercise-core/`, rendered by the personal exercise editor and the group exercise form.
 - `apps/mobile/src/exercise-calculations/`
   - owns the fixed effort vocabulary and pure explicit personal eligibility policy (`effort-policy.ts`), and the load calculation kernel (`load-metrics.ts`, `analytics.ts`) and the set rules every reader shares (`set-semantics.ts`: which sets count as performed, the canonical weight for the reps). Persistence (`src/data`), the session recorder, session insights and groups import them; this directory never imports `src/data`, hooks or UI.
   - the `agent-api` and `group-eval` Edge Functions load it by relative path, so its whole import graph uses relative `.ts` specifiers (never `@/`).
@@ -121,8 +121,8 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns the authenticated, read-only BoGa3 agent HTTP API. This is the only
     service-role data boundary in the Virtual Coach flow; every query derives
     and filters by the validated OAuth subject.
-- `supabase/functions/group-eval/` (M25)
-  - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md` §2.10). It has no client-facing API.
+- `supabase/functions/group-eval/`
+  - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md`). It has no client-facing API.
 - `supabase/tests/lib/`
   - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by `groups-contract` and `groups-leaderboards`); files here are never lane bodies themselves.
 - `docs/procedures/`
@@ -132,7 +132,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `docs/specs/`
   - owns project policy, product, architecture/testing strategy, and technical contracts (the durable source of truth).
 - `docs/specs/ui/`
-  - owns authoritative UI discovery/audit/guardrail documentation produced in M8+ tasks.
+  - owns authoritative UI discovery/audit/guardrail documentation.
 - `docs/specs/tech/`
   - owns subsystem-level technical deep-dive docs that complement (but do not replace) top-level architecture/testing docs.
 - `docs/plans/`
@@ -144,14 +144,14 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns local Supabase backend config, migrations, seeds, Edge Functions, and backend-local test/runtime wrappers.
   - `supabase/config.toml.template` is tracked; `supabase/config.toml` is generated per worktree and gitignored.
 
-## Agreed structure conventions (M5+ additions)
+## Agreed structure conventions
 
-- `supabase/` (introduced in M5)
+- `supabase/`
   - backend root for local Supabase project assets (migrations, seeds, functions, and backend-local tests).
-- `docs/specs/ui/` (introduced in M8)
+- `docs/specs/ui/`
   - canonical location for authoritative UI discovery/audit/guardrail docs (for example repo discovery baseline, pattern audit, screen map, navigation contract, components catalog, UX rules).
   - keep UI docs under `docs/specs/ui/**` rather than `docs/brainstorms/**` once they become source-of-truth references.
-- `docs/specs/tech/` (introduced in M13)
+- `docs/specs/tech/`
   - canonical location for subsystem-level technical deep dives (for example client sync engine internals, failure handling, and maintenance contracts).
   - keep deep-dive docs concise, source-linked, and update them in the same task when subsystem behavior materially changes.
 - `docs/plans/` lifecycle
@@ -165,10 +165,10 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/artifacts/maestro/`
   - canonical runtime artifact root for Maestro runs.
   - each run writes task/timestamp-scoped subdirectories plus `runtime.env` and lifecycle logs under that root.
-- `apps/mobile/components/ui/` (introduced in M8)
+- `apps/mobile/components/ui/`
   - canonical location for mobile UI tokens and primitive components used by shared/screen UI code.
   - keep specialized feature components (for example navigation/session-layout components) in domain folders under `apps/mobile/components/**`; compose primitives from `apps/mobile/components/ui/**`.
-- `apps/mobile/src/auth/` (introduced in M11)
+- `apps/mobile/src/auth/`
   - canonical location for shared mobile auth modules.
   - keep Supabase auth bootstrap/session/provider code here rather than scattering route-local client wiring under `app/**`.
 - `apps/mobile/src/utils/isDevMode.ts`

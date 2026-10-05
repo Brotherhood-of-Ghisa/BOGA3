@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# groups-certification.sh — M25 certification contract (the third body of the
+# groups-certification.sh — certification contract (the third body of the
 # groups-leaderboards lane; groups-boards.sh proves the All boards).
 #
-# Contract: docs/specs/tech/groups-contract.md §2.11–§2.12, §4.2, §4.5, §4.6.
+# Contract: docs/specs/tech/groups-contract.md
 # Proves, against the real local stack (sync_push, group-eval, PostgREST):
 #
 #   - posture of group_certifications and the certification RPCs;

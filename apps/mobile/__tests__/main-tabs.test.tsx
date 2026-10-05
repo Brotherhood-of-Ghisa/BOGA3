@@ -18,7 +18,7 @@ import {
   resolveMainTab,
 } from '@/src/navigation/main-tabs';
 
-describe('M26 main tab model', () => {
+describe('main tab model', () => {
   it('defines four unique tabs in the approved order', () => {
     expect(MAIN_TAB_KEYS).toEqual(['today', 'train', 'progress', 'more']);
     expect(MAIN_TAB_DEFINITIONS.map((tab) => tab.label)).toEqual([

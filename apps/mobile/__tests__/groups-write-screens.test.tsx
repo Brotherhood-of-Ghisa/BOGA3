@@ -1,10 +1,9 @@
 /* eslint-disable import/first */
 
 /**
- * M22-T05 group write flows (groups contract §4.3, §6.3; task card flows
- * 1–5): create with the username gate, join (incl. the deep-link code param),
+ * Group write flows (groups contract): create with the username gate, join (incl. the deep-link code param),
  * invite / share / regenerate, edit, member actions per role, and leave.
- * Every write's offline attempt is refused with no RPC (C3.10.3, AC12). The
+ * Every write's offline attempt is refused with no RPC. The
  * RPCs and the profile API are mocked; the cache is the real `group_cache` on
  * the in-memory SQLite fixture.
  */
@@ -212,7 +211,7 @@ describe('Create group (flow 1)', () => {
     });
   };
 
-  it('shows the username gate first when the username is blank, then creates and opens the group as owner (AC1, AC2)', async () => {
+  it('shows the username gate first when the username is blank, then creates and opens the group as owner', async () => {
     profile.loadUserProfile.mockResolvedValue(profileWith('  '));
     api.createGroup.mockResolvedValue({ group_id: 'g-new' });
     render(<NewGroupRoute />);
@@ -246,7 +245,7 @@ describe('Create group (flow 1)', () => {
     expect(api.createGroup).not.toHaveBeenCalled();
   });
 
-  it('refuses offline with a clear error and creates nothing (AC12)', async () => {
+  it('refuses offline with a clear error and creates nothing', async () => {
     render(<NewGroupRoute />);
     await screen.findByTestId('group-form');
     emitNetInfo(false);
@@ -284,7 +283,7 @@ describe('Create group (flow 1)', () => {
 describe('Join group (flow 3)', () => {
   const preview = { group_id: GROUP_ID, name: 'Garage Gym', member_count: 3, already_member: false };
 
-  it('prefills the deep-link code param, previews it, and joins (AC3)', async () => {
+  it('prefills the deep-link code param, previews it, and joins', async () => {
     mockParams = { code: 'ABCD2345' };
     api.previewGroupInvite.mockResolvedValue(preview);
     api.joinGroup.mockResolvedValue({ group_id: GROUP_ID, joined: true });
@@ -302,7 +301,7 @@ describe('Join group (flow 3)', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith(`/group/${GROUP_ID}`);
   });
 
-  it('shows "This invite code isn\'t valid" for an unknown or regenerated code (AC4)', async () => {
+  it('shows "This invite code isn\'t valid" for an unknown or regenerated code', async () => {
     api.previewGroupInvite.mockRejectedValue(new GroupApiError('INVITE_INVALID', 'invite code not valid'));
     render(<JoinGroupRoute />);
     await screen.findByTestId('group-join-form');
@@ -338,7 +337,7 @@ describe('Join group (flow 3)', () => {
     expect(await screen.findByTestId('group-join-preview')).toBeTruthy();
   });
 
-  it('refuses to join offline and changes nothing (AC12)', async () => {
+  it('refuses to join offline and changes nothing', async () => {
     mockParams = { code: 'ABCD2345' };
     api.previewGroupInvite.mockResolvedValue(preview);
     render(<JoinGroupRoute />);
@@ -403,7 +402,7 @@ describe('Invite (flow 2)', () => {
     expect(screen.getByTestId('group-invite-feedback')).toHaveTextContent('New code ready. The old code no longer works.');
   });
 
-  it('refuses to regenerate offline and keeps the old code (AC12)', async () => {
+  it('refuses to regenerate offline and keeps the old code', async () => {
     const alert = alertSpy();
     render(<GroupInviteRoute />);
     await screen.findByTestId('group-invite-code');
@@ -415,7 +414,7 @@ describe('Invite (flow 2)', () => {
     expect(screen.getByTestId('group-invite-feedback')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
   });
 
-  it('never shows the code to a member (C7.4)', async () => {
+  it('never shows the code to a member', async () => {
     writeGroupCache(fixture.database, {
       cacheKey: groupCacheKeys.group(GROUP_ID),
       userId: USER_ID,
@@ -483,7 +482,7 @@ describe('Edit group (flow 5)', () => {
     await act(async()=>fireEvent.press(screen.getByTestId('group-form-submit')));
     expect(api.updateGroup).toHaveBeenCalledTimes(1);expect(screen.queryByTestId('group-policy-preview')).toBeNull();
   });
-  it('refuses offline and changes nothing (AC12)', async () => {
+  it('refuses offline and changes nothing', async () => {
     render(<EditGroupRoute />);
     await screen.findByTestId('group-form');
     emitNetInfo(false);
@@ -520,7 +519,7 @@ describe('Group screen: role-gated header actions (flow 4)', () => {
     expect(mockRouter.push).toHaveBeenLastCalledWith(`/group/${GROUP_ID}/edit`);
   });
 
-  it('member: no Invite or Edit (C7.4)', async () => {
+  it('member: no Invite or Edit', async () => {
     api.getGroup.mockResolvedValue(detailFor('member'));
     render(<GroupScreenRoute />);
     await screen.findByText(metaFor('member'));
@@ -546,7 +545,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
       .map((node) => (node.props.testID as string).replace('group-member-action-', ''));
 
   const openSheet = (userId: string) => fireEvent.press(screen.getByTestId(`group-member-row-${userId}`));
-  // No Cancel (G5, T13-D2): the backdrop dismisses the sheet.
+  // No Cancel (G5): the backdrop dismisses the sheet.
   const dismissSheet = () =>
     fireEvent.press(screen.getByTestId('group-member-actions-sheet-backdrop', { includeHiddenElements: true }));
 
@@ -577,7 +576,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
     }
   });
 
-  it('member: no Invite or Edit (C7.4), Leave only, and no member actions', async () => {
+  it('member: no Invite or Edit, Leave only, and no member actions', async () => {
     await renderAs('member');
     expect(screen.queryByTestId('group-screen-invite-button')).toBeNull();
     expect(screen.queryByTestId('group-screen-edit-button')).toBeNull();
@@ -637,7 +636,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
     await waitFor(() => expect(api.getGroup.mock.calls.length).toBeGreaterThan(reads));
   });
 
-  it('refuses a member action offline with no RPC (AC12)', async () => {
+  it('refuses a member action offline with no RPC', async () => {
     const alert = alertSpy();
     await renderAs('owner');
     emitNetInfo(false);
@@ -663,7 +662,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
     expect(readGroupCache(fixture.database, groupCacheKeys.group(GROUP_ID), USER_ID)).toBeNull();
   });
 
-  it('refuses to leave offline and stays (AC12)', async () => {
+  it('refuses to leave offline and stays', async () => {
     const alert = alertSpy();
     await renderAs('member');
     emitNetInfo(false);
@@ -676,7 +675,7 @@ describe('Members screen: role-gated member actions and leave (flows 4–5)', ()
   });
 });
 
-describe('Members screen: lost access and missing data (AC2)', () => {
+describe('Members screen: lost access and missing data', () => {
   beforeEach(() => {
     mockParams = { groupId: GROUP_ID };
   });

@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * `useGroupResource` (groups contract §6.1, §7) with fake timers, a
+ * `useGroupResource` (groups contract) with fake timers, a
  * controllable NetInfo, a controllable focus, and the shared in-memory SQLite
  * fixture behind `bootstrapLocalDataLayer`: cache-first render, focus / 30 s
  * poll / manual refresh, the offline marker, NOT_FOUND eviction, and no throw

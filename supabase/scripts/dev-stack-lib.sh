@@ -4,7 +4,8 @@
 #
 # A second local Supabase, isolated from the slot-0 "BOGA" stack the gates use, so
 # a gate run (which truncates/resets slot-0) never touches a human dev session's
-# data. Contract: docs/specs/12 ("Dedicated dev stack (BOGA-dev)").
+# data. Main-checkout-only (engage_dev_stack refuses in a linked worktree).
+# Contract: docs/specs/12 ("Dedicated dev stack (BOGA-dev)").
 #
 # The stack runs from a gitignored workdir (.supabase-dev/) whose supabase/ holds
 # a port/project-rewritten config.toml plus SYMLINKS to the repo's migrations,
@@ -26,7 +27,13 @@ BOGA_DEV_WORKDIR="${REPO_ROOT}/.supabase-dev"
 
 # Render .supabase-dev/supabase/config.toml from the shared template with the dev
 # project_id + slot-100 ports, and (re)link migrations/seed/functions. Idempotent;
-# regenerates the config when missing or older than the template.
+# regenerates the config when missing or older than the template or this file.
+#
+# Every [functions.<name>] gets an entrypoint through the real supabase/ dir
+# (../../supabase/functions/<name>/index.ts), not the functions symlink: the
+# functions import shared app code by relative path (../../../apps/mobile/...),
+# which through the symlink resolves to .supabase-dev/apps — a path the Edge
+# runtime container never sees, so the workers fail to boot.
 generate_dev_supabase_config() {
   local template="${SUPABASE_DIR}/config.toml.template"
   local dev_supabase_dir="${BOGA_DEV_WORKDIR}/supabase"
@@ -42,7 +49,7 @@ generate_dev_supabase_config() {
   ln -sfn "${SUPABASE_DIR}/seed.sql" "${dev_supabase_dir}/seed.sql"
   ln -sfn "${SUPABASE_DIR}/functions" "${dev_supabase_dir}/functions"
 
-  if [[ -f "${config}" && "${config}" -nt "${template}" ]]; then
+  if [[ -f "${config}" && "${config}" -nt "${template}" && "${config}" -nt "${BASH_SOURCE[0]}" ]]; then
     return 0
   fi
 
@@ -66,14 +73,30 @@ generate_dev_supabase_config() {
     s/\{\{ANALYTICS_PORT\}\}/$ENV{ANALYTICS_PORT}/g;
     s/\{\{POOLER_PORT\}\}/$ENV{POOLER_PORT}/g;
     s/\{\{INSPECTOR_PORT\}\}/$ENV{INSPECTOR_PORT}/g;
+    s{^\[functions\.([A-Za-z0-9_-]+)\]\n\z}{$&entrypoint = "../../supabase/functions/$1/index.ts"\n};
   ' "${template}" >"${tmp_file}"
   mv "${tmp_file}" "${config}"
 }
 
+# Guardrail: the dev stack is main-checkout-only. Whichever checkout runs
+# `supabase start` owns the Edge runtime's bind mount of its functions/, so a
+# dev stack started from a linked worktree loses every function once that
+# worktree is deleted (group-eval then never runs). Linked worktrees use their
+# own slot stack; the dev launchers route there themselves.
+dev_stack_require_main_checkout() {
+  boga_is_linked_git_worktree "${REPO_ROOT}" || return 0
+  echo "[dev-stack] refusing to run: the ${BOGA_DEV_PROJECT_ID} stack is main-checkout-only, and ${REPO_ROOT} is a linked worktree." >&2
+  echo "[dev-stack] a dev stack started here would serve this worktree's functions/ and break once it is removed." >&2
+  echo "[dev-stack] use this worktree's slot stack instead: ./boga db up, or scripts/dev/dev-lan.sh / dev-remote.sh (they pick it automatically)." >&2
+  echo "[dev-stack] for ${BOGA_DEV_PROJECT_ID}, run from the main checkout: $(boga_main_worktree_path "${REPO_ROOT}")" >&2
+  exit 1
+}
+
 # Generate the workdir (if needed) and point all subsequent Supabase helpers at
 # the dev stack by exporting BOGA_SUPABASE_WORKDIR. Call once near the top of a
-# dev-stack script; child scripts inherit the var.
+# dev-stack script; child scripts inherit the var. Refuses in a linked worktree.
 engage_dev_stack() {
+  dev_stack_require_main_checkout
   generate_dev_supabase_config
   export BOGA_SUPABASE_WORKDIR="${BOGA_DEV_WORKDIR}"
 }

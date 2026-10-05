@@ -7,7 +7,7 @@ export const EXERCISE_LINK_ROUTE = '/exercise-link';
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
 
-/** The Link screen for one of my exercises (M25-T07; product E0.3). */
+/** The Link screen for one of my exercises (E0.3). */
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>
   `${EXERCISE_LINK_ROUTE}?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
 export const THEME_COLOUR_ROUTE = '/theme-colour';

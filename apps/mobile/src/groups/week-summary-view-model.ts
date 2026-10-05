@@ -1,4 +1,4 @@
-// Today's group card, from one `group_week_summary` read (contract §4.7):
+// Today's group card, from one `group_week_summary` read (contract):
 // the week's top three by working sets, the caller's own line when outside
 // them, and the latest activity row. Pure; the card only draws it.
 
@@ -78,7 +78,7 @@ export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string): 
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/** `7 sets · 3 exercises`: the working sets (`ux-rules.md` §5.11). */
+/** `7 sets · 3 exercises`: the working sets (`training-metrics-contract.md` "Counted set"). */
 export const formatWeekSessionFigures = (session: { working_sets: number; exercise_count: number }): string =>
   `${plural(session.working_sets, 'set', 'sets')} · ${formatExerciseCount(session.exercise_count)}`;
 
@@ -99,7 +99,7 @@ export const joinNames = (names: string[]): string =>
 type GroupRecordBoard = { event: CompetitionEventWire; value: CompetitionHistoryValueWire };
 
 /**
- * The session's group records, one per board taken (§4.7): the server keeps
+ * The session's group records, one per board taken: the server keeps
  * only the `record` values of the boards each record took #1 on.
  */
 export const groupRecordBoards = (records: CompetitionEventWire[]): GroupRecordBoard[] =>

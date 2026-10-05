@@ -1,7 +1,6 @@
 /**
- * M25-T08 Exercises-segment rules (`src/groups/exercise-view-model.ts`; card
- * AC3, AC5, AC6): row order, link-status wording, the owner/admin action
- * matrix, exercise write wording, and the standard-exercise search.
+ * Exercises-segment rules (`src/groups/exercise-view-model.ts`): row order,
+ * link-status wording, the owner/admin action matrix, exercise write wording, and the standard-exercise search.
  */
 
 import { SYSTEM_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
@@ -100,7 +99,7 @@ describe('buildGroupExerciseRows', () => {
   });
 });
 
-describe('groupExerciseActionsFor (contract §4.4: owner, admin)', () => {
+describe('groupExerciseActionsFor (contract: owner, admin)', () => {
   const active = { archived_at_ms: null };
   const archived = { archived_at_ms: 1 };
 

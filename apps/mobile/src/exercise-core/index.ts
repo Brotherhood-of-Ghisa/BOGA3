@@ -1,6 +1,6 @@
 // The exercise fields a personal exercise (`exercise_definitions`) and a group
 // exercise (`app_public.group_exercises`) share, and their one validator
-// (M25 design T1: one domain type, two stores). The personal repository and the
+// (T1: one domain type, two stores). The personal repository and the
 // group RPC client both validate through `validateExerciseCore`; the server
 // applies the same rules in SQL (`group_exercise_trim` and the
 // `group_exercises` CHECKs). `exercise-core-vectors.json` holds the two sides

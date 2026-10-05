@@ -337,7 +337,7 @@ fi
 
 echo "[auth-test] creating user-scoped records for user_a"
 NOW_MS="$(($(date +%s) * 1000))"
-# v2 schema (docs/specs/tech/sync-v2-server-contract.md §A.2): every entity
+# v2 schema (docs/specs/tech/sync-v2-server-contract.md, "Universal columns, index and triggers"): every entity
 # table requires client_updated_at_ms NOT NULL. Direct PostgREST inserts in this
 # auth/RLS contract must supply it; the sync_push RPC closes over the same rule
 # on the wire-level path.

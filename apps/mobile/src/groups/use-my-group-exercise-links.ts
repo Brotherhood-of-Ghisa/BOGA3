@@ -1,7 +1,7 @@
-// My live links into one group, read from the local synced rows (M25-T03,
-// `exercise_group_links`), so the Exercises segment shows link status offline.
-// Reloads on every focus (links change on other screens — the Link screen,
-// M25-T07 — and sync can pull new ones) and after a link written here.
+// My live links into one group, read from the local synced rows
+// (`exercise_group_links`), so the Exercises segment shows link status offline.
+// Reloads on every focus (links change on other screens — the Link screen —
+// and sync can pull new ones) and after a link written here.
 // It also hands the pick sheet my exercises and all my live links, which it
 // needs for its suggestion and the one-link-per-group rule.
 

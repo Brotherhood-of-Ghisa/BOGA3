@@ -1,5 +1,5 @@
-// Online-only paged group reads (`docs/specs/tech/groups-contract.md` §6.1, §7;
-// M25 design §7): the full board and its history. Unlike `useGroupResource`
+// Online-only paged group reads (`docs/specs/tech/groups-contract.md`):
+// the full board and its history. Unlike `useGroupResource`
 // nothing is cached, like the stream's older pages.
 //
 //   - the first page loads on mount, when the view identity changes (a toggle),
@@ -13,7 +13,7 @@
 //   - `NOT_FOUND: group exercise not found` sets `exerciseMissing`; any other
 //     `NOT_FOUND` evicts the group's cache and sets `lostAccess`.
 //
-// Group code never runs inside the sync cycle (C3.10.5).
+// Group code never runs inside the sync cycle.
 
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';

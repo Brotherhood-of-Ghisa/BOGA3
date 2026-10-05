@@ -1,10 +1,10 @@
 /* eslint-disable import/first */
 
 /**
- * The typed group RPC client (groups contract §4, §6.1): one wrapper per RPC
+ * The typed group RPC client (groups contract): one wrapper per RPC
  * called as `schema('app_public').rpc(name, p_* args)`, and error mapping —
  * every server token by prefix, transport failure → NETWORK, anything else →
- * INTERNAL. Supabase is mocked (the backend lands in M22-T01).
+ * INTERNAL. Supabase is mocked.
  */
 
 const mockGetRequiredSupabaseMobileClient = jest.fn();
@@ -93,7 +93,7 @@ describe('groups api client', () => {
     }
   };
 
-  it('keeps record, record_voided, and link items; drops a kind this build does not know, keeping the server cursor (M25-T10)', async () => {
+  it('keeps record, record_voided, and link items; drops a kind this build does not know, keeping the server cursor', async () => {
     const session = { kind: 'session', key: 'u:s', sort_at_ms: 9 };
     const record = { kind: 'record', key: 'e1', sort_at_ms: 9 };
     const voided = { kind: 'record_voided', key: 'e2', sort_at_ms: 8 };

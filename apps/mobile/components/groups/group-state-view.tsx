@@ -14,7 +14,7 @@ type GroupStateViewProps = {
   actionTestID?: string;
   /** `error` announces the words when they appear. */
   kind?: 'message' | 'error';
-  /** Extra content, e.g. the empty state's Create / Join actions (M22-T05). */
+  /** Extra content, e.g. the empty state's Create / Join actions. */
   children?: ReactNode;
 };
 
@@ -45,7 +45,7 @@ export function GroupStateView({
   );
 }
 
-/** `NOT_FOUND` on a group read (C3.6.8): cached data is hidden (the hook already evicted it). */
+/** `NOT_FOUND` on a group read: cached data is hidden (the hook already evicted it). */
 export function GroupLostAccessState({ testID }: { testID: string }) {
   return (
     <GroupStateView
@@ -117,7 +117,7 @@ type GroupMissingDataStateProps = {
 };
 
 /**
- * Nothing cached to show: the offline empty state (C3.10.4), the error state
+ * Nothing cached to show: the offline empty state, the error state
  * with Retry, or loading. testIDs: `<prefix>-offline-empty-state`,
  * `<prefix>-error-state` (+ `-retry`), `<prefix>-loading`.
  */

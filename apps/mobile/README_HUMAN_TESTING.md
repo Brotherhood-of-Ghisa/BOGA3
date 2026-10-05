@@ -46,7 +46,7 @@ xcrun simctl create "Boga Human" \
 Notes:
 
 - The local shared simulator dev-client build does not require Expo/EAS login.
-- Expo Go is still acceptable for quick managed-only iteration, but it is not evidence for Maestro/runtime-sensitive work and it is not the M10 automation target.
+- Expo Go is still acceptable for quick managed-only iteration, but it is not evidence for Maestro/runtime-sensitive work and it is not the automation target.
 - Maestro/runtime scripts fail fast if `.maestro/maestro.env.local` is missing.
 
 ## Workflow A: Normal JS/TS loop

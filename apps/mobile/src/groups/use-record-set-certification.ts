@@ -1,5 +1,5 @@
 // Certify / remove my certification / cancel a certification on one record set
-// (product P10–P13, P18; groups contract §4.6, §7). Every write goes through
+// (product P10–P13, P18; groups contract). Every write goes through
 // `useGroupAction`: refused before any request while offline, never queued or
 // retried, and `group_cache` is never touched. The host re-reads what it shows:
 // `onChanged` after a success, or after a failure that means the data (or my

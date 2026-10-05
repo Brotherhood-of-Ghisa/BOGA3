@@ -1,4 +1,4 @@
-// Wire types for the group RPCs (`docs/specs/tech/groups-contract.md` §4).
+// Wire types for the group RPCs (`docs/specs/tech/groups-contract.md`).
 // Field names are the server's snake_case JSON keys, unchanged: these types
 // describe payloads exactly as they arrive and are cached.
 
@@ -53,7 +53,7 @@ export type StreamSessionItem = {
   completed_at_ms: number | null;
   /** Null while active. */
   duration_sec: number | null;
-  /** Every live exercise and set, raw; the device computes the card metrics (§5). */
+  /** Every live exercise and set, raw; the device computes the card metrics. */
   exercises: GroupSessionExercise[];
 };
 
@@ -69,7 +69,7 @@ export type StreamMembershipItem = {
   member: GroupMemberRef;
 };
 
-/** A record set's board entry as the record event listed it (§2.11). */
+/** A record set's board entry as the record event listed it. */
 export type StreamRecordBoard = {
   metric: GroupBoardMetric;
   value_kg: number;
@@ -87,7 +87,7 @@ export type StreamGroupExerciseRef = {
 
 export type StreamRecordVoidReason = 'edited' | 'deleted';
 
-/** A record card (M25-T05, §4.2): one per record set, per group; sorted at its session's start. */
+/** A record card: one per record set, per group; sorted at its session's start. */
 export type StreamRecordItem = {
   kind: 'record';
   /** The event id. */
@@ -111,7 +111,7 @@ export type StreamRecordItem = {
   provisional: boolean;
   /** Voided records stay visible (D15). */
   voided: { key: string; reason: StreamRecordVoidReason; occurred_at_ms: number } | null;
-  /** An active certification pinned to the record's fingerprint (M25-T06). */
+  /** An active certification pinned to the record's fingerprint. */
   certified: boolean;
   certification: GroupBoardCertificationRef | null;
 };
@@ -176,7 +176,7 @@ export type GroupSessionExercise = {
   name: string;
   machine_name: string | null;
   order_index: number;
-  /** Every live set, in `order_index` order; the device selects the performed ones (§5). */
+  /** Every live set, in `order_index` order; the device selects the performed ones. */
   sets: GroupSessionSet[];
 };
 
@@ -215,11 +215,11 @@ export type GroupJoinResult = { group_id: string; joined: boolean };
 export type GroupLeaveResult = { group_id: string };
 /**
  * `group_remove_member`, `group_set_role`, `group_transfer_ownership`: the
- * post-write `group_get` payload (M22-T01 as-built, contract §4.3).
+ * post-write `group_get` payload (contract).
  */
 export type GroupMemberWriteResult = GroupGetResult;
 
-// ---- Group exercises (M25-T01, contract §4.4) ------------------------------
+// ---- Group exercises (contract) ------------------------------
 
 /** A group's comparison exercise. Its `name` + `load_input_mode` are an `ExerciseCore`. */
 export type GroupExercise = {
@@ -237,7 +237,7 @@ export type GroupExerciseListResult = { exercises: GroupExercise[] };
 /** `group_exercise_create`, `_update`, `_archive`, `_unarchive`: the exercise after the write. */
 export type GroupExerciseWriteResult = { exercise: GroupExercise };
 
-// ---- Boards (M25-T05, contract §4.5) -----------------------------------------
+// ---- Boards (contract) -----------------------------------------
 
 export type GroupBoardMetric = 'weight' | 'e1rm';
 
@@ -260,12 +260,12 @@ export type BoardRow = {
   set_id: string;
   /** The member's live `session_exercises.name`, or null. */
   exercise_name: string | null;
-  /** An active certification pinned to this row's set (M25-T06), on All and Certified alike. */
+  /** An active certification pinned to this row's set, on All and Certified alike. */
   certified: boolean;
   certification: GroupBoardCertificationRef | null;
 };
 
-/** The active certification behind a certified row (M25-T06, §4.5). */
+/** The active certification behind a certified row. */
 export type GroupBoardCertificationRef = {
   certification_id: string;
   /** Null when the certifier's account is gone. */
@@ -307,7 +307,7 @@ export type GroupBoardResult = {
   has_more: boolean;
 };
 
-/** A board holder (`Holder` + member, §2.11). */
+/** A board holder (`Holder` + member). */
 export type BoardHolder = {
   member_user_id: string;
   member: GroupMemberRef;
@@ -335,7 +335,7 @@ export type GroupBoardHistoryRelated =
       exercises: { exercise_definition_id: string; name: string | null }[];
     }
   | {
-      /** M25-T06: the certification that moved a Certified board, read live. */
+      /** The certification that moved a Certified board, read live. */
       kind: 'certification';
       key: string;
       event: 'certified' | 'withdrawn' | 'cancelled' | 'voided';
@@ -369,7 +369,7 @@ export type GroupBoardHistoryResult = {
   has_more: boolean;
 };
 
-// ---- Certification (M25-T06, contract §4.6) ---------------------------------------
+// ---- Certification (contract) ---------------------------------------
 
 export type GroupCertificationEndReason = 'withdrawn' | 'cancelled' | 'voided';
 
@@ -402,7 +402,7 @@ export type GroupCertifyResult = { certification: GroupCertification; created: b
 /** `group_certification_withdraw` / `_cancel`: an already-ended certification is returned unchanged. */
 export type GroupCertificationEndResult = { certification: GroupCertification };
 
-// ---- Week summary (contract §4.7) ---------------------------------------------
+// ---- Week summary (contract) ---------------------------------------------
 
 /** One current member's week: working sets and group records from completed shared sessions in the window. */
 export type GroupWeekBoardRow = {
@@ -456,7 +456,7 @@ export type GroupWeekSummaryResult = {
 
 // ---- Errors -----------------------------------------------------------------
 
-/** Tokens the server raises as `'<TOKEN>: <message>'` (contract §4). */
+/** Tokens the server raises as `'<TOKEN>: <message>'` (contract). */
 export const GROUP_SERVER_ERROR_CODES = [
   'UPDATE_REQUIRED',
   'AUTH_REQUIRED',
@@ -467,7 +467,7 @@ export const GROUP_SERVER_ERROR_CODES = [
   'USERNAME_REQUIRED',
   'INVITE_INVALID',
   'OWNER_MUST_TRANSFER',
-  /** M25-T06: the state moved on since the caller saw it (certifying a set edited ahead of the evaluator). */
+  /** The state moved on since the caller saw it (certifying a set edited ahead of the evaluator). */
   'CONFLICT',
 ] as const;
 
