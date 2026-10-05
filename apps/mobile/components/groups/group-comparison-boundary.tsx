@@ -1,19 +1,18 @@
 import { useCallback, type ReactNode } from 'react';
 import { View } from 'react-native';
 
-import { groupCacheKeys, listGroupExercises, useGroupResource, type GroupExerciseListResult } from '@/src/groups';
-import { isGroupMetricExerciseWire } from '@/src/groups/metric-wire-guards';
-import type { GroupMetricExerciseWire } from '@/src/groups/metric-wire';
+import { groupCacheKeys, listCompetitionExercises, useGroupResource } from '@/src/groups';
+
+import type { CompetitionExerciseWire, CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView } from './group-state-view';
 import { groupScreenStyles } from './screen-styles';
 
 /** Resolve direct links from the same versioned catalogue as the group page. */
-export function GroupComparisonBoundary({ userId, groupId, exerciseId, legacy, children, history = false }: {
-  userId: string; groupId: string; exerciseId: string; legacy: ReactNode;
-  children: (exercise: GroupMetricExerciseWire) => ReactNode; history?: boolean;
+export function GroupComparisonBoundary({ userId, groupId, exerciseId, children, history = false }: {
+  userId: string; groupId: string; exerciseId: string; children: (exercise: CompetitionExerciseWire) => ReactNode; history?: boolean;
 }) {
-  const fetcher = useCallback(() => listGroupExercises(groupId), [groupId]);
-  const resource = useGroupResource<GroupExerciseListResult>({ userId, cacheKey: groupCacheKeys.groupExercises(groupId),
+  const fetcher = useCallback(() => listCompetitionExercises(groupId), [groupId]);
+  const resource = useGroupResource<CompetitionExerciseListWire>({ userId, cacheKey: groupCacheKeys.groupExercises(groupId),
     fetcher, evictGroupIdOnNotFound: groupId });
   const prefix = history ? 'group-board-history' : 'group-board';
   let state: ReactNode = null;
@@ -22,7 +21,7 @@ export function GroupComparisonBoundary({ userId, groupId, exerciseId, legacy, c
     onRetry={() => void resource.refresh()} testIDPrefix={prefix} />;
   else {
     const exercise = resource.data.exercises.find(row => row.group_exercise_id === exerciseId);
-    if (exercise) return isGroupMetricExerciseWire(exercise) && !exercise.legacy ? children(exercise) : legacy;
+    if (exercise) return children(exercise);
     state = <GroupStateView title="This exercise isn't in this group" body="It may have been removed, or the link is wrong."
       testID={`${prefix}-exercise-missing`} />;
   }

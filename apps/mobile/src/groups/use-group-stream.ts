@@ -9,18 +9,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { GroupApiError, getGroupMetricStream, toGroupApiError } from './api';
-import { groupCacheKeys } from './cache';
-import type { CurrentGroupStreamPage as GroupStreamResult, GroupMetricStreamCursor as StreamCursor, CurrentGroupStreamItem as StreamItem } from './metric-wire';
+import { GroupApiError, getCompetitionStream, toGroupApiError } from './api';
+import { groupCacheKeys, getCompetitionCacheGeneration,observeGroupCompetitionPolicy } from './cache';
+import type { CompetitionStreamWire as GroupStreamResult, CompetitionStreamItemWire as StreamItem } from './competition-wire';
+import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
+import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useGroupResource, type GroupResourceState } from './use-group-resource';
 
+type StreamCursor = string;
+
 // An item or a cursor; a server cursor may name a kind this build drops.
-type StreamOrderKey = Pick<StreamCursor, 'sort_at_ms' | 'kind' | 'key'>;
+type StreamOrderKey = { sort_at_ms: number;kind: string;key: string;event?: string | { kind: string } };
+const serverStreamKind = (item: StreamOrderKey) => item.kind === 'competition'
+  ? typeof item.event === 'object' ? item.event.kind === 'unlink' ? 'link' : item.event.kind : item.kind : item.kind;
 
 /** Contract order: `sort_at_ms desc, kind, key desc`. Negative = `a` first. */
 export const compareStreamOrder = (a: StreamOrderKey, b: StreamOrderKey): number => {
   if (a.sort_at_ms !== b.sort_at_ms) return b.sort_at_ms - a.sort_at_ms;
-  if (a.kind !== b.kind) return a.kind < b.kind ? -1 : 1;
+  const aKind=serverStreamKind(a),bKind=serverStreamKind(b);
+  if (aKind !== bKind) return aKind < bKind ? -1 : 1;
   if (a.key !== b.key) return a.key < b.key ? 1 : -1;
   return 0;
 };
@@ -47,7 +54,7 @@ export const mergeStreamPages = (firstPage: GroupStreamResult, older: OlderPages
   if (!older || !firstPage.has_more || firstPage.items.length === 0) {
     return firstPage.items;
   }
-  const boundary = firstPage.next_cursor ?? firstPage.items[firstPage.items.length - 1];
+  const boundary = firstPage.items[firstPage.items.length - 1];
   const seen = new Set(firstPage.items.map((item) => `${item.kind}:${item.key}`));
   const tail = older.items.filter((item) => !seen.has(`${item.kind}:${item.key}`) && compareStreamOrder(item, boundary) > 0);
   return [...firstPage.items, ...tail];
@@ -65,7 +72,7 @@ export type GroupStreamState = GroupResourceState<GroupStreamResult> & {
 
 /** One group's stream. A null `userId` or `groupId` reads nothing. */
 export function useGroupStream({ userId, groupId }: { userId: string | null; groupId: string | null }): GroupStreamState {
-  const fetcher = useCallback(() => getGroupMetricStream({ groupId: groupId ?? '' }), [groupId]);
+  const fetcher = useCallback(() => getCompetitionStream(groupId ?? ''), [groupId]);
   const resource = useGroupResource<GroupStreamResult>({
     userId,
     cacheKey: groupId ? groupCacheKeys.stream(groupId) : null,
@@ -73,7 +80,11 @@ export function useGroupStream({ userId, groupId }: { userId: string | null; gro
     evictGroupIdOnNotFound: groupId,
   });
 
-  const identity = `${userId ?? ''} ${groupId ?? ''}`;
+  const baseIdentity=`${userId ?? ''} ${groupId ?? ''}`;
+  const [lostIdentity,setLostIdentity]=useState<{ identity: string;page: GroupStreamResult | null } | null>(null);
+  if(lostIdentity && resource.data && resource.data!==lostIdentity.page && !resource.lostAccess && !resource.error) setLostIdentity(null);
+  const generation = getCompetitionCacheGeneration(userId);
+  const identity = `${userId ?? ''} ${groupId ?? ''} ${generation}`;
   // Older pages belong to one user + group: another identity reads as empty.
   const [olderState, setOlderState] = useState<OlderPagesState>(() => emptyOlderPages(identity));
   // A return to an earlier group starts empty too, as a first visit does.
@@ -110,12 +121,16 @@ export function useGroupStream({ userId, groupId }: { userId: string | null; gro
       return;
     }
     const requestIdentity = identityRef.current;
-    const isCurrent = () => identityRef.current === requestIdentity;
+    const isCurrent = () => identityRef.current === requestIdentity && getCompetitionCacheGeneration(userId) === generation;
     loadingRef.current = true;
     updateOlderState(requestIdentity, () => ({ loadingMore: true, loadMoreError: null }));
     try {
-      const page = await getGroupMetricStream({ groupId, before: cursor });
+      const page = await getCompetitionStream(groupId,cursor);
       if (!isCurrent()) return;
+      const database=await bootstrapLocalDataLayer();
+      if (!isCurrent() || !userId) return;
+      const publishedGeneration=observeGroupCompetitionPolicy(database,groupId,userId,page);
+      if (publishedGeneration !== generation) { void resource.refresh(); return; }
       updateOlderState(requestIdentity, ({ older: previous }) => ({
         older: {
           items: [...(useOlder && previous ? previous.items : []), ...page.items],
@@ -125,14 +140,26 @@ export function useGroupStream({ userId, groupId }: { userId: string | null; gro
       }));
     } catch (caught) {
       if (!isCurrent()) return;
-      updateOlderState(requestIdentity, () => ({ loadMoreError: toGroupApiError(caught) }));
+      const error = toGroupApiError(caught);
+      if (error.code === 'NOT_FOUND') {
+        const cleanup=userId?retireCompetitionAccount(userId,groupId):Promise.resolve();
+        setLostIdentity({ identity: baseIdentity,page: resource.data });
+        await cleanup;
+        return;
+      }
+      if (userId && (error.invalidPayload || error.code === 'UPDATE_REQUIRED')) {
+        await retireCompetitionAccount(userId);
+        return;
+      }
+      updateOlderState(requestIdentity, () => ({ loadMoreError: error }));
     } finally {
       if (isCurrent()) {
         loadingRef.current = false;
         updateOlderState(requestIdentity, () => ({ loadingMore: false }));
       }
     }
-  }, [cursor, groupId, hasMore, offline, updateOlderState, useOlder]);
+  }, [cursor, groupId, hasMore, offline, updateOlderState, useOlder,userId,generation,baseIdentity,resource]);
 
-  return { ...resource, items, hasMore, loadingMore, loadMoreError, loadMore };
+  return { ...resource,lostAccess: resource.lostAccess || lostIdentity?.identity === baseIdentity,
+    items: lostIdentity?.identity === baseIdentity ? [] : items,hasMore: lostIdentity?.identity !== baseIdentity && hasMore,loadingMore,loadMoreError,loadMore };
 }

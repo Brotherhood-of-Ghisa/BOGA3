@@ -63,7 +63,7 @@ export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, g
           nowMs={now().getTime()}
           onFindGroup={() => router.push('/group/mine')}
           onOpenGroup={(groupId) => router.push(groupsStreamPath(groupId))}
-          onOpenSession={(memberId, sessionId) => router.push(`/group-session/${memberId}/${sessionId}`)}
+          onOpenSession={(memberId, sessionId, groupId) => router.push(`/group-session/${memberId}/${sessionId}?groupId=${encodeURIComponent(groupId)}`)}
           onSignIn={() => router.push(SIGN_IN_ROUTE)}
           state={groupState}
         />

@@ -8,6 +8,7 @@
  * into render.
  */
 
+import { competitionGroup, competitionCacheFixture } from './helpers/competition-fixtures';
 import { act, renderHook } from '@testing-library/react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -73,7 +74,8 @@ import {
   type GroupResourceOptions,
 } from '@/src/groups';
 
-type Payload = { v: string };
+type Payload = { groups: (typeof competitionGroup)[] };
+const payload = (name: string): Payload => ({ groups: [{ ...competitionGroup,name }] });
 
 const NOW_MS = 1_757_500_000_000;
 const CACHED_AT_MS = NOW_MS - 5 * 60 * 1000;
@@ -129,13 +131,15 @@ const deferred = <T,>() => {
 };
 
 const seedCache = (cacheKey: string, payload: Payload, userId = USER, fetchedAtMs = CACHED_AT_MS) =>
-  writeGroupCache(fixture.database, { cacheKey, userId, payload, fetchedAtMs });
+  fixture.database.insert(groupCache).values({ cacheKey,userId,
+    payloadJson: JSON.stringify(cacheKey === groupCacheKeys.mine ? payload : competitionCacheFixture(cacheKey)),fetchedAtMs }).run();
 
 const cachedKeys = () =>
   fixture.database
     .select({ key: groupCache.cacheKey })
     .from(groupCache)
     .all()
+    .filter(row => !row.key.startsWith('group-policy:'))
     .map((row) => row.key)
     .sort();
 
@@ -186,7 +190,7 @@ describe('useGroupResource', () => {
   });
 
   it('renders the cached payload first, then the refreshed one, and re-caches it', async () => {
-    seedCache(groupCacheKeys.mine, { v: 'cached' });
+    seedCache(groupCacheKeys.mine, payload('cached'));
     const pending = deferred<Payload>();
     const fetcher = jest.fn(() => pending.promise);
 
@@ -194,7 +198,7 @@ describe('useGroupResource', () => {
     await flush();
 
     expect(result.current).toMatchObject({
-      data: { v: 'cached' },
+      data: payload('cached'),
       lastUpdatedAtMs: CACHED_AT_MS,
       hydrated: true,
       refreshing: true,
@@ -203,19 +207,19 @@ describe('useGroupResource', () => {
     });
 
     await act(async () => {
-      pending.resolve({ v: 'fresh' });
+      pending.resolve(payload('fresh'));
     });
     await flush();
 
-    expect(result.current).toMatchObject({ data: { v: 'fresh' }, lastUpdatedAtMs: NOW_MS, refreshing: false });
+    expect(result.current).toMatchObject({ data: payload('fresh'), lastUpdatedAtMs: NOW_MS, refreshing: false });
     expect(readGroupCache(fixture.database, groupCacheKeys.mine, USER)).toEqual({
-      payload: { v: 'fresh' },
+      payload: payload('fresh'),
       fetchedAtMs: NOW_MS,
     });
   });
 
   it("never renders another user's cached payload", async () => {
-    seedCache(groupCacheKeys.mine, { v: 'someone else' }, 'user-2');
+    seedCache(groupCacheKeys.mine, payload('someone else'), 'user-2');
     const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
 
     const { result } = renderResource({ fetcher });
@@ -227,7 +231,7 @@ describe('useGroupResource', () => {
   });
 
   it('refreshes on focus and every 30 s while focused, and stops polling when blurred', async () => {
-    const fetcher = jest.fn(() => Promise.resolve({ v: 'x' }));
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
 
     renderResource({ fetcher });
     await flush();
@@ -251,7 +255,7 @@ describe('useGroupResource', () => {
   });
 
   it('refresh() fetches on demand and collapses concurrent calls into one request', async () => {
-    const fetcher = jest.fn(() => Promise.resolve({ v: 'x' }));
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
     const { result } = renderResource({ fetcher });
     await flush();
     fetcher.mockClear();
@@ -269,16 +273,16 @@ describe('useGroupResource', () => {
     expect(result.current.refreshing).toBe(true);
 
     await act(async () => {
-      pending.resolve({ v: 'manual' });
+      pending.resolve(payload('manual'));
       await Promise.all([first, second]);
     });
 
-    expect(result.current.data).toEqual({ v: 'manual' });
+    expect(result.current.data).toEqual(payload('manual'));
     expect(result.current.refreshing).toBe(false);
   });
 
   it('marks offline from NetInfo, keeps the cache, and skips requests until back online', async () => {
-    seedCache(groupCacheKeys.mine, { v: 'cached' });
+    seedCache(groupCacheKeys.mine, payload('cached'));
     const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
 
     blurScreen();
@@ -286,7 +290,7 @@ describe('useGroupResource', () => {
     emitNetInfo(false);
     await flush();
 
-    expect(result.current).toMatchObject({ offline: true, data: { v: 'cached' }, lastUpdatedAtMs: CACHED_AT_MS });
+    expect(result.current).toMatchObject({ offline: true, data: payload('cached'), lastUpdatedAtMs: CACHED_AT_MS });
 
     focusScreen();
     await act(async () => {
@@ -302,7 +306,7 @@ describe('useGroupResource', () => {
   });
 
   it('marks offline when the last refresh failed with NETWORK and keeps lastUpdatedAtMs; a success clears it', async () => {
-    seedCache(groupCacheKeys.mine, { v: 'cached' });
+    seedCache(groupCacheKeys.mine, payload('cached'));
     const fetcher = jest.fn(
       (): Promise<Payload> => Promise.reject(new GroupApiError('NETWORK', 'Network request failed')),
     );
@@ -313,26 +317,26 @@ describe('useGroupResource', () => {
 
     expect(result.current).toMatchObject({
       offline: true,
-      data: { v: 'cached' },
+      data: payload('cached'),
       lastUpdatedAtMs: CACHED_AT_MS,
       refreshing: false,
     });
     expect(result.current.error?.code).toBe('NETWORK');
 
-    fetcher.mockImplementationOnce(() => Promise.resolve({ v: 'fresh' }));
+    fetcher.mockImplementationOnce(() => Promise.resolve(payload('fresh')));
     await act(async () => {
       await result.current.refresh();
     });
 
-    expect(result.current).toMatchObject({ offline: false, error: null, data: { v: 'fresh' }, lastUpdatedAtMs: NOW_MS });
+    expect(result.current).toMatchObject({ offline: false, error: null, data: payload('fresh'), lastUpdatedAtMs: NOW_MS });
   });
 
-  it('on NOT_FOUND evicts the group entries and surfaces lostAccess', async () => {
-    seedCache(groupCacheKeys.mine, { v: 'mine' });
-    seedCache(groupCacheKeys.stream('g2'), { v: 'other group' });
-    seedCache(groupCacheKeys.group('g1'), { v: 'group' });
-    seedCache(groupCacheKeys.stream('g1'), { v: 'stream' });
-    seedCache(groupCacheKeys.session('u2', 's1'), { v: 'session' });
+  it('on group NOT_FOUND retires the account projections and surfaces lostAccess', async () => {
+    seedCache(groupCacheKeys.mine, payload('mine'));
+    seedCache(groupCacheKeys.stream('g2'), payload('other group'));
+    seedCache(groupCacheKeys.group('g1'), payload('group'));
+    seedCache(groupCacheKeys.stream('g1'), payload('stream'));
+    seedCache(groupCacheKeys.session('g1','u2', 's1'), payload('session'));
     const fetcher = jest.fn(() => Promise.reject(new GroupApiError('NOT_FOUND', 'group not visible')));
 
     const { result } = renderResource({
@@ -344,19 +348,19 @@ describe('useGroupResource', () => {
 
     expect(result.current).toMatchObject({ lostAccess: true, data: null, lastUpdatedAtMs: null, offline: false });
     expect(result.current.error?.code).toBe('NOT_FOUND');
-    expect(cachedKeys()).toEqual(['groups:v4:mine', 'stream:v4:g2']);
+    expect(cachedKeys()).toEqual([]);
   });
 
   it('on NOT_FOUND without a group id evicts only its own entry', async () => {
-    seedCache(groupCacheKeys.session('u2', 's1'), { v: 'session' });
-    seedCache(groupCacheKeys.session('u3', 's2'), { v: 'other session' });
+    seedCache(groupCacheKeys.session('g1','u2', 's1'), payload('session'));
+    seedCache(groupCacheKeys.session('g2','u3', 's2'), payload('other session'));
     const fetcher = jest.fn(() => Promise.reject(new GroupApiError('NOT_FOUND', 'session not visible')));
 
-    const { result } = renderResource({ fetcher, cacheKey: groupCacheKeys.session('u2', 's1') });
+    const { result } = renderResource({ fetcher, cacheKey: groupCacheKeys.session('g1','u2', 's1') });
     await flush();
 
     expect(result.current.lostAccess).toBe(true);
-    expect(cachedKeys()).toEqual(['session:v4:u3:s2']);
+    expect(cachedKeys()).toEqual(['session:v5:g2:u3:s2']);
   });
 
   it('never throws into render: unexpected failures and a corrupt cache become INTERNAL error states', async () => {
@@ -378,7 +382,7 @@ describe('useGroupResource', () => {
   });
 
   it('does nothing while signed out', async () => {
-    const fetcher = jest.fn(() => Promise.resolve({ v: 'x' }));
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
 
     const { result } = renderResource({ fetcher, userId: null });
     await flush();
@@ -391,7 +395,7 @@ describe('useGroupResource', () => {
   });
 
   it('re-hydrates and refetches when the cache key changes, ignoring a stale in-flight response', async () => {
-    seedCache(groupCacheKeys.stream('g2'), { v: 'g2 cached' });
+    seedCache(groupCacheKeys.stream('g2'), payload('g2 cached'));
     const stale = deferred<Payload>();
     const fetcher = jest.fn(() => stale.promise);
 
@@ -404,16 +408,16 @@ describe('useGroupResource', () => {
     expect(nextFetcher).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      stale.resolve({ v: 'g1 stale' });
+      stale.resolve(payload('g1 stale'));
     });
     await flush();
 
-    expect(result.current.data).toEqual({ v: 'g2 cached' });
+    expect(result.current.data).toEqual(competitionCacheFixture(groupCacheKeys.stream('g2')));
     expect(readGroupCache(fixture.database, groupCacheKeys.stream('g1'), USER)).toBeNull();
   });
 
   it('clears its poll timer and NetInfo listener on unmount', async () => {
-    const fetcher = jest.fn(() => Promise.resolve({ v: 'x' }));
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
     const { unmount } = renderResource({ fetcher });
     await flush();
     expect(mockNetInfoListeners.size).toBe(1);

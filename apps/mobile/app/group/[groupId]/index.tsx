@@ -23,15 +23,15 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import {
   canManageGroup,
   formatMemberCount,
   formatMyRole,
   getGroup,
   groupCacheKeys,
-  listGroupExercises,
+  listCompetitionExercises,
   useGroupResource,
-  type GroupExerciseListResult,
   type GroupGetResult,
 } from '@/src/groups';
 
@@ -74,8 +74,8 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
     fetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const exercisesFetcher = useCallback(() => listGroupExercises(groupId), [groupId]);
-  const exercises = useGroupResource<GroupExerciseListResult>({
+  const exercisesFetcher = useCallback(() => listCompetitionExercises(groupId), [groupId]);
+  const exercises = useGroupResource<CompetitionExerciseListWire>({
     userId,
     cacheKey: groupCacheKeys.groupExercises(groupId),
     fetcher: exercisesFetcher,

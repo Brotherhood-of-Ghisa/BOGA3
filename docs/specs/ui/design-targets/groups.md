@@ -1,5 +1,9 @@
 # Accepted target — the Groups tab and the group page shell (repo-native brief)
 
+Current competition content is governed by [group-competitions](group-competitions.md).
+The selected legacy Weight/raw-set captures below retain their layout authority;
+Volume/1RM, explicit units and safe public context replace their old content.
+
 Target record per `../ai-design-policy.md`, for DLM-T11 (the Groups tab's
 stream, the record sheet, the group page shell and the state panels) of the
 design-language migration. DLM-T12 (Leaderboards), DLM-T13 (group management)

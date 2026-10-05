@@ -62,11 +62,6 @@
       "count": 1
     }
   },
-  "components/groups/group-metric-stream-record-sheet.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/gyms/gym-editor.tsx": {
     "max-lines-per-function": {
       "count": 1

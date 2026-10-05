@@ -32,7 +32,7 @@ export type LinkRef = {
 export type GroupExerciseCatalog = {
   groupId: string;
   groupName: string;
-  exercises: GroupExercise[] | null;
+  exercises: (GroupExercise & { standard?: string })[] | null;
 };
 
 /**
@@ -129,7 +129,8 @@ export function describeGroupLinkIncompatibility(exercise: LinkableExercise, tar
   }
 }
 
-export function describeGroupLinkLoadNote(exercise: LinkableExercise, target: GroupExercise): string | null {
+export function describeGroupLinkLoadNote(exercise: LinkableExercise, target: GroupExercise & { standard?: string }): string | null {
+  if (target.standard) return `${target.standard}. Your personal exercise settings stay unchanged.`;
   const incompatible = describeGroupLinkIncompatibility(exercise, target);
   if (incompatible) return `Not counted: ${incompatible}`;
   if (!isGroupMetricExerciseWire(target) || target.legacy || !target.bodyweight_calculations_enabled ||

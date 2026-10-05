@@ -1,15 +1,18 @@
 // The metric record sheet, as plain data: certification status, why it is
 // read-only, and which actions it offers. The server enforces all of it again.
 import { formatBoardDate } from './board-view-model';
-import type { GroupMetricBoardRowWire, GroupMetricCertificationWire, GroupMetricExerciseWire } from './metric-wire';
+import type { CompetitionBoardRowWire as GroupMetricBoardRowWire,CompetitionCertificationWire as GroupMetricCertificationWire,CompetitionExerciseWire as GroupMetricExerciseWire } from './competition-wire';
 import type { GroupRole } from './types';
 import { canManageGroup } from './write-view-model';
 
 export type MetricCertificationEndAction = 'withdraw' | 'cancel';
 export type MetricRecordSheetNotice = { tone: 'error' | 'success'; message: string };
 
+export type MetricCertificationTarget = Pick<GroupMetricBoardRowWire,
+  'metric' | 'member' | 'former' | 'write_token' | 'certification'> & { performance: Pick<GroupMetricBoardRowWire['performance'], 'set_id'> };
+
 export type MetricRecordSheetInput = {
-  row: GroupMetricBoardRowWire;
+  row: MetricCertificationTarget;
   exercise: GroupMetricExerciseWire;
   userId: string;
   myRole: GroupRole | null;
@@ -40,8 +43,7 @@ export type MetricRecordSheetModel = {
 };
 
 const isReadOnly = ({ row, exercise, readOnlyReason }: MetricRecordSheetInput): boolean =>
-  Boolean(readOnlyReason) || row.former || exercise.archived_at_ms !== null || exercise.rebuilding ||
-  row.rules_revision !== exercise.rules_revision;
+  Boolean(readOnlyReason) || row.former || exercise.archived_at_ms !== null || exercise.rebuilding;
 
 const readOnlyCause = ({ row, exercise, readOnlyReason }: MetricRecordSheetInput): string => {
   if (readOnlyReason) return readOnlyReason;
@@ -55,7 +57,7 @@ const describeStatus = (
   certified: boolean,
 ): string => {
   if (active) return `Certified by ${active.certified_by?.username ?? 'a group member'} · ${formatBoardDate(active.certified_at_ms)}`;
-  if (certification?.end_reason) return `Certification ${certification.end_reason}`;
+  if (certification?.end_reason) return 'Certification ended';
   return certified ? 'Certified' : 'Uncertified';
 };
 
@@ -67,8 +69,8 @@ type CertificationState = {
 };
 
 const describeNotes = (input: MetricRecordSheetInput, { active, certified, readOnly, isMine }: CertificationState) => ({
-  observedRulesNote: active && active.rules_revision !== input.row.rules_revision
-    ? `Observed under rules ${active.rules_revision}; unchanged performance inputs remain attested.`
+  observedRulesNote: active && active.observed_rules_revision !== input.exercise.rules.rules_revision
+    ? `Observed under rules ${active.observed_rules_revision}; unchanged performance inputs remain attested.`
     : null,
   readOnlyNote: readOnly ? `Read-only · ${readOnlyCause(input)}` : null,
   offlineNote: input.online === false ? 'Reconnect to change certification.' : null,
@@ -79,7 +81,7 @@ const describeNotes = (input: MetricRecordSheetInput, { active, certified, readO
 const availableActions = ({ userId, myRole }: MetricRecordSheetInput, { active, certified, readOnly, isMine }: CertificationState) => {
   const certifiedByMe = active?.certified_by?.user_id === userId;
   return {
-    canCertify: !certified && !isMine && !readOnly,
+    canCertify: myRole !== null && !certified && !isMine && !readOnly,
     canWithdraw: certifiedByMe && !readOnly,
     canCancel: active !== null && myRole !== null && canManageGroup(myRole) && !certifiedByMe && !readOnly,
   };
@@ -89,7 +91,7 @@ export function buildMetricRecordSheetModel(input: MetricRecordSheetInput): Metr
   const { row, userId, certification, online, pending, needsReview, notice } = input;
   const active = certification?.ended_at_ms === null ? certification : null;
   // Until the certification is read, the board row says whether it is certified.
-  const certified = certification ? active !== null : row.certified;
+  const certified = certification ? active !== null : row.certification !== null;
   const state: CertificationState = { active, certified, readOnly: isReadOnly(input), isMine: row.member.user_id === userId };
   return {
     active,
@@ -99,7 +101,7 @@ export function buildMetricRecordSheetModel(input: MetricRecordSheetInput): Metr
     statusText: describeStatus(active, certification, certified),
     ...describeNotes(input, state),
     // A refused write, or a certification the row names that could not be read.
-    showRefresh: needsReview || Boolean(row.certification_id && !certification && notice?.tone === 'error'),
+    showRefresh: needsReview || Boolean(row.certification?.certification_id && notice?.tone === 'error'),
     ...availableActions(input, state),
   };
 }

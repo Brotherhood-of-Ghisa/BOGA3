@@ -12,7 +12,10 @@ import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/
 const mockRpc = jest.fn();
 
 jest.mock('@/src/auth/supabase', () => ({
-  getRequiredSupabaseMobileClient: () => ({ schema: () => ({ rpc: mockRpc }) }),
+  getRequiredSupabaseMobileClient: () => ({ schema: () => ({ rpc: (...args: unknown[]) => {
+      const request = mockRpc(...args);
+      return Object.assign(request,{ setHeader: jest.fn(() => request) });
+    } }) }),
 }));
 
 type MockNetInfoListener = (state: { isConnected: boolean | null }) => void;
@@ -30,6 +33,7 @@ jest.mock('@react-native-community/netinfo', () => ({
   },
 }));
 
+import { competitionGroupDetail } from './helpers/competition-fixtures';
 import { groupCache } from '@/src/data/schema';
 import {
   GROUP_OFFLINE_ACTION_MESSAGE,
@@ -67,7 +71,7 @@ describe('useGroupAction', () => {
     writeGroupCache(fixture.database, {
       cacheKey: groupCacheKeys.group('g1'),
       userId: 'user-1',
-      payload: { group: { group_id: 'g1' } },
+      payload: competitionGroupDetail,
       fetchedAtMs: 1_000,
     });
     const before = cacheRows();

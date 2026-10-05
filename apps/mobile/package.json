@@ -18,6 +18,7 @@
     "test": "jest",
     "test:sync": "jest __tests__/sync",
     "test:sync:infra": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/sync/drift-check.test.ts __tests__/sync/cycle-round-trip.test.ts __tests__/sync/cycle-multidevice-lww.test.ts __tests__/sync/auth-required-envelope.test.ts __tests__/sync/update-softdelete-roundtrip.test.ts __tests__/sync/future-clock-clamp.test.ts __tests__/sync/cycle-fresh-device-and-account-switch.test.ts --testPathIgnorePatterns=/node_modules/",
+    "test:groups:competition-live": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/groups-competition-api-live.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:groups:live": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/groups-api-live.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:handles": "jest --detectOpenHandles --silent",
     "test:coverage": "jest --coverage --silent",

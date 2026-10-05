@@ -1,7 +1,7 @@
 # M27-T14 — Human acceptance and group workstream closeout
 
 - Status: `planned`
-- Depends on: existing #411 task (completed), T13 (completed), T15 (completed; milestone D4), T08 (completed), T09 (completed), [T10](M27-T10-Expose_group_standards_and_bodyweight_rankings.md)
+- Depends on: existing #411 task (completed), T13 (completed), T15 (completed; milestone D4), T08 (completed), T09 (completed), T10 (completed)
 - Milestone: [M27 — Bodyweight load and group comparisons](../milestones/M27-bodyweight-load-and-group-comparisons.md)
 - Workstream: [#420](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
 - Areas: cross-stack; UI impact: yes

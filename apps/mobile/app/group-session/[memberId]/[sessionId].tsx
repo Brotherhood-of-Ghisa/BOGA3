@@ -14,11 +14,11 @@ import {
 } from '@/components/groups';
 import { ScreenScroll } from '@/components/ui/screen';
 import { useAuth } from '@/src/auth';
+import type { CompetitionSessionDetailWire } from '@/src/groups/competition-wire';
 import {
-  getGroupSessionDetail,
+  getCompetitionSession,
   groupCacheKeys,
   useGroupResource,
-  type GroupSessionDetailResult,
 } from '@/src/groups';
 
 const firstParam = (value: string | string[] | undefined): string | null =>
@@ -30,17 +30,18 @@ const firstParam = (value: string | string[] | undefined): string | null =>
  * draw their exercises with `components/session-detail/`.
  */
 export default function GroupSessionRoute() {
-  const params = useLocalSearchParams<{ memberId?: string | string[]; sessionId?: string | string[] }>();
+  const params = useLocalSearchParams<{ memberId?: string | string[]; sessionId?: string | string[]; groupId?: string | string[] }>();
+  const groupId = firstParam(params.groupId);
   const memberId = firstParam(params.memberId);
   const sessionId = firstParam(params.sessionId);
   const { isConfigured, user } = useAuth();
   if (!isConfigured || !user) {
     return <GroupsSignInRequired isConfigured={isConfigured} />;
   }
-  if (!memberId || !sessionId) {
+  if (!groupId || !memberId || !sessionId) {
     return <UnavailableState />;
   }
-  return <GroupSessionContent memberId={memberId} sessionId={sessionId} userId={user.id} />;
+  return <GroupSessionContent groupId={groupId} memberId={memberId} sessionId={sessionId} userId={user.id} />;
 }
 
 function UnavailableState() {
@@ -53,13 +54,14 @@ function UnavailableState() {
   );
 }
 
-function GroupSessionContent({ userId, memberId, sessionId }: { userId: string; memberId: string; sessionId: string }) {
-  const fetcher = useCallback(() => getGroupSessionDetail(memberId, sessionId), [memberId, sessionId]);
+function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId: string; groupId: string; memberId: string; sessionId: string }) {
+  const fetcher = useCallback(() => getCompetitionSession(groupId,memberId,sessionId), [groupId,memberId,sessionId]);
   // NOT_FOUND deletes this entry from the cache (the hook evicts its own key).
-  const detail = useGroupResource<GroupSessionDetailResult>({
+  const detail = useGroupResource<CompetitionSessionDetailWire>({
     userId,
-    cacheKey: groupCacheKeys.session(memberId, sessionId),
+    cacheKey: groupCacheKeys.session(groupId,memberId,sessionId),
     fetcher,
+    evictGroupIdOnNotFound: groupId,
   });
   const { pulling, onRefresh } = usePullToRefresh(detail.refresh);
   const session = detail.data?.session ?? null;

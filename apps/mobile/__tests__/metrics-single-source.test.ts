@@ -75,6 +75,8 @@ describe('training-metric rules have one implementation', () => {
       'apps/mobile/src/groups/session-metrics.ts',
       // The competition scorer already admits only performed projections.
       'apps/mobile/src/groups/competition-evaluation.ts',
+      // The public session view admits performed reps before counting effort; normalized load stays private.
+      'apps/mobile/src/groups/competition-session-view-model.ts',
     ])).toEqual([]);
   });
 

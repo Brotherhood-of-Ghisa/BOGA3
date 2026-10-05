@@ -68,7 +68,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
   - Group activity: `View groups`, the board and the `<n> training now` row
     open `/groups?groupId=<selected group>` (`/groups` with no group); the
     one-member training-now row and the latest completed session open
-    `/group-session/<memberId>/<sessionId>`; `Find a group` (no group) opens
+    `/group-session/<memberId>/<sessionId>?groupId=<groupId>`; `Find a group` (no group) opens
     `/group/mine`; `Sign in` (signed out) opens `/sign-in`. Picking a chip
     changes the selection Today shares with the Groups screen; it does not
     navigate
@@ -351,12 +351,14 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 - Path params:
   - `groupId`, `exerciseId` (the `group_exercise_id`; required; a missing value renders the lost-access state)
 - Query params:
-  - `metric` = `weight` | `e1rm` and `scope` = `certified` | `all`; missing or anything else means `e1rm` / `certified` (the podium card's view)
+  - `metric` = `volume` | `e1rm` and `scope` = `certified` | `all`; absent/invalid metric uses the comparison default, and absent/invalid scope uses `certified`. History additionally accepts the saved legacy metric under its recorded revision
 - Behavior:
-  - on the board the toggles are in-route state initialised from the query; they are not written back to the URL, and `History` passes the current toggles in its query
+  - the board writes in-place metric/scope selections back to the query; `History` passes those selections and the current rules revision
 
 18. `/group-session/[memberId]/[sessionId]`
 - File: `apps/mobile/app/group-session/[memberId]/[sessionId].tsx`
+- Query params:
+  - `groupId` (required authorized group scope; missing renders generic session unavailable)
 - Path params:
   - `memberId`, `sessionId` (both required; a missing value renders "This session is no longer available")
 
@@ -474,7 +476,7 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 29. `/group/mine` -> `/group/<groupId>`
    - row tap in My groups, the only way to the group page from the Groups
      screen (stream membership items do not navigate)
-30. `/groups` / `/today` -> `/group-session/<memberId>/<sessionId>`
+30. `/groups` / `/today` -> `/group-session/<memberId>/<sessionId>?groupId=<groupId>`
    - stream session-card tap; on Today, the latest-activity row for one member training now or the latest completed session (`router.push`)
 31. `/groups` (signed out, auth configured) -> `/sign-in`
    - `Sign in` action on the sign-in-required card
@@ -499,10 +501,10 @@ Brief entrypoint contract for current mobile routes, query/path params, and allo
 41. `/group/<groupId>` -> `/group/<groupId>/exercises/new`, `/group/<groupId>/exercises/<exerciseId>/edit` (M25-T08)
    - owner/admin `Add exercise` and the exercise sheet's `Rename` (`router.push`); both return with `router.back()` after saving, and the Exercises segment refreshes on focus
 42. `/groups` -> `/group/<groupId>/leaderboards/<exerciseId>` (M25-T09)
-   - a podium card on the Groups screen's Leaderboards segment (`router.push`, no query: 1RM · Certified)
+   - a podium card on the Groups screen's Leaderboards segment (`router.push`, no query: comparison default · Certified)
 43. `/group/<groupId>/leaderboards/<exerciseId>` -> `/group/<groupId>/leaderboards/<exerciseId>/history?metric=&scope=` (M25-T09)
    - the header `History` button with the current toggles; Back returns to the board, which reloads its first page on focus
-44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>` (M25-T10)
+44. `/groups`, `/group/<groupId>/leaderboards/<exerciseId>` -> `/group-session/<memberId>/<sessionId>?groupId=<groupId>` (M25-T10)
    - the row detail sheet's `View full session` (the sheet closes, then `router.push`); the sheet itself is in-route state opened from a record card or a full-board row
 45. `/today` -> `/groups?groupId=<groupId>`, `/group/mine`
    - `View groups`, the week board or the `<n> training now` row (the selected group); `Find a group` with no group
@@ -564,12 +566,12 @@ Note:
 
 ## Group calculation navigation
 
-The existing group board route keeps `metric=weight|e1rm` and
-`scope=certified|all`; optional bodyweight calculation changes arithmetic, not
-route taxonomy. In-place toggles update parameters even when Expo reuses the
-screen. History accepts a positive rules revision and event links carry their
-recorded revision rather than reinterpreting an old value. Board rows open the
-same record sheet, which never routes to or exposes private reading context.
+Boards use `metric=volume|e1rm` and `scope=certified|all`. The comparison's
+current default chooses the opening metric. In-place toggles update parameters
+when Expo reuses the screen. History carries a positive rules revision and keeps
+recorded units; retired-revision Scores are unavailable. Every full-session exit
+carries `groupId` and uses the group-scoped safe reader/cache. Record sheets never
+route to or expose private reading context.
 
 ## Documentation boundary
 

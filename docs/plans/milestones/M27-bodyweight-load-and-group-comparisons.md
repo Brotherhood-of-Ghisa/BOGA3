@@ -1,7 +1,7 @@
 # M27 — Bodyweight load and group comparisons
 
 - Milestone ID: `M27`
-- Status: `in_progress` (reconciled group follow-up tasks are `planned`)
+- Status: `in_progress` (implementation complete; human acceptance and hosted activation pending)
 - Created: 2026-09-25; reconciled: 2026-10-04
 - Planning baseline: `b997e2f4` on `origin/main`
 - Workstream: [#420 — Stabilize group metric rebuilds and certifications](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/420)
@@ -17,14 +17,14 @@ The user confirmed two product decisions on 2026-10-04: rule changes do not
 invalidate certifications; a positive **group exercise contribution** identifies
 a bodyweight exercise whose competitive strength results use bodyweight
 percentages when the group switch is On. Off uses ordinary Volume and 1RM
-rankings, as the user clarified in the same session. The current kg-only group
-wire contract does not yet satisfy the percentage target; certification
-persistence and zero-contribution no-op behavior are complete. This is an
-implementation plan, not a claim that the target is shipped.
+rankings, as the user clarified in the same session. The versioned server
+publication and compatible mobile UI now implement that target; certification
+persistence and zero-contribution no-op behavior are complete. Hosted activation
+and integrated human acceptance remain pending.
 
 This consolidation replaces the old group requirements in this milestone and
-T08–T10. Their revised scope is planned, regardless of historical implementation
-checkpoints. Original personal work (T01–T07/T11) is historical context, not a
+T08–T10. Their revised implementation scope is complete; historical checkpoints
+do not provide current acceptance. Original personal work (T01–T07/T11) is historical context, not a
 request to restore snapshots, backfill, assistance modes or three-board group
 UI. The original T12 closeout is replaced for this workstream by T14; do not run
 its obsolete acceptance scenario. Preserve those cards until their separate
@@ -70,14 +70,15 @@ is introduced. Missing/invalid private input never becomes zero for a
 bodyweight-dependent group score. Public copy must not expose why a private
 input was unavailable.
 
-### D4. Reading-correction decision (planned percentage behavior)
+### D4. Reading-correction decision (accepted percentage behavior)
 
 On 2026-10-04 the executing agent selected the existing conservative policy
 under the user's instruction to manage all subtasks autonomously and merge in
 confidence. This is a delegated agent decision, not a new human answer or an
 extension of the human's rule-only retention guarantee. T15's planning decision
 is complete; T09 implements and graduates the percentage lifecycle into specs.
-Current production still uses kg Weight/1RM projections.
+Installation remains pending until authorized activation; the compatible UI
+fails safely while that capability is unavailable.
 
 **Chosen:** an authoritative change to the applicable private dependency ends
 an already bound dependent certificate projection (`voided`). Keep the original
@@ -288,14 +289,16 @@ and compatible clients in the documented order with explicit hosted authority.
 | M27-T15 — Decide percentage reading-correction policy | D4: relevant private corrections end bound dependent projections; delegated decision | — | completed |
 | M27-T08 — Group percentage contracts | Single-set Volume, versioned units, allowlists and pending negotiation; owning representation contract | T15 | completed |
 | M27-T09 — Evaluate private percentage scores | Normalized worker/SQL publication and all group reader privacy; installation stays pending until authorized activation | T08, T13, existing #411 task | completed |
-| [M27-T10 — Group percentage UI](../tasks/M27-T10-Expose_group_standards_and_bodyweight_rankings.md) | Group rules, %BW boards, details, certification copy and safe caches | T09 | planned |
+| M27-T10 — Group percentage UI | Group rules, %BW boards, details, certification copy and safe caches | T09 | completed |
 | [M27-T14 — Human acceptance and workstream closeout](../tasks/M27-T14-Accept_and_close_group_rules_workstream.md) | Human flow acceptance, combined gate pass, rollout and graduation | All active implementation tasks | planned |
 
 The existing #411 task keeps its identifier so its issue link remains valid.
-Ready now: T10; T08, T09, T15, T13 and the existing #411 task are complete. Formula,
-switch, Volume and reading-correction decisions are recorded. Versioned runtime
-publication/privacy is implemented with pending installation; compatible UI,
-authorized hosted activation and human acceptance remain pending.
+Ready now: T14's actual human flow acceptance; T10, T08, T09, T15, T13 and the
+existing #411 task are complete. Formula, switch, Volume and reading-correction
+decisions are recorded. Versioned runtime publication/privacy and compatible UI
+are implemented with pending installation. T14's combined aggregate pass follows
+human acceptance; hosted activation/smoke also needs an explicit target and
+deployment authority. Automated captures are not that acceptance.
 No parallel-agent execution is implied.
 Do not execute the old T01–T07/T11/T12 scope as part of this workstream.
 

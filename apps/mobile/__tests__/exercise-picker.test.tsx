@@ -59,7 +59,7 @@ jest.mock('@react-native-community/netinfo', () => ({
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
-  listGroupExercises: jest.fn(),
+  listCompetitionExercises: jest.fn(),
 }));
 
 import { ExerciseSwapSheet } from '@/components/exercise-page/exercise-swap-sheet';
@@ -74,11 +74,10 @@ import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/l
 import {
   groupCacheKeys,
   writeGroupCache,
-  type GroupExercise,
-  type GroupExerciseListResult,
   type GroupListMineResult,
   type GroupSummary,
 } from '@/src/groups';
+import type { CompetitionExerciseWire as GroupExercise,CompetitionExerciseListWire as GroupExerciseListResult } from '@/src/groups/competition-wire';
 import * as groupsApi from '@/src/groups/api';
 import {
   bootLocalApp,
@@ -126,21 +125,20 @@ const IRON: GroupSummary = { group_id: 'g-iron', name: 'Iron Brotherhood', descr
 const TUESDAY: GroupSummary = { group_id: 'g-tue', name: 'Tuesday Crew', description: null, member_count: 2, my_role: 'member', bodyweight_calculations_enabled: false };
 
 const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, 'group_exercise_id' | 'name'>): GroupExercise => ({
-  load_input_mode: 'total_load',
-  source_exercise_id: null,
-  archived_at_ms: null,
+  rules: { bodyweight_calculations_enabled: false,bodyweight_contribution: 0,load_input_mode: 'total_load',default_metric: 'e1rm',rules_revision: 1 },
+  published_revision: 1,rebuilding: false,source_exercise_id: null,archived_at_ms: null,
   ...overrides,
 });
 
 const GX_BENCH = groupExercise({ group_exercise_id: 'gx-bench', name: 'Bench Press', source_exercise_id: 'seed_barbell_bench_press' });
 const GX_ROW = groupExercise({ group_exercise_id: 'gx-row', name: 'Pendlay Row' });
 const GX_TUE_SQUAT = groupExercise({ group_exercise_id: 'gx-tue-squat', name: 'Back Squat' });
-const GX_TUE_BENCH = groupExercise({ group_exercise_id: 'gx-tue-bench', name: 'Bench', load_input_mode: 'per_side_load' });
+const GX_TUE_BENCH = groupExercise({ group_exercise_id: 'gx-tue-bench', name: 'Bench', rules: { bodyweight_calculations_enabled: false,bodyweight_contribution: 0,load_input_mode: 'per_side_load',default_metric: 'e1rm',rules_revision: 1 } });
 
 const MINE: GroupListMineResult = { groups: [IRON, TUESDAY] };
 const GROUP_EXERCISES: Record<string, GroupExerciseListResult> = {
-  'g-iron': { exercises: [GX_BENCH, GX_ROW] },
-  'g-tue': { exercises: [GX_TUE_SQUAT, GX_TUE_BENCH] },
+  'g-iron': { contract_version: 4,exercises: [GX_BENCH, GX_ROW] },
+  'g-tue': { contract_version: 4,exercises: [GX_TUE_SQUAT, GX_TUE_BENCH] },
 };
 
 // ---- Seeding
@@ -277,7 +275,7 @@ beforeEach(() => {
   mockUserId = 'user-1';
   mockConnected = true;
   api.listMyGroups.mockReset().mockResolvedValue(MINE);
-  api.listGroupExercises.mockReset().mockImplementation(async (groupId: string) => GROUP_EXERCISES[groupId]);
+  api.listCompetitionExercises.mockReset().mockImplementation(async (groupId: string) => GROUP_EXERCISES[groupId]);
 });
 
 afterEach(() => {
@@ -425,10 +423,10 @@ describe('pick sheet (E0.2)', () => {
 
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-seed_barbell_bench_press'));
     expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(
-      'Weight stays as logged. 1RM is compared in per-side terms.',
+      'Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load. Your personal exercise settings stay unchanged.',
     );
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-ex-hotel'));
-    expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
+    expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(/Rules 1.*Bodyweight scoring Off/);
   });
 
   it('with no suggestion, Add as new is preselected; dismissing returns to the picker', async () => {

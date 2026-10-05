@@ -1,16 +1,29 @@
 // The group comparison form's derived state, as plain data: inline errors,
 // whether the calculation changed (and so needs a reviewed new revision), the
 // stale-revision warning, the preview copy and the submit label.
-import type { GroupExerciseRules, GroupRulesValidation } from './metric-contract';
-import type { GroupMetricExerciseWire } from './metric-wire';
+import { formatContributionPercent } from './competition-view-model';
+import { validateExerciseCore } from '@/src/exercise-core';
+import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
+import { isCompetitionMetric, type CompetitionRules as GroupExerciseRules } from './competition-contract';
+import type { CompetitionExerciseWire as GroupMetricExerciseWire } from './competition-wire';
+type GroupRulesValidation = { ok: true; value: GroupExerciseRules } | { ok: false; field: keyof GroupExerciseRules; message: string };
+
+export function validateCompetitionFormRules(input: Record<keyof GroupExerciseRules,unknown>): GroupRulesValidation {
+  const core=validateExerciseCore(input);
+  if (!core.ok) return { ok: false,field: core.issue === 'name_required' ? 'name' : 'loadInputMode',message: core.message };
+  const contribution=validateBodyweightContribution(input.bodyweightContribution);
+  if (!contribution.ok) return contribution;
+  if (typeof input.bodyweightCalculationsEnabled !== 'boolean') return { ok: false,field: 'bodyweightCalculationsEnabled',message: 'Bodyweight calculations state is required.' };
+  if (!isCompetitionMetric(input.defaultMetric)) return { ok: false,field: 'defaultMetric',message: 'Choose Volume or 1RM.' };
+  return { ok: true,value: { ...core.value,bodyweightContribution: contribution.value,bodyweightCalculationsEnabled: input.bodyweightCalculationsEnabled,defaultMetric: input.defaultMetric } };
+}
 
 /** The rules the edit started from, and the revision they belong to (null when creating). */
-export type ComparisonBaseline = { rules: GroupExerciseRules; revision: number | null; legacy: boolean };
+export type ComparisonBaseline = { rules: GroupExerciseRules; revision: number | null };
 
 export const baselineFrom = (rules: GroupExerciseRules, existing: GroupMetricExerciseWire | undefined): ComparisonBaseline => ({
   rules,
-  revision: existing?.rules_revision ?? null,
-  legacy: existing?.legacy ?? false,
+  revision: existing?.rules.rules_revision ?? null,
 });
 
 /** The contribution field as a number; blank is NaN (invalid), a decimal comma is accepted. */
@@ -26,10 +39,8 @@ const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
 export type ComparisonPreview = { summary: string; attestationNote: string };
 
 const describeRulesChange = (baseline: ComparisonBaseline, next: GroupExerciseRules): ComparisonPreview => ({
-  summary: `Apply rules revision ${(baseline.revision ?? 0) + 1}: ${baseline.rules.bodyweightContribution * 100}% → ${next.bodyweightContribution * 100}% bodyweight contribution, ${next.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`,
-  attestationNote: baseline.legacy
-    ? 'Existing certifications keep their original coverage. Recalculated comparisons need new metric-specific attestations.'
-    : 'Attestations of unchanged performance inputs stay valid. Personal exercise settings stay unchanged.',
+  summary: `Apply rules revision ${(baseline.revision ?? 0) + 1}: ${formatContributionPercent(baseline.rules.bodyweightContribution)}% → ${formatContributionPercent(next.bodyweightContribution)}% bodyweight contribution, ${next.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`,
+  attestationNote: 'Certifications of unchanged witnessed sets keep the same witness and time. Ineligible scores return when eligible under the rules. Personal exercise settings stay unchanged.',
 });
 
 export type ComparisonFormStatusInput = {
@@ -60,7 +71,7 @@ export function deriveComparisonFormStatus({
     calculationChanged,
     nameError: shownError?.field === 'name' ? shownError.message : null,
     rulesError: shownError && shownError.field !== 'name' ? shownError.message : null,
-    stale: Boolean(dirty && existing && existing.rules_revision !== baseline.revision),
+    stale: Boolean(dirty && existing && existing.rules.rules_revision !== baseline.revision),
     preview: reviewed && calculationChanged && validation.ok ? describeRulesChange(baseline, validation.value) : null,
   };
 }

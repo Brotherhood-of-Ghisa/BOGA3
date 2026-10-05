@@ -21,7 +21,6 @@ import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-g
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import {
   GROUP_EXERCISE_ACTION_LABELS,
-  archiveGroupExercise,
   buildGroupExerciseRows,
   canManageGroup,
   describeGroupExerciseWriteError,
@@ -29,20 +28,19 @@ import {
   groupExerciseActionsFor,
   groupExerciseArchiveConfirmation,
   groupExerciseLinkedMessage,
-  unarchiveGroupExercise,
   useGroupAction,
   useMyGroupExerciseLinks,
   type GroupApiError,
   type GroupExercise,
   type GroupExerciseAction,
-  type GroupExerciseListResult,
   type GroupResourceState,
   type GroupRole,
   type LinkableExercise,
 } from '@/src/groups';
 import { buildAddAsNewPrefill, requireAddAsNewCompatibility } from '@/src/groups/add-as-new';
-import { isGroupMetricExerciseWire } from '@/src/groups/metric-wire-guards';
-import { describeGroupRules } from '@/src/groups/metric-view-model';
+import { archiveCompetitionExercise } from '@/src/groups/api';
+import { competitionLinkExercise,describeCompetitionRules } from '@/src/groups/competition-view-model';
+import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
 import { useExerciseUnlink, type ExerciseUnlinkTarget } from '@/src/groups/use-exercise-unlink';
 
@@ -60,7 +58,7 @@ type GroupExercisesPageProps = {
   groupName: string;
   myRole: GroupRole;
   /** The group exercise list through its versioned cache resource, owned by the group screen. */
-  exercises: GroupResourceState<GroupExerciseListResult>;
+  exercises: GroupResourceState<CompetitionExerciseListWire>;
   offline: boolean;
   error: GroupApiError | null;
   onRetry: () => void;
@@ -69,7 +67,7 @@ type GroupExercisesPageProps = {
 };
 
 const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', groupExerciseId: string) =>
-  action === 'archive' ? archiveGroupExercise(groupId, groupExerciseId) : unarchiveGroupExercise(groupId, groupExerciseId);
+  archiveCompetitionExercise(groupId,groupExerciseId,action === 'archive');
 
 /**
  * The group management page's Exercises list (product E0.4; contract §4.4): the
@@ -235,8 +233,11 @@ export function GroupExercisesPage({
     );
   }
 
-  const byId = new Map(exercises.data.exercises.map((exercise) => [exercise.group_exercise_id, exercise]));
-  const rows = buildGroupExerciseRows(exercises.data.exercises, links.links);
+  const wireById = new Map(exercises.data.exercises.map(exercise => [exercise.group_exercise_id,exercise]));
+  const sheetStandard = sheetExercise ? wireById.get(sheetExercise.group_exercise_id) : null;
+  const presented = exercises.data.exercises.map(competitionLinkExercise);
+  const byId = new Map(presented.map((exercise) => [exercise.group_exercise_id, exercise]));
+  const rows = buildGroupExerciseRows(presented, links.links);
   const sheetActions = sheetExercise ? groupExerciseActionsFor(myRole, sheetExercise) : [];
 
   return (
@@ -280,6 +281,7 @@ export function GroupExercisesPage({
                 onLink={row.linkable && exercise && !unlink.pending ? () => openLink(exercise) : undefined}
                 onPress={canManage && !archiveWrite.pending ? () => setSheetExercise(exercise) : undefined}
                 row={row}
+                standard={describeCompetitionRules(wireById.get(row.groupExerciseId)!)}
               />
             );
           })}
@@ -302,7 +304,7 @@ export function GroupExercisesPage({
         actionTestIDPrefix="group-exercise-action"
         actions={sheetActions.map((action) => ({
           key: action,
-          label: action === 'rename' && isGroupMetricExerciseWire(sheetExercise) ? 'Edit comparison' : GROUP_EXERCISE_ACTION_LABELS[action],
+          label: action === 'rename' ? 'Edit comparison' : GROUP_EXERCISE_ACTION_LABELS[action],
           destructive: action === 'archive',
         }))}
         dismissLabel="Dismiss exercise actions"
@@ -312,7 +314,7 @@ export function GroupExercisesPage({
           sheetExercise
             ? sheetExercise.archived_at_ms !== null
               ? 'Archived'
-              : isGroupMetricExerciseWire(sheetExercise) ? describeGroupRules(sheetExercise) : LOAD_INPUT_MODE_LABELS[sheetExercise.load_input_mode]
+              : sheetStandard ? describeCompetitionRules(sheetStandard) : LOAD_INPUT_MODE_LABELS[sheetExercise.load_input_mode]
             : undefined
         }
         testIDPrefix="group-exercise-actions"

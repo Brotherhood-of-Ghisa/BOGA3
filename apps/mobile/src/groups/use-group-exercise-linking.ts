@@ -14,16 +14,19 @@
 // Group code never runs inside the sync cycle (C3.10.5).
 
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect,useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { getAuthSnapshot, subscribeToAuthState } from '@/src/auth';
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 import { listLinks, type ExerciseGroupLinkRecord } from '@/src/data/exercise-group-links';
 
-import { listGroupExercises, listMyGroups, toGroupApiError, type GroupApiError } from './api';
-import { evictGroup, groupCacheKeys, readGroupCache, writeGroupCache, type GroupCacheDatabase } from './cache';
+import { listCompetitionExercises, listMyGroups, toGroupApiError, type GroupApiError } from './api';
+import { getCompetitionCacheGeneration, subscribeCompetitionCache, groupCacheKeys, readGroupCache, writeGroupCache, type GroupCacheDatabase } from './cache';
 import type { GroupExerciseCatalog } from './link-view-model';
-import type { GroupExerciseListResult, GroupListMineResult } from './types';
+import type { GroupListMineResult } from './types';
+import type { CompetitionExerciseListWire } from './competition-wire';
+import { competitionLinkExercise } from './competition-view-model';
+import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useNetworkOnline } from './use-network-online';
 
 /**
@@ -66,6 +69,7 @@ export type GroupExerciseLinkingState = {
 };
 
 type InternalState = {
+  identity: string | null;
   catalogs: GroupExerciseCatalog[] | null;
   linkedCatalogs: GroupExerciseCatalog[];
   lastUpdatedAtMs: number | null;
@@ -75,7 +79,8 @@ type InternalState = {
   error: GroupApiError | null;
 };
 
-const initialState = (): InternalState => ({
+const initialState = (identity: string | null = null): InternalState => ({
+  identity,
   catalogs: null,
   linkedCatalogs: [],
   lastUpdatedAtMs: null,
@@ -86,7 +91,7 @@ const initialState = (): InternalState => ({
 });
 
 const readCachedExercises = (database: GroupCacheDatabase, groupId: string, userId: string) =>
-  readGroupCache<GroupExerciseListResult>(database, groupCacheKeys.groupExercises(groupId), userId);
+  readGroupCache<CompetitionExerciseListWire>(database, groupCacheKeys.groupExercises(groupId), userId);
 
 /** The cached catalogues, or null when the mine list was never cached for this user. */
 export const readCachedGroupExerciseCatalogs = (
@@ -103,14 +108,21 @@ export const readCachedGroupExerciseCatalogs = (
     if (entry) {
       fetchedAtMs = Math.min(fetchedAtMs, entry.fetchedAtMs);
     }
-    return { groupId: group.group_id, groupName: group.name, exercises: entry?.payload.exercises ?? null };
+    return { groupId: group.group_id, groupName: group.name, exercises: entry?.payload.exercises.map(competitionLinkExercise) ?? null };
   });
   return { catalogs, fetchedAtMs };
 };
 
 export function useGroupExerciseLinking({ userId }: { userId: string | null }): GroupExerciseLinkingState {
   const online = useNetworkOnline(userId !== null);
-  const [state, setState] = useState<InternalState>(initialState);
+  const generation = useSyncExternalStore(subscribeCompetitionCache,
+    () => getCompetitionCacheGeneration(userId),() => getCompetitionCacheGeneration(userId));
+  const identity = `${userId ?? ''}:${generation}`;
+  const [state, setState] = useState<InternalState>(() => initialState(identity));
+  const visible = state.identity === identity ? state : initialState(identity);
+  const visibleRef=useRef(visible);
+  useLayoutEffect(() => { visibleRef.current=visible; });
+  const focusedEpoch=useRef(generation);
   const [links, setLinks] = useState<ExerciseGroupLinkRecord[]>([]);
   const [linksReady, setLinksReady] = useState(false);
   const [linksError, setLinksError] = useState<string | null>(null);
@@ -149,14 +161,16 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
   useEffect(() => {
     userRef.current = userId;
     inFlightRef.current = null;
-    setState(initialState());
+    setState(previous => previous.identity === identity ? previous : { ...initialState(identity),
+      linkedCatalogs: previous.identity?.split(':')[0]===userId?previous.linkedCatalogs:[] });
     setLinks([]);
     setLinksReady(false);
     setLinksError(null);
     linksSequence.current++;
+    const linkRequests=linksSequence;
 
     if (!userId) {
-      setState({ ...initialState(), hydrated: true });
+      setState({ ...initialState(identity), hydrated: true });
       return;
     }
 
@@ -167,24 +181,24 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
         const cached = readCachedGroupExerciseCatalogs(database, userId);
         if (cancelled) return;
         setState((previous) => {
-          // A refresh that already landed is fresher than the cache: keep it.
-          const keepFresher =
-            cached === null || (previous.lastUpdatedAtMs !== null && previous.lastUpdatedAtMs >= cached.fetchedAtMs);
-          return keepFresher
-            ? { ...previous, hydrated: true }
-            : { ...previous, hydrated: true, catalogs: cached.catalogs, linkedCatalogs: cached.catalogs, lastUpdatedAtMs: cached.fetchedAtMs };
+          if (cancelled || userRef.current !== userId || getCompetitionCacheGeneration(userId) !== generation ||
+            previous.identity !== identity) return previous;
+          return hydratedLinkingState(previous,cached);
         });
       } catch (caught) {
         if (cancelled) return;
-        setState((previous) => ({ ...previous, hydrated: true, error: toGroupApiError(caught) }));
+        setState(previous=>{
+          if(cancelled || userRef.current!==userId || getCompetitionCacheGeneration(userId)!==generation || previous.identity!==identity) return previous;
+          return linkingHydrationFailure(previous,caught);
+        });
       }
     })();
 
     return () => {
       cancelled = true;
-      linksSequence.current++;
+      linkRequests.current++;
     };
-  }, [userId]);
+  }, [userId,identity,generation]);
 
   const refresh = useCallback((): Promise<void> => {
     if (!userId) {
@@ -197,7 +211,13 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       return Promise.resolve();
     }
 
-    const isCurrent = () => userRef.current === userId;
+    const requestGeneration = getCompetitionCacheGeneration(userId);
+    const isCurrent = () => userRef.current === userId && getCompetitionCacheGeneration(userId) === requestGeneration;
+    const hideUnsafe = async (error: GroupApiError) => {
+      const cleanup=retireCompetitionAccount(userId);
+      if (userRef.current === userId) setState({ ...initialState(`${userId}:${getCompetitionCacheGeneration(userId)}`),hydrated: true,error });
+      await cleanup;
+    };
 
     const run = (async () => {
       setState((previous) => ({ ...previous, refreshing: true }));
@@ -208,14 +228,17 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       } catch (caught) {
         const error = toGroupApiError(caught);
         if (!isCurrent()) return;
+        if (error.invalidPayload || error.code === 'UPDATE_REQUIRED') { await hideUnsafe(error); return; }
         setState((previous) => ({ ...previous, refreshing: false, networkFailed: error.code === 'NETWORK', error }));
         return;
       }
 
+      const retainedCatalogs=await readRetainedLinkLabels(userId,mine);
+      if (!isCurrent()) return;
       const results = await Promise.all(
         mine.groups.map(async (group) => {
           try {
-            return { group, result: await listGroupExercises(group.group_id), error: null };
+            return { group, result: await listCompetitionExercises(group.group_id), error: null };
           } catch (caught) {
             return { group, result: null, error: toGroupApiError(caught) };
           }
@@ -223,6 +246,8 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       );
       if (!isCurrent()) return;
 
+      const unsafe = results.find(result => result.error?.invalidPayload || result.error?.code === 'UPDATE_REQUIRED')?.error;
+      if (unsafe) { await hideUnsafe(unsafe); return; }
       const fetchedAtMs = Date.now();
       let error: GroupApiError | null = null;
       let networkFailed = false;
@@ -232,13 +257,16 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
       const lostGroupIds = new Set(
         results.filter(({ error: groupError }) => groupError?.code === 'NOT_FOUND').map(({ group }) => group.group_id),
       );
+      const cleanup=Promise.all([...lostGroupIds].map(groupId=>retireCompetitionAccount(userId,groupId)));
+      let publishedGeneration=getCompetitionCacheGeneration(userId);
+      await cleanup;
       const stillMine: GroupListMineResult = {
         ...mine,
         groups: mine.groups.filter((group) => !lostGroupIds.has(group.group_id)),
       };
       try {
         const database = await bootstrapLocalDataLayer();
-        writeGroupCache(database, { cacheKey: groupCacheKeys.mine, userId, payload: stillMine, fetchedAtMs });
+        if (userRef.current!==userId || getCompetitionCacheGeneration(userId)!==publishedGeneration) return;
         for (const { group, result, error: groupError } of results) {
           if (result) {
             writeGroupCache(database, {
@@ -247,40 +275,29 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
               payload: result,
               fetchedAtMs,
             });
-            catalogs.push({ groupId: group.group_id, groupName: group.name, exercises: result.exercises });
+            catalogs.push({ groupId: group.group_id, groupName: group.name, exercises: result.exercises.map(competitionLinkExercise) });
             continue;
           }
-          if (groupError?.code === 'NOT_FOUND') {
-            evictGroup(database, group.group_id);
-            continue;
-          }
+          if (groupError?.code === 'NOT_FOUND') continue;
           // Keep the last cached list for a group whose refresh failed.
           networkFailed = networkFailed || groupError?.code === 'NETWORK';
           error = error ?? groupError;
           catalogs.push({
             groupId: group.group_id,
             groupName: group.name,
-            exercises: readCachedExercises(database, group.group_id, userId)?.payload.exercises ?? null,
+            exercises: readCachedExercises(database, group.group_id, userId)?.payload.exercises.map(competitionLinkExercise) ?? null,
           });
         }
+        // Catalogue policy eviction may advance our own epoch; restore My groups last.
+        writeGroupCache(database,{ cacheKey: groupCacheKeys.mine,userId,payload: stillMine,fetchedAtMs });
+        publishedGeneration = getCompetitionCacheGeneration(userId);
       } catch (caught) {
         error = toGroupApiError(caught);
         catalogs = stillMine.groups.map((group) => ({ groupId: group.group_id, groupName: group.name, exercises: null }));
       }
 
-      if (!isCurrent()) return;
-      setState((previous) => ({
-        ...previous,
-        catalogs,
-        // Retain only presentation metadata in memory after membership loss;
-        // evictGroup still removes server caches and membership stays authoritative.
-        linkedCatalogs: [...new Map([...previous.linkedCatalogs, ...catalogs].map((catalog) => [catalog.groupId, catalog])).values()],
-        lastUpdatedAtMs: fetchedAtMs,
-        hydrated: true,
-        refreshing: false,
-        networkFailed,
-        error,
-      }));
+      if (userRef.current !== userId || getCompetitionCacheGeneration(userId) !== publishedGeneration) return;
+      setState(previous=>refreshedLinkingState(previous,{ userId,generation: publishedGeneration,catalogs,retainedCatalogs,fetchedAtMs,networkFailed,error }));
     })().finally(() => {
       if (inFlightRef.current === run) {
         inFlightRef.current = null;
@@ -294,22 +311,57 @@ export function useGroupExerciseLinking({ userId }: { userId: string | null }): 
   useFocusEffect(
     useCallback(() => {
       void reloadLinks();
-      void refresh();
-    }, [refresh, reloadLinks]),
+      const changed=focusedEpoch.current !== generation;
+      focusedEpoch.current=generation;
+      const current=visibleRef.current;
+      if (current.error?.invalidPayload || current.error?.code === 'UPDATE_REQUIRED') return;
+      if (!changed || current.catalogs === null) void refresh();
+    }, [refresh, reloadLinks,generation]),
   );
 
   return {
-    catalogs: state.catalogs,
-    linkedCatalogs: state.linkedCatalogs,
-    linksReady,
-    linksError,
-    links,
-    hydrated: state.hydrated,
-    refreshing: state.refreshing,
-    offline: userId !== null && (online === false || state.networkFailed),
-    lastUpdatedAtMs: state.lastUpdatedAtMs,
-    error: state.error,
-    refresh,
-    reloadLinks,
+    catalogs: visible.catalogs,
+    linkedCatalogs: visible.linkedCatalogs,
+    linksReady: userRef.current === userId && linksReady,
+    linksError: userRef.current === userId ? linksError : null,
+    links: userRef.current === userId ? links : [],
+    hydrated: visible.hydrated,
+    refreshing: visible.refreshing,
+    offline: userId !== null && (online === false || visible.networkFailed),
+    lastUpdatedAtMs: visible.lastUpdatedAtMs,
+    error: visible.error,refresh,reloadLinks,
   };
+}
+
+function refreshedLinkingState(previous: InternalState,next: { userId: string;generation: number;catalogs: GroupExerciseCatalog[];
+  retainedCatalogs: GroupExerciseCatalog[];fetchedAtMs: number;networkFailed: boolean;error: GroupApiError | null }): InternalState {
+  return { ...previous,identity: `${next.userId}:${next.generation}`,catalogs: next.catalogs,
+    // Names and archive labels remain useful for removing inactive local links.
+    linkedCatalogs: [...new Map([...previous.linkedCatalogs,...next.retainedCatalogs,...next.catalogs].map(catalog=>[catalog.groupId,catalog])).values()],
+    lastUpdatedAtMs: next.fetchedAtMs,hydrated: true,refreshing: false,networkFailed: next.networkFailed,error: next.error };
+}
+
+/** Keep only closed public names/rules/archive labels for removing inactive links.
+ * Capture before a denied catalogue retires disposable group projections. */
+async function readRetainedLinkLabels(userId: string,mine: GroupListMineResult): Promise<GroupExerciseCatalog[]> {
+  try {
+    const database=await bootstrapLocalDataLayer();
+    return mine.groups.flatMap(group=>{
+      const entry=readCachedExercises(database,group.group_id,userId);
+      return entry?[{ groupId: group.group_id,groupName: group.name,exercises: entry.payload.exercises.map(competitionLinkExercise) }]:[];
+    });
+  } catch { return []; }
+}
+
+function linkingHydrationFailure(previous: InternalState,caught: unknown): InternalState {
+  const unsafe=previous.error?.invalidPayload || previous.error?.code==='UPDATE_REQUIRED';
+  return { ...previous,hydrated: true,error: unsafe?previous.error:toGroupApiError(caught) };
+}
+
+function hydratedLinkingState(previous: InternalState,cached: ReturnType<typeof readCachedGroupExerciseCatalogs>): InternalState {
+  // A refresh that already landed is fresher than the cache: keep it.
+  if (!cached || (previous.lastUpdatedAtMs !== null && previous.lastUpdatedAtMs >= cached.fetchedAtMs)) {
+    return { ...previous,hydrated: true };
+  }
+  return { ...previous,hydrated: true,catalogs: cached.catalogs,linkedCatalogs: cached.catalogs,lastUpdatedAtMs: cached.fetchedAtMs };
 }

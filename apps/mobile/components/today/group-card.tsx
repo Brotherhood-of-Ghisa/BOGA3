@@ -9,12 +9,13 @@ import {
   buildLatestActivity,
   buildWeekBoard,
   type GroupSummary,
-  type GroupWeekSummaryResult,
+
   type LatestActivityViewModel,
   type WeekBoardRowViewModel,
   type WeekBoardViewModel,
 } from '@/src/groups';
 
+import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { todayText } from './text-styles';
 
 export type TodayGroupCardProps = {
@@ -26,7 +27,7 @@ export type TodayGroupCardProps = {
   nowMs: number;
   /** The Groups screen on this group (the board, several training now). */
   onOpenGroup: (groupId: string) => void;
-  onOpenSession: (memberUserId: string, sessionId: string) => void;
+  onOpenSession: (memberUserId: string, sessionId: string, groupId: string) => void;
 };
 
 // A board figure: Plex Mono 500 at `sm`, right-aligned in its column.
@@ -264,7 +265,7 @@ export function TodayGroupCard({
         <Text allowFontScaling={false} style={[todayText.microLabel, todayText.microLabelStrong]}>
           Latest activity
         </Text>
-        <LatestActivity activity={activity} onOpenGroup={openGroup} onOpenSession={onOpenSession} />
+        <LatestActivity activity={activity} onOpenGroup={openGroup} onOpenSession={(memberId,sessionId) => onOpenSession(memberId,sessionId,selectedGroupId)} />
       </View>
     </Card>
   );

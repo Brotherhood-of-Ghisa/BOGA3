@@ -34,10 +34,10 @@ service is required.
 - A missing personal reading produces ordinary-looking numeric output through
   the zero fallback. Zero Weight/Volume/1RM renders `0`, not an unavailable
   state, and earns no record treatment.
-- A strict group-derived score may be absent, but group UI uses generic
-  `No eligible 1RM`/empty-board language. It must not reveal or imply a member's
-  missing/invalid reading, value, date, source or history. Raw shared Weight,
-  reps and sets remain readable.
+- Group competition behavior and rendered states are governed by
+  [group-competitions](group-competitions.md): Volume/1RM with explicit units,
+  generic unavailable/ended copy and permitted public context. Normalized
+  session loads and absolute totals are omitted; reps remain readable.
 
 ## Flows and required rendered states
 
@@ -50,7 +50,7 @@ service is required.
 | Log aware set | Mode on + positive contribution → log with and without an applicable reading | Reading participates silently when present; missing uses the personal zero fallback | No warning/incomplete label; zero values remain numeric; raw Top weight stays unchanged |
 | Review history | Change toggle/contribution/reading → revisit records, History, Stats and completion/share | Derived 1RM/Volume reinterpret; raw rows and Top weight do not | Refresh failure keeps prior content plus normal retry; zero creates no record band |
 | Control group calculations | Group admin → toggle on → edit contribution → off/on | Whole group revision rebuilds; contribution survives | Member controls disabled/absent; failed online write retains form; rebuilding shows no mixed revision |
-| Review group result | Open Weight/1RM boards and a shared set with/without member context | Raw Weight remains; eligible 1RM can rank/certify | Generic absent-score state only; no private reading facts or dependency digest anywhere |
+| Review group result | Open Volume/1RM boards and a shared set | Explicit kg or %BW units, safe set context and witness state | Generic unavailable/ended state; no normalized kg, private reading facts or dependency digest |
 
 ## Reference captures
 

@@ -1,5 +1,5 @@
-import { buildGroupMetricPodiums } from '@/src/groups/metric-view-model';
-import type { GroupMetricPodiumWire } from '@/src/groups/metric-wire';
+import { buildCompetitionPodiums as buildGroupMetricPodiums } from '@/src/groups/competition-view-model';
+import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';

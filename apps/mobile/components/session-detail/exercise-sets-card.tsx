@@ -19,6 +19,7 @@ type ExerciseSetsCardBaseProps = {
   // Faded when nothing is done yet.
   countMuted?: boolean;
   rows: SessionViewSetRow[];
+  hideDerivedMetrics?: boolean;
   // The `record` band when the exercise's record set is in this card.
   record: RecordBand | null;
   // Under the header, before the set rows (exercise history's gym, tags and
@@ -52,6 +53,7 @@ export function ExerciseSetsCard({
   count,
   countMuted = false,
   rows,
+  hideDerivedMetrics = false,
   record,
   summary,
   accessory,
@@ -80,6 +82,7 @@ export function ExerciseSetsCard({
             <SetSummaryRow
               key={row.id}
               row={row}
+              hideDerivedMetrics={hideDerivedMetrics}
               testID={rowTestID ? rowTestID(row, index) : `${testID}-set-${index + 1}`}
             />
           ))}

@@ -31,6 +31,8 @@ import {
   type StreamSessionItem,
 } from '@/src/groups';
 
+import { competitionStream,competitionEvent,competitionRow } from './helpers/competition-fixtures';
+
 import { holder, linkItem, recordItem, sessionCardItem, voidedItem } from './helpers/group-record-fixtures';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -429,31 +431,19 @@ describe('board stream items (M25-T10)', () => {
     });
   });
 
-  describe('paging over every kind (card AC2)', () => {
-    it('an old cached first page without board kinds merges with an older page that has them', () => {
-      const oldCached = {
-        items: [sessionCardItem({ key: 'u2:s2', session_id: 's2', sort_at_ms: 9_000 })],
-        next_cursor: { sort_at_ms: 9_000, kind: 'session', key: 'u2:s2' },
-        has_more: true,
-      };
-      const older = {
-        items: [
-          sessionCardItem({ key: 'u2:s2', session_id: 's2', sort_at_ms: 9_000 }),
-          linkItem({ sort_at_ms: 8_000 }),
-          recordItem({ sort_at_ms: 7_000 }),
-          sessionCardItem({ sort_at_ms: 7_000 }),
-        ],
-        cursor: null,
-        hasMore: false,
-      };
-      const merged = mergeStreamPages(oldCached, older);
-      expect(merged.map((item) => `${item.kind}:${item.key}`)).toEqual([
-        'session:u2:s2',
-        'link:ev-link-1',
-        'record:ev-record-1',
-        'session:u2:s1',
-      ]);
-      expect(buildStreamViewModel(merged, 'me').map((model) => model.kind)).toEqual(['session', 'link', 'session', 'record']);
+  describe('competition stream paging', () => {
+    it('deduplicates across opaque cursors and retains server order for event kind ties', () => {
+      const session={ ...competitionStream.items[0],key: 'session-9',sort_at_ms: 9000 };
+      const first={ ...competitionStream,items: [session],next_cursor: 'opaque',has_more: true };
+      const link={ kind: 'competition' as const,key: 'link-8',sort_at_ms: 8000,event: { ...competitionEvent,kind: 'link' as const } };
+      const record={ kind: 'competition' as const,key: 'record-7',sort_at_ms: 7000,event: competitionEvent };
+      const merged=mergeStreamPages(first,{ items: [session,link,record],cursor: null,hasMore: false });
+      expect(merged.map(item=>item.key)).toEqual(['session-9','link-8','record-7']);
+      const tiedFirst={ ...first,items: [{ ...record,sort_at_ms: 8000 } ] };
+      const membership={ kind: 'membership' as const,key: 'member-8',sort_at_ms: 8000,event: 'joined' as const,
+        group: { group_id: 'g1',name: 'Crew' },member: competitionRow.member };
+      expect(mergeStreamPages(tiedFirst,{ items: [link,membership,{ ...session,sort_at_ms: 8000 }],cursor: null,hasMore: false }).map(item=>item.key))
+        .toEqual(['record-7','session-9']);
     });
   });
 });

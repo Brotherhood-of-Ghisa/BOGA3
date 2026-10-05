@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer } from 'react';
 
 import { useAuth } from '@/src/auth';
 import {
-  getGroupWeekSummary,
+
   getLastViewedGroupId,
   groupCacheKeys,
   listMyGroups,
@@ -12,8 +12,10 @@ import {
   type GroupApiError,
   type GroupListMineResult,
   type GroupSummary,
-  type GroupWeekSummaryResult,
+
 } from '@/src/groups';
+import { getCompetitionWeek } from '@/src/groups/api';
+import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
 /** The cached week read, stamped with its window so last week's board never shows as this week's. */
@@ -69,7 +71,7 @@ export function useTodayGroup(now: () => Date = systemNow): TodayGroupState {
   const fetcher = useCallback(
     async (): Promise<TodayGroupWeek> => ({
       windowStartMs,
-      summary: await getGroupWeekSummary({ groupId: selectedGroupId ?? '', windowStartMs, windowEndMs }),
+      summary: await getCompetitionWeek(selectedGroupId ?? '',windowStartMs,windowEndMs),
     }),
     [selectedGroupId, windowStartMs, windowEndMs],
   );

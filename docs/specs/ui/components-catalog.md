@@ -390,7 +390,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `GroupStreamList` — `FlatList` on `groupScreenStyles` with `RefreshControl`, online older-page loading, and an inline `StatePanel` Retry footer; (M25-T10) it renders every stream kind and owns the one certification write state (`useRecordSetCertification`) shared by the inline `Certify` buttons and the row detail sheet
   - `GroupStreamRecordCard` (M25-T10) — a record card under its session card (indented): a `Card` whose `record` band (`-band`) carries the title (`dave — group record` / `— PR`), then the group exercise and its value in bold `record` Plex Mono (`140.0 × 1 · 1RM 142.5`), board `Tag`s, `Session in progress`, the status via `GroupCertificationStatus` (`Not certified yet` / `Certified by …` / `Voided · set …`), and its group where names are shown (Today). A voided card has no band, fades to `ink-faint` and puts its status first (DLM-T11-D2). The summary is one press target (opens the sheet, or on Today the Groups screen via `pressHint`), and an outline `Certify` sits beside it with its inline notice. Without `onCertify` (Today) the card is read-only. testID `group-stream-record-card-<key>` with `-open`, `-band`, `-title`, `-value`, `-provisional`, `-status`, `-group`, `-certify`, `-notice`
   - `GroupStreamSentenceItem` (M25-T10) — a record-removed or link item: a light row with one sentence behind a `rule` hairline, not pressable. testIDs `group-stream-record-removed-<key>` / `group-stream-link-<key>` with `-sentence`
-  - `RecordSetSheet` (M25-T10; a `Sheet` since DLM-T11) — the row detail (E2) shared by record cards and board rows, titled with the lifter and the exercise: the set and 1RM as `record` `Stat`s, then the logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, `Certify` (the sheet's one `accent`), `Remove my certification` / `Cancel certification` as `danger` `ListRow`s (confirmed with `Alert.alert`), and `View full session` as a `ListRow` with a chevron. No Close: the backdrop (`Close set details`) dismisses it (G5). Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-backdrop`, `-header` (the title), `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`
+  - `GroupMetricRecordSheet` (M25-T10; a `Sheet` since DLM-T11) — the row detail (E2) shared by record cards and board rows, titled with the lifter and the exercise: the set and 1RM as `record` `Stat`s, then the logged, date · gym, logged-as, provisional and status lines, the lifter note, the write notice, `Certify` (the sheet's one `accent`), `Remove my certification` / `Cancel certification` as `danger` `ListRow`s (confirmed with `Alert.alert`), and `View full session` as a `ListRow` with a chevron. No Close: the backdrop (`Close set details`) dismisses it (G5). Gym and logged-as come from the `session:<memberId>:<sessionId>` resource. testIDs `group-record-sheet` with `-backdrop`, `-header` (the title), `-value`, `-logged`, `-date`, `-logged-as`, `-provisional`, `-status`, `-lifter-note`, `-notice`, `-certify`, `-withdraw`, `-cancel`, `-view-session`
   - `GroupOfflineBanner` — the `Offline · last updated HH:MM` marker: a neutral `Notice` with the `offline` glyph, live (08 pattern 7)
   - `GroupMemberRow`, `GroupSummaryRow` (design language DLM-T13) — dense `ListRow`s inside one `Card` (`divider` on every row but the first). `GroupMemberRow`: the name (+ "(you)") and the role as a `Tag` (`group-member-role-<userId>`); it takes an optional `onPress` (set only when my role offers actions on that member) and then shows a chevron, the control column staying empty otherwise so the tags align. `GroupSummaryRow`: the name in Archivo 600, the description (two lines) in `ink-muted`, member count · my role as a micro-label, a chevron; the My groups `FlatList` draws the card with `cardListItemStyles`
   - `GroupHeaderCard` (DLM-T13) — the group and Members screens' header: one `Card` with the name in Archivo 700, the description and an optional meta line in `ink-muted`, then its children (the group screen's `Members` `ListRow`)
@@ -403,7 +403,7 @@ Brief entrypoint inventory of the current reusable UI component set.
   - `StandardExercisePicker` (M25-T08) — a micro-label, a `SearchField` and one `Card` of radio `ListRow`s (`radio-on` in `ink` on the pick, no ground change; the weight entry as `meta`) over the bundled standard exercises to copy into a group, and `Showing N of M`
   - `GroupLostAccessState` (M25-T08) — the shared "You're no longer a member of this group" panel
   - `GroupLeaderboardsPage`, `GroupPodiumCard` (M25-T09; design language DLM-T12) — the Groups screen's Leaderboards segment: one link `Card` per group exercise (the name in Archivo 700, the view label as a micro-label, an `Archived` `Tag`, up to three podium rows with rank, value and date in Plex Mono and my row's `You` in bold, the empty label, `You: …`). testIDs `group-leaderboards-page`, `group-leaderboards-empty`, `group-podium-card-<exerciseId>` with `-name`, `-view`, `-archived`, `-row-<rank>`, `-empty`, `-you`
-  - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `RecordSetSheet` and `GroupBoardRow`
+  - `GroupCertificationStatus` — a record's certification state: a check `Icon` in `ink` (certified), a ring in `ink-muted` (not yet) or none (voided) beside its label, no success hue; `size` `body` (cards, sheet) or `meta` (a board row's mark); the label keeps the caller's testID. Used by `GroupStreamRecordCard`, `GroupMetricRecordSheet` and `GroupBoardRow`
   - `GroupBoardRow` (M25-T09; design language DLM-T12) — one full-board row, a dense `ListRow` in the board's one card (`cardListItemStyles` in `screen-styles.ts` draws the card across the `FlatList`'s cells), as a single accessibility element: rank and value in Plex Mono, the member in Source Sans with the 1RM's set below it in `ink-muted`, the date, the certification mark on All; my row on `paper` reading `You` (DLM-T12-D1); (M25-T10) a press target that opens the row detail sheet. testID `group-board-row-<rank>` with `-member`, `-value`, `-detail`, `-date`, `-mark` (the icon `-mark-certified` / `-mark-uncertified`)
   - `GroupBoardHistoryItem` (M25-T09; design language DLM-T12) — one lead change, a row of the history's one card: the date in small Plex Mono, then the sentence in Source Sans. testID `group-board-history-item-<seq>` with `-date`, `-sentence`
   - `GroupPagesFooter` (M25-T09) — the footer of an online paged list: an inline `StatePanel`, loading, or the failure with an outline `Retry` (`<prefix>-loading-more`, `-load-more-error`, `-load-more-retry`)
@@ -672,19 +672,22 @@ The logger's fixed-height amount field uses `Weight · kg`; its accessibility
 label says Weight in kilograms. The figure and label remain legible at 375pt.
 
 
-### Optional group bodyweight controls
+### Group competition controls
 
-- Group Settings composes the admin-only `Bodyweight calculations` toggle with
-  existing online-write and expected-revision feedback.
-- `GroupComparisonForm` conditionally adds one group
-  `Bodyweight contribution (%)` field, preserves it while hidden, and retains
-  stale edits. Apply remains the one primary action; Reload is outline.
-- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` reuse the
-  existing Weight/1RM kg recipes. Strict absent scores use generic copy; record
-  detail never receives private reading/provenance/dependency props.
-- `metric-view-model.ts` owns Weight/1RM labels, revision and generic eligibility
-  summaries. Wire guards will fail closed if a group payload contains a private
-  reading value/date/id or dependency digest.
+- Group Settings has an admin-only `Bodyweight calculations` toggle. Positive
+  active comparisons require an impact review before Apply; c=0 toggles keep
+  score revisions. Typed inputs survive policy refresh and failed writes.
+- `GroupComparisonForm` preserves Off contribution, reviews effective rule
+  changes and retains stale edits; its owning route keeps the draft across
+  cache retirement. Members read the same standard in catalogue/linking rows.
+- `GroupMetricBoard`, `GroupMetricHistory` and `GroupMetricRecordSheet` retain the
+  group recipes with Volume/1RM, Certified/All and explicit kg/%BW units.
+  Historical units remain original; retired Scores are unavailable.
+- `competition-view-model.ts` and the safe session/stream models consume closed
+  protocol-4 data. Normalized cards omit weight/absolute metrics; full sessions
+  omit aggregate volume. Generic unavailable/ended copy reveals no private cause.
+- Saved native certification confirmations recheck the account, target, online
+  and read-only state; uncertainty requires review before another write.
 
 ### Data and sync status
 

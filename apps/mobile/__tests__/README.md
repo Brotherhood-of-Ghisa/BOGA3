@@ -152,9 +152,10 @@ reading never creates an unavailable state.
 `groups-metric-evaluation.test.ts` must cover independent group preference and
 contribution, raw Weight, strict 1RM/Volume, kg total/per-side input, missing or
 invalid reading omission, performed eligibility and zero ranking exclusion.
-Mode-mismatch vectors must keep Weight raw, derive source-mode 1RM before target
-conversion, leave Volume target-unconverted and rebuild after either mode
-changes. Off/zero vectors must prove no private-reading lookup or invalidation;
+Retained protocol-3 mode-mismatch vectors keep Weight raw, derive source-mode
+1RM before target conversion, and leave legacy aggregate Volume unconverted.
+Current protocol-4 vectors convert ordinary single-set Volume/1RM to the target
+and use physical total load for normalized percentages; mode changes rebuild. Off/zero vectors must prove no private-reading lookup or invalidation;
 positive+missing must rebuild when a first applicable reading arrives. Personal
 preference/contribution must never affect group results.
 
@@ -165,7 +166,8 @@ are evicted. Session metric tests must prove raw activity survives an absent
 derived score.
 
 `groups-comparison-form.test.tsx` must cover admin/member control, off/on persistence
-and stale edits. Screen tests must cover Weight/1RM scope switching, rebuilding,
+and stale edits. Retained protocol-3 screen assertions preserve historical Weight units. Current
+competition screen tests cover Volume/1RM scope switching, rebuilding,
 generic absent-score copy, certification invalidation and offline reopen without
 private context. These do not replace three-size rendering or two-user device proof.
 
@@ -189,5 +191,10 @@ The backend competition fixture performs a populated prior-schema upgrade and
 local activation, tests both-metric selected-reading corrections, exact witness
 audit, legacy aliases, frozen membership catch-up, paired-reader privacy and
 publication failure/fence behavior. It restores pending state on exit. These do
-not replace the retained protocol-3 assertions; compatible UI and authorized
-hosted activation remain separate release work.
+not replace the retained protocol-3 assertions; current safe UI tests cover explicit units, normalized details/full sessions,
+account and generation races, unknown disclosure retirement, SQL cleanup failure,
+positive/c=0 rule review, decimal name-only saves and saved confirmation guards.
+`groups-competition-api-live.test.ts` runs every safe client RPC against activated
+local protocol 4 inside `groups-api-live`; the wrapper restores initially pending
+state. Three-size runtime rendering, integrated human acceptance and authorized
+hosted activation remain separate evidence requirements.

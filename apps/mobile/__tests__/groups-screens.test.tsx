@@ -47,11 +47,10 @@ jest.mock('@/src/groups/api', () => {
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
-  getGroupStream: streamRead,
-  getGroupMetricStream: streamRead,
-  getGroupSessionDetail: jest.fn(),
-  listGroupExercises: jest.fn(),
-  getGroupMetricPodiums: jest.fn(),
+  getCompetitionStream: streamRead,
+  getCompetitionSession: jest.fn(),
+  listCompetitionExercises: jest.fn(),
+  getCompetitionPodiums: jest.fn(),
   };
 });
 
@@ -65,13 +64,10 @@ import {
   setLastViewedGroupId,
   writeGroupCache,
   type GroupGetResult,
-  type GroupSessionDetailResult,
-  type GroupStreamResult,
   type GroupSummary,
-  type StreamItem,
-  type StreamMembershipItem,
   type StreamSessionItem,
 } from '@/src/groups';
+import type { CompetitionStreamWire as GroupStreamResult,CompetitionStreamItemWire as StreamItem,CompetitionSessionDetailWire as GroupSessionDetailResult } from '@/src/groups/competition-wire';
 import * as groupsApi from '@/src/groups/api';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
@@ -91,7 +87,8 @@ const T0 = new Date(2026, 8, 11, 9, 5).getTime();
 const GROUP_A: GroupSummary = { group_id: 'group-a', name: 'Garage Gym', description: 'Early crew', member_count: 3, my_role: 'owner', bodyweight_calculations_enabled: false };
 const GROUP_B: GroupSummary = { group_id: 'group-b', name: 'Lunch Lifters', description: null, member_count: 2, my_role: 'member', bodyweight_calculations_enabled: false };
 
-const completedItem = (overrides: Partial<StreamSessionItem> = {}): StreamSessionItem => ({
+const completedItem = (overrides: Partial<StreamSessionItem> = {}): Extract<StreamItem,{ kind: 'session' }> => {
+  const raw: StreamSessionItem={
   kind: 'session',
   key: 'friend-1:s-1',
   sort_at_ms: T0,
@@ -122,8 +119,10 @@ const completedItem = (overrides: Partial<StreamSessionItem> = {}): StreamSessio
       sets: [{ set_id: 'r-1', order_index: 0, weight_value: '60', reps_value: '10', set_type: 'warm_up', performance_status: null }],
     },
   ],
-  ...overrides,
-});
+  ...overrides };
+  const { kind,key,sort_at_ms,groups,...session }=raw;
+  return { kind,key,sort_at_ms,groups,session: { ...session,exercises: session.exercises.map(exercise=>({ ...exercise,visibility: 'ordinary',exercise_definition_id: null,load_input_mode: 'total_load' })) } };
+};
 
 const liveItem = completedItem({
   key: 'friend-2:s-2',
@@ -137,17 +136,17 @@ const liveItem = completedItem({
   duration_sec: null,
 });
 
-const joinedItem: StreamMembershipItem = {
+const joinedItem: Extract<StreamItem,{ kind: 'membership' }> = {
   kind: 'membership',
   key: 'm-1:joined',
   sort_at_ms: T0 - 60_000,
   event: 'joined',
-  group: { group_id: 'group-b', name: 'Lunch Lifters' },
+  group: { group_id: 'group-a', name: 'Garage Gym' },
   member: { user_id: 'friend-3', username: null },
 };
 
 const page = (items: StreamItem[], overrides: Partial<GroupStreamResult> = {}): GroupStreamResult => ({
-  items,
+  contract_version: 4,items,
   next_cursor: null,
   has_more: false,
   ...overrides,
@@ -164,7 +163,7 @@ const GROUP_A_DETAIL: GroupGetResult = {
 };
 
 const sessionDetail = (overrides: Partial<GroupSessionDetailResult['session']> = {}): GroupSessionDetailResult => ({
-  session: {
+  contract_version: 4,group_id: 'group-a',session: {
     member: { user_id: 'friend-1', username: 'alex' },
     session_id: 's-1',
     gym_name: 'Iron Temple',
@@ -174,7 +173,7 @@ const sessionDetail = (overrides: Partial<GroupSessionDetailResult['session']> =
     duration_sec: 3900,
     exercises: [
       {
-        session_exercise_id: 'ex-1',
+        session_exercise_id: 'ex-1',visibility: 'ordinary',exercise_definition_id: null,load_input_mode: 'total_load',
         name: 'Bench Press',
         machine_name: 'Flat bench',
         order_index: 0,
@@ -220,11 +219,11 @@ beforeEach(() => {
   setLastViewedGroupId(null);
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
   api.listMyGroups.mockResolvedValue({ groups: [GROUP_A, GROUP_B] });
-  api.getGroupStream.mockResolvedValue(page([]));
+  api.getCompetitionStream.mockResolvedValue(page([]));
   api.getGroup.mockResolvedValue(GROUP_A_DETAIL);
-  api.getGroupSessionDetail.mockResolvedValue(sessionDetail());
-  api.listGroupExercises.mockResolvedValue({ contract_version: 3, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listGroupExercises>>);
-  api.getGroupMetricPodiums.mockResolvedValue({ contract_version: 3, exercises: [] } as unknown as Awaited<ReturnType<typeof api.getGroupMetricPodiums>>);
+  api.getCompetitionSession.mockResolvedValue(sessionDetail());
+  api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listCompetitionExercises>>);
+  api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: true,podiums: [] });
 });
 
 afterEach(() => {
@@ -251,7 +250,7 @@ describe('Groups tab', () => {
     expect(screen.getByText('Groups need an account, and sign-in is not available in this build.')).toBeTruthy();
     expect(screen.queryByTestId('groups-sign-in-button')).toBeNull();
     expect(api.listMyGroups).not.toHaveBeenCalled();
-    expect(api.getGroupStream).not.toHaveBeenCalled();
+    expect(api.getCompetitionStream).not.toHaveBeenCalled();
   });
 
   it('shows the explanatory empty state when the user has no groups', async () => {
@@ -261,21 +260,21 @@ describe('Groups tab', () => {
     expect(screen.getByText('No groups yet')).toBeTruthy();
     expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
     // No group selected: the stream reads nothing (there is no all-groups stream).
-    expect(api.getGroupStream).not.toHaveBeenCalled();
+    expect(api.getCompetitionStream).not.toHaveBeenCalled();
   });
 
   it("renders the first group's cached stream at once, then newest-first cards", async () => {
     seed(groupCacheKeys.mine, { groups: [GROUP_A, GROUP_B] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
     const fresh = deferred<GroupStreamResult>();
-    api.getGroupStream.mockReturnValue(fresh.promise);
+    api.getCompetitionStream.mockReturnValue(fresh.promise);
 
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
     expect(screen.queryByTestId(cardID('friend-2:s-2'))).toBeNull();
 
     await act(async () => {
-      fresh.resolve(page([liveItem, completedItem(), joinedItem]));
+      fresh.resolve(page([{ ...liveItem,groups: [{ group_id: 'group-a',name: 'Garage Gym' }] },completedItem(),joinedItem]));
     });
     await screen.findByTestId(cardID('friend-2:s-2'));
 
@@ -289,15 +288,15 @@ describe('Groups tab', () => {
     expect(completed.getByText('Completed · 1h 5m')).toBeTruthy();
     expect(completed.getByText('9/11 09:05 · Iron Temple')).toBeTruthy();
     // The 60 × 10 warm-up adds no set, no volume and, alone on its exercise, no exercise.
-    expect(completed.getByText('2 sets · 1013 kg · 1 exercise')).toBeTruthy();
+    expect(completed.getByText('2 sets · 1 exercise')).toBeTruthy();
     // One group's stream does not repeat the group name on each card.
     expect(completed.queryByText('Garage Gym')).toBeNull();
     expect(within(screen.getByTestId(cardID('friend-2:s-2'))).getByText('Training now')).toBeTruthy();
     expect(screen.getByText('Unnamed member joined')).toBeTruthy();
-    expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: 'group-a' });
+    expect(api.getCompetitionStream).toHaveBeenCalledWith('group-a');
 
     fireEvent.press(screen.getByTestId(cardID('friend-1:s-1')));
-    expect(mockPush).toHaveBeenLastCalledWith('/group-session/friend-1/s-1');
+    expect(mockPush).toHaveBeenLastCalledWith('/group-session/friend-1/s-1?groupId=group-a');
     // Already on this group: membership items do not navigate.
     fireEvent.press(screen.getByTestId('group-stream-membership-m-1:joined'));
     expect(mockPush).toHaveBeenCalledTimes(1);
@@ -306,7 +305,7 @@ describe('Groups tab', () => {
   });
 
   it('always shows one group: chips switch it, and there is no All chip', async () => {
-    api.getGroupStream.mockImplementation(async ({ groupId }) =>
+    api.getCompetitionStream.mockImplementation(async (groupId) =>
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
@@ -317,22 +316,22 @@ describe('Groups tab', () => {
     fireEvent.press(screen.getByTestId('groups-stream-filter-group-b'));
     await waitFor(() => expect(screen.queryByTestId(cardID('friend-1:s-1'))).toBeNull());
     await screen.findByTestId(cardID('friend-2:s-2'));
-    expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: 'group-b' });
+    expect(api.getCompetitionStream).toHaveBeenCalledWith('group-b');
   });
 
   it('opens on the group named by ?groupId=', async () => {
     mockParams = { groupId: 'group-b' };
-    api.getGroupStream.mockImplementation(async ({ groupId }) =>
+    api.getCompetitionStream.mockImplementation(async (groupId) =>
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(screen.getByTestId('groups-stream-filter-group-b').props.accessibilityState).toEqual({ selected: true });
-    expect(api.getGroupStream).not.toHaveBeenCalledWith({ groupId: 'group-a' });
+    expect(api.getCompetitionStream).not.toHaveBeenCalledWith('group-a');
   });
 
   it('a new ?groupId= link selects that group and opens its Stream', async () => {
-    api.getGroupStream.mockImplementation(async ({ groupId }) =>
+    api.getCompetitionStream.mockImplementation(async (groupId) =>
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
@@ -346,7 +345,7 @@ describe('Groups tab', () => {
   });
 
   it('reopens on the group last viewed', async () => {
-    api.getGroupStream.mockImplementation(async ({ groupId }) =>
+    api.getCompetitionStream.mockImplementation(async (groupId) =>
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     const first = render(<GroupsTabRoute />);
@@ -361,7 +360,7 @@ describe('Groups tab', () => {
   });
 
   it("shares its selection with Today's group card: a later pick there wins over an earlier chip here", async () => {
-    api.getGroupStream.mockImplementation(async ({ groupId }) =>
+    api.getCompetitionStream.mockImplementation(async (groupId) =>
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
@@ -380,22 +379,22 @@ describe('Groups tab', () => {
   it("switches to the selected group's leaderboards", async () => {
     render(<GroupsTabRoute />);
     await screen.findByTestId('groups-segment-leaderboards');
-    expect(api.getGroupMetricPodiums).not.toHaveBeenCalled();
+    expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('groups-segment-leaderboards'));
     expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
-    expect(api.getGroupMetricPodiums).toHaveBeenCalledWith('group-a');
+    expect(api.getCompetitionPodiums).toHaveBeenCalledWith('group-a');
   });
 
   it('pull-to-refresh refetches My groups and the stream', async () => {
-    api.getGroupStream.mockResolvedValue(page([completedItem()]));
+    api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
     render(<GroupsTabRoute />);
     await screen.findByTestId(cardID('friend-1:s-1'));
     await waitFor(() => expect(api.listMyGroups).toHaveBeenCalledTimes(1));
-    const streamCalls = api.getGroupStream.mock.calls.length;
+    const streamCalls = api.getCompetitionStream.mock.calls.length;
 
     await pullToRefresh('groups-stream-list');
-    await waitFor(() => expect(api.getGroupStream.mock.calls.length).toBe(streamCalls + 1));
+    await waitFor(() => expect(api.getCompetitionStream.mock.calls.length).toBe(streamCalls + 1));
     expect(api.listMyGroups).toHaveBeenCalledTimes(2);
   });
 
@@ -403,7 +402,7 @@ describe('Groups tab', () => {
     seed(groupCacheKeys.mine, { groups: [GROUP_A] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
     api.listMyGroups.mockRejectedValue(networkError());
-    api.getGroupStream.mockRejectedValue(networkError());
+    api.getCompetitionStream.mockRejectedValue(networkError());
 
     render(<GroupsTabRoute />);
     expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
@@ -413,7 +412,7 @@ describe('Groups tab', () => {
 
   it('shows the offline empty state when offline with nothing cached', async () => {
     api.listMyGroups.mockRejectedValue(networkError());
-    api.getGroupStream.mockRejectedValue(networkError());
+    api.getCompetitionStream.mockRejectedValue(networkError());
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-offline-empty-state')).toBeTruthy();
     expect(screen.getByText('Offline')).toBeTruthy();
@@ -421,29 +420,30 @@ describe('Groups tab', () => {
 
   it('shows an error with Retry on a non-network failure, and Retry loads the stream', async () => {
     api.listMyGroups.mockRejectedValue(new GroupApiError('INTERNAL', 'Groups are unavailable in this build.'));
-    api.getGroupStream.mockRejectedValue(new GroupApiError('INTERNAL', 'Groups are unavailable in this build.'));
+    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'Groups are unavailable in this build.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-error-state')).toBeTruthy();
     expect(screen.getByText('Groups are unavailable in this build.')).toBeTruthy();
 
     api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
-    api.getGroupStream.mockResolvedValue(page([completedItem()]));
+    api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
     fireEvent.press(screen.getByTestId('groups-error-state-retry'));
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
   });
 
   it('shows the error inline, above cached cards, when data is already on screen', async () => {
+    seed(groupCacheKeys.mine,{ groups: [GROUP_A,GROUP_B] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
-    api.getGroupStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_stream returned an unexpected payload.'));
+    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_stream returned an unexpected payload.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-inline-error')).toBeTruthy();
     expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
   });
 
   it('loads older pages online at the end of the list (infinite scroll)', async () => {
-    const cursor = { sort_at_ms: liveItem.sort_at_ms, kind: 'session' as const, key: liveItem.key };
-    api.getGroupStream.mockImplementation(async ({ before }) =>
-      before ? page([completedItem()]) : page([liveItem], { has_more: true, next_cursor: cursor }),
+    const cursor='opaque-server-cursor';
+    api.getCompetitionStream.mockImplementation(async (_groupId,before) =>
+      before ? page([completedItem()]) : page([{ ...liveItem,groups: [{ group_id: 'group-a',name: 'Garage Gym' }] }], { has_more: true, next_cursor: cursor }),
     );
     render(<GroupsTabRoute />);
     await screen.findByTestId(cardID('friend-2:s-2'));
@@ -452,7 +452,7 @@ describe('Groups tab', () => {
       fireEvent(screen.getByTestId('groups-stream-list'), 'onEndReached');
     });
     expect(await screen.findByTestId(cardID('friend-1:s-1'))).toBeTruthy();
-    expect(api.getGroupStream).toHaveBeenCalledWith({ groupId: 'group-a', before: cursor });
+    expect(api.getCompetitionStream).toHaveBeenCalledWith('group-a',cursor);
   });
 });
 
@@ -460,7 +460,7 @@ describe('mergeStreamPages', () => {
   const older = { items: [completedItem(), joinedItem], cursor: null, hasMore: false };
 
   it('keeps only older items after the refreshed first page boundary, deduplicated by key', () => {
-    const boundary = { sort_at_ms: T0, kind: 'session' as const, key: 'friend-1:s-1' };
+    const boundary='opaque-boundary';
     const first = page([liveItem, completedItem()], { has_more: true, next_cursor: boundary });
     expect(mergeStreamPages(first, older).map((item) => item.key)).toEqual(['friend-2:s-2', 'friend-1:s-1', 'm-1:joined']);
   });
@@ -507,8 +507,8 @@ describe('Group screen', () => {
     expect(screen.getByText('Early crew')).toBeTruthy();
     expect(screen.getByText("3 members · You're the owner")).toBeTruthy();
     expect(screen.getByTestId('group-screen-exercises-title')).toBeTruthy();
-    await waitFor(() => expect(api.listGroupExercises).toHaveBeenCalledWith('group-a'));
-    expect(api.getGroupStream).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.listCompetitionExercises).toHaveBeenCalledWith('group-a'));
+    expect(api.getCompetitionStream).not.toHaveBeenCalled();
     expect(screen.queryByTestId('group-screen-segment-row')).toBeNull();
     // D14: members live behind the header member count.
     fireEvent.press(screen.getByTestId('group-screen-members-link'));
@@ -528,9 +528,9 @@ describe('Group screen', () => {
   it("shows \"You're no longer a member\" after removal, hiding and evicting cached data (C3.6.8)", async () => {
     seed(groupCacheKeys.group('group-a'), GROUP_A_DETAIL);
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
-    seed(groupCacheKeys.session('friend-1', 's-1'), sessionDetail());
+    seed(groupCacheKeys.session('group-a','friend-1', 's-1'), sessionDetail());
     api.getGroup.mockRejectedValue(notFound());
-    api.listGroupExercises.mockRejectedValue(notFound());
+    api.listCompetitionExercises.mockRejectedValue(notFound());
 
     render(<GroupScreenRoute />);
     expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
@@ -539,7 +539,7 @@ describe('Group screen', () => {
     expect(screen.queryByTestId(cardID('friend-1:s-1'))).toBeNull();
     await waitFor(() => expect(cached(groupCacheKeys.group('group-a'))).toBeNull());
     expect(cached(groupCacheKeys.stream('group-a'))).toBeNull();
-    expect(cached(groupCacheKeys.session('friend-1', 's-1'))).toBeNull();
+    expect(cached(groupCacheKeys.session('group-a','friend-1', 's-1'))).toBeNull();
   });
 });
 
@@ -552,7 +552,7 @@ describe("Friend's session view", () => {
   ];
 
   beforeEach(() => {
-    mockParams = { memberId: 'friend-1', sessionId: 's-1' };
+    mockParams = { groupId: 'group-a',memberId: 'friend-1',sessionId: 's-1' };
   });
 
   it('renders exercises with performed sets (weight × reps, effort, 1RM, volume) and no owner actions (AC6)', async () => {
@@ -575,7 +575,7 @@ describe("Friend's session view", () => {
     expect(screen.getByText('alex')).toBeTruthy();
     expect(screen.getByText('Completed · 1h 5m')).toBeTruthy();
     expect(screen.getByText('2026-09-11 09:05')).toBeTruthy();
-    expect(api.getGroupSessionDetail).toHaveBeenCalledWith('friend-1', 's-1');
+    expect(api.getCompetitionSession).toHaveBeenCalledWith('group-a','friend-1','s-1');
 
     for (const testID of OWNER_ACTION_TEST_IDS) {
       expect(screen.queryByTestId(testID)).toBeNull();
@@ -585,8 +585,19 @@ describe("Friend's session view", () => {
     }
   });
 
+  it('normalized sessions show reps and effort without kg, 1RM, Volume or absolute totals',async()=>{
+    const safe=sessionDetail();
+    api.getCompetitionSession.mockResolvedValue({ ...safe,session: { ...safe.session,exercises: safe.session.exercises.map(exercise=>({
+      ...exercise,visibility: 'normalized',sets: exercise.sets.map(set=>({ set_id: set.set_id,order_index: set.order_index,reps_value: set.reps_value,set_type: set.set_type,performance_status: set.performance_status })) })) } });
+    render(<GroupSessionRoute />);
+    expect(await screen.findByTestId('group-session-set-row-set-2')).toHaveTextContent(/5 reps/);
+    expect(screen.getByTestId('group-session-set-row-set-2')).toHaveTextContent(/RIR 1/);
+    expect(screen.queryByText(/102.5|110.0|kg|1RM|Vol /)).toBeNull();
+    expect(screen.queryByTestId('group-session-volume')).toBeNull();
+  });
+
   it('shows "In progress" for an active session, and pull-to-refresh updates it', async () => {
-    api.getGroupSessionDetail
+    api.getCompetitionSession
       .mockResolvedValueOnce(sessionDetail({ status: 'active', completed_at_ms: null, duration_sec: null }))
       .mockResolvedValue(sessionDetail());
     render(<GroupSessionRoute />);
@@ -599,17 +610,17 @@ describe("Friend's session view", () => {
   });
 
   it('shows "This session is no longer available" on NOT_FOUND and evicts the cached detail', async () => {
-    seed(groupCacheKeys.session('friend-1', 's-1'), sessionDetail());
-    api.getGroupSessionDetail.mockRejectedValue(new GroupApiError('NOT_FOUND', 'session not found'));
+    seed(groupCacheKeys.session('group-a','friend-1', 's-1'), sessionDetail());
+    api.getCompetitionSession.mockRejectedValue(new GroupApiError('NOT_FOUND', 'session not found'));
     render(<GroupSessionRoute />);
     expect(await screen.findByTestId('group-session-unavailable')).toBeTruthy();
     expect(screen.queryByText('Bench Press')).toBeNull();
-    await waitFor(() => expect(cached(groupCacheKeys.session('friend-1', 's-1'))).toBeNull());
+    await waitFor(() => expect(cached(groupCacheKeys.session('group-a','friend-1', 's-1'))).toBeNull());
   });
 
   it('shows the cached detail under the offline marker when offline', async () => {
-    seed(groupCacheKeys.session('friend-1', 's-1'), sessionDetail());
-    api.getGroupSessionDetail.mockRejectedValue(networkError());
+    seed(groupCacheKeys.session('group-a','friend-1', 's-1'), sessionDetail());
+    api.getCompetitionSession.mockRejectedValue(networkError());
     render(<GroupSessionRoute />);
     expect(await screen.findByText('Offline · last updated 09:05')).toBeTruthy();
     expect(screen.getByText('Bench Press')).toBeTruthy();
