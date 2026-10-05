@@ -1,737 +1,237 @@
 # RUNBOOK
 
-## Purpose
+Human-operator guide for local development: the iOS Simulator loop, development
+database accounts, local Supabase, logs, and tests. Run commands from the repo
+root unless a section says otherwise. Every `./boga test|db|ios|env` command
+needs this worktree's slot lease — `./boga worktree start` first.
 
-Human-operator guide for local development, runtime operations, logs, and tests across the mobile frontend, Maestro E2E runtime, and Supabase backend.
+Load one of these instead when that is your task:
 
-## Scope and conventions
+| If you are… | Load |
+| --- | --- |
+| running the app on an Android emulator | `docs/runbook-android-emulator.md` |
+| running a development build on a physical iPhone (LAN, Tailscale, tunnel) | `docs/runbook-physical-iphone.md` |
+| operating a **hosted** Supabase project — reset, function deploys, release cutover | `docs/runbook-hosted-operations.md` |
 
-- Run commands from repo root unless a section says otherwise.
-- This runbook is for local development/runtime only.
-- Authoritative Maestro runtime contract still lives in `docs/specs/11-maestro-runtime-and-testing-conventions.md`.
+Machine prerequisites, worktree open/release, and per-worktree dependency
+isolation live in `docs/specs/01-worktree-and-environment.md`; `./boga doctor`
+checks this machine's capability and a FAIL is a bootstrap gap, not a skip. The
+Maestro runtime contract is
+`docs/specs/11-maestro-runtime-and-testing-conventions.md`.
 
-## Table of contents
+## Preflight gotchas
 
-- [Prerequisites](#prerequisites)
-- [Worktree setup and isolation](#worktree-setup-and-isolation)
-- [Quick start (full local stack)](#quick-start-full-local-stack)
-- [Run the app on the iOS Simulator](#run-the-app-on-the-ios-simulator)
-  - [Fast JS loop (Expo)](#fast-js-loop-expo)
-  - [Dev-client loop (matches Maestro runtime)](#dev-client-loop-matches-maestro-runtime)
-  - [Wipe the app completely on the Simulator](#wipe-the-app-completely-on-the-simulator)
-  - [Automated uninstall/reinstall via smoke lane](#automated-uninstallreinstall-via-smoke-lane)
-- [Run the app on the Android Emulator](#run-the-app-on-the-android-emulator)
-  - [Prerequisites (Android)](#prerequisites-android)
-  - [Dev-client loop (matches native runtime)](#dev-client-loop-matches-native-runtime)
-  - [Wipe the app on the Android Emulator](#wipe-the-app-on-the-android-emulator)
-- [Run a development build on a physical iPhone](#run-a-development-build-on-a-physical-iphone)
-  - [One-stop: dev-lan.sh](#one-stop-dev-lansh)
-  - [Outside the LAN (Tailscale): dev-remote.sh](#outside-the-lan-tailscale-dev-remotesh)
-  - [Make local Supabase reachable from the phone](#make-local-supabase-reachable-from-the-phone)
-  - [Manual steps (env + Metro)](#manual-steps-env--metro)
-  - [Point the app at hosted Supabase instead](#point-the-app-at-hosted-supabase-instead)
-- [Troubleshooting: running on a physical phone](#troubleshooting-running-on-a-physical-phone)
-  - [Phone cannot reach Expo or Metro (use --tunnel)](#phone-cannot-reach-expo-or-metro-use---tunnel)
-  - [Phone cannot reach Supabase](#phone-cannot-reach-supabase)
-- [Log into a development database](#log-into-a-development-database)
-  - [Account inventory](#account-inventory)
-  - [Provision the dev accounts](#provision-the-dev-accounts)
-  - [Sign in](#sign-in)
-- [Supabase: run locally and reset](#supabase-run-locally-and-reset)
-- [MCP Virtual Coach](#mcp-virtual-coach)
-- [Upgrading from v1 sync (one-time wipe)](#upgrading-from-v1-sync-one-time-wipe)
-- [Logs](#logs)
-- [Tests](#tests)
-
-## Prerequisites
-
-- Node.js + npm
-- Xcode + iOS Simulator (`xcrun simctl`)
-- CocoaPods (`pod`)
-- Maestro CLI (`maestro`) plus a Java runtime
-- Docker (for local Supabase stack)
-- `jq` (required by backend contract test scripts)
-
-On macOS, prefer **Docker Desktop** for this repo when it is installed. If both
-Docker Desktop and Colima are present, check the active context before starting
-local Supabase:
-
-```bash
-docker context ls
-docker context use desktop-linux   # preferred for BOGA local Supabase
-```
-
-Using the Colima context can make Supabase CLI fail while starting optional
-service containers that mount the host Docker socket. See
-[Colima on macOS preflight](#colima-on-macos-preflight) for the symptom and
-workaround.
-
-If Java is installed through Homebrew OpenJDK and Maestro cannot locate it, run Maestro/E2E commands with:
-
-```bash
-PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk" <command>
-```
-
-## Worktree setup and isolation
-
-The worktree lifecycle — open (`./boga worktree create` / `start`), PR opened
-(`./boga db down`, optionally `./boga pr wait`), and merged (`./boga worktree release`) — is
-in `docs/specs/01-worktree-and-environment.md`. The slot-lease and isolation
-contract is `docs/specs/12-worktree-config-and-isolation.md`; clearing leftovers
-from dead sessions is `docs/procedures/worktree-cleanup.md`.
-
-Operator rules:
-
-- never create a BOGA worktree under another BOGA checkout (it must live outside it);
-- run `cd apps/mobile && npm install` in each worktree;
-- do not symlink `apps/mobile/node_modules` between worktrees;
-- use a unique iOS simulator target per concurrent worktree.
-
-## Quick start (full local stack)
-
-New-worktree setup (create → install deps → boot local Supabase) is the
-ordered sequence in `docs/specs/01-worktree-and-environment.md`. To run the app on
-a simulator afterward, see **Run the app on the iOS Simulator** below; to run on a
-physical iPhone, see **Run a development build on a physical iPhone**.
+- **macOS Docker context.** Prefer Docker Desktop. With both Docker Desktop and
+  Colima installed, the active context decides which daemon the Supabase CLI
+  uses — check `docker context ls` and run `docker context use desktop-linux`
+  before starting local Supabase. On the Colima context the full stack fails
+  when optional services bind-mount the Colima Docker socket
+  (`mkdir …/docker.sock: operation not supported`); see
+  [Colima fallback](#colima-fallback).
+- **CocoaPods** (`pod`) must be installed for iOS builds — `./boga doctor` does
+  not check it. `jq` is required by the backend contract test scripts.
+- **Maestro cannot find Java** (Homebrew OpenJDK): prefix the command with
+  `PATH="/opt/homebrew/opt/openjdk/bin:$HOME/.maestro/bin:$PATH" JAVA_HOME="/opt/homebrew/opt/openjdk"`.
+- Use a **unique iOS simulator target per concurrent worktree**.
 
 ## Run the app on the iOS Simulator
 
-### Fast JS loop (Expo)
-
 ```bash
-cd apps/mobile
-npx expo start
+cd apps/mobile && npx expo start        # fast JS loop
 ```
 
-### Dev-client loop (matches Maestro runtime)
+Dev-client loop (what the Maestro lanes run):
 
 ```bash
-cd apps/mobile
-./scripts/maestro-ios-dev-client-build.sh
-npm run start:ios:dev-client
+./boga ios build-client   # add --force after a native dependency or config-plugin change
+./boga ios start
 ```
 
-After native dependency or config-plugin changes, rebuild the dev client before retesting on simulator/device:
+- **App quits instantly on iOS 27** and the crash report names
+  `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`: the installed
+  binary predates `ios.enableSceneSupport` in `expo-build-properties`
+  (`apps/mobile/app.config.ts`), so it has no scene manifest and iOS stops it
+  before JavaScript starts. Rebuild and reinstall the dev client from the
+  current checkout — reloading Metro cannot repair that binary.
+- **GPS/location flows:** pick a location first — Simulator → Features →
+  Location → anything other than None.
 
-```bash
-cd apps/mobile
-./scripts/maestro-ios-dev-client-build.sh --force
-```
+### Wipe the app on the Simulator
 
-If Boga quits immediately on iOS 27 and the crash report names
-`UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`, rebuild the
-development client from the current checkout and reinstall it. SDK 57 builds
-must enable `ios.enableSceneSupport` in `expo-build-properties` (configured in
-`apps/mobile/app.config.ts`); the old shared binary has no scene manifest and
-iOS stops it before JavaScript starts. Reloading Metro cannot repair that binary.
-
-For GPS/location flows on iOS Simulator, choose a simulated location before testing:
-Simulator -> Features -> Location -> any option other than None.
-
-### Wipe the app completely on the Simulator
-
-Wiping clears the device-local SQLite (at `Library/LocalDatabase/<db>.db`) and all
-app state. This is also the required step when **upgrading from v1 sync** — see
-[Upgrading from v1 sync (one-time wipe)](#upgrading-from-v1-sync-one-time-wipe).
-Pick the scope you need.
-
-**App only** — drops just the BOGA3 sandbox (local DB + state), leaves everything else:
-
-- GUI: long-press the BOGA3 icon on the home screen until icons jiggle, then
-  tap the `×` (or `Remove App` → `Delete App`).
-- CLI:
-
-  ```bash
-  APP_PATH="$(cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --print-app-path)"
-  BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw -o - "$APP_PATH/Info.plist")"
-  xcrun simctl uninstall booted "$BUNDLE_ID"
-  ```
-
-**Whole simulator** — the heavy hammer; erases every app, login, photo, and saved state:
-
-- GUI: in the Simulator menu, `Device` → `Erase All Content and Settings…` against
-  the booted simulator, then confirm.
-- CLI (the device must be shut down before it can be erased):
-
-  ```bash
-  UDID="$(xcrun simctl list devices booted | grep -Eo '[0-9A-Fa-f-]{36}' | head -1)"
-  xcrun simctl shutdown "$UDID"
-  xcrun simctl erase "$UDID"
-  xcrun simctl boot "$UDID"
-  ```
-
-After either wipe, reinstall the built dev client and launch it:
+Wiping clears the device-local SQLite (`Library/LocalDatabase/<db>.db`) and all
+app state. **App only** — long-press the icon until it jiggles and tap `×`, or:
 
 ```bash
 APP_PATH="$(cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --print-app-path)"
 BUNDLE_ID="$(plutil -extract CFBundleIdentifier raw -o - "$APP_PATH/Info.plist")"
-xcrun simctl install booted "$APP_PATH"
-xcrun simctl launch booted "$BUNDLE_ID"
+xcrun simctl uninstall booted "$BUNDLE_ID"
+# reinstall + relaunch (also the recovery step after a whole-simulator erase)
+xcrun simctl install booted "$APP_PATH" && xcrun simctl launch booted "$BUNDLE_ID"
 ```
 
-The full per-platform wipe procedure (Simulator, Android Emulator, physical
-devices, TestFlight) lives in `docs/manual-wipe-v1-to-v2.md`.
-
-### Automated uninstall/reinstall via smoke lane
-
-The smoke runner uses a full reset path and reinstalls automatically:
+**Whole simulator** — the heavy hammer; erases every app, login and saved state,
+and the device must be shut down before it can be erased (GUI: Device → Erase
+All Content and Settings…):
 
 ```bash
-cd apps/mobile
-TASK_ID=ad-hoc npm run test:e2e:ios:smoke
+UDID="$(xcrun simctl list devices booted | grep -Eo '[0-9A-Fa-f-]{36}' | head -1)"
+xcrun simctl shutdown "$UDID" && xcrun simctl erase "$UDID" && xcrun simctl boot "$UDID"
 ```
 
-## Run the app on the Android Emulator
-
-### Prerequisites (Android)
-
-- Android SDK with platform-tools and emulator CLI. The helper honors `ANDROID_HOME`,
-  then a valid legacy `ANDROID_SDK_ROOT`, then standard install locations including
-  `~/Library/Android/sdk` on macOS and `~/Android/Sdk` on Linux.
-- Java 17 or 21 (Gradle 8.x is compatible with Java 17 and 21; Java 25+ is rejected by Gradle).
-- An AVD configured (e.g. `Pixel_10_Pro`).
-
-Before running Android or Gradle commands directly in your shell (such as `emulator`, `adb`, or `npx expo run:android`), source the repository's Android and Java environment helpers in your current shell:
-
-```bash
-source scripts/android-env.sh
-source scripts/java-env.sh
-```
-
-This ensures `ANDROID_HOME`, `adb`, and `emulator` are on your `PATH`, and sets `JAVA_HOME` to a compatible JDK (17 or 21, clearing any incompatible Java 25+). (Note: `./boga` commands such as `./boga android run` source these automatically).
-
-Check capability:
-
-```bash
-./boga doctor --android
-# or: ./boga android doctor
-```
-
-### Dev-client loop (matches native runtime)
-
-1. Ensure your shell environment is set and boot the emulator:
-
-```bash
-source scripts/android-env.sh
-source scripts/java-env.sh
-emulator -avd Pixel_10_Pro &
-adb wait-for-device
-```
-
-2. Configure the backend and mobile app environment:
-
-- **Main checkout (slot 0):** Boot the dedicated human-development backend (`BOGA-dev`, port 65431), provision dev accounts, and write `apps/mobile/.env.local`:
-  ```bash
-  ./boga env dev
-  ```
-  *(This runs the dev baseline via `./boga db dev`, seeds dev accounts `a@dev.local`/`b@dev.local`, and writes `EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:65431` and the dev stack `ANON_KEY` to `apps/mobile/.env.local`.)*
-
-- **Linked worktrees (slot > 0):** Per spec 12, linked worktrees must not use `BOGA-dev`. Boot the worktree's isolated slot stack:
-  ```bash
-  ./boga db up
-  ```
-  *(This boots the worktree's slot-isolated Supabase on port `55431 + 100 * slot` and automatically configures `apps/mobile/.env.local`.)*
-
-3. Build and launch the development build:
-
-```bash
-./boga android run
-```
-
-The launcher evaluates the worktree's generated Metro port (`8082 + slot`),
-validates it, pins the Supabase values from `apps/mobile/.env.local`, and runs
-`adb reverse` for Metro and the local API port in `EXPO_PUBLIC_SUPABASE_URL`.
-That selects port 65431 for `BOGA-dev` or the actual slot port in a linked
-worktree; hosted/LAN backends need no API reverse. Keep one Android target
-connected, or select it with `ANDROID_SERIAL`.
-
-Alternatively, split compilation and Metro into two terminals:
-
-```bash
-# Terminal 1 (compile & launch):
-./boga android run --no-bundler
-
-# Terminal 2 (start Metro bundler):
-./boga android start
-```
-
-Both commands configure the matching reverse ports. To override Metro, pass
-`--port 8099` (or `--port=8099`) to both commands; the same port is passed to
-Expo and `adb reverse`.
-
-### Wipe the app on the Android Emulator
-
-To clear the SQLite database and app sandbox:
-
-```bash
-adb shell pm clear com.phano.boga3.dev
-```
-
-Or via the emulator GUI: `Settings` → `Apps` → `BOGA3` → `Storage` → `Clear Storage`.
-
-## Run a development build on a physical iPhone
-
-Running on a real iPhone needs two things on the phone: (1) an installed
-development-client build of BOGA3, and (2) a reachable Metro bundler — plus a
-reachable Supabase if you want auth/sync. Building, signing, and installing the
-dev client on the device (local `eas build --profile dev --local`, ad hoc install
-via `xcrun devicectl`, device registration) is documented end-to-end in
-`apps/mobile/README-LOCAL-DEV-BUILD.md`. This section covers the day-to-day
-run loop once that build is on the phone.
-
-> Prerequisite: Mac and iPhone must be on the **same Wi-Fi/LAN**, and Docker
-> Desktop or Colima must be running for local Supabase. If you cannot share a LAN,
-> see [Troubleshooting](#troubleshooting-running-on-a-physical-phone) for the
-> `--tunnel` + hosted-Supabase fallback.
-
-### One-stop: dev-lan.sh
-
-The single command that chains everything — boots this checkout's local Supabase,
-points `apps/mobile/.env.local` at the Mac's LAN IP, and starts Expo/Metro over
-the LAN in `--dev-client` mode:
-
-```bash
-./scripts/dev/dev-lan.sh
-```
-
-Notes:
-
-- Phone and Mac must be on the same network. Open the dev client on the phone
-  (scan the QR code Expo prints, or open the dev-client URL).
-- Extra args are forwarded to `expo start`, e.g. `./scripts/dev/dev-lan.sh --clear`.
-- Supabase containers persist after you Ctrl+C Expo. Stop them with
-  `boga db dev-down` (main checkout) or `boga db down` (linked worktree).
-
-### Outside the LAN (Tailscale): dev-remote.sh
-
-When the phone is **not** on the same Wi-Fi (cellular, a different building, guest
-Wi-Fi with client isolation), route the whole session over your tailnet instead.
-This keeps the **local** Supabase + Metro — no hosted backend, no dev-client
-rebuild — by publishing both over `tailscale serve` as real HTTPS:
-
-```bash
-./scripts/dev/dev-remote.sh
-```
-
-It boots this slot's Supabase, publishes it at `https://<magicdns-name>`, rewrites
-`apps/mobile/.env.local` to that URL, publishes Metro at
-`https://<magicdns-name>:8443`, and starts Expo. On the phone's dev client, load
-`https://<magicdns-name>:8443` (the script prints the exact URL).
-
-Why HTTPS and not the LAN flow's plain HTTP: a strict-ATS dev build (the
-`com.phano.boga3.dev` TestFlight build) rejects plain HTTP to a `100.x` Tailscale
-address. The trusted `*.ts.net` cert from `tailscale serve` sidesteps App
-Transport Security entirely, so the existing build works unchanged.
-
-Prerequisites (one-time):
-
-- Tailscale installed and signed into the **same tailnet** on both this Mac and
-  the phone.
-- HTTPS certificates enabled for the tailnet:
-  [admin → DNS](https://login.tailscale.com/admin/dns) → MagicDNS on, then
-  **Enable HTTPS**. `dev-remote.sh` fails fast with this instruction if it is off.
-
-Notes:
-
-- The env-only half (boot Supabase + publish it + rewrite `.env.local`) is
-  `./scripts/dev/use-local-mobile-tailscale-env.sh` — also `./boga env tailscale`.
-- Run **one worktree at a time**: the `443`/`8443` serve mappings are per-machine.
-- Override MagicDNS detection with `BOGA_MOBILE_TS_HOST=...`; the Metro port with
-  `EXPO_PORT=...`. Extra args forward to `expo start` (e.g. `--clear`).
-- Tear down when done:
-  `./supabase/scripts/local-runtime-down.sh` and
-  `tailscale serve --https=443 off && tailscale serve --https=8443 off`.
-
-### Make local Supabase reachable from the phone
-
-On a physical phone, `localhost`/`127.0.0.1` resolves to the **phone itself**, so
-the app must reach Supabase over the Mac's LAN IP. The env half of `dev-lan.sh`:
-
-```bash
-./scripts/dev/use-local-mobile-lan-env.sh    # also: ./boga env lan
-```
-
-This starts (or reuses) local Supabase and rewrites `apps/mobile/.env.local` to
-`EXPO_PUBLIC_SUPABASE_URL=http://<mac-lan-ip>:<slot-api-port>` (keeping the
-client-safe anon key). If auto-detection picks the wrong interface, override it:
-
-```bash
-BOGA_MOBILE_LAN_HOST=<mac-lan-ip> ./scripts/dev/use-local-mobile-lan-env.sh
-```
-
-Restart Metro after any env switch so `EXPO_PUBLIC_*` values are rebundled.
-
-### Manual steps (env + Metro)
-
-If you prefer to run the pieces yourself instead of `dev-lan.sh`:
-
-```bash
-# 1. Point the mobile env at local Supabase over the LAN (see above).
-./scripts/dev/use-local-mobile-lan-env.sh
-
-# 2. Start Metro over the LAN on this worktree's dev-server port.
-cd apps/mobile
-set -a; source .maestro/maestro.env.local; set +a
-npx expo start --dev-client --host lan --scheme boga3 --port "$EXPO_DEV_SERVER_PORT"
-```
-
-### Point the app at hosted Supabase instead
-
-To run the phone build against hosted Supabase rather than your local stack:
-
-```bash
-./scripts/dev/use-hosted-mobile-env.sh    # also: ./boga env hosted
-```
-
-`use-hosted-mobile-env.sh` reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from
-`supabase/.env.hosted`. Restart Metro afterward. See
-[Switch mobile app between local and hosted Supabase](#switch-mobile-app-between-local-and-hosted-supabase)
-for the full matrix and [Log into a development database](#log-into-a-development-database) for accounts and sign-in.
-
-## Troubleshooting: running on a physical phone
-
-### Phone cannot reach Expo or Metro (use --tunnel)
-
-Symptoms: the dev client hangs on "Downloading JavaScript bundle", shows "Could
-not connect to the development server", or the LAN URL / QR code times out.
-
-Check first:
-
-- Mac and phone are on the **same Wi-Fi**, and you answered any macOS firewall
-  prompt to allow `node`/incoming connections.
-- Metro is started with `--host lan` (this is what `dev-lan.sh` does).
-
-If the LAN itself is the problem — guest/corporate Wi-Fi with client isolation, a
-VPN, or Mac and phone on different subnets — route the bundler over an Expo
-**tunnel** instead of the LAN:
-
-```bash
-cd apps/mobile
-set -a; source .maestro/maestro.env.local; set +a
-npx expo start --dev-client --tunnel --scheme boga3 --port "$EXPO_DEV_SERVER_PORT"
-```
-
-- The first `--tunnel` run prompts to install `@expo/ngrok` — accept it.
-- Scan the QR code (or open the dev-client URL) Expo prints over the tunnel.
-
-> **Important:** a tunnel fixes *Metro* reachability only. It does **not** make
-> local Supabase reachable — local Supabase is served on the Mac's LAN IP, so a
-> phone that cannot reach the LAN still cannot reach it over the tunnel. For a
-> fully off-LAN setup, also point the app at hosted Supabase
-> (`./scripts/dev/use-hosted-mobile-env.sh`) and restart Metro.
-
-### Phone cannot reach Supabase
-
-Symptoms: the app loads, but login/sync fail with network errors to
-`http://<ip>:<port>`, or auth/sync appears disabled.
-
-- **Stack not up:** start local Supabase (`./supabase/scripts/local-runtime-up.sh`)
-  and confirm the Docker daemon is reachable (`docker info`). On macOS with Colima,
-  `colima start` first.
-- **Wrong host in env:** confirm `apps/mobile/.env.local` points at the Mac's LAN
-  IP, not `127.0.0.1`/`localhost` (on the phone, localhost = the phone). Re-run
-  `./scripts/dev/use-local-mobile-lan-env.sh` (or `./scripts/dev/dev-lan.sh`), then
-  **restart Metro** so `EXPO_PUBLIC_*` rebundle.
-- **Wrong interface detected:** find the Mac IP with `ipconfig getifaddr en0`
-  (or `en1`) and pin it: `BOGA_MOBILE_LAN_HOST=<mac-lan-ip> ./scripts/dev/use-local-mobile-lan-env.sh`.
-- **Reachability test:** from another device on the same Wi-Fi (or the phone's
-  browser), open `http://<mac-lan-ip>:<slot-api-port>` (the URL written into
-  `apps/mobile/.env.local`). A timeout means a network/firewall issue — same
-  Wi-Fi? client isolation enabled? macOS firewall allowing the Docker/Supabase
-  ports?
-- **Can't share a LAN at all:** switch to hosted Supabase
-  (`./scripts/dev/use-hosted-mobile-env.sh`) and restart Metro. A Metro tunnel
-  alone will not carry traffic to a LAN-only Supabase.
-- Still stuck? Check the [Supabase logs](#supabase-logs) and the `app_logs` sync
-  rows described under [App logs](#app-logs).
+`./boga test ios-smoke` uses a full reset path and reinstalls automatically.
+
+**Upgrading an install that ran v1 sync:** wipe once before launching v2. The v2
+build assumes a clean local DB and ships no auto-migration; booting against v1
+data produces undefined behaviour (rows that never sync, missing pull cursor,
+push/pull divergence). Per-platform procedures — Simulator, Android Emulator,
+physical devices, and TestFlight testers, who must **delete** the v1 build
+rather than update in place — are in `docs/manual-wipe-v1-to-v2.md`.
 
 ## Log into a development database
 
-"Logging into a development database" means running the app pointed at a
-development Supabase — local Docker on the Simulator, local-over-LAN on a
-physical phone, or a hosted dev project (see the run sections above) — and then
-signing in through the app's auth screen with a **development account**. There is
-no separate database login for normal use; the app authenticates against Supabase
-Auth on whichever stack it targets.
+There is no separate database login: point the app at a development Supabase and
+sign in on the app's auth screen as a **development account**.
 
 ### Account inventory
 
-| Account | Email | Password | Use it for | Touched by tests? |
-| --- | --- | --- | --- | --- |
-| **Dev A** | `a@dev.local` | `dev123` | **Manual development** — a near-blank account: sign in and click around | No |
-| **Dev B** | `b@dev.local` | `dev123` | Second human account (cross-user / sharing / sync); member of `Dev crew` with four weeks of recent sessions | No |
-| **Rich History** | `history@dev.local` | `dev123` | Manual/dev testing with imported GymBook history, four weeks of recent sessions, and the `Dev crew` group it owns | No |
-| Fixture `user_a` | `user_a.local@example.test` | `ScaffoldingUserA!234` | Integration-test fixture (primary owner) | **Yes — reset / mutated / wiped every run** |
-| Fixture `user_b` | `user_b.local@example.test` | `ScaffoldingUserB!234` | Integration-test fixture (cross-user denial) | **Yes** |
-| `service_role_helper` | — (no login) | — | Service-role setup fixture | Yes |
-| `anonymous` | — (no login) | — | Guest-path placeholder fixture | Yes |
+| Account | Email / password | Use it for | Touched by tests? |
+| --- | --- | --- | --- |
+| **Dev A** | `a@dev.local` / `dev123` | Manual development — a near-blank account | No |
+| **Dev B** | `b@dev.local` / `dev123` | Second human account (cross-user / sharing / sync); member of `Dev crew`, four recent weeks of sessions | No |
+| **Rich History** | `history@dev.local` / `dev123` | Manual testing with imported GymBook history, four recent weeks, and the `Dev crew` group it owns | No |
+| Fixture `user_a` | `user_a.local@example.test` / `ScaffoldingUserA!234` | Integration-test fixture (primary owner) | **Yes — reset / mutated / wiped every run** |
+| Fixture `user_b` | `user_b.local@example.test` / `ScaffoldingUserB!234` | Integration-test fixture (cross-user denial) | **Yes** |
+| `service_role_helper` | no login | Service-role setup fixture | Yes |
+| `anonymous` | no login | Guest-path placeholder fixture | Yes |
 
-Sources: dev accounts — `supabase/scripts/dev-account-constants.sh`; fixtures —
-`supabase/scripts/auth-fixture-constants.sh` + `supabase/seed.sql`.
+Constants: `supabase/scripts/dev-account-constants.sh` (dev) and
+`supabase/scripts/auth-fixture-constants.sh` + `supabase/seed.sql` (fixtures).
 
-**Use the dev accounts (`a@dev.local` / `b@dev.local` / `history@dev.local`) for manual
-development — not the fixtures.** The backend contract suites and Maestro lanes
-create, mutate, and wipe `user_a` / `user_b` on every run, so anything you do as a
-fixture user can vanish mid-session and your edits can perturb a test run. The dev
-accounts exist precisely so manual dev never collides with integration testing:
-they are plain auth users, are not registered in `public.dev_fixture_principals`,
-and no gate, CI lane, or seed touches them.
+**Do manual development as a dev account, never as a fixture.** The backend
+contract suites and Maestro lanes create, mutate and wipe `user_a` / `user_b` on
+every run, so fixture data can vanish mid-session and your edits can perturb a
+test run. The dev accounts are plain auth users, are not registered in
+`public.dev_fixture_principals`, and no gate, CI lane or seed touches them.
 
 ### Provision the dev accounts
 
-The dev accounts are auth users on whichever Supabase you target. A fresh stack
-or reset wipes `auth.users`; re-run this after one (idempotent).
+Dev accounts are auth users on whichever Supabase you target, so a fresh stack or
+a reset wipes them. Re-provision afterwards (idempotent).
 
-**Automatic (the usual path):** the phone launchers `scripts/dev/dev-lan.sh` and
-`scripts/dev/dev-remote.sh` target a **dedicated dev Supabase stack**
-(`project_id BOGA-dev`, API `65431`) that is isolated from the slot-0 stack the
-gates use — so **running `boga test *` never wipes your dev data or session.**
-They run the **dev DB baseline** on every start: reuse the dev stack **without
-resetting it**, apply pending migrations in place, point the group-eval kick
-at it, seed `a@dev.local` (near-blank) / `b@dev.local` / `history@dev.local`
-(rich imported history), seed the `Dev crew` group (`npm run seed:dev-groups`;
-`history@` owns, `b@` joins, both backdated, four recent weeks of sessions
-each), and activate group competitions once (one-way until `boga db dev-reset`).
-`BOGA-dev` is main-checkout-only: in a linked worktree the launchers run this
-baseline on its slot stack (`./boga db reset` before its groups gates).
-Contract: `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
-stack). Commands:
+The main checkout has a **dedicated dev stack** (`project_id BOGA-dev`, API port
+`65431`) isolated from the slot-0 stack the gates use, so **`boga test *` never
+wipes your dev data or session**. The phone launchers and `./boga env dev` run
+its baseline on every start.
 
 ```bash
-boga db dev          # baseline: up + migrate + seed dev users (no reset)
-boga db dev-up       # start the dev stack only
-boga db dev-down     # stop it (data persists)
-boga db dev-reset    # rebuild it — DROPS ALL DEV DATA
+./boga db dev        # baseline: up + apply pending migrations in place + seed dev users (no reset)
+./boga db dev-up     # start the dev stack only
+./boga db dev-down   # stop it (data persists)
+./boga db dev-reset  # rebuild it — DROPS ALL DEV DATA
 ```
 
-On real schema drift the baseline **fails loud** rather than wiping; rebuild
-explicitly with `boga db dev-reset`.
+The baseline points the group-eval kick at the stack, seeds `a@` (near-blank),
+`b@` and `history@` (rich imported history), seeds the `Dev crew` group
+(`npm run seed:dev-groups` — `history@` owns, `b@` joins, both backdated), and
+activates group competitions once (one-way until `dev-reset`). On real schema
+drift it **fails loud** rather than wiping; rebuild explicitly with `dev-reset`.
 
-Local Docker/Colima Supabase, provisioning the accounts by themselves:
+`BOGA-dev` is main-checkout-only: a linked worktree runs the same baseline
+against its own slot stack (contract:
+`docs/specs/12-worktree-config-and-isolation.md`, "Dedicated dev stack").
+To provision the accounts by themselves against any stack:
 
 ```bash
-./supabase/scripts/local-runtime-up.sh             # ensure this worktree's stack is up
+./boga db up                                       # or the stack you are targeting
 ./supabase/scripts/auth-provision-dev-accounts.sh  # create/refresh dev accounts
 ```
 
-Hosted dev Supabase project:
-
-```bash
-set -a; source supabase/.env.hosted; set +a        # SUPABASE_URL + legacy JWT service_role key
-./supabase/scripts/auth-provision-dev-accounts.sh
-```
-
-Hosted provisioning needs the **legacy JWT `service_role`** key (not a
-`sb_publishable_...` / `sb_secret_...` key). The fixture users have their own provisioner
-(`./supabase/scripts/auth-provision-local-fixtures.sh`), which the test baseline
-runs automatically; you do not need it for manual dev.
+Against a hosted dev project, source `supabase/.env.hosted` first; hosted
+provisioning needs the **legacy JWT `service_role`** key, not a
+`sb_publishable_…` / `sb_secret_…` one. The fixture users have their own
+provisioner (`./supabase/scripts/auth-provision-local-fixtures.sh`), which the
+test baseline runs for you; manual dev never needs it.
 
 ### Sign in
 
-1. Point the app at the development database you want:
-   - **iOS Simulator** → local Docker/Colima Supabase (`./supabase/scripts/local-runtime-up.sh`).
-   - **Physical iPhone** → local Supabase over the Mac LAN (`./scripts/dev/dev-lan.sh`), or hosted (`./scripts/dev/use-hosted-mobile-env.sh`). See [Switch mobile app between local and hosted Supabase](#switch-mobile-app-between-local-and-hosted-supabase).
-2. Make sure the dev accounts exist on that database (provision step above).
-3. Launch the app and sign in on the auth screen as `a@dev.local` / `dev123` (or
-   `history@dev.local` / `dev123` for the imported history account).
+Point the app at the database (iOS Simulator → `./boga db up`; physical iPhone →
+`docs/runbook-physical-iphone.md`; hosted → `./boga env hosted`), make sure the
+dev accounts exist there, then sign in as `a@dev.local` / `dev123` (or
+`history@dev.local` for the imported history). A **network** error rather than
+invalid-credentials is a connectivity problem, not an account problem.
 
-If sign-in fails with a **network** error rather than invalid-credentials, that is
-a connectivity problem, not an account problem — see
-[Troubleshooting](#troubleshooting-running-on-a-physical-phone).
-
-### Inspect or manage accounts (operator)
-
-Open this worktree's local **Supabase Studio** → **Authentication → Users** to
-see, add, or reset accounts by hand. The Studio URL is printed by:
+## Local Supabase
 
 ```bash
-bash -lc 'source supabase/scripts/_common.sh && run_supabase status'   # see "Studio URL"
+./boga db up        # start this slot's stack; syncs apps/mobile/.env.local with its URL + anon key
+./boga db down      # stop it
+./boga db reset     # migrations + seed from scratch
+./boga db baseline  # non-destructive: reuse a running stack, apply pending migrations, enforce fixtures
 ```
 
-## Supabase: run locally and reset
+`db baseline` applies pending migrations with
+`supabase db push --local --include-all --yes` and never resets. Worktree
+teardown once the PR merges is `./boga worktree release`
+(`docs/specs/01-worktree-and-environment.md`); leftovers from dead sessions are
+`docs/procedures/worktree-cleanup.md`. Run `./boga db reset` between an iOS lane
+and a backend lane — iOS-lane leftovers make `sync-pull-contract` fail falsely.
 
-### Docker Desktop on WSL preflight
+**Supabase CLI pin.** The scripts invoke `npx -y supabase@${SUPABASE_CLI_VERSION}`,
+so first use may need network access. The repo owns the pin
+(`BOGA_SUPABASE_CLI_DEFAULT_VERSION` in `scripts/worktree-lib.sh`); an explicit
+`SUPABASE_CLI_VERSION` env value, then `~/.config/boga/supabase/cli.env`,
+override it. CLIs below `BOGA_SUPABASE_CLI_MIN_VERSION` (2.108.0) are
+**rejected**: their edge-runtime bootstrap imports `deno.land` on every start,
+so `supabase start` ends `Waiting for health checks...` → empty
+`supabase_edge_runtime_*` logs → `Error status 502` whenever deno.land is
+unreachable. `./boga doctor` fails on a stale `SUPABASE_CLI_VERSION` line in
+`~/.config/boga/supabase/cli.env`; delete it so the repo pin applies.
 
-When working from WSL, Docker Desktop must be reachable from this Linux distribution, not just running on Windows.
+Add or reset accounts by hand in **Studio → Authentication → Users**; the Studio
+URL is printed by
+`bash -lc 'source supabase/scripts/_common.sh && run_supabase status'`.
 
-Check from the repo shell before Supabase local commands:
+### Colima fallback
+
+Colima can run the minimal Auth/REST stack but not the full one. If you
+intentionally use Colima:
 
 ```bash
-docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'
-```
-
-If Docker Desktop is running but the command fails with socket or daemon errors:
-
-- confirm Docker Desktop uses the WSL 2 based engine;
-- open Docker Desktop **Settings -> Resources -> WSL Integration** and enable integration for this WSL distribution;
-- apply the change, then reopen the repo shell and retry the check.
-
-Reference: https://docs.docker.com/desktop/features/wsl/
-
-### Colima on macOS preflight
-
-On macOS, prefer Docker Desktop for BOGA local Supabase when it is available. If
-Docker Desktop and Colima are both installed, the active Docker context decides
-which daemon Supabase CLI uses.
-
-Check the active Docker context:
-
-```bash
-docker context ls
-```
-
-Recommended context for this repo:
-
-```bash
-docker context use desktop-linux
-docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'
-./supabase/scripts/local-runtime-up.sh
-```
-
-Colima can run the minimal Auth/REST stack, but the full Supabase local stack may
-fail when optional services try to bind-mount the Colima Docker socket:
-
-```text
-failed to start docker container: Error response from daemon:
-error while creating mount source path '/Users/<you>/.colima/default/docker.sock':
-mkdir /Users/<you>/.colima/default/docker.sock: operation not supported
-```
-
-If you intentionally use Colima, first make sure it is running:
-
-```bash
-colima start
-docker context use colima
-docker info --format '{{.ServerVersion}} {{.OperatingSystem}}'
-```
-
-For normal simulator login while on Colima, start the minimal local Supabase
-stack and provision the human dev accounts:
-
-```bash
+colima start && docker context use colima
 bash -lc 'source supabase/scripts/_common.sh && run_supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector'
 ./supabase/scripts/auth-provision-dev-accounts.sh
 ```
 
-That workaround is enough for app login (`a@dev.local` / `dev123`) and ordinary
-REST/Auth development. Use Docker Desktop, not this Colima workaround, for the
-full local runtime and test gates that expect the complete Supabase stack.
+That is enough for app login and ordinary REST/Auth development. Use Docker
+Desktop, not this workaround, for the full local runtime and every test gate.
 
-### Start/stop/reset
-
-Start runtime:
+### Switch the mobile app's backend
 
 ```bash
-./supabase/scripts/local-runtime-up.sh
+./boga env lan        # physical device → local Supabase over the Mac LAN IP
+./boga env dev        # main checkout only → the BOGA-dev stack (127.0.0.1:65431)
+./boga env tailscale  # phone off-LAN → local Supabase published over your tailnet
+./boga env hosted     # hosted Supabase (SUPABASE_URL / SUPABASE_ANON_KEY from supabase/.env.hosted)
 ```
 
-Stop runtime:
+Restart Expo/Metro after any switch so `EXPO_PUBLIC_*` values are rebundled.
+A linked worktree cannot use `env dev` — boot its own stack with `./boga db up`.
+
+## MCP Virtual Coach (local)
 
 ```bash
-./supabase/scripts/local-runtime-down.sh
+./boga test mcp-smoke        # full OAuth → training-data proof on this slot's stack
+./boga test agent-auth-web   # consent UI tests + production build + prod audit
+./boga test mcp-unit         # MCP schemas / translation / auth boundary + prod audit
+./boga test agent-api        # real local OAuth/API/RLS/revocation contract
 ```
 
-Worktree teardown once its PR merges (`./boga worktree release`):
-`docs/specs/01-worktree-and-environment.md`. Leftovers from dead sessions:
-`docs/procedures/worktree-cleanup.md`.
-
-Reset DB (migrations + seed):
-
-```bash
-./supabase/scripts/reset-local.sh
-```
-
-Ensure shared baseline (non-destructive when already up, with fixture enforcement):
-
-```bash
-./supabase/scripts/ensure-local-runtime-baseline.sh
-```
-
-### Reset hosted Supabase (clean slate)
-
-Canonical path for resetting the hosted database to match checked-in migrations. Use when the hosted schema is known-bad or has drifted, and there is no production data worth preserving.
-
-**Destructive: drops the hosted database. Back up anything worth keeping first.**
-
-Prerequisites: `supabase login` has been run and the project is linked (`supabase link --project-ref <ref>`).
-
-Steps:
-
-1. **Reset and reapply migrations (CLI, canonical path):**
-   ```bash
-   supabase db reset --linked --yes
-   ```
-   Drops the hosted database and reapplies every `supabase/migrations/*.sql` in order on a fresh DB.
-
-2. **Re-expose `app_public` on the Data API.** Easy to miss — the schema exists post-reset but PostgREST will not serve it until you toggle it back on:
-   - Supabase Dashboard → Project Settings → API → **Exposed schemas**
-   - Add `app_public` to the comma-separated list (alongside `public`, `graphql_public`).
-   - Save.
-
-3. **Verify migrations applied:**
-   ```bash
-   supabase migration list --linked
-   ```
-   All checked-in migration versions should be listed as applied with no extras.
-
-4. **Smoke check from the mobile app or `curl`:** confirm that an authenticated request to `app_public.<table>` returns rows / RLS-blocked rows (not a "schema not exposed" 404).
-
-Do not print hosted keys, connection strings, or database passwords in task notes.
-
-### Switch mobile app between local and hosted Supabase
-
-Use the mode that matches where the app is running:
-
-```bash
-# iOS Simulator -> local Docker Desktop Supabase
-./supabase/scripts/local-runtime-up.sh
-
-# Physical device -> local Docker Desktop Supabase over the Mac LAN IP
-./scripts/dev/use-local-mobile-lan-env.sh
-
-# Physical device -> hosted Supabase
-./scripts/dev/use-hosted-mobile-env.sh
-```
-
-`use-local-mobile-lan-env.sh` auto-detects the Mac LAN IP; override with `BOGA_MOBILE_LAN_HOST=<ip>` if needed.
-`use-hosted-mobile-env.sh` reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from `supabase/.env.hosted`.
-
-After either switch, restart Expo/Metro so `EXPO_PUBLIC_*` values are rebundled.
-
-For a real iPhone development-client build that installs on a physical device,
-use `apps/mobile/README-LOCAL-DEV-BUILD.md`. It covers the local `eas build
---profile dev --local` path, ad hoc install, Metro over LAN, and local Supabase
-LAN env setup. The day-to-day run loop is summarized in
-[Run a development build on a physical iPhone](#run-a-development-build-on-a-physical-iphone).
-
-### Accounts and sign-in
-
-Development sign-in accounts (`a@dev.local` / `b@dev.local` / `history@dev.local`)
-and the integration-test fixtures (`user_a` / `user_b`) — what each is for, how
-to provision them, and how to sign in — are inventoried in
-[Log into a development database](#log-into-a-development-database). Use the dev
-accounts for manual work; the fixtures are mutated and wiped by the test suites.
-
-## MCP Virtual Coach
-
-### One-command local proof
-
-Run the complete OAuth-to-training-data smoke from the repository root:
-
-```bash
-./boga test mcp-smoke
-```
-
-The wrapper starts or reuses this worktree's slot-isolated Supabase, applies
-pending migrations, provisions the deterministic users, inserts a unique
-training fixture, completes a real dynamic-registration + authorization-code +
-PKCE consent flow, builds and starts `services/boga-mcp`, lists the four tools,
-calls each tool with the OAuth token, verifies the authorizing fixture IDs, and
-cleans up the grant, audit metadata, process, and fixture rows.
-
-To target another environment with an already-issued test token, supply all
-four values and point the MCP/API/OAuth service configuration at that
-environment before running the underlying smoke script:
+`mcp-smoke` starts or reuses the slot stack, migrates, provisions the
+deterministic users, inserts a unique training fixture, completes a real
+dynamic-registration + authorization-code + PKCE consent flow, builds and starts
+`services/boga-mcp`, calls each of the four tools with the OAuth token, verifies
+the authorizing fixture IDs, and cleans up grant, audit metadata, process and
+fixture rows. To reuse an already-issued token, supply all four values:
 
 ```bash
 BOGA_MCP_SMOKE_ACCESS_TOKEN='<test-access-token>' \
@@ -741,297 +241,119 @@ BOGA_MCP_SMOKE_EXERCISE_QUERY='<owned-exercise-name>' \
 ./scripts/smoke-boga-mcp.sh
 ```
 
-The supplied-token form still starts the local MCP process with local endpoint
-defaults; use it only for a token issued by this worktree's local Supabase.
-Hosted smoke should run from the hosting platform or a dedicated operator
-client against the deployed URLs so discovery and TLS are tested as deployed.
-Never paste a token into a committed file, shell history, task note, or log.
+This form still starts the MCP process with **local** endpoint defaults, so use
+it only with a token issued by this worktree's local Supabase. Never paste a
+token into a committed file, shell history, task note or log. Hosted smoke runs
+from the hosting platform — `docs/runbook-hosted-operations.md`.
 
-Focused checks:
-
-```bash
-./boga test agent-auth-web   # consent UI tests + production build + prod audit
-./boga test mcp-unit         # MCP schemas/translation/auth boundary + prod audit
-./boga test agent-api        # real local OAuth/API/RLS/revocation contract
-```
-
-### Connected agents and revocation
-
-In a signed-in mobile build, open **Settings → Connected agents**. Each active
-OAuth grant shows the requesting client name, grant time, and the most recent
-metadata-only access timestamp. **Revoke access** asks for confirmation and
-uses Supabase Auth grant revocation; subsequent MCP/API calls with the old token
-must return `401`.
-
-If the list fails, verify the mobile build targets the same Supabase project as
-the grant and inspect Auth/OAuth availability. If only **Last access** is
-unavailable, grant management remains usable; check the
+**Connected agents.** In a signed-in build, Settings → Connected agents lists
+each active grant with its client name, grant time and most recent
+metadata-only access. **Revoke access** confirms, then uses Supabase Auth grant
+revocation; subsequent MCP/API calls with the old token must return `401`. If
+the list fails, check the build targets the same Supabase project as the grant.
+If only **Last access** is missing, grant management still works — inspect the
 `public.agent_access_audit` migration and RLS through operator SQL.
-
-### Hosted rollout checklist
-
-No production host, DNS name, callback URL, or hosted project credentials are
-committed in this repository. An operator with those resources must:
-
-1. Apply the migration chain and deploy `agent-api` from the repository root
-   with `--no-verify-jwt`; the function performs stricter live validation.
-2. Deploy `apps/agent-auth-web/dist` on HTTPS with `/oauth/consent` SPA fallback,
-   using only the project URL and client-safe publishable key.
-3. Enable the Supabase OAuth server, configure its consent path, choose dynamic
-   registration or exact client registrations, and use asymmetric signing keys.
-4. Deploy `services/boga-mcp` on Node 24+ behind HTTPS with only
-   `BOGA_MCP_PUBLIC_URL`, `BOGA_AGENT_API_BASE_URL`, and `BOGA_OAUTH_ISSUER`
-   (plus optional runtime settings). Never inject database or service-role
-   credentials into this host.
-5. Configure ingress/body/rate limits and prevent authorization headers, query
-   state, and payload bodies from reaching logs.
-6. Verify protected-resource and authorization-server discovery, explicit
-   consent/deny, every tool, cross-owner denial, refresh/expiry, revocation, and
-   metadata-only audit in the hosted environment.
-
-Exact build/configuration details live in `apps/agent-auth-web/README.md`,
-`services/boga-mcp/README.md`, and `supabase/README.md`.
-
-### Group evaluator (hosted)
-
-The group evaluator (`docs/specs/tech/groups-contract.md`) needs one
-deploy and one setting per hosted project:
-
-1. Apply the migration chain. It enables `pg_net` and `pg_cron`, schedules
-   `group-eval-sweep`, and generates the kick secret in Vault.
-2. Deploy the function from the repository root:
-   `bash -lc 'source supabase/scripts/_common.sh && run_supabase functions deploy group-eval --no-verify-jwt'`.
-   It loads `apps/mobile/src/groups/set-facts.ts` by relative path, so deploy
-   from a full checkout. The function has no secrets of its own: it checks the
-   caller's `x-group-eval-secret` against Vault.
-3. Point the kick at it in the SQL Editor:
-   `select app_public.group_eval_set_url('https://<project-ref>.supabase.co/functions/v1/group-eval');`.
-   Until this is set, nothing drains the queue. Changes keep queuing, and
-   `sync_push` is unaffected.
-4. Verify it. After a member syncs a session shared into a group, rows appear
-   in `app_public.group_set_facts` within seconds, and `group_eval_queue`
-   drains to empty.
-
-Locally, the shared baseline sets the URL for you
-(`supabase/scripts/group-eval-configure.sh`).
-
-## Optional bodyweight-calculation cutover
-
-This is an accepted operator procedure, not authorization or evidence of a
-hosted deployment. Record exact commit SHAs, store build numbers, project ref,
-migration/function versions and smoke evidence in the release PR. Never reset
-the hosted database for this cutover.
-
-1. **Distribute update-required compatibility first.** Build the latest reviewed
-   client that still speaks the current server protocol but recognizes
-   `UPDATE_REQUIRED` during setup and steady-state sync. Run its required local
-   gates and sweep, submit the same EAS profile/bundle ID used by the installed
-   fleet, and verify it reaches normal sync before the server cutover. It must
-   retain dirty local data and cursors when the guard later activates.
-
-2. **Validate the implementation release locally.** In its leased worktree, run
-   `./boga test for --diff origin/main...HEAD`, every selected lane and the
-   full sweep (`./boga sweep`). The integrated UI must already have explicit human
-   acceptance. Confirm populated migration fixtures preserve sessions, sets,
-   readings, contributions, IDs and clocks; convert lb actual/planned/readings
-   to kg exactly; default private/group preferences off; and remove all retired
-   unit/mode/movement/loading/hydration fields.
-
-3. **Review and apply the hosted cutover.** Verify the linked project and inspect
-   the exact migration plan before modifying anything:
-
-   ```bash
-   bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
-   bash -lc 'source supabase/scripts/_common.sh && run_supabase db push --linked --dry-run'
-   ```
-
-   Apply only the reviewed clean-schema/protocol-3 migrations, then immediately
-   deploy the matching `group-eval` and `agent-api` functions. Retain the Vault
-   secret, evaluator URL and queued jobs. The protocol guard must activate before
-   removed columns become inaccessible.
-
-   ```bash
-   bash -lc 'source supabase/scripts/_common.sh && run_supabase db push --linked'
-   bash -lc 'source supabase/scripts/_common.sh && run_supabase functions deploy group-eval --no-verify-jwt'
-   bash -lc 'source supabase/scripts/_common.sh && run_supabase functions deploy agent-api --no-verify-jwt'
-   bash -lc 'source supabase/scripts/_common.sh && run_supabase migration list --linked'
-   ```
-
-4. **Smoke the cutoff with dedicated hosted accounts.** Missing, malformed and
-   protocol-2 push/pull headers must return `UPDATE_REQUIRED` before row access;
-   `x-boga-sync-protocol: 3` succeeds. Rejected calls change no rows/cursors.
-   Verify the twelve clean entities, synced private preference, layer-4 kg
-   readings, removed fields and reinstall restore.
-
-   With two group members, exercise private/group off/on independence, preserved
-   contributions, reading add/backdate/edit/delete/restore, ordinary/personal/
-   strict-group calculations and coherent publication. A missing group reading
-   omits only dependent scores. Inspect every public group payload/cache/event/
-   board/certification response for absence of reading value/date/id/provenance
-   and dependency digest. Applicable reading corrections must end the dependent certification; rule-only
-   contribution changes retain the witnessed set and its original audit. Neither
-   behavior claims the witness verified bodyweight.
-   Confirm coaching uses the current `metric_revision` (`working_sets_v2`), emits ordinary/no-reading
-   output while private mode is off and authorized aware output while on. Re-run
-   hosted OAuth/discovery/revocation checks.
-
-5. **Release the protocol-3 client.** Build and submit only the reviewed commit
-   whose local gates/sweep produced the evidence above. Upgrade a populated
-   device and verify raw workouts/readings survive, lb values are kg-converted,
-   settings/contributions restore across sync, disposable group caches clear,
-   and no workout surface prompts for bodyweight.
-
-If validation fails, hold the protocol-3 client and repair forward. Keep the
-guard active and preserve readings, raw workouts, dirty data and queued jobs.
-Do not restore retired fields or the old calculation worker. Local gate results
-do not substitute for hosted checks, and implementing the feature does not
-authorize deployment or store submission.
-
-## Upgrading from v1 sync (one-time wipe)
-
-If you are picking up a v2 sync build against an installation that
-ran the v1 sync stack, you must wipe the local SQLite once before
-launching v2. The v2 build assumes a clean local DB and ships no
-auto-migration; booting against v1 data produces undefined behaviour
-(rows that never sync, missing pull cursor, push/pull divergence).
-The wipe procedure for iOS Simulator, Android Emulator, physical
-devices, and TestFlight testers lives in
-`docs/manual-wipe-v1-to-v2.md` (Simulator wipe is also summarized under
-[Wipe the app completely on the Simulator](#wipe-the-app-completely-on-the-simulator)).
-TestFlight testers in particular must **delete the v1 build before installing v2** — do
-NOT update in place.
 
 ## Logs
 
-### App logs
+- **Expo / dev-client:** the terminal running `./boga ios start` or
+  `npx expo start --dev-client`.
+- **Maestro artifacts:**
+  `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/` — `runtime.env`,
+  `provision.log`, `launch.log`, `teardown.log`, `expo-start.log`,
+  `simulator-system.log`, `maestro-junit.xml`.
+- **Live simulator process log:**
 
-- Expo/dev-client logs: terminal where `npm run start:ios:dev-client` or `npx expo start --dev-client` is running.
-- Production diagnostic rows: Supabase Dashboard / SQL Editor query against `public.app_logs`. Mobile clients can insert rows only; use operator credentials for inspection.
-  - Group triage. Filter on `source = 'database'` with `event = 'group.share_failed'` or `event = 'group.event_failed'`. `group.share_failed` means the share trigger failed and `group.event_failed` means the stream-item trigger failed. In both cases the session write committed. `context` is `{session_id, sqlstate}` and `user_id` is the session owner. The session's next accepted write heals both. For an `event_failed` session that won't be written again, run `select app_public.group_events_backfill();` in the SQL Editor. It is idempotent and inserts only missing items (`docs/specs/tech/groups-contract.md`).
-  - **Group evaluator triage** (`docs/specs/tech/groups-contract.md`). Filter `source = 'database'` on these events; `user_id` is the member.
-    - `group.eval_enqueue_failed`: an enqueue trigger failed, and the sync write committed. `context` is `{table, row_id, sqlstate}`. The member's next accepted write of that session or link re-enqueues it.
-    - `group.eval_kick_failed`: the pg_net kick failed. The `group-eval-sweep` cron job (every 5 minutes) retries it.
-    - `group.eval_failed`: a job failed and stays queued with backoff. `context` is `{job_id, kind, sqlstate}`. Inspect `app_public.group_eval_queue` (`attempts`, `last_sqlstate`) for a job that keeps failing.
-    - `group.eval_parked`: a job failed `group_eval_max_attempts()` times (10) and stopped retrying (`available_at = 'infinity'`). `context` adds `attempts`; comparison jobs (`kind = 'exercise'`, `app_public.group_metric_eval_queue`) carry `group_id` and no `user_id`. A recurring sqlstate after a deploy usually means the `group-eval` function is older than the migrations: redeploy it, then run `select app_public.group_eval_retry_parked();`.
-    - To drain now, run `select app_public.group_eval_kick();`.
-    - If the queue grows and nothing drains, check `select app_public.group_eval_config('group_eval_url');` and the `group-eval` function logs.
-  - Sync-health triage: filter `source = 'sync'`, `event = 'sync.cycle_result'` to see each cycle's classified outcome (`converged` / `auth_required` / `retryable_error` / `structural_error`) with its error code and a sanitized message — a run of non-`converged` outcomes means the scheduler is ticking but not converging (dirty rows are not draining), distinct from the scheduler cadence transitions logged under `sync_scheduler_*`. Pull-side local FK failures additionally log `source = 'database'`, `event = 'sync.pull_local_fk_violation'`. Push-side FK closure preflight now **quarantines** a local orphan dirty row (one that would fail `sync_push`) instead of wedging the whole push: it logs `source = 'sync'`, `event = 'sync.row_quarantined'` (level `warn`) with the orphan's entity type/id, parent type, the missing FK column, and the unresolved parent id, and `event = 'sync.push_continued_after_quarantine'` (level `info`) with the pushed/quarantined row counts confirming the valid rows still drained. The quarantined row is recorded in the device-local `sync_quarantine` table (not in `app_logs`) and is skipped by every subsequent push until repaired (parent restored or child removed); `getSyncStatus().blockedRowCount` reports how many rows are currently quarantined. A recurring `sync.row_quarantined` for the same id means an unrepaired structural orphan — repair the row's FK parent locally to release it; there is no user-facing repair UI yet, and the app performs no automatic destructive local graph repair.
-- Maestro run artifacts/logs:
-  - root: `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/`
-  - key files: `runtime.env`, `provision.log`, `launch.log`, `teardown.log`, `expo-start.log`, `simulator-system.log`, `maestro-junit.xml`
-- Live simulator process logs (manual):
+  ```bash
+  APP_PATH="$(cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --print-app-path)"
+  APP_EXECUTABLE="$(plutil -extract CFBundleExecutable raw -o - "$APP_PATH/Info.plist")"
+  xcrun simctl spawn booted log stream --style compact --level debug --predicate "process == \"$APP_EXECUTABLE\""
+  ```
 
-```bash
-APP_PATH="$(cd apps/mobile && ./scripts/maestro-ios-dev-client-build.sh --print-app-path)"
-APP_EXECUTABLE="$(plutil -extract CFBundleExecutable raw -o - "$APP_PATH/Info.plist")"
-xcrun simctl spawn booted log stream --style compact --level debug --predicate "process == \"$APP_EXECUTABLE\""
-```
+- **Supabase:** `tail -f supabase/.temp/health-functions-serve.log`;
+  `bash -lc 'source supabase/scripts/_common.sh && run_supabase status -o env'`;
+  `docker ps --format 'table {{.Names}}\t{{.Status}}' | rg supabase` then
+  `docker logs -f <container-name>`.
 
-### Supabase logs
+### Diagnostic rows (`public.app_logs`)
 
-- Health function log file:
+Query `public.app_logs` from the Dashboard / SQL Editor with operator
+credentials — mobile clients can only insert.
 
-```bash
-tail -f supabase/.temp/health-functions-serve.log
-```
+**Group triage** (`source = 'database'`;
+`docs/specs/tech/groups-contract.md`). For `group.share_failed` (share trigger)
+and `group.event_failed` (stream-item trigger) the session write still
+committed; `context` is `{session_id, sqlstate}` and `user_id` is the owner. The
+session's next accepted write heals both. For an `event_failed` session that
+will not be written again, run `select app_public.group_events_backfill();` —
+idempotent, inserts only missing items.
 
-- Runtime status/env:
+**Group evaluator triage** (`source = 'database'`, `user_id` = the member):
 
-```bash
-bash -lc 'source supabase/scripts/_common.sh && run_supabase status -o env'
-```
+| Event | What it means | Recovery |
+| --- | --- | --- |
+| `group.eval_enqueue_failed` | an enqueue trigger failed; the sync write committed. `context` = `{table, row_id, sqlstate}` | the member's next accepted write of that session or link re-enqueues it |
+| `group.eval_kick_failed` | the `pg_net` kick failed | the `group-eval-sweep` cron job (every 5 min) retries |
+| `group.eval_failed` | a job failed and stays queued with backoff. `context` = `{job_id, kind, sqlstate}` | inspect `app_public.group_eval_queue` (`attempts`, `last_sqlstate`) |
+| `group.eval_parked` | failed `group_eval_max_attempts()` times (10); stopped retrying (`available_at = 'infinity'`). `context` adds `attempts` | a recurring sqlstate after a deploy usually means the `group-eval` function is older than the migrations — redeploy it, then `select app_public.group_eval_retry_parked();` |
 
-- Container logs (if needed):
+Comparison jobs (`kind = 'exercise'`, `app_public.group_metric_eval_queue`) carry
+`group_id` and no `user_id`. To drain now:
+`select app_public.group_eval_kick();`. If the queue grows and nothing drains,
+check `select app_public.group_eval_config('group_eval_url');` and the
+`group-eval` function logs.
 
-```bash
-docker ps --format 'table {{.Names}}\t{{.Status}}' | rg supabase
-docker logs -f <container-name>
-```
+**Sync-health triage.** `source = 'sync'`, `event = 'sync.cycle_result'` gives
+each cycle's classified outcome (`converged` / `auth_required` /
+`retryable_error` / `structural_error`) with an error code and sanitized message
+(`apps/mobile/src/sync/cycle.ts`). A run of non-`converged` outcomes means the
+scheduler ticks but does not converge — dirty rows are not draining — which is
+distinct from the cadence transitions logged as `sync_scheduler_*`. Pull-side
+local FK failures also log `source = 'database'`,
+`event = 'sync.pull_local_fk_violation'`.
+
+Push-side FK preflight **quarantines** a local orphan dirty row instead of
+wedging the whole push: `sync.row_quarantined` (warn) names the orphan's
+entity type/id, parent type, missing FK column and unresolved parent id, and
+`sync.push_continued_after_quarantine` (info) reports pushed/quarantined counts.
+The row is recorded in the device-local `sync_quarantine` table (not
+`app_logs`) and skipped by every later push until repaired — parent restored or
+child removed; `getSyncStatus().blockedRowCount`
+(`apps/mobile/src/sync/sync-status.ts`) counts them. A recurring
+`sync.row_quarantined` for the same id is an unrepaired structural orphan:
+repair the row's FK parent locally. There is no user-facing repair UI, and the
+app never performs automatic destructive local graph repair.
 
 ## Tests
 
-### Frontend (apps/mobile)
+`./boga test --list` is the lane registry (`scripts/lanes.tsv`): every lane name,
+its gate, infra, and the command it runs. `./boga test <lane|gate>` runs one and
+`./boga timings` reports measured durations — never estimate one. Which lanes a
+change needs: `./boga test for` and
+`docs/specs/02-quality-and-test-gates.md`. `./scripts/quality-fast.sh` and
+`./scripts/quality-slow.sh` are legacy entrypoints that forward to `./boga`.
+
+Operator extras that are not lanes:
 
 ```bash
 cd apps/mobile
-npm run lint
-npm run typecheck
-npm run test
-npm run test:coverage  # instrumented run; fails under 80% branches/lines; report in coverage/lcov-report/index.html
-npm run lint:complexity  # per-function complexity limits; pre-existing offenders grandfathered
-npm run lint:deps        # import-direction rules (dependency-cruiser); pre-existing violations grandfathered
-npm run db:generate:canary
+npm run db:generate:canary               # drizzle schema/migration drift canary
+npm run test:handles -- sync-cycle       # one area; whole suite: ./boga test handles
+TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh \
+  --flow .maestro/flows/<flow>.yaml --scenario <scenario-name>   # one flow, ad hoc
 ```
 
-For a Jest shutdown warning or hang, optionally run `./boga test handles`
-from the repository root. This diagnostic reports lingering resources with
-their stacks; it runs outside CI and is not a PR requirement. To investigate
-one area, use `npm run test:handles -- sync-cycle` from `apps/mobile`.
-
-### E2E / simulator runtime (apps/mobile)
-
-```bash
-cd apps/mobile
-TASK_ID=ad-hoc npm run test:e2e:ios:smoke
-TASK_ID=ad-hoc npm run test:e2e:ios:data-smoke
-TASK_ID=ad-hoc npm run test:e2e:ios:gates        # smoke + data-smoke sharing one sim + Metro (~28% faster than running both separately)
-TASK_ID=ad-hoc npm run test:e2e:ios:auth-profile
-TASK_ID=ad-hoc ./scripts/maestro-ios-run-flow.sh --flow .maestro/flows/session-completion-states-fixture.yaml --scenario session-completion-states-fixture
-# (this flow is also gated: it runs in `./boga test ios-data-smoke`)
-```
-
-### Backend (Supabase)
-
-```bash
-./boga test backend-fast
-./boga test auth-authz
-# sync v2 contract suites (or run all backend slow suites via: ./boga test backend)
-./boga test sync-v2-schema
-./boga test sync-push-contract
-./boga test sync-pull-contract
-./boga test sync-v2-e2e
-# every lane: ./boga test --list
-```
-
-### Logger diagnostics smoke (Docker Supabase)
-
-Use the auth/authz contract suite as the canonical Docker-hosted local Supabase check for `public.app_logs`:
-
-```bash
-./boga test auth-authz
-```
-
-Notes:
-
-- `./supabase/scripts/ensure-local-runtime-baseline.sh` reuses an already-running local Supabase instance without resetting it.
-- The baseline helper still applies pending local migrations with `supabase db push --local --include-all --yes`.
-- `./supabase/scripts/local-runtime-up.sh` syncs `apps/mobile/.env.local` with the local Docker Supabase URL and anon key after startup.
-- The scripts invoke `npx -y supabase@${SUPABASE_CLI_VERSION}`, so first use may need network access to fetch the pinned Supabase CLI. The repo owns the pin (`BOGA_SUPABASE_CLI_DEFAULT_VERSION` in `scripts/worktree-lib.sh`); an explicit `SUPABASE_CLI_VERSION` env value, then `~/.config/boga/supabase/cli.env`, override it.
-- CLIs below `BOGA_SUPABASE_CLI_MIN_VERSION` (2.108.0) are rejected: their edge-runtime bootstrap imports `deno.land` on every start, so `supabase start` ends `Waiting for health checks...` → empty `supabase_edge_runtime_*` logs → `Error status 502` whenever deno.land is unreachable. `./boga doctor` fails on a stale `SUPABASE_CLI_VERSION` line in `~/.config/boga/supabase/cli.env`; delete it so the repo pin applies.
-- The expected `app_logs` client contract is authenticated insert-only. Anonymous insert must fail, authenticated insert must pass, cross-user `user_id` spoofing must fail, and authenticated select/update/delete must fail.
-- A mobile/Supabase JS smoke can validate insert success by checking that the insert returns no error. Reading the row back with an authenticated mobile client should be denied with `403` / `42501`.
-- Inspect inserted log rows through operator SQL/service-role access, not from the mobile client.
-
-### Repo-level wrappers
-
-```bash
-./scripts/quality-fast.sh
-./scripts/quality-fast.sh frontend
-./scripts/quality-fast.sh backend
-./scripts/quality-slow.sh frontend
-./scripts/quality-slow.sh backend
-```
-
-### Cross-stack restore-parity lane
-
-Reinstall/restore parity is proven by the sync-v2 `cycle-round-trip` assertion
-inside `test:sync:infra`, plus the backend sync-v2 contract suites:
-
-```bash
-cd apps/mobile
-npm run test:sync:infra            # includes the wiped-client restore assertion
-# backend parity: ./scripts/quality-slow.sh backend (from repo root)
-```
-
-See `docs/specs/02-quality-and-test-gates.md` for how to provision the local
-endpoint these read.
+- `./boga test handles` reports lingering resources with their stacks when Jest
+  warns on shutdown or hangs. A diagnostic, not a PR requirement.
+- `./boga test ios-gates` runs the smoke and data-runtime-smoke flows against
+  one provisioned simulator and one Metro instead of paying the cold-boot
+  overhead twice.
+- Reinstall/restore parity is proven by the `cycle-round-trip` wiped-client
+  assertion inside `./boga test sync-infra`, plus the backend sync contract
+  lanes.
+- `./boga test auth-authz` is the canonical local check for the
+  `public.app_logs` client contract: **authenticated insert only** — anonymous
+  insert must fail, authenticated insert must pass, cross-user `user_id`
+  spoofing must fail, and authenticated select/update/delete must all fail
+  (`403` / `42501`). Inspect inserted rows with operator/service-role SQL, never
+  from the mobile client.
