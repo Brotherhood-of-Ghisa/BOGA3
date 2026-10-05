@@ -4,7 +4,8 @@
 #
 # A second local Supabase, isolated from the slot-0 "BOGA" stack the gates use, so
 # a gate run (which truncates/resets slot-0) never touches a human dev session's
-# data. Contract: docs/specs/12 ("Dedicated dev stack (BOGA-dev)").
+# data. Main-checkout-only (engage_dev_stack refuses in a linked worktree).
+# Contract: docs/specs/12 ("Dedicated dev stack (BOGA-dev)").
 #
 # The stack runs from a gitignored workdir (.supabase-dev/) whose supabase/ holds
 # a port/project-rewritten config.toml plus SYMLINKS to the repo's migrations,
@@ -77,10 +78,25 @@ generate_dev_supabase_config() {
   mv "${tmp_file}" "${config}"
 }
 
+# Guardrail: the dev stack is main-checkout-only. Whichever checkout runs
+# `supabase start` owns the Edge runtime's bind mount of its functions/, so a
+# dev stack started from a linked worktree loses every function once that
+# worktree is deleted (group-eval then never runs). Linked worktrees use their
+# own slot stack; the dev launchers route there themselves.
+dev_stack_require_main_checkout() {
+  boga_is_linked_git_worktree "${REPO_ROOT}" || return 0
+  echo "[dev-stack] refusing to run: the ${BOGA_DEV_PROJECT_ID} stack is main-checkout-only, and ${REPO_ROOT} is a linked worktree." >&2
+  echo "[dev-stack] a dev stack started here would serve this worktree's functions/ and break once it is removed." >&2
+  echo "[dev-stack] use this worktree's slot stack instead: ./boga db up, or scripts/dev/dev-lan.sh / dev-remote.sh (they pick it automatically)." >&2
+  echo "[dev-stack] for ${BOGA_DEV_PROJECT_ID}, run from the main checkout: $(boga_main_worktree_path "${REPO_ROOT}")" >&2
+  exit 1
+}
+
 # Generate the workdir (if needed) and point all subsequent Supabase helpers at
 # the dev stack by exporting BOGA_SUPABASE_WORKDIR. Call once near the top of a
-# dev-stack script; child scripts inherit the var.
+# dev-stack script; child scripts inherit the var. Refuses in a linked worktree.
 engage_dev_stack() {
+  dev_stack_require_main_checkout
   generate_dev_supabase_config
   export BOGA_SUPABASE_WORKDIR="${BOGA_DEV_WORKDIR}"
 }

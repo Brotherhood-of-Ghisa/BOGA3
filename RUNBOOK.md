@@ -286,7 +286,7 @@ run loop once that build is on the phone.
 
 ### One-stop: dev-lan.sh
 
-The single command that chains everything — boots this slot's local Supabase,
+The single command that chains everything — boots this checkout's local Supabase,
 points `apps/mobile/.env.local` at the Mac's LAN IP, and starts Expo/Metro over
 the LAN in `--dev-client` mode:
 
@@ -300,7 +300,7 @@ Notes:
   (scan the QR code Expo prints, or open the dev-client URL).
 - Extra args are forwarded to `expo start`, e.g. `./scripts/dev/dev-lan.sh --clear`.
 - Supabase containers persist after you Ctrl+C Expo. Stop them with
-  `./supabase/scripts/local-runtime-down.sh`.
+  `boga db dev-down` (main checkout) or `boga db down` (linked worktree).
 
 ### Outside the LAN (Tailscale): dev-remote.sh
 
@@ -479,10 +479,8 @@ and no gate, CI lane, or seed touches them.
 
 ### Provision the dev accounts
 
-The dev accounts are auth users on whichever Supabase you target. A fresh local
-stack and `supabase db reset` both wipe `auth.users`, so re-run this after a
-reset — it is idempotent (creates the accounts if missing, resets their passwords
-if present).
+The dev accounts are auth users on whichever Supabase you target. A fresh stack
+or reset wipes `auth.users`; re-run this after one (idempotent).
 
 **Automatic (the usual path):** the phone launchers `scripts/dev/dev-lan.sh` and
 `scripts/dev/dev-remote.sh` target a **dedicated dev Supabase stack**
@@ -493,8 +491,10 @@ resetting it**, apply pending migrations in place, point the group-eval kick
 at it, seed `a@dev.local` (near-blank) / `b@dev.local` / `history@dev.local`
 (rich imported history), seed the `Dev crew` group (`npm run seed:dev-groups`;
 `history@` owns, `b@` joins, both backdated, four recent weeks of sessions
-each), and activate group competitions once (one-way until `boga db dev-reset`). The full isolation
-contract is in `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
+each), and activate group competitions once (one-way until `boga db dev-reset`).
+`BOGA-dev` is main-checkout-only: in a linked worktree the launchers run this
+baseline on its slot stack (`./boga db reset` before its groups gates).
+Contract: `docs/specs/12-worktree-config-and-isolation.md` (Dedicated dev
 stack). Commands:
 
 ```bash
@@ -504,8 +504,8 @@ boga db dev-down     # stop it (data persists)
 boga db dev-reset    # rebuild it — DROPS ALL DEV DATA
 ```
 
-On real schema drift the baseline **fails loud** rather than wiping — it tells
-you to run `boga db dev-reset` explicitly. Use that only for a clean rebuild.
+On real schema drift the baseline **fails loud** rather than wiping; rebuild
+explicitly with `boga db dev-reset`.
 
 Local Docker/Colima Supabase, provisioning the accounts by themselves:
 
@@ -522,8 +522,7 @@ set -a; source supabase/.env.hosted; set +a        # SUPABASE_URL + legacy JWT s
 ```
 
 Hosted provisioning needs the **legacy JWT `service_role`** key (not a
-`sb_publishable_...` / `sb_secret_...` key) — same requirement as the other auth
-scripts. The fixture users have their own provisioner
+`sb_publishable_...` / `sb_secret_...` key). The fixture users have their own provisioner
 (`./supabase/scripts/auth-provision-local-fixtures.sh`), which the test baseline
 runs automatically; you do not need it for manual dev.
 

@@ -197,7 +197,7 @@ local Supabase for that session:
 | Config + workdir | `.supabase-dev/supabase/config.toml` (gitignored), migrations/seed/functions **symlinked** to `supabase/` | `supabase/config.toml` |
 | Run mechanism | `supabase --workdir .supabase-dev …` (concurrent with slot 0) | default workdir |
 | Lifecycle | `boga db dev` (baseline: up, migrate, eval kick, seed, activate groups; no reset), `boga db dev-up\|dev-down\|dev-reset` | `boga db up\|down\|reset\|baseline` |
-| Used by | `dev-lan.sh` / `dev-remote.sh` (they `export BOGA_MOBILE_DEV_DB=1`) | the gates and `boga test *` |
+| Used by | main-checkout `dev-lan.sh` / `dev-remote.sh` (`BOGA_MOBILE_DEV_DB=1`) | the gates and `boga test *` |
 
 Slot 100 is outside the leasable `0..99` range, so its ports never collide with a
 worktree. The Supabase helpers in `supabase/scripts/_common.sh` follow
@@ -208,9 +208,10 @@ provisioning at the dev stack. Dev scripts refuse to run unless the active
 the var — so neither side can target the other's stack.
 
 The dev stack has no lease. `./boga worktree ls` lists it as the dev stack, and
-nothing removes it except `boga db dev-reset`. The dev scripts still require the
-main checkout's slot-0 lease, like every other runtime command. This is
-main-checkout-only; linked worktrees use their own slot stack for everything.
+nothing removes it except `boga db dev-reset`. It is **main-checkout-only**: its
+starter owns the Edge runtime's `functions/` mount, so `engage_dev_stack`
+refuses in a linked worktree; launchers there use the slot stack
+(`ensure-dev-baseline.sh --slot-stack`).
 
 ## Worktree lifecycle (agent-owned)
 
