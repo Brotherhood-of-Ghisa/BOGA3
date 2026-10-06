@@ -9,7 +9,8 @@
 # launchers (stub adb/Expo/JDK), the iOS simulator boot-wait (stub xcrun), and
 # the edge function server stop (stub npx process tree), and the dev stack's
 # generated config (function entrypoints) and main-checkout-only rule (temp
-# git worktree, stubbed launcher children).
+# git worktree, stubbed launcher children), and CI's docs-only fast-path
+# classifier (ci-docs-only.sh).
 # Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
 # and in CI.
 
@@ -34,6 +35,7 @@ TESTS=(
   "functions-serve-stop.test.sh"
   "dev-stack-config.test.sh"
   "dev-stack-main-checkout.test.sh"
+  "ci-docs-only.test.sh"
 )
 
 failed=0

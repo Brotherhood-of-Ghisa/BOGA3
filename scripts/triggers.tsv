@@ -102,6 +102,7 @@ scripts/test-timings.sh	meta-tests	timings reader / import (lane-timing meta-tes
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint
 scripts/pr-wait.sh	meta-tests	PR merge waiter (lifecycle meta-test)
+scripts/ci-docs-only.sh	meta-tests	CI docs-only fast-path classifier (ci-docs-only meta-test)
 scripts/boga-config-init.sh	meta-tests	machine config seeding (run by worktree start)
 scripts/tests/**	meta-tests	meta-tooling tests
 .github/workflows/**	docs-check	CI definition (update spec 02 CI posture)
