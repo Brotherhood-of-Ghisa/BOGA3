@@ -275,8 +275,8 @@ the controls. Record results in the pilot PR body.
 
 | # | PR | Gates |
 | --- | --- | --- |
-| 1 | CI fast path for docs-only PRs (`ci.yml` step guards) | `fast`; CI time measured before/after on a docs-only PR |
-| 2 | `docs/product/` with README, the facts above, `REVIEW.md`; back-test run; open questions answered as decision rows | `docs-check` (fast CI) |
+| 1 ✅ #576 | CI fast path for docs-only PRs (`ci.yml` step guards) | `fast`; CI time measured before/after on a docs-only PR |
+| 2 (in review) | `docs/product/` with README, the facts above, `REVIEW.md`; back-test run; open questions answered as decision rows | `docs-check` (fast CI) |
 | 3 | Wire it in: `docs-check` parses fact headers and `[[id]]` refs and budgets the corpus; Jest runs fact tables; AGENTS.md always-loads `docs/product/`; PR template line | `fast`, `jest-coverage`, `complexity`, `dependencies` |
 | 4 | De-duplicate: metrics contract §1, `ux-rules.md` "Sets and figures", `design-language.md` and design targets cite facts instead of restating them; soften `08` subtitle rule into a reference | `fast` |
 | 5 | Implement decisions 1 and 3 (separate PRs, after their decision PRs); decide 2 | per change: decision 1 touches groups (`backend`, `groups-api-live`, `ios-groups-e2e` rows), decision 3 touches metrics (`fast` + facts rebuild pins) |
