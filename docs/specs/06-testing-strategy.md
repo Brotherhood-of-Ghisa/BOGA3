@@ -214,7 +214,8 @@ the lane matrix in `02`). A PR that changes only `docs/**` or root-level `*.md`
 runs `docs-check` alone; every later step is skipped in the same job, and push
 to `main` always runs everything. `scripts/ci-docs-only.sh` owns that rule and
 `scripts/tests/ci-docs-only.test.sh` pins it — a doc that a test or script
-reads at runtime must live outside `docs/`. Two consequences are policy, not
+reads at runtime must live outside `docs/`. The one exception is
+`docs/product/`, whose fact tables Jest runs: a change there runs everything. Two consequences are policy, not
 trivia:
 
 - **"Not in CI" means you run it here.** This machine boots the iOS simulator and

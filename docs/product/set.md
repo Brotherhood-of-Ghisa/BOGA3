@@ -21,6 +21,8 @@ independent Working set and Volume columns). The table gives its defaults.
 Group and coaching figures use one fixed rule, the same as the personal
 defaults, and never read a device's policy.
 
+<!-- fact-table: set.eligibility -->
+
 | Effort label | Personal working set (default) | Personal volume-included (default) | Groups and coaching (fixed) |
 | --- | --- | --- | --- |
 | Warm-up | no | no | no |
@@ -47,6 +49,7 @@ and the remove-exercise alert's `its N sets`.
 Why: one number per idea, so the reader never has to pick which count
 matters.
 Code: the aggregators' `workingSetCount`.
+Signature: `n of m sets done`
 
 ### set.row-figures · presentation · accepted
 
