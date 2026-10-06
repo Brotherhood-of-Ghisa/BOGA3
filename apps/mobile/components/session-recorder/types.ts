@@ -13,6 +13,8 @@ export type SessionSet = {
   plannedWeight: string | null;
   plannedSetType: SessionSetTypeValue;
   performanceStatus: SessionSetPerformanceStatus;
+  /** Block provenance; manual sets are null. */
+  sourcePlanSetId?: string | null;
 };
 
 export type SessionExercise = {
@@ -21,6 +23,8 @@ export type SessionExercise = {
   exerciseDefinitionId: string;
   name: string;
   machineName: string;
+  /** Block provenance; unsourced cards are null. */
+  sourcePlanExerciseId?: string | null;
   sets: SessionSet[];
 };
 

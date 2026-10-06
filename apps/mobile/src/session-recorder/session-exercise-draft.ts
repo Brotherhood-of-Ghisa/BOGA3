@@ -81,6 +81,7 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
   exerciseDefinitionId: exercise.exerciseDefinitionId,
   name: exercise.name,
   machineName: exercise.machineName,
+  sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
   sets: exercise.sets.map((set) => ({
     id: set.id,
     weightValue: set.weightValue,
@@ -90,6 +91,7 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
     plannedRepsValue: set.plannedRepsValue,
     plannedSetType: set.plannedSetType,
     performanceStatus: set.performanceStatus,
+    sourcePlanSetId: set.sourcePlanSetId ?? null,
   })),
 });
 
@@ -128,6 +130,7 @@ export const saveSessionExerciseDraft = async (
     sessionId: session.sessionId,
     gymId: session.gymId,
     startedAt: session.startedAt,
+    sourcePlanId: session.sourcePlanId ?? null,
     exercises: exercises.map(toSessionExerciseInput),
   };
   if (session.status === 'completed') {

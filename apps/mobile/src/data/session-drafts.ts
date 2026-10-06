@@ -28,6 +28,8 @@ export type SessionDraftSetInput = {
   plannedWeightValue?: string | null;
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  /** Block provenance. Undefined preserves the stored value; null clears it. */
+  sourcePlanSetId?: string | null;
 };
 
 export type SessionDraftExerciseInput = {
@@ -36,6 +38,8 @@ export type SessionDraftExerciseInput = {
   name: string;
   machineName?: string | null;
   sets: SessionDraftSetInput[];
+  /** Block provenance. Undefined preserves the stored value; null clears it. */
+  sourcePlanExerciseId?: string | null;
 };
 
 export type PersistSessionDraftInput = {
@@ -43,6 +47,8 @@ export type PersistSessionDraftInput = {
   gymId: string | null;
   startedAt: Date;
   status?: SessionDraftStatus;
+  /** Whole-plan-start provenance. Undefined preserves the stored value. */
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseInput[];
 };
 
@@ -73,6 +79,7 @@ export type SessionDraftSetSnapshot = {
   plannedWeightValue?: string | null;
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  sourcePlanSetId?: string | null;
 };
 
 export type SessionDraftExerciseSnapshot = {
@@ -81,6 +88,7 @@ export type SessionDraftExerciseSnapshot = {
   exerciseDefinitionId: string;
   name: string;
   machineName: string | null;
+  sourcePlanExerciseId?: string | null;
   sets: SessionDraftSetSnapshot[];
 };
 
@@ -91,6 +99,7 @@ export type SessionDraftSnapshot = ResolvedSessionWeight & {
   startedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseSnapshot[];
 };
 
@@ -104,6 +113,7 @@ export type SessionGraphSnapshot = ResolvedSessionWeight & {
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseSnapshot[];
 };
 
@@ -173,6 +183,7 @@ export type SessionPersistenceRecord = ResolvedSessionWeight & {
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  sourcePlanId?: string | null;
 };
 
 type StoredDraftSetRecord = {
@@ -186,6 +197,7 @@ type StoredDraftSetRecord = {
   plannedWeightValue?: string | null;
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  sourcePlanSetId?: string | null;
 };
 
 type StoredDraftExerciseRecord = {
@@ -196,6 +208,7 @@ type StoredDraftExerciseRecord = {
   orderIndex: number;
   name: string;
   machineName: string | null;
+  sourcePlanExerciseId?: string | null;
 };
 
 type StoredSessionExerciseTagRecord = {
@@ -217,6 +230,7 @@ type SaveDraftGraphInput = {
   gymId: string | null;
   status: SessionDraftStatus;
   startedAt: Date;
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseInput[];
   now: Date;
 };
@@ -322,6 +336,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect & ResolvedSessionWeight
     deletedAt: toDate(row.deletedAt),
     createdAt,
     updatedAt,
+    sourcePlanId: row.sourcePlanId ?? null,
   };
 };
 
@@ -337,12 +352,14 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
   startedAt: graph.session.startedAt,
   createdAt: graph.session.createdAt,
   updatedAt: graph.session.updatedAt,
+  sourcePlanId: graph.session.sourcePlanId ?? null,
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
+    sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -355,6 +372,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
         reps: set.repsValue,
         weight: set.weightValue,
       }),
+      sourcePlanSetId: set.sourcePlanSetId ?? null,
     })),
   })),
 });
@@ -374,12 +392,14 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
   deletedAt: graph.session.deletedAt,
   createdAt: graph.session.createdAt,
   updatedAt: graph.session.updatedAt,
+  sourcePlanId: graph.session.sourcePlanId ?? null,
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
+    sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -392,6 +412,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
         reps: set.repsValue,
         weight: set.weightValue,
       }),
+      sourcePlanSetId: set.sourcePlanSetId ?? null,
     })),
   })),
 });
@@ -458,6 +479,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         reps: row.repsValue,
         weight: row.weightValue,
       }),
+      sourcePlanSetId: row.sourcePlanSetId,
     });
     acc.set(row.sessionExerciseId, current);
     return acc;
@@ -477,6 +499,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
+        sourcePlanExerciseId: exercise.sourcePlanExerciseId,
         loadContext: personalCalculationContext(
           bodyweightCalculationsEnabled,
           definitionById.get(exercise.exerciseDefinitionId),
@@ -528,6 +551,7 @@ const replaceSessionExerciseGraph = (
       sessionId: sessionExercises.sessionId,
       exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
       orderIndex: sessionExercises.orderIndex,
+      sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
     })
     .from(sessionExercises)
     .where(eq(sessionExercises.sessionId, input.sessionId))
@@ -548,6 +572,7 @@ const replaceSessionExerciseGraph = (
             plannedWeightValue: exerciseSets.plannedWeightValue,
             plannedSetType: exerciseSets.plannedSetType,
             performanceStatus: exerciseSets.performanceStatus,
+            sourcePlanSetId: exerciseSets.sourcePlanSetId,
           })
           .from(exerciseSets)
           .where(inArray(exerciseSets.sessionExerciseId, existingExerciseIds))
@@ -631,6 +656,10 @@ const replaceSessionExerciseGraph = (
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
+          sourcePlanExerciseId:
+            exercise.sourcePlanExerciseId === undefined
+              ? existingExercise.sourcePlanExerciseId ?? null
+              : exercise.sourcePlanExerciseId,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: input.localUpdatedAtMs,
@@ -647,6 +676,7 @@ const replaceSessionExerciseGraph = (
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
+          sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: input.localUpdatedAtMs,
@@ -725,6 +755,10 @@ const replaceSessionExerciseGraph = (
               set.plannedWeightValue === undefined ? existingSet?.plannedWeightValue ?? null : set.plannedWeightValue,
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
+            sourcePlanSetId:
+              set.sourcePlanSetId === undefined
+                ? existingSet?.sourcePlanSetId ?? null
+                : set.sourcePlanSetId,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -745,6 +779,7 @@ const replaceSessionExerciseGraph = (
             plannedWeightValue: set.plannedWeightValue ?? null,
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
+            sourcePlanSetId: set.sourcePlanSetId ?? null,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -853,6 +888,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            sourcePlanId: input.sourcePlanId ?? null,
             localDirty: true,
             localUpdatedAtMs,
             createdAt: input.now,
@@ -867,6 +903,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            sourcePlanId:
+              input.sourcePlanId === undefined ? existingSession.sourcePlanId ?? null : input.sourcePlanId,
             localDirty: true,
             localUpdatedAtMs,
             updatedAt: input.now,
