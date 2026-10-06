@@ -40,6 +40,9 @@ type SetLoggerProps = {
   // The swipe-left equivalent, as the logger's `discard` accessibility action.
   // Absent when dropping would change nothing.
   onDrop?: () => void;
+  // The reorder moves (`Move set N earlier/later`), absent at a boundary.
+  onMoveEarlier?: () => void;
+  onMoveLater?: () => void;
 };
 
 // Up to 5 digits and a point; the logger rejects anything else as it is typed.
@@ -62,7 +65,7 @@ const actionsHint = (canConfirm: boolean, canDrop: boolean): string | undefined 
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, onMoveEarlier, onMoveLater, loadContext },
   weightInputRef
 ) {
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
@@ -77,6 +80,8 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
     <View style={styles.logger} testID="exercise-set-logger">
       <View
         accessibilityActions={[
+          ...(onMoveEarlier ? [{ name: 'move-earlier', label: `Move set ${number} earlier` }] : []),
+          ...(onMoveLater ? [{ name: 'move-later', label: `Move set ${number} later` }] : []),
           ...(onConfirm ? [{ name: 'confirm', label: `Confirm set ${number}` }] : []),
           ...(onDrop ? [{ name: 'discard', label: `Drop set ${number}` }] : []),
         ]}
@@ -84,6 +89,8 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         accessibilityLabel={`Set ${number}, in progress`}
         accessible
         onAccessibilityAction={(event) => {
+          if (event.nativeEvent.actionName === 'move-earlier') onMoveEarlier?.();
+          if (event.nativeEvent.actionName === 'move-later') onMoveLater?.();
           if (event.nativeEvent.actionName === 'confirm') onConfirm?.();
           if (event.nativeEvent.actionName === 'discard') onDrop?.();
         }}
