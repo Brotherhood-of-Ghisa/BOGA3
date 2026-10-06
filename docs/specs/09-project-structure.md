@@ -94,6 +94,16 @@ Define the canonical repository structure, path ownership, and placement convent
     never imports the domain database, sync cycle or UI, and never nudges sync.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
+- `apps/mobile/src/session-planner/`
+  - owns the planner domain API: the read models (upcoming/unscheduled queues,
+    programme progress, next block), the plan/programme repository (the
+    mutation boundary for planner screens), pure contract-limit validation with
+    field-addressable errors, the deterministic materialization IDs,
+    `startSessionPlan` / `addPlanBlockToSession`, performed-set reordering, and
+    explicit block resolution (`docs/specs/tech/session-planning-contract.md`
+    §4.6).
+  - imports `src/data`; `src/data` never imports it back. All plan-table and
+    performed-graph SQL stays in `src/data`.
 - `apps/mobile/src/session-insights/`
   - owns the shared pure calculations for session muscle load and strict
     exercise PRs, the completed-session repository adapter, and the platform-text

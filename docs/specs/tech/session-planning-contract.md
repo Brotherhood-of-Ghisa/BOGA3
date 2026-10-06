@@ -300,6 +300,33 @@ path is defined so the permitted operation can never block sync.
    Whole-plan starts need no arbitration: their deterministic IDs (§4.2) make a
    competing Start all resolve to the same row, not a second one.
 
+### 4.6 As-built: mobile module map and deviations
+
+- **Boundary.** All plan-table SQL lives in
+  `apps/mobile/src/data/session-plan-store.ts` (graph save, meta-only plan
+  updates, single-block rewrite, tombstones, reorders); performed-graph
+  writes stay in `session-drafts.ts`.
+  `apps/mobile/src/session-planner/` owns the screen-facing API: types,
+  pure validation (§7.1 limits, field-addressable errors), deterministic IDs,
+  the plan/programme repository, read models, `startSessionPlan`,
+  `addPlanBlockToSession`, `reorderSessionExerciseSets`, and
+  `completePlanBlock` / `skipPlanBlock`. Screens never write plan tables.
+- **Deterministic IDs.** `` `${ownerId}:${sourceId}:start` `` as §4.2; a
+  signed-out device uses the `local` owner (nothing syncs, keys only need
+  local stability).
+- **Available block.** pending, definition-bearing (cards and matching need
+  the owned reference), and unclaimed by a live performed card whose session
+  is not discarded — a discarded workout returns its blocks to pending.
+- **Add block.** The created-session id is a fresh local id, not the
+  §4.2 recipe: its `source_plan_id` stays null and a retry reuses the
+  existing active session; card/set ids still follow §4.2 so Start all and
+  Add block converge on the same rows.- **Arbitration.** The token message carries the failed constraint name, not
+  the winning id — the repair needs no id: pull, clear every live local
+  claimant of exactly the pulled claims, re-push. The pull leg repairs on
+  the local violation; the push leg repairs inside its recovery pull.
+- **Reorder.** Two-phase: lift above every parent row (tombstones included),
+  then dense `0..n-1`; provenance, targets, and state untouched.
+
 ## 5. UI and UX Contracts
 
 ### 5.1 Route and Screen Map
