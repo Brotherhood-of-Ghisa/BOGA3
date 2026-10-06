@@ -31,6 +31,10 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import {
+  clearProvenanceClaimsForWirePage,
+  collectProvenanceClaimsFromWire,
+} from '@/src/data/session-drafts';
 import * as schema from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
@@ -110,7 +114,13 @@ interface ErrorEnvelope {
 // Error classification
 // -----------------------------------------------------------------------------
 
-export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
+export type SyncErrorCode =
+  | 'AUTH_REQUIRED'
+  | 'FK_VIOLATION'
+  | 'LOCAL_FK_VIOLATION'
+  | 'BLOCK_ALREADY_ATTACHED'
+  | 'UPDATE_REQUIRED'
+  | 'INTERNAL';
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
@@ -161,6 +171,11 @@ export const classifyRpcResult = (
     if (message.includes('AUTH_REQUIRED')) {
       return 'AUTH_REQUIRED';
     }
+    // Before FK_VIOLATION: the server token is self-contained, and the
+    // provenance arbitration envelope never carries the FK token.
+    if (message.includes('BLOCK_ALREADY_ATTACHED')) {
+      return 'BLOCK_ALREADY_ATTACHED';
+    }
     if (message.includes('FK_VIOLATION')) {
       return 'FK_VIOLATION';
     }
@@ -172,6 +187,9 @@ export const classifyRpcResult = (
   if (code === 'UPDATE_REQUIRED') return 'UPDATE_REQUIRED';
   if (code === 'AUTH_REQUIRED') {
     return 'AUTH_REQUIRED';
+  }
+  if (code === 'BLOCK_ALREADY_ATTACHED') {
+    return 'BLOCK_ALREADY_ATTACHED';
   }
   if (code === 'FK_VIOLATION') {
     return 'FK_VIOLATION';
@@ -217,6 +235,29 @@ const isLocalSqliteForeignKeyError = (error: unknown): boolean => {
     return true;
   }
   return sanitizeExceptionMessage(error).toLowerCase().includes('foreign key');
+};
+
+/** The three provenance columns whose unique violation means arbitration. */
+const PROVENANCE_UNIQUE_COLUMNS = [
+  'source_plan_exercise_id',
+  'source_plan_set_id',
+  'sessions.source_plan_id',
+] as const;
+
+/**
+ * A local unique violation on one of the three provenance partial unique
+ * indexes, raised while applying a pulled row: the server had already
+ * committed a competing attachment of the same plan block or source target,
+ * and the local claimant loses (session-planning contract §4.5). Matched by
+ * the failed column (SQLite's message names columns, not indexes) so
+ * unrelated unique violations classify unchanged.
+ */
+const isLocalProvenanceUniqueViolation = (error: unknown): boolean => {
+  const message = sanitizeExceptionMessage(error);
+  if (!message.toLowerCase().includes('unique constraint failed')) {
+    return false;
+  }
+  return PROVENANCE_UNIQUE_COLUMNS.some((column) => message.includes(column));
 };
 
 /**
@@ -327,6 +368,39 @@ const logPullLocalFkViolation = (
         operation: 'pull_page_apply',
         error_code: LOCAL_FK_ERROR_CODE,
         exception_message: exceptionMessage,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never mask the sync error.
+  }
+};
+
+/**
+ * Best-effort observability for the provenance arbitration repair (contract
+ * §4.5): a competing attachment won, this device's losing provenance was
+ * cleared deterministically, and its rows re-push as unsourced. Ids only —
+ * never a row payload.
+ */
+const logProvenanceArbitrationRepair = (
+  leg: 'push' | 'pull',
+  layer?: number,
+  claims?: { blocks: Set<string>; targets: Set<string> },
+): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'database',
+      event: 'sync.block_attachment_arbitration_repair',
+      message:
+        'A competing attachment of a plan block won; the losing provenance was cleared deterministically.',
+      context: {
+        operation: 'provenance_arbitration_repair',
+        leg,
+        ...(layer === undefined ? {} : { layer }),
+        ...(claims
+          ? { cleared_blocks: claims.blocks.size, cleared_targets: claims.targets.size }
+          : {}),
+        error_code: 'BLOCK_ALREADY_ATTACHED',
       },
     }).catch(() => undefined);
   } catch {
@@ -992,9 +1066,8 @@ const runPullLeg = async (
       // only moves past rows that actually committed locally. The transaction
       // returns the count of rows actually written so a no-op page does not
       // count toward convergence motion.
-      let pageChanged: number;
-      try {
-        pageChanged = database.transaction((tx) => {
+      const applyPage = (): number =>
+        database.transaction((tx) => {
           const transaction = tx as Transaction;
           let changed = 0;
           for (const type of layerTypes) {
@@ -1006,8 +1079,21 @@ const runPullLeg = async (
           writeCursorEntry(transaction, layer, page.next_cursor);
           return changed;
         });
+
+      let pageChanged: number;
+      try {
+        pageChanged = applyPage();
       } catch (error) {
-        if (isLocalSqliteForeignKeyError(error)) {
+        if (isLocalProvenanceUniqueViolation(error)) {
+          // A pulled provenance row claims a plan block or source target a
+          // local row already holds: the server committed first, so the local
+          // claimant loses. Clear exactly those claims outside the failed
+          // transaction and apply the page once more (contract §4.5).
+          const claims = collectProvenanceClaimsFromWire(page.entities);
+          logProvenanceArbitrationRepair('pull', layer, claims);
+          await clearProvenanceClaimsForWirePage(page.entities);
+          pageChanged = applyPage();
+        } else if (isLocalSqliteForeignKeyError(error)) {
           logPullLocalFkViolation(error, layer, page.entities);
           const types = Array.from(new Set(page.entities.map((entity) => entity.type))).sort();
           throw new SyncCycleError(
@@ -1015,8 +1101,9 @@ const runPullLeg = async (
             `local pull apply failed for ${types.join(', ')} (layer ${layer + 1} of ${TOPO_LAYERS.length}): ` +
               sanitizeExceptionMessage(error),
           );
+        } else {
+          throw error;
         }
-        throw error;
       }
 
       // Notify after this page commits, even if a later pull/push fails.
@@ -1264,7 +1351,23 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       const pulledBefore = await runPullLeg(database);
       // A replay can make deferred old-client metadata safe to seed in this round.
       runBundleMigrations(database);
-      const pushed = await runPushLeg(database);
+      let pushed: number;
+      try {
+        pushed = await runPushLeg(database);
+      } catch (error) {
+        if (error instanceof SyncCycleError && error.code === 'BLOCK_ALREADY_ATTACHED') {
+          // A competing device committed its attachment of the same plan block
+          // after this round's pull drained (server commit order is the
+          // tiebreak). Pull again: the winner arrives and the pull-side
+          // arbitration repair clears this device's losing claim
+          // deterministically — entered work stays, unsourced — and the loop
+          // re-pushes the repaired rows to convergence (contract §4.5).
+          logProvenanceArbitrationRepair('push');
+          await runPullLeg(database);
+          continue;
+        }
+        throw error;
+      }
       const pulledAfter = await runPullLeg(database);
 
       if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {

@@ -1,13 +1,13 @@
 import { personalCalculationContext } from '@/src/config/personal-effort';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
-import { nowMonotonic } from './clock';
+import { nowMonotonic, type Transaction } from './clock';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessions, userSettings } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessions, userSettings } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
@@ -952,6 +952,139 @@ export const reorderSessionExerciseSetOrder = async (
     notifyLocalWrite();
   }
   return wrote;
+};
+
+/**
+ * Deterministic provenance-arbitration repair (session-planning contract
+ * §4.5): the server commits first, so a pulled attachment claim beats any live
+ * local claimant. When an incoming `session_exercises` / `exercise_sets` row
+ * cannot apply because a local row already claims the same plan block or
+ * source target (the local partial unique index rejects the insert), the
+ * local claimant loses and keeps all of its user work as unsourced rows:
+ *
+ * - every live local card claiming one of `blocks` gets its
+ *   `source_plan_exercise_id` cleared, together with the `source_plan_set_id`
+ *   of its sets sourced from that block's targets (the cross-level provenance
+ *   invariant: an unsourced card holds no source-derived sets);
+ * - every live local set claiming one of `targets` gets its
+ *   `source_plan_set_id` cleared;
+ * - entered actual values, manual sets, and row identity are untouched, so
+ *   the permitted operation never blocks sync.
+ *
+ * Whole-plan starts need no arbitration: their deterministic ids make a
+ * competing Start all resolve to the same row under LWW. Returns whether
+ * anything was cleared.
+ */
+export const clearProvenanceClaimsInTransaction = (
+  tx: Transaction,
+  claims: { blocks: ReadonlySet<string>; targets: ReadonlySet<string> },
+  now: Date,
+  localUpdatedAtMs: number,
+): boolean => {
+  let cleared = false;
+
+  for (const blockId of claims.blocks) {
+    const claimantCards = tx
+      .select({ id: sessionExercises.id })
+      .from(sessionExercises)
+      .where(
+        and(
+          eq(sessionExercises.sourcePlanExerciseId, blockId),
+          isNull(sessionExercises.deletedAt),
+        ),
+      )
+      .all();
+    const blockSetIds = tx
+      .select({ id: sessionPlanSets.id })
+      .from(sessionPlanSets)
+      .where(eq(sessionPlanSets.sessionPlanExerciseId, blockId))
+      .all()
+      .map((row) => row.id);
+    for (const card of claimantCards) {
+      tx.update(sessionExercises)
+        .set({ sourcePlanExerciseId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(sessionExercises.id, card.id))
+        .run();
+      if (blockSetIds.length > 0) {
+        tx.update(exerciseSets)
+          .set({ sourcePlanSetId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+          .where(
+            and(
+              eq(exerciseSets.sessionExerciseId, card.id),
+              inArray(exerciseSets.sourcePlanSetId, blockSetIds),
+              isNull(exerciseSets.deletedAt),
+            ),
+          )
+          .run();
+      }
+      cleared = true;
+    }
+  }
+
+  for (const targetId of claims.targets) {
+    const claimantSets = tx
+      .select({ id: exerciseSets.id })
+      .from(exerciseSets)
+      .where(
+        and(eq(exerciseSets.sourcePlanSetId, targetId), isNull(exerciseSets.deletedAt)),
+      )
+      .all();
+    for (const set of claimantSets) {
+      tx.update(exerciseSets)
+        .set({ sourcePlanSetId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(exerciseSets.id, set.id))
+        .run();
+      cleared = true;
+    }
+  }
+
+  return cleared;
+};
+
+/**
+ * Collects the provenance claims an incoming pull page carries, so a page
+ * that failed on a provenance unique violation can clear exactly those local
+ * claimants (see {@link clearProvenanceClaimsInTransaction}).
+ */
+export const collectProvenanceClaimsFromWire = (
+  entities: readonly { type: string; fields: Record<string, unknown> }[],
+): { blocks: Set<string>; targets: Set<string> } => {
+  const blocks = new Set<string>();
+  const targets = new Set<string>();
+  for (const entity of entities) {
+    const sourcePlanExerciseId = entity.fields.source_plan_exercise_id;
+    if (entity.type === 'session_exercises' && typeof sourcePlanExerciseId === 'string' && sourcePlanExerciseId) {
+      blocks.add(sourcePlanExerciseId);
+    }
+    const sourcePlanSetId = entity.fields.source_plan_set_id;
+    if (entity.type === 'exercise_sets' && typeof sourcePlanSetId === 'string' && sourcePlanSetId) {
+      targets.add(sourcePlanSetId);
+    }
+  }
+  return { blocks, targets };
+};
+
+/**
+ * Runs {@link clearProvenanceClaimsInTransaction} for the claims a failed
+ * pull page carried. The caller applies the page again afterwards.
+ */
+export const clearProvenanceClaimsForWirePage = async (
+  entities: readonly { type: string; fields: Record<string, unknown> }[],
+  now: Date = new Date(),
+): Promise<boolean> => {
+  const claims = collectProvenanceClaimsFromWire(entities);
+  if (claims.blocks.size === 0 && claims.targets.size === 0) {
+    return false;
+  }
+  const database = await bootstrapLocalDataLayer();
+  let cleared = false;
+  database.transaction((tx) => {
+    cleared = clearProvenanceClaimsInTransaction(tx, claims, now, nowMonotonic(tx));
+  });
+  if (cleared) {
+    notifyLocalWrite();
+  }
+  return cleared;
 };
 
 export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({

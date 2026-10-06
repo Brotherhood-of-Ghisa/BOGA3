@@ -129,6 +129,7 @@ DUP_SESSION_BODY="$(jq -nc \
              created_at: $ts, updated_at: $ts, deleted_at: null}}]}')"
 sync_push "${USER_A_TOKEN}" "${DUP_SESSION_BODY}"
 assert_non_2xx "second live session for the same plan rejected"
+assert_body_contains "BLOCK_ALREADY_ATTACHED" "second live session carries the arbitration token"
 assert_body_contains "sessions_owner_source_plan_unique" "second live session hits the partial-unique guard"
 
 # Partial-unique retry guard: a second live performed set for the same target
@@ -143,7 +144,37 @@ DUP_SET_BODY="$(jq -nc \
              created_at: $ts, updated_at: $ts, deleted_at: null}}]}')"
 sync_push "${USER_A_TOKEN}" "${DUP_SET_BODY}"
 assert_non_2xx "second live performed set for the same target rejected"
+assert_body_contains "BLOCK_ALREADY_ATTACHED" "second live set carries the arbitration token"
 assert_body_contains "exercise_sets_owner_source_set_unique" "second live performed set hits the partial-unique guard"
+
+# §4.5 arbitration: a second live performed card claiming the same plan block
+# is rejected with the wire-stable BLOCK_ALREADY_ATTACHED token, and the batch
+# rolls back atomically — the losing card and the work-carrying set inside it
+# write nothing. Server commit order is the only tiebreak; the loser device's
+# client pulls the winner and clears its losing provenance deterministically.
+DUP_CARD_BODY="$(jq -nc \
+  --arg id "push-plansx2-${RUN_TAG}" --arg setid "push-planset3-${RUN_TAG}" \
+  --arg session "${PLAN_SESSION_ID}" --arg spe "${SPE_ID}" --argjson ts "$((BASE_MS + 6))" '
+  {entities: [
+    {type: "session_exercises", id: $id, client_updated_at_ms: $ts,
+     fields: {session_id: $session, exercise_definition_id: null,
+              source_plan_exercise_id: $spe, order_index: 1, name: "Squat Copy",
+              machine_name: null, created_at: $ts, updated_at: $ts, deleted_at: null}},
+    {type: "exercise_sets", id: $setid, client_updated_at_ms: $ts,
+     fields: {session_exercise_id: $id, source_plan_set_id: null, order_index: 0,
+              weight_value: "55", reps_value: "7", set_type: null,
+              planned_weight_value: null, planned_reps_value: null,
+              planned_set_type: null, performance_status: null,
+              created_at: $ts, updated_at: $ts, deleted_at: null}}
+  ]}')"
+sync_push "${USER_A_TOKEN}" "${DUP_CARD_BODY}"
+assert_non_2xx "second live card for the same plan block rejected"
+assert_body_contains "BLOCK_ALREADY_ATTACHED" "competing card carries the arbitration token"
+assert_body_contains "session_exercises_owner_source_block_unique" "competing card hits the partial-unique guard"
+service_select "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=eq.push-plansx2-${RUN_TAG}&select=id"
+assert_json_expr 'length == 0' "competing card wrote no row"
+service_select "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=eq.push-planset3-${RUN_TAG}&select=id"
+assert_json_expr 'length == 0' "competing card's set wrote no row"
 
 # Cross-level provenance: a source-derived set must sit under the card sourced
 # from its plan set's parent block. PLAN_SX_ID is sourced from SPE_ID, so a set
