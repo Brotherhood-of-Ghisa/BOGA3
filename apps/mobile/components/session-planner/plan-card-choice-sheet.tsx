@@ -28,11 +28,14 @@ export type PlanCardChoiceSheetProps = {
  */
 export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismiss }: PlanCardChoiceSheetProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [shownBlock, setShownBlock] = useState<string | null>(null);
-
-  // Only a new target resets the selection, not a rerender.
-  if (shownBlock !== blockName) {
-    setShownBlock(blockName);
+  const [pending, setPending] = useState(false);
+  // A new target resets the selection: keyed on the block and the exact
+  // candidate set, so a re-render with the same choice never clears it.
+  const targetKey =
+    blockName === null ? null : `${blockName}:${candidates.map((candidate) => candidate.id).join(',')}`;
+  const [shownKey, setShownKey] = useState<string | null>(null);
+  if (shownKey !== targetKey) {
+    setShownKey(targetKey);
     setSelectedId(null);
   }
 
@@ -41,9 +44,10 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
   }
 
   const confirm = () => {
-    if (selectedId === null) {
+    if (selectedId === null || pending) {
       return;
     }
+    setPending(true);
     onDismiss();
     onConfirm(selectedId);
   };
@@ -86,7 +90,7 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
       <View style={styles.footer}>
         {/* The sheet's one `accent`. */}
         <ActionButton
-          disabled={selectedId === null}
+          disabled={pending || selectedId === null}
           label="Add block to card"
           onPress={() => void confirm()}
           testID="plan-card-choice-confirm"

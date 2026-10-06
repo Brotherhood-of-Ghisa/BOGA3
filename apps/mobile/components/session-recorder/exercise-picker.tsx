@@ -46,6 +46,9 @@ export type ExercisePickerProps = {
   ) => void;
   // The host attaches the picked authored plan block to the active session.
   onAddPlanBlock: (planExerciseId: string) => void;
+  /** Planned blocks join the active session only; a completed session's
+   * picker hides the From planner entry. */
+  plannerEnabled?: boolean;
   // The host navigates to the catalogue; its back returns to the picker as left.
   onOpenManage: () => void;
   // The host's failed add, shown above the list.
@@ -83,6 +86,7 @@ export function ExercisePicker({
   onAddPlanBlock,
   onOpenManage,
   notice = null,
+  plannerEnabled = true,
 }: ExercisePickerProps) {
   const groupLinkingUserId = useGroupLinkingUserId();
   const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
@@ -340,7 +344,7 @@ export function ExercisePicker({
             value={searchValue}
           />
           <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences}>
-            <PickerPlannerToggle active={plannerOnly} onToggle={togglePlannerOnly} />
+            {plannerEnabled ? <PickerPlannerToggle active={plannerOnly} onToggle={togglePlannerOnly} /> : null}
             {groupLinkingUserId ? <PickerGroupsToggle active={groupsOnly} onToggle={toggleGroupsOnly} /> : null}
           </ExerciseListPreferenceControls>
           {notice ? <Notice live message={notice} testID="exercise-picker-notice" tone="danger" /> : null}
@@ -380,7 +384,7 @@ export function ExercisePicker({
               </>
             ) : null}
             {!isCatalogLoading && !catalogLoadError && !preselection ? (
-              plannerOnly ? (
+              plannerOnly && plannerEnabled ? (
                 <PlannerBlockSection onPickBlock={pickPlannerBlock} />
               ) : groupsOnly ? (
                 <GroupsOnlyBody

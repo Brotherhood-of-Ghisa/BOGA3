@@ -8,15 +8,17 @@ import type { PlanExerciseDraft, PlanFieldError } from './types';
 /**
  * An edit of one plan, composed from the repository's guarded operations —
  * never a whole-graph rewrite. Consumed blocks (attached or resolved) are
- * read-only snapshots: the diff is checked against the loaded detail first,
- * so touching one refuses the whole edit with `immutable-block` and writes
- * nothing. Meta (title, schedule, gym) is authored intent and always
- * editable.
+ * read-only snapshots: the whole diff — changes, deletions and the order the
+ * form shows — is checked against the loaded detail FIRST, so touching one
+ * refuses the edit with `immutable-block` and writes nothing. Meta (title,
+ * schedule, gym) is authored intent and always editable.
  *
  * The form's blocks carry the plan block id they came from
  * (`sourceBlockId`); the diff is positional: removed blocks delete, added
- * blocks append, kept-and-changed blocks rewrite in place, and the kept
- * order is written as one reorder.
+ * blocks are created, kept-and-changed blocks rewrite in place, and the
+ * form's full order — kept blocks and new blocks together — is written as
+ * one reorder, so a block added between others lands where the form showed
+ * it, not appended.
  */
 export const savePlanEdits = async (
   planId: string,
@@ -34,7 +36,6 @@ export const savePlanEdits = async (
     return { status: 'not-found' };
   }
 
-  // The write plan, checked against read-only state before anything writes.
   const plan = planBlockOperations(detail, form, prepared.draft.exercises);
   if (plan.kind === 'validation-failed') {
     return { status: 'validation-failed', errors: plan.errors };
@@ -52,6 +53,8 @@ export const savePlanEdits = async (
     return meta;
   }
 
+  // Adds return their new block ids, which slot into the intended order.
+  const addedIdsByFormIndex = new Map<number, string>();
   for (const op of plan.operations) {
     const result =
       op.kind === 'add'
@@ -62,17 +65,24 @@ export const savePlanEdits = async (
     if (result.status !== 'saved' && result.status !== 'updated') {
       return result;
     }
+    if (op.kind === 'add' && result.status === 'saved') {
+      addedIdsByFormIndex.set(op.formIndex, result.id);
+    }
   }
 
-  // Only a real order change reorders — and a plan with a consumed block
-  // never reorders (its block sequence is a read-only snapshot too).
-  const originalKeptOrder = detail.blocks.map((block) => block.id).filter((id) => plan.keptIds.includes(id));
+  // The intended final order is the form's order — a block added between
+  // kept blocks must land there, not appended after them. The pre-write
+  // refusal above guarantees a plan with a consumed block never reaches
+  // this reorder.
+  const intendedOrder = form.blocks
+    .map((block, index) => block.sourceBlockId ?? addedIdsByFormIndex.get(index) ?? null)
+    .filter((id): id is string => id !== null);
+  const originalOrder = detail.blocks.map((block) => block.id).filter((id) => intendedOrder.includes(id));
   const orderChanged =
-    plan.keptIds.length > 0 &&
-    (plan.keptIds.length !== originalKeptOrder.length ||
-      plan.keptIds.some((id, index) => id !== originalKeptOrder[index]));
+    intendedOrder.length !== originalOrder.length ||
+    intendedOrder.some((id, index) => id !== originalOrder[index]);
   if (orderChanged) {
-    const reordered = await planRepository.reorderPlanBlocks(planId, plan.keptIds);
+    const reordered = await planRepository.reorderPlanBlocks(planId, intendedOrder);
     if (reordered.status !== 'saved' && reordered.status !== 'updated') {
       return reordered;
     }
@@ -80,15 +90,14 @@ export const savePlanEdits = async (
   return { status: 'updated' };
 };
 
-type BlockOp =
-  | { kind: 'add'; draft: PlanExerciseDraft }
+export type BlockOp =
+  | { kind: 'add'; formIndex: number; draft: PlanExerciseDraft }
   | { kind: 'update'; id: string; draft: PlanExerciseDraft }
   | { kind: 'delete'; id: string };
 
 type PlanBlockDiff =
   | {
       kind: 'planned';
-      keptIds: string[];
       operations: BlockOp[];
       touchesConsumed: boolean;
     }
@@ -102,13 +111,15 @@ const planBlockOperations = (
 ): PlanBlockDiff => {
   const blocksById = new Map(detail.blocks.map((block) => [block.id, block]));
   const keptIds: string[] = [];
+  const addedFormIndexes: number[] = [];
   const operations: BlockOp[] = [];
   for (let index = 0; index < form.blocks.length; index += 1) {
     const sourceId = form.blocks[index].sourceBlockId ?? null;
     const draft = drafts[index];
     const existing = sourceId !== null ? blocksById.get(sourceId) : undefined;
     if (existing === undefined) {
-      operations.push({ kind: 'add', draft });
+      operations.push({ kind: 'add', formIndex: index, draft });
+      addedFormIndexes.push(index);
       continue;
     }
     const normalized = validatePlanExerciseDraft(draft);
@@ -125,12 +136,27 @@ const planBlockOperations = (
       operations.push({ kind: 'delete', id: block.id });
     }
   }
-  const touchesConsumed = operations.some(
+  const updateOrDeleteTouchesConsumed = operations.some(
     (op) =>
       (op.kind === 'update' || op.kind === 'delete') &&
       blocksById.get(op.id)?.status !== 'pending',
   );
-  return { kind: 'planned', keptIds, operations, touchesConsumed };
+  // Reordering is part of the same refusal: kept blocks changing position,
+  // or a new block landing before one, reshuffles the read-only sequence of
+  // a plan with a consumed block — so the whole edit refuses pre-write.
+  const keptInDetailOrder = detail.blocks.map((block) => block.id).filter((id) => keptIds.includes(id));
+  const addedBeforeKept = addedFormIndexes.some((addedIndex) =>
+    form.blocks.some(
+      (block, formIndex) =>
+        formIndex > addedIndex && block.sourceBlockId !== null && blocksById.has(block.sourceBlockId),
+    ),
+  );
+  const orderChanged =
+    keptIds.some((id, index) => id !== keptInDetailOrder[index]) || addedBeforeKept;
+  const touchesConsumed =
+    updateOrDeleteTouchesConsumed ||
+    (orderChanged && detail.blocks.some((block) => block.status !== 'pending'));
+  return { kind: 'planned', operations, touchesConsumed };
 };
 
 const blockDiffers = (

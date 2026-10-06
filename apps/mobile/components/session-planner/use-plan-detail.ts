@@ -86,8 +86,15 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
       return;
     }
     const snapshot = await loadSessionSnapshotById(sessionId);
+    // The domain's compatible card is an UNSOURCED card of the same
+    // definition: a card already sourced from another block must never be
+    // offered, or the confirm dead-ends in `target-invalid`.
     const candidates = (snapshot?.exercises ?? [])
-      .filter((card) => card.exerciseDefinitionId === block.exerciseDefinitionId)
+      .filter(
+        (card) =>
+          card.exerciseDefinitionId === block.exerciseDefinitionId &&
+          (card.sourcePlanExerciseId ?? null) === null,
+      )
       .map((card) => ({ id: card.id, exerciseName: card.name, setCount: card.sets.length }));
     if (candidates.length === 0) {
       setNotice("Couldn't add the block. Try again.");
@@ -142,8 +149,14 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
     run(async () => {
       clearNotice();
       const result = await skipPlanBlock(block.id);
-      if (result.status === 'skipped' || result.status === 'not-resolvable') {
+      if (result.status === 'skipped') {
         await reload();
+        return;
+      }
+      if (result.status === 'not-resolvable') {
+        // Confirmed source-derived work exists: skip never claims or discards
+        // done work — complete the block instead.
+        setNotice('This block has confirmed work. Complete it instead of skipping.');
         return;
       }
       setNotice("Couldn't skip the block. Try again.");

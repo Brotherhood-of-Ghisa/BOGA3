@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { PlanCardChoiceSheet, type PlanCardChoice } from '@/components/session-planner/plan-card-choice-sheet';
@@ -38,6 +38,21 @@ const BLOCK_NOTICE: Record<string, string> = {
 export function AddExerciseScreen({ sessionId }: AddExerciseScreenProps) {
   const router = useRouter();
   const [notice, setNotice] = useState<string | null>(null);
+  // Planned blocks join the ACTIVE session only: adding one to a completed
+  // session's history is meaningless, so the picker's From planner entry
+  // stays hidden there.
+  const [plannerEnabled, setPlannerEnabled] = useState(false);
+  useEffect(() => {
+    if (sessionId === null) return;
+    let cancelled = false;
+    void loadSessionSnapshotById(sessionId).then((snapshot) => {
+      if (cancelled) return;
+      setPlannerEnabled(snapshot?.status === 'active');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
   const [choiceBlockName, setChoiceBlockName] = useState<string | null>(null);
   const [choiceCandidates, setChoiceCandidates] = useState<PlanCardChoice[]>([]);
   const [pendingPlanExerciseId, setPendingPlanExerciseId] = useState<string | null>(null);
@@ -109,6 +124,7 @@ export function AddExerciseScreen({ sessionId }: AddExerciseScreenProps) {
     <>
       <ExercisePicker
         notice={notice}
+        plannerEnabled={plannerEnabled}
         onAddPlanBlock={(planExerciseId) => {
           void addPlanBlock(planExerciseId);
         }}

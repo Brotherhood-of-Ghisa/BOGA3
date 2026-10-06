@@ -79,6 +79,11 @@ export const ICON_GLYPHS = {
     circle(15, 12, 1),
     circle(15, 19, 1),
   ],
+  // Lucide `copy`: duplicate a thing (a plan's Duplicate action).
+  duplicate: [
+    path('M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z'),
+    path('M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'),
+  ],
   // Lucide `pencil`: edit the thing itself (an exercise's definition).
   pencil: [
     path(

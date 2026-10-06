@@ -64,7 +64,7 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
         />
         <IconButton
           accessibilityLabel="Duplicate this plan"
-          name="more-vertical"
+          name="duplicate"
           onPress={onDuplicate}
           testID="plan-detail-duplicate"
         />

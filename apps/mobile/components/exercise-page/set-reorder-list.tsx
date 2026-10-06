@@ -43,11 +43,31 @@ export function SetReorderList<Item extends { id: string }>({
   const listRef = useRef<ViewInstance>(null);
   const pageYRef = useRef(0);
 
-  const measureList = useCallback(() => {
-    listRef.current?.measureInWindow((_x: number, y: number) => {
-      pageYRef.current = y;
-    });
-  }, []);
+  // measureInWindow lands asynchronously; its callback refreshes both the
+  // best-known anchor and the controller's.
+  const measureInto = useCallback(
+    (apply: (y: number) => void) => {
+      listRef.current?.measureInWindow((_x: number, y: number) => {
+        pageYRef.current = y;
+        apply(y);
+      });
+    },
+    [],
+  );
+
+  const beginDragAt = useCallback(
+    (setId: string) => {
+      // Scrolling moves the list in the window without relaying it out, so a
+      // layout-time anchor is stale by the scroll offset and every pointer
+      // read would land on the wrong rows: re-measure at each drag start,
+      // seeding the controller with the best-known value first so the first
+      // pointer events are never read against a zero.
+      controller.setAnchor(pageYRef.current);
+      measureInto(controller.setAnchor);
+      controller.beginDrag(setId);
+    },
+    [controller, measureInto],
+  );
 
   const drop = useCallback(
     (setId: string, committed: boolean) => {
@@ -76,7 +96,7 @@ export function SetReorderList<Item extends { id: string }>({
   const count = items.length;
 
   return (
-    <View onLayout={measureList} ref={listRef} testID={testID}>
+    <View onLayout={() => measureInto(() => undefined)} ref={listRef} testID={testID}>
       {items.map((item, index) => {
         const rowId = item.id;
         return (
@@ -90,8 +110,8 @@ export function SetReorderList<Item extends { id: string }>({
                 count < 2 ? null : (
                   <SetReorderHandle
                     onDragEnd={drop}
-                    onDragPointer={(absoluteY) => controller.updateDrag(absoluteY - pageYRef.current)}
-                    onDragStart={controller.beginDrag}
+                    onDragPointer={controller.updateDragPointer}
+                    onDragStart={beginDragAt}
                     setNumber={index + 1}
                     setId={rowId}
                     testID={`exercise-set-${index + 1}-reorder-handle`}

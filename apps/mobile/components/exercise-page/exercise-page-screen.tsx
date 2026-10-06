@@ -1,6 +1,6 @@
 import { personalCalculationContext } from '@/src/config/personal-effort';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -21,7 +21,7 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
-import { completePlanBlock, reorderSessionExerciseSets } from '@/src/session-planner';
+import { completePlanBlock, loadPlanBlockProgressStatus, reorderSessionExerciseSets } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
@@ -58,6 +58,10 @@ import { SetReorderList } from './set-reorder-list';
 import { useSetReorder } from './use-set-reorder';
 import { pageText } from './text-styles';
 
+/** The permutation a drag produced is a no-op when it matches the persisted order. */
+const isSameOrder = (order: string[], other: string[]): boolean =>
+  order.length === other.length && order.every((id, index) => id === other[index]);
+
 type ExercisePageScreenProps = {
   sessionId: string;
   sessionExerciseId: string;
@@ -82,10 +86,15 @@ const isGymFiltered = (scope: string, gymId: string | null): boolean => scope ==
 const isCompletedEdit = (state: { status: string; sessionStatus?: string }): boolean =>
   state.status === 'ready' && state.sessionStatus === 'completed';
 
-/** The inline words for one typed block-resolution result. */
-const blockResolutionNotice = (status: string): string => {
+/** The inline words for one typed block-resolution result, against the
+ * block state the page already knows. */
+const blockResolutionNotice = (status: string, knownStatus: 'pending' | 'resolved' | null): string => {
   if (status === 'completed') return 'Block completed. It no longer counts as waiting.';
-  if (status === 'not-resolvable') return 'Finish one planned set first: confirm a set the block planned.';
+  if (status === 'not-resolvable') {
+    return knownStatus === 'pending'
+      ? 'Finish one planned set first: confirm a set the block planned.'
+      : 'This block is already resolved.';
+  }
   return "Couldn't complete the block. Try again.";
 };
 
@@ -147,7 +156,29 @@ export function ExercisePageScreen({
   const [openSetId, setOpenSetId] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [blockNotice, setBlockNotice] = useState<string | null>(null);
+  // The sourced card's block state: Complete block is offered while the
+  // block is still pending, never after it is resolved.
+  const [blockStatus, setBlockStatus] = useState<'pending' | 'resolved' | null>(null);
+  const reorderWriteRef = useRef(false);
   const weightInputRef = useRef<TextInputInstance>(null);
+
+  // The sourced card's block state decides whether Complete block is
+  // offered at all: a block that is already resolved never offers it again.
+  const sourcePlanExerciseId = exercise?.sourcePlanExerciseId ?? null;
+  useEffect(() => {
+    if (sourcePlanExerciseId === null) {
+      return;
+    }
+    let cancelled = false;
+    void loadPlanBlockProgressStatus(sourcePlanExerciseId).then((status) => {
+      if (cancelled) return;
+      // Settled asynchronously, so the effect never sets state synchronously.
+      setBlockStatus(status === 'pending' ? 'pending' : status === 'not-found' ? null : 'resolved');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [sourcePlanExerciseId]);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -268,36 +299,48 @@ export function ExercisePageScreen({
     if (!next.some((set) => set.id === setId)) setOpenSetId(null);
   };
 
-/** The permutation a drag produced is a no-op when it matches the persisted order. */
-const isSameOrder = (order: string[], other: string[]): boolean =>
-  order.length === other.length && order.every((id, index) => id === other[index]);
-
-/**
- * A committed drag drop or Move earlier/later, persisted through the
- * reorder operation — never the draft graph, so the two writers cannot
- * race. Pending edits flush first; the overlay (a drag's live order)
- * settles onto the write's result: reload on success, clear on failure,
- * which restores the prior order exactly.
- */
-const persistSetReorder = async (orderedIds: string[], announcement?: string) => {
-  if (isSameOrder(orderedIds, setOrderIds)) {
-    reorder.clearDrag();
-    return;
-  }
-  if (announcement) reorder.announce(announcement);
-    if (!(await draft.flush()) ) {
-      reorder.clearDrag();
-      reorder.announce('Not saved. The previous order stays.');
+  /**
+   * A committed drag drop or Move earlier/later, persisted through the
+   * reorder operation — never the draft graph, so the two writers cannot
+   * race. Pending edits flush first; the overlay (a drag's live order)
+   * settles onto the write's result: reload on success, clear on failure,
+   * which restores the prior order exactly. One write at a time: overlapping
+   * moves queue nowhere — a second is dropped while the first is in flight.
+   */
+  const persistSetReorder = async (orderedIds: string[], announcement?: string) => {
+    if (reorderWriteRef.current) {
       return;
     }
-    const result = await reorderSessionExerciseSets(sessionExerciseId, orderedIds);
-    if (result.status !== 'reordered') {
+    reorderWriteRef.current = true;
+    try {
+      if (isSameOrder(orderedIds, setOrderIds)) {
+        reorder.clearDrag();
+        return;
+      }
+      if (announcement) reorder.announce(announcement);
+      if (!(await draft.flush())) {
+        reorder.clearDrag();
+        reorder.announce('Not saved. The previous order stays.');
+        return;
+      }
+      const result = await reorderSessionExerciseSets(sessionExerciseId, orderedIds);
+      if (result.status !== 'reordered') {
+        reorder.clearDrag();
+        reorder.announce("Couldn't save the new order. The previous order stays.");
+        return;
+      }
+      // The reload is the only thing that moves the rows: a failed reload
+      // keeps the local order as it was and says so, rather than leaving the
+      // page reading something the store does not.
+      if (!(await draft.reload())) {
+        reorder.clearDrag();
+        reorder.announce("Couldn't save the new order. The previous order stays.");
+        return;
+      }
       reorder.clearDrag();
-      reorder.announce("Couldn't save the new order. The previous order stays.");
-      return;
+    } finally {
+      reorderWriteRef.current = false;
     }
-    await draft.reload();
-    reorder.clearDrag();
   };
 
   const finishComplete = async (nextSets: typeof sets) => {
@@ -363,7 +406,7 @@ const persistSetReorder = async (orderedIds: string[], announcement?: string) =>
     const sourceId = exercise?.sourcePlanExerciseId;
     if (!sourceId) return;
     void completePlanBlock(sourceId).then((result) => {
-      setBlockNotice(blockResolutionNotice(result.status));
+      setBlockNotice(blockResolutionNotice(result.status, blockStatus));
     });
   };
 
@@ -443,7 +486,7 @@ const persistSetReorder = async (orderedIds: string[], announcement?: string) =>
                   onSwipeLeft={onSwipeLeft}
                   onSwipeRight={onSwipeRight}
                   onToggleRow={onToggle}
-                  open={row.id === openSet?.id}
+                  openSetId={openSet?.id ?? null}
                   reorder={reorderProps}
                   row={row}
                   weightInputRef={weightInputRef}
@@ -495,7 +538,9 @@ const persistSetReorder = async (orderedIds: string[], announcement?: string) =>
       />
       <ExerciseOptionsSheet
         exerciseName={exercise.name}
-        onCompleteBlock={exercise.sourcePlanExerciseId != null ? onCompleteBlock : undefined}
+        onCompleteBlock={
+          exercise.sourcePlanExerciseId != null && blockStatus !== 'resolved' ? onCompleteBlock : undefined
+        }
         onDismiss={() => setOpenSheet('none')}
         onEdit={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('edit'); }); }}
         onLink={

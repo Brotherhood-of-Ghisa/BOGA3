@@ -223,13 +223,15 @@ screen files.
 ### Reordering sets in the recorder
 
 The set list reorders playlist-style: a quiet trailing grab handle per closed
-row is the only persistent chrome; drags start on the handle (never row
-content, never the open logger row), lift the row, and show the insertion
-position; a cancellation or a failed atomic write restores the prior order
-with a lightweight announcement. VoiceOver/switch users get `Move set N
-earlier/later` custom actions with an announced result — absent at a
-boundary — and reduced motion suppresses only the lift animation. The handle
-never steals taps from set fields or the removal swipe. Code:
+row is the only persistent chrome, and it signals the drag — there is no
+separate edit mode and the row does not lift and follow the finger; the rows
+reflow under the pointer to show the insertion position. Drags start on the
+handle only (never row content, never the open logger row); a cancellation or
+a failed atomic write restores the prior order with a lightweight
+announcement. VoiceOver/switch users get `Move set N earlier/later` custom
+actions with an announced result — absent at a boundary — and reduced motion
+suppresses only the handle's lift animation. The handle never steals taps
+from set fields or the removal swipe. Code:
 `components/exercise-page/set-reorder-handle.tsx`, `set-reorder-geometry.ts`,
 `use-set-reorder.ts`.
 

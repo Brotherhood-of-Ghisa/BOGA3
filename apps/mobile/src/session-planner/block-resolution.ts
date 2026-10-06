@@ -88,3 +88,18 @@ export const skipPlanBlock = async (
   const resolved = await planStore.resolvePlanBlock({ planExerciseId, status: 'skipped', now });
   return resolved ? { status: 'skipped', resolvedAt: now } : { status: 'not-resolvable' };
 };
+
+/**
+ * The recorder's Complete-block offer reads this before it shows: a block
+ * that is already resolved (completed or skipped) never offers resolution
+ * again. Read-only; the resolution itself stays with `completePlanBlock`.
+ */
+export const loadPlanBlockProgressStatus = async (
+  planExerciseId: string,
+): Promise<'pending' | 'completed' | 'skipped' | 'not-found'> => {
+  const block = await planStore.loadPlanBlock(planExerciseId);
+  if (!block) {
+    return 'not-found';
+  }
+  return block.exercise.progressStatus;
+};

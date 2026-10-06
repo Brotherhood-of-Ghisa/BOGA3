@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FormField, IconButton, ListRow, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { Icon } from '@/components/ui/icon';
 import { formatSessionSetType, nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import type { PlanFormBlock, PlanFormSet } from '@/src/session-planner/plan-form-model';
@@ -17,6 +18,8 @@ export type PlanBlockEditorProps = {
   onRemoveBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, step: -1 | 1) => void;
   onPickExercise: (blockId: string) => void;
+  /** The account's displayed efforts, cycling the type field like the recorder. */
+  displayEfforts?: readonly EffortChoice[];
 };
 
 const typeWord = (setType: SessionSetTypeValue) =>
@@ -69,6 +72,7 @@ export function PlanBlockEditor({
   onRemoveBlock,
   onMoveBlock,
   onPickExercise,
+  displayEfforts,
 }: PlanBlockEditorProps) {
   const weightLabel = block.loadInputMode === 'per_side_load' ? 'Weight per side · kg' : 'Weight · kg';
   const blockPath = `exercises.${index}`;
@@ -126,7 +130,9 @@ export function PlanBlockEditor({
             blockIndex={index}
             setIndex={setIndex}
             onCycle={() =>
-              onChangeSet(block.id, set.id, { targetSetType: nextSessionSetType(set.targetSetType as SessionSetTypeValue) })
+              onChangeSet(block.id, set.id, {
+                targetSetType: nextSessionSetType(set.targetSetType as SessionSetTypeValue, displayEfforts),
+              })
             }
             setType={set.targetSetType as SessionSetTypeValue}
           />

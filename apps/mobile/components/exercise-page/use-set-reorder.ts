@@ -23,8 +23,16 @@ export type UseSetReorder = {
   announcement: string | null;
   /** Row layouts in the current render order; measured by the list. */
   registerLayout: (layout: SetRowLayout) => void;
+  /**
+   * The list's window Y at drag start — the anchor the pointer is read
+   * against. The list re-measures on every drag start: scrolling moves the
+   * list in the window without relaying it out, so a layout-time anchor
+   * would point every drag at the wrong rows.
+   */
+  setAnchor: (listPageY: number) => void;
   beginDrag: (id: string) => void;
-  updateDrag: (pointerY: number) => void;
+  /** The pointer's window Y; converted against the drag-start anchor. */
+  updateDragPointer: (absoluteY: number) => void;
   /** Ends the drag; `commit` false cancels back to the original order. */
   endDrag: (commit: boolean) => void;
   /** Clears the overlay after the screen's write settles either way. */
@@ -40,6 +48,7 @@ export const useSetReorder = (currentOrder: string[]): UseSetReorder => {
   const [dragOrder, setDragOrder] = useState<string[] | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const layoutsRef = useRef(new Map<string, SetRowLayout>());
+  const anchorRef = useRef(0);
   const orderRef = useRef(currentOrder);
 
   // The controller's callers pass a fresh order each render; reading it
@@ -53,21 +62,25 @@ export const useSetReorder = (currentOrder: string[]): UseSetReorder => {
     layoutsRef.current.set(layout.id, layout);
   }, []);
 
+  const setAnchor = useCallback((listPageY: number) => {
+    anchorRef.current = listPageY;
+  }, []);
+
   const beginDrag = useCallback((id: string) => {
     setAnnouncement(null);
     setDraggingId(id);
     setDragOrder([...orderRef.current]);
   }, []);
 
-  const updateDrag = useCallback(
-    (pointerY: number) => {
+  const updateDragPointer = useCallback(
+    (absoluteY: number) => {
       const dragged = draggingId;
       const order = dragOrder;
       if (dragged === null || order === null) return;
       const layoutOrder = order
         .map((id) => layoutsRef.current.get(id))
         .filter((layout): layout is SetRowLayout => layout !== undefined);
-      const target = insertionIndexForDrag(layoutOrder, dragged, pointerY);
+      const target = insertionIndexForDrag(layoutOrder, dragged, absoluteY - anchorRef.current);
       const fromIndex = order.indexOf(dragged);
       if (target !== fromIndex) {
         setDragOrder(reorderToIndex(order, fromIndex, target));
@@ -100,8 +113,9 @@ export const useSetReorder = (currentOrder: string[]): UseSetReorder => {
     dragOrder,
     announcement,
     registerLayout,
+    setAnchor,
     beginDrag,
-    updateDrag,
+    updateDragPointer,
     endDrag,
     clearDrag,
     moveByStep,

@@ -1,6 +1,6 @@
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSessionDateTime } from '@/src/utils/local-time';
-import { PLAN_LIMITS, validatePlanDraft } from './plan-validation';
+import { validatePlanDraft } from './plan-validation';
 import type { PlanDetailView } from './plan-queries';
 import type { PlanDraft, PlanFieldError } from './types';
 
@@ -156,4 +156,3 @@ export const errorMap = (errors: PlanFieldError[]): Map<string, string> => {
   return map;
 };
 
-export const PLAN_FORM_LIMITS = PLAN_LIMITS;

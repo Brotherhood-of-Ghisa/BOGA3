@@ -132,7 +132,7 @@ Use this section as the single source of truth for reusable UX patterns.
 14. Lightweight ordered-row pattern (playlist-style reorder)
    - Intent: reorder rows of a working list by direct manipulation, without a separate edit mode.
    - Usage: the recorder's set rows (`components/exercise-page/set-reorder-handle.tsx`, `set-reorder-list.tsx`).
-   - Rules: a small trailing grab handle is the only persistent reorder chrome (hidden with fewer than two rows); drags start on the handle only, lift the row, and expose the insertion position; a cancellation or an atomic write failure restores the prior order with a lightweight announcement; the VoiceOver/switch path is `Move earlier`/`Move later` custom actions with an announced result, absent at a boundary; reduced motion suppresses the lift animation only.
+   - Rules: a small trailing grab handle is the only persistent reorder chrome (hidden with fewer than two rows); the handle signals the drag — the row does not lift and follow the finger, the rows reflow under the pointer to show the insertion position; drags start on the handle only; a cancellation or an atomic write failure restores the prior order with a lightweight announcement; the VoiceOver/switch path is `Move earlier`/`Move later` custom actions with an announced result, absent at a boundary; reduced motion suppresses the handle's lift animation only.
 
 ## Default appearance baseline (MVP)
 

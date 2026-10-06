@@ -46,10 +46,12 @@ jest.mock('expo-router', () => {
 
 import SessionPlanDetailRoute from '@/app/session-plan/[planId]';
 import SessionPlanNewRoute, { SessionPlanNewScreen } from '@/app/session-plan/new';
+import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { persistSessionDraftSnapshot } from '@/src/data/session-drafts';
+import { loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { sessions } from '@/src/data/schema';
-import { planRepository, startSessionPlan } from '@/src/session-planner';
+import { planRepository, savePlanEdits, startSessionPlan } from '@/src/session-planner';
+import type { PlanFormState } from '@/src/session-planner/plan-form-model';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
@@ -130,6 +132,14 @@ const fillSet = (blockIndex: number, setIndex: number, weight: string, reps: str
   fireEvent.changeText(screen.getByTestId(`plan-form-block-${blockIndex}-set-${setIndex}-weight`), weight);
   fireEvent.changeText(screen.getByTestId(`plan-form-block-${blockIndex}-set-${setIndex}-reps`), reps);
 };
+
+const callbackMocks = () => ({
+  onClose: jest.fn(),
+  onSelectExercise: jest.fn(),
+  onAppendPlan: jest.fn(),
+  onAddPlanBlock: jest.fn(),
+  onOpenManage: jest.fn(),
+});
 
 const pressAlertButton = (label: string) => {
   const call = alertSpy.mock.calls.at(-1);
@@ -279,7 +289,8 @@ describe('plan detail', () => {
     expect(plansBefore.length).toBe(0);
   });
 
-  it('Add block attaches to the only compatible unsourced card; several offer the choice', async () => {    await seedCatalog();
+  it('Add block attaches to the only compatible unsourced card; several offer the choice', async () => {
+    await seedCatalog();
     const planId = await createPlanThroughRepository();
     // One active session, two unsourced Barbell Squat cards: ambiguous.
     await persistSessionDraftSnapshot({
@@ -465,5 +476,246 @@ describe('recorder: complete block on a sourced card', () => {
     expect(detail?.blocks[0].status).toBe('completed');
     // The recorder never closed: the set list is still there.
     expect(screen.getByTestId('exercise-set-list')).toBeTruthy();
+  });
+
+  it('a resolved block never offers Complete block again', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    const cardId = await startFromPlan(planId);
+    const sessionId = await determineSessionId();
+
+    render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
+    await screen.findByTestId('exercise-page');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '100');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    fireEvent.press(await screen.findByTestId('exercise-options-complete-block'));
+    await waitFor(async () => {
+      expect((await planQueries.loadPlanDetail(planId))?.blocks[0].status).toBe('completed');
+    });
+
+    // The page renders again over the same, now resolved card: no offer.
+    const view = render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
+    await view.findByTestId('exercise-page');
+    await act(async () => {});
+    fireEvent.press(view.getByTestId('exercise-page-options'));
+    await view.findByTestId('exercise-options-sheet');
+    expect(view.queryByTestId('exercise-options-complete-block')).toBeNull();
+    view.unmount();
+  });
+});
+
+describe('plan edit sync: order and refusals', () => {
+  const formFromScratch = (blocks: { name: string; weight: string; reps: string }[]): PlanFormState => ({
+    title: 'Edited',
+    scheduleText: '',
+    gymId: null,
+    blocks: blocks.map((block) => ({
+      id: `form-${block.name}`,
+      sourceBlockId: null,
+      exerciseDefinitionId: null,
+      name: block.name,
+      machineName: '',
+      loadInputMode: null,
+      sets: [{ id: `set-${block.name}`, targetWeightText: block.weight, targetRepsText: block.reps, targetSetType: null }],
+    })),
+  });
+
+  it('a block added between kept blocks lands where the form showed it, not last', async () => {
+    await seedCatalog();
+    // Two authored blocks, then an edit that inserts one between them.
+    const planId = await createPlanThroughRepository({ title: 'Two Blocks' });
+    await planRepository.addPlanBlock(planId, {
+      exerciseDefinitionId: 'ex-bench',
+      name: 'Bench Press',
+      machineName: '',
+      sets: [{ targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
+    });
+    const before = await planQueries.loadPlanDetail(planId);
+    expect(before?.blocks.map((block) => block.name)).toEqual(['Barbell Squat', 'Bench Press']);
+
+    // The form's blocks: [kept squat, NEW press, kept bench].
+    const form: PlanFormState = {
+      title: 'Two Blocks',
+      scheduleText: '',
+      gymId: null,
+      blocks: [
+        {
+          id: 'form-1',
+          sourceBlockId: before?.blocks[0].id ?? null,
+          exerciseDefinitionId: 'ex-squat',
+          name: 'Barbell Squat',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+        },
+        {
+          id: 'form-2',
+          sourceBlockId: null,
+          exerciseDefinitionId: 'ex-bench',
+          name: 'Bench Press',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 's2', targetWeightText: '80', targetRepsText: '6', targetSetType: null }],
+        },
+        {
+          id: 'form-3',
+          sourceBlockId: before?.blocks[1].id ?? null,
+          exerciseDefinitionId: 'ex-bench',
+          name: 'Bench Press',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 's3', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
+        },
+      ],
+    };
+    const result = await savePlanEdits(planId, form);
+    expect(result.status).toBe('updated');
+
+    const after = await planQueries.loadPlanDetail(planId);
+    expect(after?.blocks.map((block) => block.name)).toEqual([
+      'Barbell Squat',
+      'Bench Press', // the new one, at the position the form showed
+      'Bench Press',
+    ]);
+    expect(after?.blocks[1].targets[0]).toMatchObject({ targetWeightValue: '80' });
+  });
+
+  it('a reorder touching a consumed block refuses before anything writes', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await startSessionPlan(planId); // attaches the only block: consumed
+    const before = await planQueries.loadPlanDetail(planId);
+    // Add nothing, change nothing: only move a NEW block before the consumed
+    // one — the form order alone would reshuffle the consumed sequence.
+    const form: PlanFormState = {
+      title: 'Two Blocks',
+      scheduleText: '',
+      gymId: null,
+      blocks: [
+        {
+          id: 'form-new',
+          sourceBlockId: null,
+          exerciseDefinitionId: 'ex-bench',
+          name: 'Bench Press',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 'sn', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
+        },
+        {
+          id: 'form-kept',
+          sourceBlockId: before?.blocks[0].id ?? null,
+          exerciseDefinitionId: 'ex-squat',
+          name: 'Barbell Squat',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 'sk', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+        },
+      ],
+    };
+    const result = await savePlanEdits(planId, form);
+    expect(result.status).toBe('immutable-block');
+    const after = await planQueries.loadPlanDetail(planId);
+    expect(after?.title).toBe('Heavy Day');
+    expect(after?.blocks).toHaveLength(1);
+    expect(after?.blocks[0].name).toBe('Barbell Squat');
+  });
+});
+describe('review fixes: candidate filter, skip refusal, resolved card, completed session', () => {
+  const openDetail = async (planId: string) => {
+    mockParams = { planId };
+    render(<SessionPlanDetailRoute />);
+    await screen.findByTestId('plan-detail');
+  };
+
+  it('the card choice never offers an already-sourced card', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    // Two same-exercise cards, one already sourced from another plan's block.
+    const otherPlanId = await createPlanThroughRepository({ title: 'Other Plan' });
+    const otherBlockId = (await planQueries.loadPlanDetail(otherPlanId))?.blocks[0].id as string;
+    await persistSessionDraftSnapshot({
+      sessionId: 'live-session-1',
+      gymId: null,
+      startedAt: new Date(),
+      exercises: [
+        {
+          id: 'card-1',
+          exerciseDefinitionId: 'ex-squat',
+          name: 'Barbell Squat',
+          sourcePlanExerciseId: otherBlockId,
+          sets: [],
+        },
+        {
+          id: 'card-2',
+          exerciseDefinitionId: 'ex-squat',
+          name: 'Barbell Squat',
+          sets: [],
+        },
+      ],
+    });
+    await openDetail(planId);
+
+    fireEvent.press(screen.getByTestId('plan-detail-block-1-add'));
+    // The sheet never opens: one unsourced candidate attaches directly.
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/live-session-1'));
+    expect(screen.queryByTestId('plan-card-choice-sheet')).toBeNull();
+    const detail = await planQueries.loadPlanDetail(planId);
+    expect(detail?.blocks[0]).toMatchObject({ status: 'attached', attachedSessionExerciseId: 'card-2' });
+  });
+
+  it('Skip with confirmed work says so instead of reloading silently', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await openDetail(planId);
+    // Start all, then confirm a planned set: skip is now impossible.
+    fireEvent.press(screen.getByTestId('plan-detail-start-all'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    const detail = await planQueries.loadPlanDetail(planId);
+    const cardId = detail?.blocks[0].attachedSessionExerciseId as string;
+    const sessionId = detail?.blocks[0].attachedSessionId as string;
+    const snapshot = await loadSessionSnapshotById(sessionId);
+    const card = snapshot?.exercises.find((exercise) => exercise.id === cardId);
+    await persistSessionDraftSnapshot({
+      sessionId,
+      gymId: null,
+      startedAt: new Date(),
+      exercises: (snapshot?.exercises ?? []).map((exercise) =>
+        exercise.id === cardId
+          ? {
+              ...exercise,
+              sets: (exercise.sets ?? []).map((set, index) =>
+                index === 0
+                  ? { ...set, repsValue: '5', weightValue: '100', performanceStatus: null }
+                  : set,
+              ),
+            }
+          : exercise,
+      ),
+    });
+    expect(card).toBeTruthy();
+
+    mockParams = { planId };
+    fireEvent.press(screen.getByTestId('plan-detail-block-1-skip'));
+    pressAlertButton('Skip');
+
+    expect(await screen.findByTestId('plan-detail-notice')).toHaveTextContent(
+      'This block has confirmed work. Complete it instead of skipping.'
+    );
+    const after = await planQueries.loadPlanDetail(planId);
+    expect(after?.blocks[0].status).toBe('attached');
+  });
+
+  it('the completed-session picker hides the From planner entry', async () => {
+    await seedCatalog();
+    const view = render(<ExercisePicker {...callbackMocks()} plannerEnabled={false} />);
+    await act(async () => {});
+    expect(view.queryByTestId('exercise-picker-planner-toggle')).toBeNull();
+    // The default keeps the entry: it is only suppressed for a completed session.
+    const enabled = render(<ExercisePicker {...callbackMocks()} />);
+    await act(async () => {});
+    expect(enabled.getByTestId('exercise-picker-planner-toggle')).toBeTruthy();
+    enabled.unmount();
   });
 });

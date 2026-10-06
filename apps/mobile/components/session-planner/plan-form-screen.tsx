@@ -13,6 +13,7 @@ import {
   type PlanFormState,
 } from '@/src/session-planner/plan-form-model';
 import { listSessionGymOptions, type SessionGymOption } from '@/src/session-recorder/gym-options';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 export type PlanFormScreenProps = {
   /** The editor's starting values: empty for create, a plan's values for edit/duplicate. */
@@ -26,6 +27,53 @@ export type SaveOutcome =
   | { status: 'saved'; planId: string | null }
   | { status: 'failed'; message: string | null };
 
+function PlanGymSheet({
+  gyms,
+  visible,
+  onDismiss,
+  onPick,
+}: {
+  gyms: SessionGymOption[] | null;
+  visible: boolean;
+  onDismiss: () => void;
+  onPick: (gymId: string | null) => void;
+}) {
+  return (
+    <Sheet
+      dismissLabel="Dismiss gym picker"
+      onDismiss={onDismiss}
+      testID="plan-form-gym-sheet"
+      title="Plan gym"
+      visible={visible}>
+      {gyms === null ? (
+        <StatePanel body="Loading gyms..." fill={false} kind="loading" />
+      ) : (
+        <Card>
+          <ListRow
+            accessibilityLabel="Plan the session with no gym"
+            density="list"
+            divider={gyms.length > 0}
+            label="No gym"
+            onPress={() => onPick(null)}
+            testID="plan-form-gym-none"
+          />
+          {gyms.map((gym, index) => (
+            <ListRow
+              accessibilityLabel={`Plan the session at ${gym.name}`}
+              density="list"
+              divider={index < gyms.length - 1}
+              key={gym.id}
+              label={gym.name}
+              onPress={() => onPick(gym.id)}
+              testID={`plan-form-gym-${gym.id}`}
+            />
+          ))}
+        </Card>
+      )}
+    </Sheet>
+  );
+}
+
 /**
  * The plan authoring editor shared by create, edit and duplicate: title,
  * optional schedule and gym, ordered exercise blocks with their ordered
@@ -36,9 +84,11 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
   const [form, setForm] = useState<PlanFormState>(initialForm);
   const [submitted, setSubmitted] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [gymSheetOpen, setGymSheetOpen] = useState(false);
   const [gyms, setGyms] = useState<SessionGymOption[] | null>(null);
   const [pickRequest, setPickRequest] = useState<{ blockId: string } | null>(null);
+  const { values: trainingPreferences } = useAccountLocalPreferenceState();
 
   const errors = submitted ? planFormErrors(form) : new Map<string, string>();
 
@@ -100,13 +150,18 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
 
   const save = async () => {
     setSubmitted(true);
-    if (planFormErrors(form).size > 0) {
+    if (saving || planFormErrors(form).size > 0) {
       return;
     }
+    setSaving(true);
     setSaveNotice(null);
-    const outcome = await onSave(form);
-    if (outcome.status !== 'saved') {
-      setSaveNotice(outcome.message ?? "Couldn't save the plan. Try again.");
+    try {
+      const outcome = await onSave(form);
+      if (outcome.status !== 'saved') {
+        setSaveNotice(outcome.message ?? "Couldn't save the plan. Try again.");
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -156,6 +211,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
             onChangeBlock={patchBlock}
             onChangeSet={patchSet}
             onMoveBlock={moveBlock}
+            displayEfforts={trainingPreferences.displayEfforts}
             onPickExercise={(blockId) => setPickRequest({ blockId })}
             onRemoveBlock={removeBlock}
             onRemoveSet={removeSet}
@@ -169,6 +225,11 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           onPress={() => addBlock()}
           testID="plan-form-add-block"
         />
+        {errors.get('exercises') ? (
+          <Text allowFontScaling={false} style={styles.error} testID="plan-form-blocks-error">
+            {errors.get('exercises')}
+          </Text>
+        ) : null}
         {form.blocks.length === 0 ? (
           <Text allowFontScaling={false} style={styles.hint} testID="plan-form-blocks-empty">
             A plan needs at least one exercise.
@@ -177,6 +238,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
         {saveNotice ? <Notice message={saveNotice} testID="plan-form-notice" tone="danger" /> : null}
         <ActionButton
           accessibilityLabel={saveLabel}
+          disabled={saving}
           label={saveLabel}
           onPress={() => void save()}
           testID="plan-form-save"
@@ -184,44 +246,15 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
         />
       </View>
 
-      <Sheet
-        dismissLabel="Dismiss gym picker"
+      <PlanGymSheet
+        gyms={gyms}
         onDismiss={() => setGymSheetOpen(false)}
-        testID="plan-form-gym-sheet"
-        title="Plan gym"
-        visible={gymSheetOpen}>
-        {gyms === null ? (
-          <StatePanel body="Loading gyms..." fill={false} kind="loading" />
-        ) : (
-          <Card>
-            <ListRow
-              accessibilityLabel="Plan the session with no gym"
-              density="list"
-              divider={gyms.length > 0}
-              label="No gym"
-              onPress={() => {
-                setGymSheetOpen(false);
-                patchForm({ gymId: null });
-              }}
-              testID="plan-form-gym-none"
-            />
-            {gyms.map((gym, index) => (
-              <ListRow
-                accessibilityLabel={`Plan the session at ${gym.name}`}
-                density="list"
-                divider={index < gyms.length - 1}
-                key={gym.id}
-                label={gym.name}
-                onPress={() => {
-                  setGymSheetOpen(false);
-                  patchForm({ gymId: gym.id });
-                }}
-                testID={`plan-form-gym-${gym.id}`}
-              />
-            ))}
-          </Card>
-        )}
-      </Sheet>
+        onPick={(gymId) => {
+          setGymSheetOpen(false);
+          patchForm({ gymId });
+        }}
+        visible={gymSheetOpen}
+      />
 
       <PlanExercisePickSheet
         onDismiss={() => setPickRequest(null)}
@@ -248,5 +281,8 @@ const styles = StyleSheet.create({
   },
   hint: {
     color: uiRoles.inkMuted,
+  },
+  error: {
+    color: uiRoles.danger,
   },
 });

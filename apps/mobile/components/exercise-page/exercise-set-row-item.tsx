@@ -20,8 +20,9 @@ export type ExerciseSetRowItemProps = {
   row: SetRowView;
   index: number;
   reorder: RowReorderProps;
-  /** The open row's logger values, when this row is the one being edited. */
-  open: boolean;
+  /** The set the logger sits on, or null when the cursor follows. */
+  openSetId: string | null;
+  /** The open row's logger values, when its row is on this item. */
   loggerValues: LoggerValues | null;
   loadContext: LoadContext;
   /** The card's live sets, for the open row's per-side offers. */
@@ -49,7 +50,7 @@ export function ExerciseSetRowItem({
   row,
   index,
   reorder,
-  open,
+  openSetId,
   loggerValues,
   loadContext,
   allSets,
@@ -64,15 +65,17 @@ export function ExerciseSetRowItem({
   onToggleRow,
   weightInputRef,
 }: ExerciseSetRowItemProps) {
-  const followsLogger = index > 0 && allSets[index - 1]?.id === row.id;
-  if (open && loggerValues) {
-    // Only the open row carries the swipes, and each side only when its move
+  const open = row.id === openSetId;
+  // The hairline hides directly under the open row's logger.
+  const followsLogger = index > 0 && allSets[index - 1]?.id === openSetId;
+  const divider = index > 0 && !followsLogger;
+  if (open && loggerValues) {    // Only the open row carries the swipes, and each side only when its move
     // would change the row; the accessibility actions are the non-gesture
     // path for the same two moves.
     const onConfirm = canConfirmSet(allSets, row.id) ? () => onSwipeRight(row.id) : undefined;
     const onDrop = canDropSet(allSets, row.id) ? () => onSwipeLeft(row.id) : undefined;
     return (
-      <SwipeSetRow key={row.id} onSwipeLeft={onDrop} onSwipeRight={onConfirm} testID={`exercise-set-swipe-${row.number}`}>
+      <SwipeSetRow onSwipeLeft={onDrop} onSwipeRight={onConfirm} testID={`exercise-set-swipe-${row.number}`}>
         <SetLogger
           loadContext={loadContext}
           number={row.number}
@@ -95,7 +98,7 @@ export function ExerciseSetRowItem({
   }
   return (
     <SetRow
-      divider={index > 0 && !followsLogger}
+      divider={divider}
       dragHandle={reorder.dragHandle}
       key={row.id}
       onMoveEarlier={reorder.onMoveEarlier}
