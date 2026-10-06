@@ -92,8 +92,18 @@ Pinned the MCP SDK to 1.32.1 to clear
 tests, local backend smoke, docs/meta, consent checks, and MCP audit (zero
 vulnerabilities), typecheck, 13 unit tests and production build. Local log:
 `apps/mobile/artifacts/maestro/daily-history-calendar/pr-578-repair/fast.log`.
-The proposed repair set adds mcp-smoke and repeats the three quality lanes;
-operator agreement is pending. Earlier quality/iOS results above predate this
-merge. The outstanding visual acceptance findings remain open.
+Operator approved the repair set on 2026-10-06: fast, mcp-smoke, jest-coverage,
+complexity and dependencies. The colour API merge is covered by Jest, retaining
+both History and Progress selection contracts; no simulator lane was repeated.
+
+| Repair gate | Result | Local artifact |
+| --- | --- | --- |
+| mcp-smoke | PASS; discovery, consent, refresh, rejected-token challenge and all four tool calls through the real agent API | `apps/mobile/artifacts/maestro/daily-history-calendar/pr-578-repair/mcp-smoke.log` |
+| jest-coverage | PASS; 237 suites / 3,024 tests, 87.04% branches, 94.68% lines | `apps/mobile/artifacts/maestro/daily-history-calendar/pr-578-repair/jest-coverage.log` |
+| complexity | PASS; no new suppressions | `apps/mobile/artifacts/maestro/daily-history-calendar/pr-578-repair/complexity.log` |
+| dependencies | PASS; no new violations, 444 modules / 2,119 dependencies | `apps/mobile/artifacts/maestro/daily-history-calendar/pr-578-repair/dependencies.log` |
+
+Earlier iOS results above predate this merge. The outstanding visual acceptance
+findings remain open.
 
 final result: blocked
