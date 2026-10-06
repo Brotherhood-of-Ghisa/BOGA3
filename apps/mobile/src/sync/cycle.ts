@@ -1046,6 +1046,57 @@ export interface PullLegResult {
  * reporter is passed, emits a page event per applied page and a layer event per
  * drained layer so a first-sync caller can surface advancing progress.
  */
+/**
+ * Applies one pulled page and advances that layer's cursor in one transaction
+ * (the cursor only moves past rows that actually committed locally). On a
+ * provenance unique violation — a pulled row claiming a plan block or source
+ * target a local row already holds — the server committed first, so the local
+ * claimant loses: clear exactly those claims outside the failed transaction
+ * and apply the page once more (contract §4.5). Other local FK failures are
+ * classified as `LOCAL_FK_VIOLATION`; anything else rethrows.
+ */
+const applyPageWithArbitrationRepair = async (
+  database: LocalDatabase,
+  page: PullResponse,
+  layerTypes: readonly EntityTableName[],
+  layer: number,
+): Promise<number> => {
+  const applyPage = (): number =>
+    database.transaction((tx) => {
+      const transaction = tx as Transaction;
+      let changed = 0;
+      for (const type of layerTypes) {
+        const forType = page.entities.filter((entity) => entity.type === type);
+        if (forType.length > 0) {
+          changed += applyPullPage(transaction, forType, type);
+        }
+      }
+      writeCursorEntry(transaction, layer, page.next_cursor);
+      return changed;
+    });
+
+  try {
+    return applyPage();
+  } catch (error) {
+    if (isLocalProvenanceUniqueViolation(error)) {
+      const claims = collectProvenanceClaimsFromWire(page.entities);
+      logProvenanceArbitrationRepair('pull', layer, claims);
+      await clearProvenanceClaimsForWirePage(page.entities);
+      return applyPage();
+    }
+    if (isLocalSqliteForeignKeyError(error)) {
+      logPullLocalFkViolation(error, layer, page.entities);
+      const types = Array.from(new Set(page.entities.map((entity) => entity.type))).sort();
+      throw new SyncCycleError(
+        LOCAL_FK_ERROR_CODE,
+        `local pull apply failed for ${types.join(', ')} (layer ${layer + 1} of ${TOPO_LAYERS.length}): ` +
+          sanitizeExceptionMessage(error),
+      );
+    }
+    throw error;
+  }
+};
+
 const runPullLeg = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
@@ -1062,49 +1113,7 @@ const runPullLeg = async (
       );
       const page = await callSyncPull(layer, cursor);
 
-      // Apply the page and advance the cursor in one transaction: the cursor
-      // only moves past rows that actually committed locally. The transaction
-      // returns the count of rows actually written so a no-op page does not
-      // count toward convergence motion.
-      const applyPage = (): number =>
-        database.transaction((tx) => {
-          const transaction = tx as Transaction;
-          let changed = 0;
-          for (const type of layerTypes) {
-            const forType = page.entities.filter((entity) => entity.type === type);
-            if (forType.length > 0) {
-              changed += applyPullPage(transaction, forType, type);
-            }
-          }
-          writeCursorEntry(transaction, layer, page.next_cursor);
-          return changed;
-        });
-
-      let pageChanged: number;
-      try {
-        pageChanged = applyPage();
-      } catch (error) {
-        if (isLocalProvenanceUniqueViolation(error)) {
-          // A pulled provenance row claims a plan block or source target a
-          // local row already holds: the server committed first, so the local
-          // claimant loses. Clear exactly those claims outside the failed
-          // transaction and apply the page once more (contract §4.5).
-          const claims = collectProvenanceClaimsFromWire(page.entities);
-          logProvenanceArbitrationRepair('pull', layer, claims);
-          await clearProvenanceClaimsForWirePage(page.entities);
-          pageChanged = applyPage();
-        } else if (isLocalSqliteForeignKeyError(error)) {
-          logPullLocalFkViolation(error, layer, page.entities);
-          const types = Array.from(new Set(page.entities.map((entity) => entity.type))).sort();
-          throw new SyncCycleError(
-            LOCAL_FK_ERROR_CODE,
-            `local pull apply failed for ${types.join(', ')} (layer ${layer + 1} of ${TOPO_LAYERS.length}): ` +
-              sanitizeExceptionMessage(error),
-          );
-        } else {
-          throw error;
-        }
-      }
+      const pageChanged = await applyPageWithArbitrationRepair(database, page, layerTypes, layer);
 
       // Notify after this page commits, even if a later pull/push fails.
       if (pageChanged > 0) {

@@ -477,8 +477,9 @@ export type SessionPlanStore = {
   listLivePlans(): Promise<PlanRow[]>;
 };
 
-export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
-  async savePlanGraph(input, now = new Date()) {
+
+/** See {@link SessionPlanStore}. */
+const savePlanGraph = async (input: SaveSessionPlanGraphInput, now: Date = new Date()): Promise<string> => {
     const database = await bootstrapLocalDataLayer();
     let planId = '';
     database.transaction((tx) => {
@@ -486,9 +487,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
     });
     notifyLocalWrite();
     return planId;
-  },
+  };
 
-  async saveProgrammeGraph(input, now = new Date()) {
+
+/** See {@link SessionPlanStore}. */
+const saveProgrammeGraph = async (input: SaveProgrammeGraphInput, now: Date = new Date()): Promise<{ programmeId: string; planIds: string[] }> => {
     const database = await bootstrapLocalDataLayer();
     const programmeId = input.programmeId?.trim() || mintPlanEntityId('programme');
     const planIds: string[] = [];
@@ -538,9 +541,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
     });
     notifyLocalWrite();
     return { programmeId, planIds };
-  },
+  };
 
-  async updateProgrammeMeta(input) {
+
+/** See {@link SessionPlanStore}. */
+const updateProgrammeMeta = async (input: { programmeId: string; name: string; description: string | null; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let wrote = false;
     database.transaction((tx) => {
@@ -562,9 +567,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return wrote;
-  },
+  };
 
-  async updatePlanMeta(input) {
+
+/** See {@link SessionPlanStore}. */
+const updatePlanMeta = async (input: { planId: string; title: string; gymId: string | null; scheduledFor: Date | null; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let wrote = false;
     database.transaction((tx) => {
@@ -587,9 +594,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return wrote;
-  },
+  };
 
-  async savePlanExerciseGraph(input) {
+
+/** See {@link SessionPlanStore}. */
+const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDefinitionId: string | null; name: string; machineName: string | null; sets: SavePlanSetGraphInput[]; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let wrote = false;
     database.transaction((tx) => {
@@ -677,9 +686,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return wrote;
-  },
+  };
 
-  async insertPlanExercise(input) {
+
+/** See {@link SessionPlanStore}. */
+const insertPlanExercise = async (input: { planId: string; exercise: SavePlanExerciseGraphInput; now: Date }): Promise<string> => {
     const database = await bootstrapLocalDataLayer();
     let planExerciseId = '';
     database.transaction((tx) => {
@@ -728,18 +739,22 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
     });
     notifyLocalWrite();
     return planExerciseId;
-  },
+  };
 
-  async findLiveSourcedCardForBlock(planExerciseId) {
+
+/** See {@link SessionPlanStore}. */
+const findLiveSourcedCardForBlock = async (planExerciseId: string): Promise<{ id: string; sessionId: string } | null> => {
     const database = await bootstrapLocalDataLayer();
     let card: { id: string; sessionId: string } | null = null;
     database.transaction((tx) => {
       card = findLiveSourcedCardForBlockInTransaction(tx, planExerciseId) ?? null;
     });
     return card;
-  },
+  };
 
-  async findActiveSessionIdBySourcePlan(planId) {
+
+/** See {@link SessionPlanStore}. */
+const findActiveSessionIdBySourcePlan = async (planId: string): Promise<string | null> => {
     const database = await bootstrapLocalDataLayer();
     const row = database
       .select({ id: sessions.id })
@@ -750,9 +765,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       .orderBy(desc(sessions.updatedAt))
       .get();
     return row?.id ?? null;
-  },
+  };
 
-  async findActiveSessionId() {
+
+/** See {@link SessionPlanStore}. */
+const findActiveSessionId = async (): Promise<string | null> => {
     const database = await bootstrapLocalDataLayer();
     const row = database
       .select({ id: sessions.id })
@@ -761,9 +778,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       .orderBy(desc(sessions.updatedAt))
       .get();
     return row?.id ?? null;
-  },
+  };
 
-  async findSourcedCardPerformances(planExerciseId) {
+
+/** See {@link SessionPlanStore}. */
+const findSourcedCardPerformances = async (planExerciseId: string): Promise<{ cardId: string; sessionId: string; sets: { id: string; sourcePlanSetId: string | null; repsValue: string; weightValue: string; performanceStatus: string | null }[] } | null> => {
     const database = await bootstrapLocalDataLayer();
     let result: {
       cardId: string;
@@ -799,9 +818,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       };
     });
     return result;
-  },
+  };
 
-  async resolvePlanBlock(input) {
+
+/** See {@link SessionPlanStore}. */
+const resolvePlanBlock = async (input: { planExerciseId: string; status: 'completed' | 'skipped'; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let resolved = false;
     database.transaction((tx) => {
@@ -829,36 +850,44 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return resolved;
-  },
+  };
 
-  async listSourcedCardsForBlocks(planExerciseIds) {
+
+/** See {@link SessionPlanStore}. */
+const listSourcedCardsForBlocks = async (planExerciseIds: string[]): Promise<{ id: string; sessionId: string; sourcePlanExerciseId: string }[]> => {
     const database = await bootstrapLocalDataLayer();
     let cards: { id: string; sessionId: string; sourcePlanExerciseId: string }[] = [];
     database.transaction((tx) => {
       cards = listSourcedCardsForBlocksInTransaction(tx, planExerciseIds);
     });
     return cards;
-  },
+  };
 
-  async listBlocksForPlans(planIds) {
+
+/** See {@link SessionPlanStore}. */
+const listBlocksForPlans = async (planIds: string[]): Promise<PlanExerciseRow[]> => {
     const database = await bootstrapLocalDataLayer();
     let blocks: PlanExerciseRow[] = [];
     database.transaction((tx) => {
       blocks = listBlocksForPlansInTransaction(tx, planIds);
     });
     return blocks;
-  },
+  };
 
-  async listSetsForBlocks(planExerciseIds) {
+
+/** See {@link SessionPlanStore}. */
+const listSetsForBlocks = async (planExerciseIds: string[]): Promise<PlanSetRow[]> => {
     const database = await bootstrapLocalDataLayer();
     let sets: PlanSetRow[] = [];
     database.transaction((tx) => {
       sets = listSetsForBlocksInTransaction(tx, planExerciseIds);
     });
     return sets;
-  },
+  };
 
-  async reorderProgrammePlans(input) {
+
+/** See {@link SessionPlanStore}. */
+const reorderProgrammePlans = async (input: { programmeId: string; orderedPlanIds: string[]; now: Date }): Promise<void> => {
     const database = await bootstrapLocalDataLayer();
     database.transaction((tx) => {
       const localUpdatedAtMs = nowMonotonic(tx);
@@ -889,9 +918,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
         .run();
     });
     notifyLocalWrite();
-  },
+  };
 
-  async reorderPlanExercises(input) {
+
+/** See {@link SessionPlanStore}. */
+const reorderPlanExercises = async (input: { planId: string; orderedExerciseIds: string[]; now: Date }): Promise<void> => {
     const database = await bootstrapLocalDataLayer();
     database.transaction((tx) => {
       const localUpdatedAtMs = nowMonotonic(tx);
@@ -921,9 +952,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       );
     });
     notifyLocalWrite();
-  },
+  };
 
-  async reorderPlanSets(input) {
+
+/** See {@link SessionPlanStore}. */
+const reorderPlanSets = async (input: { planExerciseId: string; orderedSetIds: string[]; now: Date }): Promise<void> => {
     const database = await bootstrapLocalDataLayer();
     database.transaction((tx) => {
       const localUpdatedAtMs = nowMonotonic(tx);
@@ -958,9 +991,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       );
     });
     notifyLocalWrite();
-  },
+  };
 
-  async tombstonePlan(input) {
+
+/** See {@link SessionPlanStore}. */
+const tombstonePlan = async (input: { planId: string; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let tombstoned = false;
     database.transaction((tx) => {
@@ -999,9 +1034,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return tombstoned;
-  },
+  };
 
-  async tombstoneProgramme(input) {
+
+/** See {@link SessionPlanStore}. */
+const tombstoneProgramme = async (input: { programmeId: string; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let tombstoned = false;
     database.transaction((tx) => {
@@ -1026,9 +1063,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return tombstoned;
-  },
+  };
 
-  async tombstonePlanExercise(input) {
+
+/** See {@link SessionPlanStore}. */
+const tombstonePlanExercise = async (input: { planExerciseId: string; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let tombstoned = false;
     database.transaction((tx) => {
@@ -1086,27 +1125,33 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       notifyLocalWrite();
     }
     return tombstoned;
-  },
+  };
 
-  async loadPlanGraph(planId) {
+
+/** See {@link SessionPlanStore}. */
+const loadPlanGraph = async (planId: string): Promise<PlanGraph | null> => {
     const database = await bootstrapLocalDataLayer();
     const plan = database.select().from(sessionPlans).where(eq(sessionPlans.id, planId)).get();
     if (!plan || plan.deletedAt !== null) {
       return null;
     }
     return loadGraphForPlan(database, plan);
-  },
+  };
 
-  async loadPlan(planId) {
+
+/** See {@link SessionPlanStore}. */
+const loadPlan = async (planId: string): Promise<PlanRow | null> => {
     const database = await bootstrapLocalDataLayer();
     const plan = database.select().from(sessionPlans).where(eq(sessionPlans.id, planId)).get();
     if (!plan || plan.deletedAt !== null) {
       return null;
     }
     return plan;
-  },
+  };
 
-  async loadPlanBlock(planExerciseId) {
+
+/** See {@link SessionPlanStore}. */
+const loadPlanBlock = async (planExerciseId: string): Promise<PlanBlockGraph | null> => {
     const database = await bootstrapLocalDataLayer();
     const exercise = database
       .select()
@@ -1132,18 +1177,22 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
         .orderBy(asc(sessionPlanSets.orderIndex))
         .all(),
     };
-  },
+  };
 
-  async loadProgramme(programmeId) {
+
+/** See {@link SessionPlanStore}. */
+const loadProgramme = async (programmeId: string): Promise<ProgrammeRow | null> => {
     const database = await bootstrapLocalDataLayer();
     const programme = database.select().from(trainingProgrammes).where(eq(trainingProgrammes.id, programmeId)).get();
     if (!programme || programme.deletedAt !== null) {
       return null;
     }
     return programme;
-  },
+  };
 
-  async listProgrammes() {
+
+/** See {@link SessionPlanStore}. */
+const listProgrammes = async (): Promise<ProgrammeRow[]> => {
     const database = await bootstrapLocalDataLayer();
     return database
       .select()
@@ -1151,9 +1200,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       .where(isNull(trainingProgrammes.deletedAt))
       .orderBy(asc(trainingProgrammes.updatedAt))
       .all();
-  },
+  };
 
-  async listPlanGraphsByProgramme(programmeId) {
+
+/** See {@link SessionPlanStore}. */
+const listPlanGraphsByProgramme = async (programmeId: string): Promise<PlanGraph[]> => {
     const database = await bootstrapLocalDataLayer();
     const plans = database
       .select()
@@ -1162,9 +1213,11 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       .orderBy(asc(sessionPlans.programmeOrderIndex), asc(sessionPlans.createdAt))
       .all();
     return plans.map((plan) => loadGraphForPlan(database, plan));
-  },
+  };
 
-  async listLivePlans() {
+
+/** See {@link SessionPlanStore}. */
+const listLivePlans = async (): Promise<PlanRow[]> => {
     const database = await bootstrapLocalDataLayer();
     return database
       .select()
@@ -1172,7 +1225,36 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       .where(isNull(sessionPlans.deletedAt))
       .orderBy(asc(sessionPlans.scheduledFor), asc(sessionPlans.createdAt))
       .all();
-  },
+  };
+
+export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
+  savePlanGraph,
+  saveProgrammeGraph,
+  updateProgrammeMeta,
+  updatePlanMeta,
+  savePlanExerciseGraph,
+  insertPlanExercise,
+  findLiveSourcedCardForBlock,
+  findActiveSessionIdBySourcePlan,
+  findActiveSessionId,
+  findSourcedCardPerformances,
+  resolvePlanBlock,
+  listSourcedCardsForBlocks,
+  listBlocksForPlans,
+  listSetsForBlocks,
+  reorderProgrammePlans,
+  reorderPlanExercises,
+  reorderPlanSets,
+  tombstonePlan,
+  tombstoneProgramme,
+  tombstonePlanExercise,
+  loadPlanGraph,
+  loadPlan,
+  loadPlanBlock,
+  loadProgramme,
+  listProgrammes,
+  listPlanGraphsByProgramme,
+  listLivePlans,
 });
 
 const loadGraphForPlan = (database: LocalDatabase, plan: PlanRow): PlanGraph => {
