@@ -11,3 +11,5 @@ export * from './materialization';
 export * from './set-reorder';
 export * from './block-resolution';
 export * from './available-blocks';
+export * from './plan-form-model';
+export * from './plan-edit-sync';

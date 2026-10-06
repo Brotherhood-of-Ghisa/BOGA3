@@ -19,7 +19,9 @@ import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-p
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
+import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
+import { completePlanBlock, reorderSessionExerciseSets } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
@@ -45,7 +47,6 @@ import {
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
-import { reorderSessionExerciseSets } from '@/src/session-planner';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
 import { useSessionExerciseDraft } from '@/src/session-recorder/use-session-exercise-draft';
@@ -135,6 +136,7 @@ export function ExercisePageScreen({
   // `null` follows the cursor: the logger sits on the first set not performed.
   const [openSetId, setOpenSetId] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [blockNotice, setBlockNotice] = useState<string | null>(null);
   const weightInputRef = useRef<TextInputInstance>(null);
 
   const goBack = useCallback(() => {
@@ -338,6 +340,29 @@ export function ExercisePageScreen({
     );
   };
 
+  /**
+   * Complete block: the sourced card's explicit resolution — the only
+   * operation that advances the plan block, never attachment or confirming
+   * alone. A refusal (no confirmed source-derived set yet) says so inline
+   * and the recorder stays open.
+   */
+  const onCompleteBlock = () => {
+    setOpenSheet('none');
+    const sourceId = exercise?.sourcePlanExerciseId;
+    if (!sourceId) return;
+    void completePlanBlock(sourceId).then((result) => {
+      if (result.status === 'completed') {
+        setBlockNotice('Block completed. It no longer counts as waiting.');
+        return;
+      }
+      if (result.status === 'not-resolvable') {
+        setBlockNotice('Finish one planned set first: confirm a set the block planned.');
+        return;
+      }
+      setBlockNotice("Couldn't complete the block. Try again.");
+    });
+  };
+
   if (draft.state.status !== 'ready' || !exercise) {
     return (
       <SafeAreaView edges={['top']} style={styles.screen}>
@@ -377,6 +402,9 @@ export function ExercisePageScreen({
             view={recordsView}
           />
           <Card testID="exercise-set-list">
+            {blockNotice ? (
+              <Notice live message={blockNotice} testID="exercise-block-notice" tone="neutral" />
+            ) : null}
             {recordBand ? (
               <View style={styles.recordBand} testID="exercise-record-band">
                 <Icon color={uiRoles.record} name="arrow-up" size="xs" />
@@ -490,6 +518,7 @@ export function ExercisePageScreen({
       />
       <ExerciseOptionsSheet
         exerciseName={exercise.name}
+        onCompleteBlock={exercise.sourcePlanExerciseId != null ? onCompleteBlock : undefined}
         onDismiss={() => setOpenSheet('none')}
         onEdit={() => { void draft.flush().then(saved => { if (saved) setOpenSheet('edit'); }); }}
         onLink={
