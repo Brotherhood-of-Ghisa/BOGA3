@@ -1087,6 +1087,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       gymId: input.gymId,
       startedAt: input.startedAt,
       status: normalizeDraftStatus(input.status),
+      sourcePlanId: input.sourcePlanId,
       exercises: input.exercises,
       now,
     });

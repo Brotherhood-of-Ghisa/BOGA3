@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
@@ -7,6 +7,7 @@ import {
   sessionPlanExercises,
   sessionPlanSets,
   sessionPlans,
+  sessions,
   trainingProgrammes,
 } from './schema';
 import type { SessionSetTypeValue } from './set-types';
@@ -332,10 +333,65 @@ const savePlanGraphInTransaction = (
  */
 const findLiveSourcedCardForBlockInTransaction = (tx: Transaction, planExerciseId: string) =>
   tx
-    .select({ id: sessionExercises.id })
+    .select({ id: sessionExercises.id, sessionId: sessionExercises.sessionId })
     .from(sessionExercises)
-    .where(and(eq(sessionExercises.sourcePlanExerciseId, planExerciseId), isNull(sessionExercises.deletedAt)))
+    .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+    .where(
+      and(
+        eq(sessionExercises.sourcePlanExerciseId, planExerciseId),
+        isNull(sessionExercises.deletedAt),
+        isNull(sessions.deletedAt),
+      ),
+    )
     .get();
+
+const listSourcedCardsForBlocksInTransaction = (tx: Transaction, planExerciseIds: string[]) =>
+  planExerciseIds.length === 0
+    ? []
+    : tx
+        .select({
+          id: sessionExercises.id,
+          sessionId: sessionExercises.sessionId,
+          sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
+        })
+        .from(sessionExercises)
+        .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+        .where(
+          and(
+            inArray(sessionExercises.sourcePlanExerciseId, planExerciseIds),
+            isNull(sessionExercises.deletedAt),
+            // A card whose session was discarded no longer claims the block:
+            // the block returns to pending (available) again.
+            isNull(sessions.deletedAt),
+          ),
+        )
+        .all()
+        .map((row) => ({
+          id: row.id,
+          sessionId: row.sessionId,
+          // The `inArray` filter above excludes the null link (manual cards).
+          sourcePlanExerciseId: row.sourcePlanExerciseId as string,
+        }));
+
+const listBlocksForPlansInTransaction = (tx: Transaction, planIds: string[]) =>
+  planIds.length === 0
+    ? []
+    : tx
+        .select()
+        .from(sessionPlanExercises)
+        .where(and(inArray(sessionPlanExercises.sessionPlanId, planIds), isNull(sessionPlanExercises.deletedAt)))
+        .orderBy(asc(sessionPlanExercises.orderIndex))
+        .all();
+
+const listSetsForBlocksInTransaction = (tx: Transaction, planExerciseIds: string[]) =>
+  planExerciseIds.length === 0
+    ? []
+    : tx
+        .select()
+        .from(sessionPlanSets)
+        .where(and(inArray(sessionPlanSets.sessionPlanExerciseId, planExerciseIds), isNull(sessionPlanSets.deletedAt)))
+        .orderBy(asc(sessionPlanSets.orderIndex))
+        .all();
 
 export type SessionPlanStore = {
   /** Creates or rewrites one plan graph in one transaction. */
@@ -375,7 +431,19 @@ export type SessionPlanStore = {
   /** Tombstones one block and its live target sets. */
   tombstonePlanExercise(input: { planExerciseId: string; now: Date }): Promise<boolean>;
   /** The block's live performed card, when one has claimed it. */
-  findLiveSourcedCardForBlock(planExerciseId: string): Promise<{ id: string } | null>;
+  findLiveSourcedCardForBlock(planExerciseId: string): Promise<{ id: string; sessionId: string } | null>;
+  /** The active, undeleted session started from this whole plan, when one exists. */
+  findActiveSessionIdBySourcePlan(planId: string): Promise<string | null>;
+  /** Any active, undeleted session — the Start-all conflict check. */
+  findActiveSessionId(): Promise<string | null>;
+  /** Live performed cards claiming any of these blocks (attachment lookup in one query). */
+  listSourcedCardsForBlocks(planExerciseIds: string[]): Promise<
+    { id: string; sessionId: string; sourcePlanExerciseId: string }[]
+  >;
+  /** Live blocks of the given plans, ordered by plan then block order. */
+  listBlocksForPlans(planIds: string[]): Promise<PlanExerciseRow[]>;
+  /** Live targets of the given blocks, ordered by block then target order. */
+  listSetsForBlocks(planExerciseIds: string[]): Promise<PlanSetRow[]>;
   loadPlanGraph(planId: string): Promise<PlanGraph | null>;
   loadPlan(planId: string): Promise<PlanRow | null>;
   /** The block plus its target sets and its live parent plan; null when either is gone. */
@@ -641,11 +709,62 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
 
   async findLiveSourcedCardForBlock(planExerciseId) {
     const database = await bootstrapLocalDataLayer();
-    let card: { id: string } | null = null;
+    let card: { id: string; sessionId: string } | null = null;
     database.transaction((tx) => {
       card = findLiveSourcedCardForBlockInTransaction(tx, planExerciseId) ?? null;
     });
     return card;
+  },
+
+  async findActiveSessionIdBySourcePlan(planId) {
+    const database = await bootstrapLocalDataLayer();
+    const row = database
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(
+        and(eq(sessions.sourcePlanId, planId), eq(sessions.status, 'active'), isNull(sessions.deletedAt)),
+      )
+      .orderBy(desc(sessions.updatedAt))
+      .get();
+    return row?.id ?? null;
+  },
+
+  async findActiveSessionId() {
+    const database = await bootstrapLocalDataLayer();
+    const row = database
+      .select({ id: sessions.id })
+      .from(sessions)
+      .where(and(eq(sessions.status, 'active'), isNull(sessions.deletedAt)))
+      .orderBy(desc(sessions.updatedAt))
+      .get();
+    return row?.id ?? null;
+  },
+
+  async listSourcedCardsForBlocks(planExerciseIds) {
+    const database = await bootstrapLocalDataLayer();
+    let cards: { id: string; sessionId: string; sourcePlanExerciseId: string }[] = [];
+    database.transaction((tx) => {
+      cards = listSourcedCardsForBlocksInTransaction(tx, planExerciseIds);
+    });
+    return cards;
+  },
+
+  async listBlocksForPlans(planIds) {
+    const database = await bootstrapLocalDataLayer();
+    let blocks: PlanExerciseRow[] = [];
+    database.transaction((tx) => {
+      blocks = listBlocksForPlansInTransaction(tx, planIds);
+    });
+    return blocks;
+  },
+
+  async listSetsForBlocks(planExerciseIds) {
+    const database = await bootstrapLocalDataLayer();
+    let sets: PlanSetRow[] = [];
+    database.transaction((tx) => {
+      sets = listSetsForBlocksInTransaction(tx, planExerciseIds);
+    });
+    return sets;
   },
 
   async reorderProgrammePlans(input) {
@@ -996,5 +1115,9 @@ const loadGraphForPlan = (database: LocalDatabase, plan: PlanRow): PlanGraph => 
 export {
   savePlanGraphInTransaction,
   redensifyRowsInTransaction,
+  liftBaseForRows,
   findLiveSourcedCardForBlockInTransaction,
+  listSourcedCardsForBlocksInTransaction,
+  listBlocksForPlansInTransaction,
+  listSetsForBlocksInTransaction,
 };
