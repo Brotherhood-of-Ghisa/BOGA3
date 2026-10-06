@@ -25,13 +25,19 @@ const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 let mockIsFocused = true;
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    dismissTo: mockDismissTo,
-    push: mockPush,
-  }),
-  useIsFocused: () => mockIsFocused,
-}));
+jest.mock('expo-router', () => {
+  const mockReact = jest.requireActual('react');
+  return {
+    useRouter: () => ({
+      dismissTo: mockDismissTo,
+      push: mockPush,
+    }),
+    useIsFocused: () => mockIsFocused,
+    useFocusEffect: (callback: () => void | (() => void)) => {
+      mockReact.useEffect(() => callback(), [callback]);
+    },
+  };
+});
 
 import SessionsRoute, { SessionsScreen } from '../app/sessions';
 import {
@@ -43,6 +49,7 @@ import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnaps
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import { planRepository } from '@/src/session-planner';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
 
 const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
@@ -345,5 +352,84 @@ describe('Sessions list load races', () => {
       await lateLoad.promise;
     });
     expect(dataClient.loadSessions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Sessions planning sections', () => {
+  const planDraft = (
+    overrides: Partial<Parameters<typeof planRepository.createPlan>[0]> = {}
+  ): Parameters<typeof planRepository.createPlan>[0] => ({
+    title: 'Heavy Day',
+    gymId: null,
+    scheduledFor: null,
+    exercises: [
+      {
+        exerciseDefinitionId: null,
+        name: 'Back Squat',
+        machineName: '',
+        sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+      },
+    ],
+    ...overrides,
+  });
+
+  const seedPlans = async () => {
+    // Upcoming, soonest last in creation order; the query sorts by schedule.
+    await planRepository.createPlan(planDraft({ title: 'Later Week', scheduledFor: new Date(2026, 9, 12, 7) }), new Date(2026, 9, 1, 8));
+    await planRepository.createPlan(planDraft({ title: 'Tomorrow', scheduledFor: new Date(2026, 9, 6, 7) }), new Date(2026, 9, 1, 9));
+    // Unscheduled; the most recently updated leads.
+    await planRepository.createPlan(planDraft({ title: 'Old Idea' }), new Date(2026, 9, 2, 8));
+    await planRepository.createPlan(planDraft({ title: 'New Idea' }), new Date(2026, 9, 3, 8));
+  };
+
+  const planRowLabels = (testID: string) =>
+    screen
+      .getAllByTestId(new RegExp(`^${testID}-row-`))
+      .map((node) => String(node.props.accessibilityLabel));
+
+  beforeEach(() => {
+    resetLocalData();
+    mockPush.mockClear();
+    mockDismissTo.mockClear();
+    mockIsFocused = true;
+    alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  it('separates Upcoming (by schedule) and Unscheduled (by recency) from Completed', async () => {
+    await openSessions(seedPlans);
+
+    // Soonest scheduled first; rows say when in words.
+    expect(planRowLabels('sessions-plan-section-upcoming')).toEqual([
+      'Tomorrow, 2026-10-06 07:00',
+      'Later Week, 2026-10-12 07:00',
+    ]);
+    // Most recently updated first.
+    expect(planRowLabels('sessions-plan-section-unscheduled')).toEqual([
+      'New Idea, Unscheduled',
+      'Old Idea, Unscheduled',
+    ]);
+
+    // The completed history keeps its own count and rows, untouched by plans.
+    expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(11);
+
+    // A plan row opens the plan detail; the quiet action opens the form.
+    fireEvent.press(screen.getAllByTestId(/^sessions-plan-section-unscheduled-row-/)[0]);
+    expect(mockPush).toHaveBeenCalledWith(
+      `/session-plan/${String(screen.getAllByTestId(/^sessions-plan-section-unscheduled-row-/)[0].props.testID).replace('sessions-plan-section-unscheduled-row-', '')}`
+    );
+    fireEvent.press(screen.getByTestId('sessions-plan-session-action'));
+    expect(mockPush).toHaveBeenCalledWith('/session-plan/new');
+  });
+
+  it('shows the quiet Plan session action and no plan sections when nothing is planned', async () => {
+    await openSessions();
+
+    expect(screen.queryByTestId('sessions-plan-section-upcoming')).toBeNull();
+    expect(screen.queryByTestId('sessions-plan-section-unscheduled')).toBeNull();
+    expect(screen.getByTestId('sessions-plan-session-action')).toBeTruthy();
+    // The completed history and its count are unaffected.
+    expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(11);
+    fireEvent.press(screen.getByTestId('sessions-plan-session-action'));
+    expect(mockPush).toHaveBeenCalledWith('/session-plan/new');
   });
 });
