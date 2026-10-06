@@ -2,12 +2,12 @@ import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { HistoryPopup } from './history-popup';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import {
+  PageSheet,
   SegmentedControl,
   StatePanel,
   uiFonts,
@@ -22,8 +22,8 @@ import type {
   SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 
-// The history of one exercise or one muscle on Progress: a
-// full-height popup holding the metric control, saved view/window, week banner and daily
+// The history of one exercise or one muscle on Progress: a sub-page
+// (`PageSheet`) holding the metric control, saved view/window, week banner and daily
 // or weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
@@ -241,7 +241,8 @@ export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   selectedWeekKey: string | null;
   onSelectWeek: (weekKey: string | null) => void;
-  // Called after the full-height popup has closed; no visible close button.
+  // Called once the sheet has gone (X, swipe down, Back or escape), so the host
+  // clears its target and restores focus after the native modal has closed.
   onDismiss: () => void;
   onRetry?: () => void;
   todayDateKey?: string;
@@ -269,22 +270,12 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 }: HistorySheetProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
+  // The host mounts the sheet open and unmounts it from `onDismiss`.
+  const [visible, setVisible] = useState(true);
 
   return (
-    <HistoryPopup dismissLabel={`Dismiss ${kind} history`} accessibilityLabel={`${eyebrow}: ${title}`}
-      onDismiss={onDismiss} testID={prefix}
-      header={<View style={styles.header}>
-          <Text allowFontScaling={false} style={styles.eyebrow}>
-            {eyebrow}
-          </Text>
-          <Text
-            accessibilityRole="header"
-            allowFontScaling={false}
-            style={styles.title}
-            testID={`${prefix}-title`}>
-            {title}
-          </Text>
-        </View>}>
+    <PageSheet closeLabel={`Close ${kind} history`} eyebrow={eyebrow} onDismiss={() => setVisible(false)}
+      onDismissed={onDismiss} testID={prefix} title={title} visible={visible}>
       <View style={styles.body} testID={`${prefix}-overlay`}>
         <View style={styles.controls}>
           <Text allowFontScaling={false} style={styles.controlLabel} testID={`${prefix}-window`}>
@@ -356,7 +347,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           </>}
         />
       </View>
-    </HistoryPopup>
+    </PageSheet>
   );
 }
 
@@ -373,19 +364,6 @@ const microLabel = {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-  },
-  header: {
-    gap: uiSpace.xs,
-    paddingHorizontal: uiSpace.lg,
-    paddingBottom: uiSpace.md,
-  },
-  eyebrow: microLabel,
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
   controls: {
     gap: uiSpace.md,

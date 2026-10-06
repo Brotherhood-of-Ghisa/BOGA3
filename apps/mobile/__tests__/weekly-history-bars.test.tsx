@@ -167,11 +167,12 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
     fireEvent.press(screen.getByTestId('stats-exercise-history-retry'));
     expect(retry).toHaveBeenCalledTimes(1);
   } else expect(screen.queryByTestId('stats-exercise-history-retry')).toBeNull();
-  // Back starts the exit; native completion closes once even after escape.
-  fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose');
-  expect(dismiss).not.toHaveBeenCalled();
-  fireEvent(screen.UNSAFE_getByType(Modal), 'accessibilityEscape');
-  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+  // An iOS swipe has already taken the page sheet away: the host hears once,
+  // and a late native dismissal of the swiped modal is not a second close.
+  const swiped = screen.UNSAFE_getByType(Modal);
+  fireEvent(swiped, 'requestClose');
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  fireEvent(swiped, 'dismiss');
   expect(dismiss).toHaveBeenCalledTimes(1);
 });
 

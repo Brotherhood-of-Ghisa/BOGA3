@@ -193,7 +193,7 @@ describe('Stats over real data', () => {
       expect(panel.getByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`).props.accessibilityLabel).toContain('Volume 600');
     } else expect(panel.queryByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`)).toBeNull();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
@@ -211,7 +211,7 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
       .toHaveProp('accessibilityState', { selected: true });
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
@@ -324,7 +324,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.queryByTestId('stats-exercise-history-overlay')).toBeNull();
   });
@@ -355,7 +355,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
@@ -387,7 +387,7 @@ describe('Stats over real data', () => {
     await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
     expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-/)).toHaveLength(1);
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
@@ -454,7 +454,7 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
     expect(screen.getByTestId('stats-muscle-history-title')).toHaveTextContent('Chest');
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.queryByTestId('stats-muscle-history-overlay')).toBeNull();
     expect(screen.getByTestId('stats-view-mode-chip-exercise')).toBeTruthy();
@@ -538,7 +538,7 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
     expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent('Barbell Back Squat');
-    fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
@@ -630,7 +630,7 @@ describe('Stats over real data', () => {
     await replayFocus();
     await waitFor(() => expect(read).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
-    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     await waitFor(() => expect(total('now')).toHaveTextContent(/^0$/));
     expect(value('quads', 'now')).toHaveTextContent(/^0$/);

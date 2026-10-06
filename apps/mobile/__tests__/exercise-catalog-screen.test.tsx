@@ -404,7 +404,7 @@ describe('ExerciseCatalogScreen', () => {
       ).toHaveLength(1);
     });
 
-    it('opens the editor as a sheet with Save as its one accent, dismissed by the backdrop', async () => {
+    it('opens the editor as a page sheet with Save as its one accent, closed by its X', async () => {
       await openCatalog();
 
       fireEvent.press(screen.getByLabelText('Create new exercise'));
@@ -415,7 +415,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(editorAccents).toHaveLength(1);
       expect(editorAccents[0].props.accessibilityLabel).toBe('Save exercise definition');
 
-      fireEvent.press(screen.getByLabelText('Dismiss exercise editor overlay', { includeHiddenElements: true }));
+      fireEvent.press(screen.getByLabelText('Close exercise editor'));
       expect(screen.queryByTestId('exercise-editor')).toBeNull();
     });
 

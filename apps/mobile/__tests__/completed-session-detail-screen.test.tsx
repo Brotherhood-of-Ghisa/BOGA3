@@ -317,9 +317,10 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(mockReleaseCapture).toHaveBeenCalledWith('file:///tmp/boga-session.png');
     expect(screen.queryByTestId('session-share-error')).toBeNull();
 
-    // A design-language sheet: no Cancel, the backdrop closes it.
+    // A page sheet: no Cancel, its X (or a swipe down) closes it.
     expect(screen.queryByTestId('session-share-cancel')).toBeNull();
-    fireEvent.press(screen.getByTestId('session-share-preview-backdrop', { includeHiddenElements: true }));
+    expect(screen.getByTestId('session-share-preview-modal')).toHaveProp('presentationStyle', 'pageSheet');
+    fireEvent.press(screen.getByTestId('session-share-preview-close'));
     expect(screen.queryByTestId('session-share-preview')).toBeNull();
   });
 

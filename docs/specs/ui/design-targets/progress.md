@@ -48,11 +48,11 @@ rule that comes with it: text on a `viz` ground is `ink`.
 
 ### History sheets and heatmaps
 
-- One `HistorySheet` (`components/stats/`) uses the full-height
-  [History popup](history-popup.md): handle/header drag, accessible dismiss,
-  Android back and VoiceOver escape; no visible close control. The older
-  three-quarter container/backdrop prescription is superseded; charts retain
-  the semantics below.
+- One `HistorySheet` (`components/stats/`) is a sub-page `PageSheet`
+  ([History popup](history-popup.md), amended container): swipe down, X,
+  Android back and VoiceOver escape. The older three-quarter
+  container/backdrop prescription is superseded; charts retain the semantics
+  below.
 - Eyebrow micro-label and the name in Archivo 800; a `Metric`
   `SegmentedControl` under its micro-label and a static saved view/window label;
   Daily/Weekly is chosen only in Settings; in Weekly a `rule-soft` banner with

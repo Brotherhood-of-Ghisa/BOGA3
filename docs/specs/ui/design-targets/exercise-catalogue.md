@@ -93,8 +93,8 @@ panels, and the `Groups`-only list.
   (`pencil`), `Link to group exercise…` (`link`, signed in only) and `Delete` in
   `danger` (`trash`). A deleted exercise gets `Undelete` instead of `Delete`,
   and `Edit` and `Link` are disabled. Delete does not confirm.
-- **The exercise editor** is a tall `Sheet` that lifts above the keyboard, with
-  no Cancel. The name is a `FormField`. The weight entry is a micro-labelled
+- **The exercise editor** is a sub-page `PageSheet` (swipe down or X, locked
+  while saving) whose body lifts above the keyboard. The name is a `FormField`. The weight entry is a micro-labelled
   `SegmentedControl`. The primary muscle is a `ListRow` framed like a field,
   with a faint placeholder and `chevron-right`, turning `danger` when missing.
   Secondary muscles are `ListRow`s in a `Card`, each with a `danger` `x`, over

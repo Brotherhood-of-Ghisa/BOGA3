@@ -516,7 +516,7 @@ describe('StatsScreenShell', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11'));
     expect(onSelectMuscleHistoryWeek).toHaveBeenCalledWith(null); // deselect since it's already selected
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-backdrop', { includeHiddenElements: true }));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
@@ -939,15 +939,14 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-history-empty')).toBeTruthy();
   });
 
-  it('has no close button: the sheet is dismissed from its backdrop (G5)', () => {
+  it('opens history as a page sheet closed by its X or a swipe down', () => {
     renderStatsScreenShell({
       selectedExercise: { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' },
     });
     expect(screen.getByTestId('stats-exercise-history')).toBeTruthy();
-    expect(
-      screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true })
-    ).toHaveProp('accessibilityLabel', 'Dismiss exercise history');
-    expect(screen.queryByTestId('stats-exercise-history-close', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByTestId('stats-exercise-history-modal')).toHaveProp('presentationStyle', 'pageSheet');
+    expect(screen.getByTestId('stats-exercise-history-header')).toHaveTextContent('Exercise HistoryBench Press');
+    expect(screen.getByTestId('stats-exercise-history-close')).toHaveProp('accessibilityLabel', 'Close exercise history');
   });
 });
 
@@ -1092,7 +1091,7 @@ it('returns screen-reader focus to the retained exercise row that launched histo
   act(() => row.props.ref(launch));
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
   view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
-  fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+  fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
   expect(focused).not.toHaveBeenCalled();
   fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   await act(async () => {});
@@ -1133,7 +1132,7 @@ it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async a
   act(() => row.props.ref({ canonical: { nativeTag: 77 } }));
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
   view.rerender(<StatsScreenShell {...props} selectedExercise={{ exerciseDefinitionId: 'lift', displayName: 'Lift' }} />);
-  fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
+  fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
   fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   if (action === 'unmount') view.unmount();
   else fireEvent.press(screen.getByTestId('stats-exercise-row-lift', { includeHiddenElements: true }));

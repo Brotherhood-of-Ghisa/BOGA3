@@ -52,8 +52,9 @@ the names of its Jest tests are the specification of that component.
    kinds. A **picker or menu** (row actions, management options, a choice of
    one value, a short form) opens a design-language `Sheet` over the current
    screen, sized to its content. A **sub-page** (a browser, an editor, a
-   preview; Swap exercise) opens a `PageSheet`, the native iOS page sheet the
-   exercise picker uses. Do not document opening either as a route transition.
+   preview: Swap exercise, the exercise editor, Share session, Progress
+   history) opens a `PageSheet`, the native iOS page sheet the exercise picker
+   uses. Do not document opening either as a route transition.
 2. **Dragging down closes every sheet, and dismissal writes nothing.** A
    `Sheet` follows a drag from its handle and title row, closes on a
    deliberate release and springs back otherwise; its body scrolls and taps
@@ -62,8 +63,6 @@ the names of its Jest tests are the specification of that component.
    anywhere and carries an X, since it has no backdrop. A sheet may refuse
    dismissal only while its own write or capture is in flight; a refused drag
    springs back.
-   Full-height Progress history uses header drag and an accessible dismiss
-   action; its reachable backdrop still dismisses (`components/stats/history-popup.tsx`).
 3. **Pickers never stack.** A choice made inside a sheet (an editor's muscle
    list) swaps the sheet's body, with a `chevron-left` back to the previous
    body. A sub-page may open over a sub-page, which iOS stacks as cards. A

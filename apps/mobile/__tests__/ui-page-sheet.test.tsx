@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Modal, Platform, Text } from 'react-native';
+import { Dimensions, KeyboardAvoidingView, Modal, Platform, Text } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { PageSheet } from '@/components/ui/page-sheet';
@@ -85,4 +85,33 @@ it('closes on Android Back and reports at once, with no native dismissal event',
   expect(dismiss).toHaveBeenCalledTimes(1);
   view.rerender(sheet({ visible: false, onDismiss: dismiss, onDismissed: dismissed }));
   expect(dismissed).toHaveBeenCalledTimes(1);
+});
+
+it('heads a sub-page with an optional eyebrow and a leading back control', () => {
+  const back = jest.fn();
+  render(
+    <PageSheet closeLabel="Close muscle history" eyebrow="Muscle History"
+      headerLeading={<IconButton accessibilityLabel="Back to exercise" name="chevron-left" onPress={back} testID="back" />}
+      onDismiss={jest.fn()} testID="history" title="Romanian Deadlift With A Long Name" visible>
+      <Text>Chart</Text>
+    </PageSheet>
+  );
+  expect(screen.getByTestId('history-header')).toHaveTextContent('Muscle HistoryRomanian Deadlift With A Long Name');
+  expect(screen.getByTestId('history-title')).toHaveProp('numberOfLines', 2);
+  fireEvent.press(screen.getByTestId('back'));
+  expect(back).toHaveBeenCalledTimes(1);
+});
+
+it('lifts a keyboard-avoiding body by the gap between the sheet and the top of the window', () => {
+  render(
+    <PageSheet closeLabel="Close exercise editor" keyboardAvoiding onDismiss={jest.fn()} testID="editor"
+      title="Create Exercise" visible>
+      <Text>Fields</Text>
+    </PageSheet>
+  );
+  const avoider = () => screen.UNSAFE_getByType(KeyboardAvoidingView).props;
+  expect(avoider()).toMatchObject({ keyboardVerticalOffset: 0, behavior: 'padding' });
+  const windowHeight = Dimensions.get('window').height;
+  fireEvent(screen.getByTestId('editor'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 390, height: windowHeight - 60 } } });
+  expect(avoider().keyboardVerticalOffset).toBe(60);
 });
