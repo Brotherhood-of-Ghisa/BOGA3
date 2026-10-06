@@ -1,7 +1,7 @@
 ---
 task_id: M23-T03-Mobile_plan_repository_and_session_materialization
 milestone_id: "M23"
-status: planned
+status: in_progress
 ui_impact: "no"
 areas: "frontend"
 runtimes: "node|expo"
@@ -15,7 +15,7 @@ docs_touched: "docs/specs/05-data-model.md, docs/specs/09-project-structure.md, 
 ## Task metadata
 
 - Task ID: `M23-T03-Mobile_plan_repository_and_session_materialization`
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: `M23-T02`
 - Precedes: `M23-T04`, `M23-T05`
 
@@ -164,12 +164,51 @@ change.
 - Run `./boga test for --diff origin/main` and any additional lane it selects.
 - No screenshots: this task has no screen or component change.
 
+## Design (agreed with operator)
+
+- **D1 — module boundary.** All plan-table SQL lives in a new
+  `src/data/session-plan-store.ts` (the `src/data`-owns-SQL convention;
+  `src/session-recorder` owns no SQL today). `src/session-planner/` owns the
+  screen-facing domain API: `types.ts`, `plan-validation.ts` (pure),
+  `deterministic-ids.ts`, `plan-repository.ts`, `plan-queries.ts`,
+  `materialization.ts`, `block-resolution.ts`, `set-reorder.ts`, `index.ts`.
+  `session-planner` imports `src/data`; `src/data` never imports back.
+- **D2 — materialize through the recorder's graph writer.** Extend the draft
+  persistence types in `src/data/session-drafts.ts` with provenance
+  passthrough (`sourcePlanSetId` on set input/snapshot, `sourcePlanExerciseId`
+  on exercise input/snapshot, `sourcePlanId` on the draft input), written
+  through by the graph rebuild. `startSessionPlan` and `addPlanBlockToSession`
+  compose draft snapshots with deterministic IDs and inherit the
+  scratch-band/tombstone/one-monotonic-stamp machinery instead of duplicating
+  it. The graph writer already round-trips `planned_*` and `performance_status`,
+  so only the three provenance fields are new.
+- **D3 — deterministic IDs.** `` `${ownerId}:${planId}:start` `` style
+  (contract §4.2), owner read from `sync_runtime_state.accountUserId`, so
+  retries upsert the same rows and competing devices converge on the same keys.
+- **D4 — reorder is two-phase.** Exact-permutation validation is pure; the
+  write lifts the card's live sets to the scratch band inside one transaction,
+  then rewrites dense `0..n-1` (the local unique `(parent, order_index)` index
+  includes tombstones), one `nowMonotonic(tx)` stamp, dirty only touched rows,
+  one `notifyLocalWrite()` post-commit.
+- **D5 — card matching A–D** per contract §4.3; appends reuse the graph-rebuild
+  path (load graph → splice → persist), so tombstone slot collisions are
+  handled by construction and appended planned sets take the next dense
+  indexes after the card's live sets.
+- **D6 — resolution.** Complete requires at least one non-deleted
+  source-derived set on the sourced card that `isConfirmedPerformedSet` and
+  whose `source_plan_set_id` resolves into that block; skip requires no
+  performed work; both set `progress_status` + `resolved_at` in one
+  transaction. Parent plan/programme progress stays derived, never stored.
+- Tests go flat in `apps/mobile/__tests__/` as `session-plan-*.test.ts`,
+  matching the repo convention (no colocated `src/**/__tests__` suites exist
+  yet).
+
 ## Implementation notes
 
 - Reuse the app's monotonic clock and transaction helpers; do not create a
   second sync timestamp scheme.
 - Keep planner state out of `session-drafts.ts` except for the final performed
-  graph that the recorder already understands.
+  graph that the recorder already understands (D2 is the sanctioned touch).
 - The repository is the mutation boundary for mobile UI; screens do not issue
   ad-hoc multi-table writes.
 - Conforming to dependency-cruiser layering rules (PR #453): `apps/mobile/src/session-planner/`
