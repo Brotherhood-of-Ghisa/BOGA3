@@ -139,7 +139,8 @@ supersedes the bar, facts card and record states above where they differ.
   active title with the start date where the elapsed time is, shrunk to fit.
 - **Facts card.** Start · Duration, then Gym · Ex · Sets · Volume, the row of
   the session view's summary card.
-- **Record band** (session view, View Session Sets). One line per record:
+- **Record band** (session view, View Session Sets, the exercise page's set
+  list). One line per record:
   `New 1RM record · <1RM>`, `New top weight` or `New 1RM · <1RM> + top weight`,
   with the set right-aligned, and `New volume record · <volume>` on the
   exercise's first block. Every record set's beaten figure is `record`.

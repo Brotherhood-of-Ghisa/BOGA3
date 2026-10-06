@@ -145,8 +145,8 @@ bold `record`, and earns a band on the containing card where the screen has one
 takes its row's colour and weight — **no screen bolds the best value in the
 current context**, which read as noise on device; `Stat` offers no `best`
 emphasis. Only the sets that took a record are highlighted, never every
-qualifying row: the exercise page shows the one record set; session cards show
-every record set, with one band line per record. Which sets those are, and
+qualifying row: the exercise page's set list and the session cards show every
+record set, with one band line per record. Which sets those are, and
 what beats a record, is `tech/training-metrics-contract.md` §3.
 
 **State is carried by a control glyph**, not by a word: a filled check means

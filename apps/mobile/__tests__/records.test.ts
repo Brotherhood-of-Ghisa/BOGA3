@@ -3,7 +3,6 @@ import {
   beatsWeightRecord,
   compareWeightRecord,
   createRecordBook,
-  pickSessionRecordSet,
   sessionRecordKinds,
   type RecordEntry,
 } from '@/src/exercise-calculations/records';
@@ -99,25 +98,5 @@ describe("a session's PRs", () => {
     book.add({ oneRepMax: { value: 100 }, weight: { weight: 90, reps: 5 }, volume: { value: 1000 } });
     expect(sessionRecordKinds(book.add({ oneRepMax: { value: 105 }, weight: { weight: 95, reps: 5 }, volume: { value: 1200 } })))
       .toHaveLength(3);
-  });
-});
-
-describe('the record set of a session', () => {
-  const baseline = { oneRepMax: 100, weight: { weight: 90, reps: 5 }, volume: null };
-  const set = (id: string, oneRepMax: number | null, weight: number | null, reps: number | null) =>
-    ({ id, oneRepMax, weight, reps });
-
-  it('is the highest beating 1RM, else the heaviest beating Weight, the first of a tie', () => {
-    expect(pickSessionRecordSet([set('a', 105, 85, 8), set('b', 110, 95, 3), set('c', 110, 96, 3)], baseline))
-      .toEqual({ id: 'b', oneRepMax: true, weight: true });
-    expect(pickSessionRecordSet([set('a', 95, 90, 6), set('b', 98, 92, 1)], baseline))
-      .toEqual({ id: 'b', oneRepMax: false, weight: true });
-    expect(pickSessionRecordSet([set('a', 101, 80, 10)], baseline)).toEqual({ id: 'a', oneRepMax: true, weight: false });
-    expect(pickSessionRecordSet([set('a', 99, 90, 5)], baseline)).toBeNull();
-  });
-
-  it('has nothing to beat without a baseline', () => {
-    expect(pickSessionRecordSet([set('a', 200, 200, 1)], null)).toBeNull();
-    expect(pickSessionRecordSet([set('a', 200, 200, 1)], { oneRepMax: null, weight: null, volume: null })).toBeNull();
   });
 });

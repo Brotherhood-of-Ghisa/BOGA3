@@ -10,18 +10,18 @@ import {
   StyleSheet,
   Text,
   type TextInputInstance,
-  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EMPTY_SESSION_WEIGHT, isValidSessionWeight } from '@/src/bodyweight/weight-entry';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 import { ExerciseEditorModal } from '@/components/exercise-catalog/exercise-editor-modal';
+import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -154,7 +154,7 @@ export function ExercisePageScreen({
   const recordSession = exercise && draft.state.status === 'ready'
     ? sessionRecordBlocks(exercise, draft.state.sessionBlocks) : null;
   const rows = buildSetRows(sets, baseline, loadContext, recordSession);
-  const recordBand = recordBandFor(rows);
+  const recordLines = recordBandFor(sets, baseline, loadContext, recordSession);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
     sets.find((set) => set.id === openSetId) ?? (cursorIndex !== null ? sets[cursorIndex] : undefined);
@@ -335,12 +335,7 @@ export function ExercisePageScreen({
             view={recordsView}
           />
           <Card testID="exercise-set-list">
-            {recordBand ? (
-              <View style={styles.recordBand} testID="exercise-record-band">
-                <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-                <Text allowFontScaling={false} style={styles.recordBandLabel}>{recordBand.label}</Text>
-              </View>
-            ) : null}
+            <RecordBand lines={recordLines} placement="header" testID="exercise-record-band" />
             {rows.map((row, index) => {
               const isOpen = row.id === openSet?.id;
               const followsLogger = index > 0 && rows[index - 1]?.id === openSet?.id;
@@ -506,27 +501,6 @@ const styles = StyleSheet.create({
   },
   saveError: {
     color: uiRoles.danger,
-  },
-  // The record band, the session view card's (`exercise-sets-card.tsx`), on
-  // the page's set list.
-  recordBand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.recordWash,
-    borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.recordRule,
-  },
-  recordBandLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.record,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).

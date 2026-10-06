@@ -2,36 +2,11 @@ import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calc
 
 import type { ExercisePersonalRecord, ExerciseRecordSet } from './calculations';
 
-/** Which record a single-set band announces: its 1RM, else its Weight. */
-export type PersonalRecordKind = 'oneRepMax' | 'weight';
-
-/**
- * The words announcing the exercise page's record set (`training-metrics-contract.md`
- * §3). `spoken` is the same phrase for an accessibility label.
- */
-export type RecordBand = { kind: PersonalRecordKind; label: string; spoken: string };
-
-export type RecordBandInput = {
-  kind: PersonalRecordKind;
-  weight: number;
-  reps: number;
-  estimatedOneRepMax: number | null;
-};
-
-export const recordBand = ({ kind, weight, reps, estimatedOneRepMax }: RecordBandInput): RecordBand => {
-  if (kind === 'oneRepMax') {
-    if (estimatedOneRepMax === null) throw new Error('a 1RM record needs its 1RM');
-    const value = formatOneRepMax(estimatedOneRepMax);
-    return { kind, label: `New 1RM record · ${value}`, spoken: `new 1RM record ${value}` };
-  }
-  const set = `${formatWeight(weight)} × ${reps}`;
-  return { kind, label: `New top weight · ${set}`, spoken: `new top weight ${set}` };
-};
-
 /**
  * One record an exercise took, or two when one set took both its 1RM and top
  * Weight: the words, and the set on the right (none for Volume). The session
- * view, View Session and completion all read these.
+ * view, View Session, the exercise page and completion all read these
+ * (`training-metrics-contract.md` §3).
  */
 export type RecordLine = { key: string; label: string; set: string | null; spoken: string };
 

@@ -1,15 +1,14 @@
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
-import {
-  pickSessionRecordSet, type RecordBaseline, type RecordSetCandidate,
-} from '@/src/exercise-calculations/records';
+import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { calculateSetMetrics, type LoadContext } from '@/src/exercise-calculations/load-metrics';
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
-import { recordBand, type RecordBand } from '@/src/session-insights/record-band';
+import { deriveExercisePersonalRecord, type ExercisePersonalRecord } from '@/src/session-insights';
+import { recordBandLines, type RecordLine } from '@/src/session-insights/record-band';
 
 import {
-  canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet,
+  canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -36,7 +35,7 @@ export type SetRowView = {
   reps: number | null;
   oneRepMax: number | null;
   volume: number | null;
-  // The session's record set beating the records before this session — the
+  // The session's record sets beating the records before this session — the
   // only figures the row highlights (`records.ts`, `design-language.md` §5).
   weightRecord: boolean;
   oneRepMaxRecord: boolean;
@@ -136,21 +135,51 @@ export const sessionRecordBlocks = (
     : [{ id: block.id, sets: [] }],
 });
 
-const recordCandidate = (set: ExercisePageSet, context: LoadContext): RecordSetCandidate | null => {
-  if (!isWorkingSet({
-    weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
-  }, context.effortPolicy)) return null;
-  const metrics = metricsOf(set.weightValue, set.repsValue, context);
-  return { id: set.id, oneRepMax: metrics.oneRepMax, weight: metrics.weight, reps: metrics.reps };
+// The page without its session (a block on its own): one block, one definition.
+const PAGE_BLOCK = 'exercise-page-block';
+const PAGE_DEFINITION = 'exercise-page-definition';
+
+/**
+ * The exercise's records in the session, as the session view's cards take
+ * them (`deriveExercisePersonalRecord`): every block of it, the page's own with
+ * its live sets. Null without a baseline or a record.
+ */
+const pageRecordOf = (
+  sets: readonly ExercisePageSet[],
+  baseline: ExerciseRecordBaseline | null,
+  context: LoadContext,
+  session: SetRowSession | null,
+): ExercisePersonalRecord | null => {
+  const blocks = session
+    ? session.blocks.map((block) => (block.id === session.blockId ? { id: block.id, sets } : block))
+    : [{ id: PAGE_BLOCK, sets }];
+  return deriveExercisePersonalRecord({
+    exerciseDefinitionId: PAGE_DEFINITION,
+    baseline,
+    exercises: blocks.map((block, orderIndex) => ({
+      id: block.id,
+      orderIndex,
+      exerciseDefinitionId: PAGE_DEFINITION,
+      exerciseName: '',
+      loadContext: context,
+      sets: block.sets.map((set, setIndex) => ({
+        id: set.id,
+        orderIndex: setIndex,
+        weightValue: set.weightValue,
+        repsValue: set.repsValue,
+        setType: set.setType,
+        performanceStatus: set.performanceStatus,
+      })),
+    })),
+  });
 };
 
 /**
- * Builds the rows. Every figure takes its row's colour and weight; the one
- * highlight is the session's record set (`pickSessionRecordSet`): a performed
- * working set whose 1RM, else Weight, beats the lifter's records before this
- * session, across every block of the exercise in the session. A warm-up keeps
- * its own figures but is never a record. Volume is never one here: its record
- * is a whole session's, so no single set can beat it.
+ * Builds the rows. Every figure takes its row's colour and weight; the only
+ * highlights are the session's record sets (`training-metrics-contract.md`
+ * §3): the performed working set whose 1RM beats the 1RM record, and the one
+ * whose Weight beats the Weight record, across every block of the exercise in
+ * the session. A warm-up keeps its own figures but is never a record.
  */
 export const buildSetRows = (
   sets: ExercisePageSet[],
@@ -159,46 +188,36 @@ export const buildSetRows = (
   session: SetRowSession | null = null,
 ): SetRowView[] => {
   const cursorIndex = findCursorIndex(sets);
-  const sessionSets = session
-    ? session.blocks.flatMap((block) => (block.id === session.blockId ? sets : block.sets))
-    : sets;
-  const winner = pickSessionRecordSet(
-    sessionSets.flatMap((set) => recordCandidate(set, context) ?? []),
-    baseline,
-  );
+  const recordSets = pageRecordOf(sets, baseline, context, session)?.sets ?? [];
   return sets.map((set, index): SetRowView => {
     const values = displayedValues(set);
-    const metrics = metricsOf(values.weightValue, values.repsValue, context);
-    const isWinner = winner !== null && winner.id === set.id;
+    const recordSet = recordSets.find((candidate) => candidate.setId === set.id);
     return {
       id: set.id,
       number: index + 1,
       kind: isPerformed(set) ? 'performed' : 'pending',
       isCursor: index === cursorIndex,
       setType: values.setType,
-      ...metrics,
-      weightRecord: isWinner && winner.weight,
-      oneRepMaxRecord: isWinner && winner.oneRepMax,
+      ...metricsOf(values.weightValue, values.repsValue, context),
+      weightRecord: recordSet?.topWeight ?? false,
+      oneRepMaxRecord: recordSet?.oneRepMax ?? false,
     };
   });
 };
 
-export type SetListRecordBand = RecordBand;
-
 /**
- * The record band for the set list, from the built rows: the session's record
- * set announced with the same words as the session view's card band
- * (`recordBand`). `null` when no performed set beats the baseline.
+ * The set list's `record` band, the session view card's words
+ * (`recordBandLines`): a line per record this block holds, Volume on the
+ * exercise's first block. Empty without a record.
  */
-export const recordBandFor = (rows: SetRowView[]): SetListRecordBand | null => {
-  const winner = rows.find((row) => row.oneRepMaxRecord || row.weightRecord);
-  if (!winner || winner.weight === null || winner.reps === null) return null;
-  return recordBand({
-    kind: winner.oneRepMaxRecord ? 'oneRepMax' : 'weight',
-    weight: winner.weight,
-    reps: winner.reps,
-    estimatedOneRepMax: winner.oneRepMax,
-  });
+export const recordBandFor = (
+  sets: ExercisePageSet[],
+  baseline: ExerciseRecordBaseline | null,
+  context: LoadContext,
+  session: SetRowSession | null = null,
+): RecordLine[] => {
+  const record = pageRecordOf(sets, baseline, context, session);
+  return record === null ? [] : recordBandLines(record, session?.blockId ?? PAGE_BLOCK);
 };
 
 /** The values the logger opens with: the row as displayed. */

@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
+import { RecordBand } from './record-band';
 import { SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
@@ -83,22 +83,7 @@ export function ExerciseSetsCard({
           ))}
         </View>
       ) : null}
-      {record.length > 0 ? (
-        <View style={styles.band} testID={`${testID}-record`}>
-          {record.map((line, index) => (
-            <View
-              key={line.key}
-              style={[styles.bandLine, index > 0 ? styles.bandLineRuled : null]}
-              testID={`${testID}-record-${index + 1}`}>
-              <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-              <Text allowFontScaling={false} style={styles.bandLabel}>{line.label}</Text>
-              {line.set ? (
-                <Text allowFontScaling={false} numberOfLines={1} style={styles.bandSet}>{line.set}</Text>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      ) : null}
+      <RecordBand lines={record} placement="footer" testID={`${testID}-record`} />
     </>
   );
 
@@ -147,39 +132,5 @@ const styles = StyleSheet.create({
   rows: {
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.sm,
-  },
-  band: {
-    backgroundColor: uiRoles.recordWash,
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.recordRule,
-  },
-  bandLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-  },
-  bandLineRuled: {
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.recordRule,
-  },
-  // The set a line names, right-aligned in the figure face.
-  bandSet: {
-    marginLeft: 'auto',
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.record,
-  },
-  bandLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.record,
   },
 });
