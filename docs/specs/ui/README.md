@@ -55,6 +55,9 @@ drifted from the code. Git history has them.)
 - `design-targets/weekly-history-bars.md`
   - accepted weekly-history redesign: horizontal bars stacked newest first,
     with visible values and an average reference; implemented with runtime comparison
+- `design-targets/daily-history-calendar.md`
+  - accepted, implementation pending: vertically stacked month calendars with
+    an eighth Week tile, Monday dates and values inside tiles
 - `design-targets/group-competitions.md`
   - accepted group Volume/1RM target, public percentage units, rules review and
     safe record/session context; replaces the older group Weight examples
