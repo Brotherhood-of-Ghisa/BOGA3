@@ -4,14 +4,88 @@ Load when you are operating a **hosted** (non-local) Supabase project: resetting
 it, deploying functions, rolling out the agent/MCP stack, or running a release
 cutover. Local development is `RUNBOOK.md`.
 
-No production host, DNS name, callback URL, or hosted project credential is
-committed in this repository. Never print hosted keys, connection strings, or
+Public deployment addresses are recorded below so operators can find the
+current services. Hosted credentials and unconfirmed callback URLs are not
+recorded here. Never print hosted keys, connection strings, or
 database passwords in task notes, PR bodies, or logs. Local gate results never
 substitute for a hosted check, and implementing a feature does not authorize
 deploying it.
 
 Prerequisite for every CLI step: `supabase login` has been run and the project is
 linked (`supabase link --project-ref <ref>`).
+
+## Current BoGa MCP deployment
+
+Recorded from the owner's Render dashboard and environment settings on
+2026-10-06. These are configured destinations, not proof of current hosted health.
+
+| Component / Render variable | Configured address |
+| --- | --- |
+| MCP origin: `BOGA_MCP_PUBLIC_URL` | https://boga3.onrender.com |
+| MCP connector endpoint (origin plus `/mcp`) | https://boga3.onrender.com/mcp |
+| Backend: `BOGA_AGENT_API_BASE_URL` | https://onluhhnvvmknqzdxgntl.supabase.co/functions/v1/agent-api |
+| OAuth issuer: `BOGA_OAUTH_ISSUER` | https://onluhhnvvmknqzdxgntl.supabase.co/auth/v1 |
+
+The public MCP adapter is configured on **Render**, service **boga3**, in the
+owner's personal **My Workspace**. The dashboard showed a Node Free service,
+repository **Brotherhood-of-Ghisa/BOGA3**, branch **main**, and a Live deployment.
+Supabase project **onluhhnvvmknqzdxgntl** hosts the **agent-api** Edge Function
+and authentication/token issuance. An OAuth redirect to Supabase does not move
+the MCP server there. The consent site's deployed address has not been recorded;
+inspect Supabase's OAuth consent configuration before changing it.
+
+Railway is not the identified MCP host. The previously observed ambient CLI
+link was an unrelated **Sophia OS Demo**; never deploy based on that link.
+
+### Configuration, credentials and collaborator access
+
+- Render dashboard → **boga3 → Environment** holds the three public URL values
+  above and any service-specific runtime settings; check linked environment
+  groups too. These URLs are configuration, not credentials.
+- Supabase dashboard → project **onluhhnvvmknqzdxgntl** holds OAuth settings
+  and Edge Function secret management. Keep privileged backend credentials
+  there; never copy service-role keys or database credentials into MCP.
+- The co-developer already has GitHub repository access. That does not grant
+  Render dashboard, logs or environment access.
+- A GitHub PAT does not grant Render access. Render's **Add Credential**
+  screen requesting `read:packages` is for pulling private container images
+  from GitHub Packages, not for collaborator deployment access.
+- For code deployments, confirm Render's current auto-deploy policy for
+  **main** before merging. The supplied dashboard showed **Auto-Deploy**,
+  but this is a snapshot, not a permanent guarantee.
+- For a redeploy without a code change, the Render owner can use **Manual
+  Deploy**, or obtain the service's **Deploy Hook** in Settings and share it
+  privately with the operator. Possession of the hook URL permits deployments;
+  never commit it. It grants no dashboard/log/environment access.
+- Dashboard changes require an authorized Render user; while using the personal
+  account, have the owner handle them or arrange supported workspace access.
+  Do not share the owner's password or commit Render API keys, Supabase keys,
+  OAuth client secrets, bearer tokens or deploy-hook URLs.
+
+### Redeploy and verify
+
+For MCP adapter changes, deploy Render's **boga3** service. Confirm its root,
+build/start commands and Node version against the production instructions in
+`services/boga-mcp/README.md`; these settings were not supplied in the dashboard
+evidence. Changes to **agent-api** require a separate Supabase Edge Function
+deployment; a Render redeploy does not update that function.
+
+Render's Free tier can sleep after inactivity; its dashboard warns that waking
+can delay requests by **50 seconds or more**. A connected BoGa tool probe timed
+out during this investigation; a cold start is a possible explanation, not a
+confirmed diagnosis. A Live badge or a successful `/health` request alone does
+not establish OAuth or tool health.
+
+After deployment, run the hosted rollout checklist below against these deployed
+URLs. Verify both discovery endpoints, explicit consent and deny, all four tools
+(`get_training_profile`, `search_exercises`, `get_exercise_context`,
+`get_recent_workouts`), grant revocation and the audit trail, plus the other
+hosted security checks in that checklist. Record the deployed revision, time,
+URLs and results without tokens or payloads. **Local green is not hosted evidence.**
+
+Update this section when hosts, ownership, branch or public settings change.
+Read actual platform configuration before deploying; do not treat this snapshot
+as a substitute for it.
 
 ## Reset the hosted database to a clean slate
 
@@ -78,3 +152,4 @@ Hosted smoke must run from the hosting platform or a dedicated operator client
 against the deployed URLs, so discovery and TLS are exercised as deployed.
 Build and configuration detail: `apps/agent-auth-web/README.md`,
 `services/boga-mcp/README.md`, `supabase/README.md`.
+
