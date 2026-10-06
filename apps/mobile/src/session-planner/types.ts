@@ -117,6 +117,13 @@ export type AddPlanBlockResult =
   | { status: 'session-not-found' }
   | { status: 'target-invalid' };
 
+/**
+ * `attached` is also the same-block retry answer: the claiming card may sit
+ * in a COMPLETED session (the block was consumed by an earlier workout), in
+ * which case the screen must treat it as history, not as the active
+ * recorder.
+ */
+
 export type ResolvePlanBlockResult =
   | { status: 'completed' | 'skipped'; resolvedAt: Date }
   | { status: 'not-resolvable' }

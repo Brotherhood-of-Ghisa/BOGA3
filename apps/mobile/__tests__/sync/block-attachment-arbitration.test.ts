@@ -32,10 +32,7 @@ jest.mock('@/src/data/bootstrap', () =>
 
 // Imported AFTER the bootstrap mock so the domain code binds to it.
 import { __resetClockForTests } from '@/src/data/clock';
-import {
-  clearProvenanceClaimsForWirePage,
-  collectProvenanceClaimsFromWire,
-} from '@/src/data/session-drafts';
+import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
 import {
   exerciseDefinitions,
   exerciseSets,
@@ -86,6 +83,8 @@ const seedLoser = (): string => {
       name: 'Squat',
       sourcePlanExerciseId: 'block-1',
       localDirty: true,
+      // A real monotonic stamp, so an older incoming echo loses LWW.
+      localUpdatedAtMs: 1500,
     })
     .run();
   db()
@@ -100,6 +99,7 @@ const seedLoser = (): string => {
         performanceStatus: null,
         sourcePlanSetId: 'target-a',
         localDirty: true,
+        localUpdatedAtMs: 1500,
       },
       {
         id: 'set-planned',
@@ -110,6 +110,7 @@ const seedLoser = (): string => {
         performanceStatus: 'planned',
         sourcePlanSetId: 'target-b',
         localDirty: true,
+        localUpdatedAtMs: 1500,
       },
       {
         id: 'set-manual',
@@ -121,6 +122,7 @@ const seedLoser = (): string => {
         performanceStatus: null,
         sourcePlanSetId: null,
         localDirty: true,
+        localUpdatedAtMs: 1500,
       },
     ])
     .run();
@@ -140,20 +142,23 @@ afterEach(() => {
   __resetClockForTests();
 });
 
-describe('clearProvenanceClaimsForWirePage', () => {
+describe('repairProvenanceForWirePage', () => {
   it('clears the local block claimant and its block-sourced sets, keeping all user work', async () => {
     seedPlanGraph();
     seedLoser();
 
-    // The winner's page: a pulled card claiming block-1 (its set rows are
-    // plain fields the collect step reads provenance from).
+    // The winner's page row: a pulled card claiming block-1 that will write
+    // (its id is absent locally, so its claim arbitrates against the loser).
     const page = [
       {
         type: 'session_exercises',
+        id: 'card-winner',
+        client_updated_at_ms: 2000,
         fields: { source_plan_exercise_id: 'block-1' },
       },
     ];
-    expect(await clearProvenanceClaimsForWirePage(page, T0)).toBe(true);
+    const repaired = await repairProvenanceForWirePage(page, T0);
+    expect(repaired).toEqual({ blocks: new Set(['block-1']), targets: new Set() });
 
     const card = db().select().from(sessionExercises).where(eq(sessionExercises.id, 'card-loser')).get();
     expect(card).toMatchObject({ sourcePlanExerciseId: null, localDirty: true });
@@ -178,8 +183,18 @@ describe('clearProvenanceClaimsForWirePage', () => {
     seedPlanGraph();
     seedLoser();
 
-    const page = [{ type: 'exercise_sets', fields: { source_plan_set_id: 'target-a' } }];
-    expect(await clearProvenanceClaimsForWirePage(page, T0)).toBe(true);
+    const page = [
+      {
+        type: 'exercise_sets',
+        id: 'set-winner',
+        client_updated_at_ms: 2000,
+        fields: { source_plan_set_id: 'target-a' },
+      },
+    ];
+    expect(await repairProvenanceForWirePage(page, T0)).toEqual({
+      blocks: new Set(),
+      targets: new Set(['target-a']),
+    });
 
     const sets = db()
       .select()
@@ -193,7 +208,27 @@ describe('clearProvenanceClaimsForWirePage', () => {
     ).toBe('block-1');
   });
 
-  it('clears exactly the named claims and reports no-op when the page carries none', async () => {
+  it('skips LWW no-op rows: a self-echo claim never clears a held attachment', async () => {
+    seedPlanGraph();
+    seedLoser();
+    // The device's OWN sourced card echoed back at an OLDER stamp — the local
+    // edit is newer, the apply is a no-op, and its claim must not be cleared.
+    const ownEcho = [
+      {
+        type: 'session_exercises',
+        id: 'card-loser',
+        client_updated_at_ms: 1, // older than the local dirty row's stamp
+        fields: { source_plan_exercise_id: 'block-1' },
+      },
+    ];
+    expect(await repairProvenanceForWirePage(ownEcho, T0)).toBeNull();
+    expect(
+      db().select().from(sessionExercises).where(eq(sessionExercises.id, 'card-loser')).get()
+        ?.sourcePlanExerciseId,
+    ).toBe('block-1');
+  });
+
+  it('clears exactly the named claims and reports null when the page carries none', async () => {
     seedPlanGraph();
     seedLoser();
     // A second plan with its own untouched claimant.
@@ -216,33 +251,27 @@ describe('clearProvenanceClaimsForWirePage', () => {
       .run();
 
     expect(
-      await clearProvenanceClaimsForWirePage(
-        [{ type: 'session_exercises', fields: { source_plan_exercise_id: 'block-1' } }],
+      await repairProvenanceForWirePage(
+        [
+          {
+            type: 'session_exercises',
+            id: 'card-winner',
+            client_updated_at_ms: 2000,
+            fields: { source_plan_exercise_id: 'block-1' },
+          },
+        ],
         T0,
       ),
-    ).toBe(true);
+    ).toEqual({ blocks: new Set(['block-1']), targets: new Set() });
     expect(
       db().select().from(sessionExercises).where(eq(sessionExercises.id, 'card-other')).get()
         ?.sourcePlanExerciseId,
     ).toBe('block-2');
 
     // A page without provenance claims is a no-op.
-    expect(await clearProvenanceClaimsForWirePage([{ type: 'gyms', fields: { name: 'x' } }], T0)).toBe(false);
-  });
-});
-
-describe('collectProvenanceClaimsFromWire', () => {
-  it('collects block and target claims from the page fields, ignoring nulls and other types', () => {
-    const claims = collectProvenanceClaimsFromWire([
-      { type: 'session_exercises', fields: { source_plan_exercise_id: 'block-1' } },
-      { type: 'session_exercises', fields: { source_plan_exercise_id: null } },
-      { type: 'exercise_sets', fields: { source_plan_set_id: 'target-a' } },
-      { type: 'exercise_sets', fields: { other: 'x' } },
-      { type: 'sessions', fields: { source_plan_id: 'plan-1' } },
-      { type: 'gyms', fields: { name: 'g' } },
-    ]);
-    expect(claims.blocks).toEqual(new Set(['block-1']));
-    expect(claims.targets).toEqual(new Set(['target-a']));
+    expect(
+      await repairProvenanceForWirePage([{ type: 'gyms', id: 'g-1', client_updated_at_ms: 1, fields: { name: 'x' } }], T0),
+    ).toBeNull();
   });
 });
 

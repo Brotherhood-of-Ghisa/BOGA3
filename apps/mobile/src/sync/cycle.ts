@@ -19,7 +19,7 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq, notInArray } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, notInArray } from 'drizzle-orm';
 
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
@@ -31,11 +31,9 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
-import {
-  clearProvenanceClaimsForWirePage,
-  collectProvenanceClaimsFromWire,
-} from '@/src/data/session-drafts';
+import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
 import * as schema from '@/src/data/schema';
+import { exerciseSets } from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
 import {
@@ -384,7 +382,7 @@ const logPullLocalFkViolation = (
 const logProvenanceArbitrationRepair = (
   leg: 'push' | 'pull',
   layer?: number,
-  claims?: { blocks: Set<string>; targets: Set<string> },
+  claims?: { blocks: Set<string>; targets: Set<string> } | null,
 ): void => {
   try {
     void logEvent({
@@ -821,7 +819,11 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
  * the caller's transaction, so a row quarantined earlier in the same transaction
  * is already absent from a subsequent selection.
  */
-export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[] => {
+export const selectPushBatch = (
+  tx: Transaction,
+  batchCap: number,
+  excludedKeysByType?: ReadonlyMap<string, ReadonlySet<string>>,
+): WireEntity[] => {
   const batch: WireEntity[] = [];
   const quarantinedIdsByType = readQuarantine(tx).idsByType;
 
@@ -831,10 +833,14 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
     }
     const remaining = batchCap - batch.length;
     const table = ENTITY_TABLES[type] as typeof schema.gyms;
-    const excludedIds = quarantinedIdsByType.get(type);
+    const drainedExclusions = excludedKeysByType?.get(type);
+    const excludedIds = [
+      ...(quarantinedIdsByType.get(type) ?? []),
+      ...(drainedExclusions ?? []),
+    ];
     const dirtyClause = eq(table.localDirty, true);
     const whereClause =
-      excludedIds && excludedIds.length > 0
+      excludedIds.length > 0
         ? and(dirtyClause, notInArray(table.id, excludedIds))
         : dirtyClause;
     const rows = tx
@@ -851,6 +857,41 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
   }
 
   return batch;
+};
+
+/**
+ * The cleared provenance cards whose equally-dirty sets were cut off by the
+ * batch boundary: a card the repair just cleared to unsourced must not ship
+ * in a batch that excludes its still-claiming sets — the server's deferred
+ * cross-level check rejects an unsourced card holding source-derived sets
+ * (`PROVENANCE_VIOLATION`), which would wedge the backlog the arbitration
+ * repair exists to unblock. Deferring the card is the safe order: its sets
+ * push (and ack clean) first, then the card re-pushes in a later drain — a
+ * sourced card holding only null-linked sets is valid throughout.
+ */
+const findProvenanceClearSplitCards = (tx: Transaction, selected: WireEntity[]): string[] => {
+  const splitCards: string[] = [];
+  for (const entity of selected) {
+    if (entity.type !== 'session_exercises' || entity.fields.source_plan_exercise_id !== null) {
+      continue;
+    }
+    const stillClaiming = tx
+      .select({ id: exerciseSets.id })
+      .from(exerciseSets)
+      .where(
+        and(
+          eq(exerciseSets.sessionExerciseId, String(entity.id)),
+          isNotNull(exerciseSets.sourcePlanSetId),
+          isNull(exerciseSets.deletedAt),
+          eq(exerciseSets.localDirty, true),
+        ),
+      )
+      .all();
+    if (stillClaiming.length > 0) {
+      splitCards.push(rowKey('session_exercises', String(entity.id)));
+    }
+  }
+  return splitCards;
 };
 
 // -----------------------------------------------------------------------------
@@ -1079,9 +1120,12 @@ const applyPageWithArbitrationRepair = async (
     return applyPage();
   } catch (error) {
     if (isLocalProvenanceUniqueViolation(error)) {
-      const claims = collectProvenanceClaimsFromWire(page.entities);
+      // A pulled provenance row claims a plan block or source target a local
+      // row already holds: the server committed first, so the local claimant
+      // loses. Clear exactly the will-write claims outside the failed
+      // transaction and apply the page once more (contract §4.5).
+      const claims = await repairProvenanceForWirePage(page.entities);
       logProvenanceArbitrationRepair('pull', layer, claims);
-      await clearProvenanceClaimsForWirePage(page.entities);
       return applyPage();
     }
     if (isLocalSqliteForeignKeyError(error)) {
@@ -1195,8 +1239,24 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
       const transaction = tx as Transaction;
       const quarantinedKeys = new Set(readQuarantine(transaction).keys);
       const createdThisDrain: QuarantineWriteResult[] = [];
+      // Provenance-split deferrals for this drain (see
+      // `findProvenanceClearSplitCards`): the excluded card re-enters
+      // selection on the next drain, once its cleared sets have acked.
+      const drainedKeys = new Set<string>();
+      const excludedByType = (): Map<string, Set<string>> => {
+        const map = new Map<string, Set<string>>();
+        for (const key of drainedKeys) {
+          const splitAt = key.indexOf(' ');
+          const type = key.slice(0, splitAt);
+          const id = key.slice(splitAt + 1);
+          const set = map.get(type) ?? new Set<string>();
+          set.add(id);
+          map.set(type, set);
+        }
+        return map;
+      };
 
-      let selected = selectPushBatch(transaction, BATCH_CAP);
+      let selected = selectPushBatch(transaction, BATCH_CAP, excludedByType());
       // Each pass quarantines at least one row and re-selects (which now excludes
       // it); a clean preflight ends the loop. The pass cap is the layer count + 1
       // so even a full top-to-bottom orphan chain cannot spin.
@@ -1214,7 +1274,20 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
         for (const violation of violations) {
           quarantinedKeys.add(quarantineKey(violation.childType, violation.childId));
         }
-        selected = selectPushBatch(transaction, BATCH_CAP);
+        selected = selectPushBatch(transaction, BATCH_CAP, excludedByType());
+      }
+
+      // Keep a cleared provenance card with its cleared sets: defer the card
+      // to the next drain when the batch boundary would split them.
+      for (let guard = 0; guard <= BATCH_CAP; guard += 1) {
+        const splitCards = findProvenanceClearSplitCards(transaction, selected);
+        if (splitCards.length === 0) {
+          break;
+        }
+        for (const key of splitCards) {
+          drainedKeys.add(key);
+        }
+        selected = selectPushBatch(transaction, BATCH_CAP, excludedByType());
       }
 
       const stamps = new Map<string, number>();

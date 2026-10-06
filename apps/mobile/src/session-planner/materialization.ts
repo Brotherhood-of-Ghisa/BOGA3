@@ -1,4 +1,10 @@
-import { loadSessionSnapshotById, persistSessionDraftSnapshot, type SessionDraftExerciseInput, type SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
+import {
+  loadSessionSnapshotById,
+  persistSessionDraftSnapshot,
+  reviveSessionRow,
+  type SessionDraftExerciseInput,
+  type SessionDraftExerciseSnapshot,
+} from '@/src/data/session-drafts';
 import { normalizeSessionSetType } from '@/src/data/set-types';
 import {
   createDrizzleSessionPlanStore,
@@ -66,6 +72,10 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
 
   const ownerId = await readPlanMaterializationOwnerId();
   const sessionId = planStartSessionId(ownerId, planId);
+  // A discarded earlier start leaves the deterministic session row
+  // tombstoned; the retry upserts the same rows, so the row must come back —
+  // otherwise the graph revives under a session no query can ever show.
+  await reviveSessionRow(sessionId, now);
   await persistSessionDraftSnapshot(
     {
       sessionId,

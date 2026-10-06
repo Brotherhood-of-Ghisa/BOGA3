@@ -103,8 +103,9 @@ const toBlockViews = (
   }, new Map());
 
   return blocks.map((block) => {
-    const attachedCard =
-      block.progressStatus === 'pending' ? (cardsByBlockId.get(block.id) ?? null) : null;
+    // A consumed block keeps the link to its performed session (contract §5.1);
+    // only a pending block's live claim makes it attached.
+    const claimingCard = cardsByBlockId.get(block.id) ?? null;
     return {
       id: block.id,
       planId: block.sessionPlanId,
@@ -114,10 +115,10 @@ const toBlockViews = (
       orderIndex: block.orderIndex,
       progressStatus: block.progressStatus,
       status:
-        block.progressStatus === 'pending' && attachedCard !== null ? 'attached' : block.progressStatus,
+        block.progressStatus === 'pending' && claimingCard !== null ? 'attached' : block.progressStatus,
       resolvedAt: block.resolvedAt,
-      attachedSessionId: attachedCard?.sessionId ?? null,
-      attachedSessionExerciseId: attachedCard?.sessionExerciseId ?? null,
+      attachedSessionId: claimingCard?.sessionId ?? null,
+      attachedSessionExerciseId: claimingCard?.sessionExerciseId ?? null,
       targets: (setsByBlockId.get(block.id) ?? []).map((set) => ({
         id: set.id,
         orderIndex: set.orderIndex,

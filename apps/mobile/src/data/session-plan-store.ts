@@ -695,14 +695,17 @@ const insertPlanExercise = async (input: { planId: string; exercise: SavePlanExe
     let planExerciseId = '';
     database.transaction((tx) => {
       const localUpdatedAtMs = nowMonotonic(tx);
-      const lastRow = tx
-        .select({ orderIndex: sessionPlanExercises.orderIndex })
-        .from(sessionPlanExercises)
-        .where(and(eq(sessionPlanExercises.sessionPlanId, input.planId), isNull(sessionPlanExercises.deletedAt)))
-        .orderBy(asc(sessionPlanExercises.orderIndex))
-        .all()
-        .at(-1);
-      const nextIndex = (lastRow?.orderIndex ?? -1) + 1;
+      // The insert slot must sit above every row of the plan, tombstones
+      // included: the local `(parent, order_index)` unique index is NOT
+      // partial, and a tombstoned block (parked above the live band by
+      // `tombstonePlanExercise`) would otherwise collide with the new row.
+      const nextIndex = liftBaseForRows(
+        tx
+          .select({ orderIndex: sessionPlanExercises.orderIndex })
+          .from(sessionPlanExercises)
+          .where(eq(sessionPlanExercises.sessionPlanId, input.planId))
+          .all(),
+      );
       planExerciseId = mintPlanEntityId('planexercise');
       tx.insert(sessionPlanExercises)
         .values({
@@ -904,7 +907,11 @@ const reorderProgrammePlans = async (input: { programmeId: string; orderedPlanId
       redensifyRowsInTransaction(
         plans.map((row) => ({ id: row.id, orderIndex: row.programmeOrderIndex ?? -1 })),
         input.orderedPlanIds,
-        liftBaseForRows(plans.map((row) => ({ orderIndex: row.programmeOrderIndex }))),
+        // Lift above every child row of the programme, tombstones included,
+        // for the same consistency as the block/set reorders.
+        liftBaseForRows(
+          plans.map((row) => ({ orderIndex: row.programmeOrderIndex })),
+        ),
         (id, index) => {
           tx.update(sessionPlans)
             .set({ programmeOrderIndex: index, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
@@ -1002,7 +1009,17 @@ const tombstonePlan = async (input: { planId: string; now: Date }): Promise<bool
       const localUpdatedAtMs = nowMonotonic(tx);
       const result = tx
         .update(sessionPlans)
-        .set({ deletedAt: input.now, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+        .set({
+          deletedAt: input.now,
+          // Detach the tombstoned plan from its programme: the programme's
+          // child list holds live plans only, and a revived plan returns as a
+          // standalone schedule.
+          programmeId: null,
+          programmeOrderIndex: null,
+          localDirty: true,
+          localUpdatedAtMs,
+          updatedAt: input.now,
+        })
         .where(and(eq(sessionPlans.id, input.planId), isNull(sessionPlans.deletedAt)))
         .run();
       tombstoned = result.changes > 0;

@@ -1042,49 +1042,93 @@ export const clearProvenanceClaimsInTransaction = (
 };
 
 /**
- * Collects the provenance claims an incoming pull page carries, so a page
- * that failed on a provenance unique violation can clear exactly those local
- * claimants (see {@link clearProvenanceClaimsInTransaction}).
+ * Collects the provenance claims of the pull-page rows that will actually be
+ * written locally: a row absent locally, or one whose incoming stamp wins
+ * LWW. Rows that would land as LWW no-ops are skipped — their claims belong
+ * to rows the device already holds, and clearing those would strip provenance
+ * from a legitimate (possibly winning) attachment on an unrelated claim.
  */
-export const collectProvenanceClaimsFromWire = (
-  entities: readonly { type: string; fields: Record<string, unknown> }[],
+const collectWillWriteClaimsInTransaction = (
+  tx: Transaction,
+  entities: readonly { type: string; id: string; client_updated_at_ms: number; fields: Record<string, unknown> }[],
 ): { blocks: Set<string>; targets: Set<string> } => {
   const blocks = new Set<string>();
   const targets = new Set<string>();
   for (const entity of entities) {
-    const sourcePlanExerciseId = entity.fields.source_plan_exercise_id;
-    if (entity.type === 'session_exercises' && typeof sourcePlanExerciseId === 'string' && sourcePlanExerciseId) {
-      blocks.add(sourcePlanExerciseId);
+    if (entity.type !== 'session_exercises' && entity.type !== 'exercise_sets') {
+      continue;
     }
-    const sourcePlanSetId = entity.fields.source_plan_set_id;
-    if (entity.type === 'exercise_sets' && typeof sourcePlanSetId === 'string' && sourcePlanSetId) {
-      targets.add(sourcePlanSetId);
+    const claim = entity.fields.source_plan_exercise_id ?? entity.fields.source_plan_set_id;
+    if (typeof claim !== 'string' || claim.length === 0) {
+      continue;
     }
+    const table = entity.type === 'session_exercises' ? sessionExercises : exerciseSets;
+    const existing = tx
+      .select({ localUpdatedAtMs: table.localUpdatedAtMs })
+      .from(table)
+      .where(eq(table.id, entity.id))
+      .get();
+    if (existing && entity.client_updated_at_ms <= existing.localUpdatedAtMs) {
+      continue;
+    }
+    (entity.type === 'session_exercises' ? blocks : targets).add(claim);
   }
   return { blocks, targets };
 };
 
 /**
- * Runs {@link clearProvenanceClaimsInTransaction} for the claims a failed
- * pull page carried. The caller applies the page again afterwards.
+ * The pull-side provenance-arbitration repair (session-planning contract
+ * §4.5): for the claims the page's will-write rows carry, clear every live
+ * local claimant — the server committed first, so the local claimant loses —
+ * keeping all entered values, manual sets, and row identity. Returns the
+ * cleared claims, or null when the page carried no will-write claims.
  */
-export const clearProvenanceClaimsForWirePage = async (
-  entities: readonly { type: string; fields: Record<string, unknown> }[],
+export const repairProvenanceForWirePage = async (
+  entities: readonly { type: string; id: string; client_updated_at_ms: number; fields: Record<string, unknown> }[],
   now: Date = new Date(),
-): Promise<boolean> => {
-  const claims = collectProvenanceClaimsFromWire(entities);
-  if (claims.blocks.size === 0 && claims.targets.size === 0) {
-    return false;
-  }
+): Promise<{ blocks: Set<string>; targets: Set<string> } | null> => {
   const database = await bootstrapLocalDataLayer();
-  let cleared = false;
+  let repaired: { blocks: Set<string>; targets: Set<string> } | null = null;
   database.transaction((tx) => {
-    cleared = clearProvenanceClaimsInTransaction(tx, claims, now, nowMonotonic(tx));
+    const transaction = tx as Transaction;
+    const claims = collectWillWriteClaimsInTransaction(transaction, entities);
+    if (claims.blocks.size === 0 && claims.targets.size === 0) {
+      return;
+    }
+    clearProvenanceClaimsInTransaction(transaction, claims, now, nowMonotonic(transaction));
+    repaired = claims;
   });
-  if (cleared) {
+  if (repaired) {
     notifyLocalWrite();
   }
-  return cleared;
+  return repaired;
+};
+
+/**
+ * Revives one tombstoned session row (clears `deleted_at`, re-dirties it).
+ * The whole-plan materialization retry upserts the same deterministic session
+ * id, so a discarded Start all must resurrect its own session row — without
+ * this, the retry revives the exercise graph under a session no query can
+ * ever show. Scoped to this one operation on purpose: a blanket revive in
+ * `saveDraftGraph` would let a stale autosave resurrect a deliberately
+ * discarded session. Returns whether a tombstoned row was revived.
+ */
+export const reviveSessionRow = async (sessionId: string, now: Date = new Date()): Promise<boolean> => {
+  const database = await bootstrapLocalDataLayer();
+  let revived = false;
+  database.transaction((tx) => {
+    const localUpdatedAtMs = nowMonotonic(tx);
+    const result = tx
+      .update(sessions)
+      .set({ deletedAt: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+      .where(and(eq(sessions.id, sessionId), isNotNull(sessions.deletedAt)))
+      .run();
+    revived = result.changes > 0;
+  });
+  if (revived) {
+    notifyLocalWrite();
+  }
+  return revived;
 };
 
 export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
