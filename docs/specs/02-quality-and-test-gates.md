@@ -171,6 +171,9 @@ the rebuild and the frontend gate.
 
 ### Full sweep
 
+For production releases, load `docs/runbook-hosted-operations.md` for the required
+hosted migration and verification gate alongside the sweep.
+
 `./boga sweep [--ref <ref>]` (`scripts/full-sweep.sh`) runs every gate lane on
 `origin/main` or a pushed branch in its own long-lived worktree and slot, writing
 a summary under `~/.config/boga/sweep/latest/`. It is never scheduled.

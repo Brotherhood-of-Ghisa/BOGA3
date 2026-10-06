@@ -292,6 +292,23 @@ This build is a development client. The teammate still needs access to Metro:
 - Remote teammate: start Metro with the `--tunnel` command in
   `Start Metro For The Phone`.
 
+## Build And Submit Production
+
+For every production release, first follow "Production mobile release" in
+`docs/runbook-hosted-operations.md`, including its hosted migration, compatibility
+and verification gate. Build and submit from the same pinned commit, starting
+at that checkout's repository root:
+
+```bash
+cd apps/mobile
+mkdir -p ../../artifacts/builds
+
+npx eas-cli build --platform ios --profile prod --local --non-interactive \
+  --output ../../artifacts/builds/boga3-prod.ipa
+npx eas-cli submit --platform ios --profile prod --non-interactive --wait \
+  --path ../../artifacts/builds/boga3-prod.ipa
+```
+
 ## Build A Store-Signed Preview IPA
 
 When you need a dev-client build of `com.phano.boga3.dev` for App Store
