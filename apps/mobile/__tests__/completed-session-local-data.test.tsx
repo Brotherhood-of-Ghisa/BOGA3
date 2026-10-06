@@ -80,6 +80,8 @@ import { uiRoles } from '@/components/ui/tokens';
 import { exerciseDefinitions, exerciseSets, sessions } from '@/src/data/schema';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
+import { configurePersonalEffortPolicy } from '@/src/config/personal-effort';
+import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import {
   bootLocalApp,
@@ -577,6 +579,23 @@ describe('a session written through the app', () => {
     expect(screen.queryByText('500.0 × 10')).toBeNull();
     expect(screen.queryByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}`)).toBeNull();
     expect(label('completed-session-detail-sets')).toBe('Sets 4');
+  });
+
+  it("counts Sets under the account's effort policy, not the fixed group rule", async () => {
+    // By default the technique set is no working set (`Sets 4`); this account counts it.
+    configurePersonalEffortPolicy({
+      workingSetEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.workingSetEfforts, 'technique'],
+      volumeEfforts: DEFAULT_PERSONAL_EFFORT_POLICY.volumeEfforts,
+    });
+    try {
+      await openDesignSession(
+        { presentation: 'completion' },
+        { benchSets: [...BENCH_SETS, { weight: '100', reps: '5', type: 'technique' }] }
+      );
+      expect(label('session-completion-sets')).toBe('Sets 5');
+    } finally {
+      configurePersonalEffortPolicy(DEFAULT_PERSONAL_EFFORT_POLICY);
+    }
   });
 
   it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {

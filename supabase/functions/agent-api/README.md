@@ -216,9 +216,9 @@ any internal safety cap explicit. `exercises` lists every block, while
 The API reads the app's own rule for which sets and sessions count
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §1–§2), through the shared calculation modules, so coaching and app figures
-agree. Coaching uses the fixed group and coaching column of `set.eligibility`
-(`docs/product/set.md`), never a device's effort settings. This section lists
-the fields that rule governs.
+agree. Coaching uses the fixed group and coaching rule of [[set.eligibility]],
+never a device's effort settings. This section lists the fields that rule
+governs.
 
 - Every derived figure reads working sets only: `personal_records`
   (1RM, top weight, max session volume), each performance's `volume` and
@@ -227,7 +227,7 @@ the fields that rule governs.
   rest).
 - Every count does too: `completed_set_count`, `exercises[].set_count`, and
   `exercise_count` (blocks with at least one working set).
-- A non-working set (warm-up, technique, cooldown) stays in the raw per-set
+- A set that is not a working set ([[set.eligibility]]) stays in the raw per-set
   output with its `set_type` and its own `calculated_load`,
   `estimated_one_rep_max` and `volume`. Those describe that set only.
 - In exercise context, a session where the exercise had no working set has no
