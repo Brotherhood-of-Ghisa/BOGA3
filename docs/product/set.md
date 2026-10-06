@@ -19,10 +19,7 @@ Volume and Volume records. The two are independent.
 Personal figures follow the account's effort policy (Settings → efforts:
 independent Working set and Volume columns). The table gives its defaults.
 Group and coaching figures use one fixed rule, the same as the personal
-defaults, and never read a device's policy. Groups apply a change to this
-rule from then on: a session's group results take it when that session is
-next recomputed (for example, edited or shared again), and existing
-certifications stand.
+defaults, and never read a device's policy.
 
 <!-- fact-table: set.eligibility -->
 

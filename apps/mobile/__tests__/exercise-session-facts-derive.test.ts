@@ -174,6 +174,24 @@ describe('exercise session facts — PR flags', () => {
     ]);
   });
 
+  it('ranks singles per [[1rm.formula]]: below a higher multi-rep 1RM, and an equal single ties', () => {
+    const rows = deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['100', '5']])]), // 1RM 116.58…
+      session('s2', 2, [block('b1', 0, [['116.5', '1']])]), // estimated, it was 118.0 and beat s1
+      session('s3', 3, [block('c1', 0, [['116.6', '1']])]),
+      session('s4', 4, [block('d1', 0, [['116.6', '1']])]), // ties s3
+    ]);
+
+    expect(rows.map(({ sessionId, bestE1rmKg }) => [sessionId, bestE1rmKg]))
+      .toEqual([['s1', estimateOneRepMax(100, 5)], ['s2', 116.5], ['s3', 116.6], ['s4', 116.6]]);
+    expect(flags(rows)).toEqual([
+      { sessionId: 's1', prE1rm: false, prWeight: false, prVolume: false },
+      { sessionId: 's2', prE1rm: false, prWeight: true, prVolume: false },
+      { sessionId: 's3', prE1rm: true, prWeight: true, prVolume: false },
+      { sessionId: 's4', prE1rm: false, prWeight: false, prVolume: false },
+    ]);
+  });
+
   it('orders sessions completed at the same instant by session id', () => {
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s-b', 1, [block('b1', 0, [['110', '5']])]),
@@ -240,13 +258,15 @@ describe('exercise session facts — rules version', () => {
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(5);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(6);
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s1', 1, [block('a1', 0, [['100', '5', 'rir_3'], ['60', '10', 'warm_up'], ['90', '8', 'rir_4']])]),
       session('s2', 2, [block('b1', 0, [['', '12', 'rir_0'], ['102.5', '5', null], ['110', '1', 'rir_1', 'planned'], ['130', '2', 'warm_up']])]),
       session('s3', 3, [block('c1', 0, [['140', '1', 'warm_up']])]),
       // Version 4: the Weight record is the pair, so more reps at 102.5 is one.
       session('s4', 4, [block('d1', 0, [['102.5', '6', 'rir_0']])]),
+      // Version 6: [[1rm.formula]], so 123 × 1 no longer beats s4.
+      session('s5', 5, [block('e1', 0, [['123', '1', 'rir_0']])]),
     ]);
 
     expect(rows.map(({ achievedAt: _achievedAt, bestE1rmKg, volumeKg, ...row }) => ({
@@ -268,6 +288,11 @@ describe('exercise session facts — rules version', () => {
         sessionId: 's4', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
         topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, volumeComplete: true, workingSets: 1, volumeSets: 1,
         prE1rm: true, prWeight: true, prVolume: false,
+      },
+      {
+        sessionId: 's5', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123, bestE1rmSetId: 'e1-s0',
+        topWeightKg: 123, topWeightSetId: 'e1-s0', volumeKg: 123, volumeComplete: true, workingSets: 1, volumeSets: 1,
+        prE1rm: false, prWeight: true, prVolume: false,
       },
     ]);
   });

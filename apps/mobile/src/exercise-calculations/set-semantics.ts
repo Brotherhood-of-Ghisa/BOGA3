@@ -40,8 +40,7 @@ export const isConfirmedPerformedSet = (set: SetPerformanceInput): boolean =>
  * shared group/coaching rule (`SHARED_EFFORT_POLICY`) applies. Read it alone
  * only where performance is already settled (a stored flag, a projection of
  * performed sets); otherwise use `isWorkingSet`. The group evaluator stores it
- * on every set fact: a change applies forward only unless
- * `GROUP_EVAL_RULES_VERSION` is bumped to re-normalize stored facts.
+ * on every set fact: changing it bumps `GROUP_EVAL_RULES_VERSION`.
  */
 export const isWorkingSetType = (setType: unknown, policy: EffortCalculationPolicy = SHARED_EFFORT_POLICY): boolean =>
   includesEffort(policy.workingSetEfforts, setType);

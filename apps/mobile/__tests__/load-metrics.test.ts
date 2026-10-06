@@ -98,6 +98,19 @@ describe('shared load metrics', () => {
     expect(result.estimatedOneRepMaxKg).toBeCloseTo(estimateOneRepMax(100, 8)! - 80, 10);
   });
 
+  it.each([
+    ['total', 'total_load', 0.6],
+    ['per-side', 'per_side_load', 1],
+  ] as const)('keeps [[1rm.formula]] for a single in entered-Weight terms with %s bodyweight load', (_label, loadInputMode, contribution) => {
+    const result = calculateSetMetrics({
+      ...pullUp, policy: 'personal', loadInputMode, bodyweightContribution: contribution,
+      weightValue: '22.5', repsValue: '1',
+    });
+    const factor = loadInputMode === 'per_side_load' ? 2 : 1;
+    expect(result.estimatedTotalOneRepMaxKg).toBeCloseTo(contribution * 80 + factor * 22.5, 10);
+    expect(result.estimatedOneRepMaxKg).toBeCloseTo(22.5, 10);
+  });
+
   it('never emits infinite metrics from finite extreme raw values', () => {
     const result = calculateSetMetrics({ ...pullUp, weightValue: `1${'0'.repeat(307)}`, repsValue: '100' });
     expect(result).toMatchObject({ eligible: true,

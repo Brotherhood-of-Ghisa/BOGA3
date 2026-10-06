@@ -24,5 +24,4 @@ when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 
 Why: a single is a measured max; estimating above it would invent strength.
 Code: `estimateOneRepMax` in `apps/mobile/src/exercise-calculations/index.ts`; `formatOneRepMax` in `apps/mobile/src/exercise-calculations/format.ts`.
-Pending: a single is still estimated (`100 × 1` shows `101.3`). Changing it can move records, so it bumps the session-facts rules version.
 Signature: `48.8`, `53.8`, `0.075`

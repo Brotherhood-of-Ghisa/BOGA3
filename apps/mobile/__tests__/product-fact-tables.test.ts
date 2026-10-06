@@ -50,7 +50,7 @@ const readFactTable = (file: string, id: string): FactTable => {
 /** Cells that disagree with code until a fact's `Pending:` decision ships: `<row key>|<column>`. */
 const PENDING: Record<string, readonly string[]> = {
   'set.eligibility': [],
-  '1rm.formula': ['100 × 1|1RM shown'],
+  '1rm.formula': [],
 };
 
 /** The facts whose tables this file runs; every fact-table marker must be one. */

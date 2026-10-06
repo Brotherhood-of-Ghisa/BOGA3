@@ -38,7 +38,7 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "working_sets_v3"` pass through
+Training projections with `metric_revision: "working_sets_v4"` pass through
 unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
 only: a set that is not a working set ([[set.eligibility]]) is listed with its own per-set figures but feeds no record,
