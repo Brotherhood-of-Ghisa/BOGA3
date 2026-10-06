@@ -33,7 +33,7 @@ jest.mock('@/src/data/bootstrap', () =>
 
 // Imported AFTER the bootstrap mock so the domain code binds to it.
 import { __resetClockForTests } from '@/src/data/clock';
-import { loadSessionSnapshotById } from '@/src/data/session-drafts';
+import { loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import {
   exerciseDefinitions,
   exerciseSets,
@@ -43,7 +43,7 @@ import {
   sessionPlans,
   sessions,
 } from '@/src/data/schema';
-import { planRepository, startSessionPlan } from '@/src/session-planner';
+import { addPlanBlockToSession, planRepository, startSessionPlan } from '@/src/session-planner';
 import type { PlanDraft } from '@/src/session-planner/types';
 
 let fixture: InMemoryDatabaseFixture;
@@ -284,5 +284,281 @@ describe('startSessionPlan', () => {
     await planRepository.deletePlan(created.id, T1);
     const result = await startSessionPlan(created.id, T1);
     expect(result).toEqual({ status: 'plan-not-found' });
+  });
+});
+
+describe('addPlanBlockToSession', () => {
+  /** A freeform active session with one unsourced card, optionally with sets. */
+  const seedActiveSession = async (
+    exerciseDefinitionId: string,
+    name: string,
+    sets: { repsValue: string; weightValue: string; setType?: string | null; performanceStatus?: 'planned' | 'unperformed' | null }[] = [],
+    cardId?: string,
+  ): Promise<{ sessionId: string; cardId: string }> => {
+    const persisted = await persistSessionDraftSnapshot(
+      {
+        gymId: null,
+        startedAt: T0,
+        exercises: [
+          {
+            ...(cardId ? { id: cardId } : {}),
+            exerciseDefinitionId,
+            name,
+            machineName: null,
+            sets: sets.map((input) => ({
+              repsValue: input.repsValue,
+              weightValue: input.weightValue,
+              setType: (input.setType ?? null) as never,
+              performanceStatus: input.performanceStatus ?? null,
+            })),
+          },
+        ],
+      },
+      { now: T0 },
+    );
+    const graph = await loadSessionSnapshotById(persisted.sessionId);
+    if (!graph) throw new Error('seed failed');
+    return { sessionId: persisted.sessionId, cardId: graph.exercises[0].id };
+  };
+
+  const createdPlanWithBlock = async () => {
+    const created = await planRepository.createPlan(planDraft(), T0);
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const blocks = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.sessionPlanId, created.id))
+      .orderBy(sessionPlanExercises.orderIndex)
+      .all();
+    return { planId: created.id, blockId: blocks[0].id };
+  };
+
+  it('creates an active session from the plan when none exists', async () => {
+    const { blockId } = await createdPlanWithBlock();
+    const result = await addPlanBlockToSession(blockId, undefined, T1);
+    expect(result).toEqual({
+      status: 'attached',
+      sessionId: expect.any(String),
+      sessionExerciseId: 'local:' + blockId + ':start',
+    });
+    if (result.status !== 'attached') throw new Error(String(result));
+
+    const session = sessionRows().find((row) => row.id === result.sessionId);
+    expect(session).toMatchObject({
+      gymId: 'gym-1',
+      sourcePlanId: null, // individual-block starts leave it null
+      status: 'active',
+      localDirty: true,
+    });
+    const card = cardRows().find((row) => row.id === result.sessionExerciseId);
+    expect(card).toMatchObject({
+      exerciseDefinitionId: 'def-squat',
+      sourcePlanExerciseId: blockId,
+      orderIndex: 0,
+    });
+    const sets = performedSetRows();
+    expect(sets.map((row) => [row.orderIndex, row.performanceStatus, row.repsValue])).toEqual([
+      [0, 'planned', ''],
+      [1, 'planned', ''],
+    ]);
+    expect(sets.map((row) => row.sourcePlanSetId)).toEqual([expect.any(String), expect.any(String)]);
+    expect(sets[0].plannedWeightValue).toBe('100');
+  });
+
+  it('appends a sourced card to an unrelated active session, leaving freeform data intact', async () => {
+    const { sessionId, cardId } = await seedActiveSession('def-bench', 'Bench', [
+      { repsValue: '10', weightValue: '80' },
+    ]);
+    const freeformBefore = cardRows().find((row) => row.id === cardId);
+    const { blockId } = await createdPlanWithBlock();
+
+    const result = await addPlanBlockToSession(blockId, undefined, T1);
+    if (result.status !== 'attached') throw new Error(String(result));
+    expect(result.sessionId).toBe(sessionId);
+
+    const cards = cardRows().filter((row) => row.deletedAt === null);
+    expect(cards).toHaveLength(2);
+    expect(cards.map((row) => row.orderIndex)).toEqual([0, 1]);
+    const sourcedCard = cards.find((row) => row.id !== cardId);
+    expect(sourcedCard).toMatchObject({
+      sourcePlanExerciseId: blockId,
+      name: 'Back Squat',
+      exerciseDefinitionId: 'def-squat',
+    });
+    const freeformAfter = cardRows().find((row) => row.id === cardId);
+    expect(freeformAfter).toMatchObject({
+      name: freeformBefore?.name,
+      machineName: freeformBefore?.machineName,
+      sourcePlanExerciseId: null,
+    });
+    // The freeform card's set is untouched.
+    expect(performedSetRows().filter((row) => row.sessionExerciseId === cardId).map((row) => row.repsValue)).toEqual(['10']);
+    // The session stays a manual session (source_plan_id null).
+    expect(sessionRows().find((row) => row.id === sessionId)?.sourcePlanId).toBeNull();
+  });
+
+  it('attaches to the single compatible unsourced card and keeps manual warm-ups above', async () => {
+    const { sessionId, cardId } = await seedActiveSession('def-squat', 'Back Squat', [
+      { repsValue: '', weightValue: '', setType: 'warm_up', performanceStatus: 'unperformed' },
+    ]);
+    const { blockId } = await createdPlanWithBlock();
+
+    const result = await addPlanBlockToSession(blockId, undefined, T1);
+    if (result.status !== 'attached') throw new Error(String(result));
+    expect(result.sessionId).toBe(sessionId);
+    expect(result.sessionExerciseId).toBe(cardId);
+
+    const sets = performedSetRows().filter((row) => row.deletedAt === null);
+    expect(sets.map((row) => [row.orderIndex, row.repsValue, row.sourcePlanSetId === null])).toEqual([
+      [0, '', true], // the manual warm-up stays first, provenance-free
+      [1, '', false],
+      [2, '', false],
+    ]);
+    expect(sets[0].setType).toBe('warm_up');
+    expect(sets[0].performanceStatus).toBe('unperformed');
+  });
+
+  it('returns ambiguity with candidate ids and writes nothing', async () => {
+    const first = await seedActiveSession('def-squat', 'Back Squat A', [], 'card-a');
+    const second = await seedActiveSession('def-squat', 'Back Squat B', [], 'card-b');
+    // Two active sessions violate the one-active invariant; fold both cards
+    // into the first session by moving the second card under it directly.
+    db().update(sessionExercises).set({ sessionId: first.sessionId, orderIndex: 1 }).where(eq(sessionExercises.id, second.cardId)).run();
+    db().update(sessions).set({ deletedAt: T0 }).where(eq(sessions.id, second.sessionId)).run();
+    const { blockId } = await createdPlanWithBlock();
+
+    const result = await addPlanBlockToSession(blockId, undefined, T1);
+    expect(result).toEqual({ status: 'ambiguous', candidateSessionExerciseIds: [first.cardId, second.cardId] });
+    // Nothing was written: the cards still carry no source link and no sets.
+    expect(cardRows().every((row) => row.sourcePlanExerciseId === null)).toBe(true);
+    expect(performedSetRows()).toHaveLength(0);
+  });
+
+  it('attaches to an explicitly selected compatible card', async () => {
+    const first = await seedActiveSession('def-squat', 'Back Squat A', [], 'card-a');
+    const second = await seedActiveSession('def-squat', 'Back Squat B', [], 'card-b');
+    db().update(sessionExercises).set({ sessionId: first.sessionId, orderIndex: 1 }).where(eq(sessionExercises.id, second.cardId)).run();
+    db().update(sessions).set({ deletedAt: T0 }).where(eq(sessions.id, second.sessionId)).run();
+    const { blockId } = await createdPlanWithBlock();
+
+    const result = await addPlanBlockToSession(blockId, second.cardId, T1);
+    if (result.status !== 'attached') throw new Error(String(result));
+    expect(result.sessionExerciseId).toBe(second.cardId);
+    expect(performedSetRows().filter((row) => row.deletedAt === null)).toHaveLength(2);
+  });
+
+  it('refuses foreign, different-exercise, or already-sourced targets', async () => {
+    const active = await seedActiveSession('def-bench', 'Bench');
+    const { blockId, planId } = await createdPlanWithBlock();
+    // A card already sourced from another plan block.
+    const otherPlan = await planRepository.createPlan(planDraft(), T0);
+    if (otherPlan.status !== 'saved') throw new Error('seed failed');
+    const otherBlocks = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.sessionPlanId, otherPlan.id))
+      .all();
+    db()
+      .update(sessionExercises)
+      .set({ sourcePlanExerciseId: otherBlocks[0].id })
+      .where(eq(sessionExercises.id, active.cardId))
+      .run();
+    void planId;
+
+    expect(await addPlanBlockToSession(blockId, 'no-such-card', T1)).toEqual({ status: 'target-invalid' });
+    expect(await addPlanBlockToSession(blockId, active.cardId, T1)).toEqual({ status: 'target-invalid' });
+    expect(performedSetRows().filter((row) => row.deletedAt === null)).toHaveLength(0);
+  });
+
+  it('returns the same attachment on retry without duplicating rows', async () => {
+    const { blockId } = await createdPlanWithBlock();
+    const first = await addPlanBlockToSession(blockId, undefined, T1);
+    if (first.status !== 'attached') throw new Error(String(first));
+
+    const retry = await addPlanBlockToSession(blockId, undefined, T1);
+    expect(retry).toEqual(first);
+    expect(cardRows().filter((row) => row.deletedAt === null)).toHaveLength(1);
+    expect(performedSetRows().filter((row) => row.deletedAt === null)).toHaveLength(2);
+  });
+
+  it('refuses a resolved block and an unknown block id', async () => {
+    const { blockId } = await createdPlanWithBlock();
+    db()
+      .update(sessionPlanExercises)
+      .set({ progressStatus: 'skipped', resolvedAt: T1 })
+      .where(eq(sessionPlanExercises.id, blockId))
+      .run();
+    expect(await addPlanBlockToSession(blockId, undefined, T1)).toEqual({ status: 'block-not-available' });
+    expect(await addPlanBlockToSession('no-such-block', undefined, T1)).toEqual({ status: 'block-not-found' });
+  });
+
+  it('lets a later manual warm-up share the sourced card without touching provenance', async () => {
+    const { blockId } = await createdPlanWithBlock();
+    const result = await addPlanBlockToSession(blockId, undefined, T1);
+    if (result.status !== 'attached') throw new Error(String(result));
+
+    // The recorder appends a manual set to the sourced card through its own
+    // load → splice → persist path.
+    const graph = await loadSessionSnapshotById(result.sessionId);
+    if (!graph) throw new Error('seed failed');
+    const card = graph.exercises.find((exercise) => exercise.id === result.sessionExerciseId);
+    if (!card) throw new Error('seed failed');
+    const plannedSetsBefore = card.sets.map((set) => [set.id, set.sourcePlanSetId]);
+    await persistSessionDraftSnapshot(
+      {
+        sessionId: graph.sessionId,
+        gymId: graph.gymId,
+        startedAt: graph.startedAt,
+        sourcePlanId: graph.sourcePlanId ?? null,
+        exercises: [
+          ...graph.exercises.filter((exercise) => exercise.id !== card.id).map((exercise) => ({
+            id: exercise.id,
+            exerciseDefinitionId: exercise.exerciseDefinitionId,
+            name: exercise.name,
+            machineName: exercise.machineName,
+            sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+            sets: exercise.sets.map((set) => ({
+              id: set.id,
+              repsValue: set.repsValue,
+              weightValue: set.weightValue,
+              setType: set.setType,
+              plannedRepsValue: set.plannedRepsValue ?? null,
+              plannedWeightValue: set.plannedWeightValue ?? null,
+              plannedSetType: set.plannedSetType ?? null,
+              performanceStatus: set.performanceStatus ?? null,
+              sourcePlanSetId: set.sourcePlanSetId ?? null,
+            })),
+          })),
+          {
+            id: card.id,
+            exerciseDefinitionId: card.exerciseDefinitionId,
+            name: card.name,
+            machineName: card.machineName,
+            sourcePlanExerciseId: card.sourcePlanExerciseId ?? null,
+            sets: [
+              ...card.sets.map((set) => ({
+                id: set.id,
+                repsValue: set.repsValue,
+                weightValue: set.weightValue,
+                setType: set.setType,
+                plannedRepsValue: set.plannedRepsValue ?? null,
+                plannedWeightValue: set.plannedWeightValue ?? null,
+                plannedSetType: set.plannedSetType ?? null,
+                performanceStatus: set.performanceStatus ?? null,
+                sourcePlanSetId: set.sourcePlanSetId ?? null,
+              })),
+              { repsValue: '', weightValue: '', setType: 'warm_up' as never, performanceStatus: 'unperformed' as const },
+            ],
+          },
+        ],
+      },
+      { now: T1 },
+    );
+
+    const sets = performedSetRows().filter((row) => row.deletedAt === null);
+    expect(sets).toHaveLength(3);
+    expect(sets.map((row) => row.setType)).toEqual([null, null, 'warm_up']);
+    expect(sets.slice(0, 2).map((row) => [row.id, row.sourcePlanSetId])).toEqual(plannedSetsBefore);
+    expect(sets[2].sourcePlanSetId).toBeNull();
   });
 });

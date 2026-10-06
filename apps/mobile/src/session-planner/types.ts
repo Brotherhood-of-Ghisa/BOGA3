@@ -112,7 +112,9 @@ export type StartSessionPlanResult =
 export type AddPlanBlockResult =
   | { status: 'attached'; sessionId: string; sessionExerciseId: string }
   | { status: 'ambiguous'; candidateSessionExerciseIds: string[] }
+  | { status: 'block-not-found' }
   | { status: 'block-not-available' }
+  | { status: 'session-not-found' }
   | { status: 'target-invalid' };
 
 export type ResolvePlanBlockResult =
