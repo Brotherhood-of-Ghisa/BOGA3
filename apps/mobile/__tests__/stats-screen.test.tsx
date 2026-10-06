@@ -521,7 +521,33 @@ describe('StatsScreenShell', () => {
     expect(onDismissMuscleHistory).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps both heatmap views warm so switching preserves the daily chart state', () => {
+  it.each([['muscle', 'daily'], ['muscle', 'weekly'], ['exercise', 'daily'], ['exercise', 'weekly']] as const)(
+    'uses the theme accent for the active %s history metric in %s mode', (kind, view) => {
+      const onSelectMetric = jest.fn();
+      const props = buildShellProps({
+        selectedMuscle: kind === 'muscle' ? { muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' } : null,
+        selectedExercise: kind === 'exercise' ? { exerciseDefinitionId: 'ex1', displayName: 'Bench Press' } : null,
+        muscleHistoryView: view,
+        exerciseHistoryView: view,
+        onSelectMuscleHistoryMetric: onSelectMetric,
+        onSelectExerciseHistoryMetric: onSelectMetric,
+      });
+      const { rerender } = render(<StatsScreenShell {...props} />);
+      const prefix = `stats-${kind}-history-metric-chip`;
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.accent });
+      expect(within(screen.getByTestId(`${prefix}-totalVolume`)).getByText('Volume')).toHaveStyle({ color: uiRoles.surface });
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.surface });
+      fireEvent.press(screen.getByTestId(`${prefix}-workingSetCount`));
+      expect(onSelectMetric).toHaveBeenCalledWith('workingSetCount');
+
+      rerender(<StatsScreenShell {...props} muscleHistoryMetric="workingSetCount" exerciseHistoryMetric="workingSetCount" />);
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.accent });
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveProp('accessibilityState', { selected: true });
+      expect(within(screen.getByTestId(`${prefix}-workingSetCount`)).getByText('Sets')).toHaveStyle({ color: uiRoles.surface });
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.surface });
+    });
+
+  it('keeps both heatmap views warm through loading, retry and view changes', () => {
     const dailyMetrics = [
       {
         dateKey: '2026-05-13',
@@ -546,23 +572,20 @@ describe('StatsScreenShell', () => {
       />
     );
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
-      'May 13, 2026'
-    );
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
 
     rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
     expect(screen.getByTestId('stats-muscle-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent('May 13, 2026');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
 
     rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', muscleHistoryErrorMessage: 'Read failed', onRetryMuscleHistory: jest.fn() })} />);
     expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Read failed/);
-    expect(screen.queryByTestId('stats-muscle-history-heatmap-day-detail-date')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date', { includeHiddenElements: true })).toHaveTextContent('May 13, 2026');
+    expect(screen.queryByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13', { includeHiddenElements: true })).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
     fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
     rerender(<StatsScreenShell {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily', isMuscleHistoryLoading: true })} />);
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent('May 13, 2026');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
 
     rerender(
       <StatsScreenShell
@@ -584,12 +607,10 @@ describe('StatsScreenShell', () => {
         {...buildShellProps({ ...sharedProps, muscleHistoryView: 'daily' })}
       />
     );
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
-      'May 13, 2026'
-    );
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
   });
 
-  it('selects a single day and shows the selected muscle metric in daily view', () => {
+  it('shows the active muscle metric directly in read-only daily tiles', () => {
     const props = {
       selectedMuscle: {
         muscleGroupIds: ['front_delts'] as [string],
@@ -620,13 +641,10 @@ describe('StatsScreenShell', () => {
     // The weekly rollup banner is hidden in daily view.
     expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
 
-    // One square per day → addressable by its date key; tapping shows the DAY detail.
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-date')).toHaveTextContent(
-      'May 13, 2026'
-    );
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
-      /Volume: 1200/
+    // Values are visible and announced directly, without a selection action.
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13')).toHaveProp('accessibilityLabel', '2026-05-13, Volume 1200');
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13-value')).toHaveTextContent(
+      /1200/
     );
     expect(screen.getByText('Volume per day')).toBeTruthy();
 
@@ -638,9 +656,8 @@ describe('StatsScreenShell', () => {
         })}
       />
     );
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13'));
-    expect(screen.getByTestId('stats-muscle-history-heatmap-day-detail-value')).toHaveTextContent(
-      /Sets: 2/
+    expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13-value')).toHaveTextContent(
+      /2/
     );
     expect(screen.getByText('Sets per day')).toBeTruthy();
   });

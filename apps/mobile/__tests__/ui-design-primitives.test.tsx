@@ -684,6 +684,25 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
   });
 
+  it('uses the theme accent with a surface label when requested, retaining disabled styling', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<SegmentedControl selectedTone="accent" onChange={onChange}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.accent);
+    expect(flatStyle(within(screen.getByTestId('view-records')).getByText('Records')).color).toBe(uiRoles.surface);
+    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(uiRoles.surface);
+    expect(screen.getByTestId('view-records')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).toHaveBeenCalledWith('last');
+
+    onChange.mockClear();
+    rerender(<SegmentedControl disabled selectedTone="accent" onChange={onChange}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('spans the row with label-sized segments that share the rest when fit', () => {
     render(<SegmentedControl layout="fit" onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
     expect(flatStyle(screen.getByTestId('view-last'))).toMatchObject({ flexGrow: 1 });

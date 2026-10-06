@@ -1,13 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { DailyHeatmap, HEAT_RAMP, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { uiRoles } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
 
-// Today and the selected day (or week) are marked differently: today a 1px
-// `ink` ring, the selected cell a 2px `ink` border plus the selected state
-// They used to be drawn identically.
+// Daily tiles are read-only. Weekly bars retain current/selected marks because
+// selecting a bar opens the host's week details.
 
 const TODAY = '2026-05-13'; // a Wednesday
 const PREFIX = 'history';
@@ -41,30 +40,27 @@ const renderDaily = () =>
   );
 
 describe('DailyHeatmap marks', () => {
-  it('selects today by default and draws it with the selected border', () => {
+  it('announces today without selecting or outlining it', () => {
     renderDaily();
 
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`)).toHaveProp('accessibilityState', { selected: true });
-    expect(border(`${PREFIX}-heatmap-cell-${TODAY}`)).toEqual({ borderWidth: 2, borderColor: uiRoles.ink });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail`)).toHaveTextContent(/Today/);
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityState).toBeUndefined();
+    expect(border(`${PREFIX}-heatmap-cell-${TODAY}`)).toEqual({ borderWidth: StyleSheet.hairlineWidth, borderColor: uiRoles.rule });
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain('Today');
+    expect(screen.queryByTestId(`${PREFIX}-heatmap-day-detail`)).toBeNull();
   });
 
-  it('gives a selected day a different border from today', () => {
+  it('shows values as accessible text without a press action', () => {
     renderDaily();
 
-    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`));
-
-    const selected = border(`${PREFIX}-heatmap-cell-2026-05-11`);
-    const today = border(`${PREFIX}-heatmap-cell-${TODAY}`);
-    expect(selected).toEqual({ borderWidth: 2, borderColor: uiRoles.ink });
-    expect(today).toEqual({ borderWidth: 1, borderColor: uiRoles.ink });
-    expect(selected).not.toEqual(today);
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`)).toHaveProp('accessibilityState', { selected: false });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Volume: 1200');
+    const tile = screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`);
+    expect(tile).toHaveProp('accessibilityRole', 'text');
+    expect(tile.props.onPress).toBeUndefined();
+    expect(tile.props.accessibilityState).toBeUndefined();
+    expect(border(`${PREFIX}-heatmap-cell-2026-05-11`)).toEqual({ borderWidth: StyleSheet.hairlineWidth, borderColor: uiRoles.rule });
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11-value`)).toHaveTextContent('1200');
   });
 
-  it('draws a rest day on viz0 with a rule hairline and says so in the detail', () => {
+  it('draws a rest day on viz0 with a rule hairline and announces rest accessibly', () => {
     renderDaily();
 
     expect(style(`${PREFIX}-heatmap-cell-2026-05-12`)).toMatchObject({
@@ -73,9 +69,8 @@ describe('DailyHeatmap marks', () => {
       borderColor: uiRoles.rule,
     });
 
-    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`));
-    expect(border(`${PREFIX}-heatmap-cell-2026-05-12`)).toEqual({ borderWidth: 2, borderColor: uiRoles.ink });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Rest day');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12-value`)).toHaveTextContent('', { exact: true });
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`).props.accessibilityLabel).toContain('Rest');
   });
 
   it('colours cells from the viz ramp', () => {
@@ -115,20 +110,17 @@ describe('WeeklyHeatmap marks', () => {
 
 
 describe('Bodyweight heatmap coverage', () => {
-  it('distinguishes zero-load training, unknown load and rest in daily details', () => {
+  it('distinguishes zero-load training, unknown load and rest in daily tiles', () => {
     const coverage = buildHeatmapData([
       day('2026-05-11', 0),
       { ...day('2026-05-12', 0), totalVolume: null, knownVolume: 0 },
     ], 'totalVolume', { todayDateKey: TODAY });
     render(<DailyHeatmap data={coverage} formatValue={String} metricLabel="Volume" testIDPrefix={PREFIX} />);
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityLabel', '2026-05-11, Volume 0');
-    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`));
-    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Volume: 0');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11-value`)).toHaveTextContent('0');
     expect(style(`${PREFIX}-heatmap-cell-2026-05-12`).borderStyle).toBe('dashed');
-    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`));
-    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Volume: Unavailable');
-    fireEvent.press(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`));
-    expect(screen.getByTestId(`${PREFIX}-heatmap-day-detail-value`)).toHaveTextContent('Rest day');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12-value`)).toHaveTextContent('?');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain('Rest');
   });
 
   it.each([

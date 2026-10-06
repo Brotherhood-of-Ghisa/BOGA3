@@ -187,26 +187,17 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-history-header"
 - takeScreenshot: "06-history-short-drag-restored"
-# Compare the day at one fixed screen position before and after the swipe.
-# Merely selecting an older day would also pass in the initial viewport.
-- tapOn:
-    id: "stats-exercise-history-heatmap"
-    point: "50%,25%"
-- copyTextFrom:
-    id: "stats-exercise-history-heatmap-day-detail-date"
-- evalScript: ${output.historyDateBeforeScroll = maestro.copiedText}
-- swipe:
-    from:
-      id: "stats-exercise-history-heatmap"
-      point: "80%,25%"
-    direction: RIGHT
-    duration: 600
-- tapOn:
-    id: "stats-exercise-history-heatmap"
-    point: "50%,25%"
-- copyTextFrom:
-    id: "stats-exercise-history-heatmap-day-detail-date"
-- assertTrue: ${maestro.copiedText !== output.historyDateBeforeScroll}
+# The month calendar scrolls vertically inside the native sheet. A month three
+# months earlier starts below the viewport; centring it proves body scrolling
+# without dismissing the sheet. Read-only tiles and calendar arithmetic remain Jest.
+- evalScript: ${output.historyOlderMonthKey = (function() { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); })()}
+- scrollUntilVisible:
+    element:
+      id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
 - assertVisible:
     id: "stats-exercise-history-header"
 - takeScreenshot: "07-history-chart-scrolled"

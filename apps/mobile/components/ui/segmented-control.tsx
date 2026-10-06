@@ -23,6 +23,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
+  // History metrics use the theme accent; other selectors keep neutral ink.
+  selectedTone?: 'neutral' | 'accent';
   hitSlop?: number;
   // Every segment inert and faded, e.g. while the form it belongs to saves.
   disabled?: boolean;
@@ -30,8 +32,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
 };
 
 // One choice from a few, joined in a single `rule` frame at the control
-// radius; the selected segment is solid `ink` (`design-language.md` §4). A tab
-// list to assistive tech. Selecting the selected segment does nothing.
+// radius; the selected segment uses ink or the theme accent, with a surface
+// label. A tab list to assistive tech. Selecting the selected segment does nothing.
 export function SegmentedControl<TValue extends string | number>({
   options,
   value,
@@ -39,6 +41,7 @@ export function SegmentedControl<TValue extends string | number>({
   testIDPrefix,
   accessibilityLabel,
   layout = 'fill',
+  selectedTone = 'neutral',
   hitSlop,
   disabled = false,
   style,
@@ -72,7 +75,7 @@ export function SegmentedControl<TValue extends string | number>({
               fill ? styles.segmentFill : null,
               fit ? styles.segmentFit : null,
               index > 0 ? styles.segmentDivider : null,
-              selected ? styles.segmentSelected : null,
+              selected ? selectedStyles[selectedTone] : null,
               disabled && selected ? styles.segmentSelectedDisabled : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
@@ -121,6 +124,9 @@ const styles = StyleSheet.create({
   segmentSelected: {
     backgroundColor: uiRoles.ink,
   },
+  segmentSelectedAccent: {
+    backgroundColor: uiRoles.accent,
+  },
   segmentSelectedDisabled: {
     backgroundColor: uiRoles.inkGhost,
   },
@@ -140,3 +146,5 @@ const styles = StyleSheet.create({
     color: uiRoles.inkGhost,
   },
 });
+
+const selectedStyles = { neutral: styles.segmentSelected, accent: styles.segmentSelectedAccent };

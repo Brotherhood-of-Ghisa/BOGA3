@@ -153,12 +153,14 @@ describe('Stats over real data', () => {
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
     await act(async () => initial.resolve([]));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toBeTruthy();
     act(() => updatePreferences({ historyLookbackWeeks: 4 }));
     expect(screen.getByTestId('stats-exercise-history-loading')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
-    expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-heatmap')).toBeNull();
+    expect(screen.getAllByTestId('stats-exercise-history-heatmap', { includeHiddenElements: true })).toHaveLength(2);
     await act(async () => reload.resolve([]));
     expect(await screen.findByTestId('stats-exercise-history-empty')).toHaveTextContent(/4-week/);
   });
@@ -187,7 +189,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent(`Daily · ${weeks} ${weeks === 1 ? 'week' : 'weeks'}`);
     expect(read).toHaveBeenLastCalledWith(expect.objectContaining(calendarWeekBounds(weeks)));
     const panel = within(screen.getByTestId('stats-exercise-history-heatmap-panel-daily'));
-    expect(panel.getAllByTestId(/^stats-exercise-history-heatmap-cell-/)).toHaveLength((weeks - 1) * 7 + 6);
+    expect(panel.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength((weeks - 1) * 7 + 6);
     const olderKey = localDateKey(new Date(Date.now() - 450 * DAY_MS));
     if (weeks === 104) {
       expect(panel.getByTestId(`stats-exercise-history-heatmap-cell-${olderKey}`).props.accessibilityLabel).toContain('Volume 600');
@@ -197,20 +199,21 @@ describe('Stats over real data', () => {
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
-  it('keeps a selected day within bounds and resets it to today when history is shortened', async () => {
+  it('updates read-only daily tiles when the saved history window is shortened', async () => {
     await renderSeededStats();
     act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    const selectedKey = localDateKey(new Date(Date.now() - 40 * DAY_MS));
-    fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${selectedKey}`));
+    const dateKey = localDateKey(new Date(Date.now() - 40 * DAY_MS));
+    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
     act(() => updatePreferences({ historyLookbackWeeks: 52 }));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${selectedKey}`)).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toHaveProp('accessibilityRole', 'text');
     act(() => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
     expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`))
-      .toHaveProp('accessibilityState', { selected: true });
+      .toHaveProp('accessibilityRole', 'text');
+    expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
@@ -309,7 +312,7 @@ describe('Stats over real data', () => {
     expect(title).toHaveTextContent(/Squat/);
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-exercise-history-heatmap-day-detail-date')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
     expect(screen.queryByText('Weekly training load')).toBeNull();
     for (const metric of ['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight']) {
       expect(screen.getByTestId(`stats-exercise-history-metric-chip-${metric}`)).toBeTruthy();
@@ -342,7 +345,7 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-error')).toBeNull());
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
     expect(screen.getByTestId('stats-exercise-history-title')).toHaveTextContent(/Squat/);
-    expect(screen.getByTestId('stats-exercise-history-heatmap-day-detail-date')).toBeTruthy();
+    expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
   });
 
   it('opens a saved Weekly choice with its banner and retains it on reopening', async () => {
@@ -386,7 +389,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByText(/Tap a week/)).toBeNull();
     await act(async () => updatePreferences({ historyLookbackWeeks: 1 }));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
-    expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-/)).toHaveLength(1);
+    expect(screen.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength(1);
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');

@@ -36,8 +36,11 @@ of Progress tables, exercise browsing or the heatmaps themselves.
   the subtle `Swipe down to dismiss` hint; accessible dismissal and system
   Back/VoiceOver escape remain available without a physical swipe.
 - Preserve the current heading, saved view/window label, metric control,
-  daily/weekly heatmap, selected detail/week banner and legend. Daily history
-  remains a seven-row horizontally scrollable grid; Weekly keeps its bar chart.
+  saved chart/window and legend. For the metric control's theme-colour amendment
+  and the Daily chart, load the accepted
+  [daily calendar target](daily-history-calendar.md); it supersedes this
+  graphic’s older horizontal grid and selected-day detail. Weekly keeps its bar
+  chart and selected-week banner.
 - Keep surrounding Progress state and every other sheet's default behavior.
   Use the active theme; Plum in the reference is one example, not a palette
   change. Sample names, dates, values and cell counts are illustrative, not data
@@ -66,8 +69,7 @@ gesture-test evidence.
   `Exercise History` eyebrow, the name (wrapping to two lines) and an X. The
   `Swipe down to dismiss` hint is gone.
 - Swiping down closes it from the header, or from the body when it is at the
-  top. The daily grid still scrolls sideways, and the metric control and
-  charts keep their taps. The X, Android Back and the VoiceOver escape close
+  top. Charts keep their own body scroll and the metric control keeps its taps. The X, Android Back and the VoiceOver escape close
   it too.
 - Progress clears its target and restores focus once the native sheet has
   gone (`HistorySheet` `onDismiss`).

@@ -1,42 +1,63 @@
-# Design QA — session completion and sharing
+# Daily history calendar design QA
 
-Status: `passed`
+Source visual truth: `docs/specs/ui/design-targets/daily-history-calendar/reference.png`.
+The target record governs chart content; `docs/specs/ui/design-targets/history-popup.md`
+governs the native PageSheet header and dismissal.
+The operator's 2026-10-06 read-only amendment supersedes the reference's black
+selection/current outlines. Daily day and Week tiles now expose text without
+press actions; only the separate Weekly view retains selection.
+The operator's metric-colour amendment also supersedes the reference's black
+active metric fill: HistorySheet now uses theme `accent` with `surface` text.
+The existing palette gates that pair at ≥4.5:1 for all presets and custom hues.
+Latest revision validation (read-only tiles and themed metrics):
+`./boga test fast` passed, including 237 Jest suites / 3,019 tests, lint, typecheck, UI guardrails, backend smoke, docs/meta
+checks and consent/MCP checks. Log:
+`apps/mobile/artifacts/maestro/daily-history-calendar/fast-theme-metrics.log`.
 
-## Comparison inputs
+Implementation: shared DailyHeatmap for muscle/exercise HistorySheet.
+The worktree is `codex/daily-history-calendar`, with simulator BOGA wt22 and Metro port 8104.
 
-- Approved source: `/Users/sboschi/.codex/generated_images/01a09739-dfda-7012-9bbb-596d3ec79241/exec-7c64514d-366a-47c6-83ba-6c2d2748c35f.png` (`853 × 1844`).
-- Large implementation: `apps/mobile/artifacts/maestro/ad-hoc/20260913-220812-17438/maestro-output/screenshots/session-completion-multiple-prs-all.png` and `session-share-preview-all-prs.png` (`1206 × 2622`, `402 × 874` points, 3×).
-- Same-input comparison: `apps/mobile/artifacts/maestro/ad-hoc/20260913-220812-17438/design-qa-comparison.png` (source, in-app completion, and share preview side by side).
-- Small implementation: `apps/mobile/artifacts/maestro/ad-hoc/20260913-221604-20823/maestro-output/screenshots/session-completion-multiple-prs-all.png` and `session-share-preview-all-prs.png` (`750 × 1334`, `375 × 667` points, 2×).
+Evidence so far: `apps/mobile/artifacts/maestro/daily-history-calendar/native/startup.png`
+confirms the native app boots. This shows Today, not a history calendar; it is
+not a source-versus-implementation comparison and cannot establish visual acceptance.
+The source is 853 × 1844 pixels, nominal 390 × 844pt. Native comparison viewport,
+density normalization and history-state captures remain pending.
 
-## States rendered
+Findings:
 
-- Two simultaneous PRs in the completion presentation.
-- Session totals with performed and working sets.
-- Two exercise-volume comparisons with P5, median, P95, and in/out-of-range current markers.
-- One-PR, no-PR, catalog-error/retry, and unmapped-muscle states.
-- Session share preview, first-launch failure, retry, native image share sheet, cancellation, and analytics handoff.
+- P2, fit: the eight columns currently retain 44pt minimum tile widths,
+  requiring at least 352pt before gaps despite the read-only amendment. Standard phone
+  widths use flexible gaps and 8pt body gutters. Narrower phones and unusually
+  long figures still need an explicitly resolved fit rule. The proposed labelled
+  row fallback and horizontal-scroll alternative are pending operator choice.
+- Native UI access reports that the Mac is locked. It must be unlocked to
+  inspect both history kinds and capture their metric, theme and edge states.
+- The operator has not yet agreed the slower lane set required by AGENTS.md.
 
-## Visual comparison
+Required fidelity surfaces:
 
-- Hierarchy matches the approved direction: all compact PRs first, session summary second, exercise comparisons third, then session actions.
-- PR cards remain distinct and readable without paging; both fit above the summary on the large and small evidence viewports.
-- Exercise names and their performed/working-set counts share one compact heading; current volume and median comparison retain clear emphasis.
-- P5/P95 endpoints, median tick, and current marker remain aligned and legible at both densities. Out-of-range state is stated in text, not color alone.
-- The share sheet previews the exact card being captured. The small viewport scrolls the preview card while keeping privacy copy and actions reachable; capture dimensions retain the full card height.
-- Spacing, typography, borders, success treatment, and primary action color use the existing BOGA design tokens. No clipping, overlap, unintended wrapping, or raw color literals were found.
+- Fonts/typography: source sizes map to existing Archivo/Plex Mono tokens;
+  native hierarchy, full numeric figures and clipping are unverified.
+- Spacing/layout rhythm: month framing and Monday–Sunday/Week order are tested;
+  native small/large phone layout and scroll/dismissal are unverified.
+- Colours/tokens: tile values reuse the existing adapter's independent heat and
+  target levels; rendered themes and adjacent-month emphasis are unverified.
+- Image quality/assets: the reference has no raster content assets to generate;
+  the app's shared PageSheet supplies its existing dismissal control.
+- Copy/content: tile numbers, blank rest, distinct zero/unknown/future states and
+  accessible dates are covered by Jest. Native readability remains unverified.
 
-## Discrepancy ledger
+Full-view and focused comparison evidence: missing. No comparison iteration or
+visual pass is claimed.
 
-- P0: none.
-- P1: none.
-- P2: none.
-- Accepted: the approved concept showed gym/location inside the share card; implementation intentionally omits it under the approved privacy contract while retaining gym in the in-app summary.
-- Accepted: source examples included multiple PR categories; the current product contract awards strict estimated-1RM PRs only, so the fixture renders two records of that supported type.
-- Accepted: native status/header chrome is present in simulator evidence because the production route owns it.
+Implementation checklist:
 
-## Verification
+1. Resolve narrow/long-value fit and finish its layout/tests.
+2. Run the operator-agreed iOS/quality lanes to green.
+3. Capture both history kinds, supported metrics/themes, read-only tiles, rest/zero/
+   unavailable, month/year boundaries and short/long windows on small/large phones.
+4. Compare matching chart regions with the accepted reference, fix P0/P1/P2
+   differences, and record intentional PageSheet/spacing deviations.
+5. Update the target status and implementation PR with verified evidence.
 
-- Large viewport: both focused Maestro flows passed.
-- Small viewport: both focused Maestro flows passed.
-- PNG capture reached the native share sheet after a retryable injected failure and cancelled without mutating session state.
+final result: blocked
