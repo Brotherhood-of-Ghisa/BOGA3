@@ -330,39 +330,40 @@ export function StatsScreenShell({
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
   }, []);
 
-  // The view switch stays reachable; comparison controls scroll with the data.
   const scrollTestID = viewMode === 'exercise' ? 'stats-exercise-list-scroll' : 'stats-scroll';
 
   return (
     <Screen testID="stats-history-screen">
-      <View style={styles.viewSwitch} testID="stats-view-switch">
-        <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
-          value={viewMode} onChange={onSelectViewMode} testIDPrefix="stats-view-mode-chip" />
-      </View>
-      <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
+      <View style={styles.controls} testID="stats-controls">
+        <View testID="stats-view-switch">
+          <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
+            value={viewMode} onChange={onSelectViewMode} selectedGround="viz" testIDPrefix="stats-view-mode-chip" />
+        </View>
         <SegmentedControl
           accessibilityLabel="Select stats time range"
-          options={targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
-            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }]}
-          value={periodDays} onChange={onSelectPeriod} testIDPrefix="stats-period-chip" />
-        {viewMode === 'muscle' ? <>
+          options={(targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
+            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }])
+            .map(option => ({ ...option, accessibilityLabel:
+              `${option.label}, ${formatPeriodComparison(option.value)}, same elapsed calendar span` }))}
+          value={periodDays} onChange={onSelectPeriod} selectedGround="viz" testIDPrefix="stats-period-chip" />
+        {viewMode === 'muscle' ? (
           <SegmentedControl accessibilityLabel="Select progress metric"
             options={[{ value: 'workingSetCount', label: 'Working sets' }, { value: 'totalVolume', label: 'Volume' }]}
-            value={tableMetric} onChange={setTableMetric} testIDPrefix="stats-metric-chip" />
-          <Text allowFontScaling={false} style={styles.comparison}
-            accessibilityLabel={`${formatPeriodComparison(periodDays)}, same elapsed calendar span`}
-            testID="stats-comparison-label">{formatPeriodComparison(periodDays)}</Text>
-        </> : null}
+            value={tableMetric} onChange={setTableMetric} selectedGround="viz" testIDPrefix="stats-metric-chip" />
+        ) : (
+          <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
+            onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+        )}
+      </View>
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
-        {viewMode === 'exercise' ? <>
-          <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
-            onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+        {viewMode === 'exercise' ? (
           <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
             isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
-        </> : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
+        ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
           weeks={periodDays / 7} weeklyTarget={weeklyWorkingSetTarget} onSelect={showContributions}
           onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
           onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
@@ -678,9 +679,7 @@ const microLabel = {
 
 // The screen body, in the design language.
 const styles = StyleSheet.create({
-  viewSwitch: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg },
-  comparison: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },
+  controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'stretch',

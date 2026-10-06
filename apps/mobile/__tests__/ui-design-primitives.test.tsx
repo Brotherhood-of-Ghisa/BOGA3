@@ -684,6 +684,21 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
   });
 
+  it('supports a palette-grade selection with ink text and retains unselected surfaces', () => {
+    const { rerender } = render(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(screen.getByTestId('view-records')).toHaveStyle({ backgroundColor: uiRoles.viz4 });
+    expect(screen.getByText('Records')).toHaveStyle({ color: uiRoles.ink });
+    expect(screen.getByTestId('view-last')).toHaveStyle({ backgroundColor: uiRoles.surface });
+    expect(screen.getByText('Last')).toHaveStyle({ color: uiRoles.inkMuted });
+
+    rerender(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
+      options={OPTIONS} testIDPrefix="view" value="last" />);
+    expect(screen.getByTestId('view-records')).toHaveStyle({ backgroundColor: uiRoles.surface });
+    expect(screen.getByTestId('view-last')).toHaveStyle({ backgroundColor: uiRoles.viz4 });
+    expect(screen.getByText('Last')).toHaveStyle({ color: uiRoles.ink });
+  });
+
   it('spans the row with label-sized segments that share the rest when fit', () => {
     render(<SegmentedControl layout="fit" onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
     expect(flatStyle(screen.getByTestId('view-last'))).toMatchObject({ flexGrow: 1 });
