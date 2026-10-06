@@ -404,7 +404,8 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityLabel', 'Hide Chest contributions');
     expect(screen.queryByTestId('stats-contributions-title')).toBeNull();
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
-    fireEvent.press(screen.getByTestId('stats-contributions-total'));
+    expect(screen.queryByTestId('stats-contributions-total')).toBeNull();
+    expect(within(screen.getByTestId('stats-contributions')).queryByText('Total')).toBeNull();
     expect(onPressMuscleHistory).not.toHaveBeenCalled();
     fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
@@ -413,6 +414,8 @@ describe('StatsScreenShell', () => {
     expect(onPressMuscleHistory).toHaveBeenCalledWith({ muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' });
     expect(screen.getByTestId('stats-muscle-select-chest')).toHaveStyle({ width: 44, minHeight: 44 });
     expect(screen.getByTestId('stats-muscle-history-chest')).toHaveStyle({ minWidth: 44, minHeight: 44 });
+    expect(within(screen.getByTestId('stats-muscle-history-chest')).getByText('Chest'))
+      .not.toHaveStyle({ textDecorationLine: 'underline' });
   });
 
   it('grades counts against the saved quota and selected weeks in either metric', () => {
@@ -1062,6 +1065,28 @@ it.each([320, 430])('keeps full figures at %ipt, using another line only when ne
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });
 
+
+it.each([375, 430])('uses the full row width for parent and contribution figures below names at %ipt', width => {
+  const dimensions = ReactNative.Dimensions.get('window');
+  act(() => ReactNative.Dimensions.set({ window: { width, height: 900, scale: 1, fontScale: 1 } }));
+  const summary = buildSummary();
+  const muscle = summary.muscles[0];
+  muscle.current.totalVolume = 188271603422374;
+  muscle.previous.totalVolume = 6172839456170;
+  muscle.exercises = [{ exerciseDefinitionId: 'bench', displayName: 'Long exercise name', role: 'primary',
+    current: muscle.current, previous: muscle.previous, workingSetChange: muscle.workingSetChange, volumeChange: muscle.volumeChange }];
+  renderStatsScreenShell({ summary });
+  fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
+  fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
+  expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ flexDirection: 'column' });
+  const parentValues = screen.getByTestId('stats-muscle-row-chest-values');
+  expect(screen.getByLabelText(/^Now 188271603422374, previous 6172839456170,/)).toHaveStyle({ width: '100%' });
+  expect(parentValues).toHaveStyle({ width: '100%' });
+  expect(screen.getByTestId('stats-contribution-bench-values')).toHaveStyle({ width: '100%' });
+  expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
+  expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
+  act(() => ReactNative.Dimensions.set({ window: dimensions }));
+});
 
 it('keeps a twelve-digit Volume baseline and long percent readable on a small phone', () => {
   const dimensions = ReactNative.Dimensions.get('window');
