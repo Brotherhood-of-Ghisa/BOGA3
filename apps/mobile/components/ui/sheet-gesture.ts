@@ -1,4 +1,4 @@
-// The downward drag that closes a sheet (`Sheet`, and Progress's history popup).
+// The downward drag that closes a `Sheet` from its handle and title row.
 // Points / points per second. A fast flick still needs deliberate downward travel.
 export const SHEET_DRAG_SLOP = 8;
 export const SHEET_HORIZONTAL_SLOP = 12;

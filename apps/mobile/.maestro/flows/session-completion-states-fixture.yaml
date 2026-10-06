@@ -52,9 +52,9 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: "Copy"
     timeout: 10000
-# The share sheet has no Cancel: tap the backdrop above it.
+# The share preview is a page sheet: its X closes it.
 - tapOn:
-    point: "50%,8%"
+    id: "session-share-preview-close"
 - extendedWaitUntil:
     notVisible:
       id: "session-share-preview"

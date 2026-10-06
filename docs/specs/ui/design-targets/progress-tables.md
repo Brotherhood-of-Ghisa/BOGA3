@@ -22,7 +22,7 @@ Current rules live in this record, `../screen-map.md` and
   count, viewport fit, dataset or target-attainment palette.
 - This brief replaces the landing portion of [Progress](progress.md). Its
   Daily/Weekly heatmap, exercise-history route and Sessions presentation remain
-  references; [History popup](history-popup.md) owns its full-height container.
+  references; [History popup](history-popup.md) owns its page-sheet container.
 - [Design language](../design-language.md), repository tokens, accessibility and
   [training metrics](../../tech/training-metrics-contract.md) govern production.
   The written rules below govern where illustrative images differ.

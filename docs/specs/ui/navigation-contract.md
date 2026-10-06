@@ -183,8 +183,8 @@ Nothing outside this table navigates. A route not listed as a source
 Progress’s pinned By Exercise / By Muscle switch changes content in-route;
 Sessions is the final scrolling link in both views. A muscle chevron toggles
 its contribution block directly below that row. Muscle/exercise names open
-the full-height header-swipe history popup. Dismissal preserves underlying
-state and scroll, restoring accessible focus after the native modal closes.
+the history page sheet. Dismissal preserves underlying state and scroll,
+restoring accessible focus after the native modal closes.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet
