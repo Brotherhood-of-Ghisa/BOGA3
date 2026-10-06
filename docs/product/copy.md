@@ -34,6 +34,18 @@ formula notes, hints under fields, or "how this works" lines.
   - A bare `So far` label above the summary cards (#504).
   - `Current week is in progress.` and `12-week average: …` under the weekly
     history bars (#535).
+  - `Display chooses labels for logging. Working set controls…` above the
+    effort table and `These choices apply to personal progress on this
+    device. Groups keep their shared rules.` under it (#585).
+  - `Colour: share of weekly muscle target` / `Colour: average share of
+    muscle targets` + `. Full colour at 100%.` under the history heatmaps;
+    the ramp reads `Weekly target` `0%`…`100%` instead (#585).
+  - `Drag around the ring to choose a colour.` and `The rest of BoGa changes
+    the next time you open it.` / `Saved. It applies the next time you open
+    BoGa.` on Custom colour; the button reads `Saved · next launch` (#585).
+  - `Pick any colour` under Custom colour and `… applies the next time you
+    open BoGa. Close BoGa fully, then open it again.` under the Appearance
+    presets; the pending row reads `Next launch` (#585).
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.
