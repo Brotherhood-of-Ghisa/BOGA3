@@ -16,7 +16,6 @@ export function EffortSettings({ values }: { values: AccountLocalPreferences }) 
     updatePreferences({ [field]: selected.includes(id) ? selected.filter(value => value !== id) : [...selected, id] });
   };
   return <View testID="settings-effort-selections">
-    <Text allowFontScaling={false} style={styles.description}>Display chooses labels for logging. Working set controls counts and strength records. Volume controls volume totals and records.</Text>
     <View style={styles.row}>
       <Text allowFontScaling={false} style={styles.name}>Effort</Text>
       {columns.map(column => <Text key={column.field} allowFontScaling={false} style={[styles.header, styles.column]}>{column.label}</Text>)}
@@ -33,7 +32,6 @@ export function EffortSettings({ values }: { values: AccountLocalPreferences }) 
         </Pressable>
       </View>)}
     </View>)}
-    <Text allowFontScaling={false} style={[styles.description, styles.note]}>These choices apply to personal progress on this device. Groups keep their shared rules.</Text>
   </View>;
 }
 
@@ -44,6 +42,4 @@ const styles = StyleSheet.create({
   column: { width: uiGeometry.tapTarget * 1.4, alignItems: 'center' },
   checkbox: { width: uiGeometry.tapTarget, height: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
   box: { width: uiSpace.lg, height: uiSpace.lg, borderWidth: uiBorder.width, borderColor: uiRoles.ink, borderRadius: uiGeometry.radius.control, alignItems: 'center', justifyContent: 'center' },
-  description: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted, marginBottom: uiSpace.sm },
-  note: { marginTop: uiSpace.md, marginBottom: 0 },
 });

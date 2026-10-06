@@ -2,11 +2,19 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { uiBorder, uiFonts, uiGeometry, uiSpace, uiTypography } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
+import { estimateOneRepMax } from '@/src/exercise-calculations';
+import { formatOneRepMax } from '@/src/exercise-calculations/format';
 
 type ThemePreviewProps = {
   roles: UiRoles;
   testID?: string;
 };
+
+// The mock's two sets and their 1RM through the real formula ([[1rm.formula]]):
+// a performed 80 × 8 and a planned 82.5 × 8, whose projected 1RM shows faded.
+// The header counts the one performed set ([[set.count-display]]).
+const oneRepMax = (weight: number, reps: number) => formatOneRepMax(estimateOneRepMax(weight, reps)!);
+const PREVIEW_ONE_REP_MAX = { performed: oneRepMax(80, 8), planned: oneRepMax(82.5, 8) };
 
 const HEATMAP: (keyof UiRoles)[] = ['viz0', 'viz2', 'viz1', 'viz0', 'viz3', 'viz4', 'viz2', 'viz0', 'viz1', 'viz3', 'viz4', 'viz0'];
 
@@ -27,7 +35,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             Bench Press
           </Text>
           <Text allowFontScaling={false} style={[styles.body, text(roles.inkMuted)]}>
-            3 sets · 1RM 102
+            1 set · 1RM {PREVIEW_ONE_REP_MAX.performed}
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopColor: roles.ruleSoft }]}>
@@ -38,7 +46,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             80 × 8
           </Text>
           <Text allowFontScaling={false} style={[styles.meta, text(roles.inkFaint)]}>
-            1RM 101
+            1RM {PREVIEW_ONE_REP_MAX.performed}
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopColor: roles.ruleSoft, backgroundColor: roles.accentWash }]}>
@@ -49,7 +57,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             82.5 × 8
           </Text>
           <Text allowFontScaling={false} style={[styles.meta, text(roles.inkGhost)]}>
-            1RM —
+            1RM {PREVIEW_ONE_REP_MAX.planned}
           </Text>
         </View>
         <View style={[styles.record, { backgroundColor: roles.recordWash, borderTopColor: roles.recordRule }]}>

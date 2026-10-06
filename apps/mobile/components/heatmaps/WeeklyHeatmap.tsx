@@ -53,16 +53,16 @@ function AverageRule({ position, testID }: { position: number; testID?: string }
   </View>;
 }
 
-function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetLegend, max, averagePosition, valueWidth, currentYear, testID }: {
+function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetAveraged, max, averagePosition, valueWidth, currentYear, testID }: {
   week: WeekCell; selected: boolean; onPress: () => void; formatValue: Props['formatValue']; metricLabel: string;
-  targetLegend?: string; max: number; averagePosition: number | null; valueWidth: number; currentYear: number; testID: string;
+  targetAveraged?: boolean; max: number; averagePosition: number | null; valueWidth: number; currentYear: number; testID: string;
 }) {
   const year = week.monday.getUTCFullYear();
   const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
   const value = weekValue(week, formatValue);
   const description = week.unavailable ? `${metricLabel} unavailable or incomplete` : value === 'Rest' ? 'Rest week' : `${metricLabel} ${value}`;
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }}
-    accessibilityLabel={`Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetLegend?.includes('average') ? ', averaged across muscles' : ''}`}`}
+    accessibilityLabel={`Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
     onPress={onPress} testID={`${testID}-cell-${week.weekStartDateKey}`} style={styles.row}>
     <View style={styles.date}>
       {selected ? <View style={styles.marker} testID={`${testID}-selected-marker`}><Icon color={HEAT_MARK.color} name="caret-down" size="xs" /></View> : null}
@@ -130,11 +130,10 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
     </></View>}
     renderItem={({ item }) => <WeeklyRow week={item} selected={item.weekStartDateKey === selectedWeekKey}
       onPress={() => onSelectWeek(item.weekStartDateKey === selectedWeekKey ? null : item.weekStartDateKey)}
-      formatValue={formatValue} metricLabel={metricLabel} targetLegend={data.targetLegend}
+      formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
       max={max} averagePosition={averagePosition} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
-      <HeatmapLegend label={legendLabel} />
-      {data.targetLegend ? <Text allowFontScaling={false} style={styles.note}>{data.targetLegend}. Full colour at 100%.</Text> : null}
+      <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
       {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={styles.note}>?: unavailable or incomplete load; excluded from the average</Text> : null}
     </View>}
   />;

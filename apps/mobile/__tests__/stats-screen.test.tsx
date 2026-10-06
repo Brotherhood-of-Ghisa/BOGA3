@@ -665,7 +665,9 @@ describe('StatsScreenShell', () => {
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-13-value')).toHaveTextContent(
       /2/
     );
-    expect(screen.getByText('Sets per day')).toBeTruthy();
+    // Muscle Sets colour grades the weekly target, so the ramp names it (0%…100%).
+    expect(screen.getByText('Weekly target')).toBeTruthy();
+    expect(screen.queryByText('Sets per day')).toBeNull();
   });
 
   it('shows the selected metric in the week selection banner', () => {

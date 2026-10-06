@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { DevSettings, StyleSheet, Text, View } from 'react-native';
+import { DevSettings, StyleSheet, View } from 'react-native';
 
 import { HueRing } from '@/components/appearance/hue-ring';
 import { ThemePreview } from '@/components/appearance/theme-preview';
-import { ActionButton, Notice, Screen, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { ActionButton, Notice, Screen, uiRoles, uiSpace } from '@/components/ui';
 import { hexToLch } from '@/components/ui/lch';
 import { generateRoles } from '@/components/ui/theme';
 import { hueThemeId, normaliseHue, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
@@ -12,13 +12,15 @@ import { logEvent } from '@/src/logging';
 
 // Settings → Appearance → Custom colour: pick one hue on a ring and see the
 // theme it makes, live, on a small mock. The app itself only repaints on the
-// next launch (`theme-launch.ts`); a development build reloads at once.
+// next launch (`theme-launch.ts`), which the saved button's label states; a
+// development build reloads at once.
 export function ThemeColourScreen() {
   const [hue, setHue] = useState(initialHue);
-  // The hue last saved here; the note says "Saved" while the ring still shows it.
+  // The hue last saved here; the button reads "Saved" while the ring still shows it.
   const [savedHue, setSavedHue] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const roles = generateRoles(seedsFromHue(hue));
+  const saved = savedHue === hue;
 
   const apply = async () => {
     setSaveError(null);
@@ -42,21 +44,19 @@ export function ThemeColourScreen() {
   return (
     <Screen testID="theme-colour-screen">
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={styles.hint}>
-          Drag around the ring to choose a colour.
-        </Text>
         <View style={styles.ring}>
           {/* `setHue` is stable, so the ring's gesture is not rebuilt mid-drag. */}
           <HueRing hue={hue} onChange={setHue} testID="theme-colour-ring" />
         </View>
         <ThemePreview roles={roles} testID="theme-colour-preview" />
         {saveError ? <Notice icon="warning" live message={saveError} testID="theme-colour-error" tone="danger" /> : null}
-        <ActionButton label="Use this colour" onPress={() => void apply()} testID="theme-colour-apply" variant="primary" />
-        <Text accessibilityLiveRegion="polite" allowFontScaling={false} style={styles.hint} testID="theme-colour-note">
-          {savedHue === hue
-            ? 'Saved. It applies the next time you open BoGa.'
-            : 'The rest of BoGa changes the next time you open it.'}
-        </Text>
+        <ActionButton
+          disabled={saved}
+          label={saved ? 'Saved · next launch' : 'Use this colour'}
+          onPress={() => void apply()}
+          testID="theme-colour-apply"
+          variant="primary"
+        />
       </View>
     </Screen>
   );
@@ -81,13 +81,5 @@ const styles = StyleSheet.create({
   },
   ring: {
     alignItems: 'center',
-  },
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-    textAlign: 'center',
   },
 });

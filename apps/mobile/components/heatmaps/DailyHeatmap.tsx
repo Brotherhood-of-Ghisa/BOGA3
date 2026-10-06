@@ -27,11 +27,11 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
     {row.days.map((day, index) => <CalendarTile key={day.dateKey} cell={day.day} dateLabel={day.dateKey}
       mondayDate={index === 0 ? day.dayOfMonth : undefined} future={day.future} adjacent={!day.inMonth}
       current={!!day.day?.isToday}
-      metricLabel={metricLabel} formatValue={formatValue} targetLegend={data.targetLegend}
+      metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
       testID={day.inMonth && day.day ? `${testID}-cell-${day.dateKey}` : `${testID}-adjacent-${monthKey}-cell-${day.dateKey}`} />)}
     <CalendarTile weekly cell={row.week} dateLabel={`Week of ${row.weekStartDateKey}`} future={row.weekStartDateKey > data.todayDateKey}
       current={!!row.week?.isCurrentWeek}
-      metricLabel={metricLabel} formatValue={formatValue} targetLegend={data.targetLegend}
+      metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
       testID={`${testID}-week-${monthKey}-${row.weekStartDateKey}`} />
   </View>;
 }
@@ -58,8 +58,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
     </View>
     {months.map(month => <Month key={month.key} month={month} data={data}
       metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} />)}
-    <HeatmapLegend label={legendLabel} />
-    {data.targetLegend ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>{data.targetLegend}. Full colour at 100%.</Text> : null}
+    <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
     {data.daily.some(day => day.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
       ?: unavailable or incomplete load
     </Text> : null}
