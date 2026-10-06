@@ -96,7 +96,7 @@ The service-only `session_weight_contexts(owner,session_ids)` helper resolves
 only already-authorized sessions. Normal authenticated/OAuth clients cannot call
 it directly, and no endpoint exposes the measurement timeline. All payload
 weights are kg and removed unit/mode/movement/loading fields are absent.
-`metric_revision: working_sets_v2` identifies the current response: derived
+`metric_revision: working_sets_v3` identifies the current response: derived
 figures and counts read working sets only
 ([training-metrics contract](tech/training-metrics-contract.md) §1–§2).
 Live OAuth grant validation, non-member/nonexistent equivalence, read-only routes,

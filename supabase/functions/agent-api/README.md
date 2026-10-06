@@ -216,8 +216,9 @@ any internal safety cap explicit. `exercises` lists every block, while
 The API reads the app's own rule for which sets and sessions count
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §1–§2), through the shared calculation modules, so coaching and app figures
-agree. In short, only `set_type: "warm_up"` and unconfirmed rows are left out.
-This section lists the fields that rule governs.
+agree. Coaching uses the fixed group and coaching rule of [[set.eligibility]],
+never a device's effort settings. This section lists the fields that rule
+governs.
 
 - Every derived figure reads working sets only: `personal_records`
   (1RM, top weight, max session volume), each performance's `volume` and
@@ -226,10 +227,10 @@ This section lists the fields that rule governs.
   rest).
 - Every count does too: `completed_set_count`, `exercises[].set_count`, and
   `exercise_count` (blocks with at least one working set).
-- A warm-up stays in the raw per-set output with its `set_type` and its own
-  `calculated_load`, `estimated_one_rep_max` and `volume`. Those describe that
-  set only.
-- In exercise context, a session where the exercise had only warm-ups has no
+- A set that is not a working set ([[set.eligibility]]) stays in the raw per-set
+  output with its `set_type` and its own `calculated_load`,
+  `estimated_one_rep_max` and `volume`. Those describe that set only.
+- In exercise context, a session where the exercise had no working set has no
   stat footprint: it is absent from `recent_performances` and `volume_series`,
   sets no `last_performed_at`, and is not an excluded-volume session.
 
@@ -238,7 +239,8 @@ This section lists the fields that rule governs.
 §3): `top_weight` is the heaviest Weight and, at that weight, the most reps; a
 tie keeps the earliest session; a zero result is never a record.
 
-`metric_revision: "working_sets_v2"` marks this meaning. `"working_sets_v1"`
+`metric_revision: "working_sets_v3"` marks this meaning. `"working_sets_v2"`
+counted technique and cooldown sets as working sets; `"working_sets_v1"`
 let a zero 1RM, Weight or Volume stand as a record; the earlier
 `"bodyweight_optional_v1"` counted warm-ups in every figure.
 
@@ -247,7 +249,7 @@ let a zero 1RM, Weight or Volume stand as a record; the earlier
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v2"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v3"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

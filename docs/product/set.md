@@ -19,7 +19,10 @@ Volume and Volume records. The two are independent.
 Personal figures follow the account's effort policy (Settings → efforts:
 independent Working set and Volume columns). The table gives its defaults.
 Group and coaching figures use one fixed rule, the same as the personal
-defaults, and never read a device's policy.
+defaults, and never read a device's policy. Groups apply a change to this
+rule from then on: a session's group results take it when that session is
+next recomputed (for example, edited or shared again), and existing
+certifications stand.
 
 <!-- fact-table: set.eligibility -->
 
@@ -37,8 +40,7 @@ A session counts toward a figure when it holds at least one working set.
 
 Why: warm-ups, technique and cooldown work is logged but is not training
 stimulus; groups compare people, so they use one rule nobody can tune.
-Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; defaults in `apps/mobile/src/exercise-calculations/effort-policy.ts`; groups read the `working` flag from `apps/mobile/src/groups/set-facts.ts`.
-Pending: groups and coaching still count Technique and Cooldown sets (they exclude only Warm-up). Changing it bumps the group rules version and the agent API metric revision.
+Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; defaults and the fixed group and coaching rule (`SHARED_EFFORT_POLICY`) in `apps/mobile/src/exercise-calculations/effort-policy.ts`; groups read the `working` flag from `apps/mobile/src/groups/set-facts.ts`.
 
 ### set.count-display · presentation · accepted
 

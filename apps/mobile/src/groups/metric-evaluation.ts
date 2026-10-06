@@ -15,7 +15,7 @@ export type GroupMetricSourceSet = Omit<GroupPerformanceSnapshotWire, 'reps'> & 
   body_weight_measurement_id: string | null;
   body_weight_measured_at_ms: number | null;
   reps_value: string;
-  /** The synced effort (`warm_up`, `rir_<n>` or null), as stored. */
+  /** The synced effort label (for example `warm_up`, `rir_<n>`, `technique` or null), as stored. */
   set_type: string | null;
   live: boolean;
   /** SQL-owned live membership, shared-session and current-link eligibility.

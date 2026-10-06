@@ -2,9 +2,10 @@
  * Guard: each training-metric rule lives in one place
  * (`docs/specs/tech/training-metrics-contract.md`).
  *
- * - The counted-set rule: only `set-semantics.ts` compares a set type with
- *   `'warm_up'`. Everything else asks `isWorkingSet` (or, where performance is
- *   already settled, `isWorkingSetType`).
+ * - The counted-set rule: no statistic compares a set type with an effort
+ *   label (`'warm_up'`, `'technique'`, `'cooldown'`); the effort policies in
+ *   `effort-policy.ts` select labels. Everything else asks `isWorkingSet` (or,
+ *   where performance is already settled, `isWorkingSetType`).
  * - `isWorkingSetType` alone is for stored flags and projections of performed
  *   sets; every other caller uses `isWorkingSet`, which also checks the set
  *   was performed.
@@ -56,12 +57,14 @@ describe('training-metric rules have one implementation', () => {
     expect(files.length).toBeGreaterThan(100);
   });
 
-  it('compares a set type with warm_up only in the counted-set rule and the effort labels', () => {
-    const comparison = /[!=]==?\s*['"]warm_up['"]|['"]warm_up['"]\s*[!=]==?/;
+  it('compares a set type with an effort label only to show or pick it, never to count it', () => {
+    const label = `['"](?:warm_up|technique|cooldown)['"]`;
+    const comparison = new RegExp(`[!=]==?\\s*${label}|${label}\\s*[!=]==?`);
     expect(offenders(comparison, [
-      'apps/mobile/src/exercise-calculations/set-semantics.ts',
       // Effort labels and the picker cycle, not a statistic.
       'apps/mobile/src/data/set-types.ts',
+      // The logger's compact effort text, not a statistic.
+      'apps/mobile/components/exercise-page/set-logger.tsx',
     ])).toEqual([]);
   });
 

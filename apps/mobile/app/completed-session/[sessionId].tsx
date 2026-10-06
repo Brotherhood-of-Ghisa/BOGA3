@@ -401,7 +401,7 @@ export function CompletedSessionDetailScreenShell({
     () =>
       performedExercises.reduce(
         (count, exercise) =>
-          count + exercise.sets.filter((set) => isWorkingSet(set)).length,
+          count + exercise.sets.filter((set) => isWorkingSet(set, exercise.loadContext?.effortPolicy)).length,
         0
       ),
     [performedExercises]

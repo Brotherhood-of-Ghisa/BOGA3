@@ -8,9 +8,13 @@ import {
   isConfirmedPerformedSet,
   isCountedSession,
   isPerformedSet,
+  isVolumeSet,
   isWorkingSet,
+  isWorkingSetType,
   normalizeSessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
+import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
+import { GROUP_COACHING_ELIGIBILITY } from './helpers/set-eligibility';
 
 describe('one parser decides validity everywhere', () => {
   // `Number()` accepts these, the calculation parser does not: a set must be
@@ -30,13 +34,27 @@ describe('the counted-set and counted-session rules', () => {
     weight: '100', reps: '5', performanceStatus: null, setType, ...extra,
   });
 
-  it('counts every confirmed set but a warm-up', () => {
-    expect(isWorkingSet(set(null))).toBe(true);
-    expect(isWorkingSet(set('rir_0'))).toBe(true);
-    expect(isWorkingSet(set('unknown_future'))).toBe(true);
-    expect(isWorkingSet(set('warm_up'))).toBe(false);
+  it.each(GROUP_COACHING_ELIGIBILITY)('without a policy, applies the fixed group and coaching rule to %s', (_label, setType, counts) => {
+    expect(isWorkingSetType(setType)).toBe(counts);
+    expect(isWorkingSet(set(setType))).toBe(counts);
+    expect(isVolumeSet(set(setType))).toBe(counts);
+    // The fixed rule equals the personal defaults.
+    expect(isWorkingSet(set(setType), DEFAULT_PERSONAL_EFFORT_POLICY)).toBe(counts);
+    expect(isVolumeSet(set(setType), DEFAULT_PERSONAL_EFFORT_POLICY)).toBe(counts);
+  });
+
+  it('never counts an unconfirmed set, whatever its effort', () => {
     expect(isWorkingSet(set(null, { performanceStatus: 'unperformed' }))).toBe(false);
     expect(isWorkingSet(set(null, { reps: '' }))).toBe(false);
+    expect(isVolumeSet(set('rir_2', { performanceStatus: 'unperformed' }))).toBe(false);
+  });
+
+  it('follows an explicit personal policy instead of the fixed rule', () => {
+    const policy = { workingSetEfforts: ['technique'] as const, volumeEfforts: ['warm_up'] as const };
+    expect(isWorkingSet(set('technique'), policy)).toBe(true);
+    expect(isWorkingSet(set(null), policy)).toBe(false);
+    expect(isVolumeSet(set('warm_up'), policy)).toBe(true);
+    expect(isVolumeSet(set('technique'), policy)).toBe(false);
   });
 
   it('counts a session with at least one working set', () => {
