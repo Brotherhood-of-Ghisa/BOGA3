@@ -82,3 +82,5 @@ checkout, into your machine's store:
 ```
 
 Import is idempotent (keyed by file name) and never overwrites a record.
+
+<!-- docs-only CI probe; never merges -->
