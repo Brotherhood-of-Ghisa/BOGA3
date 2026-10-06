@@ -11,7 +11,7 @@ type ThemePreviewProps = {
 };
 
 // The mock's two sets and their 1RM through the real formula ([[1rm.formula]]):
-// a performed 80 × 8 and a planned 82.5 × 8, whose projected 1RM shows faded.
+// a performed 80 × 8 and a planned 82.5 × 8 ([[set.row-figures]]).
 // The header counts the one performed set ([[set.count-display]]).
 const oneRepMax = (weight: number, reps: number) => formatOneRepMax(estimateOneRepMax(weight, reps)!);
 const PREVIEW_ONE_REP_MAX = { performed: oneRepMax(80, 8), planned: oneRepMax(82.5, 8) };
