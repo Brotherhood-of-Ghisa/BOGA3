@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
 import {
+  exerciseSets,
   sessionExercises,
   sessionPlanExercises,
   sessionPlanSets,
@@ -436,6 +437,28 @@ export type SessionPlanStore = {
   findActiveSessionIdBySourcePlan(planId: string): Promise<string | null>;
   /** Any active, undeleted session — the Start-all conflict check. */
   findActiveSessionId(): Promise<string | null>;
+  /**
+   * The live performed card claiming this block (its owning session not
+   * discarded) together with the card's live performed sets — the read behind
+   * block completion/skip validation.
+   */
+  findSourcedCardPerformances(planExerciseId: string): Promise<{
+    cardId: string;
+    sessionId: string;
+    sets: {
+      id: string;
+      sourcePlanSetId: string | null;
+      repsValue: string;
+      weightValue: string;
+      performanceStatus: string | null;
+    }[];
+  } | null>;
+  /** Explicitly resolves one pending block (completed or skipped) with a timestamp. */
+  resolvePlanBlock(input: {
+    planExerciseId: string;
+    status: 'completed' | 'skipped';
+    now: Date;
+  }): Promise<boolean>;
   /** Live performed cards claiming any of these blocks (attachment lookup in one query). */
   listSourcedCardsForBlocks(planExerciseIds: string[]): Promise<
     { id: string; sessionId: string; sourcePlanExerciseId: string }[]
@@ -738,6 +761,74 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
       .orderBy(desc(sessions.updatedAt))
       .get();
     return row?.id ?? null;
+  },
+
+  async findSourcedCardPerformances(planExerciseId) {
+    const database = await bootstrapLocalDataLayer();
+    let result: {
+      cardId: string;
+      sessionId: string;
+      sets: {
+        id: string;
+        sourcePlanSetId: string | null;
+        repsValue: string;
+        weightValue: string;
+        performanceStatus: string | null;
+      }[];
+    } | null = null;
+    database.transaction((tx) => {
+      const card = findLiveSourcedCardForBlockInTransaction(tx, planExerciseId);
+      if (!card) {
+        return;
+      }
+      result = {
+        cardId: card.id,
+        sessionId: card.sessionId,
+        sets: tx
+          .select({
+            id: exerciseSets.id,
+            sourcePlanSetId: exerciseSets.sourcePlanSetId,
+            repsValue: exerciseSets.repsValue,
+            weightValue: exerciseSets.weightValue,
+            performanceStatus: exerciseSets.performanceStatus,
+          })
+          .from(exerciseSets)
+          .where(and(eq(exerciseSets.sessionExerciseId, card.id), isNull(exerciseSets.deletedAt)))
+          .orderBy(asc(exerciseSets.orderIndex))
+          .all(),
+      };
+    });
+    return result;
+  },
+
+  async resolvePlanBlock(input) {
+    const database = await bootstrapLocalDataLayer();
+    let resolved = false;
+    database.transaction((tx) => {
+      const localUpdatedAtMs = nowMonotonic(tx);
+      const result = tx
+        .update(sessionPlanExercises)
+        .set({
+          progressStatus: input.status,
+          resolvedAt: input.now,
+          localDirty: true,
+          localUpdatedAtMs,
+          updatedAt: input.now,
+        })
+        .where(
+          and(
+            eq(sessionPlanExercises.id, input.planExerciseId),
+            isNull(sessionPlanExercises.deletedAt),
+            eq(sessionPlanExercises.progressStatus, 'pending'),
+          ),
+        )
+        .run();
+      resolved = result.changes > 0;
+    });
+    if (resolved) {
+      notifyLocalWrite();
+    }
+    return resolved;
   },
 
   async listSourcedCardsForBlocks(planExerciseIds) {
