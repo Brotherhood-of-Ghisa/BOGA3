@@ -9,10 +9,10 @@ press actions; only the separate Weekly view retains selection.
 The operator's metric-colour amendment also supersedes the reference's black
 active metric fill: HistorySheet now uses theme `accent` with `surface` text.
 The existing palette gates that pair at ≥4.5:1 for all presets and custom hues.
-Latest revision validation (read-only tiles and themed metrics):
+Latest revision validation (read-only tiles and themed metrics, rebased onto main):
 `./boga test fast` passed, including 237 Jest suites / 3,019 tests, lint, typecheck, UI guardrails, backend smoke, docs/meta
 checks and consent/MCP checks. Log:
-`apps/mobile/artifacts/maestro/daily-history-calendar/fast-theme-metrics.log`.
+`apps/mobile/artifacts/maestro/daily-history-calendar/fast-pr.log`.
 
 Implementation: shared DailyHeatmap for muscle/exercise HistorySheet.
 The worktree is `codex/daily-history-calendar`, with simulator BOGA wt22 and Metro port 8104.
