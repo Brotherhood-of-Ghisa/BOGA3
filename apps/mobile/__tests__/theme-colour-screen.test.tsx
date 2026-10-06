@@ -67,15 +67,35 @@ it('repaints the preview as the hue changes', () => {
   expect(previewBackground('BEST EVER')).toBe(generateRoles(seedsFromHue(357)).recordWash);
 });
 
+it('shows the preview sets with their 1RM to one decimal and counts the performed set', () => {
+  render(<ThemeColourRoute />);
+  const preview = (text: string) => screen.getByText(text, { includeHiddenElements: true });
+  // 1rm.formula: 80 × 8 is 102.1; the planned 82.5 × 8 projects 105.3.
+  // set.count-display: the header counts only the performed set.
+  expect(preview('1 set · 1RM 102.1')).toBeTruthy();
+  expect(preview('1RM 102.1')).toBeTruthy();
+  expect(preview('1RM 105.3')).toBeTruthy();
+  expect(screen.queryByText(/1RM (101|102|—)$/, { includeHiddenElements: true })).toBeNull();
+});
+
 it('stores the hue for the next launch and asks to reload', async () => {
   render(<ThemeColourRoute />);
+  // No sentence explains the ring or the restart (copy.no-inline-explanation).
+  expect(screen.queryByText(/ring|next time/i)).toBeNull();
   fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
 
   fireEvent.press(screen.getByTestId('theme-colour-apply'));
 
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:57'));
   expect(reload).toHaveBeenCalledTimes(1);
-  expect(screen.getByTestId('theme-colour-note')).toHaveTextContent('Saved. It applies the next time you open BoGa.');
+  // The button carries the restart: saved, from the next launch, until the hue moves.
+  const apply = screen.getByTestId('theme-colour-apply');
+  expect(apply).toHaveTextContent('Saved · next launch');
+  expect(apply.props.accessibilityState).toEqual({ disabled: true });
+
+  fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+  expect(screen.getByTestId('theme-colour-apply')).toHaveTextContent('Use this colour');
+  expect(screen.getByTestId('theme-colour-apply').props.accessibilityState).toEqual({ disabled: false });
 });
 
 it('says nothing changed, and logs why, when the save fails', async () => {

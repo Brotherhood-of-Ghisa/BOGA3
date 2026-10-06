@@ -69,28 +69,28 @@ it('names the theme in use and lists every preset, the current one checked', () 
   }
   expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: true });
   expect(sheet.getByRole('radio', { name: 'Slate' }).props.accessibilityState).toEqual({ checked: false });
-  expect(sheet.getByTestId('settings-appearance-note')).toHaveTextContent(
-    'A new theme applies the next time you open BoGa.',
-  );
+  // No sentence explains the restart (copy.no-inline-explanation): nothing is pending.
+  expect(sheet.queryByText(/next/i)).toBeNull();
 });
 
-it('saves a choice at once and says it applies next launch', async () => {
+it('saves a choice at once and labels it as applying next launch', async () => {
   render(<SettingsRoute />);
   const sheet = within(openSheet());
 
   fireEvent.press(sheet.getByTestId('settings-appearance-option-slate'));
 
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('slate'));
-  expect(sheet.getByRole('radio', { name: 'Slate' }).props.accessibilityState).toEqual({ checked: true });
-  expect(sheet.getByTestId('settings-appearance-note')).toHaveTextContent(
-    'Slate applies the next time you open BoGa. Close BoGa fully, then open it again.',
-  );
+  expect(sheet.getByRole('radio', { name: 'Slate, next launch' }).props.accessibilityState).toEqual({ checked: true });
+  expect(within(sheet.getByTestId('settings-appearance-option-slate')).getByText('Next launch')).toBeTruthy();
+  expect(sheet.queryByText(/next time/i)).toBeNull();
   expect(screen.getByLabelText('Appearance, Slate from next launch')).toBeTruthy();
 
   // Choosing the theme in use again leaves nothing pending.
   fireEvent.press(sheet.getByTestId('settings-appearance-option-warm'));
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('warm'));
   expect(screen.getByLabelText('Appearance, Warm')).toBeTruthy();
+  expect(sheet.queryByText('Next launch')).toBeNull();
+  expect(within(sheet.getByTestId('settings-appearance-option-warm')).getByText('Default')).toBeTruthy();
 });
 
 it('keeps the previous choice and says nothing changed when the save fails', async () => {
@@ -153,7 +153,9 @@ it('offers a custom colour last, opening the picker once the sheet has gone', ()
   const sheet = within(openSheet());
   const custom = sheet.getByTestId('settings-appearance-option-custom');
   expect(custom.props.accessibilityState).toEqual({ checked: false });
-  expect(sheet.getByText('Pick any colour')).toBeTruthy();
+  // The label and chevron say it opens a picker; no description under it.
+  expect(within(custom).queryByText('Pick any colour')).toBeNull();
+  expect(within(custom).getAllByText(/./).map(node => node.props.children)).toEqual(['Custom colour']);
 
   fireEvent.press(custom);
   // The sheet's modal must be gone before a route can be pushed over it.
@@ -174,6 +176,6 @@ it('names a custom colour chosen earlier this run, checked in the sheet', () => 
 
   const sheet = within(openSheet());
   expect(sheet.getByTestId('settings-appearance-option-custom').props.accessibilityState).toEqual({ checked: true });
-  expect(sheet.getByText('Teal, 200°')).toBeTruthy();
+  expect(sheet.getByText('Teal, 200° · Next launch')).toBeTruthy();
   expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: false });
 });

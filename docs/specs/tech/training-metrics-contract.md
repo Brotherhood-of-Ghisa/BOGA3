@@ -12,8 +12,8 @@ shows and link here for what they mean; they do not restate these rules.
 | 4 | Calculations and display (parse, load, Volume, 1RM, top weight, precision) | `parse.ts`, `load-metrics.ts`, `index.ts` (`estimateOneRepMax`), `format.ts` in `apps/mobile/src/exercise-calculations/` |
 
 `apps/mobile/__tests__/metrics-single-source.test.ts` fails when the rules
-below are re-implemented. It checks for a `'warm_up'` comparison outside
-§1's code, `isWorkingSetType` read alone outside the settled-performance
+below are re-implemented. It checks for an effort-label comparison outside
+the effort labels, `isWorkingSetType` read alone outside the settled-performance
 sites, and the Wathan constants outside the 1RM estimate.
 
 ## 1. Counted set
@@ -21,8 +21,8 @@ sites, and the Wathan constants outside the 1RM estimate.
 Personal statistics have two independent eligibility rules. A **working set**
 controls set/session counts, 1RM and Weight records. A **volume-included set**
 controls aggregate volume and Volume records. Both must be **confirmed performed**.
-Groups and coaching retain the shared default: every confirmed performed set
-except `warm_up` contributes to every aggregate.
+Which effort labels each rule selects, personally and for groups and coaching,
+is [[set.eligibility]] (`docs/product/set.md`).
 
 - **Confirmed performed** means valid reps and Weight, and no
   `performance_status`. Planned, unperformed and legacy-skipped rows are not
@@ -46,8 +46,8 @@ except `warm_up` contributes to every aggregate.
   not become selectable options.
 - **Scope**: these choices are account-local on this device. Personal adapters
   pass the durable active policy explicitly to the kernel. Groups and coaching
-  receive no device policy and continue excluding only `warm_up`; no group
-  settings are displayed. The weekly muscle target grades working-set counts
+  receive no device policy: the kernel's default, `SHARED_EFFORT_POLICY`
+  (`effort-policy.ts`), applies; no group settings are displayed. The weekly muscle target grades working-set counts
   and never changes eligibility.
 - Every performed row keeps its own per-set 1RM and volume, regardless of
   either calculation checkbox (`calculateSetMetrics`). Changing the policy
@@ -69,8 +69,8 @@ Aggregations apply the two policies at the source:
 
 The agent API imports the same modules with the shared default. SQL never
 re-implements the rule: group functions read the evaluator's `working` flag
-(`tech/groups-contract.md`). Changing the shared group rule needs a
-`GROUP_EVAL_RULES_VERSION` bump. Changing personal derivation bumps
+(`tech/groups-contract.md`). A change to the shared rule reaches stored group
+facts only as that contract's rules-version section says. Changing personal derivation bumps
 `EXERCISE_SESSION_FACTS_RULES_VERSION`; each facts read also compares its stored
 canonical policy key, rebuilding all definitions when the active choices differ.
 

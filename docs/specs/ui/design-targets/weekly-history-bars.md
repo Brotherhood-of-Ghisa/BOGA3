@@ -55,6 +55,9 @@ operator review happens in the implementation PR.
   the supplied screenshot: `Current week is in progress` and the repeated
   `12-week average`. Retain the row's `Current week` label, the average label
   above its reference, and the existing colour/availability legend.
+- Product-owner ruling (2026-10-06, [[copy.no-inline-explanation]]): the
+  muscle target line `Colour: … Full colour at 100%.` is removed. While colour
+  grades the weekly target, the legend reads `Weekly target` from `0%` to `100%`.
 - Stay in the same sheet during selection; no session drilldown is introduced.
   Backdrop tap, Android back and VoiceOver escape dismiss it while preserving
   the parent browsing state. No new close button or drag gesture is part of

@@ -45,19 +45,20 @@ One line per finding, most severe first, then a one-line verdict:
 
 ```text
 <class> <fact id or "none"> — <file>:<line> — <what a user would observe, one sentence>
-Verdict: clean | needs decision PR | needs fix
+Verdict: clean | needs decision | needs fix
 ```
 
 - **violates** → `needs fix`.
-- **changes**, **answers**, **new decision** → `needs decision PR`: the
-  product owner decides in a `docs/product/**` PR before this change merges.
+- **changes**, **answers**, **new decision** → `needs decision`: the
+  product owner decides, as a `docs/product/**` change in this PR or its
+  own, before this change merges.
   For a new decision, propose the fact (ID, kind, statement) in one line.
 - **restates** → `needs fix` (replace with `[[id]]`).
 - No findings → `Verdict: clean`. Do not pad with style or code remarks.
 
 ## Audit mode
 
-Run it after any decision PR changes a fact: old wording lingers in the docs
+Run it after any PR changes a fact: old wording lingers in the docs
 that restated it.
 
 - **Input:** every persistent doc (tracked `*.md` outside `docs/plans/**`,

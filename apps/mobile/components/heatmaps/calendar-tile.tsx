@@ -14,7 +14,7 @@ type Props = {
   current: boolean;
   metricLabel: string;
   formatValue: (value: number) => string;
-  targetLegend?: string;
+  targetAveraged?: boolean;
   testID: string;
 };
 
@@ -36,11 +36,11 @@ function description({ cell, future, metricLabel, formatValue }: Props) {
 }
 
 export function CalendarTile(props: Props) {
-  const { cell, dateLabel, mondayDate, future, adjacent, weekly, current, formatValue, targetLegend, testID } = props;
+  const { cell, dateLabel, mondayDate, future, adjacent, weekly, current, formatValue, targetAveraged, testID } = props;
   const value = calendarValue(cell, future, formatValue);
   const target = cell?.targetAttainment;
   return <View accessible accessibilityRole="text"
-    accessibilityLabel={`${dateLabel}, ${description(props)}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetLegend?.includes('average') ? ', averaged across muscles' : ''}`}`}
+    accessibilityLabel={`${dateLabel}, ${description(props)}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
     testID={testID}
     style={[styles.tile, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
       cell?.unavailable ? styles.unavailable : null]}>

@@ -180,10 +180,15 @@ Postgres (shared secret, no JWT); it has no client API.
 linked or not, so a new link is a re-apply. `apps/mobile/src/groups/set-facts.ts`
 is the one implementation of the group set rules; device session cards parse
 with the same kernel.
-`fingerprint` hashes raw synced values and interprets nothing. Every reader
-reads `working` as `working is not false`. Changing the set rules (including
-`isWorkingSetType`) bumps `GROUP_EVAL_RULES_VERSION`; drains re-queue older
-facts as a silent `rules` recompute.
+`fingerprint` hashes raw synced values and interprets nothing. `working` is
+the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
+policy); every reader reads it as `working is not false`, so a non-working
+set is excluded like a warm-up. A set-rule change either bumps
+`GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
+`rules` recompute, or applies forward only without a bump: a fact takes the
+new rule when its session is next evaluated and a comparison when it next
+rebuilds. Excluding Technique and Cooldown, and [[1rm.formula]]'s single, went
+forward only (version 5).
 
 **Live target:** the member is active in a non-deleted group that owns the
 unarchived group exercise. Any other board is frozen.

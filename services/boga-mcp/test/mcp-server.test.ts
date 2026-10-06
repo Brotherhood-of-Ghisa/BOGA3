@@ -57,7 +57,7 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'working_sets_v3',
+    metric_revision: 'working_sets_v4',
     recent_performances: [{
       session_body_weight: { status: 'known', value: 80, unit: 'kg', measured_at: '2026-09-01T10:00:00Z' },
       volume: { value: null, unit: 'kg_reps', known_subtotal: 500, complete: false },
@@ -67,7 +67,7 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/workouts/recent': {
     next_cursor: null,
-    metric_revision: 'working_sets_v3',
+    metric_revision: 'working_sets_v4',
     workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
 };

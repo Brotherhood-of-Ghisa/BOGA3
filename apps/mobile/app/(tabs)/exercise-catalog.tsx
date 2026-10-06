@@ -27,6 +27,10 @@ import {
 } from '@/src/data/exercise-catalog';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
+  buildDuplicateExercisePrefill,
+  type ExerciseEditorPrefill,
+} from '@/src/exercise-catalog/editor-model';
+import {
   buildExerciseListModel,
   type ExerciseListItem,
 } from '@/src/exercise-catalog/list-model';
@@ -69,6 +73,8 @@ export default function ExerciseCatalogScreen() {
   const [didHandleInitialIntent, setDidHandleInitialIntent] = useState(false);
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [editorExerciseTarget, setEditorExerciseTarget] = useState<ExerciseCatalogExercise | null>(null);
+  const [editorPrefill, setEditorPrefill] = useState<ExerciseEditorPrefill | null>(null);
+  const [editorModalTitle, setEditorModalTitle] = useState<string | undefined>(undefined);
   const [exerciseSearchValue, setExerciseSearchValue] = useState('');
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -116,6 +122,16 @@ export default function ExerciseCatalogScreen() {
 
   const openEditorForExercise = useCallback((exercise: ExerciseCatalogExercise) => {
     setEditorExerciseTarget(exercise);
+    setEditorPrefill(null);
+    setEditorModalTitle(undefined);
+    setSaveFeedback(null);
+    setIsEditorModalVisible(true);
+  }, []);
+
+  const duplicateExercise = useCallback((exercise: ExerciseCatalogExercise) => {
+    setEditorExerciseTarget(null);
+    setEditorPrefill(buildDuplicateExercisePrefill(exercise));
+    setEditorModalTitle('Duplicate Exercise');
     setSaveFeedback(null);
     setIsEditorModalVisible(true);
   }, []);
@@ -156,6 +172,8 @@ export default function ExerciseCatalogScreen() {
 
   const startNewExercise = () => {
     setEditorExerciseTarget(null);
+    setEditorPrefill(null);
+    setEditorModalTitle(undefined);
     setSaveFeedback(null);
     setIsEditorModalVisible(true);
   };
@@ -164,6 +182,8 @@ export default function ExerciseCatalogScreen() {
   if (!didHandleInitialIntent && !isLoading && !loadError) {
     if (routeIntent === 'add') {
       setEditorExerciseTarget(null);
+      setEditorPrefill(null);
+      setEditorModalTitle(undefined);
       setSaveFeedback(null);
       setIsEditorModalVisible(true);
     }
@@ -174,6 +194,8 @@ export default function ExerciseCatalogScreen() {
   const closeEditorModal = () => {
     setIsEditorModalVisible(false);
     setEditorExerciseTarget(null);
+    setEditorPrefill(null);
+    setEditorModalTitle(undefined);
     setExerciseActionMenuTarget(null);
   };
 
@@ -182,6 +204,8 @@ export default function ExerciseCatalogScreen() {
     setSaveFeedback(wasEditing ? 'Exercise updated.' : 'Exercise created.');
     setIsEditorModalVisible(false);
     setEditorExerciseTarget(null);
+    setEditorPrefill(null);
+    setEditorModalTitle(undefined);
     setExerciseActionMenuTarget(null);
 
     if (isFromSession) {
@@ -300,6 +324,8 @@ export default function ExerciseCatalogScreen() {
       <ExerciseEditorModal
         visible={isEditorModalVisible}
         editingExercise={editorExerciseTarget}
+        prefill={editorPrefill}
+        title={editorModalTitle}
         onRequestClose={closeEditorModal}
         onSaved={handleEditorSaved}
       />
@@ -341,6 +367,19 @@ export default function ExerciseCatalogScreen() {
             }
           }}
           testID="exercise-action-edit"
+        />
+        <ListRow
+          accessibilityLabel="Duplicate exercise from actions"
+          disabled={isActionTargetDeleted}
+          label="Duplicate"
+          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="copy" size="md" />}
+          onPress={() => {
+            setExerciseActionMenuTarget(null);
+            if (actionTarget && !actionTarget.deletedAt) {
+              duplicateExercise(actionTarget);
+            }
+          }}
+          testID="exercise-action-duplicate"
         />
         {groupLinkingUserId ? (
           <ListRow

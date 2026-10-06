@@ -12,7 +12,7 @@ import {
   isValidSessionWeight, type ResolvedSessionWeight,
 } from '../../../apps/mobile/src/bodyweight/as-of.ts';
 
-export const METRIC_REVISION = 'working_sets_v3';
+export const METRIC_REVISION = 'working_sets_v4';
 
 export type ExerciseLoadRow = {
   bodyweight_contribution: number;
@@ -96,7 +96,7 @@ export function projectTrainingSets(
     performanceStatus: set.performance_status === null ? null : set.performance_status as SessionSetPerformanceStatus,
   }));
   // Every performed row keeps its own figures; only working sets feed the
-  // aggregates and counts (a warm-up is listed but never a stat).
+  // aggregates and counts (a non-working set is listed but never a stat).
   const perSet = summarizeExerciseLoad(inputs, context);
   const summary = summarizeExerciseLoad(workingSetsOnly(inputs), context);
   return {

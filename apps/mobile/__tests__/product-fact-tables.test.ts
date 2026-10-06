@@ -49,7 +49,7 @@ const readFactTable = (file: string, id: string): FactTable => {
 
 /** Cells that disagree with code until a fact's `Pending:` decision ships: `<row key>|<column>`. */
 const PENDING: Record<string, readonly string[]> = {
-  'set.eligibility': ['Technique|Groups and coaching (fixed)', 'Cooldown|Groups and coaching (fixed)'],
+  'set.eligibility': [],
   '1rm.formula': [],
 };
 
