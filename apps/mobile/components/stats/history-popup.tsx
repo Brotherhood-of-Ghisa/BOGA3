@@ -7,7 +7,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import { HISTORY_DRAG_SLOP, HISTORY_HORIZONTAL_SLOP, shouldDismissHistory } from './history-popup-gesture';
+import { SHEET_DRAG_SLOP, SHEET_HORIZONTAL_SLOP, shouldDismissSheet } from '@/components/ui/sheet-gesture';
 
 type Props = {
   children: ReactNode;
@@ -58,9 +58,9 @@ export function HistoryPopup({ children, header, accessibilityLabel, dismissLabe
   }, [drag]);
 
   const pan = usePanGesture({
-    activeOffsetY: HISTORY_DRAG_SLOP,
-    failOffsetY: -HISTORY_DRAG_SLOP,
-    failOffsetX: [-HISTORY_HORIZONTAL_SLOP, HISTORY_HORIZONTAL_SLOP],
+    activeOffsetY: SHEET_DRAG_SLOP,
+    failOffsetY: -SHEET_DRAG_SLOP,
+    failOffsetX: [-SHEET_HORIZONTAL_SLOP, SHEET_HORIZONTAL_SLOP],
     onActivate: () => {
       'worklet';
       if (!closing.get()) { cancelAnimation(drag); startDrag.set(drag.get()); }
@@ -71,7 +71,7 @@ export function HistoryPopup({ children, header, accessibilityLabel, dismissLabe
     },
     onDeactivate: event => {
       'worklet';
-      if (!event.canceled && !closing.get() && shouldDismissHistory({ ...event, translationY: drag.get() })) {
+      if (!event.canceled && !closing.get() && shouldDismissSheet({ ...event, translationY: drag.get() })) {
         closing.set(true);
         runOnJS(dismiss)();
       }

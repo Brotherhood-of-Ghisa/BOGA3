@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Keyboard, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseListContent, ExerciseListPreferenceControls, useFamilyExpansion } from '@/components/exercise-catalog/exercise-list-controls';
 import { SearchField } from '@/components/ui/search-field';
-import { Sheet } from '@/components/ui/sheet';
+import { PageSheet } from '@/components/ui/page-sheet';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiSpace } from '@/components/ui/tokens';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -18,9 +18,9 @@ type ExerciseSwapSheetProps = {
   onDismiss: () => void;
 };
 
-// The same browser as Add and the catalogue, excluding the current exercise.
+// The same browser as Add and the catalogue, excluding the current exercise, in
+// the picker's page sheet: swipe down or X to leave without swapping.
 export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSelect, onDismiss }: ExerciseSwapSheetProps) {
-  const { height } = useWindowDimensions();
   const [query, setQuery] = useState('');
   const [preferences, setPreferences] = useExerciseListPreferences();
   const catalog = useExerciseCatalog();
@@ -36,13 +36,13 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
   const dismiss = () => { setQuery(''); onDismiss(); };
 
   return (
-    <Sheet dismissLabel="Dismiss swap exercise" keyboardAvoiding onDismiss={dismiss} testID="exercise-swap-sheet" title="Swap exercise" visible={visible}>
-      <View style={[styles.body, { height: height * 0.8 }]}>
+    <PageSheet closeLabel="Close swap exercise" onDismiss={dismiss} testID="exercise-swap-sheet" title="Swap exercise" visible={visible}>
+      <View style={styles.body}>
         <View style={styles.controls}>
           <SearchField accessibilityLabel="Search exercises" onChangeText={setQuery} placeholder="Search exercises or muscles" testID="exercise-swap-search" value={query} />
           <ExerciseListPreferenceControls preferences={preferences} onChangePreferences={setPreferences} />
         </View>
-        <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={styles.list} testID="exercise-swap-list">
+        <ScrollView automaticallyAdjustKeyboardInsets keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" style={styles.list} testID="exercise-swap-list">
           {catalog.status === 'error' ? (
             <StatePanel body={catalog.lastError ?? 'Unable to load exercises.'} fill={false} kind="error" action={{ label: 'Retry', onPress: () => { void ensureExerciseCatalogLoaded(); } }} />
           ) : catalog.status !== 'ready' || !model ? (
@@ -60,12 +60,12 @@ export function ExerciseSwapSheet({ visible, currentExerciseDefinitionId, onSele
           )}
         </ScrollView>
       </View>
-    </Sheet>
+    </PageSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { flexShrink: 1 },
+  body: { flex: 1 },
   controls: { paddingHorizontal: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.sm },
   list: { flex: 1, paddingHorizontal: uiSpace.lg },
 });

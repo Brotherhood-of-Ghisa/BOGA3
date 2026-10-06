@@ -118,8 +118,9 @@ micro-labels Archivo 700, sheet titles Archivo 800.
   elevation ramp; there is no elevation token.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
-  and a `rule` handle. **Tapping outside dismisses; sheets carry no Cancel
-  button.** Progress history alone fills the safe-area viewport, with header
+  and a `rule` handle. **Tapping outside or dragging the handle down
+  dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
+  page sheet instead: grabber, title, X (`ux-rules.md` "Sheets"). Progress history alone fills the safe-area viewport, with header
   drag and a subtle dismissal hint (`design-targets/history-popup.md`).
 - Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
   content.

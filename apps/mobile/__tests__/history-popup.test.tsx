@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { Modal, Platform, Pressable, ScrollView, Text } from 'react-native';
 import { HistoryPopup } from '@/components/stats/history-popup';
-import { shouldDismissHistory, type HistoryDrag } from '@/components/stats/history-popup-gesture';
+import { type SheetDrag as HistoryDrag } from '@/components/ui/sheet-gesture';
 
 type Animation = { value: number; config: { duration: number; reduceMotion: string }; complete?: (finished: boolean) => void };
 let mockAnimations: Animation[] = [];
@@ -74,27 +74,6 @@ beforeEach(() => {
   mockReducedMotion = false; mockCancel.mockClear();
 });
 afterEach(() => { Platform.OS = originalPlatform; });
-
-describe('history release rules', () => {
-  it.each<[HistoryDrag, boolean]>([
-    [event({ translationY: 119 }), false],
-    [event({ translationY: 120 }), true],
-    [event({ translationY: 121 }), true],
-    [event({ translationY: 23, velocityY: 900 }), false],
-    [event({ translationY: 24, velocityY: 899 }), false],
-    [event({ translationY: 24, velocityY: 900 }), true],
-    [event({ translationY: 25, velocityY: 901 }), true],
-    [event({ translationY: 120, velocityY: -1 }), false],
-    [event({ translationY: -120, velocityY: 1000 }), false],
-    [event({ velocityY: 1000 }), false],
-    [event({ translationX: 120, translationY: 120 }), false],
-    [event({ translationX: -121, translationY: 120 }), false],
-    [event({ translationY: 24, velocityY: 900, velocityX: 900 }), false],
-    [event({ translationY: 24, velocityY: 900, velocityX: -901 }), false],
-  ])('decides %j as %s', (drag, expected) => {
-    expect(shouldDismissHistory(drag)).toBe(expected);
-  });
-});
 
 it('fills the safe-area viewport and scopes its 44pt handle / dismiss action to the header', () => {
   const dismiss = jest.fn(); const metric = jest.fn();
