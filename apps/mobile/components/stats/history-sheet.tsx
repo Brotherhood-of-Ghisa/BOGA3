@@ -289,7 +289,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
               accessibilityLabel="Select effort metric"
               // Four metrics: `Top weight` outgrows an equal quarter.
               layout="fit"
-              selectedTone="accent"
+              selectedGround="accent"
               onChange={onSelectMetric}
               options={metricOptions}
               testIDPrefix={`${prefix}-metric-chip`}

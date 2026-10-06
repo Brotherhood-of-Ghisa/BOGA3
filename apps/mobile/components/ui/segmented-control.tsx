@@ -23,8 +23,7 @@ export type SegmentedControlProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
-  // History metrics use the theme accent; other selectors keep neutral ink.
-  selectedTone?: 'neutral' | 'accent';
+  selectedGround?: 'ink' | 'viz' | 'accent';
   hitSlop?: number;
   // Every segment inert and faded, e.g. while the form it belongs to saves.
   disabled?: boolean;
@@ -32,8 +31,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
 };
 
 // One choice from a few, joined in a single `rule` frame at the control
-// radius; the selected segment uses ink or the theme accent, with a surface
-// label. A tab list to assistive tech. Selecting the selected segment does nothing.
+// radius; the selected segment defaults to `ink` (`design-language.md` §4). A tab
+// list to assistive tech. Selecting the selected segment does nothing.
 export function SegmentedControl<TValue extends string | number>({
   options,
   value,
@@ -41,7 +40,7 @@ export function SegmentedControl<TValue extends string | number>({
   testIDPrefix,
   accessibilityLabel,
   layout = 'fill',
-  selectedTone = 'neutral',
+  selectedGround = 'ink',
   hitSlop,
   disabled = false,
   style,
@@ -75,14 +74,15 @@ export function SegmentedControl<TValue extends string | number>({
               fill ? styles.segmentFill : null,
               fit ? styles.segmentFit : null,
               index > 0 ? styles.segmentDivider : null,
-              selected ? selectedStyles[selectedTone] : null,
+              selected ? selectedStyles[selectedGround] : null,
               disabled && selected ? styles.segmentSelectedDisabled : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
             <Text
               allowFontScaling={false}
               numberOfLines={1}
-              style={[styles.label, selected ? styles.labelSelected : null, disabled && !selected ? styles.labelDisabled : null]}>
+              style={[styles.label, selected ? (selectedGround === 'viz' ? styles.labelSelectedViz : styles.labelSelected) : null,
+                disabled && !selected ? styles.labelDisabled : null]}>
               {option.label}
             </Text>
           </Pressable>
@@ -127,6 +127,9 @@ const styles = StyleSheet.create({
   segmentSelectedAccent: {
     backgroundColor: uiRoles.accent,
   },
+  segmentSelectedViz: {
+    backgroundColor: uiRoles.viz4,
+  },
   segmentSelectedDisabled: {
     backgroundColor: uiRoles.inkGhost,
   },
@@ -142,9 +145,12 @@ const styles = StyleSheet.create({
   labelSelected: {
     color: uiRoles.surface,
   },
+  labelSelectedViz: {
+    color: uiRoles.ink,
+  },
   labelDisabled: {
     color: uiRoles.inkGhost,
   },
 });
 
-const selectedStyles = { neutral: styles.segmentSelected, accent: styles.segmentSelectedAccent };
+const selectedStyles = { ink: styles.segmentSelected, viz: styles.segmentSelectedViz, accent: styles.segmentSelectedAccent };
