@@ -684,6 +684,25 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
   });
 
+  it('uses the theme accent with a surface label when requested, retaining disabled styling', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<SegmentedControl selectedGround="accent" onChange={onChange}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.accent);
+    expect(flatStyle(within(screen.getByTestId('view-records')).getByText('Records')).color).toBe(uiRoles.surface);
+    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(uiRoles.surface);
+    expect(screen.getByTestId('view-records')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).toHaveBeenCalledWith('last');
+
+    onChange.mockClear();
+    rerender(<SegmentedControl disabled selectedGround="accent" onChange={onChange}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('supports a palette-grade selection with ink text and retains unselected surfaces', () => {
     const { rerender } = render(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
       options={OPTIONS} testIDPrefix="view" value="records" />);

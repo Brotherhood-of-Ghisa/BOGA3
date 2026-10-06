@@ -81,7 +81,7 @@ const formatWeekValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatm
   }
 };
 
-// One day's value for the daily heatmap's detail card, in its metric's format.
+// One day's value inside its calendar tile, in the metric's format.
 const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
     case 'workingSetCount': return String(value);
@@ -151,7 +151,7 @@ function HistoryHeatmap({
   status: ReactNode;
   chartHidden: boolean;
 }) {
-  // Both views span the saved window; only Daily scrolls horizontally.
+  // Both views span the saved window and scroll vertically.
   const data = useMemo(
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: lookbackWeeks, muscleTargets }),
     [dailyMetrics, metric, todayDateKey, lookbackWeeks, muscleTargets]
@@ -197,7 +197,7 @@ function HistoryHeatmap({
         pointerEvents={dailyVisible ? 'auto' : 'none'}
         style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive]}
         testID={`${testIDPrefix}-heatmap-panel-daily`}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={styles.dailyContent} showsVerticalScrollIndicator={false}
           style={styles.scroll} testID={`${testIDPrefix}-scroll`}>
           {status}
           <View accessibilityElementsHidden={chartHidden} importantForAccessibility={chartHidden ? 'no-hide-descendants' : 'auto'}
@@ -289,6 +289,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
               accessibilityLabel="Select effort metric"
               // Four metrics: `Top weight` outgrows an equal quarter.
               layout="fit"
+              selectedGround="accent"
               onChange={onSelectMetric}
               options={metricOptions}
               testIDPrefix={`${prefix}-metric-chip`}
@@ -318,7 +319,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           testIDPrefix={prefix}
           todayDateKey={todayDateKey}
           view={view}
-          chartHidden={!!errorMessage}
+          chartHidden={!!errorMessage || (isLoading && dailyMetrics.length === 0)}
           status={<>
           {isLoading ? (
             <StatePanel body={`Loading ${title} history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
@@ -413,6 +414,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     padding: uiSpace.lg,
   },
+  dailyContent: { gap: uiSpace.lg, paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm },
   hiddenChart: { height: 0, opacity: 0, overflow: 'hidden' },
   weeklyChart: { flex: 1 },
   hiddenWeeklyChart: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0 },

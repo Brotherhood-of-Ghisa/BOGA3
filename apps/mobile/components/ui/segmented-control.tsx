@@ -23,7 +23,7 @@ export type SegmentedControlProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
-  selectedGround?: 'ink' | 'viz';
+  selectedGround?: 'ink' | 'viz' | 'accent';
   hitSlop?: number;
   // Every segment inert and faded, e.g. while the form it belongs to saves.
   disabled?: boolean;
@@ -74,7 +74,7 @@ export function SegmentedControl<TValue extends string | number>({
               fill ? styles.segmentFill : null,
               fit ? styles.segmentFit : null,
               index > 0 ? styles.segmentDivider : null,
-              selected ? (selectedGround === 'viz' ? styles.segmentSelectedViz : styles.segmentSelected) : null,
+              selected ? selectedStyles[selectedGround] : null,
               disabled && selected ? styles.segmentSelectedDisabled : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
@@ -124,6 +124,9 @@ const styles = StyleSheet.create({
   segmentSelected: {
     backgroundColor: uiRoles.ink,
   },
+  segmentSelectedAccent: {
+    backgroundColor: uiRoles.accent,
+  },
   segmentSelectedViz: {
     backgroundColor: uiRoles.viz4,
   },
@@ -149,3 +152,5 @@ const styles = StyleSheet.create({
     color: uiRoles.inkGhost,
   },
 });
+
+const selectedStyles = { ink: styles.segmentSelected, viz: styles.segmentSelectedViz, accent: styles.segmentSelectedAccent };
