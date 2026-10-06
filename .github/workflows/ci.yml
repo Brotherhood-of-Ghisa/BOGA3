@@ -20,6 +20,32 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # On a PR the checkout is GitHub's merge commit; depth 2 brings its
+          # first parent (the base tip), which `Classify changes` diffs against.
+          fetch-depth: 2
+
+      # Docs-only fast path: on a PR whose every changed path is under docs/
+      # or a root-level *.md (rule + tests: scripts/ci-docs-only.sh), only
+      # Docs check runs; every later step is skipped. Push to main always runs
+      # everything. One job either way, so the required check name is stable.
+      - name: Classify changes
+        id: changes
+        working-directory: ${{ github.workspace }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          changed=""
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            changed="$(git diff --name-only --no-renames HEAD^1 HEAD)"
+          fi
+          printf '%s\n' "${changed}"
+          docs_only="$(printf '%s\n' "${changed}" | ./scripts/ci-docs-only.sh --event "${EVENT_NAME}")"
+          echo "docs_only=${docs_only}"
+          echo "docs_only=${docs_only}" >> "${GITHUB_OUTPUT}"
+          if [[ "${docs_only}" == "true" ]]; then
+            echo "Docs-only change: ran Docs check, skipped every later step." >> "${GITHUB_STEP_SUMMARY}"
+          fi
 
       # Docs drift guard (`docs-check` lane): generated blocks (lane matrix)
       # current, lane-name citations valid, relative .md links resolve, spec
@@ -32,11 +58,13 @@ jobs:
       # Meta-tooling self-tests (`meta-tests` lane): gen-docs / test-for
       # against fixtures. Infra-free.
       - name: Meta tests
+        if: steps.changes.outputs.docs_only != 'true'
         run: ./scripts/tests/run-meta-tests.sh
         working-directory: ${{ github.workspace }}
         timeout-minutes: 2
 
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.docs_only != 'true'
         with:
           node-version: 24
           cache: npm
@@ -46,18 +74,22 @@ jobs:
             services/boga-mcp/package-lock.json
 
       - name: Install dependencies
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm ci
 
       - name: Lint
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm run lint
 
       - name: Typecheck
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm run typecheck
 
       # Design-token guardrail (`ui-guardrails` lane). Blocks raw color
       # literals outright, and holds raw fontSize / spacing / radius counts to
       # the budgets in scripts/ui-guardrails.config.js so they can only fall.
       - name: UI guardrails
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm run lint:ui-guardrails
 
       # Hard ceiling on the unit run. A leaked handle that keeps Jest alive
@@ -65,15 +97,18 @@ jobs:
       # is killed here in minutes instead of running to the default 6h job
       # timeout. Deliberately NOT `--forceExit`, which would hide the leak.
       - name: Test
+        if: steps.changes.outputs.docs_only != 'true'
         run: npm test
         timeout-minutes: 5
 
       - name: Agent authorization web
+        if: steps.changes.outputs.docs_only != 'true'
         run: ./scripts/test-agent-auth-web.sh
         working-directory: ${{ github.workspace }}
         timeout-minutes: 5
 
       - name: MCP server
+        if: steps.changes.outputs.docs_only != 'true'
         run: ./scripts/test-boga-mcp.sh
         working-directory: ${{ github.workspace }}
         timeout-minutes: 5
