@@ -128,7 +128,8 @@ commit boundaries.
 - `docs/product/` — every file: the product decisions (what counts, how
   figures are computed and shown, screen copy), one fact per ID
   (`docs/product/README.md`). Never decide an `open` fact or change an
-  `accepted` one inside a feature PR: stop and propose the decision PR.
+  `accepted` one without the product owner's approval: stop and ask. An
+  approved fact change may ship in the PR that implements it.
 
 ## Load on demand (by task area)
 

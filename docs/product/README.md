@@ -68,12 +68,13 @@ only shrinks.
 
 ## Changing a fact
 
-1. A decision PR touches only `docs/product/**`. The product owner approves
-   it; that approval is the decision.
+1. A fact may change in its own PR or in the PR that implements it. The
+   product owner approves the fact change; that approval is the decision.
+   The PR body names each fact ID it changes.
 2. Implementation PRs cite the fact IDs they implement and remove its
    `Pending:` line when the code matches.
-3. A builder never changes an accepted fact or answers an open one inside a
-   feature PR.
+3. A builder never changes an accepted fact or answers an open one without
+   the product owner's approval: stop and ask.
 
 ## Reviewing a change against the facts
 
