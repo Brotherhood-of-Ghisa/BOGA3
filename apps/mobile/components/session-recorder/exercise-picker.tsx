@@ -12,6 +12,7 @@ import {
 import { GroupExercisePickSheet, type GroupExercisePickTarget } from '@/components/groups/group-exercise-pick-sheet';
 import { pickInlineError } from '@/components/groups/group-state-view';
 import { PickerGroupSectionList, PickerGroupsToggle } from '@/components/groups/picker-group-section';
+import { PickerPlannerToggle, PlannerBlockSection } from '@/components/session-recorder/planner-block-section';
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
@@ -53,6 +54,8 @@ export type ExercisePickerProps = {
     exercise: { id: string; name: string },
     suggestion: ExerciseBlockHistorySuggestedPlan
   ) => void;
+  // The host attaches the picked authored plan block to the active session.
+  onAddPlanBlock: (planExerciseId: string) => void;
   // The host navigates to the catalogue; its back returns to the picker as left.
   onOpenManage: () => void;
   // The host's failed add, shown above the list.
@@ -63,14 +66,16 @@ export type ExercisePickerProps = {
  * The session's exercise picker, the body of its own route
  * (`app/session/[sessionId]/add-exercise.tsx`, an iOS page sheet: swipe down
  * or Close to leave): a filtered catalogue list with the shared one-row
- * filters, the add preselection (Add empty set / Append plan), `From your
- * groups` with its pick sheet, inline create, and a Manage exit. A
- * pick closes the keyboard, and scrolling the list does too.
+ * filters, the add preselection (Add empty set / Repeat last), the `From
+ * planner` toggle with its authored one-off blocks, `From your groups` with
+ * its pick sheet, inline create, and a Manage exit. A pick closes the
+ * keyboard, and scrolling the list does too.
  */
 export function ExercisePicker({
   onClose,
   onSelectExercise,
   onAppendPlan,
+  onAddPlanBlock,
   onOpenManage,
   notice = null,
 }: ExercisePickerProps) {
@@ -79,6 +84,7 @@ export function ExercisePicker({
   const [searchValue, setSearchValue] = useState('');
   const [preselection, setPreselection] = useState<ExercisePickerPreselectionState | null>(null);
   const [groupsOnly, setGroupsOnly] = useState(false);
+  const [plannerOnly, setPlannerOnly] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [groupPickTarget, setGroupPickTarget] = useState<GroupExercisePickTarget | null>(null);
   const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercisePickTarget | null>(null);
@@ -216,6 +222,17 @@ export function ExercisePicker({
     setGroupsOnly((current) => !current);
   };
 
+  const togglePlannerOnly = () => {
+    clearPreselection();
+    setPlannerOnly((current) => !current);
+  };
+
+  const pickPlannerBlock = (planExerciseId: string) => {
+    Keyboard.dismiss();
+    clearPreselection();
+    onAddPlanBlock(planExerciseId);
+  };
+
   const selectGroupRow = (row: PickerGroupRow) => {
     Keyboard.dismiss();
     const selection = resolvePickerGroupSelection(row);
@@ -318,6 +335,7 @@ export function ExercisePicker({
             value={searchValue}
           />
           <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences}>
+            <PickerPlannerToggle active={plannerOnly} onToggle={togglePlannerOnly} />
             {groupLinkingUserId ? <PickerGroupsToggle active={groupsOnly} onToggle={toggleGroupsOnly} /> : null}
           </ExerciseListPreferenceControls>
           {notice ? <Notice live message={notice} testID="exercise-picker-notice" tone="danger" /> : null}
@@ -370,7 +388,7 @@ export function ExercisePicker({
                       </ScrollView>
                     </View>
                   ) : null}
-                  {/* The sheet's one `accent`: Append plan. */}
+                  {/* The sheet's one `accent`: Repeat last. */}
                   <View style={styles.actions}>
                     <View style={styles.action}>
                       <ActionButton
@@ -383,11 +401,11 @@ export function ExercisePicker({
                     </View>
                     <View style={styles.action}>
                       <ActionButton
-                        accessibilityLabel={`Append historical plan for ${preselection.exercise.name}`}
+                        accessibilityLabel={`Repeat last workout for ${preselection.exercise.name}`}
                         disabled={appendDisabled}
-                        label="Append plan"
+                        label="Repeat last"
                         onPress={() => appendPlan(preselection)}
-                        testID="exercise-picker-append-plan-button"
+                        testID="exercise-picker-repeat-last-button"
                         variant="primary"
                       />
                     </View>
@@ -402,7 +420,9 @@ export function ExercisePicker({
               </>
             ) : null}
             {!isCatalogLoading && !catalogLoadError && !preselection ? (
-              groupsOnly ? (
+              plannerOnly ? (
+                <PlannerBlockSection onPickBlock={pickPlannerBlock} />
+              ) : groupsOnly ? (
                 groupSections.length > 0 ? (
                   <PickerGroupSectionList sections={groupSections} onPressRow={selectGroupRow} />
                 ) : (
