@@ -640,7 +640,7 @@ Each card is intended to be one reviewable PR.
    — local repositories, validation, deterministic whole-plan/block
    materialization, compatible-card selection, performed-set reordering,
    explicit resolution, and active-session behavior
-   (`in_progress`).
+   (`completed`; card deleted at merge).
 4. `docs/plans/tasks/M23-T04-Mobile_one_off_session_planner.md` — Sessions planning
    sections plus one-off create/view/edit/start/add-block/duplicate/delete and
    recorder block/reordering UX (`planned`).
