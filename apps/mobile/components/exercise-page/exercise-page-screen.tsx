@@ -33,8 +33,6 @@ import { exerciseLinkHref } from '@/src/navigation/routes';
 import {
   addSet,
   buildSetRows,
-  canConfirmSet,
-  canDropSet,
   sessionRecordBlocks,
   commitSet,
   describeCompleteExercisePlan,
@@ -55,10 +53,8 @@ import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
-import { SetLogger } from './set-logger';
-import { SetRow } from './set-row';
+import { ExerciseSetRowItem } from './exercise-set-row-item';
 import { SetReorderList } from './set-reorder-list';
-import { SwipeSetRow } from './swipe-set-row';
 import { useSetReorder } from './use-set-reorder';
 import { pageText } from './text-styles';
 
@@ -78,6 +74,20 @@ const LOAD_ERROR_MESSAGES = {
   'missing-exercise': 'This exercise is no longer in the session.',
   'load-failed': 'The exercise could not be loaded.',
 } as const;
+
+/** The records panel filters to the current gym only under that preference. */
+const isGymFiltered = (scope: string, gymId: string | null): boolean => scope === 'current-gym' && gymId !== null;
+
+/** A completed session is edited in place (history, not a draft). */
+const isCompletedEdit = (state: { status: string; sessionStatus?: string }): boolean =>
+  state.status === 'ready' && state.sessionStatus === 'completed';
+
+/** The inline words for one typed block-resolution result. */
+const blockResolutionNotice = (status: string): string => {
+  if (status === 'completed') return 'Block completed. It no longer counts as waiting.';
+  if (status === 'not-resolvable') return 'Finish one planned set first: confirm a set the block planned.';
+  return "Couldn't complete the block. Try again.";
+};
 
 // Until the session view (step 5) is the entry point, a page opened without
 // history (a deep link) has nothing to go back to; Train is the training hub.
@@ -109,7 +119,7 @@ export function ExercisePageScreen({
     client: draftClient,
   });
   const exercise = draft.state.status === 'ready' ? draft.state.exercise : null;
-  const isCompletedSession = draft.state.status === 'ready' && draft.state.sessionStatus === 'completed';
+  const isCompletedSession = isCompletedEdit(draft.state);
   const catalog = useExerciseCatalog();
   const editingExercise = exercise
     ? (catalog.exercises.find((candidate) => candidate.id === exercise.exerciseDefinitionId) ?? null)
@@ -118,7 +128,7 @@ export function ExercisePageScreen({
   const currentGymId = draft.state.status === 'ready' ? draft.state.gymId : null;
   const [listPreferences] = useExerciseListPreferences();
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
-  const isFilteredByGym = listPreferences.pastRecordsGymScope === 'current-gym' && Boolean(currentGymId);
+  const isFilteredByGym = isGymFiltered(listPreferences.pastRecordsGymScope, currentGymId);
   const records = useExerciseRecords(
     exercise?.exerciseDefinitionId ?? null,
     loadRecords,
@@ -258,21 +268,23 @@ export function ExercisePageScreen({
     if (!next.some((set) => set.id === setId)) setOpenSetId(null);
   };
 
-  /**
-   * A committed drag drop or Move earlier/later, persisted through the
-   * reorder operation — never the draft graph, so the two writers cannot
-   * race. Pending edits flush first; the overlay (a drag's live order)
-   * settles onto the write's result: reload on success, clear on failure,
-   * which restores the prior order exactly.
-   */
-  const persistSetReorder = async (orderedIds: string[], announcement?: string) => {
-    const unchanged =
-      orderedIds.length === setOrderIds.length && orderedIds.every((id, index) => id === setOrderIds[index]);
-    if (unchanged) {
-      reorder.clearDrag();
-      return;
-    }
-    if (announcement) reorder.announce(announcement);
+/** The permutation a drag produced is a no-op when it matches the persisted order. */
+const isSameOrder = (order: string[], other: string[]): boolean =>
+  order.length === other.length && order.every((id, index) => id === other[index]);
+
+/**
+ * A committed drag drop or Move earlier/later, persisted through the
+ * reorder operation — never the draft graph, so the two writers cannot
+ * race. Pending edits flush first; the overlay (a drag's live order)
+ * settles onto the write's result: reload on success, clear on failure,
+ * which restores the prior order exactly.
+ */
+const persistSetReorder = async (orderedIds: string[], announcement?: string) => {
+  if (isSameOrder(orderedIds, setOrderIds)) {
+    reorder.clearDrag();
+    return;
+  }
+  if (announcement) reorder.announce(announcement);
     if (!(await draft.flush()) ) {
       reorder.clearDrag();
       reorder.announce('Not saved. The previous order stays.');
@@ -351,15 +363,7 @@ export function ExercisePageScreen({
     const sourceId = exercise?.sourcePlanExerciseId;
     if (!sourceId) return;
     void completePlanBlock(sourceId).then((result) => {
-      if (result.status === 'completed') {
-        setBlockNotice('Block completed. It no longer counts as waiting.');
-        return;
-      }
-      if (result.status === 'not-resolvable') {
-        setBlockNotice('Finish one planned set first: confirm a set the block planned.');
-        return;
-      }
-      setBlockNotice("Couldn't complete the block. Try again.");
+      setBlockNotice(blockResolutionNotice(result.status));
     });
   };
 
@@ -424,54 +428,27 @@ export function ExercisePageScreen({
               controller={reorder}
               items={rows}
               onReorder={(orderedIds, announcement) => void persistSetReorder(orderedIds, announcement)}
-              renderRow={(row, index, reorderProps) => {
-                const isOpen = row.id === openSet?.id;
-                const followsLogger = index > 0 && rows[index - 1]?.id === openSet?.id;
-                if (isOpen && loggerValues) {
-                  // Only the open row carries the swipes, and each side only
-                  // when its move would change the row; the accessibility
-                  // actions are the non-gesture path for the same two moves.
-                  const onConfirm = canConfirmSet(sets, row.id) ? () => onSwipeRight(row.id) : undefined;
-                  const onDrop = canDropSet(sets, row.id) ? () => onSwipeLeft(row.id) : undefined;
-                  return (
-                    <SwipeSetRow
-                      key={row.id}
-                      onSwipeLeft={onDrop}
-                      onSwipeRight={onConfirm}
-                      testID={`exercise-set-swipe-${row.number}`}>
-                      <SetLogger
-                        loadContext={loadContext}
-                        number={row.number}
-                        onChangeReps={(repsValue) => onChangeLogger({ repsValue })}
-                        onChangeWeight={(weightValue) => onChangeLogger({ weightValue })}
-                        onCommit={onCommit}
-                        onConfirm={onConfirm}
-                        onCycleEffort={() => onSelectEffort(nextSessionSetType(loggerValues.setType, trainingPreferences.displayEfforts))}
-                        onDrop={onDrop}
-                        onMoveEarlier={reorderProps.onMoveEarlier}
-                        onMoveLater={reorderProps.onMoveLater}
-                        onOpenEffort={() => setOpenSheet('effort')}
-                        ref={weightInputRef}
-                        repsValue={loggerValues.repsValue}
-                        setType={loggerValues.setType}
-                        weightValue={loggerValues.weightValue}
-                      />
-                    </SwipeSetRow>
-                  );
-                }
-                return (
-                  <SetRow
-                    divider={index > 0 && !followsLogger}
-                    dragHandle={reorderProps.dragHandle}
-                    key={row.id}
-                    onMoveEarlier={reorderProps.onMoveEarlier}
-                    onMoveLater={reorderProps.onMoveLater}
-                    onOpen={setOpenSetId}
-                    onToggle={onToggle}
-                    row={row}
-                  />
-                );
-              }}
+              renderRow={(row, index, reorderProps) => (
+                <ExerciseSetRowItem
+                  allSets={sets}
+                  index={index}
+                  loadContext={loadContext}
+                  loggerValues={loggerValues}
+                  nextSessionSetType={(setType) => nextSessionSetType(setType, trainingPreferences.displayEfforts)}
+                  onChangeLogger={onChangeLogger}
+                  onCommit={onCommit}
+                  onCycleEffort={onSelectEffort}
+                  onOpenEffort={() => setOpenSheet('effort')}
+                  onOpenRow={setOpenSetId}
+                  onSwipeLeft={onSwipeLeft}
+                  onSwipeRight={onSwipeRight}
+                  onToggleRow={onToggle}
+                  open={row.id === openSet?.id}
+                  reorder={reorderProps}
+                  row={row}
+                  weightInputRef={weightInputRef}
+                />
+              )}
               testID="exercise-set-list-rows"
             />
             <Pressable

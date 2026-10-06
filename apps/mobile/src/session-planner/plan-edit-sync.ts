@@ -3,6 +3,7 @@ import type { PlanFormState } from './plan-form-model';
 import { planFormToDraft } from './plan-form-model';
 import { validatePlanExerciseDraft } from './plan-validation';
 import { planRepository, type PlanMutationResult } from './plan-repository';
+import type { PlanExerciseDraft, PlanFieldError } from './types';
 
 /**
  * An edit of one plan, composed from the repository's guarded operations —
@@ -34,42 +35,11 @@ export const savePlanEdits = async (
   }
 
   // The write plan, checked against read-only state before anything writes.
-  const blocksById = new Map(detail.blocks.map((block) => [block.id, block]));
-  const keptIds: string[] = [];
-  type BlockOp =
-    | { kind: 'add'; draft: (typeof prepared.draft.exercises)[number] }
-    | { kind: 'update'; id: string; draft: (typeof prepared.draft.exercises)[number] }
-    | { kind: 'delete'; id: string };
-  const blockOps: BlockOp[] = [];
-  for (let index = 0; index < form.blocks.length; index += 1) {
-    const formBlock = form.blocks[index];
-    const sourceId = formBlock.sourceBlockId ?? null;
-    const draft = prepared.draft.exercises[index];
-    const existing = sourceId !== null ? blocksById.get(sourceId) : undefined;
-    if (existing === undefined) {
-      blockOps.push({ kind: 'add', draft });
-      continue;
-    }
-    const normalized = validatePlanExerciseDraft(draft);
-    if (!normalized.ok) {
-      return { status: 'validation-failed', errors: normalized.errors };
-    }
-    if (blockDiffers(existing, normalized.value.exercise)) {
-      blockOps.push({ kind: 'update', id: existing.id, draft });
-    }
-    keptIds.push(existing.id);
+  const plan = planBlockOperations(detail, form, prepared.draft.exercises);
+  if (plan.kind === 'validation-failed') {
+    return { status: 'validation-failed', errors: plan.errors };
   }
-  for (const block of detail.blocks) {
-    if (!keptIds.includes(block.id)) {
-      blockOps.push({ kind: 'delete', id: block.id });
-    }
-  }
-  const touchesConsumed = blockOps.some(
-    (op) =>
-      (op.kind === 'update' || op.kind === 'delete') &&
-      blocksById.get(op.id)?.status !== 'pending',
-  );
-  if (touchesConsumed) {
+  if (plan.touchesConsumed) {
     return { status: 'immutable-block' };
   }
 
@@ -82,7 +52,7 @@ export const savePlanEdits = async (
     return meta;
   }
 
-  for (const op of blockOps) {
+  for (const op of plan.operations) {
     const result =
       op.kind === 'add'
         ? await planRepository.addPlanBlock(planId, op.draft)
@@ -96,16 +66,71 @@ export const savePlanEdits = async (
 
   // Only a real order change reorders — and a plan with a consumed block
   // never reorders (its block sequence is a read-only snapshot too).
-  const originalKeptOrder = detail.blocks.map((block) => block.id).filter((id) => keptIds.includes(id));
+  const originalKeptOrder = detail.blocks.map((block) => block.id).filter((id) => plan.keptIds.includes(id));
   const orderChanged =
-    keptIds.length > 0 && (keptIds.length !== originalKeptOrder.length || keptIds.some((id, index) => id !== originalKeptOrder[index]));
+    plan.keptIds.length > 0 &&
+    (plan.keptIds.length !== originalKeptOrder.length ||
+      plan.keptIds.some((id, index) => id !== originalKeptOrder[index]));
   if (orderChanged) {
-    const reordered = await planRepository.reorderPlanBlocks(planId, keptIds);
+    const reordered = await planRepository.reorderPlanBlocks(planId, plan.keptIds);
     if (reordered.status !== 'saved' && reordered.status !== 'updated') {
       return reordered;
     }
   }
   return { status: 'updated' };
+};
+
+type BlockOp =
+  | { kind: 'add'; draft: PlanExerciseDraft }
+  | { kind: 'update'; id: string; draft: PlanExerciseDraft }
+  | { kind: 'delete'; id: string };
+
+type PlanBlockDiff =
+  | {
+      kind: 'planned';
+      keptIds: string[];
+      operations: BlockOp[];
+      touchesConsumed: boolean;
+    }
+  | { kind: 'validation-failed'; errors: PlanFieldError[] };
+
+/** The positional block diff of one edit, against the loaded detail. */
+const planBlockOperations = (
+  detail: PlanDetailView,
+  form: PlanFormState,
+  drafts: PlanExerciseDraft[],
+): PlanBlockDiff => {
+  const blocksById = new Map(detail.blocks.map((block) => [block.id, block]));
+  const keptIds: string[] = [];
+  const operations: BlockOp[] = [];
+  for (let index = 0; index < form.blocks.length; index += 1) {
+    const sourceId = form.blocks[index].sourceBlockId ?? null;
+    const draft = drafts[index];
+    const existing = sourceId !== null ? blocksById.get(sourceId) : undefined;
+    if (existing === undefined) {
+      operations.push({ kind: 'add', draft });
+      continue;
+    }
+    const normalized = validatePlanExerciseDraft(draft);
+    if (!normalized.ok) {
+      return { kind: 'validation-failed', errors: normalized.errors };
+    }
+    if (blockDiffers(existing, normalized.value.exercise)) {
+      operations.push({ kind: 'update', id: existing.id, draft });
+    }
+    keptIds.push(existing.id);
+  }
+  for (const block of detail.blocks) {
+    if (!keptIds.includes(block.id)) {
+      operations.push({ kind: 'delete', id: block.id });
+    }
+  }
+  const touchesConsumed = operations.some(
+    (op) =>
+      (op.kind === 'update' || op.kind === 'delete') &&
+      blocksById.get(op.id)?.status !== 'pending',
+  );
+  return { kind: 'planned', keptIds, operations, touchesConsumed };
 };
 
 const blockDiffers = (
