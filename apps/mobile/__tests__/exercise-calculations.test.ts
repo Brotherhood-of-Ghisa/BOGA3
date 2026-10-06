@@ -5,6 +5,7 @@ import {
   parseSetWeight,
 } from '@/src/exercise-calculations';
 import { workingSetsOnly } from '@/src/exercise-calculations/analytics';
+import { formatOneRepMax } from '@/src/exercise-calculations/format';
 
 describe('exercise calculations: parsing', () => {
   describe('parseSetWeight', () => {
@@ -71,11 +72,26 @@ describe('exercise calculations: parsing', () => {
 });
 
 describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
-  it('returns weight itself within ~1.5% at one rep', () => {
-    const estimate = estimateOneRepMax(100, 1) as number;
-    expect(estimate).toBeCloseTo(101.305, 2);
-    expect(estimate / 100).toBeGreaterThan(1.0);
-    expect(estimate / 100).toBeLessThan(1.02);
+  // The example rows of [[1rm.formula]] (docs/product/1rm.md), as shown.
+  it.each([
+    [100, 1, '100.0'],
+    [100, 5, '116.6'],
+    [100, 10, '134.7'],
+    [60, 12, '84.9'],
+    [0, 8, '0.0'],
+  ])('shows %p kg × %p as %s', (load, reps, shown) => {
+    expect(formatOneRepMax(estimateOneRepMax(load, reps) as number)).toBe(shown);
+  });
+
+  it('pins the single-rep row of [[1rm.formula]] at full precision', () => {
+    expect(estimateOneRepMax(100, 1)).toBe(100);
+    expect(estimateOneRepMax(82.5, 1)).toBe(82.5);
+    expect(estimateOneRepMax(0, 1)).toBe(0);
+  });
+
+  it('applies [[1rm.formula]] from two reps', () => {
+    expect(estimateOneRepMax(100, 2)).toBeCloseTo(100 * 100 / (48.8 + 53.8 * Math.exp(-0.15)), 10);
+    expect(estimateOneRepMax(100, 2)).toBeCloseTo(105.146, 2);
   });
 
   it('matches Wathan values across a representative rep range', () => {
@@ -104,6 +120,8 @@ describe('exercise calculations: estimateOneRepMax (Wathan)', () => {
     expect(estimateOneRepMax(0, 5)).toBe(0);
     expect(estimateOneRepMax(-1, 5)).toBeNull();
     expect(estimateOneRepMax(100, 0)).toBeNull();
+    expect(estimateOneRepMax(-1, 1)).toBeNull();
+    expect(estimateOneRepMax(Number.POSITIVE_INFINITY, 1)).toBeNull();
     expect(estimateOneRepMax(100, -1)).toBeNull();
     expect(estimateOneRepMax(100, 1.5)).toBeNull();
     expect(estimateOneRepMax(100, Number.POSITIVE_INFINITY)).toBeNull();

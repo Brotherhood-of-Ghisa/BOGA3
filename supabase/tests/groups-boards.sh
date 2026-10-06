@@ -129,10 +129,10 @@ drain() {
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
 
-# e1rm <weight> <reps>: the Wathan estimate, rounded like the boards (6 dp, trimmed).
+# e1rm <weight> <reps>: the 1RM ([[1rm.formula]]), rounded like the boards (6 dp, trimmed).
 e1rm() {
   node -e 'const [w, r, f] = process.argv.slice(1).map(Number);
-           const v = (100 * w / (48.8 + 53.8 * Math.exp(-0.075 * r))) * (f || 1);
+           const v = (r === 1 ? w : 100 * w / (48.8 + 53.8 * Math.exp(-0.075 * r))) * (f || 1);
            process.stdout.write(String(Number(v.toFixed(6))));' "$1" "$2" "${3:-1}"
 }
 
@@ -791,7 +791,7 @@ echo "[${LANE_LABEL}] R10 — a rules_version bump recomputes silently"
 run_psql "update app_public.group_board_entries set value_kg = 1
            where group_exercise_id = '${GX1}' and member_user_id = '${ATHLETE_UID}' and metric = 'weight';" >/dev/null
 mark
-expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(6, 1000) >= 1;" "t"
+expect_sql "R10 a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
 drain "R10 rules"
 expect_entry "${GX1}" A weight "105@r1c1" "R10 the recompute corrects entries"
 expect_sql "R10 the recompute writes no event in the group" \

@@ -238,7 +238,9 @@ This section lists the fields that rule governs.
 §3): `top_weight` is the heaviest Weight and, at that weight, the most reps; a
 tie keeps the earliest session; a zero result is never a record.
 
-`metric_revision: "working_sets_v2"` marks this meaning. `"working_sets_v1"`
+`metric_revision: "working_sets_v3"` marks this meaning, with 1RM per
+[[1rm.formula]] (`docs/product/1rm.md`). `"working_sets_v2"` estimated a
+single's 1RM; `"working_sets_v1"`
 let a zero 1RM, Weight or Volume stand as a record; the earlier
 `"bodyweight_optional_v1"` counted warm-ups in every figure.
 
@@ -247,7 +249,7 @@ let a zero 1RM, Weight or Volume stand as a record; the earlier
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v2"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v3"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

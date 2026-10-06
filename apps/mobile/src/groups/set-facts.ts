@@ -10,7 +10,7 @@ import {
 } from '../exercise-calculations/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
-export const GROUP_EVAL_RULES_VERSION = 5;
+export const GROUP_EVAL_RULES_VERSION = 6;
 
 export type GroupRawSetValues = {
   weight_value: string;

@@ -237,11 +237,7 @@ Bodyweight is counted once. Per-side entry doubles only the external Weight in
 the positive-contribution branch. Screens show Weight, 1RM and Volume, never
 the calculated-load breakdown.
 
-**1RM** (`estimateOneRepMax`, `index.ts`) is Wathan:
-
-```text
-1RM = 100 × load / (48.8 + 53.8 × exp(-0.075 × reps))
-```
+**1RM** (`estimateOneRepMax`, `index.ts`) implements [[1rm.formula]].
 
 - Only positive integer reps are eligible.
 - Negative or non-finite Weight is rejected, as are a contribution outside
