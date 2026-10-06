@@ -23,6 +23,10 @@ calculation, eligibility or record rule), or the sync protocol.
 - Order: migrations → `group-eval` and `agent-api` redeployed in the same
   sitting → app release. A stale `group-eval` against newer SQL failed group
   jobs for ~21 h (#507).
+- Exception: a migration that only enqueues recomputes goes after the new
+  `group-eval` is live, or the old function does the work with the old rule.
+- Verify each deployed function's files byte-match the merge commit, and
+  record every hosted migration in `supabase_migrations.schema_migrations`.
 - Every environment: hosted, BOGA-dev, dev-lan. Skipped activation and kick
   config left dev-lan groups returning `UPDATE_REQUIRED` (#544).
 - Hosted steps: `docs/runbook-hosted-operations.md`.
