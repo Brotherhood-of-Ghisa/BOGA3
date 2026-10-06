@@ -80,4 +80,20 @@ Implementation checklist:
    differences, and record intentional PageSheet/spacing deviations.
 5. Update the target status and implementation PR with verified evidence.
 
+## PR repair verification (2026-10-06)
+
+Merged the current main branch and combined the concurrent SegmentedControl
+extensions into `selectedGround`: History keeps accent/surface selection and
+Progress keeps viz/ink selection. Both Jest cases are retained.
+Pinned the MCP SDK to 1.32.1 to clear
+[GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).
+
+`./boga test fast` passed on the combined revision: 237 Jest suites / 3,024
+tests, local backend smoke, docs/meta, consent checks, and MCP audit (zero
+vulnerabilities), typecheck, 13 unit tests and production build. Local log:
+`apps/mobile/artifacts/maestro/daily-history-calendar/pr-578-repair/fast.log`.
+The proposed repair set adds mcp-smoke and repeats the three quality lanes;
+operator agreement is pending. Earlier quality/iOS results above predate this
+merge. The outstanding visual acceptance findings remain open.
+
 final result: blocked
