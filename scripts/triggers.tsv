@@ -94,6 +94,7 @@ scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs g
 scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/doc-budgets.tsv	docs-check	doc word budgets
+scripts/product-fact-restatements.tsv	docs-check	product-fact restatements
 scripts/plan-ref-exempt.txt	docs-check	plan-ID exemptions
 scripts/test-for.sh	meta-tests	trigger matcher
 scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
@@ -108,6 +109,7 @@ scripts/tests/**	meta-tests	meta-tooling tests
 .github/workflows/**	docs-check	CI definition (update spec 02 CI posture)
 .github/pull_request_template.md	docs-check	PR template
 AGENTS.md	docs-check	agent entrypoint
+docs/product/**	jest-full	product fact tables (Jest runs them)
 docs/**	docs-check	curated docs
 *.md	docs-check	root markdown
 **/*.md	docs-check	markdown anywhere

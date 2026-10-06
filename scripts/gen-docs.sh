@@ -29,8 +29,14 @@
 #      - the components catalog names every `components/ui/*.tsx` primitive and
 #        every `components/<area>/` folder, and no row names a folder that is
 #        gone (so adding a component forces a catalog edit),
-#      - every doc reachable from AGENTS.md fits its word budget
-#        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings).
+#      - every doc reachable from AGENTS.md fits its word budget, and each
+#        `corpus` directory fits its combined one
+#        (scripts/doc-budgets.tsv; `gen` lowers grandfathered ceilings),
+#      - product facts (docs/product/README.md): every fact heading parses,
+#        IDs are unique, every `[[id]]` and fact-table marker names a fact,
+#        and a fact's `Signature:` text appears outside docs/product/ only in
+#        a paragraph that cites it (grandfathered restatements:
+#        scripts/product-fact-restatements.tsv, which only shrinks).
 
 set -euo pipefail
 
@@ -495,9 +501,9 @@ def reachable_docs():
                     break
     return via
 
-budget_rows = []
+budget_rows, corpus_rows = [], []
 if os.path.exists(os.path.join(root, ENTRYPOINT)):
-    limits, exempt, ceilings = {}, [], {}
+    limits, exempt, ceilings, corpora = {}, [], {}, {}
     with open(BUDGETS_TSV) as f:
         for line in f:
             if not line.strip() or line.lstrip().startswith("#"):
@@ -509,6 +515,8 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
                 exempt.append(parts[1])
             elif parts[0] == "ceiling" and len(parts) == 3:
                 ceilings[parts[1]] = int(parts[2])
+            elif parts[0] == "corpus" and len(parts) == 3 and parts[1].endswith("/"):
+                corpora[parts[1]] = int(parts[2])
             else:
                 problems.append(f"scripts/doc-budgets.tsv: malformed row: {line.rstrip()!r}")
     via = reachable_docs()
@@ -549,6 +557,168 @@ if os.path.exists(os.path.join(root, ENTRYPOINT)):
         print("[gen-docs] lowered grandfathered ceilings in scripts/doc-budgets.tsv")
     elif mode != "gen":
         problems += stale
+    # A corpus is a directory an agent loads whole, so its docs share one
+    # budget on top of their own.
+    for prefix, limit in sorted(corpora.items()):
+        docs = [rel for rel in PERSISTENT_DOCS if rel.startswith(prefix)]
+        words = sum(len(open(os.path.join(root, rel), encoding="utf-8").read().split()) for rel in docs)
+        corpus_rows.append((words, limit, prefix, len(docs)))
+        if words > limit:
+            problems.append(f"{prefix}: {words} words in {len(docs)} docs, over its {limit}-word corpus "
+                            "budget — trim it; it is loaded whole (rules: docs/specs/README.md)")
+
+# 9. product facts (docs/product/README.md, "Fact format"). Every `### `
+#    heading in a subject file is a fact header `### <subject>.<slug> · <kind>
+#    · <status>` whose subject is the file's name, and IDs are unique. Every
+#    `[[id]]` and `<!-- fact-table: <id> -->` in a persistent doc names a fact.
+#    A fact's `Signature:` texts (literal, case- and wrap-insensitive) appear
+#    outside docs/product/ only in a paragraph that cites the fact: anything
+#    else restates it. Paragraphs split at blank lines outside fenced code, so
+#    fenced code counts too. scripts/product-fact-restatements.tsv
+#    grandfathers the restatements that predate the check, per doc and fact;
+#    a row only shrinks, and a stale count fails like a stale exemption. A
+#    count, not a list of places: a restatement moved within a grandfathered
+#    doc keeps passing, as a suppression count does in the eslint baseline.
+PRODUCT_DIR = "docs/product/"
+PRODUCT_NON_FACT = {"README.md", "REVIEW.md"}
+FACT_KINDS = {"definition", "calculation", "presentation", "principle"}
+FACT_HEADER = re.compile(r"^### (\S+) · (\S+) · (.+?)\s*$")
+FACT_ID = re.compile(r"^([a-z0-9]+)\.[a-z0-9]+(?:-[a-z0-9]+)*$")
+FACT_REF = re.compile(r"\[\[([^\[\]\s<>]+\.[^\[\]\s<>]+)\]\]")
+FACT_TABLE = re.compile(r"<!-- fact-table: ([^\s<>]+) -->")
+SIGNATURE = re.compile(r"^Signature:(.*)$")
+RESTATEMENTS_REL = "scripts/product-fact-restatements.tsv"
+
+def parse_fact_file(rel, facts, signatures):
+    """Fill facts (id -> (rel, line, status)) and signatures (id -> texts)."""
+    subject = os.path.basename(rel)[:-len(".md")]
+    current, fenced = None, False
+    for ln, line in enumerate(open(os.path.join(root, rel), encoding="utf-8"), 1):
+        line = line.rstrip("\n")
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        if fenced:
+            continue
+        if line.startswith("### "):
+            current = parse_fact_header(rel, ln, line, subject, facts)
+            continue
+        if re.match(r"#{1,6} ", line):
+            current = None  # a Signature under another section belongs to no fact
+            if re.match(r"#+ \S+\.\S+ · ", line):
+                problems.append(f"{rel}:{ln}: fact header at the wrong level — a fact is a '### ' heading")
+            continue
+        sig = SIGNATURE.match(line)
+        if not sig:
+            continue
+        texts = re.findall(r"`([^`]+)`", sig.group(1))
+        if current is None or not texts or re.sub(r"`[^`]+`|[,\s]", "", sig.group(1)):
+            problems.append(f"{rel}:{ln}: malformed Signature line — under a fact header, write "
+                            "`Signature: `<text>`, `<text>``")
+        else:
+            signatures.setdefault(current, []).extend(texts)
+
+def parse_fact_header(rel, ln, line, subject, facts):
+    """The fact ID a header line opens, or None (reported) when it is malformed."""
+    m = FACT_HEADER.match(line)
+    fid_ok = m and FACT_ID.match(m.group(1))
+    if not fid_ok:
+        problems.append(f"{rel}:{ln}: malformed fact header {line!r} — expected "
+                        "'### <subject>.<slug> · <kind> · <status>'")
+        return None
+    fid, kind, status = m.groups()
+    if fid_ok.group(1) != subject:
+        problems.append(f"{rel}:{ln}: fact '{fid}' is in {subject}.md — a fact lives in its subject's file")
+    if kind not in FACT_KINDS:
+        problems.append(f"{rel}:{ln}: fact '{fid}' has unknown kind '{kind}' — one of {', '.join(sorted(FACT_KINDS))}")
+    if status not in ("accepted", "open") and not re.fullmatch(r"superseded-by: \S+", status):
+        problems.append(f"{rel}:{ln}: fact '{fid}' has unknown status '{status}' — accepted, open "
+                        "or superseded-by: <id>")
+    if fid in facts:
+        first, first_ln, _ = facts[fid]
+        problems.append(f"{rel}:{ln}: duplicate fact ID '{fid}' (first at {first}:{first_ln})")
+        return fid
+    facts[fid] = (rel, ln, status)
+    return fid
+
+def paragraphs(text):
+    """(first line number, text) per blank-line-separated block; fenced code never splits."""
+    out, buf, start, fenced = [], [], 1, False
+    for ln, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+        if not line.strip() and not fenced:
+            if buf:
+                out.append((start, "\n".join(buf)))
+            buf = []
+            continue
+        if not buf:
+            start = ln
+        buf.append(line)
+    if buf:
+        out.append((start, "\n".join(buf)))
+    return out
+
+def signature_pattern(text):
+    body = r"\s+".join(re.escape(word) for word in text.split())
+    head = r"(?<!\w)" if re.match(r"\w", text) else ""
+    tail = r"(?!\w)" if re.search(r"\w$", text) else ""
+    return re.compile(head + body + tail, re.I)
+
+def restatements(signatures):
+    """(doc, fact) -> [(line, text)], one per uncited paragraph outside docs/product/."""
+    patterns = {fid: [(t, signature_pattern(t)) for t in texts] for fid, texts in signatures.items()}
+    found = {}
+    for rel in PERSISTENT_DOCS:
+        if rel.startswith(PRODUCT_DIR):
+            continue
+        for start, para in paragraphs(open(os.path.join(root, rel), encoding="utf-8").read()):
+            cited = set(FACT_REF.findall(para))
+            for fid, pats in patterns.items():
+                hits = [(m.start(), t) for t, p in pats for m in [p.search(para)] if m and fid not in cited]
+                if hits:
+                    pos, text = min(hits)
+                    found.setdefault((rel, fid), []).append((start + para.count("\n", 0, pos), text))
+    return found
+
+facts, signatures = {}, {}
+for rel in PERSISTENT_DOCS:
+    if (rel.startswith(PRODUCT_DIR) and "/" not in rel[len(PRODUCT_DIR):]
+            and os.path.basename(rel) not in PRODUCT_NON_FACT):
+        parse_fact_file(rel, facts, signatures)
+for fid, (rel, ln, status) in sorted(facts.items()):
+    target = status.split(": ", 1)[1] if status.startswith("superseded-by: ") else None
+    if target is not None and target not in facts:
+        problems.append(f"{rel}:{ln}: fact '{fid}' is superseded by '{target}', which is no fact")
+for rel in PERSISTENT_DOCS:
+    for ln, line in enumerate(open(os.path.join(root, rel), encoding="utf-8"), 1):
+        for fid in FACT_REF.findall(line) + FACT_TABLE.findall(line):
+            if fid not in facts:
+                problems.append(f"{rel}:{ln}: '{fid}' names no fact in {PRODUCT_DIR} — fix the ID")
+
+grandfathered = {}
+RESTATEMENTS = os.path.join(root, RESTATEMENTS_REL)
+with open(RESTATEMENTS) if os.path.exists(RESTATEMENTS) else open(os.devnull) as f:
+    for line in f:
+        parts = line.rstrip("\n").split("\t")
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if (len(parts) == 3 and parts[2].isdigit() and int(parts[2]) > 0 and parts[1] in signatures
+                and (parts[0], parts[1]) not in grandfathered):
+            grandfathered[(parts[0], parts[1])] = int(parts[2])
+        else:
+            problems.append(f"{RESTATEMENTS_REL}: malformed row (doc, fact with a Signature, "
+                            f"paragraphs above 0; one row per doc and fact): {line.rstrip()!r}")
+found = restatements(signatures)
+for key in sorted(set(found) | set(grandfathered)):
+    rel, fid = key
+    hits, allowed = found.get(key, []), grandfathered.get(key, 0)
+    if len(hits) > allowed:
+        for ln, text in hits:
+            problems.append(f"{rel}:{ln}: restates [[{fid}]] ('{text}') — cite [[{fid}]] in this "
+                            "paragraph, or state only what the doc owns")
+    elif len(hits) < allowed:
+        problems.append(f"{RESTATEMENTS_REL}: '{rel}' restates [[{fid}]] in {len(hits)} paragraph(s), "
+                        f"not {allowed} — lower the row (drop it at 0); it only shrinks")
 
 if mode == "budgets":
     print(f"{'words':>6}  {'budget':>6}  {'ceiling':>7}  {'status':<13}  doc  (loaded via)")
@@ -558,6 +728,8 @@ if mode == "budgets":
     print(f"\n{len(budgeted)} budgeted docs, {sum(r[0] for r in budgeted)} words; "
           f"{sum(r[0] > r[1] for r in budgeted)} over budget by "
           f"{sum(r[0] - r[1] for r in budgeted if r[0] > r[1])} words in total")
+    for words, limit, prefix, count in corpus_rows:
+        print(f"corpus {prefix}: {words} of {limit} words in {count} docs ({'ok' if words <= limit else 'OVER'})")
     sys.exit(0)
 
 if problems:

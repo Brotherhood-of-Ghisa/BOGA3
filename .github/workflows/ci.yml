@@ -26,7 +26,8 @@ jobs:
           fetch-depth: 2
 
       # Docs-only fast path: on a PR whose every changed path is under docs/
-      # or a root-level *.md (rule + tests: scripts/ci-docs-only.sh), only
+      # (bar docs/product/, whose fact tables Jest runs) or a root-level *.md
+      # (rule + tests: scripts/ci-docs-only.sh), only
       # Docs check runs; every later step is skipped. Push to main always runs
       # everything. One job either way, so the required check name is stable.
       - name: Classify changes

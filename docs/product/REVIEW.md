@@ -31,7 +31,7 @@ decisions in this directory, not code quality (that is `/code-review`).
      display or wording rule) → **new decision**;
    - a line the diff adds to a doc, comment or UI string states a fact's
      rule in its own words instead of citing `[[id]]` → **restates**. Lines
-     the diff does not add are out of scope.
+     the diff does not add are out of scope (whole docs: Audit mode).
 
    When unsure between **changes** and **violates**, choose **changes**: the
    product owner decides either way.
@@ -54,3 +54,18 @@ Verdict: clean | needs decision PR | needs fix
   For a new decision, propose the fact (ID, kind, statement) in one line.
 - **restates** → `needs fix` (replace with `[[id]]`).
 - No findings → `Verdict: clean`. Do not pad with style or code remarks.
+
+## Audit mode
+
+Run it after any decision PR changes a fact: old wording lingers in the docs
+that restated it.
+
+- **Input:** every persistent doc (tracked `*.md` outside `docs/plans/**`,
+  `docs/brainstorms/**` and this directory) instead of a diff, plus the facts.
+- **Classes:** the same, but report only **restates** (the doc states a
+  fact's rule in its own words instead of citing `[[id]]`) and **violates**
+  (the doc states a rule an accepted fact contradicts). A spec describing how
+  the code implements a fact, while citing it, is neither.
+- **Output:** as above, with the doc's `<file>:<line>`; verdict `clean` or
+  `needs fix`. `docs-check` already fails on a fact's literal `Signature:`
+  text; the audit finds the paraphrases.
