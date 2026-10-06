@@ -35,6 +35,9 @@ expect false pull_request .github/workflows/ci.yml
 expect false pull_request .github/pull_request_template.md
 expect false pull_request boga
 expect false pull_request README.txt
+# Jest runs the product fact tables, so a fact change is code
+expect false pull_request docs/product/set.md
+expect false pull_request docs/specs/05-data-model.md docs/product/README.md
 # a directory named docs below the root is not the docs tree
 expect false pull_request apps/mobile/docs/x.md
 

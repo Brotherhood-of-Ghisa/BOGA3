@@ -125,6 +125,10 @@ commit boundaries.
 - `docs/specs/02-quality-and-test-gates.md` — the full gate/lane reference.
 - `docs/specs/03-technical-architecture.md` — tech choices, decision register.
 - `docs/specs/09-project-structure.md` — repo layout, path ownership.
+- `docs/product/` — every file: the product decisions (what counts, how
+  figures are computed and shown, screen copy), one fact per ID
+  (`docs/product/README.md`). Never decide an `open` fact or change an
+  `accepted` one inside a feature PR: stop and propose the decision PR.
 
 ## Load on demand (by task area)
 
@@ -196,4 +200,6 @@ Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md
 pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
 the lanes that ran, each with its result and an evidence link ("CI green" alone
 is not enough), and notes that the set was agreed with the operator, including
-any default lane skipped and the reason.
+any default lane skipped and the reason. Before opening it, run
+`docs/product/REVIEW.md` on the branch diff next to `/code-review`, and put
+its verdict on the Tests section's `Product facts:` line.
