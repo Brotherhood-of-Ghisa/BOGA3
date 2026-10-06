@@ -9,12 +9,8 @@ import {
   isWorkingSetType,
 } from '../exercise-calculations/set-semantics.ts';
 
-/**
- * Bump to re-normalize every older fact, silently, when a rule below changes.
- * Unbumped, a rule change applies forward only: a fact takes it when its
- * session is next evaluated.
- */
-export const GROUP_EVAL_RULES_VERSION = 5;
+/** Bump when a rule below changes: every older fact is re-normalized, silently. */
+export const GROUP_EVAL_RULES_VERSION = 6;
 
 export type GroupRawSetValues = {
   weight_value: string;

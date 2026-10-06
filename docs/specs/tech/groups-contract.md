@@ -183,12 +183,10 @@ with the same kernel.
 `fingerprint` hashes raw synced values and interprets nothing. `working` is
 the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
 policy); every reader reads it as `working is not false`, so a non-working
-set is excluded like a warm-up. A set-rule change either bumps
+set is excluded like a warm-up. A set-rule or kernel change bumps
 `GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
-`rules` recompute, or applies forward only without a bump: a fact takes the
-new rule when its session is next evaluated and a comparison when it next
-rebuilds. Excluding Technique and Cooldown, and [[1rm.formula]]'s single, went
-forward only (version 5).
+`rules` recompute. Comparisons are not stamped with it: the same change ships
+a migration enqueuing a `rules` evaluation of every live comparison.
 
 **Live target:** the member is active in a non-deleted group that owns the
 unarchived group exercise. Any other board is frozen.

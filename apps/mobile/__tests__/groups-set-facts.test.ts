@@ -94,7 +94,7 @@ describe('group evaluator set facts', () => {
       fingerprint: 'fp-s1',
       rules_version: GROUP_EVAL_RULES_VERSION,
     });
-    expect(GROUP_EVAL_RULES_VERSION).toBe(5);
+    expect(GROUP_EVAL_RULES_VERSION).toBe(6);
   });
 
   it('stores e1rm_kg per [[1rm.formula]], singles included', () => {
