@@ -28,6 +28,20 @@ export type ExerciseEditorPrefill = {
   mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
 };
 
+/** Builds prefill data to duplicate an existing catalog exercise. */
+export const buildDuplicateExercisePrefill = (
+  exercise: ExerciseCatalogExercise
+): ExerciseEditorPrefill => ({
+  name: `${exercise.name} (Copy)`,
+  loadInputMode: exercise.loadInputMode ?? 'total_load',
+  bodyweightContribution: exercise.bodyweightContribution,
+  mappings: exercise.mappings.map((mapping) => ({
+    muscleGroupId: mapping.muscleGroupId,
+    weight: mapping.weight,
+    role: mapping.role,
+  })),
+});
+
 export type EditorMapping = { muscleGroupId: string; weight: number; role: ExerciseCatalogExerciseMuscleMapping['role'] };
 
 export const PRIMARY_MUSCLE_WEIGHT = 1;

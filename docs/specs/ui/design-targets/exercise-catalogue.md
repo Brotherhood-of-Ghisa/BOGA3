@@ -90,9 +90,9 @@ panels, and the `Groups`-only list.
 - **Manage exercises** is a `Sheet` with no Done (G5), containing only
   Show deleted, a multi `ChipGroup` solid `ink` while on. Changes apply live.
 - **A row's ⋮** opens a `Sheet` titled with the exercise's name: `Edit`
-  (`pencil`), `Link to group exercise…` (`link`, signed in only) and `Delete` in
+  (`pencil`), `Duplicate` (`copy`), `Link to group exercise…` (`link`, signed in only) and `Delete` in
   `danger` (`trash`). A deleted exercise gets `Undelete` instead of `Delete`,
-  and `Edit` and `Link` are disabled. Delete does not confirm.
+  and `Edit`, `Duplicate` and `Link` are disabled. Delete does not confirm.
 - **The exercise editor** is a sub-page `PageSheet` (swipe down or X, locked
   while saving) whose body lifts above the keyboard. The name is a `FormField`. The weight entry is a micro-labelled
   `SegmentedControl`. The primary muscle is a `ListRow` framed like a field,
