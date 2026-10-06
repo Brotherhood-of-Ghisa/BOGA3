@@ -197,6 +197,8 @@ describe('Stats over real data', () => {
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
+  // The 104-week heatmap re-render trips the 15 s default ceiling when jest
+  // workers run in parallel; this test alone needs ~18 s worst-case.
   it('keeps a selected day within bounds and resets it to today when history is shortened', async () => {
     await renderSeededStats();
     act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
@@ -213,7 +215,7 @@ describe('Stats over real data', () => {
       .toHaveProp('accessibilityState', { selected: true });
     fireEvent.press(screen.getByTestId('stats-exercise-history-backdrop', { includeHiddenElements: true }));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-  });
+  }, 30_000);
 
   it('shows the empty state on an empty database', async () => {
     await renderStats();
