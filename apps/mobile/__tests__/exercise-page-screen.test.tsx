@@ -755,6 +755,20 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Incline Barbell Bench Press');
   });
 
+  it('opens swap as a page sheet whose X leaves the exercise unchanged', async () => {
+    await openPage();
+
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    fireEvent.press(await screen.findByTestId('exercise-options-swap'));
+    await screen.findByTestId('exercise-swap-sheet');
+    expect(screen.getByTestId('exercise-swap-sheet-modal')).toHaveProp('presentationStyle', 'pageSheet');
+    fireEvent.press(screen.getByLabelText('Close swap exercise'));
+
+    await waitFor(() => expect(screen.queryByTestId('exercise-swap-sheet')).toBeNull());
+    expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
+    expect((await readSession())?.exercises[0]).toMatchObject({ exerciseDefinitionId: BENCH_DEF });
+  });
+
   it('says so when the exercise or the session is gone, or the session was deleted', async () => {
     await seedPage(() => setSessionDeletedState(NEWER_HISTORY, true));
 
