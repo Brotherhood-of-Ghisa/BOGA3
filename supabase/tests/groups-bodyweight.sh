@@ -71,19 +71,26 @@ expect_sql() {
   actual="$(run_psql "$2")"
   [[ "${actual}" == "$3" ]] || fail "$1: expected '$3', got '${actual}'"
 }
+# The app calls only protocol 4, so no client decoder reads these protocol-3
+# payloads; the server still serves them, so check their envelope here.
 assert_wire() {
-  node --input-type=module -e '
-    import fs from "node:fs";
-    import { pathToFileURL } from "node:url";
-    const guards=await import(pathToFileURL(process.argv[1]).href);
-    const body=JSON.parse(fs.readFileSync(0,"utf8"));
-    const kind=process.argv[2];
-    const ok=kind==="board" ? guards.isGroupMetricBoardWire(body) :
-      kind==="certification" ? body.contract_version===3 && guards.isGroupMetricCertificationWire(body.certification) :
-      kind==="stream" ? body.contract_version===3 && guards.isGroupMetricStreamCursor(body.next_cursor) &&
-        body.items.every(item=>guards.isGroupMetricStreamItem(item)) : false;
-    if (!ok) throw new Error(`Actual ${kind} response failed mobile decoding`);
-  ' "${SUPABASE_DIR}/../apps/mobile/src/groups/metric-wire-guards.ts" "$1" <<<"${BODY}" ||
+  local filter
+  case "$1" in
+    board) filter='.contract_version==3 and (.state|IN("ready","rebuilding","archived"))
+      and (.metric|IN("weight","e1rm")) and (.entries|type=="array") and .entry_count>=(.entries|length)
+      and all(.entries[]; .metric==$m and .unit=="kg" and (.rank|type=="number" and .>0)
+        and (.member.user_id|type=="string") and (.set_id|type=="string")
+        and (.fingerprint|type=="string" and length>0) and .certified==(.certification_id!=null))' ;;
+    certification) filter='.contract_version==3 and (.certification.certification_id|type=="string")
+      and (.certification.metric|IN("weight","e1rm")) and (.certification.certified_at_ms|type=="number")
+      and (if .certification.ended_at_ms==null then .certification.end_reason==null
+        else .certification.end_reason|IN("withdrawn","cancelled","voided") end)' ;;
+    stream) filter='.contract_version==3 and (.items|type=="array") and (.next_cursor==null
+      or (.next_cursor.sort_at_ms|type=="number")) and all(.items[]; (.key|type=="string") and (.sort_at_ms|type=="number")
+      and (.kind|type=="string"))' ;;
+    *) fail "unknown wire kind $1" ;;
+  esac
+  jq -e --arg m "$(jq -r '.metric // ""' <<<"${BODY}")" "${filter}" <<<"${BODY}" >/dev/null ||
     fail "actual $1 wire contract"
 }
 drain() {
