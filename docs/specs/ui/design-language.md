@@ -70,7 +70,9 @@ and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
-a `rule` hairline, being only 1.18:1 against `surface`.
+a `rule` hairline, being only 1.18:1 against `surface`. The operator-authorized
+Progress selectors also use the strongest palette grade for selection; if
+changing them, load `design-targets/progress-tables.md`.
 
 ## 3. Typography
 
@@ -118,9 +120,9 @@ micro-labels Archivo 700, sheet titles Archivo 800.
   elevation ramp; there is no elevation token.
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
-  and a `rule` handle. **Tapping outside dismisses; sheets carry no Cancel
-  button.** Progress history alone fills the safe-area viewport, with header
-  drag and a subtle dismissal hint (`design-targets/history-popup.md`).
+  and a `rule` handle. **Tapping outside or dragging the handle down
+  dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
+  page sheet instead: grabber, title, X (`ux-rules.md` "Sheets").
 - Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing

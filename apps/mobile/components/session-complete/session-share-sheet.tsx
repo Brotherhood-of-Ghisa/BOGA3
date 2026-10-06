@@ -1,10 +1,10 @@
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ViewInstance, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
-import { Sheet } from '@/components/ui/sheet';
+import { PageSheet } from '@/components/ui/page-sheet';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   captureSessionShareImage,
@@ -137,10 +137,10 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
 }
 
 /**
- * `Share session`: a `Sheet` previewing the exact image, with `Share image` as
- * its one action. The backdrop, Android back and the VoiceOver escape close it,
- * except while an image is being prepared. Native-sheet cancel is silent; a
- * capture or launch failure shows inline and can be retried.
+ * `Share session`: a `PageSheet` previewing the exact image, with `Share image`
+ * as its one action. Swiping down, the X, Android back and the VoiceOver escape
+ * close it, except while an image is being prepared. Native-sheet cancel is
+ * silent; a capture or launch failure shows inline and can be retried.
  */
 export function SessionShareSheet({
   visible,
@@ -151,7 +151,6 @@ export function SessionShareSheet({
   shareImageAction = shareSessionImage,
   releaseImageAction = releaseSessionShareImage,
 }: SessionShareSheetProps) {
-  const { height } = useWindowDimensions();
   const shareCardRef = useRef<ViewInstance | null>(null);
   const hasFailedShareRef = useRef(false);
   const [cardDimensions, setCardDimensions] = useState<SessionShareCaptureDimensions | null>(null);
@@ -201,15 +200,16 @@ export function SessionShareSheet({
   };
 
   return (
-    <Sheet
-      dismissLabel="Close session share preview"
+    <PageSheet
+      closeLabel="Close session share preview"
+      dismissDisabled={isSharing}
       onDismiss={closePreview}
       testID="session-share-preview"
       title="Share session"
       visible={visible}>
       <ScrollView
         contentContainerStyle={styles.previewContent}
-        style={{ maxHeight: height * 0.6 }}
+        style={styles.preview}
         testID="session-share-preview-scroll">
         <View
           collapsable={false}
@@ -237,7 +237,7 @@ export function SessionShareSheet({
           variant="primary"
         />
       </View>
-    </Sheet>
+    </PageSheet>
   );
 }
 
@@ -254,6 +254,9 @@ const styles = StyleSheet.create({
   previewContent: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
+  },
+  preview: {
+    flex: 1,
   },
   captureTarget: {
     width: '100%',

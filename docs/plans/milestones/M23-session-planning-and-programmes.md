@@ -635,12 +635,14 @@ Each card is intended to be one reviewable PR.
    (`completed`).
 2. `docs/plans/tasks/M23-T02-Synced_session_plan_schema_and_server_contract.md` —
    add the four synced entities, performed session/block/set provenance, and
-   full Sync v2 expansion (`completed`; card deleted at merge).
+2. `docs/plans/tasks/M23-T02-Synced_session_plan_schema_and_server_contract.md` —
+   add the four synced entities, performed session/block/set provenance, and
+   full Sync v2 expansion (`completed`; card archived).
 3. `docs/plans/tasks/M23-T03-Mobile_plan_repository_and_session_materialization.md`
    — local repositories, validation, deterministic whole-plan/block
    materialization, compatible-card selection, performed-set reordering,
    explicit resolution, and active-session behavior
-   (`completed`; card deleted at merge).
+   (`completed`; card archived).
 4. `docs/plans/tasks/M23-T04-Mobile_one_off_session_planner.md` — Sessions planning
    sections plus one-off create/view/edit/start/add-block/duplicate/delete and
    recorder block/reordering UX (`planned`).

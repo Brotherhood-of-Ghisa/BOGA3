@@ -26,7 +26,7 @@ draws the same fixed bar on every screen that shows tabs.
 | --- | --- | --- |
 | `/today` | Landing page: how this week and month are going, the latest session, and one joined group's week — each linking to its full screen. Starts and resumes nothing | `(tabs)/today.tsx`, `components/today/`, `apps/mobile/src/progress-summary/` |
 | `/train` | The single entry surface for starting a personal workout (and, when it ships, planning it) | `(tabs)/train.tsx` |
-| `/progress` | Pinned By Exercise / By Muscle switch; comparisons with one row contribution accordion; full-height per-muscle / per-exercise history popup; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
+| `/progress` | Frozen breakdown, period and metric/search controls; comparisons with one row contribution accordion; per-muscle / per-exercise history page sheet; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four: Community, Tools, Library & account | `(tabs)/more.tsx` |
 
 ### Preserved tab roots

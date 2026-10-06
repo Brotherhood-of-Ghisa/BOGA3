@@ -107,11 +107,13 @@ afterEach(() => {
 });
 
 describe('production scheduler status accessor', () => {
-  it('retains a required-update message without recording sync success', async () => {
+  it('retains the possible backend-release mismatch message without recording sync success', async () => {
     goOnline();
     jest.advanceTimersByTime(1000);
     await endCycleOutcome('update-required');
-    expect(getSchedulerStatus().lastCycleError).toBe('Update BoGa to continue syncing. Your data remains on this device.');
+    expect(getSchedulerStatus().lastCycleError).toBe(
+      'BoGa and the backend use different sync versions. Update the app. If this is the latest build, the backend may still need its release update. Your data remains on this device.'
+    );
     expect(getSchedulerStatus().lastSuccessAtMs).toBeNull();
   });
 

@@ -21,6 +21,12 @@ export {
 } from '@/components/ui/list-row';
 export { Notice, type NoticeProps, type NoticeTone } from '@/components/ui/notice';
 export { PageHeader, SectionHeader } from '@/components/ui/page-header';
+export {
+  PageSheet,
+  PageSheetHeader,
+  type PageSheetHeaderProps,
+  type PageSheetProps,
+} from '@/components/ui/page-sheet';
 export { Screen, ScreenScroll, type ScreenGutter } from '@/components/ui/screen';
 export { SearchField, type SearchFieldProps } from '@/components/ui/search-field';
 export {

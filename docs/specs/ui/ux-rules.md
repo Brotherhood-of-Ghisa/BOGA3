@@ -48,19 +48,26 @@ the names of its Jest tests are the specification of that component.
 
 ## Sheets
 
-1. **A sheet is state within its route, not navigation.** Secondary workflows
-   (row actions, management options, pickers of one value, editors) open a
-   design-language `Sheet` over the current screen. Do not document opening one
-   as a route transition.
-2. **No Cancel, no Close.** The backdrop, Android back and the VoiceOver escape
-   dismiss a sheet and write nothing. A sheet may refuse dismissal only while
-   its own write or capture is in flight.
-   Full-height Progress history uses header drag and an accessible dismiss
-   action; its reachable backdrop still dismisses (`components/stats/history-popup.tsx`).
-3. **Never stack sheets.** A choice made inside a sheet (an editor's muscle
+1. **A sheet is state within its route, not navigation.** There are two
+   kinds. A **picker or menu** (row actions, management options, a choice of
+   one value, a short form) opens a design-language `Sheet` over the current
+   screen, sized to its content. A **sub-page** (a browser, an editor, a
+   preview: Swap exercise, the exercise editor, Share session, Progress
+   history) opens a `PageSheet`, the native iOS page sheet the exercise picker
+   uses. Do not document opening either as a route transition.
+2. **Dragging down closes every sheet, and dismissal writes nothing.** A
+   `Sheet` follows a drag from its handle and title row, closes on a
+   deliberate release and springs back otherwise; its body scrolls and taps
+   without dragging. Its backdrop, Android Back and the VoiceOver escape close
+   it too, and it has no Cancel or Close. A `PageSheet` swipes down from
+   anywhere and carries an X, since it has no backdrop. A sheet may refuse
+   dismissal only while its own write or capture is in flight; a refused drag
+   springs back.
+3. **Pickers never stack.** A choice made inside a sheet (an editor's muscle
    list) swaps the sheet's body, with a `chevron-left` back to the previous
-   body. A confirmation that follows a sheet opens once the sheet has gone
-   (`Sheet.onDismissed`).
+   body. A sub-page may open over a sub-page, which iOS stacks as cards. A
+   confirmation that follows a sheet opens once the sheet has gone
+   (`onDismissed`).
 4. **The keyboard closes before a sheet opens**, so a sheet never opens under
    it, and a sheet holding fields lifts above the keyboard.
 5. **Confirm what cannot be undone, not what can.** A soft delete (exercise,
@@ -68,10 +75,9 @@ the names of its Jest tests are the specification of that component.
    `Undelete` / `Unarchive`. Discarding an active session, removing an
    exercise from a session, and destructive group writes confirm first in a
    native `Alert` with a destructive button.
-6. **The exception is the exercise picker**, a route
-   (`/session/<id>/add-exercise`) presented as a full-height iOS page sheet,
-   because it hosts its own editor and pick sheets. Swiping it down leaves
-   without adding.
+6. **The exercise picker is the one sub-page with a route**
+   (`/session/<id>/add-exercise`, presented as a page sheet), because Manage
+   pushes the catalogue over it. Swiping it down leaves without adding.
 
 ## Lists and rows
 

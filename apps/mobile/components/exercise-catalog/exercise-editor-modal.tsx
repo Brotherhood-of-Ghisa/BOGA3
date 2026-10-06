@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton } from '@/components/ui/action-button';
@@ -8,7 +8,7 @@ import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { ListRow } from '@/components/ui/list-row';
 import { Notice } from '@/components/ui/notice';
-import { Sheet } from '@/components/ui/sheet';
+import { PageSheet } from '@/components/ui/page-sheet';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -37,10 +37,6 @@ type ExerciseEditorModalProps = {
   title?: string;
 };
 
-// The editor is a tall sheet: its body keeps this share of the window, and
-// shrinks with the sheet when the keyboard is up (as the exercise picker's).
-const EDITOR_SHARE_OF_SCREEN = 0.8;
-
 type MuscleGroupLookup = Map<string, ExerciseCatalogMuscleGroup>;
 
 export function ExerciseEditorModal({
@@ -53,14 +49,16 @@ export function ExerciseEditorModal({
   title,
 }: ExerciseEditorModalProps) {
   const form = useExerciseEditorForm({ visible, editingExercise, prefill, onRequestClose, onSaved, onSave });
-  const { height } = useWindowDimensions();
   const isSelectorOpen = form.muscleSelectorMode !== null;
   const selectorTitle = form.muscleSelectorMode === 'primary' ? 'Select primary muscle' : 'Add secondary muscle';
   const editorTitle = title ?? (editingExercise ? 'Edit Exercise' : 'Create Exercise');
 
+  // A sub-page (`ux-rules.md` "Sheets"): swipe down or X to leave without
+  // saving, except while a save is in flight.
   return (
-    <Sheet
-      dismissLabel="Dismiss exercise editor overlay"
+    <PageSheet
+      closeLabel="Close exercise editor"
+      dismissDisabled={form.isSaving}
       headerLeading={
         isSelectorOpen ? (
           <IconButton
@@ -76,10 +74,8 @@ export function ExerciseEditorModal({
       testID="exercise-editor"
       title={isSelectorOpen ? selectorTitle : editorTitle}
       visible={visible}>
-      <View style={[styles.body, { height: height * EDITOR_SHARE_OF_SCREEN }]}>
-        <EditorBody form={form} />
-      </View>
-    </Sheet>
+      <EditorBody form={form} />
+    </PageSheet>
   );
 }
 
@@ -331,10 +327,6 @@ function MuscleSelectorList({ mode, options, primaryMuscleGroupId, onPick }: {
 }
 
 const styles = StyleSheet.create({
-  // A tall body that shrinks with the sheet when the keyboard is up.
-  body: {
-    flexShrink: 1,
-  },
   panel: {
     flex: 1,
   },

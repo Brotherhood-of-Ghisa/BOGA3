@@ -32,7 +32,8 @@ Two standing rules:
 | A container for content | `Card` (`card.tsx`) — with `onPress` the whole card is one labelled link |
 | A legend plus a figure | `Stat` (`stat.tsx`) — `stacked` or `inline`; its only emphasis is `record` |
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
-| A secondary workflow: row actions, options, a picker of one value, an editor | `Sheet` (`sheet.tsx`) |
+| A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
+| A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button | `ActionButton` (`action-button.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`) |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
@@ -40,7 +41,7 @@ Two standing rules:
 | The inline outcome of an action | `Notice` (`notice.tsx`) |
 | A labelled text or figure input | `FormField` (`form-field.tsx`) |
 | A search input | `SearchField` (`search-field.tsx`) |
-| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) |
+| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, theme-accent or palette-grade selection |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`) |
@@ -60,8 +61,12 @@ Rules the code cannot state for itself:
   carries no icon dependency.
 - `Sheet` never grows past the top of the screen: a taller body shrinks so a
   full 44pt dismissal target stays below the status bar. It has no Cancel and
-  no Close (`ux-rules.md` "Sheets"). Use `onDismissed` when a native `Alert`
-  must follow a choice made in the sheet, so the two never stack.
+  no Close; its handle and title row drag it down, by the release rule in
+  `sheet-gesture.ts` (`ux-rules.md` "Sheets"). Use `onDismissed` when a native
+  `Alert` must follow a choice made in the sheet, so the two never stack.
+- `PageSheet` is in-route state, not a route. A host's `onDismiss` must close
+  it, because an iOS swipe has already taken it off screen; to refuse while a
+  write is in flight, pass `dismissDisabled`.
 - `Icon`'s `name` is a closed union. A glyph is decorative by default — hidden
   from assistive tech and never takes touches — until given a `label`. Geometry
   is vendored from **Lucide 1.47.0** (ISC; notice in `LICENSE.lucide`) plus a
@@ -81,7 +86,7 @@ folder rather than re-implementing its row, card or sheet.
 | `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, the session view and exercise history; `MoreHubBackButton` (the `source=more` back action); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and presses go through `apps/mobile/components/navigation/use-open-main-tab.ts` so Train opens a workout in progress |
 | `exercise-core/` | `ExerciseCoreFields` — the exercise name and weight-entry controls with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |
 | `exercise-catalog/` | `ExerciseEditorModal` (create/edit, reused by the catalogue, the picker's `Add new`, group `Add as new`, the exercise page and the group exercises page) and `ExerciseListContent` / `ExerciseListPreferenceControls` — the shared list rows, family headers and filter row for every exercise list. The grouping, filtering, sorting, row stats and preference models are `apps/mobile/src/exercise-catalog/`. Target: `design-targets/exercise-catalogue.md` |
-| `exercise-page/` | the in-workout exercise page: top bar, `RecordsPanel`, `SetRow`, `SetLogger`, `SwipeSetRow`, the effort and options sheets, and `ExerciseSwapSheet` (which reuses `ExerciseListContent`). Rules live in `apps/mobile/src/session-recorder/exercise-page-model.ts` |
+| `exercise-page/` | the in-workout exercise page: top bar, `RecordsPanel`, `SetRow`, `SetLogger`, `SwipeSetRow`, the effort and options sheets, and `ExerciseSwapSheet` (a `PageSheet` reusing `ExerciseListContent`). Rules live in `apps/mobile/src/session-recorder/exercise-page-model.ts` |
 | `session-recorder/` | the exercise picker (body of the `app/session/[sessionId]/add-exercise.tsx` page-sheet route — it only **adds**; swapping is the exercise page's `ExerciseSwapSheet`), `SessionInsightPresentation` (shared by live, completion and historical Summary) and the session / exercise / set / location types in `types.ts`. The folder name predates the session view |
 | `session-view/` | the active session and completed-session edit: `SessionTopBar` (its `active` / `completed` / `complete` modes), `SessionSummaryCard`, `SessionTimesFields`, `SessionExerciseCard`, the gym and options sheets |
 | `session-detail/` | the read-only session cards — `SetSummaryRow`, `ExerciseSetsCard`, `SessionFactsCard` — shared by the session view, View Session, exercise history and the group session view. Row and card models: `src/session-recorder/session-view-model.ts`, `completed-session-detail-model.ts` |
@@ -91,7 +96,7 @@ folder rather than re-implementing its row, card or sheet.
 | `today/` | the Today cards: `TodayProgressCard` with `WeekFigures`, `ShareBar` and `MonthPace`; the group card; and `SessionSummaryRow` + `TrainingNowMark`, the session row both cards share. Reads: `apps/mobile/src/progress-summary/`. Target: `design-targets/today-landing.md` |
 | `train/` | `StartDisc`, Train's one action (`design-targets/train-page.md`) |
 | `heatmaps/` | `DailyHeatmap` / `WeeklyHeatmap`, `HeatmapLegend` and their data and metric modules; semantics in `apps/mobile/components/heatmaps/README.md` |
-| `stats/` | Progress’s `HistorySheet` uses the full-height `HistoryPopup` for one exercise definition or muscle. Only its handle/header pans; charts and controls remain outside the gesture. Accessible dismissal restores focus after native close. Comparison tables have one inline contribution accordion; the shared `Sheet` keeps its default behavior. Targets: `design-targets/progress.md`, `progress-tables.md`, `history-popup.md` |
+| `stats/` | Progress’s `HistorySheet`, a `PageSheet` for one exercise definition or muscle; Progress restores focus once it has gone. Comparison tables have one inline contribution accordion. Targets: `design-targets/progress.md`, `progress-tables.md`, `history-popup.md` |
 | `gyms/` | `GymsScreen` and `GymEditor`; the gym directory and writes are `src/session-recorder/gym-options.ts`, location reads `src/location/gym-location-reads.ts` |
 | `groups/` | every group surface, behind the barrel `apps/mobile/components/groups/index.ts`: stream session and membership items, `GroupStreamList`, boards (`GroupBoardRow`, `GroupMetricBoard`, `GroupMetricHistory`, `GroupPodiumCard`, `GroupLeaderboardsPage`), the record and action sheets, member and exercise rows, the group / comparison / details forms, `StandardExercisePicker`, `UsernameGate`, `GroupCertificationStatus`, `GroupOfflineBanner`, `GroupWriteNotice`, the feature state panels (thin `StatePanel` wrappers), `usePullToRefresh` and the `groupScreenStyles` page shell. Data comes from `apps/mobile/src/groups`. Targets: `design-targets/groups.md`, `group-competitions.md`, `group-exercise-unlink.md` |
 | `bodyweight/` | `WeightEntrySheet`, `BodyWeightSettingsRow`, `BodyWeightScreen` — the only bodyweight entry surfaces. No session, logger or analytics component shows or edits a reading (`docs/specs/tech/bodyweight-load-contract.md`) |
