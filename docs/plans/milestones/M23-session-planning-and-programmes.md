@@ -643,7 +643,7 @@ Each card is intended to be one reviewable PR.
    (`completed`; card deleted at merge).
 4. `docs/plans/tasks/M23-T04-Mobile_one_off_session_planner.md` — Sessions planning
    sections plus one-off create/view/edit/start/add-block/duplicate/delete and
-   recorder block/reordering UX (`planned`).
+   recorder block/reordering UX (`completed`; card archived).
 5. `docs/plans/tasks/M23-T05-Mobile_training_programmes.md` — programme create,
    order, edit, detail, next-block, Complete/Skip, and child-plan flows
    (`planned`).
