@@ -35,7 +35,6 @@ marked ad hoc:
 | Screenshot | State |
 | --- | --- |
 | `view-session-detail` (ad hoc) | summary card and the first exercise card, with a record band |
-| `view-session-exercise-options` (ad hoc) | an exercise's ⋮ sheet (`Append to current session`) |
 | `view-session-options` (ad hoc) | the session ⋮ sheet (`Delete session`) |
 | `view-session-deleted` (ad hoc) | the deleted band, no `Edit` |
 | `view-session-not-found` (ad hoc) | not found, with the top bar's back |
