@@ -68,22 +68,22 @@ function useSheetDrag(visible: boolean, onDismiss: () => void) {
     };
   }, [drag]);
 
-  const timing = useCallback(
-    (duration: number) => ({ duration: reducedMotion ? 0 : duration, reduceMotion: ReduceMotion.System }),
-    [reducedMotion]
-  );
+  // Plain values, not a helper: the gesture's worklets run on the UI thread and
+  // cannot call back into JS synchronously.
+  const exitMs = reducedMotion ? 0 : EXIT_MS;
+  const settleMs = reducedMotion ? 0 : SNAP_BACK_MS;
   const snapBack = useCallback(() => {
     closing.set(false);
-    drag.set(withTiming(0, timing(SNAP_BACK_MS)));
-  }, [closing, drag, timing]);
+    drag.set(withTiming(0, { duration: settleMs, reduceMotion: ReduceMotion.System }));
+  }, [closing, drag, settleMs]);
   const release = useCallback(() => {
-    drag.set(withTiming(height, timing(EXIT_MS)));
+    drag.set(withTiming(height, { duration: exitMs, reduceMotion: ReduceMotion.System }));
     onDismiss();
     // The host's close has rendered by the next frame; still open means it refused.
     requestAnimationFrame(() => {
       if (mounted.current && visibleRef.current) snapBack();
     });
-  }, [drag, height, onDismiss, snapBack, timing]);
+  }, [drag, exitMs, height, onDismiss, snapBack]);
   // Once the modal has gone, so the next opening starts in place.
   const reset = useCallback(() => {
     cancelAnimation(drag);
@@ -115,7 +115,7 @@ function useSheetDrag(visible: boolean, onDismiss: () => void) {
     },
     onFinalize: () => {
       'worklet';
-      if (!closing.get()) drag.set(withTiming(0, timing(SNAP_BACK_MS)));
+      if (!closing.get()) drag.set(withTiming(0, { duration: settleMs, reduceMotion: ReduceMotion.System }));
     },
   });
   const translation = useAnimatedStyle(() => ({ transform: [{ translateY: drag.get() }] }));
