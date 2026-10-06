@@ -127,7 +127,7 @@ lane and restores afterwards. The mechanism is owned by `11`; **do not hand-edit
 | Lane | Exists to prove |
 |---|---|
 | `ios-smoke` | A freshly installed dev client cold-launches intact: Today, the four tabs, Train's Start opening an empty session view. The cold-start lane — real tab navigation, no teleport. |
-| `ios-data-smoke` | Real `expo-sqlite` migration + write/read on the native runtime, backend-less catalog seeding, a workout logged through Train and read back on Progress; plus the native share sheet and the catalogue editor. |
+| `ios-data-smoke` | Real `expo-sqlite` migration + write/read on the native runtime, backend-less catalog seeding, a workout logged through Train and read back through Progress’s pinned By Exercise switch; native history header snap-back/dismissal and independent chart scrolling; plus the native share sheet and catalogue editor. |
 | `ios-exercise-page` | The exercise page's device claims: history push and native back, a set committed on the keyboard. |
 | `ios-session-view` | The session view's: resume, card → exercise page → back, gym sheet and Gyms, picker sheet, finish/abandon. |
 | `ios-auth-profile` | The real login/profile happy path: login-on-start enforcement, first-sync gate, Connected agents grant list, username update, sign-out. |

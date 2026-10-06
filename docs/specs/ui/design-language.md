@@ -180,7 +180,8 @@ Headline figures (summary, records) stay Plex Mono 700, micro-labels Archivo
 - Cards are `surface` on `paper`, 1px `rule`, radius 6.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
   and a `rule` handle. **Tapping outside dismisses; sheets carry no Cancel
-  button.**
+  button.** Progress history alone fills the safe-area viewport, with header
+  drag and a subtle dismissal hint (`design-targets/history-popup.md`).
 - Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing

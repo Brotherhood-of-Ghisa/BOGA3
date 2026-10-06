@@ -45,6 +45,7 @@ jest.mock('react-native-gesture-handler', () => {
     GestureHandlerRootView: ({ children, ...props }: { children?: unknown }) =>
       React.createElement(View, props, children),
     GestureDetector: ({ children }: { children?: unknown }) => children ?? null,
+    usePanGesture: () => ({}),
     Gesture: {
       Pan: () => chainable(),
       Tap: () => chainable(),
@@ -62,6 +63,7 @@ jest.mock('react-native-gesture-handler', () => {
 });
 
 jest.mock('react-native-reanimated', () => {
+  const React = require('react');
   const { View, Text, Image, ScrollView } = require('react-native');
   return {
     __esModule: true,
@@ -77,11 +79,21 @@ jest.mock('react-native-reanimated', () => {
     Image,
     ScrollView,
     createAnimatedComponent: (c: unknown) => c,
-    useSharedValue: (init: unknown) => ({ value: init }),
+    useSharedValue: (init: unknown) => {
+      const ref = React.useRef({ value: init });
+      return Object.assign(ref.current, { get: () => ref.current.value,
+        set: (value: unknown) => { ref.current.value = value; } });
+    },
     useAnimatedStyle: (fn: () => unknown) => fn(),
-    withTiming: (toValue: unknown) => toValue,
+    withTiming: (toValue: unknown, _config?: unknown, callback?: (finished: boolean) => void) => {
+      callback?.(true);
+      return toValue;
+    },
     withSpring: (toValue: unknown) => toValue,
     runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+    cancelAnimation: jest.fn(),
+    ReduceMotion: { System: 'system' },
+    useReducedMotion: () => false,
   };
 });
 

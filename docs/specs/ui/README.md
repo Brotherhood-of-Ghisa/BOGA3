@@ -63,7 +63,7 @@ drifted from the code. Git history has them.)
     comparisons, separate chevron selection/name history, inline contributions
     and minimal copy; `/progress` owns the shared `/stats-history` surface
 - `design-targets/history-popup.md`
-  - accepted, pending implementation: full-height muscle/exercise history
+  - implemented and verified: full-height muscle/exercise history
     popup with header swipe dismissal, no close button, and existing heatmaps
 
 ## Maintenance rules (for future tasks)

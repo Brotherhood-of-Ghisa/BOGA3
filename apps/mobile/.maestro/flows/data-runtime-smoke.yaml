@@ -12,19 +12,23 @@ appId: com.dinoderek.mobile
 #      so Stats counts it), and it commits `135.0 × 8`;
 #   4. Finish (one confirmed set, no prompt) opens the completion screen, and
 #      Done replaces it with Stats;
-#   5. Progress → Browse exercises reads back the session just written: the only
+#   5. Progress → By Exercise reads back the session just written: the only
 #      on-device check of the Stats queries (their values over the harness
 #      fixtures are stats-screen-local-data.test.tsx).
+#   6. history's native header pan snaps back after a short drag, leaves chart
+#      scrolling independent, and dismisses after a deliberate downward drag.
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
 #   4. the root-stack replace after Finish.
+#   6. Gesture Handler / Reanimated recognition inside a native Modal.
 # Jest counterpart: __tests__/exercise-picker.test.tsx,
 #   __tests__/exercise-page-screen.test.tsx (logger),
 #   __tests__/set-effort-defaults.test.ts (first-set warm-up),
 #   __tests__/session-view-model.test.ts (Finish prompts),
 #   __tests__/completed-session-local-data.test.tsx (Done → Stats),
 #   __tests__/stats-screen-local-data.test.tsx, __tests__/sessions-screen.test.tsx.
+#   __tests__/history-popup.test.tsx (release/cancellation/close decisions).
 #
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
@@ -136,15 +140,9 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-history-screen"
     timeout: 30000
-# 5. Progress opens on Work by muscle. Its Browse exercises action preserves
-# the exercise list query proof after the table-first Progress redesign.
-- scrollUntilVisible:
-    element:
-      id: "stats-browse-exercises"
-    direction: DOWN
-    timeout: 15000
+# 5. The pinned switch opens exercise browsing without leaving Progress.
 - tapOn:
-    id: "stats-browse-exercises"
+    id: "stats-view-mode-chip-exercise"
 - extendedWaitUntil:
     visible:
       id: "stats-exercise-list"
@@ -154,3 +152,71 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "stats-exercise-list-empty"
 - takeScreenshot: "05-data-runtime-smoke-exercise-list"
+# One native gesture scenario; disclosure and browsing state remain Jest.
+# Establish its Daily/window preconditions: data reset preserves saved preferences.
+# This is setup for scrolling, not a new Settings claim (settings-progress.test.tsx).
+- openLink: "boga3://settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-history-lookback"
+    direction: DOWN
+- tapOn:
+    id: "settings-history-lookback"
+- eraseText
+- inputText: "52"
+- hideKeyboard
+- tapOn:
+    id: "settings-heatmap-view-daily"
+- openLink: "boga3://progress"
+- tapOn:
+    id: "stats-view-mode-chip-exercise"
+- tapOn:
+    id: "stats-exercise-row-seed_barbell_back_squat"
+- extendedWaitUntil:
+    visible:
+      id: "stats-exercise-history-drag-header"
+    timeout: 15000
+- tapOn:
+    id: "stats-exercise-history-metric-chip-workingSetCount"
+- swipe:
+    start: "50%,8%"
+    end: "50%,12%"
+    duration: 600
+- assertVisible:
+    id: "stats-exercise-history-drag-header"
+- takeScreenshot: "06-history-short-drag-restored"
+# Compare the day at one fixed screen position before and after the swipe.
+# Merely selecting an older day would also pass in the initial viewport.
+- tapOn:
+    id: "stats-exercise-history-heatmap"
+    point: "50%,25%"
+- copyTextFrom:
+    id: "stats-exercise-history-heatmap-day-detail-date"
+- evalScript: ${output.historyDateBeforeScroll = maestro.copiedText}
+- swipe:
+    from:
+      id: "stats-exercise-history-heatmap"
+      point: "80%,25%"
+    direction: RIGHT
+    duration: 600
+- tapOn:
+    id: "stats-exercise-history-heatmap"
+    point: "50%,25%"
+- copyTextFrom:
+    id: "stats-exercise-history-heatmap-day-detail-date"
+- assertTrue: ${maestro.copiedText !== output.historyDateBeforeScroll}
+- assertVisible:
+    id: "stats-exercise-history-drag-header"
+- takeScreenshot: "07-history-chart-scrolled"
+- swipe:
+    from:
+      id: "stats-exercise-history-drag-header"
+    direction: DOWN
+    duration: 600
+- extendedWaitUntil:
+    notVisible:
+      id: "stats-exercise-history-drag-header"
+    timeout: 10000
+- assertVisible:
+    id: "stats-exercise-row-seed_barbell_back_squat"
+- takeScreenshot: "08-history-swipe-dismissed"
