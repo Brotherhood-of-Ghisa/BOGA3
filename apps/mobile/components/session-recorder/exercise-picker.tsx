@@ -19,6 +19,7 @@ import { SearchField } from '@/components/ui/search-field';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { loadSuggestedExercisePlan, type ExerciseBlockHistorySuggestedPlan } from '@/src/data';
+import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { type ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -35,12 +36,6 @@ import {
   type PickerGroupSection,
 } from '@/src/groups/link-view-model';
 import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-
-export type ExercisePickerPreselectionState = {
-  exercise: ExerciseListItem;
-  status: 'loading' | 'ready' | 'error';
-  suggestion: ExerciseBlockHistorySuggestedPlan | null;
-};
 
 export type ExercisePickerProps = {
   onClose: () => void;

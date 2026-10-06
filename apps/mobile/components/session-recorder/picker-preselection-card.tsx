@@ -8,7 +8,7 @@ import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-seman
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
-import type { ExercisePickerPreselectionState } from '@/components/session-recorder/exercise-picker';
+import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 
 export type PickerPreselectionCardProps = {
   state: ExercisePickerPreselectionState;
