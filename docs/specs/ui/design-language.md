@@ -70,7 +70,9 @@ and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
-a `rule` hairline, being only 1.18:1 against `surface`.
+a `rule` hairline, being only 1.18:1 against `surface`. The operator-authorized
+Progress selectors also use the strongest palette grade for selection; if
+changing them, load `design-targets/progress-tables.md`.
 
 ## 3. Typography
 

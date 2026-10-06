@@ -2,7 +2,9 @@
 
 **Accepted direction, refined 2026-10-06.** The operator selected the continuous
 inline contribution table and amended it to use normal, non-underlined names
-and no visible contribution Total row. This image supersedes the earlier
+and no visible contribution Total row. The operator also requested frozen
+selectors/search, palette-coloured selection and removal of the comparison
+subtitle. This image supersedes the earlier
 contribution layout. `/progress` owns the implementation; `/stats-history`
 re-exports it. The written rules preserve production data, accessibility,
 responsive fallbacks and target-attainment shading. Current rules also live in
@@ -27,15 +29,14 @@ responsive fallbacks and target-attainment shading. Current rules also live in
 
 ## Brief and copy
 
-- One pinned `By Exercise` / `By Muscle` control above `ScreenScroll` on
-  `paper` and the existing fixed `MainTabs`. The scroll starts with the
-  joined period control: configured `N weeks` / `This week`, or
-  only `This week` when N=1. The configured window remains the default. A second
-  joined control offers `Working sets` / `Volume`, initially Working sets.
-  Use one comparison label, `vs previous week` or `vs previous N weeks`; the
-  accessible wording states that the preceding window covers the same elapsed
-  calendar span. No rolling-day controls, bare `So far` label or duplicated
-  date subtitles.
+- Freeze `By Exercise` / `By Muscle`, the period control and either the muscle
+  metric control or exercise search above `ScreenScroll` on `paper`; retain
+  fixed `MainTabs`. Period choices are configured `N weeks` / `This week`, or
+  only `This week` when N=1; the configured window remains the default. Muscle
+  metrics are `Working sets` / `Volume`, initially Working sets. Selected
+  segments use `viz4` with `ink` text. No visible comparison subtitle; each period
+  tab's accessible wording names the preceding window and same elapsed
+  calendar span. No rolling-day controls or duplicated date subtitles.
 - `Work by muscle`: `Muscle | Now | Previous | Change`, with aligned numbers,
   taxonomy-ordered static family headings and quiet dividers. Include every
   individual taxonomy muscle, even all-zero and previous-only rows. There are
@@ -146,7 +147,7 @@ and the retained [history target](progress.md#history-sheets-and-heatmaps-dlm-t0
 | --- | --- |
 | Default table | Working sets, configured calendar window, all taxonomy rows, no selection |
 | Expanded / collapsed contributions | Separate chevron/name actions; one block directly after its row, repeat tap collapses; reconciled rows, normal name links and no visible Total |
-| Pinned views / final Sessions | Switch visible over either scrolled body; retained search/sort; Sessions last, including empty/error |
+| Frozen controls / final Sessions | Breakdown, period and metric/search visible over either scrolled body; retained search/sort; Sessions last, including empty/error |
 | Zero current / previous-only | Muscle 0 vs 3 → −3; its previous-only exercise remains explainable |
 | All-zero / no history | Keep muscle rows and name links; when the selected metric has no eligible contributors, say `No working sets for <muscle> in either period` or `No volume-included sets for <muscle> in either period` only after a successful read; included zero-load sets retain exercise rows with real zeros; retained empty history sheet remains available |
 | Volume-only / empty calculation column | Zero working sets can coexist with Volume; contributors and empty copy follow the selected metric; valid zero load is not missing data |

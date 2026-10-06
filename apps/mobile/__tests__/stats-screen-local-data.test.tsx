@@ -471,13 +471,23 @@ describe('Stats over real data', () => {
   const value = (id: string, column: string) => screen.getByTestId(`stats-muscle-row-${id}-${column}`);
   const contribution = (column: string) => screen.getByTestId(`stats-contribution-${SQUAT}-${column}`);
 
-  it('pins one switch outside either scroll, with Sessions last even for an empty search', async () => {
+  it('pins every selector and exercise search outside either scroll, with Sessions last even for an empty search', async () => {
     await renderMuscles();
     const assertPinned = (scrollId: string) => {
+      const controls = within(screen.getByTestId('stats-controls'));
+      const scroll = within(screen.getByTestId(scrollId));
       expect(within(screen.getByTestId('stats-view-switch')).getAllByRole('tab')).toHaveLength(2);
-      expect(within(screen.getByTestId(scrollId)).queryByTestId('stats-view-mode-chip-exercise')).toBeNull();
+      const ids = ['stats-view-mode-chip-row', 'stats-period-chip-row',
+        scrollId === 'stats-scroll' ? 'stats-metric-chip-row' : 'stats-search-input'];
+      for (const id of ids) {
+        expect(controls.getByTestId(id)).toBeTruthy();
+        expect(scroll.queryByTestId(id)).toBeNull();
+      }
+      for (const tab of controls.getAllByRole('tab')) {
+        expect(tab).toHaveStyle({ backgroundColor: tab.props.accessibilityState.selected ? uiRoles.viz4 : uiRoles.surface });
+      }
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
-      const content = within(screen.getByTestId(scrollId)).getAllByTestId(
+      const content = scroll.getAllByTestId(
         /^stats-(muscle-table|exercise-list|exercise-list-empty|sessions-link)$/
       );
       expect(content.at(-1)).toHaveProp('testID', 'stats-sessions-link');

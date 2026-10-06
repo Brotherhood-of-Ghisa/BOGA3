@@ -271,9 +271,12 @@ describe('formatPeriodComparison', () => {
   });
 });
 
-it.each([[7, 'week'], [28, '4 weeks']])('announces the %i-day comparison once', (periodDays, wording) => {
+it.each([[7, 'week'], [28, '4 weeks']])('announces the %i-day comparison without a visible subtitle', (periodDays, wording) => {
   renderStatsScreenShell({ periodDays });
-  expect(screen.getByTestId('stats-comparison-label')).toHaveProp('accessibilityLabel', `vs previous ${wording}, same elapsed calendar span`);
+  const label = `${periodDays === 7 ? 'This week' : '4 weeks'}, vs previous ${wording}, same elapsed calendar span`;
+  expect(screen.getByRole('tab', { name: label })).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.queryByText(`vs previous ${wording}`)).toBeNull();
+  expect(screen.queryByTestId('stats-comparison-label')).toBeNull();
 });
 
 describe('formatCountDelta', () => {
