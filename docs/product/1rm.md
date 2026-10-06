@@ -12,6 +12,8 @@ A single (reps = 1) is not estimated: its 1RM is its load. A zero load gives
 `0.0`, a valid figure that is never a record. `load` is the calculated load
 when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 
+<!-- fact-table: 1rm.formula -->
+
 | Load kg | Reps | 1RM shown |
 | --- | --- | --- |
 | 100 | 1 | 100.0 |
@@ -22,3 +24,4 @@ when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 
 Why: a single is a measured max; estimating above it would invent strength.
 Code: `estimateOneRepMax` in `apps/mobile/src/exercise-calculations/index.ts`; `formatOneRepMax` in `apps/mobile/src/exercise-calculations/format.ts`.
+Signature: `48.8`, `53.8`, `0.075`

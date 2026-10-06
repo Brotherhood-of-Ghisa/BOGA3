@@ -6,9 +6,8 @@ stated once, here, with a stable ID. Specs describe how the code implements a
 fact; they cite it and never restate it.
 
 **Pilot status.** This corpus covers sets, 1RM, muscle set counts and screen
-copy. It is not yet routed from `AGENTS.md`; until it is, where a spec and a
-fact disagree, the fact records the decision and the spec records today's
-code (see each fact's `Pending:` line).
+copy. Where a spec and a fact disagree, the fact records the decision and the
+spec records today's code (see each fact's `Pending:` line).
 
 ## Subjects
 
@@ -37,6 +36,7 @@ owns them.
 Why: <one or two sentences>
 Code: <where it is implemented>
 Pending: <only when the code does not yet match>
+Signature: `<text>`, `<text>`  (optional)
 ```
 
 - **ID** never changes. A replaced fact keeps its heading with status
@@ -50,7 +50,21 @@ Pending: <only when the code does not yet match>
 - **Examples** for definitions and calculations are table rows a test can run.
   Principles grow by cases: each review verdict the product owner gives is
   added as a case.
+- **Executable tables** carry `<!-- fact-table: <id> -->` above them; a Jest
+  test (`apps/mobile/__tests__/product-fact-tables.test.ts`) runs every row
+  through the real code. A row the `Pending:` line explains runs as an
+  expected failure, so implementing the decision fails the test until the
+  `Pending:` line goes.
+- **Signature**: a few literal texts only a restatement of the fact would
+  contain (a formula constant, an exact label). Principles rarely have one.
 - **Reference** a fact from any doc as `[[set.eligibility]]`.
+
+`docs-check` enforces the format: a malformed header, a duplicate ID, an
+unknown kind or status, or a `[[id]]` naming no fact fails it. So does a
+signature in a persistent doc outside this directory whose paragraph does not
+cite the fact: cite it there, or remove the restatement. Restatements older
+than the check are listed in `scripts/product-fact-restatements.tsv`, which
+only shrinks.
 
 ## Changing a fact
 

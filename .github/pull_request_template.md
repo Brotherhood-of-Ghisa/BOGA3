@@ -22,6 +22,8 @@ Link CI runs / artifacts / prior threads — do not paste them.
 
 Agreed with operator: <!-- yes, plus anything lowered or raised and why -->
 
+Product facts: <!-- ids touched (`set.eligibility`, …) | none --> — product review: <!-- verdict of docs/product/REVIEW.md on this diff -->
+
 ## Review hard
 
 <!-- 2-4 spots that need real scrutiny, each with file:line. "Nothing risky — mechanical" is a valid answer. -->

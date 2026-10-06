@@ -1,0 +1,11 @@
+# Grandfathered product-fact restatements: persistent docs outside docs/product/
+# that contained a fact's `Signature:` text, uncited, when docs-check began
+# enforcing it (scripts/gen-docs.sh, check 9; rules: docs/product/README.md).
+#
+# This list only shrinks. When a doc stops restating a fact (it cites
+# [[<id>]] in that paragraph, or the restatement goes), docs-check fails until
+# the row is lowered to the new count, or dropped at 0. Never add or raise a
+# row without the operator's agreement.
+#
+# Rows (tab-separated): <doc>  <fact id>  <uncited paragraphs>
+docs/specs/ui/ux-rules.md	set.count-display	1

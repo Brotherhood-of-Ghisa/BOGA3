@@ -6,7 +6,8 @@
 #
 # Prints `true` when the GitHub event is `pull_request` and every changed path
 # is under `docs/` or is a root-level `*.md` (AGENTS.md, RUNBOOK.md, …);
-# otherwise `false`. Any other event (push to main), an empty path list, or a
+# otherwise `false`. `docs/product/` is not docs-only: Jest runs its fact
+# tables (apps/mobile/__tests__/product-fact-tables.test.ts). Any other event (push to main), an empty path list, or a
 # single path outside those two places means `false`: CI then runs every step.
 # Feed it `git diff --name-only --no-renames` so a rename out of `docs/` also
 # lists its non-docs side. Tested by scripts/tests/ci-docs-only.test.sh.
@@ -32,6 +33,7 @@ while IFS= read -r path || [[ -n "${path}" ]]; do
   [[ -n "${path}" ]] || continue
   seen=1
   case "${path}" in
+    docs/product/*) echo false; exit 0 ;;
     docs/*) ;;
     */*) echo false; exit 0 ;;
     *.md) ;;

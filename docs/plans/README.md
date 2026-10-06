@@ -47,7 +47,7 @@ cannot run their gates there). Never merge a PR yourself unless asked.
 | Load | The card, its milestone, and the AGENTS.md load list for the areas touched; check assumptions against `origin/main`. |
 | Design | UI: pin the accepted design target per `docs/specs/ui/ai-design-policy.md`. |
 | Build | `./boga test for` lists the required gates; run them to green (AGENTS.md rule 3). Durable decisions go in `docs/specs/**`. |
-| Review | `/code-review` on the branch diff; add `/security-review` for auth/RLS/API changes. |
+| Review | `/code-review` and `docs/product/REVIEW.md` on the branch diff; add `/security-review` for auth/RLS/API changes. |
 | PR | Delete the card, mark it `completed` in the milestone (last task: delete the milestone). Body per `.github/pull_request_template.md` (lanes run, agreed with the operator). Then `./boga db down`. Optional: `./boga pr wait` in the background to notice the merge. |
 | User review | Fix, re-run affected gates, push, `./boga db down`; or reply why not. |
 | Merged | Confirm on GitHub (or `pr wait` exit 0), `git fetch origin main`, read the milestone at `origin/main`, offer ready cards as `Execute docs/plans/tasks/<task-id>.md with /task-protocol.` |
