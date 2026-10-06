@@ -19,6 +19,10 @@
 /** The non-auth failure classifications a cycle can report. */
 export type CycleErrorCode = 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
 
+/** UPDATE_REQUIRED can mean either the app or the backend is behind. */
+export const SYNC_VERSION_MISMATCH_MESSAGE =
+  'BoGa and the backend use different sync versions. Update the app. If this is the latest build, the backend may still need its release update. Your data remains on this device.';
+
 type CycleErrorListener = () => void;
 
 const listeners = new Set<CycleErrorListener>();

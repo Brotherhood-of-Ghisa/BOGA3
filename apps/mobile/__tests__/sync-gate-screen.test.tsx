@@ -190,11 +190,14 @@ describe('SyncSetupScreen', () => {
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeNull();
   });
 
-  it('explains a required update without offering a futile retry', () => {
+  it('explains an app/backend version mismatch and a possible missing backend release update', () => {
     renderGate();
     publish({ lastCycleErrorCode: 'UPDATE_REQUIRED' });
-    expect(screen.getByText('App update required')).toBeTruthy();
-    expect(screen.getByText('Update BoGa to continue syncing. Your data remains on this device.')).toBeTruthy();
+    expect(screen.getByText('Sync version mismatch')).toBeTruthy();
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage)).toHaveTextContent(
+      'BoGa and the backend use different sync versions. Update the app. If this is the latest build, the backend may still need its release update. Your data remains on this device.'
+    );
+    expect(screen.queryByText('App update required')).toBeNull();
     expect(screen.queryByTestId(SYNC_GATE_TEST_IDS.retryButton)).toBeNull();
   });
 
