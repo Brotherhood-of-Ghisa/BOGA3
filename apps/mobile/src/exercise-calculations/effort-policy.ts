@@ -22,6 +22,11 @@ export const DEFAULT_PERSONAL_EFFORT_POLICY: EffortCalculationPolicy = {
   workingSetEfforts: contributingEfforts,
   volumeEfforts: contributingEfforts,
 };
+/**
+ * The fixed group and coaching rule (`set.eligibility`): the personal defaults,
+ * never a device's policy. Groups store it as each fact's `working` flag.
+ */
+export const SHARED_EFFORT_POLICY: EffortCalculationPolicy = DEFAULT_PERSONAL_EFFORT_POLICY;
 
 export const isEffortChoice = (value: unknown): value is EffortChoice =>
   EFFORT_CHOICES.some(choice => choice.id === value);

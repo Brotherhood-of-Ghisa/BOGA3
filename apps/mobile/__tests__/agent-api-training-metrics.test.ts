@@ -1,6 +1,7 @@
 import {
   METRIC_REVISION, projectTrainingSets, type EnteredSetRow, type SessionWeightRow,
 } from '../../../supabase/functions/agent-api/training-metrics.ts';
+import { GROUP_COACHING_ELIGIBILITY } from './helpers/set-eligibility';
 
 const noReading: SessionWeightRow = {
   body_weight_kg: null, body_weight_source: null, body_weight_measurement_id: null, body_weight_measured_at: null,
@@ -15,7 +16,18 @@ const set = (id: string, weight: string, reps: string, setType: string | null,
 
 describe('agent-api training projection', () => {
   it('labels the working-set meaning of its figures', () => {
-    expect(METRIC_REVISION).toBe('working_sets_v2');
+    expect(METRIC_REVISION).toBe('working_sets_v3');
+  });
+
+  it.each(GROUP_COACHING_ELIGIBILITY)("applies set.eligibility's fixed coaching rule to %s", (_label, setType, counts) => {
+    const projection = projectTrainingSets([set('s0', '100', '5', setType)], ordinary, noReading, false);
+
+    expect(projection.workingSetCount).toBe(counts ? 1 : 0);
+    expect(projection.volumeCoverage).toMatchObject({ totalVolumeKgReps: counts ? 500 : 0, eligibleSetCount: counts ? 1 : 0 });
+    expect(projection.topWeightSet).toEqual(counts ? { weight: 100, reps: 5 } : null);
+    expect(projection.estimatedOneRepMax === null).toBe(!counts);
+    // Every performed row is listed with its own figures either way.
+    expect(projection.sets).toEqual([expect.objectContaining({ id: 's0', set_type: setType, volume: { value: 500, unit: 'kg_reps' } })]);
   });
 
   it('lists a heavier warm-up with its own figures but excludes it from every aggregate', () => {

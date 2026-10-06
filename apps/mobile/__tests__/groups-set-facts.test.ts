@@ -14,6 +14,7 @@ import {
 } from '@/src/groups';
 import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
 import { competitionSession } from './helpers/competition-fixtures';
+import { GROUP_COACHING_ELIGIBILITY } from './helpers/set-eligibility';
 
 const STARTED_AT_MS = 1_757_500_000_000;
 
@@ -96,12 +97,13 @@ describe('group evaluator set facts', () => {
     expect(GROUP_EVAL_RULES_VERSION).toBe(5);
   });
 
-  it("stores the app's working-set rule: every set but a warm-up", () => {
-    const workingOf = (setType: string | null) => factOf(row('s1', '100', '5', { set_type: setType })).working;
-    const setTypes = ['rir_0', 'rir_3', 'rir_12', null, 'working', 'RIR_1', 'cooldown', 'technique', 'warm_up'];
-    expect(setTypes.map(workingOf)).toEqual(setTypes.map(value => isWorkingSetType(value)));
-    expect(setTypes.map(workingOf)).toEqual([true, true, true, true, true, true, true, true, false]);
-    // Independent of performed: the summary filters on both.
+  it.each(GROUP_COACHING_ELIGIBILITY)("stores set.eligibility's fixed group rule as working: %s", (_label, setType, counts) => {
+    const fact = factOf(row('s1', '100', '5', { set_type: setType }));
+    expect(fact).toMatchObject({ performed: true, working: counts });
+    expect(fact.working).toBe(isWorkingSetType(setType));
+  });
+
+  it('stores working independently of performed: the summary filters on both', () => {
     expect(factOf(row('s1', '100', '5', { set_type: 'rir_1', performance_status: 'planned' }))).toMatchObject({
       performed: false,
       working: true,

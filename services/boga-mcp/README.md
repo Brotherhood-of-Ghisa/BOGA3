@@ -38,10 +38,10 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "working_sets_v2"` pass through
+Training projections with `metric_revision: "working_sets_v3"` pass through
 unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
-only: a warm-up is listed with its own per-set figures but feeds no record,
+only: a non-working set (warm-up, technique, cooldown) is listed with its own per-set figures but feeds no record,
 volume, 1RM or count (see the
 [working-set rule](../../docs/specs/tech/training-metrics-contract.md#1-counted-set)).
 All Weight is kg: `load`/`top_weight` are raw,
