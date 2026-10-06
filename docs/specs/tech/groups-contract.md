@@ -128,7 +128,8 @@ retry), `UPDATE_REQUIRED` (client contract too old). Client-only: `NETWORK`,
 Three RPC generations coexist: legacy `group_*` (kg Weight/1RM) and protocol 3
 (`group_metric_*`, `*_v2`) are this doc's; protocol 4 (`group_competition_*`)
 is the competition contract's. Once it is active, unsafe older RPCs return
-`UPDATE_REQUIRED`.
+`UPDATE_REQUIRED`. The app calls only protocol 4 and the shared membership and
+settings RPCs.
 
 **Week summary.** The client sends its local week (≤ 8 days): the server never
 guesses a time zone. It counts completed, untombstoned sessions shared to the
@@ -141,11 +142,16 @@ exercises, sets); latest completed is any time.
 
 ## Device-computed card metrics
 
-Stream cards and the friend view compute metrics on the viewing device
-(`apps/mobile/src/groups/session-metrics.ts`) with the session screens' TS.
-Nothing is mirrored in SQL: SQL mirrors once duplicated set rules in two
-languages. The cost: a co-member's device receives every live set. Card Volume
-is ordinary kg and never reads a personal preference, contribution or reading.
+Session cards and the friend view count on the viewing device
+(`buildCompetitionSession`,
+`apps/mobile/src/groups/competition-session-view-model.ts`) with the session
+screens' TS. Counts come only from permitted set context: `Sets` is the
+performed working rows, `exercises` those holding one. A normalized exercise
+shows reps and effort, never a load figure, and no session total is
+reconstructed. Nothing is mirrored in SQL: SQL mirrors once duplicated set
+rules in two languages. The cost: a co-member's device receives every permitted
+live set. Ordinary rows use ordinary kg and never read a personal preference,
+contribution or reading.
 
 ## Evaluator
 
@@ -172,7 +178,8 @@ Postgres (shared secret, no JWT); it has no client API.
 
 **Facts.** `group_set_facts` has one row per set of every shared session,
 linked or not, so a new link is a re-apply. `apps/mobile/src/groups/set-facts.ts`
-is the one implementation of the group set rules (device cards use it too).
+is the one implementation of the group set rules; device session cards parse
+with the same kernel.
 `fingerprint` hashes raw synced values and interprets nothing. Every reader
 reads `working` as `working is not false`. Changing the set rules (including
 `isWorkingSetType`) bumps `GROUP_EVAL_RULES_VERSION`; drains re-queue older
@@ -257,8 +264,9 @@ never a Sync v2 trigger.
   see `rebuilding`, never mixed revisions.
 - Rule-only changes keep a witness; set edits and deletes void it; a
   private-reading correction ends only the dependent projection.
-- `metric-wire-guards.ts` and `competition-wire-guards.ts` reject private
-  fields, mixed revisions and wrong units before the cache.
+- `competition-wire-guards.ts` rejects private fields, mixed revisions and
+  wrong units before the cache; `metric-wire-guards.ts` rejects private fields
+  in a comparison's rules.
 
 ## Mobile client
 
@@ -310,7 +318,7 @@ Code and tests cite these.
 | D6 | 1RM converts across load modes; Weight stays raw |
 | E0–E0.4 | Linking: picker search, pick sheet, Link screen, group-page link/unlink |
 | E1–E1.3 | Podiums, full board with toggles, history |
-| E2, E3 | Row detail sheet; stream record card |
+| E2, E3 | Row detail sheet; stream record card (`GroupMetricStreamCard`) |
 | T1–T8 | Separate exercise store; links in Sync v2; `group-eval`; kick + sweep; one stream table; history-only lead changes; diffed boards; provisional records |
 | R1 | New best: `record`, `lead_change{record}` if #1 moves |
 | R2 | Record set edited down, unperformed or deleted: void, fall back to next best |

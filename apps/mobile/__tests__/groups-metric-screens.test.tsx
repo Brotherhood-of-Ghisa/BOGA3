@@ -42,26 +42,20 @@ jest.mock('expo-router', () => ({
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
-jest.mock('@/src/groups/api', () => {
-  const streamRead = jest.fn();
-  return {
-    ...jest.requireActual('@/src/groups/api'),
-    getGroup: jest.fn(),
-    listMyGroups: jest.fn(),
-    getGroupStream: streamRead,
-    getCompetitionStream: streamRead,
-    listCompetitionExercises: jest.fn(),
-    getCompetitionPodiums: jest.fn(),
-    getGroupBoard: jest.fn(),
-    getGroupBoardHistory: jest.fn(),
-    getCompetitionBoard: jest.fn(),
-    getCompetitionRevisions: jest.fn(),
-    getCompetitionHistory: jest.fn(),
-    certifyCompetition: jest.fn(),
-    getCompetitionCertification: jest.fn(),
-    endCompetitionCertification: jest.fn(),
-  };
-});
+jest.mock('@/src/groups/api', () => ({
+  ...jest.requireActual('@/src/groups/api'),
+  getGroup: jest.fn(),
+  listMyGroups: jest.fn(),
+  getCompetitionStream: jest.fn(),
+  listCompetitionExercises: jest.fn(),
+  getCompetitionPodiums: jest.fn(),
+  getCompetitionBoard: jest.fn(),
+  getCompetitionRevisions: jest.fn(),
+  getCompetitionHistory: jest.fn(),
+  certifyCompetition: jest.fn(),
+  getCompetitionCertification: jest.fn(),
+  endCompetitionCertification: jest.fn(),
+}));
 
 import * as groupsApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
@@ -114,7 +108,6 @@ it('shows normalized 1RM and Volume with explicit units and independent Certifie
   expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('650.0 %BW·reps');
   fireEvent.press(screen.getByTestId('group-board-scope-all'));await settleReads();
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: false }));
-  expect(api.getGroupBoard).not.toHaveBeenCalled();
 });
 it('hides rows while a new revision rebuilds',async()=>{
   api.getCompetitionBoard.mockResolvedValue({ ...board,state: 'rebuilding',entries: [],entry_count: 0 });

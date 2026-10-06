@@ -162,11 +162,11 @@ and use physical total load for normalized percentages; mode changes rebuild. Of
 positive+missing must rebuild when a first applicable reading arrives. Personal
 preference/contribution must never affect group results.
 
-`groups-metric-api.test.ts` must check Weight/1RM kg/revision/scope coherence,
-rebuilding emptiness and fails closed if any reading value/date/id/provenance or
-dependency digest enters a public payload. Cache tests must prove old projections
-are evicted. Session metric tests must prove raw activity survives an absent
-derived score.
+`groups-metric-wire-guards.test.ts` must fail closed if any reading
+value/date/id/provenance or dependency digest enters a comparison's rules.
+Cache tests must prove old projections are evicted.
+`groups-competition-presentation.test.ts` must prove a session's permitted raw
+activity survives an absent derived score.
 
 `groups-comparison-form.test.tsx` must cover admin/member control, off/on persistence
 and stale edits. Retained protocol-3 screen assertions preserve historical Weight units. Current

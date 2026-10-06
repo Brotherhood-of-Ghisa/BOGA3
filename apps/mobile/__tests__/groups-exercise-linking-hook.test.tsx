@@ -38,7 +38,7 @@ jest.mock('@/src/auth', () => ({
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
   listMyGroups: jest.fn(),
-  listGroupExercises: jest.fn(),
+  listCompetitionExercises: jest.fn(),
 }));
 
 import * as groupsApi from '@/src/groups/api';
@@ -66,7 +66,7 @@ describe('useGroupExerciseLinking signed out', () => {
     expect(mockBootstrap).not.toHaveBeenCalled();
     expect(mockListLinks).not.toHaveBeenCalled();
     expect(api.listMyGroups).not.toHaveBeenCalled();
-    expect(api.listGroupExercises).not.toHaveBeenCalled();
+    expect(api.listCompetitionExercises).not.toHaveBeenCalled();
   });
 });
 

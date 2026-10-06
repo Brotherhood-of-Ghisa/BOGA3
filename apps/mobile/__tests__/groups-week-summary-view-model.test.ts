@@ -12,12 +12,12 @@ import {
   groupRecordBoards,
   joinNames,
   type GroupWeekBoardRow,
-  type GroupWeekTrainingSession,
 } from '@/src/groups';
 
 import { competitionEvent } from './helpers/competition-fixtures';
 import type { CompetitionEventWire,CompetitionHistoricalMetric,CompetitionWeekSummaryWire } from '@/src/groups/competition-wire';
 type GroupWeekLatestSession = NonNullable<CompetitionWeekSummaryWire['latest_completed']>;
+type GroupWeekTrainingSession = CompetitionWeekSummaryWire['training_now'][number];
 const ME = 'me';
 
 const row = (userId: string, rank: number, workingSets: number, groupRecords = 0, username: string | null = userId): GroupWeekBoardRow => ({

@@ -74,8 +74,8 @@ Define the canonical repository structure, path ownership, and placement convent
     shared with that worker.
     Their entire import graph follows the same relative `.ts` rule, including
     type-only imports. `metric-wire.ts` / `metric-wire-guards.ts` own versioned
-    payloads and privacy validation at `api.ts`; `session-metrics.ts` owns the
-    raw/public shared-session projection and never a private reading context.
+    comparison rules and their privacy validation; `competition-session-view-model.ts`
+    owns the public shared-session projection and never a private reading context.
     `competition-score.ts` / `competition-evaluation.ts` own activated
     protocol-4 scoring/worker dispatch; competition wire guards own its exact
     safe reader shapes at the same API boundary. They follow the same `.ts`

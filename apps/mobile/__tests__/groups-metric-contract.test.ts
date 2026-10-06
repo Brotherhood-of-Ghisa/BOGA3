@@ -1,4 +1,3 @@
-import { formatGroupRawPerformance } from '@/src/groups/metric-view-model';
 import {
   GROUP_METRICS,
   GROUP_METRIC_UNITS,
@@ -59,19 +58,5 @@ describe('group metric contract', () => {
       .toEqual({ compatible: true, enteredWeightFactor: 2 });
     expect(checkGroupLinkCompatibility(source, { ...pull, loadInputMode: 'per_side_load' }))
       .toEqual({ compatible: true, enteredWeightFactor: 0.5 });
-  });
-});
-
-describe('group raw performance line', () => {
-  const snapshot = (weight_value: string, mode: 'total_load' | 'per_side_load' = 'total_load') => ({
-    session_id: 's', session_exercise_id: 'se', exercise_definition_id: 'd', set_id: 'x',
-    weight_value, reps_value: '5', reps: 5, performance_status: null,
-    source_load_input_mode: mode, achieved_at_ms: 0, exercise_order_index: 0, set_order_index: 0,
-  });
-
-  it('shows the entered Weight in the one Weight format', () => {
-    expect(formatGroupRawPerformance(snapshot('60'))).toBe('Weight 60.0 kg × 5');
-    expect(formatGroupRawPerformance(snapshot('22.25', 'per_side_load'))).toBe('Weight 22.25 kg per side × 5');
-    expect(formatGroupRawPerformance(snapshot(''))).toBe('Weight 0.0 kg × 5');
   });
 });
