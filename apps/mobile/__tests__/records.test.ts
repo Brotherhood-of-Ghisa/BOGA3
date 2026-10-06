@@ -103,7 +103,7 @@ describe("a session's PRs", () => {
 });
 
 describe('the record set of a session', () => {
-  const baseline = { oneRepMax: 100, weight: { weight: 90, reps: 5 } };
+  const baseline = { oneRepMax: 100, weight: { weight: 90, reps: 5 }, volume: null };
   const set = (id: string, oneRepMax: number | null, weight: number | null, reps: number | null) =>
     ({ id, oneRepMax, weight, reps });
 
@@ -118,6 +118,6 @@ describe('the record set of a session', () => {
 
   it('has nothing to beat without a baseline', () => {
     expect(pickSessionRecordSet([set('a', 200, 200, 1)], null)).toBeNull();
-    expect(pickSessionRecordSet([set('a', 200, 200, 1)], { oneRepMax: null, weight: null })).toBeNull();
+    expect(pickSessionRecordSet([set('a', 200, 200, 1)], { oneRepMax: null, weight: null, volume: null })).toBeNull();
   });
 });

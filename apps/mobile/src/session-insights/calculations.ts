@@ -4,13 +4,13 @@ import {
 } from '@/src/exercise-calculations/analytics';
 import {
   compareSessionPosition,
-  eligibleSetsByBlockInSessionOrder,
   summarizeSessionBests,
 } from '@/src/exercise-calculations/best-set';
 import {
   compareRecordOrder,
   createRecordBook,
-  pickSessionRecordSet,
+  beatsRecord,
+  beatsWeightRecord,
   type RecordBaseline,
 } from '@/src/exercise-calculations/records';
 import {
@@ -107,27 +107,37 @@ export type ExercisePersonalRecordInput = {
   baseline: RecordBaseline | null;
 };
 
-/** Which record the record set is shown for: its 1RM, else its Weight. */
-export type PersonalRecordKind = "oneRepMax" | "weight";
-
 /**
- * One exercise's record set in a session (`training-metrics-contract.md` §3):
- * the one set a screen highlights.
+ * A set of the session that took a record (`training-metrics-contract.md`
+ * §3): the session's best 1RM, its top Weight, or both when one set is both.
  */
-export type ExercisePersonalRecord = {
-  kind: PersonalRecordKind;
-  // The set also beats the Weight record; always true for a Weight record.
-  weightRecord: boolean;
-  exerciseDefinitionId: string;
-  exerciseName: string;
+export type ExerciseRecordSet = {
   sessionExerciseId: string;
-  sessionExerciseOrderIndex: number;
   setId: string;
   setOrderIndex: number;
   weight: number;
   reps: number;
   // Null only for a Weight record whose load is unknown (no bodyweight reading).
   estimatedOneRepMax: number | null;
+  oneRepMax: boolean;
+  topWeight: boolean;
+};
+
+/**
+ * Every record one exercise took in a session: one per kind, so up to three
+ * (`sessionRecordKinds`). Strength records name their set; Volume is the
+ * exercise's whole session.
+ */
+export type ExercisePersonalRecord = {
+  exerciseDefinitionId: string;
+  exerciseName: string;
+  // The exercise's first block, where a card shows its Volume record.
+  sessionExerciseId: string;
+  sessionExerciseOrderIndex: number;
+  // The 1RM record's set, then the Weight record's when it is another set.
+  sets: ExerciseRecordSet[];
+  // The exercise's complete session volume, when it beat the Volume record.
+  volume: number | null;
   baseline: RecordBaseline;
 };
 
@@ -398,46 +408,56 @@ const definitionBlocks = (exerciseDefinitionId: string, exercises: SessionInsigh
     .map((exercise) => ({ ...exercise, loadContext: exercise.loadContext ?? ordinaryLoadContext() }));
 
 /**
- * The session's record set for one definition (`pickSessionRecordSet`), over
- * its working sets across every block: the highest 1RM that beats the 1RM
- * record, else the heaviest Weight that beats the Weight record. Null without
- * a baseline, or when nothing beats it.
+ * The records one definition took in the session, over every block of it:
+ * its best 1RM, top Weight and complete Volume (`summarizeSessionBests`), each
+ * where it beats the record before. Null without a baseline, or when nothing
+ * beats it.
  */
 export const deriveExercisePersonalRecord = (
   input: ExercisePersonalRecordInput,
 ): ExercisePersonalRecord | null => {
   const blocks = definitionBlocks(input.exerciseDefinitionId, input.exercises);
-  const groupOrderIndex = blocks[0]?.orderIndex;
-  if (groupOrderIndex === undefined || input.baseline === null) return null;
-  const sets = eligibleSetsByBlockInSessionOrder(blocks).flat().map((eligible) => ({
-    ...eligible,
-    candidate: {
-      id: eligible.set.id,
-      oneRepMax: eligible.metric.estimatedOneRepMaxKg,
-      weight: enteredWeightKg(eligible.set),
-      reps: eligible.metric.reps,
-    },
-  }));
-  const winner = pickSessionRecordSet(sets.map(({ candidate }) => candidate), input.baseline);
-  const best = winner && sets.find(({ set }) => set.id === winner.id);
-  if (!winner || !best) return null;
-  // A working set always has a valid Weight (§1).
-  if (best.candidate.weight === null) throw new Error(`record set ${best.set.id} has no Weight`);
+  const firstBlock = blocks[0];
+  const bests = summarizeSessionBests(blocks);
+  if (firstBlock === undefined || input.baseline === null || bests === null) return null;
+  const oneRepMax = bests.oneRepMax !== null &&
+    beatsRecord(bests.oneRepMax.estimatedOneRepMaxKg, input.baseline.oneRepMax) ? bests.oneRepMax : null;
+  const topWeight = bests.topWeight !== null &&
+    beatsWeightRecord(bests.topWeight, input.baseline.weight) ? bests.topWeight : null;
+  const volume = bests.volumeComplete && beatsRecord(bests.volumeKg, input.baseline.volume) ? bests.volumeKg : null;
+  const sets: ExerciseRecordSet[] = [];
+  for (const best of [oneRepMax, topWeight]) {
+    if (best === null || sets.some((entry) => entry.setId === best.set.id)) continue;
+    const weight = enteredWeightKg(best.set);
+    // A working set always has a valid Weight (§1).
+    if (weight === null) throw new Error(`record set ${best.set.id} has no Weight`);
+    sets.push({
+      sessionExerciseId: best.block.id,
+      setId: best.set.id,
+      setOrderIndex: best.set.orderIndex,
+      weight,
+      reps: best.metric.reps,
+      estimatedOneRepMax: best.metric.estimatedOneRepMaxKg,
+      oneRepMax: best.set.id === oneRepMax?.set.id,
+      topWeight: best.set.id === topWeight?.set.id,
+    });
+  }
+  if (sets.length === 0 && volume === null) return null;
   return {
-    kind: winner.oneRepMax ? "oneRepMax" : "weight",
-    weightRecord: winner.weight,
     exerciseDefinitionId: input.exerciseDefinitionId,
-    exerciseName: best.block.exerciseName,
-    sessionExerciseId: best.block.id,
-    sessionExerciseOrderIndex: groupOrderIndex,
-    setId: best.set.id,
-    setOrderIndex: best.set.orderIndex,
-    weight: best.candidate.weight,
-    reps: best.candidate.reps,
-    estimatedOneRepMax: best.candidate.oneRepMax,
+    exerciseName: firstBlock.exerciseName,
+    sessionExerciseId: firstBlock.id,
+    sessionExerciseOrderIndex: firstBlock.orderIndex,
+    sets,
+    volume,
     baseline: input.baseline,
   };
 };
+
+/** The PRs an exercise's records count: one per kind (`sessionRecordKinds`). */
+export const personalRecordCount = (record: ExercisePersonalRecord): number =>
+  record.sets.reduce((count, set) => count + Number(set.oneRepMax) + Number(set.topWeight), 0) +
+  (record.volume === null ? 0 : 1);
 
 /** Both sessions completed, and `session` first in record order (`compareRecordOrder`). */
 const isBeforeInRecordOrder = (
@@ -450,7 +470,7 @@ const isBeforeInRecordOrder = (
     { sessionId: target.sessionId, completedAt: target.completedAt },
   ) < 0;
 
-/** The replay reference's earlier 1RM and Weight records, folded by the record book from raw sets. */
+/** The replay reference's earlier records, folded by the record book from raw sets. */
 const collectRecordBaselineByExerciseDefinition = (
   targetSession: PersonalRecordSessionInput,
   historicalSessions: PersonalRecordSessionInput[],
@@ -481,7 +501,7 @@ const collectRecordBaselineByExerciseDefinition = (
       book.add({
         oneRepMax: bests.oneRepMax ? { value: bests.oneRepMax.estimatedOneRepMaxKg } : null,
         weight: bests.topWeight ? { weight: bests.topWeight.weight, reps: bests.topWeight.reps } : null,
-        volume: null,
+        volume: bests.volumeComplete && bests.volumeKg !== null ? { value: bests.volumeKg } : null,
       });
     }
   }
@@ -491,6 +511,7 @@ const collectRecordBaselineByExerciseDefinition = (
     baselineByDefinition.set(exerciseDefinitionId, {
       oneRepMax: holders.oneRepMax?.value ?? null,
       weight: holders.weight,
+      volume: holders.volume?.value ?? null,
     });
   }
   return baselineByDefinition;
@@ -509,8 +530,8 @@ const isLiveCompletedTarget = (target: PersonalRecordSessionInput): boolean => {
 };
 
 /**
- * The target's record sets (1RM, else Weight) against each definition's
- * records from earlier completed sessions, in first-exercise order. A
+ * Each definition's records in the target against its records from earlier
+ * completed sessions, in first-exercise order. A
  * definition absent from the map has no earlier record and so no PR.
  */
 export const deriveSessionPersonalRecordsFromBests = (

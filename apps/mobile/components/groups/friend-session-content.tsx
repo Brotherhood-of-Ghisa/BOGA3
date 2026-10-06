@@ -70,7 +70,6 @@ export function FriendSessionContent({ session }: { session: CompetitionSessionW
             count={formatSetCount(card.rows.length)}
             key={card.id}
             name={card.name}
-            record={null}
             rowTestID={(row) => `group-session-set-row-${row.id}`}
             rows={card.rows}
             hideDerivedMetrics={card.hideDerivedMetrics}

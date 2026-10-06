@@ -9,13 +9,13 @@ type SessionExerciseCardProps = {
 };
 
 // An exercise in the session view: a read-only card that links to the exercise
-// page, showing its sets, an `n/m` done count and, when the exercise's record
-// set is in it, a `record` band.
+// page, showing its sets, an `n/m` done count and a `record` band with a line
+// per record it holds.
 export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps) {
   const label = [
     card.name,
     `${card.doneCount} of ${card.totalCount} sets done`,
-    card.record?.spoken,
+    ...card.record.map((line) => line.spoken),
   ]
     .filter(Boolean)
     .join(', ');

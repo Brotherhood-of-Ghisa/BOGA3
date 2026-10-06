@@ -144,7 +144,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `/sync-setup` | `/sign-in` | the latest cycle outcome is `AUTH_REQUIRED` (no Retry offered) |
 | `/today` ↔ `/train` ↔ `/progress` ↔ `/more` | | `MainTabBar` |
 | any tab strip | `/session/<sessionId>` | the Train tab with a workout in progress: `push` from the tab bar and `exercise-history`, `dismissTo` from a completed session view, and nothing on that session's own view |
-| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch, Sessions' review/complete, and the completed screen's `Append to current session`, which pushes the id the append returns. Train rechecks for an existing draft first and `apps/mobile/src/session-entry/coordinator.ts` serialises simultaneous requests, so two drafts cannot appear |
+| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch and Sessions' review/complete. Train rechecks for an existing draft first and `apps/mobile/src/session-entry/coordinator.ts` serialises simultaneous requests, so two drafts cannot appear |
 | `/session/<id>` | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`replace`) |
 | `/session/<id>` | `/train` or another tab | Abandon after its confirmation, or the bottom bar (`dismissTo`, so the tab below is reused rather than stacked) |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |

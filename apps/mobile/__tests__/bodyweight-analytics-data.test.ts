@@ -83,7 +83,7 @@ it('keeps the raw Weight presentation while the contribution changes only derive
   expect(value.daily[0].totalVolume).toBe(800);
   expect(value.muscle[0].totalWeight).toBe(400);
   expect(value.insights.personalRecords).toHaveLength(1);
-  expect(value.insights.personalRecords[0].estimatedOneRepMax).toBeCloseTo(47.671419, 6);
+  expect(value.insights.personalRecords[0].sets[0].estimatedOneRepMax).toBeCloseTo(47.671419, 6);
   expect(value.view.cards[0].rows[0].weightReps).toBe('20.0 × 8');
   expect(value.view.cards[0].rows[0]).not.toHaveProperty('bodyweight');
 });

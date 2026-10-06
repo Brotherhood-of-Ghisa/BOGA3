@@ -91,10 +91,12 @@ export const compareRecordOrder = (
   left.completedAt.getTime() - right.completedAt.getTime() ||
   left.sessionId.localeCompare(right.sessionId);
 
-/** The records a session's sets are compared with: the bests before it. */
+/** The records a session is compared with: the bests before it. */
 export type RecordBaseline = {
   oneRepMax: number | null;
   weight: WeightRecordValue | null;
+  // The best complete Volume.
+  volume: number | null;
 };
 
 export type RecordSetCandidate = {

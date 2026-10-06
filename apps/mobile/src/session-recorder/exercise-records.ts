@@ -182,6 +182,7 @@ export const deriveLastSession = (entries: ExerciseHistorySessionEntry[]): LastS
 export const recordBaselineOf = (records: ExerciseRecords): ExerciseRecordBaseline => ({
   oneRepMax: records.oneRepMax?.value ?? null,
   weight: records.maxWeight ? { weight: records.maxWeight.weight, reps: records.maxWeight.reps } : null,
+  volume: records.volume?.value ?? null,
 });
 
 const DAY_MS = 24 * 60 * 60 * 1000;

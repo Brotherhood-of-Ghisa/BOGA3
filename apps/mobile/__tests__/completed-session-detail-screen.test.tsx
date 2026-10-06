@@ -81,7 +81,6 @@ jest.mock('@/src/data', () => ({
   loadRecentExerciseBlocks: jest.fn().mockResolvedValue({ blocks: [] }),
   loadLocalGymById: jest.fn(),
   loadSessionSnapshotById: jest.fn(),
-  appendCompletedSessionExerciseAsPlanned: jest.fn(),
   ...jest.requireActual('@/src/data/set-types'),
   setSessionDeletedState: jest.fn(),
 }));
@@ -248,7 +247,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     const dataClient: CompletedSessionDetailDataClient = {
       loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
       loadInsights: jest.fn().mockRejectedValue(new Error('Insight history unavailable')),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -278,7 +276,6 @@ describe('CompletedSessionDetailScreenShell', () => {
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -340,7 +337,6 @@ describe('CompletedSessionDetailScreenShell', () => {
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -377,7 +373,6 @@ describe('CompletedSessionDetailScreenShell', () => {
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -407,7 +402,6 @@ describe('CompletedSessionDetailScreenShell', () => {
         personalRecords: [],
         exerciseVolumeComparisons: [],
       }),
-      appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue(undefined),
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -429,7 +423,6 @@ describe('CompletedSessionDetailScreenShell', () => {
     overrides: Partial<CompletedSessionDetailDataClient> = {}
   ): CompletedSessionDetailDataClient => ({
     loadCompletedSession: jest.fn().mockResolvedValue(COMPLETED_SESSION_DETAIL_FIXTURE),
-    appendCompletedSessionExerciseAsPlanned: jest.fn().mockResolvedValue({ sessionId: 'active-1' }),
     setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   });
@@ -447,12 +440,12 @@ describe('CompletedSessionDetailScreenShell', () => {
 
   it('asks for the bests before this session and bands the set that beats them', async () => {
     const loadHistoricalBests = jest.fn().mockResolvedValue(
-      new Map([['bench-press', { oneRepMax: 200, weight: { weight: 200, reps: 1 } }]])
+      new Map([['bench-press', { oneRepMax: 200, weight: { weight: 200, reps: 1 }, volume: null }]])
     );
     await renderDetail(detailClient({ loadHistoricalBests }));
 
-    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record'))
-      .toHaveTextContent('New 1RM record · 236.2');
+    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record-1'))
+      .toHaveTextContent('New 1RM record · 236.2185.0 × 8');
     expect(loadHistoricalBests).toHaveBeenCalledWith(
       { sessionId: 'completed-under-test', completedAt: new Date('2026-02-20T16:58:00.000Z') },
       ['bench-press', 'lat-pulldown']
@@ -461,16 +454,19 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-exercise-exercise-2-record')).toBeNull();
   });
 
-  it('bands a Weight record, and says it, when no 1RM beats the record', async () => {
-    // 185 × 8 is as heavy as the record with more reps, but below the 1RM record.
+  it('bands every record, a line each, and says them', async () => {
+    // 185 × 8 is as heavy as the record with more reps, but below the 1RM
+    // record; the working volume (185 × 19) beats the Volume record.
     const loadHistoricalBests = jest.fn().mockResolvedValue(
-      new Map([['bench-press', { oneRepMax: 300, weight: { weight: 185, reps: 7 } }]])
+      new Map([['bench-press', { oneRepMax: 300, weight: { weight: 185, reps: 7 }, volume: 3000 }]])
     );
     await renderDetail(detailClient({ loadHistoricalBests }));
 
-    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record'))
-      .toHaveTextContent('New top weight · 185.0 × 8');
-    expect(screen.getByLabelText('Bench Press, 3 sets, new top weight 185.0 × 8')).toBeTruthy();
+    expect(await screen.findByTestId('completed-session-detail-exercise-exercise-1-record-1'))
+      .toHaveTextContent('New top weight185.0 × 8');
+    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1-record-2'))
+      .toHaveTextContent('New volume record · 3515');
+    expect(screen.getByLabelText('Bench Press, 3 sets, new top weight 185.0 × 8, new volume record 3515')).toBeTruthy();
   });
 
   it('shows no record while history is unavailable, and still renders the session', async () => {
@@ -482,21 +478,26 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-exercise-exercise-1-record')).toBeNull();
   });
 
-  it('shows a failed append inline and stays on the session', async () => {
-    await renderDetail(
-      detailClient({
-        appendCompletedSessionExerciseAsPlanned: jest.fn().mockRejectedValue(new Error('Unable to append now')),
-      })
-    );
+  it('titles the session and shows Start and Duration, then Gym, Ex, Sets and Volume', async () => {
+    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient()} />);
+    await screen.findByTestId('completed-session-detail-screen');
 
-    fireEvent.press(screen.getByTestId('completed-session-detail-exercise-options-exercise-1'));
-    fireEvent.press(screen.getByTestId('completed-session-detail-append-exercise-button-exercise-1'));
+    // 16:00 UTC is 16:00 in London in February: an afternoon.
+    expect(screen.getByTestId('completed-session-detail-title')).toHaveTextContent('Afternoon training · 20 Feb');
+    expect(screen.getByLabelText('Start 2026-02-20 16:00')).toBeTruthy();
+    expect(screen.getByLabelText('Duration 58m')).toBeTruthy();
+    expect(screen.queryByTestId('completed-session-detail-times-end')).toBeNull();
+    expect(screen.getByTestId('completed-session-detail-gym')).toHaveProp('accessibilityLabel', 'Gym Westside Barbell Club');
+    expect(screen.getByTestId('completed-session-detail-exercises')).toHaveProp('accessibilityLabel', 'Exercises 2');
+    expect(screen.getByTestId('completed-session-detail-sets')).toHaveProp('accessibilityLabel', 'Sets 4');
+  });
 
-    expect(await screen.findByTestId('completed-session-detail-error-notice')).toHaveTextContent(
-      'Unable to append now'
-    );
-    expect(mockPush).not.toHaveBeenCalled();
-    expect(screen.getByTestId('completed-session-detail-screen')).toBeTruthy();
+  it('offers no per-exercise options: the cards carry no ⋮', async () => {
+    await renderDetail(detailClient());
+
+    expect(screen.getByTestId('completed-session-detail-exercise-exercise-1')).toBeTruthy();
+    expect(screen.queryByTestId('completed-session-detail-exercise-options-exercise-1')).toBeNull();
+    expect(screen.queryByLabelText('Options for Bench Press')).toBeNull();
   });
 
   it('ignores a second delete while the first is being written', async () => {

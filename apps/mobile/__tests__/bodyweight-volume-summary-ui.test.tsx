@@ -17,9 +17,9 @@ it('keeps an active session subtotal compact and its incomplete coverage readabl
 
 it('keeps the same coverage visible on a completed session', () => {
   render(<ViewSessionScreen section="sets" onSectionChange={() => {}} summaryContent={null}
-    summary={{ start: '2026-09-20 12:00', end: '2026-09-20 13:00', duration: '1h', gymName: null, deleted: false }}
+    summary={{ title: 'Afternoon training · 20 Sep', start: '2026-09-20 12:00', duration: '1h', gymName: null, deleted: false }}
     model={{ cards: [], workingSetCount: 2, ...sessionVolumeSummary(partial) }} error={null}
-    onBack={() => {}} onEdit={() => {}} onToggleDeleted={() => {}} onAppend={() => {}} />);
+    onBack={() => {}} onEdit={() => {}} onToggleDeleted={() => {}} />);
   expect(screen.getByTestId('completed-session-detail-volume').props.accessibilityLabel).toBe('Known vol 500');
   expect(screen.getByTestId('completed-session-detail-summary-note')).toHaveTextContent(note);
 });

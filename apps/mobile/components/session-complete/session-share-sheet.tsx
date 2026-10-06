@@ -11,6 +11,7 @@ import {
   releaseSessionShareImage,
   shareSessionImage,
   type ExercisePersonalRecord,
+  type ExerciseRecordSet,
   type ExerciseVolumeComparison,
   type SessionShareCaptureDimensions,
 } from '@/src/session-insights';
@@ -55,9 +56,16 @@ const formatSessionDate = (isoTimestamp: string): string => {
   }).format(parsed);
 };
 
+type ShareRecord = { record: ExercisePersonalRecord; set: ExerciseRecordSet };
+
+// The image lists one set per exercise: its 1RM record's set, else its Weight
+// record's. An exercise whose only record is Volume is not listed.
+const shareRecordsOf = (records: ExercisePersonalRecord[]): ShareRecord[] =>
+  records.flatMap((record) => (record.sets[0] ? [{ record, set: record.sets[0] }] : []));
+
 /** One record line: the kind in words (the image has no screen reader), the figures it set in `record`. */
-function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
-  const oneRepMax = record.estimatedOneRepMax === null ? '—' : formatOneRepMax(record.estimatedOneRepMax);
+function ShareRecordRow({ record, set }: ShareRecord) {
+  const oneRepMax = set.estimatedOneRepMax === null ? '—' : formatOneRepMax(set.estimatedOneRepMax);
   return (
     <View style={styles.recordRow} testID={`session-share-card-pr-${record.exerciseDefinitionId}`}>
       <View style={styles.recordNameRow}>
@@ -68,15 +76,15 @@ function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
           allowFontScaling={false}
           style={styles.recordKind}
           testID={`session-share-card-pr-${record.exerciseDefinitionId}-kind`}>
-          {record.kind === 'oneRepMax' ? '1RM' : 'Top weight'}
+          {set.oneRepMax ? '1RM' : 'Top weight'}
         </Text>
       </View>
       <Text allowFontScaling={false} style={styles.recordFact}>
-        <Text allowFontScaling={false} style={record.weightRecord ? styles.recordFigure : null}>
-          {`${formatWeight(record.weight)} × ${record.reps}`}
+        <Text allowFontScaling={false} style={set.topWeight ? styles.recordFigure : null}>
+          {`${formatWeight(set.weight)} × ${set.reps}`}
         </Text>
         {'  1RM '}
-        <Text allowFontScaling={false} style={record.kind === 'oneRepMax' ? styles.recordFigure : null}>
+        <Text allowFontScaling={false} style={set.oneRepMax ? styles.recordFigure : null}>
           {oneRepMax}
         </Text>
       </Text>
@@ -89,6 +97,7 @@ function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
  * the design language. It never shows the gym or any location.
  */
 export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot }) {
+  const shareRecords = shareRecordsOf(snapshot.personalRecords);
   return (
     <View style={styles.shareCard} testID="session-share-card">
       <View style={styles.brandRow}>
@@ -106,16 +115,16 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
         {formatSessionDate(snapshot.completedAt)}
       </Text>
 
-      {snapshot.personalRecords.length > 0 ? (
+      {shareRecords.length > 0 ? (
         <View style={styles.records} testID="session-share-card-personal-records">
           <View style={styles.recordsHeading}>
             <Icon color={uiRoles.record} name="arrow-up" size="xs" />
             <Text allowFontScaling={false} style={styles.recordsTitle}>
-              {formatCount(snapshot.personalRecords.length, 'new record')}
+              {formatCount(shareRecords.length, 'new record')}
             </Text>
           </View>
-          {snapshot.personalRecords.map((record) => (
-            <ShareRecordRow key={record.setId} record={record} />
+          {shareRecords.map(({ record, set }) => (
+            <ShareRecordRow key={set.setId} record={record} set={set} />
           ))}
         </View>
       ) : null}
