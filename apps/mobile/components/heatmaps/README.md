@@ -44,7 +44,8 @@ smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
 against one shared weekly target, capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;
-legends and accessible labels report the target share. Displayed metrics and
+the legend then reads `Weekly target`, `0%` to `100%`, and accessible labels
+report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;

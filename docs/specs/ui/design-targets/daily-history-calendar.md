@@ -74,6 +74,12 @@ metric control's black active box with a high-contrast theme colour. This
 applies to both history kinds in Daily and Weekly modes. The reference's black
 active metric fill predates this amendment.
 
+**Target-legend amendment, approved 2026-10-06:** the product owner removed the
+`Colour: … Full colour at 100%.` line under muscle Sets
+([[copy.no-inline-explanation]]). When colour grades the weekly muscle target,
+the ramp's label reads `Weekly target` and its ends `0%` and `100%` instead.
+This applies to the Weekly view too.
+
 The reference shows exercise Volume, adjoining-month days, future cells and
 weekly tiles. Its Monday 5 October selection and Tuesday 6 October outline
 predate this amendment. It is design evidence, not an implemented screen or

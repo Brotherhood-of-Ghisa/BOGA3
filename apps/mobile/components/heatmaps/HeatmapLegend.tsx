@@ -1,5 +1,5 @@
-// HeatmapLegend.tsx — the metric legend and the Less…More ramp under both
-// heatmap views.
+// HeatmapLegend.tsx — the metric legend and its ramp under both heatmap views.
+// Target-graded colour names the target and its 0%…100% ends, not Less…More.
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -9,15 +9,15 @@ import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import { HEAT_RAMP } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 
-export function HeatmapLegend({ label }: { label: string }) {
+export function HeatmapLegend({ label, target = false }: { label: string; target?: boolean }) {
   return (
     <View style={styles.legend}>
       <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-        {label}
+        {target ? 'Weekly target' : label}
       </Text>
       <View style={styles.ramp}>
         <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-          Less
+          {target ? '0%' : 'Less'}
         </Text>
         {HEAT_RAMP.map((color, i) => (
           <View
@@ -26,7 +26,7 @@ export function HeatmapLegend({ label }: { label: string }) {
           />
         ))}
         <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-          More
+          {target ? '100%' : 'More'}
         </Text>
       </View>
     </View>

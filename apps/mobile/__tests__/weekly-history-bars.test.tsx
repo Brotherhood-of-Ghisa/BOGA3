@@ -101,6 +101,10 @@ it('retains target colour independently of length and bounds long formatted valu
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ width: 96, textAlign: 'right' });
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('100% of weekly muscle target');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).not.toContain('averaged');
+  // The ramp names the target and its ends; no sentence explains the colour.
+  for (const text of ['Weekly target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  expect(screen.queryByText(/Less|More|Full colour|Colour:/)).toBeNull();
 });
 
 it('retains the complete 520-week window while initially rendering a small recent subset', () => {

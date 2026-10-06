@@ -79,12 +79,14 @@ describe('buildHeatmapData', () => {
     expect(data.daily.filter(day => day.hasTraining).map(day => [day.value, day.level, day.targetAttainment]))
       .toEqual([[4, 2, .5], [4, 2, .5]]);
     expect(data.weekly.at(-1)).toMatchObject({ value: 8, level: 4, targetAttainment: 1 });
+    expect(data.targetGrading).toEqual({ averaged: false });
     const group = buildHeatmapData(days, 'workingSetCount', { todayDateKey: TODAY, weeks: 104,
       muscleTargets: { muscleIds: ['quads', 'calves'], weeklyTarget: 4 } });
     expect(group.weekly.at(-1)).toMatchObject({ value: 8, level: 2, targetAttainment: .5 });
+    expect(group.targetGrading).toEqual({ averaged: true });
     const volume = buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks: 4,
       muscleTargets: { muscleIds: ['quads'], weeklyTarget: 1000 } });
-    expect(volume.targetLegend).toBeUndefined();
+    expect(volume.targetGrading).toBeUndefined();
     expect(volume.daily.find(day => day.hasTraining)).toMatchObject({ value: 100, level: 4 });
   });
 

@@ -48,7 +48,8 @@ export interface HeatmapData {
   daily: DayCell[];
   weekly: WeekCell[];
   todayDateKey: string;
-  targetLegend?: string;
+  /** Set when colour grades the weekly muscle target; `averaged` across several muscles. */
+  targetGrading?: { averaged: boolean };
 }
 
 export interface BuildHeatmapDataOptions {
@@ -267,7 +268,7 @@ export function buildHeatmapData(
   const targetDaily = daily.map(day => withTargetLevel(day, grade(day.workingSetCountsByMuscle)));
   const targetWeekly = weekly.map(week => withTargetLevel(week, grade(totals.get(week.weekStartDateKey)?.workingSetCountsByMuscle)));
   return { daily: targetDaily, weekly: targetWeekly, todayDateKey,
-    targetLegend: target.muscleIds.length === 1 ? 'Colour: share of weekly muscle target' : 'Colour: average share of muscle targets' };
+    targetGrading: { averaged: target.muscleIds.length > 1 } };
 }
 
 const withTargetLevel = <T extends { level: CalendarHeatmapBucket }>(cell: T, targetAttainment: number) =>
