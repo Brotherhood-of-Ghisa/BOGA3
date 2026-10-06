@@ -80,6 +80,8 @@ Task templates/task cards may summarize these triggers for convenience, but shou
 3. Reusable component/primitives API or variants changed:
    - Update the component file; it is the source for props and variants
    - Update `components-catalog.md` only if which component to reach for changes
+   - Adding or removing a primitive or a `components/<area>/` folder always
+     needs a `components-catalog.md` row; `docs-check` enforces it
 4. UI semantics/pattern expectations changed (buttons, lists, states, error handling, modal conventions):
    - Update `ux-rules.md`
    - Update `docs/specs/08-ux-delivery-standard.md` only if the change is a cross-task/process-level UX rule
