@@ -284,7 +284,8 @@ analytics. A volume-only exercise remains a contributor even at zero load.
 Every period exposes working-set count, complete Volume or `null`, known
 subtotal, and known/included Volume-set counts. Counts, Volume and coverage
 reconcile with the contribution rows; unknown Volume stays incomplete rather
-than becoming zero. Working-set changes are signed absolute differences.
+than becoming zero (today's code; the decision to leave such sets out is
+[[copy.no-inline-explanation]], `Pending:`). Working-set changes are signed absolute differences.
 Volume changes use each row's own baseline: `empty` for two zeros, `new` for
 positive Volume after zero, rounded percentage otherwise, `incomplete` when
 either total is unknown, and `increased` if the percentage overflows. Row
