@@ -62,13 +62,25 @@ node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
 ' "${SUPABASE_DIR}/../apps/mobile/src/groups" <"${WIRE_DIR}/in" >"${WIRE_DIR}/out" &
 WIRE_PID=$!
 exec 7>"${WIRE_DIR}/in" 8<"${WIRE_DIR}/out"
-assert_wire() {
-  local verdict=""
-  kill -0 "${WIRE_PID}" 2>/dev/null || fail "actual $1 decoder: decoder exited"
-  printf '%s\t%s\n' "$1" "${BODY//$'\n'/}" >&7
-  read -r verdict <&8 || true
-  [[ "${verdict}" == ok ]] || fail "actual $1 decoder: ${verdict:-decoder exited}"
+# wire_verdict <guard>: the decoder's verdict on BODY, run in a subshell that
+# ignores SIGPIPE, so a decoder that has exited fails the write instead of
+# killing bash. The write gets its own subshell so a failed write's buffered
+# line cannot leak into the verdict.
+wire_verdict() {
+  local verdict="" wrote=0
+  trap '' PIPE
+  (printf '%s\t%s\n' "$1" "${BODY//$'\n'/}") >&7 2>/dev/null && wrote=1
+  [[ ${wrote} -eq 1 ]] && read -r verdict <&8 || true
+  printf '%s' "${verdict:-decoder exited}"
 }
+assert_wire() {
+  local verdict
+  verdict="$(wire_verdict "$1")"
+  [[ "${verdict}" == ok ]] || fail "actual $1 decoder: ${verdict}"
+}
+# Canary: the decoder must be able to say no, or every assert_wire is a no-op.
+BODY='{}'; [[ "$(wire_verdict isCompetitionContractWire)" == 'rejected {}' ]] || fail 'decoder accepted an empty contract'
+BODY=''
 expect_sql() { local actual; actual="$(run_psql "$2")"; [[ "${actual}" == "$3" ]] || fail "$1: expected '$3', got '$actual'"; }
 drain() {
   local out; out="$(mktemp)"
