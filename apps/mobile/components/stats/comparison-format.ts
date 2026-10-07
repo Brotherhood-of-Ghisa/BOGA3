@@ -7,7 +7,7 @@ export const formatCountDelta = (current: number, previous: number): DeltaDispla
 };
 
 export const formatVolumeDelta = (current: number | null, previous: number | null): DeltaDisplay => {
-  if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) return { text: 'Incomplete', tone: 'neutral' };
+  if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) return { text: '—', tone: 'neutral' };
   if (current === 0 && previous === 0) return { text: '—', tone: 'neutral' };
   if (previous === 0) return { text: 'new', tone: 'new' };
   const percent = Math.round(((current - previous) / previous) * 100);

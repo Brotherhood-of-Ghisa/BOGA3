@@ -14,7 +14,7 @@ import type { ExerciseSessionFact } from './schema';
  * Bump when a rule below changes what a row holds. Every device then rebuilds
  * the whole table once before its next facts read.
  */
-export const EXERCISE_SESSION_FACTS_RULES_VERSION = 6;
+export const EXERCISE_SESSION_FACTS_RULES_VERSION = 7;
 
 export type FactsSetInput = {
   id: string;
@@ -63,7 +63,6 @@ export const summarizeFactSession = (
     topWeightSetId: bests.topWeight?.set.id ?? null,
     topWeightReps: bests.topWeight?.reps ?? null,
     volumeKg: bests.volumeKg,
-    volumeComplete: bests.volumeComplete,
     workingSets: bests.workingSets,
     volumeSets: bests.volumeSets,
   };
@@ -71,8 +70,8 @@ export const summarizeFactSession = (
 
 /**
  * Facts for one definition across its completed history, in PR-history order.
- * The PR flags are the record book's (`records.ts`): an incomplete volume is
- * never a volume PR and never raises the volume bar.
+ * The PR flags are the record book's (`records.ts`). A Volume that left out a
+ * set whose load cannot be calculated competes like any other.
  */
 export const deriveExerciseSessionFacts = (
   exerciseDefinitionId: string,
@@ -89,7 +88,7 @@ export const deriveExerciseSessionFacts = (
         oneRepMax: bests.bestE1rmKg === null ? null : { value: bests.bestE1rmKg },
         weight: bests.topWeightKg === null || topWeightReps === null
           ? null : { weight: bests.topWeightKg, reps: topWeightReps },
-        volume: bests.volumeComplete && bests.volumeKg !== null ? { value: bests.volumeKg } : null,
+        volume: bests.volumeKg === null ? null : { value: bests.volumeKg },
       });
       return [{ ...bests, prE1rm: flags.oneRepMax, prWeight: flags.weight, prVolume: flags.volume }];
     });

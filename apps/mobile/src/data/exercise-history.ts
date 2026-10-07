@@ -5,7 +5,7 @@ import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { and, asc, desc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 
 import { personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
-import type { LoadContext, LoadInputMode, VolumeCoverage } from '@/src/exercise-calculations/load-metrics';
+import type { LoadContext, LoadInputMode } from '@/src/exercise-calculations/load-metrics';
 import {
   isConfirmedPerformedSet,
   isWorkingSet,
@@ -53,7 +53,6 @@ export type ExerciseHistorySessionEntry = ResolvedSessionWeight & {
   workingSetCount: number;
   estimatedOneRepMax: number | null;
   totalVolume: number | null;
-  volumeCoverage?: VolumeCoverage;
   loadContext?: LoadContext;
   topWeightSet: { weight: number; reps: number } | null;
 };
@@ -246,11 +245,10 @@ const buildSessionEntry = (
   const workingSetCount = sets.reduce((count, set) => (set.isWorking ? count + 1 : count), 0);
   // Strength reads working sets; volume uses its independent policy. Every
   // performed row retains its own figures.
-  const { estimatedOneRepMax, topWeightSet, volumeCoverage } = summarizeExerciseLoad(
+  const { estimatedOneRepMax, topWeightSet, volumeKgReps: totalVolume } = summarizeExerciseLoad(
     orderedSets,
     loadContext,
   );
-  const totalVolume = volumeCoverage.totalVolumeKgReps;
 
   const tagIds = tagRows.map((row) => row.tagDefinitionId);
 
@@ -266,7 +264,7 @@ const buildSessionEntry = (
     sets,
     workingSetCount,
     estimatedOneRepMax,
-    totalVolume, volumeCoverage, loadContext,
+    totalVolume, loadContext,
     topWeightSet,
   };
 };

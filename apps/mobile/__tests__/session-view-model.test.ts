@@ -205,7 +205,18 @@ describe('session view model', () => {
     expect(model.cards[0].rows[0]).toMatchObject({ typeLabel: 'W-Up', volume: '1000' });
     expect(model.workingSetCount).toBe(0);
     expect(model.volume).toBe('0');
-    expect(model.volumeNote).toBeUndefined();
+  });
+
+  it('totals the volume of the rest when a set\'s load cannot be calculated, with no note', () => {
+    // Corrupt stored context: the way a personal set's load cannot be calculated.
+    const corrupt = { ...bench, id: 'corrupt', exerciseDefinitionId: 'def_corrupt',
+      loadContext: { policy: 'personal' as const, bodyweightContribution: 0, loadInputMode: 'sideways' as 'total_load' },
+      sets: [doneSet('c1', '200', '5', 'rir_1')] };
+    const model = buildSessionViewModel(session([bench, corrupt]), new Map());
+    // [[copy.no-inline-explanation]]: 160 × 8 + 162.5 × 6, the 200 × 5 left out.
+    expect(model.workingSetCount).toBe(3);
+    expect(model.volume).toBe('2255');
+    expect(Object.keys(model)).toEqual(['cards', 'workingSetCount', 'volume']);
   });
 
   it('shows a blank row as absent values', () => {

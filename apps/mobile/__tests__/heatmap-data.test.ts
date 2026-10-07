@@ -202,8 +202,8 @@ describe('buildHeatmapData', () => {
 
   it('keeps the best known value for best-of metrics in the weekly cell', () => {
     const data = buildHeatmapData(daily, 'estimatedRM1', { todayDateKey: TODAY, weeks: 1 });
-    expect(data.weekly[0]).toMatchObject({ value: 55, knownValue: 55, unavailable: false, hasTraining: true, sessions: 2 });
-    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ knownValue: 50, unavailable: false });
+    expect(data.weekly[0]).toMatchObject({ value: 55, unavailable: false, hasTraining: true, sessions: 2 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 50, unavailable: false });
   });
 
   it('marks a best-of week unavailable when every training day lacks the metric', () => {
@@ -211,20 +211,19 @@ describe('buildHeatmapData', () => {
       { dateKey: '2026-06-03', totalVolume: 0, workingSetCount: 1, estimatedRM1: null, highestWeight: null },
     ];
     const data = buildHeatmapData(noLoad, 'highestWeight', { todayDateKey: TODAY, weeks: 1 });
-    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 0, unavailable: true, knownValue: 0 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 0, unavailable: true });
     expect(data.weekly[0]).toMatchObject({ value: 0, level: 0, unavailable: true, hasTraining: true, sessions: 1 });
   });
 
-  it('keeps known volume beside an unavailable volume day, and treats a missing known volume as zero', () => {
+  it('marks an overflowed volume day and its week unavailable, with no subtotal', () => {
     const partial: DailyEffortMetrics[] = [
       { dateKey: '2026-06-02', totalVolume: 200, workingSetCount: 2, estimatedRM1: 60, highestWeight: 60 },
-      { dateKey: '2026-06-03', totalVolume: null, knownVolume: 80, workingSetCount: 2, estimatedRM1: 60, highestWeight: 60 },
-      { dateKey: '2026-06-04', totalVolume: null, workingSetCount: 1, estimatedRM1: 60, highestWeight: 60 },
+      { dateKey: '2026-06-03', totalVolume: null, workingSetCount: 2, estimatedRM1: 60, highestWeight: 60 },
     ];
     const data = buildHeatmapData(partial, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
-    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 0, unavailable: true, knownValue: 80 });
-    expect(data.daily.find((d) => d.dateKey === '2026-06-04')).toMatchObject({ value: 0, unavailable: true, knownValue: undefined });
-    expect(data.weekly[0]).toMatchObject({ value: 0, level: 0, unavailable: true, knownValue: 280, sessions: 3 });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).toMatchObject({ value: 0, unavailable: true });
+    expect(data.daily.find((d) => d.dateKey === '2026-06-03')).not.toHaveProperty('knownValue');
+    expect(data.weekly[0]).toMatchObject({ value: 0, level: 0, unavailable: true, sessions: 2 });
   });
 
   it('marks a volume week unavailable when the weekly sum overflows', () => {
@@ -233,13 +232,13 @@ describe('buildHeatmapData', () => {
       { dateKey: '2026-06-03', totalVolume: Number.MAX_VALUE, workingSetCount: 1, estimatedRM1: null, highestWeight: null },
     ];
     const data = buildHeatmapData(huge, 'totalVolume', { todayDateKey: TODAY, weeks: 1 });
-    expect(data.weekly[0]).toMatchObject({ value: 0, unavailable: true, knownValue: null });
+    expect(data.weekly[0]).toMatchObject({ value: 0, unavailable: true });
   });
 });
 
 
 it('distinguishes a warm-up-only day with zero working sets from missing load and rest', () => {
-  const day = { dateKey: '2026-06-04', totalVolume: null, knownVolume: 0, workingSetCount: 0, estimatedRM1: null, highestWeight: null };
+  const day = { dateKey: '2026-06-04', totalVolume: null, workingSetCount: 0, estimatedRM1: null, highestWeight: null };
   const counts = buildHeatmapData([day], 'workingSetCount', { todayDateKey: '2026-06-05' });
   expect(counts.daily.find(row => row.dateKey === day.dateKey)).toMatchObject({ value: 0, hasTraining: true, unavailable: false });
   expect(counts.daily.find(row => row.dateKey === '2026-06-05')).toMatchObject({ value: 0, hasTraining: false, unavailable: false });

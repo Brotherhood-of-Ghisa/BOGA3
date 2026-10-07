@@ -86,9 +86,8 @@ export function ViewSessionScreen({
             },
             { label: 'Ex', spokenLabel: 'Exercises', value: String(model.cards.length), testID: 'completed-session-detail-exercises' },
             { label: 'Sets', value: String(model.workingSetCount), testID: 'completed-session-detail-sets' },
-            { label: model.volumeNote && model.volume !== '—' ? 'Known vol' : 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
+            { label: 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
           ]}
-          note={model.volumeNote}
           testID="completed-session-detail-summary"
           times={{ start: summary.start, duration: summary.duration, testID: 'completed-session-detail-times' }}
         />

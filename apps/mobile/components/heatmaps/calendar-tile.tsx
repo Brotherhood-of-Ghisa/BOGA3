@@ -28,10 +28,7 @@ export function calendarValue(cell: DayCell | WeekCell | undefined, future: bool
 function description({ cell, future, metricLabel, formatValue }: Props) {
   if (future) return 'Future, no observed value';
   if (!cell) return 'Outside history window';
-  if (cell.unavailable) {
-    const subtotal = cell.knownValue;
-    return `${metricLabel} unavailable or incomplete${subtotal !== undefined && subtotal !== null && subtotal > 0 ? `, known subtotal ${formatValue(subtotal)}` : ''}`;
-  }
+  if (cell.unavailable) return `${metricLabel} unavailable`;
   return (cell.hasTraining ?? cell.value > 0) ? `${metricLabel} ${formatValue(cell.value)}` : 'Rest';
 }
 

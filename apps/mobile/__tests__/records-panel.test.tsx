@@ -115,12 +115,12 @@ describe('collapsed records panel', () => {
     expect(screen.queryByTestId('exercise-records-volume-coverage')).toBeNull();
   });
 
-  it('notes incomplete volume when the last session has sets of unknown load', () => {
-    renderPanel(ready(ALL_RECORDS, lastSession({ oneRepMax: null, maxWeight: null, volume: null, knownVolume: 480, sets: [] })), {
+  it('dashes an overflowed last-session volume with no note', () => {
+    renderPanel(ready(ALL_RECORDS, lastSession({ oneRepMax: null, maxWeight: null, volume: null, sets: [] })), {
       view: 'last',
     });
     expect(collapsedValues()).toEqual(['1RM —', 'Max —', 'Vol —']);
-    expect(screen.getByTestId('exercise-records-volume-coverage')).toHaveTextContent('Volume: 480 · incomplete');
+    expect(screen.queryByTestId('exercise-records-volume-coverage')).toBeNull();
   });
 });
 
@@ -176,14 +176,14 @@ describe('expanded last-session view', () => {
     expect(within(screen.getByTestId('exercise-records-last-set-1')).getByText('100.0 × 5')).toBeTruthy();
   });
 
-  it('omits the gym and dashes a missing 1RM, with incomplete volume', () => {
-    renderPanel(ready(ALL_RECORDS, lastSession({ gymName: null, oneRepMax: null, volume: null, knownVolume: 480 })), {
+  it('omits the gym and dashes a missing 1RM and an overflowed volume', () => {
+    renderPanel(ready(ALL_RECORDS, lastSession({ gymName: null, oneRepMax: null, volume: null })), {
       view: 'last',
       expanded: true,
     });
     const last = screen.getByTestId('exercise-records-last');
     expect(within(last).getByText('2026-09-12 · 2d ago')).toBeTruthy();
-    expect(within(last).getByText('1RM — · VOL 480 · incomplete')).toBeTruthy();
+    expect(within(last).getByText('1RM — · VOL —')).toBeTruthy();
   });
 
   it.each<[boolean | undefined, string]>([

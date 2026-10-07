@@ -37,12 +37,12 @@ it('fills the current month through Sunday with future cells and unscored future
 
 it('keeps zero, unavailable and target attainment distinct without recalculating them', () => {
   const data = buildHeatmapData([source('2026-09-28', 0),
-    { ...source('2026-09-29', 0), totalVolume: null, knownVolume: 20 }],
+    { ...source('2026-09-29', 0), totalVolume: null }],
   'totalVolume', { todayDateKey: '2026-10-06', weeks: 2 });
   const row = buildCalendarMonths(data)[0].weeks[0];
   expect(row.days[0].day).toMatchObject({ value: 0, hasTraining: true, unavailable: false });
-  expect(row.days[1].day).toMatchObject({ unavailable: true, knownValue: 20 });
-  expect(row.week).toMatchObject({ unavailable: true, knownValue: 20 });
+  expect(row.days[1].day).toMatchObject({ unavailable: true });
+  expect(row.week).toMatchObject({ unavailable: true });
   const targeted = buildHeatmapData([{ ...source('2026-10-05', 3), workingSetCountsByMuscle: { chest: 3 } }],
     'workingSetCount', { todayDateKey: '2026-10-06', weeks: 1, muscleTargets: { muscleIds: ['chest'], weeklyTarget: 10 } });
   expect(buildCalendarMonths(targeted)[0].weeks[0].week).toMatchObject({ targetAttainment: .3, level: 2 });

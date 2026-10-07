@@ -46,6 +46,17 @@ describe('buildCompletedSessionDetailModel', () => {
     expect(model.volume).toBe('1160');
   });
 
+  it('totals the volume of the rest when a set\'s load cannot be calculated, with no note', () => {
+    const corrupt = { ...bench, id: 'corrupt', exerciseDefinitionId: 'corrupt-def',
+      loadContext: { policy: 'personal' as const, bodyweightContribution: 0, loadInputMode: 'sideways' as 'total_load' },
+      sets: [{ id: 'c1', weight: '200', reps: '5', setType: 'rir_1' }] };
+    const model = buildCompletedSessionDetailModel([bench, corrupt], new Map());
+    // [[copy.no-inline-explanation]]: 100×5 + 0×5, the 200×5 left out.
+    expect(model.workingSetCount).toBe(3);
+    expect(model.volume).toBe('500');
+    expect(Object.keys(model)).toEqual(['cards', 'workingSetCount', 'volume']);
+  });
+
   it('keeps a warm-up-only exercise card, with no sets or volume', () => {
     const warmUpOnly = { ...bench, sets: [{ id: 'w', weight: '60', reps: '10', setType: 'warm_up' }] };
     const model = buildCompletedSessionDetailModel([warmUpOnly], new Map());

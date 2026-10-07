@@ -1,6 +1,6 @@
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
-import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
+import { sumVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
+import { calculateAnalyticsSetMetrics, ordinaryLoadContext, formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import type { Session, SessionSet } from '@/components/session-recorder/types';
 import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
@@ -53,7 +53,6 @@ export type SessionViewModel = {
   // The summary's `Sets`: the performed working sets (`training-metrics-contract.md` "Counted set").
   workingSetCount: number;
   volume: string;
-  volumeNote?: string;
 };
 
 
@@ -201,7 +200,7 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, workingSetCount, ...sessionVolumeSummary(summarizeVolume(volumeMetrics)) };
+  return { cards, workingSetCount, volume: formatVolumeFigure(sumVolume(volumeMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */

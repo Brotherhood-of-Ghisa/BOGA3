@@ -1,7 +1,7 @@
 import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -74,7 +74,7 @@ const formatWeekDateRange = (weekStartDateKey: string): string => {
 
 const formatWeekValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
-    case 'totalVolume': return formatVolumeWithCoverage(week.totalVolume, week.knownVolume);
+    case 'totalVolume': return formatVolumeFigure(week.totalVolume);
     case 'workingSetCount': return String(week.workingSetCount);
     case 'estimatedRM1': return week.estimatedRM1 !== null ? formatOneRepMax(week.estimatedRM1) : '—';
     case 'highestWeight': return week.highestWeight !== null ? formatWeight(week.highestWeight) : '—';

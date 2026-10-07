@@ -6,7 +6,7 @@ import { canonicalizeWeightForReps, isWorkingSet, isVolumeSet } from './set-sema
 import type { EffortCalculationPolicy } from './effort-policy.ts';
 import {
   calculateSetMetrics, summarizeVolume,
-  type LoadContext, type LoadInputMode, type SetMetricInput, type VolumeCoverage,
+  type LoadContext, type LoadInputMode, type SetMetricInput,
 } from './load-metrics.ts';
 
 export const ordinaryLoadContext = (loadInputMode: LoadInputMode = 'total_load'): LoadContext => ({
@@ -87,35 +87,19 @@ export function summarizeExerciseLoad(
       topWeightSet = { weight, reps: metric.reps };
     }
   }
-  return { metrics, volumeCoverage, estimatedOneRepMax, topWeightSet };
+  // `volumeKgReps` is the figure every screen shows (`sumVolume`); the coaching
+  // API reads the coverage counts.
+  return { metrics, volumeCoverage, volumeKgReps: volumeCoverage.knownVolumeKgReps, estimatedOneRepMax, topWeightSet };
 }
 
-export function formatVolumeWithCoverage(total: number | null, known: number | null = 0): string {
-  if (total !== null && Number.isFinite(total)) return formatVolume(total);
-  return known !== null && Number.isFinite(known) && known > 0 ? `${formatVolume(known)} · incomplete` : '— · unavailable';
+/** A Volume figure, or `—` when its sum is not finite. */
+export function formatVolumeFigure(total: number | null): string {
+  return total !== null && Number.isFinite(total) ? formatVolume(total) : '—';
 }
 
-/** Preserve unknown/overflow across rollups; omitted subtotals start at zero. */
+/** Preserve overflow across rollups; omitted subtotals start at zero. */
 export function addFiniteVolume(left: number | null | undefined, right: number | null | undefined): number | null {
   if (left === null || right === null) return null;
   const sum = (left ?? 0) + (right ?? 0);
   return Number.isFinite(sum) ? sum : null;
-}
-
-/** Compact session figures and a full-width coverage note travel together. */
-export function sessionVolumeSummary(coverage: VolumeCoverage): { volume: string; volumeNote?: string } {
-  if (coverage.totalVolumeKgReps !== null) return { volume: formatVolume(coverage.totalVolumeKgReps) };
-  if (coverage.knownSetCount === 0 || coverage.knownVolumeKgReps === null) {
-    return { volume: '—', volumeNote: coverage.overflow
-      ? 'Volume unavailable. The combined load exceeds the supported numeric range.'
-      : 'Volume unavailable. Some included sets have missing or invalid load information.' };
-  }
-  return { volume: formatVolume(coverage.knownVolumeKgReps),
-    volumeNote: `Volume incomplete. Known subtotal from ${coverage.knownSetCount} of ${coverage.eligibleSetCount} included sets.` };
-}
-
-/** Numeric slot only: callers must render coverage alongside this figure. */
-export function compactVolumeFigure(total: number | null, known?: number | null): string {
-  if (total !== null && Number.isFinite(total)) return formatVolume(total);
-  return known != null && Number.isFinite(known) && known > 0 ? formatVolume(known) : '—';
 }
