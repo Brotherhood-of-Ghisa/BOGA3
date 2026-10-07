@@ -406,7 +406,7 @@ const definitionBlocks = (exerciseDefinitionId: string, exercises: SessionInsigh
 
 /**
  * The records one definition took in the session, over every block of it:
- * its best 1RM, top Weight and complete Volume (`summarizeSessionBests`), each
+ * its best 1RM, top Weight and Volume (`summarizeSessionBests`), each
  * where it beats the record before. Null without a baseline, or when nothing
  * beats it.
  */

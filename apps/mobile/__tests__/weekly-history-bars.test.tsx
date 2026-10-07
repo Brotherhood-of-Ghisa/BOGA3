@@ -84,7 +84,8 @@ it('keeps rest, known-zero and unavailable training separate, tappable and unfil
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('?');
   expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('Rest');
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toContain('unavailable');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 2026-09-28, Volume unavailable');
+  expect(screen.getByText('?: unavailable; excluded from the average')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', borderWidth: 2 });
   expect(style('bars-heatmap-bar-2026-09-21')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
   fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-21'));

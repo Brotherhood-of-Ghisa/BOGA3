@@ -180,8 +180,8 @@ const buildSummary = (): ProgressComparisons => {
   return { ...summary, muscles: summary.current.totals.muscleFamilies.flatMap(family => family.muscles).map(row => {
     const old = previous.get(row.muscleGroupId);
     return { muscleGroupId: row.muscleGroupId, displayName: row.displayName, familyName: row.familyName, sortOrder: row.sortOrder,
-      current: { workingSetCount: row.workingSetCount, totalVolume: row.totalVolume, knownVolume: row.totalVolume, volumeSetCount: row.totalVolume ? 1 : 0, knownVolumeSetCount: row.totalVolume ? 1 : 0 },
-      previous: { workingSetCount: old?.workingSetCount ?? 0, totalVolume: old?.totalVolume ?? 0, knownVolume: old?.totalVolume ?? 0, volumeSetCount: old?.totalVolume ? 1 : 0, knownVolumeSetCount: old?.totalVolume ? 1 : 0 },
+      current: { workingSetCount: row.workingSetCount, totalVolume: row.totalVolume, volumeSetCount: row.totalVolume ? 1 : 0 },
+      previous: { workingSetCount: old?.workingSetCount ?? 0, totalVolume: old?.totalVolume ?? 0, volumeSetCount: old?.totalVolume ? 1 : 0 },
       workingSetChange: row.workingSetCount - (old?.workingSetCount ?? 0), volumeChange: compareProgressVolume(row.totalVolume, old?.totalVolume ?? 0), exercises: [] };
   }) };
 };
