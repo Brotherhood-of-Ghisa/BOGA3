@@ -6,7 +6,6 @@ import {
   comparisonSubmitLabel,
   deriveComparisonFormStatus,
   validateCompetitionFormRules,
-  type ComparisonPreview,
 } from '@/src/groups/comparison-form-model';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS, type CompetitionRules as GroupExerciseRules, type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import type { CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
@@ -57,7 +56,7 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
     bodyweightCalculationsEnabled, bodyweightContribution: draft.contribution,
     defaultMetric: draft.defaultMetric });
   const status = deriveComparisonFormStatus({ validation, baseline: draft.baseline, existing,
-    dirty: draft.dirty, showErrors: draft.showErrors, reviewed: draft.reviewed });
+    dirty: draft.dirty, showErrors: draft.showErrors });
   const submit = () => {
     draft.revealErrors();
     if (!validation.ok || pending) return;
@@ -81,7 +80,6 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
       <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={draft.defaultMetric} layout="fit"
         options={METRIC_OPTIONS} onChange={draft.changeDefaultMetric} testIDPrefix="group-exercise-default-metric" />
       {status.stale ? <StaleRulesNotice onReload={draft.reload} pending={pending} /> : null}
-      {status.preview ? <RulesChangePreview preview={status.preview} /> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
       <ActionButton variant="primary" disabled={pending || status.stale}
         label={comparisonSubmitLabel({ pending, calculationChanged: status.calculationChanged, reviewed: draft.reviewed, pendingLabel, submitLabel })}
@@ -96,8 +94,4 @@ function StaleRulesNotice({ pending, onReload }: { pending: boolean; onReload: (
       message="The group rules changed while you were editing. Your values are kept. Reload group rules to replace them with the current settings before editing again." />
     <ActionButton variant="outline" label="Reload group rules" disabled={pending} testID="group-rules-reload" onPress={onReload} />
   </>;
-}
-
-function RulesChangePreview({ preview }: { preview: ComparisonPreview }) {
-  return <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-preview">{preview.summary}</Text>;
 }

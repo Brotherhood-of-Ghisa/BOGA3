@@ -1,7 +1,6 @@
 // The group comparison form's derived state, as plain data: inline errors,
 // whether the calculation changed (and so needs a reviewed new revision), the
-// stale-revision warning, the preview copy and the submit label.
-import { formatContributionPercent } from './competition-view-model';
+// stale-revision warning and the submit label.
 import { validateExerciseCore } from '@/src/exercise-core';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 import { isCompetitionMetric, type CompetitionRules as GroupExerciseRules } from './competition-contract';
@@ -36,19 +35,12 @@ const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
     (right.bodyweightCalculationsEnabled && right.bodyweightContribution > 0) &&
   left.bodyweightContribution === right.bodyweightContribution;
 
-export type ComparisonPreview = { summary: string };
-
-const describeRulesChange = (baseline: ComparisonBaseline, next: GroupExerciseRules): ComparisonPreview => ({
-  summary: `Apply rules revision ${(baseline.revision ?? 0) + 1}: ${formatContributionPercent(baseline.rules.bodyweightContribution)}% → ${formatContributionPercent(next.bodyweightContribution)}% bodyweight contribution, ${next.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight.`,
-});
-
 export type ComparisonFormStatusInput = {
   validation: GroupRulesValidation;
   baseline: ComparisonBaseline;
   existing: GroupMetricExerciseWire | undefined;
   dirty: boolean;
   showErrors: boolean;
-  reviewed: boolean;
 };
 
 export type ComparisonFormStatus = {
@@ -58,11 +50,10 @@ export type ComparisonFormStatus = {
   rulesError: string | null;
   /** Edits started on an older revision than the one now loaded. */
   stale: boolean;
-  preview: ComparisonPreview | null;
 };
 
 export function deriveComparisonFormStatus({
-  validation, baseline, existing, dirty, showErrors, reviewed,
+  validation, baseline, existing, dirty, showErrors,
 }: ComparisonFormStatusInput): ComparisonFormStatus {
   const calculationChanged = baseline.revision !== null && validation.ok && !sameCalculation(baseline.rules, validation.value);
   const shownError = showErrors && !validation.ok ? validation : null;
@@ -71,7 +62,6 @@ export function deriveComparisonFormStatus({
     nameError: shownError?.field === 'name' ? shownError.message : null,
     rulesError: shownError && shownError.field !== 'name' ? shownError.message : null,
     stale: Boolean(dirty && existing && existing.rules.rules_revision !== baseline.revision),
-    preview: reviewed && calculationChanged && validation.ok ? describeRulesChange(baseline, validation.value) : null,
   };
 }
 
