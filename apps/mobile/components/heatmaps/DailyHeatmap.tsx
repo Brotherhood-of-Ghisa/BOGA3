@@ -60,7 +60,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
       metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} />)}
     <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
     {data.daily.some(day => day.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-      ?: unavailable or incomplete load
+      ?: unavailable
     </Text> : null}
   </View>;
 }

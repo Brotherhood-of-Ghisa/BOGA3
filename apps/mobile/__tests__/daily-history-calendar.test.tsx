@@ -72,6 +72,7 @@ it('distinguishes blank rest, numeric zero, an overflowed volume, future days an
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-02-value')).toHaveTextContent('0');
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03-value')).toHaveTextContent('?');
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toBe('2026-10-03, Volume unavailable');
+  expect(screen.queryByText(/incomplete/)).toBeNull();
   expect(style('calendar-heatmap-cell-2026-10-03').borderStyle).toBe('dashed');
   const future = screen.getByLabelText('2026-10-07, Future, no observed value');
   expect(future).toHaveProp('accessibilityRole', 'text');
