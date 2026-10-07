@@ -16,9 +16,11 @@
 #   - non-member ≡ nonexistent (byte-identical NOT_FOUND bodies);
 #   - the share rule, flow-through, the raw-set card and
 #     friend-session detail payloads, and stream order/dedupe/pagination/scope
-#     — all driven by real `sync_push` calls; share trigger failure isolation
-#     and self-heal;
-#   - AUTH_REQUIRED (anon) and AGENT_FORBIDDEN (client_id token) on every RPC;
+#     through the protocol-4 readers (group_competition_stream,
+#     group_competition_session_detail) — all driven by real `sync_push` calls;
+#     share trigger failure isolation and self-heal;
+#   - AUTH_REQUIRED (anon) and AGENT_FORBIDDEN (client_id token) on every
+#     membership RPC (the group_competition_* denials: groups-competitions.sh);
 #   - direct PostgREST select/insert/update/delete denial on every group table;
 #   - the persistent stream `group_events`: catalog posture, one item
 #     per membership edge and per share, no duplicates on re-push, event
@@ -26,8 +28,11 @@
 #     every user's stream byte-identical.
 #   - group exercises: the shared ExerciseCore vectors
 #     (apps/mobile/src/exercise-core/exercise-core-vectors.json) through
-#     group_exercise_create and the table CHECKs, the role matrix, targets,
-#     update, and the archive round trip.
+#     group_competition_exercise_create and the table CHECKs, the role matrix,
+#     targets, rule-neutral update, and the archive round trip.
+#
+# Runs on a protocol-4-active stack: it activates group competitions first
+# (activate_group_competitions, groups-fixtures.sh).
 #
 # Hermetic: every run provisions its own seven users (owner, admin, member,
 # outsider, joiner, athlete, viewer) with a per-run tag, never reads fixture
@@ -60,6 +65,7 @@ load_supabase_status_env
   fail "JWT_SECRET missing from 'supabase status'; it is required to mint the client_id probe token"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
+activate_group_competitions
 
 RUN_TAG="${GROUPS_CONTRACT_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -158,13 +164,11 @@ SYNC_TABLES="'gyms','exercise_definitions','muscle_groups','exercise_tag_definit
   fail "a group table has an FK into a Sync v2 table (ground rule 2)"
 
 RPCS=(group_list_mine group_get group_invite_preview group_invite_get group_create group_update
-  group_invite_regenerate group_join group_leave group_remove_member group_set_role group_transfer_ownership
-  group_stream group_session_detail
-  group_exercise_list group_exercise_create group_exercise_update group_exercise_archive group_exercise_unarchive)
+  group_invite_regenerate group_join group_leave group_remove_member group_set_role group_transfer_ownership)
 HELPERS=(group_require_app_user group_active_role group_require_member group_require_username
   group_validate_name group_validate_description group_normalize_invite_code group_generate_invite_code
   group_write_invite_code group_summary_json group_members_json group_detail_json group_require_target
-  group_share_session group_session_exercises_json group_member_ref_json group_session_card_json
+  group_share_session group_member_ref_json
   group_exercise_trim group_exercise_validate_name group_exercise_validate_load_input_mode
   group_exercise_validate_source_id group_exercise_require_manager group_exercise_require group_exercise_json)
 rpc_list="$(printf "'%s'," "${RPCS[@]}")"
@@ -637,14 +641,16 @@ pass "soft-deleted groups are invisible"
 
 CUAM="$(run_psql "select floor(extract(epoch from clock_timestamp()) * 1000)::bigint;")"
 
-# stream <token> <group|""> [before-json] [limit]
+# stream <token> <group|""> [before-json] [limit]: the opaque cursor is a JSON
+# string (next_cursor as returned) or null.
 stream() {
-  rpc "$1" group_stream "$(jq -nc --arg g "$2" --argjson b "${3:-null}" --argjson l "${4:-null}" \
+  rpc "$1" group_competition_stream "$(jq -nc --arg g "$2" --argjson b "${3:-null}" --argjson l "${4:-null}" \
     '{p_group_id: (if $g == "" then null else $g end), p_before: $b, p_limit: $l}')"
 }
-# detail <token> <member> <session>
+# detail <token> <member> <session> [group]: the session as group A (default) sees it.
 detail() {
-  rpc "$1" group_session_detail "$(jq -nc --arg m "$2" --arg s "$3" '{p_member_user_id: $m, p_session_id: $s}')"
+  rpc "$1" group_competition_session_detail "$(jq -nc --arg g "${4:-${GA}}" --arg m "$2" --arg s "$3" \
+    '{p_group_id: $g, p_member_user_id: $m, p_session_id: $s}')"
 }
 # shares_of <session>: comma-joined group ids holding a share of the athlete's session, in G_A,G_B order.
 shares_of() {
@@ -738,13 +744,15 @@ push "${ATHLETE_TOKEN}" "S1 active with one set" \
 [[ "$(shares_of "${S1}")" == "A,B" ]] || fail "S1 must be shared into both groups, got '$(shares_of "${S1}")'"
 S1_KEY="${ATHLETE_UID}:${S1}"
 
-# card <context> <jq-filter> [args]: asserts on VIEWER's All-stream card for S1.
+# card <context> <jq-filter> [args]: asserts on VIEWER's All-stream card for S1,
+# its `.session` fields read beside the card's sort_at_ms.
 card() {
   local context="$1" filter="$2"
   shift 2
   stream "${VIEWER_TOKEN}" "" null 50
   expect_ok "viewer stream (${context})"
-  check "${context}" "[.items[] | select(.key == \$k)] | length == 1 and (.[0] | ${filter})" --arg k "${S1_KEY}" "$@"
+  check "${context}" "[.items[] | select(.key == \$k)] | length == 1 and (.[0] | .session + {sort_at_ms} | ${filter})" \
+    --arg k "${S1_KEY}" "$@"
 }
 
 card "active card: training now, its one live set as raw synced text" \
@@ -753,7 +761,7 @@ card "active card: training now, its one live set as raw synced text" \
    and .member == {user_id: $u, username: $un} and .gym_name == $gym
    and .exercises == [{session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
                        exercise_definition_id: $def, load_input_mode: "total_load",
-                       order_index: 0,
+                       order_index: 0, visibility: "ordinary",
                        sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_value: "100", reps_value: "5",
                                set_type: "working", performance_status: null}]}]' \
   --arg def "${DEF_A}" --argjson s "${S1_START}" --arg sid "${S1}" --arg u "${ATHLETE_UID}" \
@@ -808,6 +816,7 @@ expect_ok "viewer stream after tombstone"
 check "a tombstoned session's card is hidden" '[.items[] | select(.key == $k)] == []' --arg k "${S1_KEY}"
 detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
 expect_error NOT_FOUND "detail of a tombstoned session"
+check "a tombstoned session reads as a missing session" '.message == "NOT_FOUND: session not found"'
 TOMB_BODY="${BODY}"
 [[ "$(shares_of "${S1}")" == "A,B" ]] || fail "a tombstone must keep the share rows"
 
@@ -821,7 +830,7 @@ expect_ok "detail after undelete"
 pass "active/sets/completed/edit/tombstone/undelete all flow through"
 
 # --- detail -------------------------------------------------------------------
-echo "[groups-contract] group_session_detail"
+echo "[groups-contract] group_competition_session_detail"
 
 detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
 expect_ok "viewer detail of S1"
@@ -833,7 +842,7 @@ check "detail: every live set as raw synced text, tombstoned sets and exercises 
    and (.exercises | map(.order_index)) == [0, 1, 2, 3, 4]
    and .exercises[0] == {session_exercise_id: ($sid + "-a"), name: $bench, machine_name: ("Machine " + $bench),
                        exercise_definition_id: $def, load_input_mode: "total_load",
-                         order_index: 0,
+                         order_index: 0, visibility: "ordinary",
                          sets: [{set_id: ($sid + "-a1"), order_index: 0, weight_value: "102.5", reps_value: "5",
                                  set_type: "working", performance_status: null},
                                 {set_id: ($sid + "-a2"), order_index: 1, weight_value: "110", reps_value: "5",
@@ -848,9 +857,11 @@ check "detail: every live set as raw synced text, tombstoned sets and exercises 
 check "detail carries no GPS field at any depth" \
   '[.. | objects | keys[]] | map(select(test("lat|lon|coordinate|accuracy"))) == []'
 check "detail keys are exactly the contract shape" \
-  '(.session | keys) == ["completed_at_ms","duration_sec","exercises","gym_name","member","session_id","started_at_ms","status"]
-   and (.session.exercises[0] | keys) == ["exercise_definition_id","load_input_mode","machine_name","name","order_index","session_exercise_id","sets"]
-   and (.session.exercises[0].sets[0] | keys) == ["order_index","performance_status","reps_value","set_id","set_type","weight_value"]'
+  'keys == ["contract_version","group_id","session"] and .contract_version == 4 and .group_id == $g
+   and (.session | keys) == ["completed_at_ms","duration_sec","exercises","gym_name","member","session_id","started_at_ms","status"]
+   and (.session.exercises[0] | keys) == ["exercise_definition_id","load_input_mode","machine_name","name","order_index","session_exercise_id","sets","visibility"]
+   and (.session.exercises[0].sets[0] | keys) == ["order_index","performance_status","reps_value","set_id","set_type","weight_value"]' \
+  --arg g "${GA}"
 stream "${VIEWER_TOKEN}" "" null 50
 expect_ok "viewer stream for the GPS check"
 check "stream carries no GPS field at any depth" \
@@ -858,20 +869,27 @@ check "stream carries no GPS field at any depth" \
 
 detail "${ATHLETE_TOKEN}" "${ATHLETE_UID}" "${S1}"
 expect_ok "the athlete may open their own shared session"
+# Detail is group-bound: a caller outside the group reads it exactly as a
+# nonexistent group; a member asking for a session the group cannot see reads
+# it exactly as a nonexistent session (tombstoned ≡ unshared ≡ missing).
 detail "${OUTSIDER_TOKEN}" "${ATHLETE_UID}" "${S1}"
 expect_error NOT_FOUND "non-member detail"
+check "a non-member gets the group's NOT_FOUND" '.message == "NOT_FOUND: group not found"'
 NM_BODY="${BODY}"
 NM_STATUS="${STATUS}"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}" "${MISSING_GROUP}"
+expect_error NOT_FOUND "detail in a nonexistent group"
+[[ "${STATUS}" == "${NM_STATUS}" && "${BODY}" == "${NM_BODY}" ]] ||
+  fail "detail: non-member and nonexistent group responses differ"
 detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-does-not-exist"
 expect_error NOT_FOUND "detail of a nonexistent session"
-[[ "${STATUS}" == "${NM_STATUS}" && "${BODY}" == "${NM_BODY}" && "${TOMB_BODY}" == "${NM_BODY}" ]] ||
-  fail "detail: non-member, nonexistent, and tombstoned responses differ"
+[[ "${BODY}" == "${TOMB_BODY}" ]] || fail "detail: nonexistent and tombstoned sessions differ"
 detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-pre"
 expect_error NOT_FOUND "detail of an existing but unshared session"
-[[ "${BODY}" == "${NM_BODY}" ]] || fail "detail: an unshared session must look nonexistent"
+[[ "${BODY}" == "${TOMB_BODY}" ]] || fail "detail: an unshared session must look nonexistent"
 detail "${VIEWER_TOKEN}" "${MISSING_GROUP}" "${S1}"
 expect_error NOT_FOUND "detail with a nonexistent member"
-pass "detail: shape, raw live sets, no GPS, non-member ≡ nonexistent ≡ tombstoned ≡ unshared"
+pass "detail: shape, raw live sets, no GPS; non-member ≡ nonexistent group; tombstoned ≡ unshared ≡ nonexistent session"
 
 # --- leave / push-after-leave / post-leave / rejoin ----------------------------
 echo "[groups-contract] share rule across leave and rejoin"
@@ -898,7 +916,7 @@ push "${ATHLETE_TOKEN}" "session started after leaving B" \
 stream "${VIEWER_TOKEN}" "${GB}" null 50
 expect_ok "viewer B stream after the athlete left"
 check "shares made before leaving stay visible; post-leave sessions are absent" \
-  '(.items | map(select(.kind == "session") | .session_id)) as $ids
+  '(.items | map(select(.kind == "session") | .session.session_id)) as $ids
    | ($ids | index($s1)) != null and ($ids | index($late)) != null
      and ($ids | index($after)) == null and ($ids | index($bonly)) != null' \
   --arg s1 "${S1}" --arg late "${LATE}" --arg after "${AFTER}" --arg bonly "${T}-bonly"
@@ -947,7 +965,7 @@ push "${ATHLETE_TOKEN}" "next autosave after the fault is removed" \
 pass "forced trigger failure: sync_push commits, owner reads the row, share_failed logged, next push self-heals"
 
 # --- stream: order, dedupe, pagination, scope, membership items, removal ----------------
-echo "[groups-contract] group_stream"
+echo "[groups-contract] group_competition_stream"
 
 # The viewer logs a session with the same started_at as S1: a sort_at_ms tie
 # the keyset must break by kind then key.
@@ -958,6 +976,7 @@ push "${VIEWER_TOKEN}" "viewer session tied with S1" \
 stream "${VIEWER_TOKEN}" "" null 50
 expect_ok "viewer All stream (one page)"
 FULL="${BODY}"
+check "All: top-level shape" 'keys == ["contract_version","has_more","items","next_cursor"] and .contract_version == 4'
 check "All: has_more false, next_cursor null on the last page" '.has_more == false and .next_cursor == null'
 check "All: ordered by sort_at_ms desc, kind asc, key desc" '
   def before($a; $b): ($a.sort_at_ms > $b.sort_at_ms)
@@ -970,7 +989,7 @@ check "All: S1 appears once, listing both groups (dedupe)" \
 check "All: the S1 / viewer-session tie is present and adjacent" \
   '[.items[] | select(.sort_at_ms == $s) | .key] | length == 2' --argjson s "${S1_START}"
 check "All: unshared sessions never appear" \
-  '[.items[] | select(.kind == "session") | .session_id] as $ids
+  '[.items[] | select(.kind == "session") | .session.session_id] as $ids
    | all([$pre, $h1]; . as $x | ($ids | index($x)) == null)' \
   --arg pre "${T}-pre" --arg h1 "${T}-h1"
 check "All: membership items for joined and left, keyed <membership_id>:joined|ended" '
@@ -982,10 +1001,9 @@ check "All: membership items for joined and left, keyed <membership_id>:joined|e
     and ($ms[0] | keys) == ["event","group","key","kind","member","sort_at_ms"]' \
   --arg ath "${ATHLETE_UID}" --arg a "${GA}" --arg b "${GB}"
 check "session card keys are exactly the contract shape" '
-  [.items[] | select(.kind == "session")][0] | keys == ["completed_at_ms","duration_sec","exercises","groups",
-    "gym_name","key","kind","member","session_id","sort_at_ms","started_at_ms","status"]'
+  [.items[] | select(.kind == "session")][0] | keys == ["groups","key","kind","session","sort_at_ms"]'
 
-rpc "${VIEWER_TOKEN}" group_stream '{}'
+rpc "${VIEWER_TOKEN}" group_competition_stream '{}'
 expect_ok "viewer stream with every argument defaulted"
 check "defaults: All scope and p_limit 20" \
   '(.items | map(.key)) == ($full.items[:20] | map(.key)) and .has_more == (($full.items | length) > 20)' \
@@ -1002,8 +1020,10 @@ paginate() {
     pages=$((pages + 1))
     [[ "${pages}" -le 200 ]] || fail "pagination did not terminate"
     if [[ "$(jq -r '.has_more' <<<"${BODY}")" == "true" ]]; then
-      check "has_more implies a full page and a cursor" \
-        '(.items | length) == $l and .next_cursor == (.items[-1] | {sort_at_ms, kind, key})' --argjson l "${limit}"
+      check "has_more implies a full page and an opaque cursor at its last item" \
+        '(.items | length) == $l and (.next_cursor | @base64d | fromjson)
+           == {kind: "competition_stream", group: null, cursor: (.items[-1] | {sort_at_ms, kind, key})}' \
+        --argjson l "${limit}"
       cursor="$(jq -c '.next_cursor' <<<"${BODY}")"
     else
       check "the last page has no cursor" '.next_cursor == null'
@@ -1025,15 +1045,26 @@ stream "${VIEWER_TOKEN}" "${GA}" null 50
 expect_ok "viewer A-scope stream"
 check "per-group scope: only group A's cards and membership items" '
   all(.items[]; if .kind == "session" then .groups == [{group_id: $a, name: $an}] else .group.group_id == $a end)
-  and ([.items[] | select(.kind == "session") | .session_id] | index($bonly)) == null
-  and ([.items[] | select(.kind == "session") | .session_id] | index($after)) != null' \
+  and ([.items[] | select(.kind == "session") | .session.session_id] | index($bonly)) == null
+  and ([.items[] | select(.kind == "session") | .session.session_id] | index($after)) != null' \
   --arg a "${GA}" --arg an "Record A ${RUN_TAG}" --arg bonly "${T}-bonly" --arg after "${AFTER}"
 
-# Cursor and limit validation (VALIDATION after the membership check).
+# Cursor and limit validation (VALIDATION after the membership check). The
+# cursor is base64 of {kind, group, cursor}: undecodable text and a cursor
+# bound to another scope fail first, then each bad inner position.
+# cursor_of <inner-json> [group-json]: the opaque cursor string, as JSON.
+cursor_of() {
+  jq -nc --argjson c "$1" --argjson g "${2:-null}" '{kind: "competition_stream", group: $g, cursor: $c} | tojson | @base64'
+}
+stream "${VIEWER_TOKEN}" "" '"not base64 %%"' 5
+expect_error VALIDATION "an undecodable cursor"
+stream "${VIEWER_TOKEN}" "" "$(cursor_of '{"sort_at_ms":1,"kind":"session","key":"k"}' "\"${GA}\"")" 5
+expect_error VALIDATION "a cursor bound to group A, used on All"
+check "a cursor from another scope is a scope mismatch" '.message == "VALIDATION: stream cursor scope mismatch"'
 for bad in '"x"' '[]' '{}' '{"sort_at_ms":"1","kind":"session","key":"k"}' '{"sort_at_ms":1.5,"kind":"session","key":"k"}' \
   '{"sort_at_ms":1,"kind":"other","key":"k"}' '{"sort_at_ms":1,"kind":"session","key":""}' \
   '{"sort_at_ms":1,"kind":"session","key":7}' '{"sort_at_ms":1,"kind":"session","key":"k","extra":1}'; do
-  stream "${VIEWER_TOKEN}" "" "${bad}" 5
+  stream "${VIEWER_TOKEN}" "" "$(cursor_of "${bad}")" 5
   expect_error VALIDATION "cursor ${bad}"
 done
 for bad in 0 51 -1; do
@@ -1050,7 +1081,7 @@ expect_error NOT_FOUND "nonexistent group stream"
 [[ "${BODY}" == "${NM_BODY}" ]] || fail "stream: non-member and nonexistent group responses differ"
 stream "${OUTSIDER_TOKEN}" "" null 5
 expect_ok "a user with no groups streams All"
-check "no groups → empty stream" '. == {items: [], next_cursor: null, has_more: false}'
+check "no groups → empty stream" '. == {contract_version: 4, items: [], next_cursor: null, has_more: false}'
 pass "scope, VALIDATION for bad cursors/limits, NOT_FOUND for non-members"
 
 # Removal: the viewer loses B.
@@ -1064,10 +1095,11 @@ expect_ok "removed member's All stream"
 check "All excludes the group the caller was removed from" '
   all(.items[]; if .kind == "session" then (.groups | map(.group_id) | index($b)) == null else .group.group_id != $b end)
   and ([.items[] | select(.key == $k)][0].groups | map(.group_id)) == [$a]
-  and ([.items[] | select(.kind == "session") | .session_id] | index($bonly)) == null' \
+  and ([.items[] | select(.kind == "session") | .session.session_id] | index($bonly)) == null' \
   --arg a "${GA}" --arg b "${GB}" --arg k "${S1_KEY}" --arg bonly "${T}-bonly"
-detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-bonly"
+detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${T}-bonly" "${GB}"
 expect_error NOT_FOUND "removed member's detail of a B-only session"
+[[ "${BODY}" == "${NM_BODY}" ]] || fail "removed member's detail in B must read as a nonexistent group"
 detail "${VIEWER_TOKEN}" "${ATHLETE_UID}" "${S1}"
 expect_ok "removed member still sees S1 through group A"
 stream "${OWNER_TOKEN}" "${GB}" null 50
@@ -1088,16 +1120,22 @@ VECTORS_FILE="${SUPABASE_DIR}/../apps/mobile/src/exercise-core/exercise-core-vec
 ISSUE_MESSAGES='{"name_required":"VALIDATION: exercise name is required",
   "load_input_mode_invalid":"VALIDATION: load_input_mode must be total_load or per_side_load"}'
 
-# b_gx_create <group> <name> <mode> [source] — an empty source sends null.
+# b_gx_create <group> <name> <mode> [source] — an empty source sends null; the
+# rules default to an ordinary 1RM comparison (contribution 0).
 b_gx_create() {
   jq -nc --arg g "$1" --arg n "$2" --arg m "$3" --arg s "${4:-}" \
     '{p_group_id: $g, p_name: $n, p_load_input_mode: $m, p_source_exercise_id: (if $s == "" then null else $s end)}'
 }
+# b_gx_update <group> <exercise> <name> <mode>: a rule-neutral update at the
+# exercise's current revision (1 for an exercise that does not exist).
 b_gx_update() {
   jq -nc --arg g "$1" --arg e "$2" --arg n "$3" --arg m "$4" \
-    '{p_group_id: $g, p_exercise_id: $e, p_name: $n, p_load_input_mode: $m}'
+    --argjson r "$(run_psql "select coalesce((select rules_revision from app_public.group_exercises where id::text = '$2'), 1);")" \
+    '{p_group_id: $g, p_exercise_id: $e, p_expected_revision: $r, p_name: $n, p_load_input_mode: $m,
+      p_bodyweight_contribution: 0, p_default_metric: "e1rm"}'
 }
-b_gx() { jq -nc --arg g "$1" --arg e "$2" '{p_group_id: $g, p_exercise_id: $e}'; }
+# b_gx <group> <exercise> <archived>: archive (true) or unarchive (false).
+b_gx() { jq -nc --arg g "$1" --arg e "$2" --argjson a "$3" '{p_group_id: $g, p_exercise_id: $e, p_archived: $a}'; }
 
 rpc "${OWNER_TOKEN}" group_create "$(b_create "Vectors ${RUN_TAG}" "")"
 expect_ok "owner creates the vectors group"
@@ -1106,12 +1144,12 @@ GV="$(jq -r '.group_id' <<<"${BODY}")"
 VECTOR_COUNT=0
 while IFS= read -r vector; do
   label="$(jq -r '.label' <<<"${vector}")"
-  rpc "${OWNER_TOKEN}" group_exercise_create \
+  rpc "${OWNER_TOKEN}" group_competition_exercise_create \
     "$(jq -c --arg g "${GV}" '{p_group_id: $g, p_name: .name, p_load_input_mode: .loadInputMode, p_source_exercise_id: null}' <<<"${vector}")"
   if jq -e '.expect | has("name")' <<<"${vector}" >/dev/null; then
     expect_ok "vector '${label}'"
     check "vector '${label}': stored as validateExerciseCore normalizes it" \
-      '.exercise.name == $v.expect.name and .exercise.load_input_mode == $v.loadInputMode' --argjson v "${vector}"
+      '.exercise.name == $v.expect.name and .exercise.rules.load_input_mode == $v.loadInputMode' --argjson v "${vector}"
   else
     expect_error VALIDATION "vector '${label}'"
     check "vector '${label}': the validator's issue" \
@@ -1177,14 +1215,14 @@ expect_check_violation "101-char source_exercise_id" "'${GV}', 'Bench', 'total_l
     rollback;")" == "stored" ]] || fail "a 100-char source_exercise_id must be storable"
 
 # NBSP as octal UTF-8 bytes: macOS bash 3.2 has no $'\u…'.
-rpc "${OWNER_TOKEN}" group_exercise_create \
+rpc "${OWNER_TOKEN}" group_competition_exercise_create \
   "$(b_gx_create "${GV}" "Copy" total_load "$(printf '\302\240 seed_barbell_bench_press\t')")"
 expect_ok "create with a padded source id"
 check "the source id is JS-trimmed" '.exercise.source_exercise_id == "seed_barbell_bench_press"'
-rpc "${OWNER_TOKEN}" group_exercise_create "$(b_gx_create "${GV}" "Copy" total_load "   ")"
+rpc "${OWNER_TOKEN}" group_competition_exercise_create "$(b_gx_create "${GV}" "Copy" total_load "   ")"
 expect_error VALIDATION "create with a blank source id"
 check "blank source id message" '.message | startswith("VALIDATION: source_exercise_id must be")'
-rpc "${OWNER_TOKEN}" group_exercise_create "$(b_gx_create "${GV}" "Copy" total_load "$(repeat_char s 101)")"
+rpc "${OWNER_TOKEN}" group_competition_exercise_create "$(b_gx_create "${GV}" "Copy" total_load "$(repeat_char s 101)")"
 expect_error VALIDATION "create with a 101-char source id"
 pass "shared vectors: RPC normalization and issues and the CHECKs agree with validateExerciseCore; source id bounds"
 
@@ -1205,154 +1243,158 @@ done
 rpc "${OWNER_TOKEN}" group_set_role "$(b_role "${GX}" "${ADMIN_UID}" admin)"
 expect_ok "owner promotes admin in the exercises group"
 
-rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_list "$(b_group "${GX}")"
 expect_ok "member lists an empty catalogue"
-check "an empty catalogue" '. == {exercises: []}'
+check "an empty catalogue" '. == {contract_version: 4, exercises: []}'
 
-rpc "${OWNER_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "  Bench ${RUN_TAG}  " total_load)"
+rpc "${OWNER_TOKEN}" group_competition_exercise_create "$(b_gx_create "${GX}" "  Bench ${RUN_TAG}  " total_load)"
 expect_ok "owner creates a custom exercise"
-check "create returns { exercise: GroupExercise }: trimmed, custom, active" \
-  '(keys == ["exercise"])
-   and (.exercise | keys == ["archived_at_ms","group_exercise_id","load_input_mode","name","source_exercise_id"])
-   and .exercise.name == $n and .exercise.load_input_mode == "total_load"
-   and .exercise.source_exercise_id == null and .exercise.archived_at_ms == null' --arg n "Bench ${RUN_TAG}"
+check "create returns { exercise }: trimmed, custom, active, published at revision 1" \
+  '(keys == ["contract_version","exercise"])
+   and (.exercise | keys == ["archived_at_ms","group_exercise_id","name","published_revision","rebuilding","rules","source_exercise_id"])
+   and .exercise.name == $n and .exercise.rules.load_input_mode == "total_load"
+   and .exercise.source_exercise_id == null and .exercise.archived_at_ms == null
+   and .exercise.rules.rules_revision == 1 and .exercise.published_revision == 1 and .exercise.rebuilding == false' \
+  --arg n "Bench ${RUN_TAG}"
 GX_BENCH="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
 [[ "${GX_BENCH}" =~ ${UUID_RE} ]] || fail "group_exercise_id must be a uuid"
 [[ "$(run_psql "select group_id = '${GX}' and created_by = '${OWNER_UID}'
                  from app_public.group_exercises where id = '${GX_BENCH}';")" == "t" ]] ||
   fail "a created exercise must belong to its group and record created_by"
 
-rpc "${ADMIN_TOKEN}" group_exercise_create \
+rpc "${ADMIN_TOKEN}" group_competition_exercise_create \
   "$(b_gx_create "${GX}" "Barbell Back Squat" per_side_load seed_barbell_back_squat)"
 expect_ok "admin copies a standard exercise"
 check "a copy keeps the standard id, name, and load mode" \
-  '.exercise | .name == "Barbell Back Squat" and .load_input_mode == "per_side_load"
+  '.exercise | .name == "Barbell Back Squat" and .rules.load_input_mode == "per_side_load"
    and .source_exercise_id == "seed_barbell_back_squat" and .archived_at_ms == null'
 GX_SQUAT="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
-rpc "${ADMIN_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "alpha Row" total_load)"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_create "$(b_gx_create "${GX}" "alpha Row" total_load)"
 expect_ok "admin creates a custom exercise"
 GX_ROW="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
 
-rpc "${MEMBER_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "Member ${RUN_TAG}" total_load)"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_create "$(b_gx_create "${GX}" "Member ${RUN_TAG}" total_load)"
 expect_error FORBIDDEN "member creates"
-rpc "${MEMBER_TOKEN}" group_exercise_create "$(b_gx_create "${GX}" "" kg)"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_create "$(b_gx_create "${GX}" "" kg)"
 expect_error FORBIDDEN "member creates with bad input (role before VALIDATION)"
-rpc "${MEMBER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Hijack" total_load)"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Hijack" total_load)"
 expect_error FORBIDDEN "member updates"
-rpc "${MEMBER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "Hijack" total_load)"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "Hijack" total_load)"
 expect_error FORBIDDEN "member updates a nonexistent exercise (role before target)"
-rpc "${MEMBER_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_BENCH}")"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_archive "$(b_gx "${GX}" "${GX_BENCH}" true)"
 expect_error FORBIDDEN "member archives"
-rpc "${MEMBER_TOKEN}" group_exercise_unarchive "$(b_gx "${GX}" "${GX_BENCH}")"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_archive "$(b_gx "${GX}" "${GX_BENCH}" false)"
 expect_error FORBIDDEN "member unarchives"
 [[ "$(run_psql "select count(*) || ':' || bool_and(archived_at is null) || ':' || bool_and(name not like 'Hijack%')
                  from app_public.group_exercises where group_id = '${GX}';")" == "3:true:true" ]] ||
   fail "a forbidden write changed the catalogue"
 
-rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_list "$(b_group "${GX}")"
 expect_ok "member lists the catalogue"
-check "list: every exercise, by name case-insensitively" \
-  '(.exercises | map(.group_exercise_id)) == [$row, $squat, $bench] and all(.exercises[]; .archived_at_ms == null)' \
+check "list: every exercise, by name in C collation (uppercase first)" \
+  '(.exercises | map(.group_exercise_id)) == [$squat, $bench, $row] and all(.exercises[]; .archived_at_ms == null)' \
   --arg row "${GX_ROW}" --arg squat "${GX_SQUAT}" --arg bench "${GX_BENCH}"
 pass "owner and admin create and copy; a member reads the catalogue and gets FORBIDDEN on every write"
 
-rpc "${OUTSIDER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+# Outsider list ≡ nonexistent group: groups-competitions.sh. Here every write
+# answers an outsider byte-identically to the outsider's list.
+rpc "${OUTSIDER_TOKEN}" group_competition_exercise_list "$(b_group "${GX}")"
 expect_error NOT_FOUND "outsider lists"
 NM_BODY="${BODY}"
-rpc "${OUTSIDER_TOKEN}" group_exercise_list "$(b_group "${MISSING_GROUP}")"
-expect_error NOT_FOUND "list of a nonexistent group"
-[[ "${BODY}" == "${NM_BODY}" ]] || fail "group_exercise_list: non-member and nonexistent responses differ"
 for entry in \
-  "group_exercise_create|$(b_gx_create "${GX}" "Outsider" total_load)" \
-  "group_exercise_update|$(b_gx_update "${GX}" "${GX_BENCH}" "Outsider" total_load)" \
-  "group_exercise_archive|$(b_gx "${GX}" "${GX_BENCH}")" \
-  "group_exercise_unarchive|$(b_gx "${GX}" "${GX_BENCH}")"; do
+  "group_competition_exercise_create|$(b_gx_create "${GX}" "Outsider" total_load)" \
+  "group_competition_exercise_update|$(b_gx_update "${GX}" "${GX_BENCH}" "Outsider" total_load)" \
+  "group_competition_exercise_archive|$(b_gx "${GX}" "${GX_BENCH}" true)" \
+  "group_competition_exercise_archive|$(b_gx "${GX}" "${GX_BENCH}" false)"; do
   rpc "${OUTSIDER_TOKEN}" "${entry%%|*}" "${entry#*|}"
   expect_error NOT_FOUND "outsider ${entry%%|*}"
   [[ "${BODY}" == "${NM_BODY}" ]] || fail "outsider ${entry%%|*}: NOT_FOUND must match a nonexistent group"
 done
 rpc "${OWNER_TOKEN}" group_remove_member "$(b_target "${GX}" "${JOINER_UID}")"
 expect_ok "owner removes the joiner from the exercises group"
-rpc "${JOINER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+rpc "${JOINER_TOKEN}" group_competition_exercise_list "$(b_group "${GX}")"
 expect_error NOT_FOUND "removed member lists"
 [[ "${BODY}" == "${NM_BODY}" ]] || fail "removed member's NOT_FOUND must match a nonexistent group"
 pass "non-member ≡ nonexistent ≡ removed member: byte-identical NOT_FOUND on every group-exercise RPC"
 
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "Nope" total_load)"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "Nope" total_load)"
 expect_error NOT_FOUND "update a nonexistent exercise"
 check "a missing exercise has its own NOT_FOUND" '.message == "NOT_FOUND: group exercise not found"'
 TARGET_BODY="${BODY}"
 GV_EXERCISE="$(run_psql "select id from app_public.group_exercises where group_id = '${GV}' order by id limit 1;")"
 [[ "${GV_EXERCISE}" =~ ${UUID_RE} ]] || fail "the vectors group must hold an exercise"
 for entry in \
-  "group_exercise_update|$(b_gx_update "${GX}" "${GV_EXERCISE}" "Nope" total_load)" \
-  "group_exercise_archive|$(b_gx "${GX}" "${GV_EXERCISE}")" \
-  "group_exercise_unarchive|$(b_gx "${GX}" "${GV_EXERCISE}")"; do
+  "group_competition_exercise_update|$(b_gx_update "${GX}" "${GV_EXERCISE}" "Nope" total_load)" \
+  "group_competition_exercise_archive|$(b_gx "${GX}" "${GV_EXERCISE}" true)" \
+  "group_competition_exercise_archive|$(b_gx "${GX}" "${GV_EXERCISE}" false)"; do
   rpc "${ADMIN_TOKEN}" "${entry%%|*}" "${entry#*|}"
   expect_error NOT_FOUND "${entry%%|*} of another group's exercise"
   [[ "${BODY}" == "${TARGET_BODY}" ]] || fail "${entry%%|*}: another group's exercise must look nonexistent"
 done
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "" total_load)"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${MISSING_GROUP}" "" total_load)"
 expect_error VALIDATION "input is validated before the target"
 pass "targets: another group's exercise ≡ nonexistent (NOT_FOUND: group exercise not found)"
 
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Unexpected change" per_side_load)"
-expect_error VALIDATION "legacy writer must upgrade for calculation changes"
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" " Bench (comp) ${RUN_TAG} " total_load)"
-expect_ok "admin renames without changing legacy rules"
-check "update replaces the trimmed name, keeping load mode, id and source" \
-  '.exercise == {group_exercise_id: $id, name: $n, load_input_mode: "total_load",
-                 source_exercise_id: null, archived_at_ms: null}' \
+# Updates here stay rule-neutral: a rules change publishes a rules_change event,
+# which the backfill count below does not expect.
+rpc "${ADMIN_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" " Bench (comp) ${RUN_TAG} " total_load)"
+expect_ok "admin renames without changing the rules"
+check "update replaces the trimmed name, keeping rules, revision, id and source" \
+  '.exercise == {group_exercise_id: $id, name: $n, source_exercise_id: null, archived_at_ms: null,
+                 rules: {load_input_mode: "total_load", bodyweight_calculations_enabled: false,
+                         bodyweight_contribution: 0, default_metric: "e1rm", rules_revision: 1},
+                 published_revision: 1, rebuilding: false}' \
   --arg id "${GX_BENCH}" --arg n "Bench (comp) ${RUN_TAG}"
-rpc "${OWNER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_SQUAT}" "Barbell Back Squat" total_load)"
-expect_error VALIDATION "owner also upgrades before changing calculation rules"
-rpc "${OWNER_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_SQUAT}" "Barbell Back Squat" per_side_load)"
-expect_ok "owner updates the legacy copy without changing its rules"
-check "a copy keeps its standard id and original rules through an update" \
-  '.exercise.source_exercise_id == "seed_barbell_back_squat" and .exercise.load_input_mode == "per_side_load"'
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" $' \t' total_load)"
+rpc "${OWNER_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${GX_SQUAT}" "Barbell Back Squat" per_side_load)"
+expect_ok "owner updates the copy without changing its rules"
+check "a copy keeps its standard id and rules through an update" \
+  '.exercise.source_exercise_id == "seed_barbell_back_squat" and .exercise.rules.load_input_mode == "per_side_load"'
+rpc "${ADMIN_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" $' \t' total_load)"
 expect_error VALIDATION "update with a blank name"
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Bench" per_side)"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${GX_BENCH}" "Bench" per_side)"
 expect_error VALIDATION "update with an unknown load mode"
-pass "update: owner/admin rename; legacy rule-change refusal and VALIDATION for bad input"
+pass "update: owner/admin rename and VALIDATION for bad input"
 
-rpc "${ADMIN_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_ROW}")"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_archive "$(b_gx "${GX}" "${GX_ROW}" true)"
 expect_ok "admin archives"
 ARCHIVED_MS="$(jq -r '.exercise.archived_at_ms' <<<"${BODY}")"
 [[ "${ARCHIVED_MS}" =~ ^[0-9]{13}$ ]] || fail "archive must set archived_at_ms, got ${ARCHIVED_MS}"
 check "archive keeps the rest of the exercise" \
-  '.exercise | .group_exercise_id == $id and .name == "alpha Row" and .load_input_mode == "total_load"' \
+  '.exercise | .group_exercise_id == $id and .name == "alpha Row" and .rules.load_input_mode == "total_load"' \
   --arg id "${GX_ROW}"
-rpc "${OWNER_TOKEN}" group_exercise_archive "$(b_gx "${GX}" "${GX_ROW}")"
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(b_gx "${GX}" "${GX_ROW}" true)"
 expect_ok "archive again"
 check "archive is idempotent (the first archived_at is kept)" '.exercise.archived_at_ms == $ms' --argjson ms "${ARCHIVED_MS}"
-rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_list "$(b_group "${GX}")"
 expect_ok "member lists after the archive"
-check "an archived exercise stays listed, flagged, after the active ones" \
+check "an archived exercise stays listed (in name order) and flagged" \
   '(.exercises | map(.group_exercise_id)) == [$squat, $bench, $row]
    and (.exercises | map(.archived_at_ms != null)) == [false, false, true]
    and .exercises[2].archived_at_ms == $ms' \
   --arg row "${GX_ROW}" --arg squat "${GX_SQUAT}" --arg bench "${GX_BENCH}" --argjson ms "${ARCHIVED_MS}"
-rpc "${ADMIN_TOKEN}" group_exercise_update "$(b_gx_update "${GX}" "${GX_ROW}" "Row" total_load)"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_update "$(b_gx_update "${GX}" "${GX_ROW}" "Row" total_load)"
 expect_error VALIDATION "update an archived exercise"
-check "an archived exercise is read-only" '.message | startswith("VALIDATION: an archived group exercise is read-only")'
-rpc "${OWNER_TOKEN}" group_exercise_unarchive "$(b_gx "${GX}" "${GX_ROW}")"
+check "an archived exercise is read-only" '.message | startswith("VALIDATION: unarchive the group exercise before editing")'
+rpc "${OWNER_TOKEN}" group_competition_exercise_archive "$(b_gx "${GX}" "${GX_ROW}" false)"
 expect_ok "owner unarchives"
-check "unarchive clears archived_at_ms and keeps the exercise" \
-  '.exercise == {group_exercise_id: $id, name: "alpha Row", load_input_mode: "total_load",
-                 source_exercise_id: null, archived_at_ms: null}' --arg id "${GX_ROW}"
-rpc "${ADMIN_TOKEN}" group_exercise_unarchive "$(b_gx "${GX}" "${GX_ROW}")"
+# Unarchiving rebuilds the comparison: it is unpublished until the evaluator catches up.
+check "unarchive clears archived_at_ms, keeps the exercise and rebuilds it" \
+  '.exercise == {group_exercise_id: $id, name: "alpha Row", source_exercise_id: null, archived_at_ms: null,
+                 rules: {load_input_mode: "total_load", bodyweight_calculations_enabled: false,
+                         bodyweight_contribution: 0, default_metric: "e1rm", rules_revision: 1},
+                 published_revision: null, rebuilding: true}' --arg id "${GX_ROW}"
+rpc "${ADMIN_TOKEN}" group_competition_exercise_archive "$(b_gx "${GX}" "${GX_ROW}" false)"
 expect_ok "unarchive again"
 check "unarchive is idempotent" '.exercise.archived_at_ms == null'
-rpc "${MEMBER_TOKEN}" group_exercise_list "$(b_group "${GX}")"
+rpc "${MEMBER_TOKEN}" group_competition_exercise_list "$(b_group "${GX}")"
 expect_ok "member lists after the unarchive"
 check "the round trip restores the active list" \
-  '(.exercises | map(.group_exercise_id)) == [$row, $squat, $bench] and all(.exercises[]; .archived_at_ms == null)' \
+  '(.exercises | map(.group_exercise_id)) == [$squat, $bench, $row] and all(.exercises[]; .archived_at_ms == null)' \
   --arg row "${GX_ROW}" --arg squat "${GX_SQUAT}" --arg bench "${GX_BENCH}"
 pass "archive/unarchive round trip: flagged in the list, read-only while archived, both idempotent"
 
 # =============================================================================
-echo "[groups-contract] AUTH_REQUIRED and AGENT_FORBIDDEN on every RPC"
+echo "[groups-contract] AUTH_REQUIRED and AGENT_FORBIDDEN on every membership RPC"
 # =============================================================================
 
 CONTROL_TOKEN="$(mint_token "${ADMIN_TOKEN}")"
@@ -1373,13 +1415,6 @@ RPC_BODIES=(
   "group_remove_member|$(b_target "${G}" "${OWNER_UID}")"
   "group_set_role|$(b_role "${G}" "${OWNER_UID}" admin)"
   "group_transfer_ownership|$(b_target "${G}" "${OWNER_UID}")"
-  "group_stream|$(jq -nc '{p_group_id: null, p_before: null, p_limit: null}')"
-  "group_session_detail|$(jq -nc --arg m "${ATHLETE_UID}" --arg s "${S1}" '{p_member_user_id: $m, p_session_id: $s}')"
-  "group_exercise_list|$(b_group "${GX}")"
-  "group_exercise_create|$(b_gx_create "${GX}" "Agent ${RUN_TAG}" total_load)"
-  "group_exercise_update|$(b_gx_update "${GX}" "${GX_BENCH}" "Agent ${RUN_TAG}" total_load)"
-  "group_exercise_archive|$(b_gx "${GX}" "${GX_BENCH}")"
-  "group_exercise_unarchive|$(b_gx "${GX}" "${GX_BENCH}")"
 )
 [[ ${#RPC_BODIES[@]} -eq ${#RPCS[@]} ]] || fail "RPC_BODIES must cover every RPC"
 for entry in "${RPC_BODIES[@]}"; do
@@ -1394,16 +1429,13 @@ done
   fail "a rejected agent/anon call changed the group"
 [[ "$(run_psql "select count(*) from app_public.groups where name = 'Agent ${RUN_TAG}';")" == "0" ]] ||
   fail "a rejected agent/anon group_create wrote a row"
-[[ "$(run_psql "select count(*) from app_public.group_exercises
-                 where name = 'Agent ${RUN_TAG}' or (id = '${GX_BENCH}' and archived_at is not null);")" == "0" ]] ||
-  fail "a rejected agent/anon group-exercise call wrote or archived a row"
-pass "every RPC: AGENT_FORBIDDEN for client_id tokens, AUTH_REQUIRED for anon"
+pass "every membership RPC: AGENT_FORBIDDEN for client_id tokens, AUTH_REQUIRED for anon"
 
 rpc "${ADMIN_TOKEN}" group_active_role "$(jq -nc --arg g "${G}" --arg u "${ADMIN_UID}" '{p_group_id: $g, p_user_id: $u}')"
 [[ ! "${STATUS}" =~ ^2 ]] || fail "internal helper group_active_role must not be callable by clients"
 check "internal helper call must be a permission denial (42501)" '.code == "42501"'
-rpc "${VIEWER_TOKEN}" group_session_card_json "$(jq -nc --arg m "${ATHLETE_UID}" --arg s "${S1}" '{p_member: $m, p_session_id: $s, p_groups: []}')"
-[[ ! "${STATUS}" =~ ^2 ]] || fail "internal helper group_session_card_json must not be callable by clients"
+rpc "${VIEWER_TOKEN}" group_competition_session_card "$(jq -nc --arg m "${ATHLETE_UID}" --arg s "${S1}" '{p_member: $m, p_session: $s, p_groups: []}')"
+[[ ! "${STATUS}" =~ ^2 ]] || fail "internal helper group_competition_session_card must not be callable by clients"
 check "card helper call must be a permission denial (42501)" '.code == "42501"'
 pass "internal helpers are not reachable through PostgREST"
 
@@ -1770,7 +1802,7 @@ SNAP_VIEWER="$(stream_all "${VIEWER_TOKEN}")"
 [[ "$(jq 'length' <<<"${SNAP_OWNER}")" -gt 20 ]] || fail "the owner's All stream should hold the run's items"
 
 run_psql "delete from app_public.group_events where group_id in (${RUN_GROUPS_SQL});" >/dev/null
-[[ "$(stream_all "${OWNER_TOKEN}")" == "[]" ]] || fail "group_stream must read only group_events"
+[[ "$(stream_all "${OWNER_TOKEN}")" == "[]" ]] || fail "the stream must read only group_events"
 BACKFILLED="$(run_psql "select app_public.group_events_backfill();")"
 [[ "${BACKFILLED}" == "${LIVE_N}" ]] ||
   fail "the backfill must insert exactly one item per share and membership edge (${LIVE_N}), inserted ${BACKFILLED}"

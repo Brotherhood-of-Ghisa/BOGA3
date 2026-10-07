@@ -34,7 +34,10 @@ describe('temporary local competition runtime',()=>{
     directory=fs.mkdtempSync(path.join(os.tmpdir(),'boga-competition-runtime-test-'));
     fs.mkdirSync(path.join(directory,'supabase/scripts'),{ recursive: true });fs.mkdirSync(path.join(directory,'bin'));
     fs.copyFileSync(path.resolve(__dirname,'../../../supabase/scripts/with-local-group-competitions.sh'),path.join(directory,'supabase/scripts/runtime.sh'));
+    // The mark text is the real one: the baseline preflight matches it exactly.
+    const realCommon=fs.readFileSync(path.resolve(__dirname,'../../../supabase/scripts/_common.sh'),'utf8');
     fs.writeFileSync(path.join(directory,'supabase/scripts/_common.sh'),[
+      realCommon.match(/^PROTOCOL4_ACTIVATION_MARK=.*$/m)?.[0] ?? '',
       'REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"',
       'load_supabase_status_env() { API_URL=http://127.0.0.1:1234; ANON_KEY=fixture; SERVICE_ROLE_KEY=fixture; }',
       'resolve_db_container() { printf "fixture-db"; }',

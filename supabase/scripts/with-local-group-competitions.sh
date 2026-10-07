@@ -11,7 +11,7 @@ db_container="$(resolve_db_container)"
 was_active="$(docker exec "${db_container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atqc 'select app_public.group_competition_active();')"
 activation_body="$(mktemp)"
 trap 'rm -f "${activation_body}"' EXIT
-[[ "${was_active}" == t ]] || mark_stack_needs_reset 'with-local-group-competitions.sh activated protocol 4'
+[[ "${was_active}" == t ]] || mark_stack_needs_reset "${PROTOCOL4_ACTIVATION_MARK}"
 activation_status="$(curl --silent --show-error -X POST -H "apikey: ${ANON_KEY}" \
   -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" -H 'Content-Profile: app_public' \
   -H 'Content-Type: application/json' -H 'x-boga-group-contract: 4' \

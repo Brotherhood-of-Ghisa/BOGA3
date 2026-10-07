@@ -25,6 +25,10 @@ operator's explicit authority, and verify V4 is unchanged for users.
   migration is `20261006220000`, and
   `20261007120000_group_eval_rules_drain.sql` is not applied. Apply the
   migrations in order; T04's migration lands after it.
+- T02 added a production bug fix,
+  `20261007180000_group_metric_publish_large_reps.sql`: a set above int4 reps
+  parked its comparison's publication. If the operator has not applied it on
+  hosted already, apply it in order here, before T04's.
 - Repair forward on failure; never restore pre-V4 readers.
 
 ## Open — resolve with the user at session start

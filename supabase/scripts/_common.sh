@@ -249,6 +249,10 @@ stack_reset_marker() {
   printf '%s/.temp/stack-needs-reset' "${SUPABASE_DIR}"
 }
 
+# The mark with-local-group-competitions.sh leaves: the one mark a protocol-4
+# lane's preflight may keep (ensure-local-runtime-baseline.sh).
+PROTOCOL4_ACTIVATION_MARK='with-local-group-competitions.sh activated protocol 4'
+
 mark_stack_needs_reset() {
   ensure_tmp_dir
   printf '%s\n' "$1" >>"$(stack_reset_marker)"

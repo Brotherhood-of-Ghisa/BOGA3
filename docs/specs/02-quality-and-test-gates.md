@@ -2,8 +2,8 @@
 
 > **Owns:** the gate ladder, the (generated) lane matrix, path→gate triggers, CI posture. **Not here:** per-test purpose and policies → `06`; durations → `./boga timings`. **Load when:** always (always-load).
 
-Which lanes exist, which to run for the change in front of you, what must be
-green before the PR.
+Which lanes exist, which to run for your change, what must be green before
+the PR.
 
 ## Run the gates (`./boga`, from anywhere in the repo)
 
@@ -24,7 +24,7 @@ green before the PR.
 everywhere (this doc, the timing records, `boga`). `./scripts/quality-fast.sh` /
 `./scripts/quality-slow.sh` are legacy forwarders. Each lane `cd`s into the right
 workspace and installs deps itself, so never invoke the raw `npm run …` scripts
-(they live only in `apps/mobile/package.json`; there is no root one). Worktree
+(they live only in `apps/mobile/package.json`). Worktree
 lifecycle and the slot lease every lane requires:
 `01-worktree-and-environment.md`.
 
@@ -41,7 +41,7 @@ are labels that track that one axis; when they seem to disagree, infra wins.
   tests as infra-free.
 - **iOS simulator + Metro** → can **never** run on CI's Linux runners.
 
-"Fast" therefore does not imply "in CI": the backend fast smoke needs Docker.
+"Fast" does not imply "in CI": the backend fast smoke needs Docker.
 
 ### Lane matrix (what runs where)
 
@@ -52,9 +52,9 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | Lane | Run via | In which gate | CI? | Measured median† |
 | --- | --- | --- | :--: | --- |
 | *Infra: none — CI runs these* | | | | |
-| lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.6s |
+| lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~7.7s |
 | typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.9s |
-| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~24s |
+| jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~17s |
 | ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~1.6s |
 | meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~1.1m |
@@ -66,21 +66,22 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | complexity | `./boga test complexity` | — (run by name) | ❌ | ~8.2s |
 | dependencies | `./boga test dependencies` | — (run by name) | ❌ | ~0.9s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
-| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~1.3m |
-| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~7.2s |
-| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~19s |
-| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~1.4m |
-| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~4.4s |
+| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~40s |
+| auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~8.7s |
+| groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~47s |
+| groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~12s |
+| groups-competitions | `./boga test groups-competitions` | `boga test backend` | ❌ | ~16s |
+| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~5.6s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~10s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~6.6s |
 | sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~5.2s |
 | sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~3.5s |
 | dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~2.3s |
-| sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~40s |
-| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~1.0m |
+| sync-drift | `./boga test sync-drift` | `boga test backend` | ❌ | ~29s |
+| sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~26s |
 | sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~20s |
 | mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~5.9s |
-| groups-protocol4 | `./boga test groups-protocol4` | — (run by name) | ❌ | ~3.0m |
+| groups-protocol4 | `./boga test groups-protocol4` | — (run by name) | ❌ | ~1.7m |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
 | ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~57s |
 | ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~2.1m |
@@ -99,8 +100,8 @@ Two traps this table exists to kill:
 - **The `extra`-gate lanes sit in no gate and no CI job** — `handles`,
   `ios-gates`, `jest-sync`, `groups-protocol4`, plus the three quality-target
   lanes below. `handles` is an optional `--detectOpenHandles` diagnostic, not a
-  PR requirement. `groups-protocol4` is a real contract lane whose one-way
-  activation the next preflight resets: run it when `boga test for` prints it.
+  PR requirement. `groups-protocol4` is a real contract lane: run it when
+  `boga test for` prints it.
 - **`sync-infra` and `ios-sync-e2e` both cross the FE/BE line, and they are NOT
   interchangeable.** `sync-infra` (a mobile jest body at the end of
   `boga test backend`) drives the real `runSyncCycle` against a real Supabase
