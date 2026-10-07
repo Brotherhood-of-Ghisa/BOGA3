@@ -38,8 +38,7 @@ TESTS=(
   "sync-v2-push-roundtrip.sh"      # outcome 6
   "sync-v2-pull-drain.sh"          # outcomes 7, 8 (cross-task push→pull integration)
   "sync-v2-pull-fk-closure.sh"     # outcome 8a (layered drain FK closure)
-  "sync-v2-drift-synthetic.sh"     # outcome 9 negative (synthetic drift) + positive (as-built) — folded
-  "sync-v2-drift-asbuilt.sh"       # outcome 9 positive (standalone — also exercised inside the synthetic script)
+  "sync-v2-drift-synthetic.sh"     # outcome 9 negative (synthetic drift); restore proven byte-exact
   "sync-v2-spec-rule.sh"           # outcome 10
 )
 

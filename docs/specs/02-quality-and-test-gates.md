@@ -3,7 +3,7 @@
 > **Owns:** the gate ladder, the (generated) lane matrix, path→gate triggers, CI posture. **Not here:** per-test purpose and policies → `06`; durations → `./boga timings`. **Load when:** always (always-load).
 
 Which lanes exist, which to run for the change in front of you, what must be
-green before the PR. Per-test purpose and policies: `06-testing-strategy.md`.
+green before the PR.
 
 ## Run the gates (`./boga`, from anywhere in the repo)
 
@@ -41,9 +41,7 @@ are labels that track that one axis; when they seem to disagree, infra wins.
   tests as infra-free.
 - **iOS simulator + Metro** → can **never** run on CI's Linux runners.
 
-"Fast" therefore does not imply "in CI" (the backend fast smoke needs Docker).
-CI's Linux runner is the only thing that genuinely cannot run the iOS and
-Supabase lanes; this machine runs all of them (`./boga doctor`).
+"Fast" therefore does not imply "in CI": the backend fast smoke needs Docker.
 
 ### Lane matrix (what runs where)
 
@@ -57,7 +55,7 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | lint | `./boga test lint` | `boga test fast` (frontend half) | ✅ | ~1.6s |
 | typecheck | `./boga test typecheck` | `boga test fast` (frontend half) | ✅ | ~4.1s |
 | jest-full | `./boga test jest-full` | `boga test fast` (frontend half) | ✅ | ~13s |
-| ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.3s |
+| ui-guardrails | `./boga test ui-guardrails` | `boga test fast` (frontend half) | ✅ | ~0.2s |
 | docs-check | `./boga test docs-check` | `boga test fast` (repo half) | ✅ | ~1.3s |
 | meta-tests | `./boga test meta-tests` | `boga test fast` (repo half) | ✅ | ~54s |
 | agent-auth-web | `./boga test agent-auth-web` | `boga test fast` (repo half) | ✅ | ~2.7s |
@@ -68,13 +66,13 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | complexity | `./boga test complexity` | — (run by name) | ❌ | ~8.2s |
 | dependencies | `./boga test dependencies` | — (run by name) | ❌ | ~0.9s |
 | *Infra: local Supabase + Docker — CI-able, local-only today* | | | | |
-| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~1.1m |
+| backend-fast | `./boga test backend-fast` | `boga test fast` (backend half) | ❌ | ~46s |
 | auth-authz | `./boga test auth-authz` | `boga test backend` | ❌ | ~9.0s |
 | groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~27s |
 | groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~3.8m |
 | groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~56s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~1.4m |
-| sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~8.4s |
+| sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~10s |
 | sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~8.4s |
 | sync-pull-contract | `./boga test sync-pull-contract` | `boga test backend` | ❌ | ~7.0s |
 | dev-wipe-my-data | `./boga test dev-wipe-my-data` | `boga test backend` | ❌ | ~6.0s |
@@ -82,10 +80,11 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~2.0m |
 | sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~20s |
 | mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~10s |
+| groups-protocol4 | `./boga test groups-protocol4` | — (run by name) | ❌ | ~3.0m |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
 | ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~39s |
-| ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~1.5m |
-| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~40s |
+| ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~2.1m |
+| ios-exercise-page | `./boga test ios-exercise-page` | `boga test frontend` + `frontend-ui` | ❌ | ~56s |
 | ios-session-view | `./boga test ios-session-view` | `boga test frontend` + `frontend-ui` | ❌ | ~1.3m |
 | ios-gates | `./boga test ios-gates` | — (run by name) | ❌ | ~2.2m |
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.5m |
@@ -98,8 +97,10 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 Two traps this table exists to kill:
 
 - **The `extra`-gate lanes sit in no gate and no CI job** — `handles`,
-  `ios-gates`, `jest-sync`, plus the three quality-target lanes below. `handles`
-  is an optional `--detectOpenHandles` diagnostic, not a PR requirement.
+  `ios-gates`, `jest-sync`, `groups-protocol4`, plus the three quality-target
+  lanes below. `handles` is an optional `--detectOpenHandles` diagnostic, not a
+  PR requirement. `groups-protocol4` is a real contract lane: its one-way
+  activation rebuilds the stack, so run it when `boga test for` prints it.
 - **`sync-infra` and `ios-sync-e2e` both cross the FE/BE line, and they are NOT
   interchangeable.** `sync-infra` (a mobile jest body at the end of
   `boga test backend`) drives the real `runSyncCycle` against a real Supabase
