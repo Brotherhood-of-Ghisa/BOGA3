@@ -481,6 +481,43 @@ describe('FK_VIOLATION handling', () => {
     expect(row?.localDirty).toBe(true);
   });
 
+  it('restarts the round and converges when the arbitration recovery pull changes rows', async () => {
+    database.insert(gyms).values({ id: 'gym-local', name: 'Local', localDirty: true, localUpdatedAtMs: 50 }).run();
+
+    let pushAttempts = 0;
+    let winnerDelivered = false;
+    mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
+      if (name === 'sync_pull') {
+        if (args.layer === 0 && pushAttempts === 1 && !winnerDelivered) {
+          winnerDelivered = true;
+          return {
+            data: {
+              entities: [gymEntity('gym-winner', 100)],
+              next_cursor: { server_received_at: '2026-05-29T10:00:00.000Z', owner_user_id: 'u', type: 'gyms', id: 'gym-winner' },
+              has_more: false,
+            },
+            error: null,
+          };
+        }
+        return { data: emptyPage, error: null };
+      }
+      pushAttempts += 1;
+      if (pushAttempts === 1) {
+        return {
+          data: null,
+          error: { code: 'P0001', message: 'BLOCK_ALREADY_ATTACHED: duplicate key value violates unique constraint' },
+        };
+      }
+      return pushOk;
+    });
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    expect(winnerDelivered).toBe(true);
+    expect(pushAttempts).toBeGreaterThanOrEqual(2);
+    expect(database.select().from(gyms).where(eq(gyms.id, 'gym-winner')).get()).toBeDefined();
+    expect(database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get()?.localDirty).toBe(false);
+  });
+
   it('stops arbitration retries and returns internal outcome when recovery pull makes no progress', async () => {
     database.insert(sessions).values({ id: 'sess-1', startedAt: new Date(100), localDirty: true, localUpdatedAtMs: 50 }).run();
 

@@ -1448,27 +1448,9 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       const pulledBefore = await runPullLeg(database);
       // A replay can make deferred old-client metadata safe to seed in this round.
       runBundleMigrations(database);
-      let pushed: number;
-      try {
-        pushed = await runPushLeg(database);
-      } catch (error) {
-        if (error instanceof SyncCycleError && error.code === 'BLOCK_ALREADY_ATTACHED') {
-          // A competing device committed its attachment of the same plan block
-          // after this round's pull drained (server commit order is the
-          // tiebreak). Pull again: the winner arrives and the pull-side
-          // arbitration repair clears this device's losing claim
-          // deterministically — entered work stays, unsourced — and the loop
-          // re-pushes the repaired rows to convergence (contract §4.5).
-          // Stop retrying if recovery makes no progress (0 rows changed) to avoid
-          // an infinite loop holding the sync lock.
-          logProvenanceArbitrationRepair('push');
-          const recoveryPull = await runPullLeg(database);
-          if (recoveryPull.changed === 0) {
-            throw error;
-          }
-          continue;
-        }
-        throw error;
+      const pushed = await runPushLegRecoveringLostAttachment(database);
+      if (pushed === null) {
+        continue;
       }
       const pulledAfter = await runPullLeg(database);
 
@@ -1478,6 +1460,33 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     }
   } catch (error) {
     return classifyThrow(error);
+  }
+};
+
+/**
+ * Runs the push leg, recovering from a lost plan-block attachment race.
+ * A competing device committed its attachment of the same plan block after
+ * this round's pull drained (server commit order is the tiebreak). Pull again:
+ * the winner arrives and the pull-side arbitration repair clears this device's
+ * losing claim deterministically — entered work stays, unsourced — and the
+ * caller restarts the round to re-push the repaired rows to convergence
+ * (contract §4.5). Returns the pushed count, or `null` when the round must
+ * restart. A recovery pull that changes nothing rethrows the push error, so the
+ * loop never spins holding the sync lock.
+ */
+const runPushLegRecoveringLostAttachment = async (database: LocalDatabase): Promise<number | null> => {
+  try {
+    return await runPushLeg(database);
+  } catch (error) {
+    if (!(error instanceof SyncCycleError && error.code === 'BLOCK_ALREADY_ATTACHED')) {
+      throw error;
+    }
+    logProvenanceArbitrationRepair('push');
+    const recoveryPull = await runPullLeg(database);
+    if (recoveryPull.changed === 0) {
+      throw error;
+    }
+    return null;
   }
 };
 
