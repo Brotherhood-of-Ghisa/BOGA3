@@ -150,7 +150,7 @@ beats a record is `tech/training-metrics-contract.md` §3.
 
 **State is carried by a control glyph**, not by a word: a filled check means
 done, an `accent` ring means current, a dashed ring means planned. Planned items
-additionally render faded (§6).
+additionally render faded ([[set.row-figures]], §6).
 
 ## 6. Presenting data
 

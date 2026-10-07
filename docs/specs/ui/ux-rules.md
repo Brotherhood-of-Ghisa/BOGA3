@@ -176,7 +176,7 @@ audit, and `--update-budgets` after a cleanup.
 ## Appearance
 
 Every theme is light; the presets, their seeds and why the choice applies at
-next launch are `design-language.md` "Presets" and the decision register in
+next launch are `design-language.md` "Choosing one" and the decision register in
 `docs/specs/03-technical-architecture.md`. Outside the roles: `app/_layout.tsx`
 keeps `<StatusBar style="dark" />`; the splash is a fixed white
 (`app.config.ts`); neither reads a role. The stack header takes `surface`

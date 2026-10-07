@@ -144,9 +144,9 @@ session with zero working sets. There are three kinds:
   1RM does, it is the heaviest Weight that beats the Weight record. A tie keeps
   the set that reached the value first. Volume has no set: its record is a
   whole session's.
-- **A session's record sets** are every set that took a record: the session's
-  best 1RM when it beats the 1RM record, and its top Weight when it beats the
-  Weight record. One set may take both. Volume adds no set
+- **A session's record sets** ([[set.row-figures]]) are every set that took a
+  record: the session's best 1RM when it beats the 1RM record, and its top
+  Weight when it beats the Weight record. One set may take both. Volume adds no set
   (`deriveExercisePersonalRecord`).
 
 **Code.** `records.ts` holds the whole rule:

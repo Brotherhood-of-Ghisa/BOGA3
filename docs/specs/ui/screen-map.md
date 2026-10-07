@@ -165,7 +165,7 @@ addressable, each resolving to a canonical owner for tab selection.
   place — Settings' Data & sync `Error` row, retried by its `Refresh` — so no
   preference control or exercise browser grows its own error box.
 - An Appearance preset reads `<Preset> from next launch` until the app reopens
-  (`design-language.md`, "Presets"); meanwhile its checked sheet row reads
+  (`design-language.md`, "Choosing one"); meanwhile its checked sheet row reads
   `Next launch`, and a saved custom colour's button `Saved · next launch`. No
   sentence explains the restart ([[copy.no-inline-explanation]]).
 - `Body weight log` sits on Settings regardless of the bodyweight-calculation
