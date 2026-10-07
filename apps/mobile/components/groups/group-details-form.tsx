@@ -9,7 +9,6 @@ import {
   type GroupDetailsInput,
 } from '@/src/groups';
 
-import { groupMetricTextStyles } from './screen-styles';
 import { GroupWriteNotice } from './write-notice';
 
 type GroupDetailsFormProps = {
@@ -51,19 +50,14 @@ export function GroupDetailsFormFields({
   initialBodyweightCalculationsEnabled,positiveContributionCount=null,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft,
 }: GroupDetailsFormProps & { draft: ReturnType<typeof useGroupDetailsDraft> }) {
   const { name,description,bodyweightCalculationsEnabled,setName,setDescription,setBodyweightCalculationsEnabled }=draft;
-  const [reviewedDraft,setReviewedDraft] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const validation = validateGroupDetails(name, description);
 
   const switchChanged = initialBodyweightCalculationsEnabled !== undefined &&
     bodyweightCalculationsEnabled !== initialBodyweightCalculationsEnabled;
-  const draftKey = JSON.stringify([name,description,bodyweightCalculationsEnabled,positiveContributionCount]);
-  const needsPreview = switchChanged && positiveContributionCount !== null && positiveContributionCount > 0;
-  const reviewed = needsPreview && reviewedDraft === draftKey;
   const submit = () => {
     setShowErrors(true);
     if (pending || (switchChanged && positiveContributionCount === null)) return;
-    if (validation.valid && needsPreview && !reviewed) { setReviewedDraft(draftKey); return; }
     if (validation.valid) onSubmit({ ...validation.value,
       ...(initialBodyweightCalculationsEnabled === undefined ? {} : { bodyweightCalculationsEnabled }) });
   };
@@ -117,18 +111,10 @@ export function GroupDetailsFormFields({
           />
         </View>
       ) : null}
-      {switchChanged && positiveContributionCount === 0 ? <Text allowFontScaling={false} style={styles.counter} testID="group-policy-zero-effect">
-        No active comparison uses a positive bodyweight contribution. Score revisions stay unchanged.
-      </Text> : null}
-      {reviewed ? <View testID="group-policy-preview" style={styles.field}>
-        <Text allowFontScaling={false} style={styles.sectionLabel}>Review group rules</Text>
-        <Text allowFontScaling={false} style={groupMetricTextStyles.body}>Bodyweight scoring {bodyweightCalculationsEnabled ? 'On' : 'Off'} for {positiveContributionCount} active comparisons. Each affected board rebuilds together under a new revision.</Text>
-        <Text allowFontScaling={false} style={groupMetricTextStyles.body}>Saved contributions and personal exercise settings stay unchanged. Existing certifications retain their witness; historical values keep their original units.</Text>
-      </View> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-form-error" tone="error" /> : null}
       <ActionButton
         disabled={pending || (switchChanged && positiveContributionCount === null)}
-        label={pending ? pendingLabel : reviewed ? 'Apply group rules' : needsPreview ? 'Review group rules' : submitLabel}
+        label={pending ? pendingLabel : submitLabel}
         onPress={submit}
         testID="group-form-submit"
         variant="primary"
