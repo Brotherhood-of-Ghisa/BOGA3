@@ -19,6 +19,11 @@ millisecond.
 - Never hand-roll DB setup or copy DDL into a test: driving the schema from the
   generated bundle is what makes every test track the real shipped schema when a
   new migration lands.
+- The fixture runs each `--> statement-breakpoint` chunk as one
+  `prepare().run()`, as the device does: expo-sqlite prepares a chunk once and
+  SQLite skips every statement after the first. A chunk with two statements,
+  or only comments, fails Jest rather than shipping a schema the device never
+  gets. Never switch it back to `exec`.
 - `createInMemoryDatabase()` in `beforeEach`, `close()` in `afterEach`. Pass
   `{ foreignKeys: false }` only to plant a deliberate orphan, with the reason at
   the call site.
