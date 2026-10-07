@@ -58,8 +58,8 @@ responsive fallbacks and target-attainment shading. Current rules also live in
   sort, comparison metric, period and disclosure. Remove `Browse exercises`.
   `Sessions` is the final scrolling link in both views (including empty/error),
   opening `/sessions`; no fixed footer or explanatory subtitle.
-- Calculation choices remain in Settings. Do not assert unconditional warm-up
-  exclusion or imply that Volume uses Working set eligibility. Add explanation
+- Calculation choices remain in Settings ([[set.eligibility]]): do not assert
+  a fixed warm-up rule or tie Volume to Working set eligibility. Add explanation
   only when needed to interpret unavailable data, coverage or an empty state.
   Keep the existing concise coverage wording for incomplete Volume.
 
@@ -115,12 +115,11 @@ The mock's neutral rows do not waive this existing target behavior.
 
 Both periods, the muscle table and contributions use one local-data and durable
 account-policy snapshot. Reuse the settled working/volume flags and period
-bounds. Each eligible physical working set counts once per muscle at primary
-or secondary involvement; stabilizers add nothing. Role weights affect Volume,
-not this set count. The session summary's role-weighted Sets by muscle is
-unchanged. Counts overlap across muscles and are never summed into a workout
-total. Volume independently includes its eligible performed sets, including
-volume-only contributors, with the existing per-side/bodyweight arithmetic.
+bounds. A muscle's set count is [[muscle.set-count]], an open fact whose
+Progress row this screen is; stabilizers add nothing, and role weights affect
+Volume. Counts overlap across muscles and are never summed into a workout
+total. Volume includes its volume-included sets ([[set.eligibility]]),
+including volume-only contributors, with the existing per-side/bodyweight arithmetic.
 
 Combine repeated exercise blocks by definition ID, using the union of
 contributors from both periods. Exercise Volume here is its allocation to the

@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 2
 
       # Docs-only fast path: on a PR whose every changed path is under docs/
-      # (bar docs/product/, whose fact tables Jest runs) or a root-level *.md
+      # (bar docs/product/ files with fact tables, which Jest runs) or a root-level *.md
       # (rule + tests: scripts/ci-docs-only.sh), only
       # Docs check runs; every later step is skipped. Push to main always runs
       # everything. One job either way, so the required check name is stable.
@@ -41,7 +41,7 @@ jobs:
             changed="$(git diff --name-only --no-renames HEAD^1 HEAD)"
           fi
           printf '%s\n' "${changed}"
-          docs_only="$(printf '%s\n' "${changed}" | ./scripts/ci-docs-only.sh --event "${EVENT_NAME}")"
+          docs_only="$(printf '%s\n' "${changed}" | ./scripts/ci-docs-only.sh --event "${EVENT_NAME}" --base HEAD^1)"
           echo "docs_only=${docs_only}"
           echo "docs_only=${docs_only}" >> "${GITHUB_OUTPUT}"
           if [[ "${docs_only}" == "true" ]]; then

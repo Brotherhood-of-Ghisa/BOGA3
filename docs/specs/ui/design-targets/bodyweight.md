@@ -26,13 +26,15 @@ service is required.
   only bodyweight entry surface. No workout/session screen shows a reading,
   prompt, card, warning, action or dialog.
 - The personal exercise editor conditionally adds only `Bodyweight contribution
-  (%)` with a short hint. Hidden state preserves the value. The group setting
+  (%)`, with no hint under it ([[copy.no-inline-explanation]]). Hidden state
+  preserves the value. The group setting
   and group exercise editor use the analogous admin-only toggle/field.
 - The logger is unchanged structurally: `Weight`, reps, effort and confirm.
   Rows, records, History, Stats, completion and share use `Top weight`, `1RM`
   and `Volume`; bodyweight arithmetic stays invisible.
 - A missing personal reading produces ordinary-looking numeric output through
-  the zero fallback. Zero Weight/Volume/1RM renders `0`, not an unavailable
+  the zero fallback. A zero Weight, Volume or 1RM renders as a number
+  ([[1rm.formula]]; formats in `design-language.md` §6), not an unavailable
   state, and earns no record treatment.
 - Group competition behavior and rendered states are governed by
   [group-competitions](group-competitions.md): Volume/1RM with explicit units,
@@ -46,9 +48,9 @@ service is required.
 | Toggle private calculations | Settings → toggle on → inspect row → off → on | Editor contribution visibility follows the toggle; `Body weight log` remains available and saved values return unchanged | Offline toggle persists locally; no destructive warning |
 | Manage kg readings | Settings → `Body weight log` with calculations either off or on → add/edit/delete dated kg reading | Current/history list updates and affected projections refresh | Empty history; blank/zero/negative/nonfinite/future input; failed save retains input |
 | Configure contribution | Enable private mode → create/edit exercise → enter 0–100% | One contribution field saves and later drives calculations | Decimal/range validation inline; disabled mode hides but preserves value; no extra fields |
-| Log ordinary set | Mode off or contribution 0 → enter or omit Weight → reps → confirm | Weight/1RM/Volume use ordinary kg math; blank becomes zero | Invalid numeric input cannot commit; no reading prompt or bodyweight copy |
+| Log ordinary set | Mode off or contribution 0 → enter or omit Weight → reps → confirm | Weight/1RM/Volume use ordinary kg math; blank Weight as [[set.performed]] | Invalid numeric input cannot commit; no reading prompt or bodyweight copy |
 | Log aware set | Mode on + positive contribution → log with and without an applicable reading | Reading participates silently when present; missing uses the personal zero fallback | No warning/incomplete label; zero values remain numeric; raw Top weight stays unchanged |
-| Review history | Change toggle/contribution/reading → revisit records, History, Stats and completion/share | Derived 1RM/Volume reinterpret; raw rows and Top weight do not | Refresh failure keeps prior content plus normal retry; zero creates no record band |
+| Review history | Change toggle/contribution/reading → revisit records, History, Stats and completion/share | Derived 1RM/Volume reinterpret; raw rows and Top weight do not | Refresh failure keeps prior content plus normal retry; zero creates no record band ([[1rm.formula]]) |
 | Control group calculations | Group admin → toggle on → edit contribution → off/on | Whole group revision rebuilds; contribution survives | Member controls disabled/absent; failed online write retains form; rebuilding shows no mixed revision |
 | Review group result | Open Volume/1RM boards and a shared set | Explicit kg or %BW units, safe set context and witness state | Generic unavailable/ended state; no normalized kg, private reading facts or dependency digest |
 

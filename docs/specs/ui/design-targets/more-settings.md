@@ -14,8 +14,9 @@ information only. **Accepted** by the user in the gallery on 2026-09-25.
 
 - More and Settings are `paper` under a `PageHeader`. Each section is an
   `ink-muted` micro-label over one `Card` of hairline `ListRow`s: a leading
-  glyph in `ink-muted` (no badge), the label and an `ink-muted`
-  description, and a trailing `chevron-right`, or `arrow-up-right` for the
+  glyph in `ink-muted` (no badge), the label, an `ink-muted` value only where
+  the row has one (the account's email), no describing line
+  ([[copy.no-inline-explanation]]), and a trailing `chevron-right`, or `arrow-up-right` for the
   external setup link. A failed browser launch shows `danger` text under its row.
 - Settings' date format is a `SegmentedControl`. The signed-out sync
   guidance is a `StatePanel` in a `Card`. About is a `Card` of text rows.
@@ -36,11 +37,10 @@ information only. **Accepted** by the user in the gallery on 2026-09-25.
   the operator's fixed effort table (2026-10-04): Warm-up, Unspecified, RIR-4–0,
   Technique and Cooldown, with Display, Working set and Volume columns. No Add
   control. Every checkbox has a 44pt target and a label naming its row and column.
-  All Display defaults are on; the two calculation columns default on for
-  Unspecified/RIR and off for Warm-up/Technique/Cooldown. Keep at least one
-  Display choice; calculation columns may be empty. The columns are independent
-  and account-local on this device. Groups keep their shared rule and show no
-  effort settings. This operator brief supersedes the earlier visibility-only
+  All Display defaults are on; the calculation columns' defaults, and the
+  fixed group rule, are [[set.eligibility]]. Keep at least one Display choice;
+  calculation columns may be empty. The columns are account-local on this
+  device. Groups show no effort settings. This operator brief supersedes the earlier visibility-only
   controls. Numeric drafts commit on editing completion;
   invalid and unsaved drafts remain recoverable, with errors in Data & Sync.
 - Neither screen has an `accent` button.

@@ -145,8 +145,8 @@ exercises, sets); latest completed is any time.
 Session cards and the friend view count on the viewing device
 (`buildCompetitionSession`,
 `apps/mobile/src/groups/competition-session-view-model.ts`) with the session
-screens' TS. Counts come only from permitted set context: `Sets` is the
-performed working rows, `exercises` those holding one. A normalized exercise
+screens' TS. Counts come only from permitted set context: `Sets` as
+[[set.count-display]], `exercises` those holding a working set. A normalized exercise
 shows reps and effort, never a load figure, and no session total is
 reconstructed. Nothing is mirrored in SQL: SQL mirrors once duplicated set
 rules in two languages. The cost: a co-member's device receives every permitted

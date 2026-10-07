@@ -94,7 +94,7 @@ Use this section as the single source of truth for reusable UX patterns.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows on the exercise page, for an active or a completed session (`components/exercise-page/set-row.tsx`).
-   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
+   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values ([[set.performed]]); allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
    - Usage: the group stream (`components/groups/group-stream-list.tsx`): session cards (`stream-session-card.tsx`) and competition event cards (`group-metric-stream-card.tsx`).
@@ -138,7 +138,7 @@ Use this section as the single source of truth for reusable UX patterns.
 2. Typography
    - Body and input text should remain readable without zoom.
    - Titles and section labels should be visually distinct from body text.
-   - Use a subtitle only when the title alone cannot communicate the item's purpose or action. Do not add subtitles that merely repeat the title, preview details that become clear after opening the item, or state units the destination already makes evident.
+   - Titles stand alone: [[copy.no-subtitles]].
 3. Touch targets
    - Primary interactive elements must meet mobile tap-target expectations.
    - Destructive actions must be visually distinguishable from primary actions.

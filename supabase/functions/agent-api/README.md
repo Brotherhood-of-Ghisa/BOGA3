@@ -170,8 +170,8 @@ by another user and a nonexistent exercise produce the same `404` envelope.
 ```
 
 Personal-record and volume calculations import the canonical mobile domain
-calculation module and read [working sets only](#working-sets-only): the
-warm-up above is listed but feeds no session or record figure. BoGa has no
+calculation module and read [working sets only](#working-sets-only)
+([[set.eligibility]]), so the warm-up above is listed but feeds no figure. BoGa has no
 canonical user-authored note field or failed-set meaning, so this API reports
 those fields unavailable instead of inventing semantics.
 
@@ -237,7 +237,8 @@ governs.
 `personal_records` follow the app's record rules
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §3): `top_weight` is the heaviest Weight and, at that weight, the most reps; a
-tie keeps the earliest session; a zero result is never a record.
+tie keeps the earliest session; a zero result is never a record
+([[1rm.formula]] for a zero 1RM).
 
 `metric_revision: "working_sets_v4"` marks this meaning, with 1RM per
 [[1rm.formula]] (`docs/product/1rm.md`). `"working_sets_v3"` estimated a
@@ -301,7 +302,7 @@ Performed sets use ordinary vocabulary and separate raw/derived values:
 
 Parsing, the zero rule and the load, Volume and 1RM formulas are the app's
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
-§4); planned, skipped, unperformed, invalid and deleted rows do not
+§4); only confirmed performed rows ([[set.performed]]) that are not deleted
 contribute. The breakdown is an API interpretation aid, not a user-facing label.
 
 Volume coverage remains explicit for invalid/overflow/truncated input. Missing

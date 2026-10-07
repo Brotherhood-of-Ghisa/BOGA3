@@ -32,8 +32,7 @@ gets its own target.
 - The set row is the unit: `type · weight × reps · 1RM/VOL · control`, with every
   row ending in a 44px control column.
 - Session view is read-only — cards are links, not controls.
-- Numbers are monospaced and always shown: 1RM and volume on performed, current
-  and planned sets alike.
+- Numbers are monospaced and always shown ([[set.row-figures]]).
 
 ## States
 

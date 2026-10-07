@@ -79,8 +79,8 @@ migration are that directory's to state;
 what the effort selections mean.
 
 - **Out of sync scope.** No dirty bits, no sync nudges, no `user_settings`
-  column, no server counterpart; groups and coaching never read these keys and
-  keep the shared default rule. The private bodyweight toggle, by contrast, is
+  column, no server counterpart; groups and coaching never read these keys
+  ([[set.eligibility]]). The private bodyweight toggle, by contrast, is
   account-synced through `user_settings`.
 - Keys live in `expo-sqlite/kv-store` scoped to the authenticated account id,
   with a distinct profile for local-only builds, so they **survive sign-out,
@@ -254,8 +254,8 @@ the data-model-level invariants.
 4. **Effort labels cost nothing to add.** `exercise_sets.set_type` and
    `planned_set_type` are nullable text in sync scope, so a new label needs no
    wire or server migration, and hidden historical or prescribed labels stay
-   readable. Personal Working set and Volume choices are device-local (above);
-   groups and coaching keep the shared rule.
+   readable. Personal Working set and Volume choices are device-local (above;
+   [[set.eligibility]]).
 5. **Planned targets and performance state are `in sync scope`** —
    `exercise_sets.planned_weight_value`, `planned_reps_value`,
    `planned_set_type` and `performance_status` ride the existing envelope,
@@ -266,9 +266,9 @@ the data-model-level invariants.
    written again. On upgrade a valid pre-existing row with legacy `null` stays
    confirmed, while a blank or partial legacy draft row with `null` reads as
    `unperformed`, so later entry cannot silently confirm it.
-6. Only valid confirmed actual rows become completed history, and **every
-   reader with performed/completed semantics filters to valid actual values
-   plus confirmed status** — planned, legacy-skipped, unperformed, blank,
+6. Only valid confirmed actual rows ([[set.performed]]) become completed
+   history, and **every reader with performed/completed semantics filters to
+   valid actual values plus confirmed status** — planned, legacy-skipped, unperformed, blank,
    partial, invalid, deleted and tombstoned rows contribute to no count,
    record, list, analytic or the agent coaching API. Blank and partial active
    rows are lossless drafts keeping their ids and order across save, hydration

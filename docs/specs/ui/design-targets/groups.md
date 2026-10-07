@@ -159,12 +159,13 @@ older-page footer.
   subtitle (the member's role), then one `ListRow` per action, `danger` when
   destructive. No Cancel: the backdrop dismisses them (G5). The native
   confirmations after `Remove` / `Transfer` are unchanged.
-- **Invite.** A `Card`: the title in Archivo 700, the body in `ink-muted`, the
-  code in Plex Mono 700 at `xxl`, letter-spaced, and the link in
+- **Invite.** A `Card`: the title in Archivo 700 with no body under it
+  ([[copy.no-subtitles]]), the code in Plex Mono 700 at `xxl`, letter-spaced, and the link in
   `ink-muted`. `Share invite` is the one `accent`; `Regenerate code` an outline
   in `danger`. "New code ready…" is a neutral `Notice` with the `success`
   glyph (G3).
-- **Forms.** The username gate is a `Card` with its reason, a `FormField` and
+- **Forms.** The username gate is a `Card` with its title, no reason line
+  ([[copy.no-inline-explanation]]), a `FormField` and
   `Save username` (`accent`). Create / edit is two `FormField`s on the page,
   the description's `n/280` counter in Plex Mono under it, a `danger` `Notice`
   for the write's failure and the submit as the `accent`. Join is a Plex Mono
@@ -213,9 +214,9 @@ brief stays.
 - **Add exercise.** `From catalogue` | `Custom` is a `SegmentedControl`. The
   catalogue is a micro-label, a `SearchField` and one `Card` of radio rows (the
   weight entry on the right in `ink-muted`): the pick is `radio-on` in `ink`,
-  with no ground change. The form is a `Card`: the copy note in `ink-muted`,
-  T07's fields, a `danger` `Notice` on failure and the submit, the screen's one
-  `accent`. Rename uses the same form.
+  with no ground change. The form is a `Card`: no copy note
+  ([[copy.no-inline-explanation]]), T07's fields, a `danger` `Notice` on
+  failure and the submit, the screen's one `accent`. Rename uses the same form.
 - **The pick sheet** (also opened by the session picker) is a `Sheet` titled
   `<exercise> · <group>`, with no Cancel (G5): radio `ListRow`s (`radio-on` /
   `radio-off` in `ink`, no ground change), the other exercises under a

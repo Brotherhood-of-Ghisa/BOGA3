@@ -11,8 +11,8 @@ the gallery on 2026-09-25.
 
 ## Brief
 
-- **Sign in** is `paper`, centred, with no header: a `PageHeader` ("Sign in"
-  and an `ink-muted` intro) over one `Card` holding the Email and Password
+- **Sign in** is `paper`, centred, with no header: a `PageHeader` ("Sign in",
+  no intro: [[copy.no-subtitles]]) over one `Card` holding the Email and Password
   `FormField`s, a `danger` `Notice` for a failure, and `Sign in`, the screen's
   one `accent`. An auth-unconfigured build shows a `Notice` with the `warning`
   glyph, "Sign-in unavailable" and the reason, and no form (G3).
@@ -31,7 +31,8 @@ the gallery on 2026-09-25.
   `Notice` ("Auth setup required"). Signed out, Profile shows the sign-in
   `Card` with `Sign in` as its `accent`.
 - **Connected agents** has no in-content title: the native header carries it
-  (G4), and the `ink-muted` intro stays. Signed-out, loading, empty and
+  (G4), and no intro ([[copy.no-inline-explanation]]; the access granted is
+  stated on the consent page). Signed-out, loading, empty and
   error states are `StatePanel`s in a `Card`; the error's `Retry` is an outline.
   Each agent is a `Card`: the name in Archivo 700, "Read training data" in
   `ink-muted`, an `AI` `Tag`, `ListRow`s for Access granted and Last access

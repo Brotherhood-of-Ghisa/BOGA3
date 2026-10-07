@@ -79,9 +79,9 @@ rule that comes with it: text on a `viz` ground is `ink`.
   the figure in bold Plex Mono `record` (brass) over its date in Plex
   Mono `ink-muted`. `1RM`, never `Est. 1RM` (G7).
 - Each session is View Session's `ExerciseSetsCard` as a link: the
-  completion stamp in Plex Mono and `<n> sets` (working sets); the gym, `Tag`s
+  completion stamp in Plex Mono and `<n> sets` ([[set.count-display]]); the gym, `Tag`s
   and stacked `Stat`s (`1RM`, `Top set`, `Vol`, `Sets`); then `SetSummaryRow`s
-  (`type · weight × reps · 1RM · VOL`), warm-ups like working sets.
+  (`type · weight × reps · 1RM · VOL`, [[set.row-figures]]).
 - Sessions is one `ScreenScroll`: `Active` and `History` micro-labels; the
   active session a `Card` with the `set-current` glyph and 44pt `check` and ⋮;
   completed sessions `ListRow`s in one `Card`, a deleted one faded with a
@@ -100,11 +100,11 @@ History uses the saved look-back in both views. Muscle Sets cells compare daily
 or weekly counts against that same weekly target; other metric scaling stays unchanged.
 Legends and accessibility labels explain target colouring.
 
-Personal metrics use the operator's independent Working set and Volume effort
-columns (2026-10-04; `tech/training-metrics-contract.md`). Volume-only exercise
+Personal metrics follow [[set.eligibility]] (2026-10-04). Volume-only exercise
 rows remain visible with zero Sets and unavailable 1RM; heatmaps retain their
 volume cells without creating working-set counts or strength values. Per-set
-figures and recorded effort labels stay visible regardless of the two choices.
+figures follow [[set.row-figures]]; recorded effort labels stay visible
+regardless of the two choices.
 
 ## States
 

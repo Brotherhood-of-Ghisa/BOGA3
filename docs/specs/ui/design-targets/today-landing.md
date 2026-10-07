@@ -27,7 +27,7 @@ runtime gallery of every state below on 2026-10-03.
   `View groups` (the Groups tab). Each section is one `Card`.
 - **Progress card, top: this week** (Mon–Sun, local). A `This week` micro-label
   with the date range in `ink-faint`, then three stacked figures: `Sessions`,
-  `Sets` (working sets, `../../tech/training-metrics-contract.md`) and `PRs` (the `record` figure
+  `Sets` ([[set.count-display]]) and `PRs` (the `record` figure
   with its up arrow). Under each figure a thin bar on the `viz` ramp shows this
   week as a share of **last week's total**, in laps of it: `viz2` up to the
   total, then `viz3` over it up to twice, then `viz4` up to three times, where

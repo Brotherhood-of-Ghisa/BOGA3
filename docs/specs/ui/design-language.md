@@ -160,20 +160,17 @@ additionally render faded (§6).
   Bodyweight contribution and dated readings may alter the calculation when the
   applicable capability is enabled, but normal data surfaces never expose the
   arithmetic. All weights are kg. Valid zero renders as a number (`0.0` for a
-  Weight or 1RM, `0` for Volume); `—` is reserved for invalid, failed or
+  Weight or 1RM ([[1rm.formula]]), `0` for Volume); `—` is reserved for invalid, failed or
   genuinely unavailable strict-group results. Long context wraps or gets a
   separate line instead of shrinking numeric figures.
-- **One format per figure** — Weight `60.0`, 1RM `104.7`, Volume `2560` — on
-  every screen (`tech/training-metrics-contract.md` §4, `format.ts`).
+- **One format per figure** — Weight `60.0`, 1RM `104.7` ([[1rm.formula]]),
+  Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
+  `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.
-- **Show a figure wherever it can be computed**, including for values that are
-  not yet realised — a planned set shows its projected 1RM and volume faded:
-  values in `ink-faint`, legends in `ink-ghost` (the faintest ink read too faint
-  for the values themselves).
-- **Warm-ups are presented exactly like working sets**, including a real 1RM.
-  That 1RM and volume describe the warm-up row alone: a warm-up is never a
-  record (brass) and feeds no record, PR or best. The full rule is
-  `tech/training-metrics-contract.md` "Counted set" (`isWorkingSet`).
+- **Which figures a set row shows**, warm-ups and planned rows included, is
+  [[set.row-figures]]. Unrealised figures are faded: values in `ink-faint`,
+  legends in `ink-ghost` (the faintest ink read too faint for the values
+  themselves).

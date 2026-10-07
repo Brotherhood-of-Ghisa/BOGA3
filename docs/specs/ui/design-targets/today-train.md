@@ -14,8 +14,8 @@ Today's half of this record was replaced by `today-landing.md` (accepted
 
 ## Brief
 
-- The page is `paper` under a `PageHeader` (Archivo 800 title, `ink-muted`
-  intro). Each section has a `SectionHeader`.
+- The page is `paper` with no title or intro (`train-page.md`). Each section
+  has a `SectionHeader`.
 - An active workout is a `Card` marked by the `set-current` ring and the words
   "Continue your active session", with no green. `Resume workout` is the
   screen's one `accent`.
