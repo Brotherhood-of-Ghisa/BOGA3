@@ -1,5 +1,5 @@
-// The group comparison form's derived state, as plain data: inline errors,
-// the stale-revision warning and the submit label.
+// The group comparison form's derived state, as plain data: rule validation,
+// inline errors and the stale-revision warning.
 import { validateExerciseCore } from '@/src/exercise-core';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 import { isCompetitionMetric, type CompetitionRules as GroupExerciseRules } from './competition-contract';
