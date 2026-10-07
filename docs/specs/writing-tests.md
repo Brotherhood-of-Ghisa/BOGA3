@@ -86,7 +86,7 @@ the test is about the UTC instant itself.
 
 A body's cost is processes, not SQL: a `docker exec psql` per statement costs
 ~40 ms against ~1 ms of query, and every extra `mktemp`/`cat`/`jq` adds a
-process. The group bodies (`supabase/tests/lib/groups-fixtures.sh`) therefore:
+process. The group bodies built on `supabase/tests/lib/groups-fixtures.sh` therefore:
 
 - call `psql_session_start` once, so `run_psql` shares one psql session. Each
   call ends with `discard all` (fresh settings, temp tables and session locks;

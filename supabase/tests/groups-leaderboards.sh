@@ -130,11 +130,8 @@ expect_sql() {
   [[ "${actual}" == "$3" ]] || fail "$1: expected '$3', got '${actual}'"
 }
 
-# drain [secret]: POST group-eval (direct-drain mode); STATUS/BODY hold the reply.
-drain() { eval_drain "$@"; }
-
 drain_ok() {
-  drain
+  eval_drain
   expect_ok "group-eval drain: $1"
   check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 6'
 }
@@ -308,9 +305,9 @@ for bearer in "${ATHLETE_TOKEN}" "${ANON_KEY}"; do
   [[ ! "${STATUS}" =~ ^2 ]] || fail "a client claimed evaluator jobs (HTTP ${STATUS})"
   check "client group_eval_claim must be a 42501 denial" '.code == "42501"'
 done
-drain ""
+eval_drain ""
 [[ "${STATUS}" == "401" ]] || fail "group-eval without a secret: expected 401, got ${STATUS}"
-drain "wrong-${EVAL_SECRET}"
+eval_drain "wrong-${EVAL_SECRET}"
 [[ "${STATUS}" == "401" ]] || fail "group-eval with a wrong secret: expected 401, got ${STATUS}"
 STATUS="$(curl --silent -o /dev/null -w '%{http_code}' "${API_URL}/functions/v1/group-eval")"
 [[ "${STATUS}" == "405" ]] || fail "group-eval GET: expected 405, got ${STATUS}"

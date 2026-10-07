@@ -1126,7 +1126,7 @@ run_psql_once "begin; select pg_advisory_xact_lock(${BOARD_LOCK_KEY}, hashtext('
   >/dev/null 2>&1 &
 LOCK_PID=$!
 release_lock_holder() {
-  run_psql "select count(pg_terminate_backend(pid)) from pg_locks
+  run_psql "select count(*) filter (where pg_terminate_backend(pid)) from pg_locks
              where locktype = 'advisory' and classid = ${BOARD_LOCK_KEY} and granted;"
 }
 for _ in $(seq 1 50); do

@@ -46,14 +46,20 @@ run_psql_once() {
 # (settings, temp tables, session locks), and a call that leaves a transaction
 # open fails. Notices are not shown (client_min_messages=warning).
 PSQL_SESSION_DIR=""
+PSQL_SESSION_PID=""
 psql_session_start() {
   PSQL_SESSION_DIR="$(mktemp -d)"
   mkfifo "${PSQL_SESSION_DIR}/in" "${PSQL_SESSION_DIR}/out"
   docker exec -i -e PGOPTIONS='-c client_min_messages=warning' "${DB_CONTAINER}" \
     sh -c 'exec psql -X -U postgres -d postgres -Atq 2>&1' \
     <"${PSQL_SESSION_DIR}/in" >"${PSQL_SESSION_DIR}/out" &
+  PSQL_SESSION_PID=$!
   exec 7>"${PSQL_SESSION_DIR}/in" 8<"${PSQL_SESSION_DIR}/out"
   [[ "$(run_psql "select 'session';")" == "session" ]] || fail "psql session did not start"
+  # The session must fail a call on an error and on a transaction left open,
+  # or every assertion after this would pass on a broken query.
+  ! run_psql "select 1/0;" >/dev/null 2>&1 || fail "psql session did not fail an ERROR"
+  ! run_psql "begin;" >/dev/null 2>&1 || fail "psql session did not fail an open transaction"
 }
 
 psql_session_stop() {
@@ -69,6 +75,10 @@ PSQL_FAILURE_RE='^(psql:[^ ]*: )?(ERROR|FATAL|PANIC):'
 run_psql() {
   [[ -n "${PSQL_SESSION_DIR}" ]] || { run_psql_once "$1"; return; }
   local marker line out="" ended=0 failed=0
+  # Writing to a session that has gone would SIGPIPE the shell and skip its
+  # exit-trap cleanup; fail the call instead.
+  kill -0 "${PSQL_SESSION_PID}" 2>/dev/null ||
+    { echo "[${LANE_LABEL}] psql session ended unexpectedly" >&2; return 3; }
   PSQL_CALLS=$((PSQL_CALLS + 1))
   marker="__psql_done_${RANDOM}${RANDOM}_${PSQL_CALLS}__"
   # The `;` line ends an unterminated last statement; psql ignores an empty one.

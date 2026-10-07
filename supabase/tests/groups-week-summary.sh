@@ -482,7 +482,8 @@ pass "working sets by the app rule, performed, live and present; group records n
 
 # The late member: a session that started before their join is never shared.
 # The join must land inside the window, which opened 1 s after setup began.
-until (( $(now_ms) > WS + 1 )); do sleep 0.1; done
+for _ in $(seq 1 30); do (( $(now_ms) > WS + 1 )) && break; sleep 0.1; done
+(( $(now_ms) > WS + 1 )) || fail "the server clock did not pass the window start ${WS}"
 rpc "${LATE_TOKEN}" group_join "$(jq -nc --arg c "${INVITE_CODE}" '{p_code: $c}')"
 expect_ok "late join"
 LATE_JOINED="$(run_psql "select floor(extract(epoch from joined_at) * 1000)::bigint from app_public.group_memberships
