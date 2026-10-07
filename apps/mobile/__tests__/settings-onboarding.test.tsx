@@ -52,7 +52,7 @@ jest.mock('@/src/utils/runtime-metadata', () => ({
   readAppRuntimeMetadata: () => ({
     buildNumber: '45',
     displayFlavor: 'preview',
-    releaseCodename: 'Jemiliano',
+    releaseCodename: 'Ziocleziano',
     version: '1.2.3',
   }),
 }));
@@ -111,7 +111,7 @@ describe('settings onboarding surface', () => {
     }
     expect(screen.getByText('member@example.test')).toBeTruthy();
     expect(screen.getByText('Version 1.2.3 (build 45)')).toBeTruthy();
-    expect(screen.getByText('Release Jemiliano')).toBeTruthy();
+    expect(screen.getByText('Release Ziocleziano')).toBeTruthy();
     expect(screen.getByText('Flavor Preview')).toBeTruthy();
   });
 
