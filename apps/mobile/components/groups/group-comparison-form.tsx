@@ -20,7 +20,6 @@ type Props = {
   initialRules?: GroupExerciseRules;
   /** Preserve the version seen when editing begins, even if a refresh lands. */
   existing?: GroupMetricExerciseWire;
-  note?: string | null;
   submitLabel: string;
   pendingLabel: string;
   pending: boolean;
@@ -44,15 +43,15 @@ const METRIC_OPTIONS = GROUP_METRICS.map(metric => ({
 }));
 
 /** Shared field recipe, with a version-bound preview for group-wide changes. */
-export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRules = emptyComparisonRules, existing, note,
+export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRules = emptyComparisonRules, existing,
   submitLabel, pendingLabel, pending, errorMessage, onSubmit }: Props) {
   const prefill = existing ? comparisonRulesFromWire(existing) : { ...initialRules, bodyweightCalculationsEnabled };
   const draft = useComparisonDraft(prefill, existing);
   return <GroupComparisonFormFields bodyweightCalculationsEnabled={bodyweightCalculationsEnabled} existing={existing}
-    note={note} submitLabel={submitLabel} pendingLabel={pendingLabel} pending={pending} errorMessage={errorMessage} onSubmit={onSubmit} draft={draft} />;
+    submitLabel={submitLabel} pendingLabel={pendingLabel} pending={pending} errorMessage={errorMessage} onSubmit={onSubmit} draft={draft} />;
 }
 
-export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existing,note,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft }:
+export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existing,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft }:
   Props & { draft: ReturnType<typeof useComparisonDraft> }) {
   const validation = validateCompetitionFormRules({ name: draft.name, loadInputMode: draft.loadInputMode,
     bodyweightCalculationsEnabled, bodyweightContribution: draft.contribution,
@@ -67,7 +66,6 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
   };
   return (
     <Card style={{ padding: uiSpace.md, gap: uiSpace.md }} testID="group-exercise-form">
-      {note ? <Text allowFontScaling={false} style={textStyles.muted} testID="group-exercise-form-note">{note}</Text> : null}
       {draft.baseline.revision !== null ? <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-revision">Rules revision {draft.baseline.revision}</Text> : null}
       <ExerciseCoreFields editable={!pending} name={draft.name} loadInputMode={draft.loadInputMode}
         nameError={status.nameError}
@@ -76,14 +74,12 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
         testIDPrefix="group-exercise-form"
         bodyweightContribution={bodyweightCalculationsEnabled ? {
           value: draft.contributionField,
-          scope: 'group',
           onChange: draft.changeContribution,
           error: status.rulesError,
         } : undefined} />
       <Text allowFontScaling={false} style={textStyles.muted}>Default ranking</Text>
       <SegmentedControl accessibilityLabel="Default ranking" disabled={pending} value={draft.defaultMetric} layout="fit"
         options={METRIC_OPTIONS} onChange={draft.changeDefaultMetric} testIDPrefix="group-exercise-default-metric" />
-      <Text allowFontScaling={false} style={textStyles.muted}>Members can switch ranking views. This choice only sets the opening view.</Text>
       {status.stale ? <StaleRulesNotice onReload={draft.reload} pending={pending} /> : null}
       {status.preview ? <RulesChangePreview preview={status.preview} /> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
@@ -103,8 +99,5 @@ function StaleRulesNotice({ pending, onReload }: { pending: boolean; onReload: (
 }
 
 function RulesChangePreview({ preview }: { preview: ComparisonPreview }) {
-  return <>
-    <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-preview">{preview.summary}</Text>
-    <Text allowFontScaling={false} style={textStyles.muted}>{preview.attestationNote}</Text>
-  </>;
+  return <Text allowFontScaling={false} style={textStyles.muted} testID="group-rules-preview">{preview.summary}</Text>;
 }

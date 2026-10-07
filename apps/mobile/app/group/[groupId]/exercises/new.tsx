@@ -1,6 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
 
 import {
   GroupLostAccessState,
@@ -10,7 +9,7 @@ import {
   StandardExercisePicker,
   pickInlineError,
 } from '@/components/groups';
-import { ScreenScroll, SegmentedControl, uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { ScreenScroll, SegmentedControl } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
 import type { CompetitionRules as GroupExerciseRules } from '@/src/groups/competition-contract';
@@ -143,14 +142,9 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
                   bodyweightCalculationsEnabled: group.data.group.bodyweight_calculations_enabled,
                   bodyweightContribution: 0, defaultMetric: 'e1rm' }}
                 key={picked.sourceExerciseId}
-                note={`Copies the standard exercise "${picked.name}". You can change its name.`}
                 {...formProps}
               />
-            ) : (
-              <Text allowFontScaling={false} style={styles.hint} testID="group-exercise-pick-hint">
-                Pick a standard exercise to copy.
-              </Text>
-            )}
+            ) : null}
           </>
         )}
       </>
@@ -163,13 +157,3 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
     </ScreenScroll>
   );
 }
-
-const styles = StyleSheet.create({
-  hint: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-});

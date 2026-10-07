@@ -60,6 +60,7 @@ describe('SignInScreen', () => {
     expect(screen.getByTestId('sign-in-email-input')).toBeTruthy();
     expect(screen.getByTestId('sign-in-password-input')).toBeTruthy();
     expect(screen.getByTestId('sign-in-submit-button')).toBeTruthy();
+    expect(screen.queryByText(/keep it in sync/)).toBeNull();
   });
 
   it('submits the trimmed email + password and clears the auth-required signal on success', async () => {

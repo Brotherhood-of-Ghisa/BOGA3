@@ -85,6 +85,8 @@ describe('editing an existing exercise', () => {
     renderEditor({ editingExercise: exercise({ bodyweightContribution: 0.25 }) });
     expect(screen.getByTestId('exercise-editor-name-input')).toHaveProp('value', 'Bench Press');
     expect(screen.getByTestId('exercise-editor-bodyweight-percentage')).toHaveProp('value', '25');
+    expect(screen.queryByText(/applicable dated weight/)).toBeNull();
+    expect(screen.queryByText(/shared across both sides/)).toBeNull();
     await save();
     expect(onSave).toHaveBeenCalledWith({
       bodyweightContribution: 0.25,

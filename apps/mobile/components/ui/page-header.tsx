@@ -5,19 +5,16 @@ import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens'
 
 type PageHeaderProps = {
   title: string;
-  // One line under the title saying what the screen is for.
-  intro?: string;
 };
 
 // A tab screen's in-content title (the tab screens have no native header):
-// Archivo 800 at `xxl`, with an optional `ink-muted` intro.
-export function PageHeader({ title, intro }: PageHeaderProps) {
+// Archivo 800 at `xxl`, standing alone ([[copy.no-subtitles]]).
+export function PageHeader({ title }: PageHeaderProps) {
   return (
     <View style={styles.page}>
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.pageTitle}>
         {title}
       </Text>
-      {intro ? <Text allowFontScaling={false} style={styles.intro}>{intro}</Text> : null}
     </View>
   );
 }
@@ -60,13 +57,6 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.xxl,
     lineHeight: uiTypography.lineHeight.xxl,
     color: uiRoles.ink,
-  },
-  intro: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   section: {
     flexDirection: 'row',

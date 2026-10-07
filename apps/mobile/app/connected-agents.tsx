@@ -112,14 +112,9 @@ export default function ConnectedAgentsScreen() {
     );
   };
 
-  // The native header carries the title (G4); the intro stays.
+  // The native header carries the title (G4).
   return (
     <ScreenScroll contentInsetAdjustmentBehavior="automatic" testID="connected-agents-screen">
-      <Text allowFontScaling={false} style={styles.intro}>
-        Agents can read training data only. They cannot create, edit, or delete exercises,
-        workouts, or sets.
-      </Text>
-
       {!user ? (
         <Card>
           <StatePanel
@@ -215,13 +210,6 @@ export default function ConnectedAgentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  intro: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
   agentHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',

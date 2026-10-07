@@ -98,7 +98,7 @@ export default function SignInScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           style={styles.flex}>
-          <PageHeader intro="Sign in to load your data and keep it in sync." title="Sign in" />
+          <PageHeader title="Sign in" />
 
           {authDisabledMessage ? (
             <Notice

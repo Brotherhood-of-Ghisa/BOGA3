@@ -10,6 +10,14 @@ that describes it.
   count, `3 sets · 1RM 102.5`), it is data and stays.
 - **Bad:** a line like "Your training at a glance" under `Today`.
 - **Good:** `Mon 6 Oct · 52 min` under a session title.
+- **Cases** (removed after the fact, decided 2026-10-07):
+  - `Sign in to load your data and keep it in sync.` under Sign in,
+    `Agents can read training data only. …` under Connected agents, and
+    `Community, coaching tools, and library management stay close …` under
+    More.
+  - The sentence under each Settings and More row (`Review access and
+    revoke existing connections.`, `Sign in and manage your account.`, …);
+    the signed-in email under Account is data and stays.
 
 Why: the screen's content already says what the screen is; a describing line
 costs space and is read once.
@@ -54,6 +62,16 @@ formula notes, hints under fields, or "how this works" lines.
   - The preview under a group's scoring-rules form (`Apply rules revision N:
     … The whole board will rebuild together. …` and the certification note):
     removed, with nothing in its place (decided 2026-10-07).
+  - Field hints on the exercise forms: under Weight entry and Bodyweight
+    contribution (%), `Members can switch ranking views. …` under Default
+    ranking, `Pick a standard exercise to copy.` and `Copies the standard
+    exercise "…". …` on Add group exercise (decided 2026-10-07).
+  - `Anyone with this code can join. …` on the group invite and `Group
+    members see you by your username. …` on Choose a username (decided
+    2026-10-07).
+  - `Coaches get read-only training access …` under AI coaching and
+    `Configure how dates and other details are displayed …` in Settings'
+    Preferences (decided 2026-10-07).
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.

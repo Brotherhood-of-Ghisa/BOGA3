@@ -90,11 +90,13 @@ describe('group comparison rule editor', () => {
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ bodyweightContribution: 0.8 }), 3);
   });
-  it('preserves witnesses when changing contribution', () => {
+  it('reviews a contribution change as the new values alone, with no explanation', () => {
     render(<GroupComparisonForm {...props} existing={{ ...existing,rules: { ...existing.rules,bodyweight_contribution: 0 } }} onSubmit={jest.fn()} />);
     fireEvent.changeText(screen.getByTestId('group-exercise-form-bodyweight-percentage'), '100');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
-    expect(screen.getByText(/Certifications of unchanged witnessed sets keep the same witness and time/)).toBeOnTheScreen();
+    expect(screen.getByTestId('group-rules-preview')).toHaveTextContent(/0% → 100%/);
+    expect(screen.queryByText(/Certifications of unchanged witnessed sets/)).toBeNull();
+    expect(screen.queryByText(/whole board will rebuild/)).toBeNull();
   });
   it('retains values and the inline failure for a retry, and disables pending writes', () => {
     const onSubmit = jest.fn();
@@ -138,10 +140,12 @@ describe('group comparison rule editor: creating and edge inputs', () => {
     expect(screen.queryByTestId('group-rules-revision')).toBeNull();
   });
 
-  it('shows the note and the current revision', () => {
-    render(<GroupComparisonForm {...props} note="Linked from your exercise." onSubmit={jest.fn()} />);
-    expect(screen.getByTestId('group-exercise-form-note')).toHaveTextContent('Linked from your exercise.');
+  it('shows the current revision, with no hint under a field', () => {
+    render(<GroupComparisonForm {...props} onSubmit={jest.fn()} />);
     expect(screen.getByTestId('group-rules-revision')).toHaveTextContent('Rules revision 2');
+    expect(screen.queryByText(/opening view/)).toBeNull();
+    expect(screen.queryByText(/applicable weight/)).toBeNull();
+    expect(screen.queryByText(/shared across both sides/)).toBeNull();
   });
 
   it('names a missing name inline, without the contribution error', () => {
@@ -185,10 +189,9 @@ describe('group comparison rule editor: creating and edge inputs', () => {
     expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Review rule changes');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(screen.getByTestId('group-rules-preview')).toHaveTextContent(
-      'Apply rules revision 3: 100% → 100% bodyweight contribution, per-side Weight. The whole board will rebuild together. ' +
-        'Previous scores stay in their original rules history; this is not a new performed record.',
+      'Apply rules revision 3: 100% → 100% bodyweight contribution, per-side Weight.',
+      { exact: true },
     );
-    expect(screen.getByText(/Certifications of unchanged witnessed sets keep the same witness and time/)).toBeOnTheScreen();
     expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Apply group rules');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ loadInputMode: 'per_side_load' }), 2);

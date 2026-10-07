@@ -48,10 +48,7 @@ export default function MoreScreen() {
       contentContainerStyle={styles.content}
       contentInsetAdjustmentBehavior="automatic"
       testID="more-screen">
-      <PageHeader
-        intro="Community, coaching tools, and library management stay close without crowding your daily training."
-        title="More"
-      />
+      <PageHeader title="More" />
 
       {sections.map((section) => (
         <View key={section.key} style={styles.section} testID={`more-section-${section.key}`}>
@@ -65,10 +62,9 @@ export default function MoreScreen() {
                 <View key={destination.key}>
                   <ListRow
                     accessibilityHint={destination.accessibilityHint}
-                    accessibilityLabel={`${destination.label}. ${destination.description}`}
+                    accessibilityLabel={destination.label}
                     accessibilityRole={external ? 'link' : 'button'}
                     density="list"
-                    description={destination.description}
                     divider={index > 0}
                     label={destination.label}
                     leading={<Icon color={uiRoles.inkMuted} name={destination.icon} />}

@@ -36,11 +36,10 @@ const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
     (right.bodyweightCalculationsEnabled && right.bodyweightContribution > 0) &&
   left.bodyweightContribution === right.bodyweightContribution;
 
-export type ComparisonPreview = { summary: string; attestationNote: string };
+export type ComparisonPreview = { summary: string };
 
 const describeRulesChange = (baseline: ComparisonBaseline, next: GroupExerciseRules): ComparisonPreview => ({
-  summary: `Apply rules revision ${(baseline.revision ?? 0) + 1}: ${formatContributionPercent(baseline.rules.bodyweightContribution)}% → ${formatContributionPercent(next.bodyweightContribution)}% bodyweight contribution, ${next.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`,
-  attestationNote: 'Certifications of unchanged witnessed sets keep the same witness and time. Ineligible scores return when eligible under the rules. Personal exercise settings stay unchanged.',
+  summary: `Apply rules revision ${(baseline.revision ?? 0) + 1}: ${formatContributionPercent(baseline.rules.bodyweightContribution)}% → ${formatContributionPercent(next.bodyweightContribution)}% bodyweight contribution, ${next.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight.`,
 });
 
 export type ComparisonFormStatusInput = {
