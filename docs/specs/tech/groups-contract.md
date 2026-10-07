@@ -132,10 +132,11 @@ is the competition contract's. Once it is active, unsafe older RPCs return
 settings RPCs.
 
 **Week summary.** The client sends its local week (≤ 8 days): the server never
-guesses a time zone. It counts completed, untombstoned sessions shared to the
-group by current members and started in the window; their performed, live,
-working facts whose rows still exist (trailing the evaluator); and non-voided
-group records, one per board taken. Every current member is ranked, zeros
+guesses a time zone. It reads completed, untombstoned sessions shared to the
+group by current members and started in the window, and counts their
+performed, live, working facts whose rows still exist (trailing the
+evaluator; [[set.eligibility]]) and their non-voided group records, one per
+board taken. It reports no session count. Every current member is ranked, zeros
 included, on `(working_sets desc, group_records desc)`. Training now is an
 active session written within 2 h (max `server_received_at` over session,
 exercises, sets); latest completed is any time.

@@ -247,7 +247,9 @@ choices may change which recorded set qualifies.
 - A session's or exercise's Volume is the sum over its volume-included sets (§1)
   (`summarizeVolume`).
 - When a set's load is unknown, the total is a known subtotal, with coverage
-  shown as `Known subtotal from X of Y included sets`.
+  shown as `Known subtotal from X of Y included sets`. Decided to go: such a
+  set is left out and no note shows ([[copy.no-inline-explanation]],
+  `Pending:`).
 
 **Muscle volume.**
 
