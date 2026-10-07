@@ -273,6 +273,92 @@ describe('repairProvenanceForWirePage', () => {
       await repairProvenanceForWirePage([{ type: 'gyms', id: 'g-1', client_updated_at_ms: 1, fields: { name: 'x' } }], T0),
     ).toBeNull();
   });
+
+  it('excludes same-row updates from arbitration clearing when page carries competing attachment', async () => {
+    seedPlanGraph();
+    seedLoser();
+
+    // A second plan block and an already-local card claiming it.
+    db().insert(sessionPlans).values({ id: 'plan-2', title: 'Q' }).run();
+    db()
+      .insert(sessionPlanExercises)
+      .values({ id: 'block-2', sessionPlanId: 'plan-2', exerciseDefinitionId: 'def-1', orderIndex: 0, name: 'Bench' })
+      .run();
+    db()
+      .insert(sessionPlanSets)
+      .values({ id: 'target-c', sessionPlanExerciseId: 'block-2', orderIndex: 0, targetReps: 10 })
+      .run();
+    db()
+      .insert(sessionExercises)
+      .values({
+        id: 'card-unrelated',
+        sessionId: 'sess-1',
+        exerciseDefinitionId: 'def-1',
+        orderIndex: 1,
+        name: 'Old Name',
+        sourcePlanExerciseId: 'block-2',
+        localDirty: false,
+        localUpdatedAtMs: 1500,
+      })
+      .run();
+    db()
+      .insert(exerciseSets)
+      .values({
+        id: 'set-unrelated',
+        sessionExerciseId: 'card-unrelated',
+        orderIndex: 0,
+        repsValue: '10',
+        weightValue: '50',
+        sourcePlanSetId: 'target-c',
+        localDirty: false,
+        localUpdatedAtMs: 1500,
+      })
+      .run();
+
+    // The wire page contains:
+    // 1. One actual competing attachment (competing for block-1 against card-loser)
+    // 2. An unrelated newer update to card-unrelated and set-unrelated
+    const page = [
+      {
+        type: 'session_exercises',
+        id: 'card-winner',
+        client_updated_at_ms: 2000,
+        fields: { source_plan_exercise_id: 'block-1' },
+      },
+      {
+        type: 'session_exercises',
+        id: 'card-unrelated',
+        client_updated_at_ms: 2000,
+        fields: { name: 'New Name', source_plan_exercise_id: 'block-2' },
+      },
+      {
+        type: 'exercise_sets',
+        id: 'set-unrelated',
+        client_updated_at_ms: 2000,
+        fields: { reps_value: '12', source_plan_set_id: 'target-c' },
+      },
+    ];
+
+    const repaired = await repairProvenanceForWirePage(page, T0);
+    // Only the conflicting block-1 claim should be repaired; block-2 / target-c must not be touched.
+    expect(repaired).toEqual({ blocks: new Set(['block-1']), targets: new Set() });
+
+    // card-loser was repaired/cleared
+    const loser = db().select().from(sessionExercises).where(eq(sessionExercises.id, 'card-loser')).get();
+    expect(loser?.sourcePlanExerciseId).toBeNull();
+    expect(loser?.localDirty).toBe(true);
+
+    // card-unrelated and set-unrelated retained their provenance links and local timestamp was not bumped
+    const unrelatedCard = db().select().from(sessionExercises).where(eq(sessionExercises.id, 'card-unrelated')).get();
+    expect(unrelatedCard?.sourcePlanExerciseId).toBe('block-2');
+    expect(unrelatedCard?.localUpdatedAtMs).toBe(1500);
+    expect(unrelatedCard?.localDirty).toBe(false);
+
+    const unrelatedSet = db().select().from(exerciseSets).where(eq(exerciseSets.id, 'set-unrelated')).get();
+    expect(unrelatedSet?.sourcePlanSetId).toBe('target-c');
+    expect(unrelatedSet?.localUpdatedAtMs).toBe(1500);
+    expect(unrelatedSet?.localDirty).toBe(false);
+  });
 });
 
 describe('classifyRpcResult — arbitration token', () => {

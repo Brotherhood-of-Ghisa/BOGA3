@@ -261,9 +261,15 @@ export const createPlanRepository = (): PlanRepository => ({
     }
     // Duplicates are authored plans: fresh pending blocks, unscheduled unless
     // the caller says otherwise, with the authored gym carried over.
+    const copySuffix = ' (copy)';
+    const maxBaseLength = PLAN_LIMITS.name.max - copySuffix.length;
+    const defaultTitle =
+      graph.plan.title.length > maxBaseLength
+        ? `${graph.plan.title.slice(0, maxBaseLength)}${copySuffix}`
+        : `${graph.plan.title}${copySuffix}`;
     const duplicate: SaveSessionPlanGraphInput = {
       gymId: graph.plan.gymId,
-      title: patch?.title ?? `${graph.plan.title} (copy)`,
+      title: patch?.title ?? defaultTitle,
       scheduledFor: patch?.scheduledFor === undefined ? null : patch.scheduledFor,
       exercises: graph.exercises.map((exercise) => ({
         exerciseDefinitionId: exercise.exerciseDefinitionId,

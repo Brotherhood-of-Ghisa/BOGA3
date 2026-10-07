@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
@@ -222,7 +222,10 @@ const savePlanGraphInTransaction = (
 
   const keptExerciseIds = new Set<string>();
   const keptSetIdsByExerciseId = new Map<string, Set<string>>();
-  let setTombstoneCursor = ORDER_INDEX_TOMBSTONE_BASE;
+  const maxExistingSetIndex = Array.from(existingSetsByExerciseId.values())
+    .flat()
+    .reduce((max, set) => Math.max(max, set.orderIndex), -1);
+  let setTombstoneCursor = Math.max(ORDER_INDEX_TOMBSTONE_BASE, maxExistingSetIndex + 1);
 
   input.exercises.forEach((exerciseInput, exerciseIndex) => {
     const requestedId = exerciseInput.id?.trim();
@@ -433,6 +436,8 @@ export type SessionPlanStore = {
   tombstonePlanExercise(input: { planExerciseId: string; now: Date }): Promise<boolean>;
   /** The block's live performed card, when one has claimed it. */
   findLiveSourcedCardForBlock(planExerciseId: string): Promise<{ id: string; sessionId: string } | null>;
+  /** Releases (tombstones) child cards and sets of discarded sessions claiming these blocks. */
+  releaseDiscardedBlockClaims(planExerciseIds: string[], now?: Date): Promise<void>;
   /** The active, undeleted session started from this whole plan, when one exists. */
   findActiveSessionIdBySourcePlan(planId: string): Promise<string | null>;
   /** Any active, undeleted session — the Start-all conflict check. */
@@ -636,7 +641,8 @@ const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDe
       });
 
       const keptSetIds = new Set<string>();
-      let setTombstoneCursor = ORDER_INDEX_TOMBSTONE_BASE;
+      const maxExistingSetIndex = existingSetRows.reduce((max, row) => Math.max(max, row.orderIndex), -1);
+      let setTombstoneCursor = Math.max(ORDER_INDEX_TOMBSTONE_BASE, maxExistingSetIndex + 1);
       input.sets.forEach((setInput, setIndex) => {
         const requestedSetId = setInput.id?.trim();
         const existingSet = requestedSetId
@@ -754,6 +760,43 @@ const findLiveSourcedCardForBlock = async (planExerciseId: string): Promise<{ id
     });
     return card;
   };
+
+/** See {@link SessionPlanStore}. */
+const releaseDiscardedBlockClaims = async (planExerciseIds: string[], now: Date = new Date()): Promise<void> => {
+  if (planExerciseIds.length === 0) return;
+  const database = await bootstrapLocalDataLayer();
+  let updated = false;
+  database.transaction((tx) => {
+    const localUpdatedAtMs = nowMonotonic(tx);
+    const discardedCards = tx
+      .select({ id: sessionExercises.id })
+      .from(sessionExercises)
+      .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+      .where(
+        and(
+          inArray(sessionExercises.sourcePlanExerciseId, planExerciseIds),
+          isNull(sessionExercises.deletedAt),
+          isNotNull(sessions.deletedAt),
+        ),
+      )
+      .all();
+    if (discardedCards.length > 0) {
+      updated = true;
+      const cardIds = discardedCards.map((c) => c.id);
+      tx.update(sessionExercises)
+        .set({ deletedAt: now, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(inArray(sessionExercises.id, cardIds))
+        .run();
+      tx.update(exerciseSets)
+        .set({ deletedAt: now, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(and(inArray(exerciseSets.sessionExerciseId, cardIds), isNull(exerciseSets.deletedAt)))
+        .run();
+    }
+  });
+  if (updated) {
+    notifyLocalWrite();
+  }
+};
 
 
 /** See {@link SessionPlanStore}. */
@@ -1106,7 +1149,13 @@ const tombstonePlanExercise = async (input: { planExerciseId: string; now: Date 
       // keeps a re-parked slot and the deleted block moves above the plan's
       // current maximum — otherwise a later reorder of the surviving blocks
       // would collide with the deleted row.
-      let setTombstoneCursor = ORDER_INDEX_TOMBSTONE_BASE;
+      const maxSetIndex = tx
+        .select({ orderIndex: sessionPlanSets.orderIndex })
+        .from(sessionPlanSets)
+        .where(eq(sessionPlanSets.sessionPlanExerciseId, block.id))
+        .all()
+        .reduce((max, row) => Math.max(max, row.orderIndex), -1);
+      let setTombstoneCursor = Math.max(ORDER_INDEX_TOMBSTONE_BASE, maxSetIndex + 1);
       for (const set of tx
         .select({ id: sessionPlanSets.id })
         .from(sessionPlanSets)
@@ -1252,6 +1301,7 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
   savePlanExerciseGraph,
   insertPlanExercise,
   findLiveSourcedCardForBlock,
+  releaseDiscardedBlockClaims,
   findActiveSessionIdBySourcePlan,
   findActiveSessionId,
   findSourcedCardPerformances,

@@ -197,8 +197,12 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
     }
     // Programme-order then exercise-order: plans come ordered by
     // programme_order_index and blocks by order_index, so the first pending
-    // block in that sequence is the next one to offer.
-    const nextBlock = details.flatMap((detail) => detail.blocks).find((block) => block.status === 'pending') ?? null;
+    // materializable block in that sequence (with a non-null exercise definition)
+    // is the next one to offer.
+    const nextBlock =
+      details
+        .flatMap((detail) => detail.blocks)
+        .find((block) => block.status === 'pending' && block.exerciseDefinitionId !== null) ?? null;
     return {
       id: programme.id,
       name: programme.name,

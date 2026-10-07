@@ -1,7 +1,7 @@
 import { personalCalculationContext } from '@/src/config/personal-effort';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
@@ -644,7 +644,15 @@ const replaceSessionExerciseGraph = (
     }
 
     const existingExercise = requestedId ? existingExercisesById.get(requestedId) : undefined;
-    const sessionExerciseId = requestedId || createLocalEntityId('exercise');
+    const foreignExercise =
+      requestedId && !existingExercise
+        ? tx
+            .select({ id: sessionExercises.id })
+            .from(sessionExercises)
+            .where(and(eq(sessionExercises.id, requestedId), ne(sessionExercises.sessionId, input.sessionId)))
+            .get()
+        : undefined;
+    const sessionExerciseId = requestedId && !foreignExercise ? requestedId : createLocalEntityId('exercise');
 
     if (existingExercise) {
       // Reuse the surviving row: take its final position and revive it (clear
@@ -716,12 +724,20 @@ const replaceSessionExerciseGraph = (
       // Only reuse a set row that already belongs to THIS exercise; otherwise a
       // moved-between-exercises id would steal another exercise's set.
       const reuseSet = existingSet !== undefined && existingSet.sessionExerciseId === sessionExerciseId;
-      // A requested id that names a row under a DIFFERENT exercise must not be
+      // A requested id that names a row under a DIFFERENT exercise or session must not be
       // reused as a fresh insert (it would collide on the primary key), so mint
       // a new id in that case.
+      const foreignSet =
+        requestedSetId && !existingSet
+          ? tx
+              .select({ id: exerciseSets.id })
+              .from(exerciseSets)
+              .where(eq(exerciseSets.id, requestedSetId))
+              .get()
+          : undefined;
       const setId = reuseSet
         ? (requestedSetId as string)
-        : !requestedSetId || existingSet !== undefined
+        : !requestedSetId || existingSet !== undefined || foreignSet !== undefined
           ? createLocalEntityId('set')
           : requestedSetId;
       const nextSetType =
@@ -980,6 +996,7 @@ export const clearProvenanceClaimsInTransaction = (
   claims: { blocks: ReadonlySet<string>; targets: ReadonlySet<string> },
   now: Date,
   localUpdatedAtMs: number,
+  excludeEntityIds?: ReadonlySet<string>,
 ): boolean => {
   let cleared = false;
 
@@ -1001,20 +1018,25 @@ export const clearProvenanceClaimsInTransaction = (
       .all()
       .map((row) => row.id);
     for (const card of claimantCards) {
+      if (excludeEntityIds?.has(card.id)) {
+        continue;
+      }
       tx.update(sessionExercises)
         .set({ sourcePlanExerciseId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
         .where(eq(sessionExercises.id, card.id))
         .run();
       if (blockSetIds.length > 0) {
+        const setWhere = [
+          eq(exerciseSets.sessionExerciseId, card.id),
+          inArray(exerciseSets.sourcePlanSetId, blockSetIds),
+          isNull(exerciseSets.deletedAt),
+        ];
+        if (excludeEntityIds && excludeEntityIds.size > 0) {
+          setWhere.push(notInArray(exerciseSets.id, Array.from(excludeEntityIds)));
+        }
         tx.update(exerciseSets)
           .set({ sourcePlanSetId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
-          .where(
-            and(
-              eq(exerciseSets.sessionExerciseId, card.id),
-              inArray(exerciseSets.sourcePlanSetId, blockSetIds),
-              isNull(exerciseSets.deletedAt),
-            ),
-          )
+          .where(and(...setWhere))
           .run();
       }
       cleared = true;
@@ -1030,6 +1052,9 @@ export const clearProvenanceClaimsInTransaction = (
       )
       .all();
     for (const set of claimantSets) {
+      if (excludeEntityIds?.has(set.id)) {
+        continue;
+      }
       tx.update(exerciseSets)
         .set({ sourcePlanSetId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
         .where(eq(exerciseSets.id, set.id))
@@ -1043,10 +1068,10 @@ export const clearProvenanceClaimsInTransaction = (
 
 /**
  * Collects the provenance claims of the pull-page rows that will actually be
- * written locally: a row absent locally, or one whose incoming stamp wins
- * LWW. Rows that would land as LWW no-ops are skipped — their claims belong
- * to rows the device already holds, and clearing those would strip provenance
- * from a legitimate (possibly winning) attachment on an unrelated claim.
+ * written locally and conflict with a different local row: a row absent locally,
+ * or one whose incoming stamp wins LWW, where another live local row holds that
+ * claim. Rows that would land as LWW no-ops, or newer updates to an already-local
+ * row claiming its own block, are skipped so their provenance is never cleared.
  */
 const collectWillWriteClaimsInTransaction = (
   tx: Transaction,
@@ -1069,6 +1094,16 @@ const collectWillWriteClaimsInTransaction = (
       .where(eq(table.id, entity.id))
       .get();
     if (existing && entity.client_updated_at_ms <= existing.localUpdatedAtMs) {
+      continue;
+    }
+    const claimColumn =
+      entity.type === 'session_exercises' ? sessionExercises.sourcePlanExerciseId : exerciseSets.sourcePlanSetId;
+    const hasConflictingClaimant = tx
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(claimColumn, claim), ne(table.id, entity.id), isNull(table.deletedAt)))
+      .get();
+    if (!hasConflictingClaimant) {
       continue;
     }
     (entity.type === 'session_exercises' ? blocks : targets).add(claim);
@@ -1095,7 +1130,8 @@ export const repairProvenanceForWirePage = async (
     if (claims.blocks.size === 0 && claims.targets.size === 0) {
       return;
     }
-    clearProvenanceClaimsInTransaction(transaction, claims, now, nowMonotonic(transaction));
+    const excludeEntityIds = new Set(entities.map((e) => e.id));
+    clearProvenanceClaimsInTransaction(transaction, claims, now, nowMonotonic(transaction), excludeEntityIds);
     repaired = claims;
   });
   if (repaired) {

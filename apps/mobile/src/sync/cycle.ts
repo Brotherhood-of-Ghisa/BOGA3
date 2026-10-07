@@ -19,7 +19,7 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq, isNotNull, isNull, notInArray } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
@@ -843,11 +843,26 @@ export const selectPushBatch = (
       excludedIds.length > 0
         ? and(dirtyClause, notInArray(table.id, excludedIds))
         : dirtyClause;
+    const claimOrder =
+      type === 'session_exercises'
+        ? asc(
+            sql<number>`CASE WHEN ${schema.sessionExercises.deletedAt} IS NULL AND ${schema.sessionExercises.sourcePlanExerciseId} IS NOT NULL THEN 1 ELSE 0 END`,
+          )
+        : type === 'exercise_sets'
+          ? asc(
+              sql<number>`CASE WHEN ${schema.exerciseSets.deletedAt} IS NULL AND ${schema.exerciseSets.sourcePlanSetId} IS NOT NULL THEN 1 ELSE 0 END`,
+            )
+          : type === 'sessions'
+            ? asc(
+                sql<number>`CASE WHEN ${schema.sessions.deletedAt} IS NULL AND ${schema.sessions.sourcePlanId} IS NOT NULL THEN 1 ELSE 0 END`,
+              )
+            : undefined;
+    const orderClauses = claimOrder ? [claimOrder, asc(table.localUpdatedAtMs)] : [asc(table.localUpdatedAtMs)];
     const rows = tx
       .select()
       .from(table)
       .where(whereClause)
-      .orderBy(asc(table.localUpdatedAtMs))
+      .orderBy(...orderClauses)
       .limit(remaining)
       .all() as EntityRow[];
 
@@ -1444,8 +1459,13 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
           // arbitration repair clears this device's losing claim
           // deterministically — entered work stays, unsourced — and the loop
           // re-pushes the repaired rows to convergence (contract §4.5).
+          // Stop retrying if recovery makes no progress (0 rows changed) to avoid
+          // an infinite loop holding the sync lock.
           logProvenanceArbitrationRepair('push');
-          await runPullLeg(database);
+          const recoveryPull = await runPullLeg(database);
+          if (recoveryPull.changed === 0) {
+            throw error;
+          }
           continue;
         }
         throw error;

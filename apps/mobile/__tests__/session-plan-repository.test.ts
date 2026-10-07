@@ -261,6 +261,21 @@ describe('plan repository — meta, duplicate and delete lifecycle', () => {
     expect(duplicateReps).toEqual(originalReps);
   });
 
+  it('keeps generated duplicate titles within the title limit when duplicating a long title', async () => {
+    const longTitle = 'A'.repeat(100);
+    const created = await planRepository.createPlan(
+      planDraft({ title: longTitle, exercises: [exercise()] }),
+      T0,
+    );
+    if (created.status !== 'saved') throw new Error(String(created.status));
+    const result = await planRepository.duplicatePlan(created.id, undefined, T1);
+    expect(result).toEqual({ status: 'saved', id: expect.any(String) });
+    if (result.status !== 'saved') throw new Error(String(result.status));
+    const duplicate = planRows().find((row) => row.id === result.id);
+    expect(duplicate?.title).toBe(`${'A'.repeat(93)} (copy)`);
+    expect(duplicate?.title.length).toBe(100);
+  });
+
   it('tombstones the whole graph on delete and hides it from loads', async () => {
     const result = await planRepository.deletePlan(planId, T1);
     expect(result).toEqual({ status: 'updated' });
@@ -326,6 +341,21 @@ describe('plan repository — meta, duplicate and delete lifecycle', () => {
       .run();
     const result = await planRepository.updatePlanBlock(blockId, exercise(), T1);
     expect(result).toEqual({ status: 'immutable-block' });
+  });
+
+  it('deletes an edited block whose targets were previously parked as tombstones', async () => {
+    const benchId = blockRows().find((row) => row.name === 'Bench')?.id ?? '';
+    const editResult = await planRepository.updatePlanBlock(
+      benchId,
+      exercise({ name: 'Bench Press', exerciseDefinitionId: 'def-bench', sets: [set({ targetRepsText: '10' })] }),
+      T1,
+    );
+    expect(editResult).toEqual({ status: 'updated' });
+
+    const deleteResult = await planRepository.deletePlanBlock(benchId, T1);
+    expect(deleteResult).toEqual({ status: 'updated' });
+    const benchRow = blockRows().find((row) => row.id === benchId);
+    expect(benchRow?.deletedAt).not.toBeNull();
   });
 
   it('reports not-found for unknown plan and block ids', async () => {

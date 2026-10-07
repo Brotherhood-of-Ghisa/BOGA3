@@ -480,6 +480,33 @@ describe('FK_VIOLATION handling', () => {
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(true);
   });
+
+  it('stops arbitration retries and returns internal outcome when recovery pull makes no progress', async () => {
+    database.insert(sessions).values({ id: 'sess-1', startedAt: new Date(100), localDirty: true, localUpdatedAtMs: 50 }).run();
+
+    let pushAttempts = 0;
+    mockRpc.mockImplementation(async (name: string) => {
+      if (name === 'sync_pull') {
+        return { data: emptyPage, error: null };
+      }
+      if (name === 'sync_push') {
+        pushAttempts += 1;
+        return {
+          data: null,
+          error: {
+            code: 'P0001',
+            message: 'BLOCK_ALREADY_ATTACHED: duplicate key value violates unique constraint',
+          },
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    await expect(runSyncCycle()).resolves.toBe('internal');
+    expect(getCycleErrorCode()).toBe('INTERNAL');
+    // Must NOT have spun in an infinite retry loop: attempted push once, recovery pull changed 0, stopped
+    expect(pushAttempts).toBe(1);
+  });
 });
 
 describe('structured cycle-result logging', () => {

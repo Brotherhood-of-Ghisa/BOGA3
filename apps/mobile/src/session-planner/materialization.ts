@@ -11,7 +11,7 @@ import {
   type PlanGraph,
   type SessionPlanStore,
 } from '@/src/data/session-plan-store';
-import { planStartCardId, planStartSessionId, planStartSetId, readPlanMaterializationOwnerId } from './deterministic-ids';
+import { planAttachedSetId, planStartCardId, planStartSessionId, planStartSetId, readPlanMaterializationOwnerId } from './deterministic-ids';
 import type { AddPlanBlockResult, StartSessionPlanResult } from './types';
 
 /**
@@ -71,17 +71,23 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
   }
 
   const ownerId = await readPlanMaterializationOwnerId();
-  const sessionId = planStartSessionId(ownerId, planId);
-  // A discarded earlier start leaves the deterministic session row
-  // tombstoned; the retry upserts the same rows, so the row must come back —
-  // otherwise the graph revives under a session no query can ever show.
-  await reviveSessionRow(sessionId, now);
-  await persistSessionDraftSnapshot(
+  const deterministicSessionId = planStartSessionId(ownerId, planId);
+  const existingSession = await loadSessionSnapshotById(deterministicSessionId);
+  const isCompleted = existingSession?.status === 'completed';
+  const targetSessionId = isCompleted ? undefined : deterministicSessionId;
+  if (!isCompleted) {
+    // A discarded earlier start leaves the deterministic session row
+    // tombstoned; the retry upserts the same rows, so the row must come back —
+    // otherwise the graph revives under a session no query can ever show.
+    await reviveSessionRow(deterministicSessionId, now);
+  }
+  await planStore.releaseDiscardedBlockClaims(blocks.map((b) => b.id), now);
+  const result = await persistSessionDraftSnapshot(
     {
-      sessionId,
+      ...(targetSessionId ? { sessionId: targetSessionId } : {}),
       gymId: graph.plan.gymId,
       startedAt: now,
-      sourcePlanId: planId,
+      sourcePlanId: isCompleted ? null : planId,
       exercises: blocks.map((block) => ({
         id: planStartCardId(ownerId, block.id),
         exerciseDefinitionId: block.exerciseDefinitionId,
@@ -106,7 +112,7 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
     { now },
   );
 
-  return { status: 'started', sessionId };
+  return { status: 'started', sessionId: result.sessionId };
 };
 
 /** Maps one loaded exercise card back to a persistence input, provenance included. */
@@ -130,10 +136,10 @@ const toDraftExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDr
 });
 
 const plannedSetInput = (
-  ownerId: string | null,
+  cardId: string,
   target: { id: string; targetWeightValue: string | null; targetReps: number; targetSetType: string | null },
 ): SessionDraftExerciseInput['sets'][number] => ({
-  id: planStartSetId(ownerId, target.id),
+  id: planAttachedSetId(cardId, target.id),
   repsValue: '',
   weightValue: '',
   // The working default in the recorder's set vocabulary; the target's own
@@ -189,6 +195,8 @@ export const addPlanBlockToSession = async (
     return { status: 'block-not-available' };
   }
   const exerciseDefinitionId = block.exercise.exerciseDefinitionId;
+
+  await planStore.releaseDiscardedBlockClaims([planExerciseId], now);
 
   const existingCard = await planStore.findLiveSourcedCardForBlock(planExerciseId);
   if (existingCard) {
@@ -249,7 +257,7 @@ export const addPlanBlockToSession = async (
         ...toDraftExerciseInput(targetCard).sets,
         // Manual sets already on the card stay above the copied targets; the
         // graph rewrite re-densifies to 0..n-1 in array order.
-        ...block.sets.map((target) => plannedSetInput(ownerId, target)),
+        ...block.sets.map((target) => plannedSetInput(targetCard.id, target)),
       ],
     };
     const exercises = graph.exercises.map((exercise) =>
@@ -274,22 +282,24 @@ export const addPlanBlockToSession = async (
 
   // No active session: create one from the source plan with exactly this
   // block, in one transaction.
+  const cardId = planStartCardId(ownerId, planExerciseId);
   const result = await persistSessionDraftSnapshot(
     {
       gymId: block.plan.gymId,
       startedAt: now,
       exercises: [
         {
-          id: planStartCardId(ownerId, planExerciseId),
+          id: cardId,
           exerciseDefinitionId,
           name: block.exercise.name,
           machineName: block.exercise.machineName,
           sourcePlanExerciseId: planExerciseId,
-          sets: block.sets.map((target) => plannedSetInput(ownerId, target)),
+          sets: block.sets.map((target) => plannedSetInput(cardId, target)),
         },
       ],
     },
     { now },
   );
-  return { status: 'attached', sessionId: result.sessionId, sessionExerciseId: planStartCardId(ownerId, planExerciseId) };
+  const createdCard = await planStore.findLiveSourcedCardForBlock(planExerciseId);
+  return { status: 'attached', sessionId: result.sessionId, sessionExerciseId: createdCard?.id ?? cardId };
 };
