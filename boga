@@ -108,6 +108,11 @@ run_gate() {
   shift
   local gates=("$@")
   local row matched=0 gate infra
+  # One id per gate run: the baseline preflight pays its repairs once per id
+  # (supabase/scripts/ensure-local-runtime-baseline.sh). Always fresh, never
+  # inherited, so no two gate runs share a stamp.
+  BOGA_GATE_RUN_ID="gate-$(date +%s)-$$"
+  export BOGA_GATE_RUN_ID
   for spec in "${gates[@]}"; do
     gate="${spec%%:*}"
     infra=""
@@ -157,6 +162,8 @@ cmd_test() {
     *)
       local row
       row="$(lane_lookup "${target}")" || fail "unknown lane or gate: '${target}' (see: boga test --list)"
+      # A lane run by name always ensures the full baseline.
+      unset BOGA_GATE_RUN_ID
       run_lane_row "${row}" "${dry}"
       ;;
   esac

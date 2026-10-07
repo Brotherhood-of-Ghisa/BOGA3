@@ -119,6 +119,7 @@ Behavior:
 1. If local Supabase is not running, it starts the stack, resets/seeds DB, and provisions deterministic auth fixtures.
 2. If local Supabase is already running, it reuses that instance as-is (no reset), verifies baseline seed fixtures, and reprovisions auth fixtures idempotently.
 3. Bootstrap/reset path is lock-protected so concurrent callers on one machine do not race startup.
+4. Within one `./boga test <gate>` run, later lanes skip the repairs while the gate's stamp still matches. If you are changing that rule, load `docs/specs/06-testing-strategy.md` ("Local Supabase baseline contract").
 
 Current coverage:
 

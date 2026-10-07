@@ -11,7 +11,8 @@
 # generated config (function entrypoints) and main-checkout-only rule (temp
 # git worktree, stubbed launcher children), and CI's docs-only fast-path
 # classifier (ci-docs-only.sh), and docs-check's product-fact rules
-# (fixture repo).
+# (fixture repo), and the baseline preflight's once-per-gate stamp (stub
+# stack).
 # Runs as the `meta-tests` lane (fast gate, repo half; see scripts/lanes.tsv)
 # and in CI.
 
@@ -34,6 +35,7 @@ TESTS=(
   "android-launcher.test.sh"
   "ios-sim-boot.test.sh"
   "functions-serve-stop.test.sh"
+  "baseline-stamp.test.sh"
   "dev-stack-config.test.sh"
   "dev-stack-main-checkout.test.sh"
   "ci-docs-only.test.sh"

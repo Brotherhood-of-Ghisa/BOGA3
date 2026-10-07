@@ -224,6 +224,16 @@ Applies to every lane that hits a running stack rather than a mocked client.
   reset/seed, provision fixtures. Runtime up → reuse as-is with **no reset**,
   refresh stale Edge Function routing, apply pending migrations, verify baseline
   rows, re-provision fixtures idempotently.
+- **Once per gate:** `./boga test <gate>` exports one `BOGA_GATE_RUN_ID`. The
+  full path ends by stamping it in `public.local_runtime_bootstrap_markers`
+  with a hash of its inputs (migrations, seed, fixture constants) and one of the
+  state it repaired (applied migrations, fixture principals and auth users, the
+  group-eval kick URL). A later lane of that gate still checks reachability and
+  Edge routing, then skips the repairs only while the stamp and both hashes
+  match. A reset truncates the stamp (`seed.sql`) and any changed hash means
+  the full path, so a skip never rests on unchecked state. A lane run by name
+  has no gate id and always runs the full path
+  (`scripts/tests/baseline-stamp.test.sh`).
 - **Expected baseline:** the stack is reachable and
   `public.dev_fixture_principals` holds at least `anonymous`, `user_a`, `user_b`,
   provisioned with the known credentials.
