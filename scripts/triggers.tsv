@@ -80,7 +80,7 @@ supabase/functions/group-eval/**	groups-leaderboards,groups-competitions	group e
 supabase/tests/**	backend	backend test bodies
 supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-competitions,groups-api-live	shared group lane fixtures
 supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
-supabase/migrations/*competition*	groups-protocol4,groups-competitions	protocol-4 representation / cutover (one-way activation ⇒ its own lane)
+supabase/migrations/*competition*	groups-protocol4,groups-competitions	protocol-4 representation (the steady-state lane + the one-way cutover lane)
 supabase/scripts/with-local-group-competitions.sh	groups-protocol4,groups-contract,groups-leaderboards,groups-competitions	the protocol-4 activation wrapper
 supabase/tests/groups-competitions.sh	groups-competitions	the protocol-4 competition lane body
 supabase/tests/groups-competitions-cutover.sh	groups-protocol4	the protocol-4 populated-upgrade lane body

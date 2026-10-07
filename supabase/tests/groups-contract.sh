@@ -168,7 +168,7 @@ RPCS=(group_list_mine group_get group_invite_preview group_invite_get group_crea
 HELPERS=(group_require_app_user group_active_role group_require_member group_require_username
   group_validate_name group_validate_description group_normalize_invite_code group_generate_invite_code
   group_write_invite_code group_summary_json group_members_json group_detail_json group_require_target
-  group_share_session group_session_exercises_json group_member_ref_json group_session_card_json
+  group_share_session group_member_ref_json
   group_exercise_trim group_exercise_validate_name group_exercise_validate_load_input_mode
   group_exercise_validate_source_id group_exercise_require_manager group_exercise_require group_exercise_json)
 rpc_list="$(printf "'%s'," "${RPCS[@]}")"
