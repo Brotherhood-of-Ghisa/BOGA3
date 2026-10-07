@@ -144,6 +144,7 @@ commit boundaries.
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
 | Worktree lifecycle (open / release / repair), slot-lease errors, or isolation bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |
 | Cleaning up leftover worktrees, leases, or Supabase stacks | `docs/procedures/worktree-cleanup.md` (follow it step by step) |
+| A stored or published figure's rule (calculation, eligibility, records), a `*_RULES_VERSION` / `METRIC_REVISION`, or the sync protocol | `docs/procedures/rule-upgrade.md` |
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md` |
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
