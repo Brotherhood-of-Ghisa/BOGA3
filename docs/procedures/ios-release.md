@@ -152,7 +152,10 @@ BOGA_RELEASE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionS
 BOGA_RELEASE_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$BOGA_RELEASE_APP/Info.plist")"
 /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$BOGA_RELEASE_APP/Info.plist"
 printf 'Version %s (build %s)\n' "$BOGA_RELEASE_VERSION" "$BOGA_RELEASE_BUILD"
-shasum -a 256 "$BOGA_RELEASE_DIR/app.ipa" > "$BOGA_RELEASE_DIR/app.ipa.sha256"
+(
+  cd "$BOGA_RELEASE_DIR"
+  shasum -a 256 app.ipa > app.ipa.sha256
+)
 ```
 
 Record these values and the build log path. Stop on a mismatch. When checking
@@ -168,7 +171,10 @@ staged cutovers follow their owning contract.
 Verify the recorded checksum, then submit using the same profile:
 
 ```bash
-shasum -a 256 -c "$BOGA_RELEASE_DIR/app.ipa.sha256"
+(
+  cd "$BOGA_RELEASE_DIR"
+  shasum -a 256 -c app.ipa.sha256
+)
 (
   cd apps/mobile
   npx eas-cli submit --platform ios --profile "$BOGA_RELEASE_PROFILE" \
