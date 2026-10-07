@@ -4,7 +4,7 @@
 
 Several agents and humans run on one machine via `git worktree`. Each worktree
 holds one slot lease, which gives it its own local Supabase stack and ports,
-Expo/Metro port, iOS simulator, and dependency install.
+Expo/Metro port, iOS simulator, Android AVD, and dependency install.
 
 ## Design principles
 
@@ -133,8 +133,10 @@ CLI-truncated form of such an id only when it publishes this slot's port.
 | Edge Function serve state | worktree-local `supabase/.temp` plus slot-derived API/inspector ports |
 | Metro/Expo | `EXPO_DEV_SERVER_PORT` in the worktree-local Maestro env |
 | iOS simulator | slot-named simulator (`BOGA wt<slot>`) or an explicit `IOS_SIM_UDID` |
+| Android emulator | slot-named AVD (`BOGA_wt<slot>`, cloned on first use from a template AVD) or an explicit `ANDROID_SERIAL`; the emulator's adb port is assigned by the emulator, and the lane is found by its AVD name |
 | Mobile dependencies | worktree-local `apps/mobile/node_modules`; a symlinked one is refused by runtime guards |
 | iOS dev-client build cache | intentionally **shared**: one host-local cache at `~/.cache/boga/maestro/ios-dev-client`; rebuild with `--force` after a native change |
+| Android dev-client build cache | intentionally **shared**: one host-local APK at `~/.cache/boga/maestro/android-dev-client`; rebuild with `--force` after a native change |
 
 ### Generated Supabase config
 
@@ -277,9 +279,9 @@ harness:
    compare ports with `./boga worktree doctor`.
 5. **Port already allocated at stack start**: `./boga worktree ls` shows which
    stack holds that slot's ports; clear leftovers via the cleanup procedure.
-6. **Duplicate Metro port or simulator**: check
+6. **Duplicate Metro port, simulator or AVD**: check
    `apps/mobile/.maestro/maestro.env.local` — one Expo port
-   (`8082 + slot`) and one simulator per worktree.
+   (`8082 + slot`), one simulator and one AVD per worktree.
 7. **Shared dependencies**: `apps/mobile/node_modules` must be a real directory.
 8. **Docker commands hang while `orb status` says Running**: check
    `pmset -g log | grep -E "Clamshell|FullWake"`. OrbStack pauses its VM while

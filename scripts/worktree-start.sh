@@ -268,6 +268,14 @@ write_maestro_env() {
     printf 'EXPO_DEV_SERVER_PORT="${EXPO_DEV_SERVER_PORT:-%s}"\n' "$(boga_port_for_slot expo "$slot")"
     printf 'EXPO_START_WAIT_SECONDS="${EXPO_START_WAIT_SECONDS:-30}"\n'
     printf 'MAESTRO_KEEP_SIMULATOR_BOOTED="${MAESTRO_KEEP_SIMULATOR_BOOTED:-0}"\n'
+    printf '\n'
+    printf '# Android lane emulator (the android-* lanes). ANDROID_SERIAL overrides\n'
+    printf '# ANDROID_AVD with an already-connected device; the AVD is created on demand\n'
+    printf '# from the first non-lane AVD (or ANDROID_AVD_TEMPLATE) when missing.\n'
+    printf 'ANDROID_AVD="${ANDROID_AVD:-%s}"\n' "$(boga_android_avd_name_for_slot "$slot")"
+    printf 'ANDROID_SERIAL="${ANDROID_SERIAL:-}"\n'
+    printf 'ANDROID_EMULATOR_AUTO_CREATE="${ANDROID_EMULATOR_AUTO_CREATE:-1}"\n'
+    printf 'MAESTRO_KEEP_EMULATOR_BOOTED="${MAESTRO_KEEP_EMULATOR_BOOTED:-0}"\n'
   } >"$tmp_file"
   mv "$tmp_file" "$local_env"
   echo "[worktree-start] wrote Maestro env: $local_env"

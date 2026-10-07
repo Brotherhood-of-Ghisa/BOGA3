@@ -2,8 +2,7 @@
 
 > **Owns:** the gate ladder, the (generated) lane matrix, path→gate triggers, CI posture. **Not here:** per-test purpose and policies → `06`; durations → `./boga timings`. **Load when:** always (always-load).
 
-Which lanes exist, which to run for the change in front of you, what must be
-green before the PR.
+Which lanes exist, which to run for a change, what must be green before the PR.
 
 ## Run the gates (`./boga`, from anywhere in the repo)
 
@@ -21,8 +20,8 @@ green before the PR.
 ```
 
 `scripts/lanes.tsv` is the lane registry; its names are the canonical lane names
-everywhere (this doc, the timing records, `boga`). `./scripts/quality-fast.sh` /
-`./scripts/quality-slow.sh` are legacy forwarders. Each lane `cd`s into the right
+everywhere (this doc, the timing records, `boga`). Legacy
+`./scripts/quality-{fast,slow}.sh` forward here. Each lane `cd`s into the right
 workspace and installs deps itself, so never invoke the raw `npm run …` scripts
 (they live only in `apps/mobile/package.json`; there is no root one). Worktree
 lifecycle and the slot lease every lane requires:
@@ -39,9 +38,10 @@ are labels that track that one axis; when they seem to disagree, infra wins.
   cost). A regression here lands on `main` green until a human runs the backend
   gate; the cheap way to close that is to run this gate in CI, not to rewrite the
   tests as infra-free.
-- **iOS simulator + Metro** → can **never** run on CI's Linux runners.
+- **iOS simulator / Android emulator + Metro** → can **never** run on CI's Linux
+  runners.
 
-"Fast" therefore does not imply "in CI": the backend fast smoke needs Docker.
+"Fast" does not imply "in CI": backend-fast needs Docker.
 
 ### Lane matrix (what runs where)
 
@@ -90,6 +90,9 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | ios-auth-profile *(+ local Supabase)* | `./boga test ios-auth-profile` | `boga test frontend` | ❌ | ~1.5m |
 | ios-sync-e2e *(+ local Supabase)* | `./boga test ios-sync-e2e` | `boga test frontend` | ❌ | ~1.6m |
 | ios-groups-e2e *(+ local Supabase)* | `./boga test ios-groups-e2e` | `boga test frontend` | ❌ | ~2.4m |
+| *Infra: Android emulator + Metro — never CI-able* | | | | |
+| android-smoke | `./boga test android-smoke` | `boga test frontend-android` | ❌ | ~2.0m |
+| android-data-smoke | `./boga test android-data-smoke` | `boga test frontend-android` | ❌ | ~2.3m |
 
 † Median of each lane's 5 newest green runs (all machines, by `recorded_at`) in the generating machine's timing store (`~/.config/boga/timings/records/`); `./boga docs gen` keeps a committed figure until that median moves more than 20% from it. `N/A` = no measured data yet, **not** "instant" — run the lane to record it. Per-machine numbers over a time window: `./boga timings`.
 <!-- /boga:gen:lane-matrix -->
@@ -156,19 +159,17 @@ they run only for their own screens and for the sync / auth / groups / migration
 triggers. The one thing a UI change *can* break in them — renaming an element id
 a flow taps — is caught by `maestro-testids` inside `meta-tests` (so in the fast
 gate and CI): every Maestro `id:` selector must still exist in app source, except
-generic `${prefix}-${value}` joins, which are only loosely checked. Any UI change
-may still run `./boga test frontend`.
+generic `${prefix}-${value}` joins, which are only loosely checked.
 
-### Dev-client rebuild (never lowered)
+### Native dev-client rebuild (never lowered)
 
-Adding, removing or upgrading a **native iOS** dependency — an iOS pod, a native
-Expo module, or an iOS-affecting native field / config plugin in
-`apps/mobile/app.config.ts` — needs `./boga ios build-client --force` **before**
-`./boga test frontend`, or every worktree's Maestro run fails at boot with
-`Cannot find native module`. Pure-JS and config-only changes never need it (Metro
-bundles them at runtime), and Android-only fields in `app.config.ts` (e.g.
-`android.package`, Android icons) do not alter the iOS binary — exempt from both
-the rebuild and the frontend gate.
+A new or changed **native** dependency — an iOS pod, a native Expo module, or an
+iOS- or Android-affecting native field / config plugin in `app.config.ts` — needs
+a forced rebuild **before** the Maestro lanes, or they fail at boot with
+`Cannot find native module`: `./boga ios build-client --force` (iOS),
+`./scripts/maestro-android-dev-client-build.sh --force` (Android). Pure-JS and
+config-only changes never need it (Metro bundles them at runtime). Cache rules:
+spec `11`.
 
 ### Full sweep
 
@@ -179,10 +180,10 @@ hosted migration and verification gate alongside the sweep.
 `origin/main` or a pushed branch in its own long-lived worktree and slot, writing
 a summary under `~/.config/boga/sweep/latest/`. It is never scheduled.
 
-- **Required** on the `main` commit you are about to ship as a release build
+- **Required** on the `main` commit you ship as a release build
   (TestFlight / App Store), before building
   (`apps/mobile/README-LOCAL-DEV-BUILD.md`, `RUNBOOK.md`).
-- **Otherwise a suggestion, never a requirement.** `./boga test for` prints a
+- **Otherwise a suggestion.** `./boga test for` prints a
   *SUGGEST TO THE OPERATOR* sweep line when a diff touches shared UI chrome or
   many screens; pass it on, the operator decides.
 - A RED sweep means the ref has a regression the PR gates did not select —
@@ -192,9 +193,9 @@ a summary under `~/.config/boga/sweep/latest/`. It is never scheduled.
 ## Quality targets (run once before the PR)
 
 Three `extra` lanes hold the mobile app to its quality targets. They sit outside
-every gate and outside CI, so nothing runs them for you: run each **once, on the
-finished change, before opening the PR**, and list all three green in the PR's
-Tests table. `AGENTS.md` states the thresholds; this is where they live.
+every gate and outside CI, so nothing runs them for you: run each **once, before
+opening the PR**, and list them green in the PR's Tests table. `AGENTS.md` states
+the thresholds; this is where they live.
 
 | Lane | Target | Enforced in |
 | --- | --- | --- |
@@ -222,9 +223,9 @@ Tests table. `AGENTS.md` states the thresholds; this is where they live.
 CI (`.github/workflows/ci.yml`) runs exactly the lanes marked `CI? ✅` above,
 installing each workspace from its own lockfile; a docs-only PR runs
 `docs-check` alone (`06`, "CI posture"). **Everything else is
-local-only** — backend/sync by choice, Maestro iOS by necessity — so breakage
-there accumulates on `main` invisibly until a human runs the gate. Run the slow
-gate for your area before the PR.
+local-only** — backend/sync by choice, Maestro iOS/Android by necessity — so
+breakage there accumulates on `main` invisibly until a human runs the gate. Run
+the slow gate for your area before the PR.
 
 ## Maintenance
 

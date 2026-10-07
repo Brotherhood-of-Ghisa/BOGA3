@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# maestro-run-lane.sh — uniform runner for the per-lane iOS Maestro wrappers.
+# maestro-run-lane.sh — uniform runner for the per-lane Maestro wrappers.
 #
 # Replaces the one-file-per-lane wrappers (maestro-ios-smoke.sh, -data-smoke.sh,
 # -auth-profile.sh, -sync-e2e.sh; groups-e2e was added directly here): the per-lane differences are DATA (flows,
@@ -9,10 +9,18 @@
 # (maestro-ios-gates.sh) keeps its own script — it is a different execution
 # model, not a thin wrapper.
 #
-#   ./scripts/maestro-run-lane.sh smoke|data-smoke|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e
+#   ./scripts/maestro-run-lane.sh <lane>
+#
+# Lanes: iOS (smoke, data-smoke, exercise-page, session-view, auth-profile,
+# sync-e2e, groups-e2e) and Android (android-smoke, android-data-smoke). The
+# platform decides only which provision/launch/teardown runner is used
+# (maestro-<platform>-run-flow.sh / -run-flows.sh); the lane data is shared. The
+# android-* lanes are the infra-free starter set; the Supabase-backed and
+# screen-specific lanes are iOS-only for now (spec 11, "Android lanes").
 #
 # Canonical lane names / gate membership: scripts/lanes.tsv (run via
-# `./boga test ios-smoke` etc.; the npm test:e2e:ios:* scripts also land here).
+# `./boga test ios-smoke` / `./boga test android-smoke` etc.; the npm
+# test:e2e:{ios,android}:* scripts also land here).
 
 set -euo pipefail
 
@@ -21,12 +29,22 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e"
+LANES="smoke|data-smoke|exercise-page|session-view|auth-profile|sync-e2e|groups-e2e|android-smoke|android-data-smoke"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
+
+RUN_FLOW="$SCRIPT_DIR/maestro-ios-run-flow.sh"
+RUN_FLOWS="$SCRIPT_DIR/maestro-ios-run-flows.sh"
+
+# Switch the runner pair to Android. Called from the android-* arms; the flow
+# list for each lane stays beside its iOS twin below.
+use_android() {
+  RUN_FLOW="$SCRIPT_DIR/maestro-android-run-flow.sh"
+  RUN_FLOWS="$SCRIPT_DIR/maestro-android-run-flows.sh"
+}
 
 run_flow() {
   local reset="$1" scenario="$2" flow="$3"
-  MAESTRO_RESET_STRATEGY="$reset" "$SCRIPT_DIR/maestro-ios-run-flow.sh" \
+  MAESTRO_RESET_STRATEGY="$reset" "$RUN_FLOW" \
     --scenario "$scenario" \
     --flow "$APP_DIR/.maestro/flows/$flow"
 }
@@ -70,6 +88,13 @@ case "$lane" in
     run_flow full "Smoke" smoke-launch.yaml
     ;;
 
+  # The same cold-launch + navigation smoke on the Android emulator. Infra-free;
+  # the flow is shared with the iOS lane above.
+  android-smoke)
+    use_android
+    run_flow full "Smoke" smoke-launch.yaml
+    ;;
+
   # Infra-free, no Supabase. data-runtime-smoke: real expo-sqlite migration +
   # smoke write/read, and the backend-less build seeds its own starter catalog
   # at boot. Then the two screen flows whose device claims need no backend:
@@ -80,10 +105,24 @@ case "$lane" in
   # through the maestro-harness deep link, so a `data` reset is enough.
   data-smoke)
     MAESTRO_RESET_STRATEGY=data \
-    "$SCRIPT_DIR/maestro-ios-run-flows.sh" \
+    "$RUN_FLOWS" \
       --session "Data runtime smoke" \
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
       --scenario "Session completion share" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
+      --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
+    ;;
+
+  # The Android data smoke shares the data-runtime-smoke and exercise-catalogue
+  # flows but omits session-completion-states-fixture.yaml: its assertions are
+  # the iOS native share sheet (a "Copy" destination and a page-sheet drag),
+  # which the Android Sharesheet does not reproduce. The other two flows are
+  # platform-neutral. One provisioned emulator + Metro for both.
+  android-data-smoke)
+    use_android
+    MAESTRO_RESET_STRATEGY=data \
+    "$RUN_FLOWS" \
+      --session "Data runtime smoke" \
+      --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml"
     ;;
 

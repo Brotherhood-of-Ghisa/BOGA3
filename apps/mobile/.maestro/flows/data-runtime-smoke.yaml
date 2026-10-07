@@ -16,7 +16,8 @@ appId: com.dinoderek.mobile
 #      on-device check of the Stats queries (their values over the harness
 #      fixtures are stats-screen-local-data.test.tsx).
 #   6. history's page sheet snaps back after a short drag of its header, leaves
-#      chart scrolling independent, and closes on a deliberate downward swipe.
+#      chart scrolling independent, and closes on a deliberate downward swipe
+#      (iOS only; the android-data-smoke lane stops at item 5).
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
@@ -152,64 +153,73 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "stats-exercise-list-empty"
 - takeScreenshot: "05-data-runtime-smoke-exercise-list"
-# One native gesture scenario; disclosure and browsing state remain Jest.
-# Establish its Daily/window preconditions: data reset preserves saved preferences.
-# This is setup for scrolling, not a new Settings claim (settings-progress.test.tsx).
-- openLink: "boga3://settings"
-- scrollUntilVisible:
-    element:
-      id: "settings-history-lookback"
-    direction: DOWN
-- tapOn:
-    id: "settings-history-lookback"
-- eraseText
-- inputText: "52"
-- hideKeyboard
-- tapOn:
-    id: "settings-heatmap-view-daily"
-- openLink: "boga3://progress"
-- tapOn:
-    id: "stats-view-mode-chip-exercise"
-- tapOn:
-    id: "stats-exercise-row-seed_barbell_back_squat"
-- extendedWaitUntil:
-    visible:
-      id: "stats-exercise-history-header"
-    timeout: 15000
-- tapOn:
-    id: "stats-exercise-history-metric-chip-workingSetCount"
-- swipe:
-    start: "50%,10%"
-    end: "50%,14%"
-    duration: 600
-- waitForAnimationToEnd:
-    timeout: 4000
-- assertVisible:
-    id: "stats-exercise-history-header"
-- takeScreenshot: "06-history-short-drag-restored"
-# The month calendar scrolls vertically inside the native sheet. A month three
-# months earlier starts below the viewport; centring it proves body scrolling
-# without dismissing the sheet. Read-only tiles and calendar arithmetic remain Jest.
-- evalScript: ${output.historyOlderMonthKey = (function() { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); })()}
-- scrollUntilVisible:
-    element:
-      id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
-    direction: DOWN
-    centerElement: true
-- assertVisible:
-    id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
-- assertVisible:
-    id: "stats-exercise-history-header"
-- takeScreenshot: "07-history-chart-scrolled"
-- swipe:
-    from:
-      id: "stats-exercise-history-header"
-    direction: DOWN
-    duration: 600
-- extendedWaitUntil:
-    notVisible:
-      id: "stats-exercise-history-header"
-    timeout: 10000
-- assertVisible:
-    id: "stats-exercise-row-seed_barbell_back_squat"
-- takeScreenshot: "08-history-swipe-dismissed"
+# --- Item 6: iOS-only native-sheet scenario ----------------------------------
+# The UIKit page sheet's header snap-back, its inner chart scroll, and its
+# downward-swipe dismissal have no Android equivalent, so the android-data-smoke
+# lane stops at the portable Stats read-back (item 5) above. The iOS commands are
+# unchanged; only their nesting under `when: platform: iOS` is new.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # One native gesture scenario; disclosure and browsing state remain Jest.
+      # Establish its Daily/window preconditions: data reset preserves saved preferences.
+      # This is setup for scrolling, not a new Settings claim (settings-progress.test.tsx).
+      - openLink: "boga3://settings"
+      - scrollUntilVisible:
+          element:
+            id: "settings-history-lookback"
+          direction: DOWN
+      - tapOn:
+          id: "settings-history-lookback"
+      - eraseText
+      - inputText: "52"
+      - hideKeyboard
+      - tapOn:
+          id: "settings-heatmap-view-daily"
+      - openLink: "boga3://progress"
+      - tapOn:
+          id: "stats-view-mode-chip-exercise"
+      - tapOn:
+          id: "stats-exercise-row-seed_barbell_back_squat"
+      - extendedWaitUntil:
+          visible:
+            id: "stats-exercise-history-header"
+          timeout: 15000
+      - tapOn:
+          id: "stats-exercise-history-metric-chip-workingSetCount"
+      - swipe:
+          start: "50%,10%"
+          end: "50%,14%"
+          duration: 600
+      - waitForAnimationToEnd:
+          timeout: 4000
+      - assertVisible:
+          id: "stats-exercise-history-header"
+      - takeScreenshot: "06-history-short-drag-restored"
+      # The month calendar scrolls vertically inside the native sheet. A month three
+      # months earlier starts below the viewport; centring it proves body scrolling
+      # without dismissing the sheet. Read-only tiles and calendar arithmetic remain Jest.
+      - evalScript: ${output.historyOlderMonthKey = (function() { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 3); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2); })()}
+      - scrollUntilVisible:
+          element:
+            id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
+          direction: DOWN
+          centerElement: true
+      - assertVisible:
+          id: "stats-exercise-history-heatmap-month-title-${output.historyOlderMonthKey}"
+      - assertVisible:
+          id: "stats-exercise-history-header"
+      - takeScreenshot: "07-history-chart-scrolled"
+      - swipe:
+          from:
+            id: "stats-exercise-history-header"
+          direction: DOWN
+          duration: 600
+      - extendedWaitUntil:
+          notVisible:
+            id: "stats-exercise-history-header"
+          timeout: 10000
+      - assertVisible:
+          id: "stats-exercise-row-seed_barbell_back_squat"
+      - takeScreenshot: "08-history-swipe-dismissed"

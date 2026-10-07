@@ -49,7 +49,7 @@ appId: com.dinoderek.mobile
 # previously-tapped "Open" (URL-scheme trust dialog) is pre-authorized away and is
 # not tapped. If this dismissal ever stops matching, the sign-in assertion below
 # fails loudly.
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
       text: "Continue"

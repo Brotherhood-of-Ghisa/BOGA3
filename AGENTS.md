@@ -29,6 +29,7 @@ place each under `docs/specs/**`, routed from here.
    ./boga test backend    # local Supabase: auth/agent/sync contracts + MCP smoke
    ./boga test frontend   # iOS sim: every Maestro lane (the frontend-ui lanes + auth-profile + sync e2e + groups e2e)
    ./boga test frontend-ui  # iOS sim: the lanes that need no backend — the default for a screen/component change
+   ./boga test frontend-android  # Android emulator: the infra-free starter lanes (smoke + data-smoke)
    ```
 
    Path defaults (`./boga test for` prints them for your diff):
@@ -45,6 +46,7 @@ place each under `docs/specs/**`, routed from here.
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
+   | Native Android dependency / config-plugin change | `./scripts/maestro-android-dev-client-build.sh --force` first, then `boga test frontend-android` (see `02`) |
 
    - **Jest is never optional:** every code change adds or updates Jest
      coverage for the behaviour it changes and passes `boga test fast`.

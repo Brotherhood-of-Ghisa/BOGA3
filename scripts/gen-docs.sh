@@ -73,7 +73,7 @@ with open(os.path.join(root, "scripts/lanes.tsv")) as f:
             continue
         lanes.append(parts)
 lane_names = {l[0] for l in lanes}
-GATE_ALIASES = {"fast", "backend", "frontend", "frontend-ui", "slow", "all",
+GATE_ALIASES = {"fast", "backend", "frontend", "frontend-ui", "frontend-android", "slow", "all",
                 "fast-frontend", "fast-backend", "fast-repo",
                 "for"}  # `boga test for` — the trigger-matcher subcommand
 
@@ -153,6 +153,7 @@ INFRA_SECTIONS = [
     ("supabase", "*Infra: local Supabase + Docker — CI-able, local-only today*"),
     ("ios", "*Infra: iOS simulator + Metro — never CI-able*"),
     ("ios+supabase", None),  # folded into the ios section
+    ("android", "*Infra: Android emulator + Metro — never CI-able*"),
 ]
 GATE_DISPLAY = {
     "fast-frontend": "`boga test fast` (frontend half)",
@@ -160,6 +161,7 @@ GATE_DISPLAY = {
     "fast-repo": "`boga test fast` (repo half)",
     "slow-backend": "`boga test backend`",
     "slow-frontend": "`boga test frontend`",
+    "slow-frontend-android": "`boga test frontend-android`",
     "extra": "— (run by name)",
 }
 

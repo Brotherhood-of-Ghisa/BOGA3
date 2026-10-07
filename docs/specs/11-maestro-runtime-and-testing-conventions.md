@@ -1,6 +1,6 @@
 # Maestro Runtime and Testing Conventions
 
-> **Owns:** the Maestro iOS runtime/testing contract — reset taxonomy, artifacts, config files, isolation. **Not here:** lane membership → `02`/`scripts/lanes.tsv`; when lanes are required → `06`. **Load when:** Maestro/iOS e2e flow or harness work.
+> **Owns:** the Maestro runtime/testing contract — reset taxonomy, artifacts, config files, isolation. **Not here:** lane membership → `02`/`scripts/lanes.tsv`; when lanes are required → `06`. **Load when:** Maestro/e2e flow or harness work.
 
 Everything below is normative. The implementation is the toolkit under
 `apps/mobile/scripts/` (`maestro-*`), the per-lane runner
@@ -15,10 +15,19 @@ instead of restating this contract.
 
 ## 1. Runtime model
 
-1. The iOS automation runtime is Maestro + iOS Simulator + Expo development
-   client. Expo Go is not a supported automation runtime.
-2. The user-facing runners (`npm run test:e2e:ios:*`) are thin wrappers over the
-   shared toolkit; they must not duplicate runtime orchestration logic.
+1. The automation runtime is Maestro + a device target + Expo development
+   client: an iOS Simulator for the `ios-*` lanes, an Android emulator for the
+   `android-*` lanes. Expo Go is not a supported automation runtime.
+2. The user-facing runners (`npm run test:e2e:{ios,android}:*`) are thin wrappers
+   over the shared toolkit; they must not duplicate runtime orchestration logic.
+3. The `android-*` lanes are the infra-free starter set (`android-smoke`,
+   `android-data-smoke`); the Supabase-backed and screen-specific lanes are
+   iOS-only for now. A new Android lane reuses the same lane data in
+   `maestro-run-lane.sh` (an `android-*` arm) plus a `scripts/lanes.tsv` row. The
+   platform-neutral helpers are shared in `maestro-runtime.sh`; only the
+   simulator/emulator lifecycle differs (`maestro-ios-*` / `maestro-android-*`).
+   Flow files are shared across platforms, so a flow variable is named for the
+   platform-neutral `MAESTRO_DEV_CLIENT_URL`, never `MAESTRO_IOS_*`.
 3. **The iOS runtime is pinned, host-wide.** One checked-in value —
    `BOGA_IOS_SIM_RUNTIME` in `scripts/worktree-lib.sh` — names the iOS version
    every lane simulator runs, so a lane behaves the same whichever slot a
@@ -87,6 +96,16 @@ runtime-state keys in `apps/mobile/scripts/maestro-ios-runtime.sh`
    `rsync`, `ditto`, `shasum`. No Expo/EAS login is needed;
    `apps/mobile/eas.json` keeps the development-client profiles (including
    `development-simulator`) for optional manual or EAS-based workflows.
+6. The Android dev-client APK is a second shared host-local cache:
+   `$HOME/.cache/boga/maestro/android-dev-client/mobile-dev-client.apk`, built by
+   `maestro-android-dev-client-build.sh` (`expo prebuild --platform android` then
+   Gradle `:app:assembleDebug -PreactNativeArchitectures=<host ABI>`) and rebuilt
+   only when the APK is missing or `--force` is passed. Like the iOS `.app`, it
+   builds only the host's ABI (x86_64 on x86_64, arm64-v8a on Apple Silicon), so
+   the shared cache is host-local and installable on the host's own emulator. The
+   same native-dependency rule below applies to it. Host tools required:
+   `node`/`npm`/`npx`, `rsync`, `adb`, `emulator`, and a JDK
+   (`./boga doctor --android`).
 
 ### Native-dependency rebuilds are the author's responsibility
 
@@ -97,19 +116,20 @@ Metro bundle at runtime. Auto-fingerprinting every native input was evaluated
 and rejected because it forces full rebuilds on changes that do not need one.
 
 So: when you add, remove, or upgrade a **native** dependency — any package that
-ships an iOS pod or native Expo module (e.g. `expo-task-manager`,
-`expo-background-task`, `expo-network`, anything from `npx expo install` with
-native code) — or change a config plugin or a native iOS field in
-`app.config.ts` (Android-only fields such as `android.package` are exempt), you
-MUST force a rebuild before running the iOS Maestro gates:
+ships a native module (an iOS pod or an Android library) — or change a config
+plugin or a native field in `app.config.ts`, you MUST force a rebuild of the
+affected platform's client before its Maestro gates:
 
 ```bash
-./scripts/maestro-ios-dev-client-build.sh --force
+./scripts/maestro-ios-dev-client-build.sh --force      # iOS .app
+./scripts/maestro-android-dev-client-build.sh --force  # Android APK
 ```
 
-Otherwise the gate silently reuses the old `.app`, which lacks the new native
+Otherwise the gate silently reuses the old artifact, which lacks the new native
 module, and every flow fails at boot with `Cannot find native module '<X>'`.
-Pure-JS or config-only changes need no rebuild.
+Pure-JS or config-only changes need no rebuild; an iOS-only native field does not
+invalidate the Android APK, and an Android-only field does not invalidate the iOS
+`.app`.
 
 ## 4. Toolkit contracts
 
@@ -120,22 +140,34 @@ reset strategy, Supabase config and fixture users, and `maestro-ios-gates.sh`
 as the additive combined entrypoint). The contracts that are not visible from
 the scripts' names:
 
-1. **Flow copies.** `maestro-ios-run-flow.sh` and `maestro-ios-run-flows.sh`
-   run each flow from a per-run copy under `MAESTRO_ARTIFACT_ROOT` (rewritten
-   with the dev client's `appId`) and copy `apps/mobile/.maestro/scripts/`
-   beside it, so a flow's `runScript` paths (`../scripts/*.js`) resolve
-   identically from the source and the copy.
-2. **Flow-variable allowlist.** `maestro-ios-run-flow.sh` forwards only an
+1. **Flow copies.** `maestro-<platform>-run-flow.sh` and
+   `maestro-<platform>-run-flows.sh` run each flow from a per-run copy under
+   `MAESTRO_ARTIFACT_ROOT` (rewritten with the dev client's app id) and copy
+   `apps/mobile/.maestro/scripts/` beside it, so a flow's `runScript` paths
+   (`../scripts/*.js`) resolve identically from the source and the copy.
+2. **Flow-variable allowlist.** `maestro-<platform>-run-flow.sh` forwards only an
    explicit allowlist of variables to `maestro test -e`. A lane that adds a
    flow variable must add it to that list, or the flow silently sees nothing.
-3. **Shared-session runs.** `maestro-ios-run-flows.sh` runs several flows
-   against ONE provisioned sim + Metro, paying the ~55-60s
+3. **Shared-session runs.** `maestro-<platform>-run-flows.sh` runs several flows
+   against ONE provisioned device + Metro, paying the ~55-60s
    provision/launch/teardown overhead once instead of per flow. Every flow runs
    even after one fails, and any failure fails the run. Use it only for flows
    that reset what they need in-flow (`?reset=data`); a flow whose objective
    includes cold-install, permission or onboarding behaviour needs its own
    `full`-reset run through the singular runner. The caller owns
    `MAESTRO_RESET_STRATEGY`.
+4. **Cold-install permission pre-grant.** Provision pre-authorizes the native
+   dialogs a fresh install raises so they never cover the RN root: the iOS
+   runtime seeds the location TCC grant and the URL-scheme approvals; the Android
+   runtime `pm grant`s the nearby-devices (`ACCESS_LOCAL_NETWORK`) and location
+   permissions and appends the reserved `__expo_disable_onboarding` /
+   `__expo_disable_fab` / `__expo_disable_auto_launch` params to the dev-client
+   URL. Because Android's expo-dev-menu also opens its sheet at launch by default
+   (`EXDevMenuShowsAtLaunch` defaults true there, unlike iOS), the Android
+   manifest bakes `EXDevMenuShowsAtLaunch=false` /
+   `EXDevMenuIsOnboardingFinished=true` via the
+   `apps/mobile/plugins/with-android-dev-menu-preferences.js` config plugin.
+   Best-effort on both — a failed grant is logged, not fatal.
 
 ## 5. Runtime state and logs
 
@@ -146,8 +178,10 @@ subdirectory of it.
 
 Every run must emit, into that root: `runtime.env`, `provision.log`,
 `launch.log`, `teardown.log`, `expo-start.log` (raw Expo process log),
-`simulator-system.log` (`simctl log show`, for post-failure native diagnostics),
-`maestro-junit.xml`, `maestro-output/` and `maestro-debug/`. When the dev
+`maestro-junit.xml`, `maestro-output/` and `maestro-debug/`. An iOS run also
+emits `simulator-system.log` (`simctl log show`); an Android run emits
+`android-logcat.log` (`adb logcat -d`) and `emulator.log` (`adb`-free host log)
+in its place, for post-failure native diagnostics. When the dev
 client crashed during the run, the runner copies the slot's crash reports
 into `crash-reports/` and prints a `dev client CRASHED` line with the signal
 and top frame. `simulator-system.log` shows no crash, because SpringBoard logs
@@ -162,12 +196,13 @@ When a run fails, check for a `dev client CRASHED` line first, then read
 
 Cross-worktree parallel safety is mandatory, and is achieved with explicit
 per-worktree config rather than host-level arbitration: each worktree
-deterministically owns one Expo port, one simulator selection, one
-`maestro.env.local`, and one runtime-state file per run (the dev-client build
-cache is the deliberate exception — shared, see section 3). The port/simulator
-derivation itself is owned by `docs/specs/12-worktree-config-and-isolation.md`.
-Reintroducing automatic arbitration must preserve these guarantees without
-weakening the per-worktree config contract.
+deterministically owns one Expo port, one iOS simulator selection, one Android
+AVD, one `maestro.env.local`, and one runtime-state file per run (the iOS `.app`
+and Android `.apk` build caches are the deliberate exception — shared, see
+section 3). The port/simulator/AVD derivation itself is owned by
+`docs/specs/12-worktree-config-and-isolation.md`. Reintroducing automatic
+arbitration must preserve these guarantees without weakening the per-worktree
+config contract.
 
 ## 7. Reset taxonomy
 
@@ -179,7 +214,7 @@ cold-start behaviour is part of the test objective.
 | --- | --- | --- |
 | `teleport` | Land directly in the target screen/state via deep link or the hidden harness route. The default for routine positioning, because it avoids slow UI tapping. | Flows open `boga3://maestro-harness?…`; the harness route `replace`s into the requested screen after its reset work. |
 | `data reset` | Clear app-owned persisted data, keeping the installed binary and runtime in place. Preferred when a clean data state is needed without re-testing install semantics. | The harness route calls `resetLocalAppData()`: close the SQLite handle, delete the local database, re-bootstrap migrations/seeds. |
-| `full reset` | Cold-start/install-level reset. Not the default for ordinary setup. | `MAESTRO_RESET_STRATEGY=full`; `maestro-ios-provision.sh` uninstalls the dev client before reinstalling it. |
+| `full reset` | Cold-start/install-level reset. Not the default for ordinary setup. | `MAESTRO_RESET_STRATEGY=full`; `maestro-<platform>-provision.sh` uninstalls the dev client before reinstalling it. |
 
 ## 8. Harness and deep-link contract
 
@@ -217,6 +252,9 @@ from `apps/mobile/.env.local` at bundle time. The `auth-profile`, `sync-e2e` and
 Supabase baseline and export those vars; every other iOS lane is deliberately
 infra-free and exports none, so the inlined values are empty. (Which lanes take
 which shape, and why, is testing policy — `docs/specs/06-testing-strategy.md`.)
+The Android launcher sets the same forwards with `adb reverse` (Metro, and the
+local API port when the lane is Supabase-configured) before it opens the dev
+client.
 
 `apps/mobile/.env.local` is a durable per-worktree file that local-Supabase
 startup writes and that Expo's dev server reads **authoritatively** in dev (it

@@ -31,7 +31,7 @@ appId: com.dinoderek.mobile
 # renders once more against the scheduler the reload has just freed. The
 # simulator is then left on the home screen, and today-screen never appears.
 - stopApp
-- openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
+- openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
       id: "today-screen"

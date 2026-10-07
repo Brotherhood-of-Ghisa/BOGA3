@@ -141,7 +141,8 @@ exclusive configurations, selected by whether the app sees
 `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`:
 
 - **infra-free** (`ios-smoke`, `ios-data-smoke`, `ios-exercise-page`,
-  `ios-session-view`): no Supabase. The app runs local-only with the
+  `ios-session-view`, and their `android-smoke` / `android-data-smoke` twins): no
+  Supabase. The app runs local-only with the
   login-on-start gate disabled, which keeps these lanes fast and focused on the
   local SQLite runtime — and lets `ios-data-smoke` prove a backend-less build
   seeds its own starter exercise catalog at boot.

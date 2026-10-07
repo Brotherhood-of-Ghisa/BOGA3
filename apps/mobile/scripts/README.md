@@ -31,9 +31,13 @@ This directory contains two kinds of files:
   - used by: `npm run start:ios:dev-client`.
   - status: used and needed.
 - `maestro-run-lane.sh`
-  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `exercise-page` / `session-view` / `auth-profile` / `sync-e2e` / `groups-e2e`). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-ios-run-flow.sh` (one flow, own sim + Metro) or `maestro-ios-run-flows.sh` (several flows sharing one). Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` etc.).
-  - used by: all `npm run test:e2e:ios:*` scripts except `gates`.
+  - purpose: the single parameterized per-lane Maestro runner (`smoke` / `data-smoke` / `exercise-page` / `session-view` / `auth-profile` / `sync-e2e` / `groups-e2e` on iOS, `android-smoke` / `android-data-smoke` on Android). Holds each lane's data — flows, reset strategy, Supabase configuration, fixture user — and delegates to `maestro-<platform>-run-flow.sh` (one flow, own device + Metro) or `maestro-<platform>-run-flows.sh` (several flows sharing one). Canonical lane names: `scripts/lanes.tsv` (run via `./boga test ios-smoke` / `./boga test android-smoke` etc.).
+  - used by: all `npm run test:e2e:{ios,android}:*` scripts except `gates`.
   - status: used and needed. Replaced the one-wrapper-per-lane scripts (`maestro-ios-smoke.sh`, `-data-smoke.sh`, `-auth-profile.sh`, `-sync-e2e.sh`).
+- `maestro-android-dev-client-build.sh`
+  - purpose: builds or reuses the shared Android debug dev-client APK for the android-* lanes (`expo prebuild --platform android` + Gradle `assembleDebug`), cached at `$HOME/.cache/boga/maestro/android-dev-client/mobile-dev-client.apk`; rebuild with `--force` after a native change.
+  - used by: humans directly, `README-maestro.md`, and `maestro-android-provision.sh`.
+  - status: used and needed.
 - `maestro-ios-gates.sh`
   - purpose: the smoke + data-runtime-smoke flow list and a `full` reset, handed to `maestro-ios-run-flows.sh` so both run against ONE provisioned simulator and ONE Metro instance.
   - used by: `npm run test:e2e:ios:gates`.
@@ -50,8 +54,36 @@ This directory contains two kinds of files:
   - used by: all current Maestro runtime scripts.
   - status: used and needed.
 - `maestro-ios-runtime.sh`
-  - purpose: shared runtime helpers for artifact paths, runtime env persistence, bundle ID lookup, Metro waits, and flow rewriting.
+  - purpose: iOS-only runtime helpers (simulator control, native permission/scheme pre-authorization, dev-menu seeding, simulator/crash log capture). Sources the shared `maestro-runtime.sh` and defines the iOS runtime-state key set.
   - used by: `maestro-ios-run-flow.sh`, `maestro-ios-run-flows.sh`, `maestro-ios-provision.sh`, `maestro-ios-launch.sh`, and `maestro-ios-teardown.sh`.
+  - status: used and needed.
+- `maestro-runtime.sh`
+  - purpose: platform-neutral Maestro helpers shared by both toolkits — artifact paths, runtime-state persistence, Metro probing/waits, process waits, flow-copy rewriting, the dev-client URL, and the managed `.env.local` pin/restore.
+  - used by: `maestro-ios-runtime.sh` and `maestro-android-runtime.sh` (every runtime entrypoint transitively).
+  - status: used and needed.
+- `maestro-android-runtime.sh`
+  - purpose: Android-only runtime helpers — SDK/adb checks, AVD discovery/creation (cloned from a template AVD; no `avdmanager` needed), boot-complete wait, app-id resolution, logcat capture, force-stop. Sources `maestro-runtime.sh` and defines the Android runtime-state key set.
+  - used by: `maestro-android-run-flow.sh`, `maestro-android-run-flows.sh`, `maestro-android-provision.sh`, `maestro-android-launch.sh`, and `maestro-android-teardown.sh`.
+  - status: used and needed.
+- `maestro-android-run-flow.sh`
+  - purpose: the Android counterpart of `maestro-ios-run-flow.sh` — provision (boot emulator + install APK), launch (Metro + dev client), run one flow via `maestro test --device`, emit artifacts, tear down.
+  - used by: `maestro-run-lane.sh` android arms.
+  - status: used and needed.
+- `maestro-android-run-flows.sh`
+  - purpose: the Android counterpart of `maestro-ios-run-flows.sh` — several flows against ONE provisioned emulator + Metro.
+  - used by: `maestro-run-lane.sh android-data-smoke`.
+  - status: used and needed.
+- `maestro-android-provision.sh`
+  - purpose: ensures the shared APK exists, boots the lane AVD (or uses `ANDROID_SERIAL`), installs the app, and records runtime state.
+  - used by: the Android run-flow/run-flows runners.
+  - status: used and needed.
+- `maestro-android-launch.sh`
+  - purpose: `adb reverse`s Metro and the local Supabase API, starts Metro, opens the installed dev client against it, and blocks until Metro serves the app-entry bundle.
+  - used by: the Android run-flow/run-flows runners.
+  - status: used and needed.
+- `maestro-android-teardown.sh`
+  - purpose: stops Metro, restores the developer's `.env.local`, force-stops the app, and shuts down a lane emulator this run started.
+  - used by: the Android run-flow/run-flows runners via the `cleanup()` `EXIT` trap.
   - status: used and needed.
 - `maestro-ios-run-flow.sh`
   - purpose: common scenario runner that orchestrates provision, launch, Maestro execution, artifact emission, and cleanup for ONE flow.
@@ -107,5 +139,13 @@ Current verdict after repository call-graph review:
   - Metro/deep-link phase
 - `maestro-ios-teardown.sh`
   - cleanup phase
+- `maestro-android-run-flows.sh` / `maestro-android-run-flow.sh`
+  - Android shared-session / single-flow orchestration entrypoints
+- `maestro-android-provision.sh`
+  - Android boot/install phase (AVD boot, APK install)
+- `maestro-android-launch.sh`
+  - Android Metro/`adb reverse`/deep-link phase
+- `maestro-android-teardown.sh`
+  - Android cleanup phase
 
 This file owns the script inventory. If you change the command surface, update `apps/mobile/README-maestro.md` in the same task; update `docs/specs/11-maestro-runtime-and-testing-conventions.md` only when the runtime *contract* changes.

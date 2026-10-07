@@ -1,4 +1,4 @@
-# Maestro iOS Runtime Runbook
+# Maestro Runtime Runbook
 
 The full Maestro runtime/testing contract lives in [`docs/specs/11-maestro-runtime-and-testing-conventions.md`](../../docs/specs/11-maestro-runtime-and-testing-conventions.md).
 
@@ -120,6 +120,36 @@ The cached `.app` is reused whenever it exists. A rebuild only happens when the 
 > Otherwise the gate reuses the old binary, which lacks the new native module, and
 > every flow fails at boot with `Cannot find native module '<X>'`. Pure-JS or
 > config-only changes need no rebuild.
+
+## Android lanes
+
+The Android starter lanes (`android-smoke`, `android-data-smoke`) run the same
+infra-free flows on a slot-named Android emulator. Prerequisites — Android SDK,
+`adb`, `emulator`, a JDK, and at least one AVD on the host — are checked by
+`./boga doctor --android`.
+
+```bash
+cd ../.. && ./boga worktree start && cd apps/mobile   # once per worktree
+
+TASK_ID=ad-hoc npm run test:e2e:android:smoke
+TASK_ID=ad-hoc npm run test:e2e:android:data-smoke
+# or the repo-level lanes:
+cd ../.. && ./boga test android-smoke && ./boga test android-data-smoke
+```
+
+- `.maestro/maestro.env.local` carries `ANDROID_AVD` (slot-named, e.g.
+  `BOGA_wt4`). When it does not exist the lane clones it from the first non-lane
+  AVD (or `ANDROID_AVD_TEMPLATE`) and boots it headless; set `ANDROID_SERIAL` to
+  use an already-connected device instead.
+- The dev-client APK is a shared host-local cache
+  (`~/.cache/boga/maestro/android-dev-client/mobile-dev-client.apk`), built on
+  first use. After a **native** Android dependency or config-plugin change,
+  rebuild with `./scripts/maestro-android-dev-client-build.sh --force`.
+- Artifacts match the iOS lanes, with `android-logcat.log` and `emulator.log` in
+  place of `simulator-system.log`.
+- The Android data-smoke lane omits `session-completion-states-fixture.yaml`: its
+  assertions are the iOS native share sheet, which the Android Sharesheet does
+  not reproduce.
 
 ## Main validation commands
 

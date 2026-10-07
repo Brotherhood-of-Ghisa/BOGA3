@@ -6,9 +6,9 @@
 # this file in the same change.
 #
 # Columns (tab-separated): name	gate	infra	ci	cwd	command
-#   gate:  fast-frontend | fast-backend | fast-repo | slow-backend | slow-frontend | extra
+#   gate:  fast-frontend | fast-backend | fast-repo | slow-backend | slow-frontend | slow-frontend-android | extra
 #          (extra = not part of any gate aggregate; run by name)
-#   infra: none | supabase | ios | ios+supabase
+#   infra: none | supabase | ios | android | ios+supabase
 #   ci:    yes | no   (whether .github/workflows/ci.yml runs it)
 #   cwd:   working directory relative to the repo root
 #   ROW ORDER IS EXECUTION ORDER within a gate.
@@ -41,6 +41,8 @@ ios-session-view	slow-frontend	ios	no	apps/mobile	./scripts/maestro-run-lane.sh 
 ios-auth-profile	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh auth-profile
 ios-sync-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh sync-e2e
 ios-groups-e2e	slow-frontend	ios+supabase	no	apps/mobile	./scripts/maestro-run-lane.sh groups-e2e
+android-smoke	slow-frontend-android	android	no	apps/mobile	./scripts/maestro-run-lane.sh android-smoke
+android-data-smoke	slow-frontend-android	android	no	apps/mobile	./scripts/maestro-run-lane.sh android-data-smoke
 groups-protocol4	extra	supabase	no	.	./supabase/scripts/run-suite.sh groups-competition-live.sh groups-competitions.sh
 handles	extra	none	no	apps/mobile	npm run test:handles
 ios-gates	extra	ios	no	apps/mobile	./scripts/maestro-ios-gates.sh
