@@ -25,6 +25,9 @@ calculation, eligibility or record rule), or the sync protocol.
   jobs for ~21 h (#507).
 - Exception: a migration that only enqueues recomputes goes after the new
   `group-eval` is live, or the old function does the work with the old rule.
+- A `GROUP_EVAL_RULES_VERSION` bump starts at the new `group-eval`'s first
+  run: kick it once (`select app_public.group_eval_kick();`); the sweep
+  finishes the rest.
 - Verify each deployed function's files byte-match the merge commit, and
   record every hosted migration in `supabase_migrations.schema_migrations`.
 - Every environment: hosted, BOGA-dev, dev-lan. Skipped activation and kick
@@ -42,6 +45,7 @@ calculation, eligibility or record rule), or the sync protocol.
 
 - `group_eval_queue` and `group_metric_eval_queue` drain to empty; no
   parked jobs.
+- All `group_set_facts` reach the new `rules_version`.
 - `agent-api` returns the new `metric_revision`.
 - On a device: history, records and PR markers show the new figures.
 
