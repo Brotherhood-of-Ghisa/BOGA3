@@ -266,10 +266,14 @@ done < <(run_psql "select p.proname||E'\\t'||coalesce((select jsonb_object_agg(a
   when 'jsonb' then 'null'::jsonb else '1'::jsonb end)::text from unnest(p.proargnames) with ordinality a(name,n)), '{}')
   from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app_public'
     and exists(select 1 from pg_proc helper where helper.pronamespace=p.pronamespace and helper.proname=p.proname||'_pre_competition') order by p.proname;")
-for protocol in '' 3 invalid 04; do
+for protocol in '' 3 invalid 04 4.0; do
   rpc4 "${OWNER_TOKEN}" group_get "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')" "${protocol}"; expect_error UPDATE_REQUIRED 'old capability group read'
 done
 rpc4 "${OUTSIDER_TOKEN}" group_competition_exercise_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_error NOT_FOUND outsider
+OUTSIDER_ERROR="$(jq -er .message <<<"${BODY}")"
+rpc4 "${OWNER_TOKEN}" group_competition_exercise_list "$(jq -nc --arg g "$(run_psql "select gen_random_uuid();")" '{p_group_id:$g}')"
+expect_error NOT_FOUND 'nonexistent group'
+[[ "$(jq -er .message <<<"${BODY}")" == "${OUTSIDER_ERROR}" ]] || fail 'a nonexistent group must read exactly like an outsider (no existence disclosure)'
 rpc4 "$(mint_token "${OWNER_TOKEN}" competition-agent)" group_competition_exercise_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_error AGENT_FORBIDDEN OAuth
 rpc4 "${ANON_KEY}" group_competition_exercise_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; [[ ! "${STATUS}" =~ ^2 ]] || fail 'anonymous data read'
 rest GET "${OWNER_TOKEN}" group_metric_set_scores 'select=*'; [[ ! "${STATUS}" =~ ^2 ]] || fail 'direct score table exposed'

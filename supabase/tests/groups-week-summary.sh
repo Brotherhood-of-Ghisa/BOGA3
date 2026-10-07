@@ -46,6 +46,7 @@ load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" && -n "${JWT_SECRET:-}" ]] ||
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_WEEK_SUMMARY_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -89,6 +90,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
@@ -121,13 +123,7 @@ expect_sql() {
 }
 
 drain() {
-  local out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
-    -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+  eval_drain
   expect_ok "group-eval drain: $1"
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
@@ -485,7 +481,8 @@ expect_board "R=1/5/4,A=2/5/2,M=3/3/5,X=4/0/0,O=4/0/0" "the end is exclusive"
 pass "working sets by the app rule, performed, live and present; group records non-voided, one per #1 board, completed; ranks, ties, edges"
 
 # The late member: a session that started before their join is never shared.
-sleep 2
+# The join must land inside the window, which opened 1 s after setup began.
+until (( $(now_ms) > WS + 1 )); do sleep 0.1; done
 rpc "${LATE_TOKEN}" group_join "$(jq -nc --arg c "${INVITE_CODE}" '{p_code: $c}')"
 expect_ok "late join"
 LATE_JOINED="$(run_psql "select floor(extract(epoch from joined_at) * 1000)::bigint from app_public.group_memberships

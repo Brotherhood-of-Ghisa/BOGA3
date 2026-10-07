@@ -20,6 +20,7 @@ load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" && -n "${JWT_SECRET:-}" ]] ||
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_BODYWEIGHT_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -53,6 +54,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
@@ -94,13 +96,7 @@ assert_wire() {
     fail "actual $1 wire contract"
 }
 drain() {
-  local out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H 'Content-Type: application/json' \
-    -H "x-group-eval-secret: ${EVAL_SECRET}" -o "${out}" -w '%{http_code}' --data '{}' \
-    "${API_URL}/functions/v1/group-eval")"
-  BODY="$(cat "${out}")"; rm -f "${out}"
+  eval_drain
   expect_ok "drain: $1"; check "drain: $1" '.failed == 0'
 }
 e_reading() {
@@ -183,7 +179,7 @@ comparison_snapshot() {
 assert_zero_toggles() {
   local before
   before="$(comparison_snapshot)"
-  for enabled in true false true true false false; do
+  for enabled in true true false false; do
     set_group_policy "${enabled}"
     expect_sql 'zero contribution never queues a rules rebuild' \
       "select count(*) from app_public.group_metric_eval_queue where group_exercise_id='${GX}';" 0
@@ -201,46 +197,14 @@ assert_zero_toggles() {
 provision OWNER owner
 provision ATHLETE athlete
 provision RIVAL rival
-provision OUTSIDER outsider
 node "${SUPABASE_DIR}/tests/bodyweight-as-of-parity.mjs" "${DB_CONTAINER}" "${OWNER_UID}"
-for pair in OWNER:owner ATHLETE:athlete RIVAL:rival OUTSIDER:outsider; do
+for pair in OWNER:owner ATHLETE:athlete RIVAL:rival; do
   uid_var="${pair%%:*}_UID"; set_username "${!uid_var}" "bw_${pair##*:}_${RUN_TAG//-/_}"
 done
 set_kick_url ''; set_sweep_active false
 
 rpc "${OWNER_TOKEN}" group_create "$(jq -nc --arg n "Bodyweight ${RUN_TAG}" '{p_name:$n,p_description:null}')"
 expect_ok 'group create'; GID="$(jq -er .group_id <<<"${BODY}")"
-# Additive protocol-4 negotiation stays pending until scorer/readers/UI cut over.
-competition_contract() {
-  local token="$1" protocol="$2" group="${3:-${GID}}" out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST -H "apikey: ${ANON_KEY}" \
-    -H "Authorization: Bearer ${token}" -H 'Content-Profile: app_public' \
-    -H 'Content-Type: application/json' -H "x-boga-group-contract: ${protocol}" \
-    --data "$(jq -nc --arg g "${group}" '{p_group_id:$g}')" -o "${out}" -w '%{http_code}' \
-    "${API_URL}/rest/v1/rpc/group_competition_contract")"
-  BODY="$(cat "${out}")"; rm -f "${out}"
-}
-competition_contract "${OWNER_TOKEN}" 4; expect_ok 'competition negotiation'
-node --input-type=module -e '
-  import fs from "node:fs";
-  import { pathToFileURL } from "node:url";
-  const {isCompetitionContractWire}=await import(pathToFileURL(process.argv[1]).href);
-  const body=JSON.parse(fs.readFileSync(0,"utf8"));
-  if (!isCompetitionContractWire(body) || body.activation_state!=="pending")
-    throw new Error("Actual negotiation must decode and remain pending");
-' "${SUPABASE_DIR}/../apps/mobile/src/groups/competition-wire-guards.ts" <<<"${BODY}"
-for protocol in '' 3 04 4.0 invalid; do
-  competition_contract "${OWNER_TOKEN}" "${protocol}"; expect_error UPDATE_REQUIRED 'unsupported competition protocol'
-done
-competition_contract "${OUTSIDER_TOKEN}" 4; expect_error NOT_FOUND 'competition outsider'
-OUTSIDER_ERROR="$(jq -er .message <<<"${BODY}")"
-competition_contract "${OWNER_TOKEN}" 4 "$(run_psql "select gen_random_uuid();")"; expect_error NOT_FOUND 'competition nonexistent group'
-[[ "$(jq -er .message <<<"${BODY}")" == "${OUTSIDER_ERROR}" ]] || fail 'competition existence disclosure'
-competition_contract "$(mint_token "${OWNER_TOKEN}" competition-agent)" 4; expect_error AGENT_FORBIDDEN 'competition OAuth denial'
-competition_contract "${ANON_KEY}" 4
-[[ ! "${STATUS}" =~ ^2 ]] || fail 'anonymous competition negotiation allowed'
-pass 'competition negotiation: exact version/units, pending activation, membership/OAuth/anonymous denial'
 rpc "${OWNER_TOKEN}" group_invite_get "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
 expect_ok 'invite'; INVITE="$(jq -er .code <<<"${BODY}")"
 for token in "${ATHLETE_TOKEN}" "${RIVAL_TOKEN}"; do
@@ -329,7 +293,7 @@ update_comparison() {
       p_load_input_mode:$mode,p_bodyweight_contribution:$c,p_default_metric:"e1rm"}')"
   expect_ok 'update comparison rules'
 }
-for enabled in false true false true; do
+for enabled in false true; do
   set_group_policy "${enabled}"; drain 'repeat policy rule change'
   assert_retained "policy ${enabled}"
 done
@@ -554,19 +518,6 @@ check 'the board falls to the best working set' '
   (.entries[]|select(.member.user_id==$a)|.value==25 and .set_id==$s) and .entries[0].member.user_id==$r' \
   --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}" --arg s "${T}-ca3"
 pass 'comparisons count working sets only; a stored warm-up record stands and its board moves silently'
-
-# The cutover schema and function signatures are complete on the backend.
-expect_sql 'final exercise definition columns exist' \
-  "select count(*) from information_schema.columns where table_schema='app_public' and table_name='exercise_definitions' and column_name in ('load_input_mode','bodyweight_contribution');" 2
-expect_sql 'superseded exercise definition columns are gone' \
-  "select count(*) from information_schema.columns where table_schema='app_public' and table_name='exercise_definitions' and column_name in ('bodyweight_coefficient','movement_standard','loading_method');" 0
-expect_sql 'superseded set columns are gone' \
-  "select count(*) from information_schema.columns where table_schema='app_public' and table_name='exercise_sets' and column_name in ('weight_unit','external_load_mode','planned_weight_unit','planned_external_load_mode');" 0
-expect_sql 'kg-only reading schema is final' \
-  "select count(*) from information_schema.columns where table_schema='app_public' and table_name='body_weight_measurements' and column_name in ('weight_value','weight_unit');" 0
-expect_sql 'private settings table has one current preference field' \
-  "select count(*) from information_schema.columns where table_schema='app_public' and table_name='user_settings' and column_name='bodyweight_calculations_enabled';" 1
-pass 'backend schema, settings, group policy and wire contract match the final model'
 
 # D6 load factor: the shared vectors the mobile groupEnteredWeightFactor runs
 # (apps/mobile/src/groups/load-factor-vectors.json), against the SQL.

@@ -59,6 +59,7 @@ load_supabase_status_env
 [[ -n "${JWT_SECRET:-}" ]] ||
   fail "JWT_SECRET missing from 'supabase status'; it is required to mint the client_id probe token"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_CONTRACT_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -99,6 +100,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
