@@ -71,7 +71,7 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | groups-leaderboards | `./boga test groups-leaderboards` | `boga test backend` | ❌ | ~47s |
 | groups-contract | `./boga test groups-contract` | `boga test backend` | ❌ | ~12s |
 | groups-competitions | `./boga test groups-competitions` | `boga test backend` | ❌ | ~16s |
-| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~5.6s |
+| groups-api-live | `./boga test groups-api-live` | `boga test backend` | ❌ | ~7.9s |
 | agent-api | `./boga test agent-api` | `boga test backend` | ❌ | ~10s |
 | sync-v2-schema | `./boga test sync-v2-schema` | `boga test backend` | ❌ | ~6.6s |
 | sync-push-contract | `./boga test sync-push-contract` | `boga test backend` | ❌ | ~5.2s |
@@ -81,7 +81,7 @@ those, run `./boga docs gen`; `docs-check` fails if this table drifts.
 | sync-v2-e2e | `./boga test sync-v2-e2e` | `boga test backend` | ❌ | ~26s |
 | sync-infra | `./boga test sync-infra` | `boga test backend` | ❌ | ~20s |
 | mcp-smoke | `./boga test mcp-smoke` | `boga test backend` | ❌ | ~5.9s |
-| groups-protocol4 | `./boga test groups-protocol4` | — (run by name) | ❌ | ~1.7m |
+| groups-protocol4 | `./boga test groups-protocol4` | — (run by name) | ❌ | ~1.2m |
 | *Infra: iOS simulator + Metro — never CI-able (+ local Supabase where noted)* | | | | |
 | ios-smoke | `./boga test ios-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~57s |
 | ios-data-smoke | `./boga test ios-data-smoke` | `boga test frontend` + `frontend-ui` | ❌ | ~2.1m |
