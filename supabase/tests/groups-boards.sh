@@ -14,7 +14,7 @@
 #     comparison job (group_metric_eval_publish → group_metric_apply_member);
 #     a load-mode change rescores silently and a rules change publishes a new
 #     revision with one rules_change event;
-#   - working sets only: a warm-up never ranks, records or certifies, and a
+#   - working sets only ([[set.eligibility]]): a warm-up never ranks, records or certifies, and a
 #     stored warm-up record stands while its board moves silently (forward only);
 #   - the provisional rule for active sessions (T8), D6 conversion, value-based
 #     voids, P7 ties, rejoin catch-up, the per-group advisory lock of a
