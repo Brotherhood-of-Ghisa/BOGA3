@@ -99,8 +99,8 @@ Two traps this table exists to kill:
 - **The `extra`-gate lanes sit in no gate and no CI job** — `handles`,
   `ios-gates`, `jest-sync`, `groups-protocol4`, plus the three quality-target
   lanes below. `handles` is an optional `--detectOpenHandles` diagnostic, not a
-  PR requirement. `groups-protocol4` is a real contract lane: its one-way
-  activation rebuilds the stack, so run it when `boga test for` prints it.
+  PR requirement. `groups-protocol4` is a real contract lane whose one-way
+  activation the next preflight resets: run it when `boga test for` prints it.
 - **`sync-infra` and `ios-sync-e2e` both cross the FE/BE line, and they are NOT
   interchangeable.** `sync-infra` (a mobile jest body at the end of
   `boga test backend`) drives the real `runSyncCycle` against a real Supabase

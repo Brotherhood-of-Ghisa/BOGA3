@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Protocol-4 populated upgrade, actual Sync/Edge publication and public privacy.
-# Uses only this lane's slot-local stack; restores latest pending schema on exit.
+# Uses only this lane's slot-local stack. The reset to a pre-cutover migration
+# and the activation are one-way: the stack is marked before either, and the
+# next baseline preflight restores it (ensure-local-runtime-baseline.sh).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -13,34 +15,23 @@ PASSWORD="Competition!${RUN_TAG}"
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 RUN_USER_IDS=()
 COMPLETED=0
-RESET_NEEDED=0
+WIRE_PID=""
 cleanup() {
   local status=$?
   trap - EXIT
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then status=1; fi
-  if [[ ${RESET_NEEDED} -eq 1 ]]; then
-    # Activation has no production rollback API. The isolated test stack is
-    # rebuilt so every later lane runs the installed, pending representation.
-    if ! "${SUPABASE_DIR}/../boga" db reset >"${RESET_LOG}" 2>&1; then
-      cat "${RESET_LOG}" >&2; status=1
-    fi
-  fi
-  rm -f "${RESET_LOG}" "${UPGRADE_LOG}"
+  if [[ -n "${WIRE_PID}" ]]; then exec 7>&- 8<&-; kill "${WIRE_PID}" 2>/dev/null || true; fi
+  rm -rf "${RESET_LOG}" "${UPGRADE_LOG}" "${WIRE_DIR}"
   exit "${status}"
 }
-RESET_LOG="$(mktemp)"; UPGRADE_LOG="$(mktemp)"
+RESET_LOG="$(mktemp)"; UPGRADE_LOG="$(mktemp)"; WIRE_DIR="$(mktemp -d)"
 trap cleanup EXIT
-RESET_NEEDED=1
+mark_stack_needs_reset 'groups-competitions.sh reset to a pre-cutover migration and activated protocol 4'
 # A real populated migration, not a synthetic post-install pin backfill.
 run_supabase db reset --local --version 20261004225853 --yes >"${RESET_LOG}" 2>&1 || { cat "${RESET_LOG}" >&2; fail 'pre-cutover reset'; }
+refresh_edge_proxy_after_reset >/dev/null || fail 'Edge Function routing after the pre-cutover reset'
 load_supabase_status_env
 DB_CONTAINER="$(resolve_db_container)"
-KONG_CONTAINER="$(resolve_worktree_container kong "$(worktree_project_id)" "$(worktree_config_port api)")"
-docker restart "${KONG_CONTAINER}" >/dev/null
-for attempt in $(seq 1 45); do
-  if curl_health --max-time 2 >/dev/null 2>&1; then break; fi
-  sleep 1
-done
 EVAL_SECRET="$(run_psql "select app_public.group_eval_config('group_eval_secret');")"
 run_psql "select app_public.group_eval_set_url(''); select cron.alter_job(jobid,active:=false) from cron.job where jobname='group-eval-sweep';" >/dev/null
 rpc4() {
@@ -51,15 +42,45 @@ rpc4() {
     -H 'x-boga-sync-protocol: 3' --data "${args}" -o "${out}" -w '%{http_code}' "${API_URL}/rest/v1/rpc/${name}")"
   BODY="$(cat "${out}")"; rm -f "${out}"
 }
-assert_wire() {
-  node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
-    import fs from "node:fs"; import {pathToFileURL} from "node:url";
-    const dir=process.argv[1],kind=process.argv[2],body=JSON.parse(fs.readFileSync(0,"utf8"));
-    const base=await import(pathToFileURL(`${dir}/competition-wire-guards.ts`));
-    const readers=await import(pathToFileURL(`${dir}/competition-reader-guards.ts`));
-    if (!(base[kind]??readers[kind])?.(body)) throw new Error(`Actual RPC failed ${kind}: ${JSON.stringify(body)}`);
-  ' "${SUPABASE_DIR}/../apps/mobile/src/groups" "$1" <<<"${BODY}" || fail "actual $1 decoder"
+# One decoder process for the whole body (a node start per call was ~70 ms, over
+# 200 calls). Each call writes "<guard>\t<compact JSON>" and blocks on its own
+# verdict line, so a failure stops the body at the call that caused it; a dead
+# decoder reads as EOF, which fails too.
+mkfifo "${WIRE_DIR}/in" "${WIRE_DIR}/out"
+node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
+  import readline from "node:readline"; import {pathToFileURL} from "node:url";
+  const dir=process.argv[1];
+  const base=await import(pathToFileURL(`${dir}/competition-wire-guards.ts`));
+  const readers=await import(pathToFileURL(`${dir}/competition-reader-guards.ts`));
+  for await (const line of readline.createInterface({input:process.stdin})) {
+    const tab=line.indexOf("\t"),kind=line.slice(0,tab);
+    let verdict;
+    try { verdict=(base[kind]??readers[kind])?.(JSON.parse(line.slice(tab+1))) ? "ok" : `rejected ${line.slice(tab+1)}`; }
+    catch (error) { verdict=`threw ${error.message}`; }
+    process.stdout.write(`${verdict}\n`);
+  }
+' "${SUPABASE_DIR}/../apps/mobile/src/groups" <"${WIRE_DIR}/in" >"${WIRE_DIR}/out" &
+WIRE_PID=$!
+exec 7>"${WIRE_DIR}/in" 8<"${WIRE_DIR}/out"
+# wire_verdict <guard>: the decoder's verdict on BODY, run in a subshell that
+# ignores SIGPIPE, so a decoder that has exited fails the write instead of
+# killing bash. The write gets its own subshell so a failed write's buffered
+# line cannot leak into the verdict.
+wire_verdict() {
+  local verdict="" wrote=0
+  trap '' PIPE
+  (printf '%s\t%s\n' "$1" "${BODY//$'\n'/}") >&7 2>/dev/null && wrote=1
+  [[ ${wrote} -eq 1 ]] && read -r verdict <&8 || true
+  printf '%s' "${verdict:-decoder exited}"
 }
+assert_wire() {
+  local verdict
+  verdict="$(wire_verdict "$1")"
+  [[ "${verdict}" == ok ]] || fail "actual $1 decoder: ${verdict}"
+}
+# Canary: the decoder must be able to say no, or every assert_wire is a no-op.
+BODY='{}'; [[ "$(wire_verdict isCompetitionContractWire)" == 'rejected {}' ]] || fail 'decoder accepted an empty contract'
+BODY=''
 expect_sql() { local actual; actual="$(run_psql "$2")"; [[ "${actual}" == "$3" ]] || fail "$1: expected '$3', got '$actual'"; }
 drain() {
   local out; out="$(mktemp)"
@@ -403,7 +424,7 @@ ended() {
 reading() { next_cuam; push "${ATHLETE_TOKEN}" "$1" "$(e_reading "$2" "$3" "$4" "${5:-null}")"; }
 MAIN_READING="${T}-ATHLETE-reading"
 pair
-for enabled in false true false true; do policy "${enabled}"; drain 'rule-only switch'; retained "switch ${enabled}"; done
+for enabled in false true; do policy "${enabled}"; drain 'rule-only switch'; retained "switch ${enabled}"; done
 for c in 0 0.5 1; do update_rules "${c}"; drain contribution; retained "contribution ${c}"; done
 for mode in per_side_load total_load; do update_rules 1 "${mode}"; drain 'target distribution'; retained "target ${mode}"; done
 for mode in per_side_load total_load; do

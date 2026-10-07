@@ -3,15 +3,16 @@
 # groups-protocol4). Provisions its own owner and member, activates competitions
 # on this worktree's slot-local stack, runs apps/mobile's
 # groups-competition-api-live Jest suite against it, then deletes the users and
-# everything they made. Activation is one-way, so the wrapper rebuilds the stack
-# on exit — which is why this body lives outside the default backend gate.
+# everything they made. Activation is one-way, so the wrapper marks the stack for
+# the next baseline preflight to reset — which is why this body lives outside
+# the default backend gate.
 # The ordinary (pre-competition) client wire is groups-api-live.sh's job.
 #
 # ORDER: this body runs BEFORE groups-competitions.sh in the lane. That body
-# unsets the evaluator kick URL for direct-drain mode and rebuilds the stack on
-# exit, leaving no configured baseline behind; this body needs a live evaluator
-# to publish a board, so it must see the preflight's baseline. Reversing them
-# leaves the board empty and this suite times out.
+# unsets the evaluator kick URL for direct-drain mode, leaving no configured
+# baseline behind; this body needs a live evaluator to publish a board, so it
+# must see the preflight's baseline. Reversing them leaves the board empty and
+# this suite times out.
 # Execute only through its Boga lane.
 set -euo pipefail
 
