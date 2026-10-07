@@ -34,6 +34,16 @@ populated data, and failure isolation.
   `groups-competition-contract.test.ts`. Confirm this pattern before moving
   anything — the expensive bodies may already be correctly placed.
 
+## Measured cost profile (at `39cd6f8f`)
+
+Profiled per command (a timing wrapper, which adds its own overhead) over the
+five `groups-leaderboards` bodies (86s unwrapped): `docker exec psql` 771 calls
+/ 37.6s (38–69 ms each), PostgREST 674 / 8.8s, `group-eval` drains 218 / 8.3s
+(curl's own timer, unwrapped; 22–61 ms each), `node -e` 48 / 8.3s (up to 0.45s
+each), `jq` 2528 / 7.0s, auth 78 / 4.7s. An assertion's cost is mostly the
+`run_psql` calls around it, not the drain that reaches its state. Host `psql`
+over TCP measured 24 ms vs 38 ms for `docker exec`.
+
 ## Open — resolve with the user at session start
 
 1. **The audit output.** Agree the shape: per body, which assertions are
