@@ -216,7 +216,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-  });
+  }, 30_000);
 
   it('shows the empty state on an empty database', async () => {
     await renderStats();

@@ -19,7 +19,7 @@ import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calcula
 // local-only bookkeeping columns (the dirty bit and the monotonic timestamp)
 // never cross the wire.
 
-import { and, asc, eq, notInArray } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
@@ -31,7 +31,9 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
+import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
 import * as schema from '@/src/data/schema';
+import { exerciseSets } from '@/src/data/schema';
 import { syncRuntimeState } from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
 import {
@@ -110,7 +112,13 @@ interface ErrorEnvelope {
 // Error classification
 // -----------------------------------------------------------------------------
 
-export type SyncErrorCode = 'AUTH_REQUIRED' | 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
+export type SyncErrorCode =
+  | 'AUTH_REQUIRED'
+  | 'FK_VIOLATION'
+  | 'LOCAL_FK_VIOLATION'
+  | 'BLOCK_ALREADY_ATTACHED'
+  | 'UPDATE_REQUIRED'
+  | 'INTERNAL';
 
 export class SyncCycleError extends Error {
   readonly code: SyncErrorCode;
@@ -161,6 +169,11 @@ export const classifyRpcResult = (
     if (message.includes('AUTH_REQUIRED')) {
       return 'AUTH_REQUIRED';
     }
+    // Before FK_VIOLATION: the server token is self-contained, and the
+    // provenance arbitration envelope never carries the FK token.
+    if (message.includes('BLOCK_ALREADY_ATTACHED')) {
+      return 'BLOCK_ALREADY_ATTACHED';
+    }
     if (message.includes('FK_VIOLATION')) {
       return 'FK_VIOLATION';
     }
@@ -172,6 +185,9 @@ export const classifyRpcResult = (
   if (code === 'UPDATE_REQUIRED') return 'UPDATE_REQUIRED';
   if (code === 'AUTH_REQUIRED') {
     return 'AUTH_REQUIRED';
+  }
+  if (code === 'BLOCK_ALREADY_ATTACHED') {
+    return 'BLOCK_ALREADY_ATTACHED';
   }
   if (code === 'FK_VIOLATION') {
     return 'FK_VIOLATION';
@@ -217,6 +233,29 @@ const isLocalSqliteForeignKeyError = (error: unknown): boolean => {
     return true;
   }
   return sanitizeExceptionMessage(error).toLowerCase().includes('foreign key');
+};
+
+/** The three provenance columns whose unique violation means arbitration. */
+const PROVENANCE_UNIQUE_COLUMNS = [
+  'source_plan_exercise_id',
+  'source_plan_set_id',
+  'sessions.source_plan_id',
+] as const;
+
+/**
+ * A local unique violation on one of the three provenance partial unique
+ * indexes, raised while applying a pulled row: the server had already
+ * committed a competing attachment of the same plan block or source target,
+ * and the local claimant loses (session-planning contract §4.5). Matched by
+ * the failed column (SQLite's message names columns, not indexes) so
+ * unrelated unique violations classify unchanged.
+ */
+const isLocalProvenanceUniqueViolation = (error: unknown): boolean => {
+  const message = sanitizeExceptionMessage(error);
+  if (!message.toLowerCase().includes('unique constraint failed')) {
+    return false;
+  }
+  return PROVENANCE_UNIQUE_COLUMNS.some((column) => message.includes(column));
 };
 
 /**
@@ -327,6 +366,39 @@ const logPullLocalFkViolation = (
         operation: 'pull_page_apply',
         error_code: LOCAL_FK_ERROR_CODE,
         exception_message: exceptionMessage,
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Diagnostic logging is best-effort and must never mask the sync error.
+  }
+};
+
+/**
+ * Best-effort observability for the provenance arbitration repair (contract
+ * §4.5): a competing attachment won, this device's losing provenance was
+ * cleared deterministically, and its rows re-push as unsourced. Ids only —
+ * never a row payload.
+ */
+const logProvenanceArbitrationRepair = (
+  leg: 'push' | 'pull',
+  layer?: number,
+  claims?: { blocks: Set<string>; targets: Set<string> } | null,
+): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'database',
+      event: 'sync.block_attachment_arbitration_repair',
+      message:
+        'A competing attachment of a plan block won; the losing provenance was cleared deterministically.',
+      context: {
+        operation: 'provenance_arbitration_repair',
+        leg,
+        ...(layer === undefined ? {} : { layer }),
+        ...(claims
+          ? { cleared_blocks: claims.blocks.size, cleared_targets: claims.targets.size }
+          : {}),
+        error_code: 'BLOCK_ALREADY_ATTACHED',
       },
     }).catch(() => undefined);
   } catch {
@@ -747,7 +819,11 @@ export const wireToEntity = (envelope: WireEntity, type: EntityTableName): Entit
  * the caller's transaction, so a row quarantined earlier in the same transaction
  * is already absent from a subsequent selection.
  */
-export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[] => {
+export const selectPushBatch = (
+  tx: Transaction,
+  batchCap: number,
+  excludedKeysByType?: ReadonlyMap<string, ReadonlySet<string>>,
+): WireEntity[] => {
   const batch: WireEntity[] = [];
   const quarantinedIdsByType = readQuarantine(tx).idsByType;
 
@@ -757,17 +833,36 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
     }
     const remaining = batchCap - batch.length;
     const table = ENTITY_TABLES[type] as typeof schema.gyms;
-    const excludedIds = quarantinedIdsByType.get(type);
+    const drainedExclusions = excludedKeysByType?.get(type);
+    const excludedIds = [
+      ...(quarantinedIdsByType.get(type) ?? []),
+      ...(drainedExclusions ?? []),
+    ];
     const dirtyClause = eq(table.localDirty, true);
     const whereClause =
-      excludedIds && excludedIds.length > 0
+      excludedIds.length > 0
         ? and(dirtyClause, notInArray(table.id, excludedIds))
         : dirtyClause;
+    const claimOrder =
+      type === 'session_exercises'
+        ? asc(
+            sql<number>`CASE WHEN ${schema.sessionExercises.deletedAt} IS NULL AND ${schema.sessionExercises.sourcePlanExerciseId} IS NOT NULL THEN 1 ELSE 0 END`,
+          )
+        : type === 'exercise_sets'
+          ? asc(
+              sql<number>`CASE WHEN ${schema.exerciseSets.deletedAt} IS NULL AND ${schema.exerciseSets.sourcePlanSetId} IS NOT NULL THEN 1 ELSE 0 END`,
+            )
+          : type === 'sessions'
+            ? asc(
+                sql<number>`CASE WHEN ${schema.sessions.deletedAt} IS NULL AND ${schema.sessions.sourcePlanId} IS NOT NULL THEN 1 ELSE 0 END`,
+              )
+            : undefined;
+    const orderClauses = claimOrder ? [claimOrder, asc(table.localUpdatedAtMs)] : [asc(table.localUpdatedAtMs)];
     const rows = tx
       .select()
       .from(table)
       .where(whereClause)
-      .orderBy(asc(table.localUpdatedAtMs))
+      .orderBy(...orderClauses)
       .limit(remaining)
       .all() as EntityRow[];
 
@@ -777,6 +872,41 @@ export const selectPushBatch = (tx: Transaction, batchCap: number): WireEntity[]
   }
 
   return batch;
+};
+
+/**
+ * The cleared provenance cards whose equally-dirty sets were cut off by the
+ * batch boundary: a card the repair just cleared to unsourced must not ship
+ * in a batch that excludes its still-claiming sets — the server's deferred
+ * cross-level check rejects an unsourced card holding source-derived sets
+ * (`PROVENANCE_VIOLATION`), which would wedge the backlog the arbitration
+ * repair exists to unblock. Deferring the card is the safe order: its sets
+ * push (and ack clean) first, then the card re-pushes in a later drain — a
+ * sourced card holding only null-linked sets is valid throughout.
+ */
+const findProvenanceClearSplitCards = (tx: Transaction, selected: WireEntity[]): string[] => {
+  const splitCards: string[] = [];
+  for (const entity of selected) {
+    if (entity.type !== 'session_exercises' || entity.fields.source_plan_exercise_id !== null) {
+      continue;
+    }
+    const stillClaiming = tx
+      .select({ id: exerciseSets.id })
+      .from(exerciseSets)
+      .where(
+        and(
+          eq(exerciseSets.sessionExerciseId, String(entity.id)),
+          isNotNull(exerciseSets.sourcePlanSetId),
+          isNull(exerciseSets.deletedAt),
+          eq(exerciseSets.localDirty, true),
+        ),
+      )
+      .all();
+    if (stillClaiming.length > 0) {
+      splitCards.push(rowKey('session_exercises', String(entity.id)));
+    }
+  }
+  return splitCards;
 };
 
 // -----------------------------------------------------------------------------
@@ -972,6 +1102,60 @@ export interface PullLegResult {
  * reporter is passed, emits a page event per applied page and a layer event per
  * drained layer so a first-sync caller can surface advancing progress.
  */
+/**
+ * Applies one pulled page and advances that layer's cursor in one transaction
+ * (the cursor only moves past rows that actually committed locally). On a
+ * provenance unique violation — a pulled row claiming a plan block or source
+ * target a local row already holds — the server committed first, so the local
+ * claimant loses: clear exactly those claims outside the failed transaction
+ * and apply the page once more (contract §4.5). Other local FK failures are
+ * classified as `LOCAL_FK_VIOLATION`; anything else rethrows.
+ */
+const applyPageWithArbitrationRepair = async (
+  database: LocalDatabase,
+  page: PullResponse,
+  layerTypes: readonly EntityTableName[],
+  layer: number,
+): Promise<number> => {
+  const applyPage = (): number =>
+    database.transaction((tx) => {
+      const transaction = tx as Transaction;
+      let changed = 0;
+      for (const type of layerTypes) {
+        const forType = page.entities.filter((entity) => entity.type === type);
+        if (forType.length > 0) {
+          changed += applyPullPage(transaction, forType, type);
+        }
+      }
+      writeCursorEntry(transaction, layer, page.next_cursor);
+      return changed;
+    });
+
+  try {
+    return applyPage();
+  } catch (error) {
+    if (isLocalProvenanceUniqueViolation(error)) {
+      // A pulled provenance row claims a plan block or source target a local
+      // row already holds: the server committed first, so the local claimant
+      // loses. Clear exactly the will-write claims outside the failed
+      // transaction and apply the page once more (contract §4.5).
+      const claims = await repairProvenanceForWirePage(page.entities);
+      logProvenanceArbitrationRepair('pull', layer, claims);
+      return applyPage();
+    }
+    if (isLocalSqliteForeignKeyError(error)) {
+      logPullLocalFkViolation(error, layer, page.entities);
+      const types = Array.from(new Set(page.entities.map((entity) => entity.type))).sort();
+      throw new SyncCycleError(
+        LOCAL_FK_ERROR_CODE,
+        `local pull apply failed for ${types.join(', ')} (layer ${layer + 1} of ${TOPO_LAYERS.length}): ` +
+          sanitizeExceptionMessage(error),
+      );
+    }
+    throw error;
+  }
+};
+
 const runPullLeg = async (
   database: LocalDatabase,
   reporter?: PullProgressReporter,
@@ -988,36 +1172,7 @@ const runPullLeg = async (
       );
       const page = await callSyncPull(layer, cursor);
 
-      // Apply the page and advance the cursor in one transaction: the cursor
-      // only moves past rows that actually committed locally. The transaction
-      // returns the count of rows actually written so a no-op page does not
-      // count toward convergence motion.
-      let pageChanged: number;
-      try {
-        pageChanged = database.transaction((tx) => {
-          const transaction = tx as Transaction;
-          let changed = 0;
-          for (const type of layerTypes) {
-            const forType = page.entities.filter((entity) => entity.type === type);
-            if (forType.length > 0) {
-              changed += applyPullPage(transaction, forType, type);
-            }
-          }
-          writeCursorEntry(transaction, layer, page.next_cursor);
-          return changed;
-        });
-      } catch (error) {
-        if (isLocalSqliteForeignKeyError(error)) {
-          logPullLocalFkViolation(error, layer, page.entities);
-          const types = Array.from(new Set(page.entities.map((entity) => entity.type))).sort();
-          throw new SyncCycleError(
-            LOCAL_FK_ERROR_CODE,
-            `local pull apply failed for ${types.join(', ')} (layer ${layer + 1} of ${TOPO_LAYERS.length}): ` +
-              sanitizeExceptionMessage(error),
-          );
-        }
-        throw error;
-      }
+      const pageChanged = await applyPageWithArbitrationRepair(database, page, layerTypes, layer);
 
       // Notify after this page commits, even if a later pull/push fails.
       if (pageChanged > 0) {
@@ -1099,8 +1254,24 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
       const transaction = tx as Transaction;
       const quarantinedKeys = new Set(readQuarantine(transaction).keys);
       const createdThisDrain: QuarantineWriteResult[] = [];
+      // Provenance-split deferrals for this drain (see
+      // `findProvenanceClearSplitCards`): the excluded card re-enters
+      // selection on the next drain, once its cleared sets have acked.
+      const drainedKeys = new Set<string>();
+      const excludedByType = (): Map<string, Set<string>> => {
+        const map = new Map<string, Set<string>>();
+        for (const key of drainedKeys) {
+          const splitAt = key.indexOf(' ');
+          const type = key.slice(0, splitAt);
+          const id = key.slice(splitAt + 1);
+          const set = map.get(type) ?? new Set<string>();
+          set.add(id);
+          map.set(type, set);
+        }
+        return map;
+      };
 
-      let selected = selectPushBatch(transaction, BATCH_CAP);
+      let selected = selectPushBatch(transaction, BATCH_CAP, excludedByType());
       // Each pass quarantines at least one row and re-selects (which now excludes
       // it); a clean preflight ends the loop. The pass cap is the layer count + 1
       // so even a full top-to-bottom orphan chain cannot spin.
@@ -1118,7 +1289,20 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
         for (const violation of violations) {
           quarantinedKeys.add(quarantineKey(violation.childType, violation.childId));
         }
-        selected = selectPushBatch(transaction, BATCH_CAP);
+        selected = selectPushBatch(transaction, BATCH_CAP, excludedByType());
+      }
+
+      // Keep a cleared provenance card with its cleared sets: defer the card
+      // to the next drain when the batch boundary would split them.
+      for (let guard = 0; guard <= BATCH_CAP; guard += 1) {
+        const splitCards = findProvenanceClearSplitCards(transaction, selected);
+        if (splitCards.length === 0) {
+          break;
+        }
+        for (const key of splitCards) {
+          drainedKeys.add(key);
+        }
+        selected = selectPushBatch(transaction, BATCH_CAP, excludedByType());
       }
 
       const stamps = new Map<string, number>();
@@ -1264,7 +1448,28 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       const pulledBefore = await runPullLeg(database);
       // A replay can make deferred old-client metadata safe to seed in this round.
       runBundleMigrations(database);
-      const pushed = await runPushLeg(database);
+      let pushed: number;
+      try {
+        pushed = await runPushLeg(database);
+      } catch (error) {
+        if (error instanceof SyncCycleError && error.code === 'BLOCK_ALREADY_ATTACHED') {
+          // A competing device committed its attachment of the same plan block
+          // after this round's pull drained (server commit order is the
+          // tiebreak). Pull again: the winner arrives and the pull-side
+          // arbitration repair clears this device's losing claim
+          // deterministically — entered work stays, unsourced — and the loop
+          // re-pushes the repaired rows to convergence (contract §4.5).
+          // Stop retrying if recovery makes no progress (0 rows changed) to avoid
+          // an infinite loop holding the sync lock.
+          logProvenanceArbitrationRepair('push');
+          const recoveryPull = await runPullLeg(database);
+          if (recoveryPull.changed === 0) {
+            throw error;
+          }
+          continue;
+        }
+        throw error;
+      }
       const pulledAfter = await runPullLeg(database);
 
       if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {

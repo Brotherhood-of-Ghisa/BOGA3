@@ -1,13 +1,13 @@
 import { personalCalculationContext } from '@/src/config/personal-effort';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
-import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
-import { nowMonotonic } from './clock';
+import { nowMonotonic, type Transaction } from './clock';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessions, userSettings } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessions, userSettings } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
@@ -28,6 +28,8 @@ export type SessionDraftSetInput = {
   plannedWeightValue?: string | null;
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  /** Block provenance. Undefined preserves the stored value; null clears it. */
+  sourcePlanSetId?: string | null;
 };
 
 export type SessionDraftExerciseInput = {
@@ -36,6 +38,8 @@ export type SessionDraftExerciseInput = {
   name: string;
   machineName?: string | null;
   sets: SessionDraftSetInput[];
+  /** Block provenance. Undefined preserves the stored value; null clears it. */
+  sourcePlanExerciseId?: string | null;
 };
 
 export type PersistSessionDraftInput = {
@@ -43,6 +47,8 @@ export type PersistSessionDraftInput = {
   gymId: string | null;
   startedAt: Date;
   status?: SessionDraftStatus;
+  /** Whole-plan-start provenance. Undefined preserves the stored value. */
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseInput[];
 };
 
@@ -73,6 +79,7 @@ export type SessionDraftSetSnapshot = {
   plannedWeightValue?: string | null;
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  sourcePlanSetId?: string | null;
 };
 
 export type SessionDraftExerciseSnapshot = {
@@ -81,6 +88,7 @@ export type SessionDraftExerciseSnapshot = {
   exerciseDefinitionId: string;
   name: string;
   machineName: string | null;
+  sourcePlanExerciseId?: string | null;
   sets: SessionDraftSetSnapshot[];
 };
 
@@ -91,6 +99,7 @@ export type SessionDraftSnapshot = ResolvedSessionWeight & {
   startedAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseSnapshot[];
 };
 
@@ -104,6 +113,7 @@ export type SessionGraphSnapshot = ResolvedSessionWeight & {
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseSnapshot[];
 };
 
@@ -165,6 +175,7 @@ export type SessionPersistenceRecord = ResolvedSessionWeight & {
   deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  sourcePlanId?: string | null;
 };
 
 type StoredDraftSetRecord = {
@@ -178,6 +189,7 @@ type StoredDraftSetRecord = {
   plannedWeightValue?: string | null;
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
+  sourcePlanSetId?: string | null;
 };
 
 type StoredDraftExerciseRecord = {
@@ -188,6 +200,7 @@ type StoredDraftExerciseRecord = {
   orderIndex: number;
   name: string;
   machineName: string | null;
+  sourcePlanExerciseId?: string | null;
 };
 
 type StoredSessionExerciseTagRecord = {
@@ -209,6 +222,7 @@ type SaveDraftGraphInput = {
   gymId: string | null;
   status: SessionDraftStatus;
   startedAt: Date;
+  sourcePlanId?: string | null;
   exercises: SessionDraftExerciseInput[];
   now: Date;
 };
@@ -314,6 +328,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect & ResolvedSessionWeight
     deletedAt: toDate(row.deletedAt),
     createdAt,
     updatedAt,
+    sourcePlanId: row.sourcePlanId ?? null,
   };
 };
 
@@ -329,12 +344,14 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
   startedAt: graph.session.startedAt,
   createdAt: graph.session.createdAt,
   updatedAt: graph.session.updatedAt,
+  sourcePlanId: graph.session.sourcePlanId ?? null,
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
+    sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -347,6 +364,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
         reps: set.repsValue,
         weight: set.weightValue,
       }),
+      sourcePlanSetId: set.sourcePlanSetId ?? null,
     })),
   })),
 });
@@ -366,12 +384,14 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
   deletedAt: graph.session.deletedAt,
   createdAt: graph.session.createdAt,
   updatedAt: graph.session.updatedAt,
+  sourcePlanId: graph.session.sourcePlanId ?? null,
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
+    sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -384,6 +404,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
         reps: set.repsValue,
         weight: set.weightValue,
       }),
+      sourcePlanSetId: set.sourcePlanSetId ?? null,
     })),
   })),
 });
@@ -450,6 +471,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         reps: row.repsValue,
         weight: row.weightValue,
       }),
+      sourcePlanSetId: row.sourcePlanSetId,
     });
     acc.set(row.sessionExerciseId, current);
     return acc;
@@ -469,6 +491,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         orderIndex: exercise.orderIndex,
         name: exercise.name,
         machineName: exercise.machineName,
+        sourcePlanExerciseId: exercise.sourcePlanExerciseId,
         loadContext: personalCalculationContext(
           bodyweightCalculationsEnabled,
           definitionById.get(exercise.exerciseDefinitionId),
@@ -520,6 +543,7 @@ const replaceSessionExerciseGraph = (
       sessionId: sessionExercises.sessionId,
       exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
       orderIndex: sessionExercises.orderIndex,
+      sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
     })
     .from(sessionExercises)
     .where(eq(sessionExercises.sessionId, input.sessionId))
@@ -540,6 +564,7 @@ const replaceSessionExerciseGraph = (
             plannedWeightValue: exerciseSets.plannedWeightValue,
             plannedSetType: exerciseSets.plannedSetType,
             performanceStatus: exerciseSets.performanceStatus,
+            sourcePlanSetId: exerciseSets.sourcePlanSetId,
           })
           .from(exerciseSets)
           .where(inArray(exerciseSets.sessionExerciseId, existingExerciseIds))
@@ -611,7 +636,15 @@ const replaceSessionExerciseGraph = (
     }
 
     const existingExercise = requestedId ? existingExercisesById.get(requestedId) : undefined;
-    const sessionExerciseId = requestedId || createLocalEntityId('exercise');
+    const foreignExercise =
+      requestedId && !existingExercise
+        ? tx
+            .select({ id: sessionExercises.id })
+            .from(sessionExercises)
+            .where(and(eq(sessionExercises.id, requestedId), ne(sessionExercises.sessionId, input.sessionId)))
+            .get()
+        : undefined;
+    const sessionExerciseId = requestedId && !foreignExercise ? requestedId : createLocalEntityId('exercise');
 
     if (existingExercise) {
       // Reuse the surviving row: take its final position and revive it (clear
@@ -623,6 +656,10 @@ const replaceSessionExerciseGraph = (
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
+          sourcePlanExerciseId:
+            exercise.sourcePlanExerciseId === undefined
+              ? existingExercise.sourcePlanExerciseId ?? null
+              : exercise.sourcePlanExerciseId,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: input.localUpdatedAtMs,
@@ -639,6 +676,7 @@ const replaceSessionExerciseGraph = (
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
+          sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: input.localUpdatedAtMs,
@@ -678,12 +716,20 @@ const replaceSessionExerciseGraph = (
       // Only reuse a set row that already belongs to THIS exercise; otherwise a
       // moved-between-exercises id would steal another exercise's set.
       const reuseSet = existingSet !== undefined && existingSet.sessionExerciseId === sessionExerciseId;
-      // A requested id that names a row under a DIFFERENT exercise must not be
+      // A requested id that names a row under a DIFFERENT exercise or session must not be
       // reused as a fresh insert (it would collide on the primary key), so mint
       // a new id in that case.
+      const foreignSet =
+        requestedSetId && !existingSet
+          ? tx
+              .select({ id: exerciseSets.id })
+              .from(exerciseSets)
+              .where(eq(exerciseSets.id, requestedSetId))
+              .get()
+          : undefined;
       const setId = reuseSet
         ? (requestedSetId as string)
-        : !requestedSetId || existingSet !== undefined
+        : !requestedSetId || existingSet !== undefined || foreignSet !== undefined
           ? createLocalEntityId('set')
           : requestedSetId;
       const nextSetType =
@@ -717,6 +763,10 @@ const replaceSessionExerciseGraph = (
               set.plannedWeightValue === undefined ? existingSet?.plannedWeightValue ?? null : set.plannedWeightValue,
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
+            sourcePlanSetId:
+              set.sourcePlanSetId === undefined
+                ? existingSet?.sourcePlanSetId ?? null
+                : set.sourcePlanSetId,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -737,6 +787,7 @@ const replaceSessionExerciseGraph = (
             plannedWeightValue: set.plannedWeightValue ?? null,
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
+            sourcePlanSetId: set.sourcePlanSetId ?? null,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -815,6 +866,299 @@ const replaceSessionExerciseGraph = (
 
 export const __replaceSessionExerciseGraphForTests = replaceSessionExerciseGraph;
 
+/**
+ * The live set rows of one exercise card, ordered by `order_index`, or null
+ * when the card is missing or tombstoned. Read side of the reorder operation:
+ * the caller validates the exact permutation over these ids before asking for
+ * the two-phase rewrite.
+ */
+export const listSessionExerciseLiveSets = async (
+  sessionExerciseId: string,
+): Promise<{ id: string; orderIndex: number }[] | null> => {
+  const database = await bootstrapLocalDataLayer();
+  const card = database
+    .select({ id: sessionExercises.id, deletedAt: sessionExercises.deletedAt })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .get();
+  if (!card || card.deletedAt !== null) {
+    return null;
+  }
+  return database
+    .select({ id: exerciseSets.id, orderIndex: exerciseSets.orderIndex })
+    .from(exerciseSets)
+    .where(and(eq(exerciseSets.sessionExerciseId, sessionExerciseId), isNull(exerciseSets.deletedAt)))
+    .orderBy(asc(exerciseSets.orderIndex))
+    .all();
+};
+
+/**
+ * Rewrites one card's live sets to the dense order given by `orderedSetIds`
+ * inside one transaction. `orderedSetIds` must be an exact permutation of the
+ * card's live set ids (checked here too — the caller validates first) and the
+ * write lifts every row above the card's current maximum `order_index`
+ * (tombstones included — they occupy their parked slots) before placing the
+ * dense positions, so the non-partial local unique index never collides.
+ *
+ * Only `order_index` and the dirty/stamp columns change: ids, source links,
+ * planned and actual values, and confirmation state are untouched, and the
+ * source plan's own order is never involved. Works for active recording and
+ * the completed-session edit flow alike.
+ *
+ * Returns false (writing nothing) when the card is gone or the list is not an
+ * exact permutation.
+ */
+export const reorderSessionExerciseSetOrder = async (
+  sessionExerciseId: string,
+  orderedSetIds: string[],
+  now: Date = new Date(),
+): Promise<boolean> => {
+  const database = await bootstrapLocalDataLayer();
+  let wrote = false;
+  database.transaction((tx) => {
+    const allRows = tx
+      .select({ id: exerciseSets.id, orderIndex: exerciseSets.orderIndex, deletedAt: exerciseSets.deletedAt })
+      .from(exerciseSets)
+      .where(eq(exerciseSets.sessionExerciseId, sessionExerciseId))
+      .all();
+    const liveRows = allRows.filter((row) => row.deletedAt === null);
+    if (orderedSetIds.length !== liveRows.length) {
+      return;
+    }
+    const liveIds = new Set(liveRows.map((row) => row.id));
+    const seen = new Set<string>();
+    let isPermutation = true;
+    for (const id of orderedSetIds) {
+      if (!liveIds.has(id) || seen.has(id)) {
+        isPermutation = false;
+        break;
+      }
+      seen.add(id);
+    }
+    if (!isPermutation) {
+      return;
+    }
+
+    const localUpdatedAtMs = nowMonotonic(tx);
+    const liftBase =
+      allRows.reduce((max, row) => Math.max(max, row.orderIndex), -1) + 1;
+    orderedSetIds.forEach((id, liftIndex) => {
+      tx.update(exerciseSets)
+        .set({ orderIndex: liftBase + liftIndex, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(exerciseSets.id, id))
+        .run();
+    });
+    orderedSetIds.forEach((id, index) => {
+      tx.update(exerciseSets)
+        .set({ orderIndex: index, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(exerciseSets.id, id))
+        .run();
+    });
+    wrote = true;
+  });
+  if (wrote) {
+    notifyLocalWrite();
+  }
+  return wrote;
+};
+
+/**
+ * Deterministic provenance-arbitration repair (session-planning contract
+ * §4.5): the server commits first, so a pulled attachment claim beats any live
+ * local claimant. When an incoming `session_exercises` / `exercise_sets` row
+ * cannot apply because a local row already claims the same plan block or
+ * source target (the local partial unique index rejects the insert), the
+ * local claimant loses and keeps all of its user work as unsourced rows:
+ *
+ * - every live local card claiming one of `blocks` gets its
+ *   `source_plan_exercise_id` cleared, together with the `source_plan_set_id`
+ *   of its sets sourced from that block's targets (the cross-level provenance
+ *   invariant: an unsourced card holds no source-derived sets);
+ * - every live local set claiming one of `targets` gets its
+ *   `source_plan_set_id` cleared;
+ * - entered actual values, manual sets, and row identity are untouched, so
+ *   the permitted operation never blocks sync.
+ *
+ * Whole-plan starts need no arbitration: their deterministic ids make a
+ * competing Start all resolve to the same row under LWW. Returns whether
+ * anything was cleared.
+ */
+export const clearProvenanceClaimsInTransaction = (
+  tx: Transaction,
+  claims: { blocks: ReadonlySet<string>; targets: ReadonlySet<string> },
+  now: Date,
+  localUpdatedAtMs: number,
+  excludeEntityIds?: ReadonlySet<string>,
+): boolean => {
+  let cleared = false;
+
+  for (const blockId of claims.blocks) {
+    const claimantCards = tx
+      .select({ id: sessionExercises.id })
+      .from(sessionExercises)
+      .where(
+        and(
+          eq(sessionExercises.sourcePlanExerciseId, blockId),
+          isNull(sessionExercises.deletedAt),
+        ),
+      )
+      .all();
+    const blockSetIds = tx
+      .select({ id: sessionPlanSets.id })
+      .from(sessionPlanSets)
+      .where(eq(sessionPlanSets.sessionPlanExerciseId, blockId))
+      .all()
+      .map((row) => row.id);
+    for (const card of claimantCards) {
+      if (excludeEntityIds?.has(card.id)) {
+        continue;
+      }
+      tx.update(sessionExercises)
+        .set({ sourcePlanExerciseId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(sessionExercises.id, card.id))
+        .run();
+      if (blockSetIds.length > 0) {
+        const setWhere = [
+          eq(exerciseSets.sessionExerciseId, card.id),
+          inArray(exerciseSets.sourcePlanSetId, blockSetIds),
+          isNull(exerciseSets.deletedAt),
+        ];
+        if (excludeEntityIds && excludeEntityIds.size > 0) {
+          setWhere.push(notInArray(exerciseSets.id, Array.from(excludeEntityIds)));
+        }
+        tx.update(exerciseSets)
+          .set({ sourcePlanSetId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+          .where(and(...setWhere))
+          .run();
+      }
+      cleared = true;
+    }
+  }
+
+  for (const targetId of claims.targets) {
+    const claimantSets = tx
+      .select({ id: exerciseSets.id })
+      .from(exerciseSets)
+      .where(
+        and(eq(exerciseSets.sourcePlanSetId, targetId), isNull(exerciseSets.deletedAt)),
+      )
+      .all();
+    for (const set of claimantSets) {
+      if (excludeEntityIds?.has(set.id)) {
+        continue;
+      }
+      tx.update(exerciseSets)
+        .set({ sourcePlanSetId: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(exerciseSets.id, set.id))
+        .run();
+      cleared = true;
+    }
+  }
+
+  return cleared;
+};
+
+/**
+ * Collects the provenance claims of the pull-page rows that will actually be
+ * written locally and conflict with a different local row: a row absent locally,
+ * or one whose incoming stamp wins LWW, where another live local row holds that
+ * claim. Rows that would land as LWW no-ops, or newer updates to an already-local
+ * row claiming its own block, are skipped so their provenance is never cleared.
+ */
+const collectWillWriteClaimsInTransaction = (
+  tx: Transaction,
+  entities: readonly { type: string; id: string; client_updated_at_ms: number; fields: Record<string, unknown> }[],
+): { blocks: Set<string>; targets: Set<string> } => {
+  const blocks = new Set<string>();
+  const targets = new Set<string>();
+  for (const entity of entities) {
+    if (entity.type !== 'session_exercises' && entity.type !== 'exercise_sets') {
+      continue;
+    }
+    const claim = entity.fields.source_plan_exercise_id ?? entity.fields.source_plan_set_id;
+    if (typeof claim !== 'string' || claim.length === 0) {
+      continue;
+    }
+    const table = entity.type === 'session_exercises' ? sessionExercises : exerciseSets;
+    const existing = tx
+      .select({ localUpdatedAtMs: table.localUpdatedAtMs })
+      .from(table)
+      .where(eq(table.id, entity.id))
+      .get();
+    if (existing && entity.client_updated_at_ms <= existing.localUpdatedAtMs) {
+      continue;
+    }
+    const claimColumn =
+      entity.type === 'session_exercises' ? sessionExercises.sourcePlanExerciseId : exerciseSets.sourcePlanSetId;
+    const hasConflictingClaimant = tx
+      .select({ id: table.id })
+      .from(table)
+      .where(and(eq(claimColumn, claim), ne(table.id, entity.id), isNull(table.deletedAt)))
+      .get();
+    if (!hasConflictingClaimant) {
+      continue;
+    }
+    (entity.type === 'session_exercises' ? blocks : targets).add(claim);
+  }
+  return { blocks, targets };
+};
+
+/**
+ * The pull-side provenance-arbitration repair (session-planning contract
+ * §4.5): for the claims the page's will-write rows carry, clear every live
+ * local claimant — the server committed first, so the local claimant loses —
+ * keeping all entered values, manual sets, and row identity. Returns the
+ * cleared claims, or null when the page carried no will-write claims.
+ */
+export const repairProvenanceForWirePage = async (
+  entities: readonly { type: string; id: string; client_updated_at_ms: number; fields: Record<string, unknown> }[],
+  now: Date = new Date(),
+): Promise<{ blocks: Set<string>; targets: Set<string> } | null> => {
+  const database = await bootstrapLocalDataLayer();
+  let repaired: { blocks: Set<string>; targets: Set<string> } | null = null;
+  database.transaction((tx) => {
+    const transaction = tx as Transaction;
+    const claims = collectWillWriteClaimsInTransaction(transaction, entities);
+    if (claims.blocks.size === 0 && claims.targets.size === 0) {
+      return;
+    }
+    const excludeEntityIds = new Set(entities.map((e) => e.id));
+    clearProvenanceClaimsInTransaction(transaction, claims, now, nowMonotonic(transaction), excludeEntityIds);
+    repaired = claims;
+  });
+  if (repaired) {
+    notifyLocalWrite();
+  }
+  return repaired;
+};
+
+/**
+ * Revives one tombstoned session row (clears `deleted_at`, re-dirties it).
+ * The whole-plan materialization retry upserts the same deterministic session
+ * id, so a discarded Start all must resurrect its own session row — without
+ * this, the retry revives the exercise graph under a session no query can
+ * ever show. Scoped to this one operation on purpose: a blanket revive in
+ * `saveDraftGraph` would let a stale autosave resurrect a deliberately
+ * discarded session. Returns whether a tombstoned row was revived.
+ */
+export const reviveSessionRow = async (sessionId: string, now: Date = new Date()): Promise<boolean> => {
+  const database = await bootstrapLocalDataLayer();
+  let revived = false;
+  database.transaction((tx) => {
+    const localUpdatedAtMs = nowMonotonic(tx);
+    const result = tx
+      .update(sessions)
+      .set({ deletedAt: null, localDirty: true, localUpdatedAtMs, updatedAt: now })
+      .where(and(eq(sessions.id, sessionId), isNotNull(sessions.deletedAt)))
+      .run();
+    revived = result.changes > 0;
+  });
+  if (revived) {
+    notifyLocalWrite();
+  }
+  return revived;
+};
+
 export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   async saveDraftGraph(input) {
     const database = await bootstrapLocalDataLayer();
@@ -845,6 +1189,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            sourcePlanId: input.sourcePlanId ?? null,
             localDirty: true,
             localUpdatedAtMs,
             createdAt: input.now,
@@ -859,6 +1204,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            sourcePlanId:
+              input.sourcePlanId === undefined ? existingSession.sourcePlanId ?? null : input.sourcePlanId,
             localDirty: true,
             localUpdatedAtMs,
             updatedAt: input.now,
@@ -1041,6 +1388,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       gymId: input.gymId,
       startedAt: input.startedAt,
       status: normalizeDraftStatus(input.status),
+      sourcePlanId: input.sourcePlanId,
       exercises: input.exercises,
       now,
     });
