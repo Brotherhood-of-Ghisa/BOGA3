@@ -63,7 +63,7 @@ Rule 5 is enforced by review here, not by a gate.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| `M33-T01-Preflight_once_per_gate` | Run the shared baseline preflight once per gate instead of once per lane (~55s measured), with a fail-loud backstop | none | planned |
+| `M33-T01-Preflight_once_per_gate` | Run the shared baseline preflight once per gate instead of once per lane (~55s measured), with a fail-loud backstop | none | completed |
 | `M33-T02-Cut_drain_setup_cost` | Measure the setup/assertion split of the group bodies' 213 `group-eval` drains, then cut the setup share. Measured: drains are 8.3s of 86s lane body time, strict setup 2.0s; nothing cut (operator's call) | none | completed |
 | `M33-T03-Move_assertions_to_cheaper_layers` | Audit the backend bodies for assertions a Jest layer can hold, and move them | T02 | planned |
 

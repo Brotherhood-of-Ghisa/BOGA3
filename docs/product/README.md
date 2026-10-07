@@ -21,6 +21,7 @@ purpose, in its own PR.
 | `1rm` | `1rm.md` | The 1RM estimate and its display |
 | `muscle` | `muscle.md` | How sets and work are attributed to muscles |
 | `copy` | `copy.md` | Words on screen: titles, subtitles, explanations |
+| `notifications` | `notifications.md` | Group workout alerts, recipients, defaults, batching and freshness |
 
 Not yet here: volume totals, records, sessions, bodyweight, groups-only
 scoring. Until they move in, `docs/specs/tech/training-metrics-contract.md`
