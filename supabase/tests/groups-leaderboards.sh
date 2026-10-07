@@ -17,6 +17,8 @@
 #     group, archived, member left), unarchive, load-mode change, retarget, unlink;
 #     no server function writes exercise_group_links beyond sync_push/dev_wipe;
 #   - coalescing, the claim generation guard, lease expiry, the rules requeue;
+#     a rules bump over more stale sessions than one run requeues finishes
+#     through the sweep alone;
 #   - failure isolation: a forced enqueue failure, an unreachable kick URL, and a
 #     failing evaluator job never break sync_push; the job is kept and retried,
 #     parks at the attempt cap (session and comparison queues alike), and
@@ -249,7 +251,7 @@ pass "users, groups G/H, group exercises GX/GX3/GXA (archived)/HX"
 echo "[${LANE_LABEL}] posture"
 # =============================================================================
 
-for table in group_eval_queue group_set_facts; do
+for table in group_eval_queue group_set_facts group_eval_rules_state; do
   expect_sql "${table}: RLS on" \
     "select relrowsecurity from pg_class where oid = 'app_public.${table}'::regclass;" "t"
   expect_sql "${table}: no policies" \
@@ -615,6 +617,47 @@ expect_sql "a future rules version requeues evaluated sessions" "select app_publ
 drain_ok "rules"
 expect_mine "a rules requeue re-normalizes silently" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"rules\"], targets: [\"${GXA}\"]}]"
 pass "rules requeue"
+expect_sql "a drain records the rules version it runs with" \
+  "select rules_version from app_public.group_eval_rules_state;" "6"
+
+# More stale sessions than one run requeues (RULES_REQUEUE_LIMIT, 50). After a
+# bump the first run is the only one a member write would kick; the rest must
+# come from the sweep (the cron call, made here by hand) with no member writes.
+BULK=51
+next_cuam
+BULK_ROWS=()
+for i in $(seq 1 "${BULK}"); do
+  BULK_ROWS+=("$(e_session "${T}-bulk-${i}" $(( START + 1000 + i )) completed $(( START + 2000 + i )) 1 null "${CUAM}")"
+              "$(e_se "${T}-bulk-${i}-se" "${T}-bulk-${i}" "${DEF_ROW}" 0 Row "${CUAM}")"
+              "$(e_set "${T}-bulk-${i}-set" "${T}-bulk-${i}-se" 0 60 5 "" "${CUAM}")")
+done
+push "${ATHLETE_TOKEN}" "${BULK} shared sessions" "${BULK_ROWS[@]}"
+drain_ok "bulk sessions"
+bulk_stale() {
+  run_psql "select count(distinct session_id) from app_public.group_set_facts
+             where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%' and rules_version < 6;"
+}
+expect_sql "every bulk session is normalized" \
+  "select count(distinct session_id) from app_public.group_set_facts
+    where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" "${BULK}"
+expect_sql "the sweep does not kick when facts are current" "select app_public.group_eval_sweep();" "f"
+# Facts as the previous rules version wrote them.
+run_psql "update app_public.group_set_facts set rules_version = 5
+           where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" >/dev/null
+EVENTS_BEFORE="$(run_psql "select count(*) from app_public.group_events where group_id = '${GID}';")"
+RUNS=0
+REQUEUED=()
+while [[ "$(run_psql "select app_public.group_eval_sweep();")" == "t" ]]; do
+  (( RUNS < 5 )) || fail "the sweep still kicks after 5 runs; stale sessions: $(bulk_stale)"
+  drain_ok "rules bulk run $(( RUNS + 1 ))"
+  REQUEUED+=("$(jq -r '.rules_requeued' <<<"${BODY}")")
+  RUNS=$(( RUNS + 1 ))
+done
+[[ "$(bulk_stale)" == "0" ]] || fail "the sweep stopped kicking with $(bulk_stale) stale bulk sessions left"
+[[ "${REQUEUED[*]}" == "50 1" ]] || fail "a bulk rules bump: expected requeues '50 1', got '${REQUEUED[*]}'"
+expect_sql "a bulk rules recompute writes no event" \
+  "select count(*) from app_public.group_events where group_id = '${GID}';" "${EVENTS_BEFORE}"
+pass "a rules bump over ${BULK} stale sessions finishes through the sweep alone"
 
 # =============================================================================
 echo "[${LANE_LABEL}] failure isolation"
