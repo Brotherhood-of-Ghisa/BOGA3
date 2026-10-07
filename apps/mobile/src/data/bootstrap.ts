@@ -66,7 +66,7 @@ const recordRuntimeMigrationFailure = (error: unknown) => {
   }).catch(() => undefined);
 };
 
-const readForeignKeyPragma =(database: SQLiteDatabase): number => {
+const readForeignKeyPragma = (database: SQLiteDatabase): number => {
   const row = database.getFirstSync<ForeignKeyPragmaRow>('PRAGMA foreign_keys');
   const rawValue = row?.foreign_keys;
   if (typeof rawValue === 'number') {
