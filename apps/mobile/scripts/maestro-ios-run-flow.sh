@@ -59,6 +59,9 @@ EXPO_LOG_FILE="$MAESTRO_ARTIFACT_ROOT/expo-start.log"
 SIMULATOR_SYSTEM_LOG_FILE="$MAESTRO_ARTIFACT_ROOT/simulator-system.log"
 
 mkdir -p "$MAESTRO_OUTPUT_DIR" "$MAESTRO_DEBUG_DIR"
+# Crash reports newer than this marker belong to this run (maestro_collect_crash_reports).
+RUN_STARTED_MARKER="$MAESTRO_ARTIFACT_ROOT/.run-started"
+touch "$RUN_STARTED_MARKER"
 
 [[ -n "${EXPO_DEV_SERVER_PORT:-}" ]] || maestro_fail "Missing EXPO_DEV_SERVER_PORT. Set it in .maestro/maestro.env.local."
 if [[ -z "${IOS_SIM_UDID:-}" && -z "${IOS_SIM_DEVICE:-}" ]]; then
@@ -151,6 +154,11 @@ if [[ -n "${IOS_SIM_UDID:-}" ]]; then
     "${MAESTRO_IOS_DEV_CLIENT_EXECUTABLE:-}" \
     "$SIMULATOR_SYSTEM_LOG_FILE" \
     "30m" || true
+  maestro_collect_crash_reports \
+    "$IOS_SIM_UDID" \
+    "${MAESTRO_IOS_DEV_CLIENT_EXECUTABLE:-}" \
+    "$RUN_STARTED_MARKER" \
+    "$MAESTRO_ARTIFACT_ROOT/crash-reports" || true
 fi
 
 echo "${SCENARIO_NAME} run complete."

@@ -23,6 +23,14 @@ appId: com.dinoderek.mobile
 # costs the full ~7s optionalLookupTimeoutMs (measured) and they were all
 # WARNED/absent on every run. If pre-authorization regresses, the next assertion
 # fails loudly rather than silently absorbing ~7s/tap.
+#
+# Stop the app first, so the dev-client link cold-starts it. maestro-ios-launch.sh
+# has already loaded the bundle, and opening the link on that running app makes
+# the dev client reload it. On React Native 0.88 that reload sometimes crashes
+# with a SIGSEGV in Scheduler::uiManagerDidFinishTransaction: the old JS thread
+# renders once more against the scheduler the reload has just freed. The
+# simulator is then left on the home screen, and today-screen never appears.
+- stopApp
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
