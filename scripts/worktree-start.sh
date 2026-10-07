@@ -262,7 +262,7 @@ write_maestro_env() {
     printf '# worktree reuses an already-built client. Do NOT pin a per-worktree build\n'
     printf '# root here. After a NATIVE dependency or app.config.ts native-field change,\n'
     printf '# rebuild with `./boga ios build-client --force`.\n\n'
-    printf 'IOS_SIM_DEVICE="${IOS_SIM_DEVICE:-BOGA wt%s}"\n' "$slot"
+    printf 'IOS_SIM_DEVICE="${IOS_SIM_DEVICE:-%s}"\n' "$(boga_ios_sim_name_for_slot "$slot")"
     printf 'IOS_SIM_UDID="${IOS_SIM_UDID:-}"\n\n'
     printf 'IOS_SIM_AUTO_CREATE="${IOS_SIM_AUTO_CREATE:-1}"\n\n'
     printf 'EXPO_DEV_SERVER_PORT="${EXPO_DEV_SERVER_PORT:-%s}"\n' "$(boga_port_for_slot expo "$slot")"
