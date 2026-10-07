@@ -67,7 +67,9 @@ to what only that lane can prove.
    lane it runs **last**: it leaves no configured baseline for the bodies after
    it, and a body that needs one then fails for a reason that looks nothing
    like the cause. It marks the stack first (`mark_stack_needs_reset`) and
-   never resets on exit; the next preflight resets it.
+   never resets on exit; the next preflight resets it. Until the local baseline
+   is protocol-4 active, groups bodies activate it themselves, after a lane's
+   pending bodies; `run-suite.sh --protocol4` lanes keep that mark.
 4. **Bodies are chapters; lanes are concepts.** Split a large surface into
    several bodies in one lane for readability. Splitting it into lanes instead
    makes every piece pay the baseline preflight again.
@@ -122,9 +124,8 @@ reach; everything else is Jest.
 ### Every committed flow belongs to a lane
 
 A flow no lane runs is covered by no gate and no CI, so nothing tells you when it
-stops matching the app: it rots silently and is found broken when someone needs
-it — four of the six unlaned flows this repo once accumulated were already
-failing when finally run. So a new flow either earns a lane in
+stops matching the app: it rots silently (four of six unlaned flows were
+failing when finally run). So a new flow either earns a lane in
 `scripts/lanes.tsv` or it is not committed: run it ad hoc from a branch instead
 (`RUNBOOK.md`) and delete it. `scripts/tests/maestro-flow-lanes.test.sh` enforces
 this in `meta-tests`.
@@ -181,7 +182,8 @@ Rules these lanes run under:
 - `ios-groups-e2e` drives its second user over HTTP from Maestro `runScript`
   (`apps/mobile/.maestro/scripts/`) with the same RPCs its app would call — one
   simulator, no second device. Its scope is a *thin* pass of the device-only
-  surface: server rules belong to `groups-contract` / `groups-leaderboards`, and
+  surface: server rules belong to `groups-contract` / `groups-leaderboards` /
+  `groups-competitions`, and
   every call of the groups client against the live server to `groups-api-live`.
   Offline and airplane mode are out of scope — simulator networking cannot be
   toggled reliably, so offline is proven in Jest.
@@ -197,12 +199,13 @@ the name does not give away.
 |---|---|
 | `backend-fast` | Runtime up + reset (migrations + seed) + schema lint + health endpoint + deterministic seed fixtures. The backend half of the fast gate. |
 | `auth-authz` | Real auth context and RLS: owner success, cross-user denial, validation and unauthorized paths. |
-| `groups-contract` | The group domain rules of `docs/specs/tech/groups-contract.md`: the share ledger across join/leave/rejoin, stream and session detail, edit/tombstone flow-through, share-trigger failure isolation, and the membership RPC matrix including error tokens and direct-PostgREST denial. Hermetic — it provisions and deletes its own users. |
-| `groups-leaderboards` | The evaluator: boards, certification, bodyweight policies, week summary, with Edge assertions made deterministic by direct-drain mode. |
+| `groups-contract` | The group domain rules of `docs/specs/tech/groups-contract.md`: the share ledger across join/leave/rejoin, protocol-4 stream, session detail and group exercises, edit/tombstone flow-through, share-trigger failure isolation, and the membership RPC matrix including error tokens and direct-PostgREST denial. |
+| `groups-leaderboards` | The evaluator: boards, certification, bodyweight (pending), then facts, targets, fault isolation and the week summary (protocol 4); direct-drain mode makes Edge assertions deterministic. |
+| `groups-competitions` | `docs/specs/tech/group-competition-contract.md` on protocol 4: authorization, payload privacy, the correction matrix, write tokens, publication fences, and stored pre-protocol-4 history. |
 | `groups-api-live` | The app's own groups client (`apps/mobile/src/groups/api.ts`) against the live server, so a drifted RPC name, parameter or response shape fails here instead of on a device. |
-| `groups-protocol4` | The one-way competition cutover of `docs/specs/tech/group-competition-contract.md`: the populated pre-cutover→protocol-4 upgrade, publication and public privacy, plus the client's protocol-4 wire. An `extra` lane, not in `boga test backend`: activation has no rollback RPC, so the next preflight rebuilds the stack. Run it for competition migrations and scoring changes (`boga test for` prints it). |
+| `groups-protocol4` | The one-way competition cutover: the populated pre-cutover→protocol-4 upgrade, plus the client's protocol-4 wire. `extra`, not in `boga test backend`: it resets the stack to an old migration, so the next preflight rebuilds it. `boga test for` prints it. |
 | `sync-drift` | Client Drizzle schemas vs the introspected server schema: indexes, triggers, RLS policy inventory and body hashes, soft-delete and sync columns, topological FK order. `--strict` promotes warn-only to failure. It resets the local database itself, so it is the gate's single positive drift check — `sync-v2-e2e` proves only the negative (synthetic drift) case. |
-| `sync-v2-e2e` | Integration assertions across the as-built stack, including push→pull parity over every data-scope entity and tombstone visibility. Its drift body proves only the checker's CLI wiring, with no database reset: synthetic drift fails the run, and the mutated file is restored byte-exactly. The column rules are unit-tested; the positive case is `sync-drift`'s. |
+| `sync-v2-e2e` | Integration assertions across the as-built stack, including push→pull parity over every data-scope entity and tombstone visibility. Its drift body proves only the checker's CLI wiring, with no database reset: synthetic drift fails the run, and the mutated file is restored byte-exactly. |
 | `sync-infra` | The cross-stack layer above — the one lane whose body is frontend and whose infra is backend. Runs last in the backend gate. |
 | `mcp-smoke` | Protocol-to-data proof for the MCP service: OAuth/PKCE consent, tool discovery and calls, returned fixture ids, account-data exclusion, artifact cleanup. |
 | `dev-wipe-my-data` | The developer-only RPC's guards: auth, non-production environment, owner-scoped deletion only. |

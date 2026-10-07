@@ -16,7 +16,13 @@ groups test asserts V4 behaviour. No server code changes in this task.
   - Port `groups-boards.sh` (map §6: nearly a full rewrite, 153 ports),
     `groups-certification.sh` and `groups-bodyweight.sh` (map §7).
   - Activate after reset and seed in the local baseline.
-  - Retire T02's interim activation step, the reset rule and the wrappers.
+  - Retire T02's interim activation step, the reset rule and the wrappers:
+    `activate_group_competitions` (`supabase/tests/lib/groups-fixtures.sh`,
+    called by groups-contract, groups-leaderboards, groups-week-summary and
+    groups-competitions), `run-suite.sh --protocol4` and
+    `PROTOCOL4_ACTIVATION_MARK` (`supabase/scripts/_common.sh`, read by
+    `stack_reset_reason`, pinned by `scripts/tests/baseline-stamp.test.sh`).
+    The groups-leaderboards body order (pending bodies first) can go too.
   - Shrink groups-protocol4 to the cutover chapters.
 - Out: migrations and server functions (T04); app code (T05).
 
@@ -50,7 +56,11 @@ groups test asserts V4 behaviour. No server code changes in this task.
   `apps/mobile/README-maestro.md`, `scripts/triggers.tsv`. Drop the "groups
   gates expect it pending" note in `ensure-dev-baseline.sh`.
 - groups-protocol4 shrinks to the cutover chapters (map §8.1 B, C, D, K and
-  the cutover rows of A and E). It retires in T04.
+  the cutover rows of A and E). Its body is now
+  `supabase/tests/groups-competitions-cutover.sh` (renamed in T02); the
+  steady-state chapters F–J, L, M already run active in the `groups-competitions`
+  lane (`supabase/tests/groups-competitions.sh`), so delete them from the
+  cutover body rather than port them. It retires in T04.
 
 ## Deliverables and acceptance
 

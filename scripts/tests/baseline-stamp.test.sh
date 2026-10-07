@@ -11,7 +11,9 @@
 #     migration, an unreadable stamp or a down runtime → the full path again;
 #   - a failing full path exits non-zero and leaves no stamp;
 #   - a stack a one-way body marked, or with protocol 4 active, is reset first
-#     (and says why); a failed reset fails the preflight and keeps the mark.
+#     (and says why); a failed reset fails the preflight and keeps the mark;
+#   - a protocol-4 lane (run-suite.sh --protocol4) keeps a stack whose only
+#     mark is protocol-4 activation, and still resets any other mark.
 # And `boga` exports one fresh BOGA_GATE_RUN_ID per gate run, never one for a
 # lane run by name.
 #
@@ -214,6 +216,36 @@ echo t >"$DB/active"
 preflight G4
 [[ "$(repairs)" == "reset-local $FULL" ]] && pass "reset, then the full path" || fail "repairs were '$(repairs)'"
 grep -Fq "protocol 4 is active); resetting" "$OUT" && pass "says why" || fail "no activation reason"
+
+echo "== a protocol-4 lane keeps a stack marked only by protocol-4 activation"
+P4_MARK="$(sed -n "s/^PROTOCOL4_ACTIVATION_MARK='\\(.*\\)'$/\\1/p" "$SRC_ROOT/supabase/scripts/_common.sh")"
+[[ -n "$P4_MARK" ]] && pass "activation mark: '$P4_MARK'" || fail "no PROTOCOL4_ACTIVATION_MARK in _common.sh"
+grep -Fq 'mark_stack_needs_reset "${PROTOCOL4_ACTIVATION_MARK}"' "$SRC_ROOT/supabase/scripts/with-local-group-competitions.sh" \
+  && pass "the activation wrapper leaves exactly that mark" || fail "with-local-group-competitions.sh marks with another text"
+grep -Fq -- '--protocol4) export BOGA_STACK_ACCEPTS_PROTOCOL4=1' "$SRC_ROOT/supabase/scripts/run-suite.sh" \
+  && pass "run-suite.sh --protocol4 tells the preflight" || fail "run-suite.sh no longer exports BOGA_STACK_ACCEPTS_PROTOCOL4"
+preflight G5
+printf '%s\n%s\n' "$P4_MARK" "$P4_MARK" >"$MARK"
+echo t >"$DB/active"
+export BOGA_STACK_ACCEPTS_PROTOCOL4=1
+preflight G5 && pass "exit 0" || fail "exit non-zero"
+expect_fast "protocol-4 lane on an activation-marked stack"
+[[ -s "$MARK" ]] && pass "mark kept for the next lane" || fail "mark lost"
+rm -f "$MARK"
+echo t >"$DB/active"
+preflight G5
+expect_fast "protocol-4 lane on an active stack without a mark"
+echo "== a protocol-4 lane still resets a stack another body marked"
+printf '%s\nbody-d reset to an old migration\n' "$P4_MARK" >"$MARK"
+preflight G5
+[[ "$(repairs)" == "reset-local $FULL" ]] && pass "reset, then the full path" || fail "repairs were '$(repairs)'"
+grep -Fq "body-d reset to an old migration); resetting" "$OUT" && pass "names the other body" || fail "no reset reason"
+unset BOGA_STACK_ACCEPTS_PROTOCOL4
+echo "== the next ordinary lane resets an activation-marked stack"
+echo "$P4_MARK" >"$MARK"
+echo t >"$DB/active"
+preflight G5
+[[ "$(repairs)" == "reset-local $FULL" && ! -e "$MARK" ]] && pass "reset, then the full path" || fail "repairs were '$(repairs)'"
 
 echo "== a failed reset fails the preflight and keeps the mark"
 echo "body-c" >"$MARK"

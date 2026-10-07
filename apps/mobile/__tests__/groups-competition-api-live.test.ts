@@ -1,7 +1,8 @@
 /* eslint-disable import/first */
-/** Actual protocol-4 client RPCs and guards against the leased local endpoint.
- * The groups-api-live lane activates locally for this phase and restores pending
- * state on exit. Server arithmetic/privacy vectors remain in backend fixtures. */
+/** Actual protocol-4 client RPCs and guards against this worktree's leased local
+ * stack (supabase/tests/groups-competition-live.sh, lane groups-protocol4, which
+ * activates protocol 4 first). Server arithmetic/privacy vectors remain in
+ * backend fixtures. */
 import { readGroupsLiveEnv, signInLiveClient, type LiveClient } from './helpers/groups-live-endpoint';
 let mockActiveClient: LiveClient['client'] | null = null;
 jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () => {

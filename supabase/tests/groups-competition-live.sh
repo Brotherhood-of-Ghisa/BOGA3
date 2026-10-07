@@ -8,11 +8,11 @@
 # the default backend gate.
 # The ordinary (pre-competition) client wire is groups-api-live.sh's job.
 #
-# ORDER: this body runs BEFORE groups-competitions.sh in the lane. That body
-# unsets the evaluator kick URL for direct-drain mode, leaving no configured
-# baseline behind; this body needs a live evaluator to publish a board, so it
-# must see the preflight's baseline. Reversing them leaves the board empty and
-# this suite times out.
+# ORDER: this body runs BEFORE groups-competitions-cutover.sh in the lane. That
+# body resets the stack to a pre-cutover migration and unsets the evaluator kick
+# URL for direct-drain mode, leaving no configured baseline behind; this body
+# needs a live evaluator to publish a board, so it must see the preflight's
+# baseline. Reversing them leaves the board empty and this suite times out.
 # Execute only through its Boga lane.
 set -euo pipefail
 

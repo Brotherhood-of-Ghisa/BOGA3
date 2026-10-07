@@ -226,10 +226,16 @@ SQL
 # _common.sh) and this preflight resets it before the next lane, so a killed run
 # cannot hand that lane a broken baseline. Protocol 4 active without a mark —
 # activated by hand, or by a script that predates the mark — is reset too.
+# A lane of protocol-4 bodies (run-suite.sh --protocol4 exports
+# BOGA_STACK_ACCEPTS_PROTOCOL4=1) keeps a stack whose only mark is protocol-4
+# activation: its bodies activate anyway, so a reset would buy nothing.
 # Prints why the stack needs a reset; false when it does not.
 stack_reset_reason() {
   local marker container
   marker="$(stack_reset_marker)"
+  if [[ "${BOGA_STACK_ACCEPTS_PROTOCOL4:-0}" == 1 ]]; then
+    [[ -s "${marker}" ]] && grep -qvxF "${PROTOCOL4_ACTIVATION_MARK}" "${marker}" || return 1
+  fi
   if [[ -s "${marker}" ]]; then
     tr '\n' ';' <"${marker}" | sed 's/;$//'
     return 0

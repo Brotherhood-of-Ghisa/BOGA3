@@ -134,7 +134,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `supabase/functions/group-eval/`
   - owns the group evaluator: it drains `group_eval_queue` for the pg_net kick and pg_cron sweep, normalizes shared sets with `apps/mobile/src/groups/set-facts.ts`, and writes only through the service-role-only `group_eval_*` RPCs (`docs/specs/tech/groups-contract.md`). It has no client-facing API.
 - `supabase/tests/lib/`
-  - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by `groups-contract` and `groups-leaderboards`); files here are never lane bodies themselves.
+  - owns helpers sourced by more than one backend lane body (for example `groups-fixtures.sh`, shared by the `groups-*` lane bodies); files here are never lane bodies themselves.
 - `docs/procedures/`
   - owns step-by-step procedures that any agent harness follows when `AGENTS.md` routes to them (for example `worktree-cleanup.md`). A procedure states when to run it, its rules, and exact commands; the contracts it applies stay in `docs/specs/**`.
 - `apps/mobile/artifacts/maestro/`
