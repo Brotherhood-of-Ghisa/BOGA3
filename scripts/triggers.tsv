@@ -80,6 +80,12 @@ supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies
 supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-api-live	shared group lane fixtures
 supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
+supabase/migrations/*competition*	groups-protocol4	protocol-4 representation / cutover (one-way activation ⇒ its own lane)
+supabase/scripts/with-local-group-competitions.sh	groups-protocol4	the protocol-4 activation wrapper
+supabase/tests/groups-competitions.sh	groups-protocol4	the protocol-4 populated-upgrade lane body
+supabase/tests/groups-competition-live.sh	groups-protocol4	the protocol-4 client live lane body
+apps/mobile/src/groups/competition-*.ts	groups-protocol4	protocol-4 scoring / wire / reader guards
+apps/mobile/__tests__/groups-competition-api-live.test.ts	groups-protocol4	the protocol-4 client live suite
 apps/mobile/__tests__/groups-api-live.test.ts	groups-api-live	the groups client live suite
 apps/mobile/__tests__/helpers/groups-live-endpoint.ts	groups-api-live	the groups client live suite's endpoint helper
 supabase/scripts/**	backend	backend wrappers / runtime scripts

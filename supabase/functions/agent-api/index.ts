@@ -2,7 +2,9 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.9
 
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
-import { AUTH_RETRY_AFTER_SECONDS, isTokenRejection } from './auth-upstream.ts';
+import {
+  AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
+} from './auth-upstream.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
@@ -112,13 +114,14 @@ const getAnonKey = () =>
   getRequiredEnv('ANON_KEY');
 const getServiceRoleKey = () => getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-const createServerClient = (key: string): SupabaseClient =>
+const createServerClient = (key: string, fetchImpl?: typeof fetch): SupabaseClient =>
   createClient(getSupabaseUrl(), key, {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(fetchImpl ? { global: { fetch: fetchImpl } } : {}),
   });
 
 const extractBearerToken = (request: Request): string => {
@@ -186,7 +189,7 @@ const authUnavailable = (step: string, status: unknown): ApiError => {
 const getValidatedUser = async (accessToken: string): Promise<{ id: string }> => {
   let result;
   try {
-    result = await createServerClient(getAnonKey()).auth.getUser(accessToken);
+    result = await createServerClient(getAnonKey(), authUpstreamFetch).auth.getUser(accessToken);
   } catch {
     throw authUnavailable('user', null);
   }
@@ -203,7 +206,7 @@ const getValidatedUser = async (accessToken: string): Promise<{ id: string }> =>
 const fetchActiveGrants = async (accessToken: string): Promise<JsonObject[]> => {
   let response: Response;
   try {
-    response = await fetch(`${getSupabaseUrl()}/auth/v1/user/oauth/grants`, {
+    response = await authUpstreamFetch(`${getSupabaseUrl()}/auth/v1/user/oauth/grants`, {
       headers: {
         apikey: getAnonKey(),
         authorization: `Bearer ${accessToken}`,

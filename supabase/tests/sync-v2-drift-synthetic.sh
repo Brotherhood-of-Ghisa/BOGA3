@@ -147,23 +147,10 @@ pass "drift — hermetic: schema file restored to pre-test contents"
 
 rm -f "${OUTPUT_FILE}" "${ORIGINAL_COMPARE}"
 
-# ---------------------------------------------------------------------------
-# Positive case — folded into this script: after restoring, the drift checker
-# against the unmodified tree must exit 0 in --strict mode.
-# ---------------------------------------------------------------------------
-echo "[sync-v2-drift-synthetic] positive case — drift checker on unmodified tree"
-POS_OUTPUT_FILE="$(mktemp)"
-set +e
-(cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict) >"${POS_OUTPUT_FILE}" 2>&1
-POS_RC=$?
-set -e
-echo "[sync-v2-drift-synthetic] positive-case rc=${POS_RC}; tail of output:"
-tail -n 20 "${POS_OUTPUT_FILE}" || true
-if [[ "${POS_RC}" != "0" ]]; then
-  fail "drift checker on the unmodified tree exited rc=${POS_RC}; expected 0 (as-built schema must pass)"
-fi
-rm -f "${POS_OUTPUT_FILE}"
-pass "drift positive — drift checker exits 0 on the as-built tree"
+# The positive case (checker exits 0 on the as-built tree) is the `sync-drift`
+# lane's job, so it is not repeated here: this script's own `cmp` above already
+# proves the restore byte-exact, which is what the positive re-run was standing
+# in for.
 
 COMPLETED=1
 echo "[sync-v2-drift-synthetic] all assertions passed"
