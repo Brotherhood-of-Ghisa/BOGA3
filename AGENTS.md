@@ -41,6 +41,7 @@ place each under `docs/specs/**`, routed from here.
    | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
    | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test groups-api-live` (client ↔ live server) + `boga test ios-groups-e2e` (two-user e2e) |
+| Group competitions (`src/groups/competition-*`, `supabase/migrations/*competition*`) | the Groups row + `boga test groups-protocol4` (the one-way protocol-4 cutover; not in `boga test backend`) |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
@@ -116,15 +117,21 @@ place each under `docs/specs/**`, routed from here.
 
 For every significant UI/design task, load and follow
 `docs/specs/ui/ai-design-policy.md`. It is the single provider-neutral policy
-for accepted design targets, external-artifact vs repository authority,
+for design targets, external-artifact vs repository authority,
 generated-code integration, screenshot comparison, conflict reporting, and
-commit boundaries.
+commit boundaries. A design target is a build input, kept with the task or PR,
+never a spec of the result: what must outlive the build moves to its owner.
 
 ## Always load (every session)
 
 - `docs/specs/02-quality-and-test-gates.md` — the full gate/lane reference.
 - `docs/specs/03-technical-architecture.md` — tech choices, decision register.
 - `docs/specs/09-project-structure.md` — repo layout, path ownership.
+- `docs/product/` — every file: the product decisions (what counts, how
+  figures are computed and shown, screen copy), one fact per ID
+  (`docs/product/README.md`). Never decide an `open` fact or change an
+  `accepted` one without the product owner's approval: stop and ask. An
+  approved fact change may ship in the PR that implements it.
 
 ## Load on demand (by task area)
 
@@ -139,6 +146,7 @@ commit boundaries.
 | Maestro / iOS e2e flows or harness | `docs/specs/11-maestro-runtime-and-testing-conventions.md`, `apps/mobile/README-maestro.md` |
 | Worktree lifecycle (open / release / repair), slot-lease errors, or isolation bugs | `docs/specs/01-worktree-and-environment.md` (everyday), `docs/specs/12-worktree-config-and-isolation.md` (deep contract) |
 | Cleaning up leftover worktrees, leases, or Supabase stacks | `docs/procedures/worktree-cleanup.md` (follow it step by step) |
+| A stored or published figure's rule (calculation, eligibility, records), a `*_RULES_VERSION` / `METRIC_REVISION`, or the sync protocol | `docs/procedures/rule-upgrade.md` |
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md` |
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
@@ -196,4 +204,6 @@ Keep PR bodies lean and data-driven — follow `.github/pull_request_template.md
 pointers, not prose (~25 lines; link, don't quote). The **Tests** section lists
 the lanes that ran, each with its result and an evidence link ("CI green" alone
 is not enough), and notes that the set was agreed with the operator, including
-any default lane skipped and the reason.
+any default lane skipped and the reason. Before opening it, run
+`docs/product/REVIEW.md` on the branch diff next to `/code-review`, and put
+its verdict on the Tests section's `Product facts:` line.

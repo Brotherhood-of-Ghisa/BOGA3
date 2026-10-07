@@ -43,6 +43,7 @@ load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" && -n "${JWT_SECRET:-}" ]] ||
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_CERTIFICATION_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -89,6 +90,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
@@ -126,13 +128,7 @@ expect_message() {
 }
 
 drain() {
-  local out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
-    -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+  eval_drain
   expect_ok "group-eval drain: $1"
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
@@ -735,7 +731,7 @@ expect_centry R weight "97@r3" "a load-mode change leaves the certified Weight r
 run_psql "delete from app_public.group_board_entries
            where group_exercise_id = '${GX}' and member_user_id = '${RIVAL_UID}' and certified;" >/dev/null
 mark
-expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(6, 1000) >= 1;" "t"
+expect_sql "a rules bump requeues evaluated sessions" "select app_public.group_eval_requeue_rules(7, 1000) >= 1;" "t"
 drain "rules"
 expect_centry R weight "97@r3" "the rules recompute restores Certified entries"
 [[ "$(active_certs r3)" == "1" ]] || fail "a rules recompute voids nothing that still matches"

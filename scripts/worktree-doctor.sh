@@ -44,6 +44,55 @@ toml_value() {
   ' "$file"
 }
 
+# Every Maestro lane must run the pinned iOS runtime, whatever slot this
+# worktree holds (docs/specs/11-maestro-runtime-and-testing-conventions.md). A
+# slot sim on another runtime is not a failure here: the next lane run deletes
+# and recreates it on the pin.
+check_ios_sim_runtime() {
+  local env_file="$1"
+  local configured_udid configured_name runtime_id fields udid device_runtime
+
+  # Linux CI runs this script's meta-test; there is nothing to pin without Xcode.
+  if ! command -v xcrun >/dev/null 2>&1; then
+    warn "xcrun is not available; skipping the pinned iOS simulator runtime check"
+    return 0
+  fi
+
+  if runtime_id="$(boga_ios_sim_runtime_id)" && [[ -n "$runtime_id" ]]; then
+    ok "pinned iOS simulator runtime $BOGA_IOS_SIM_RUNTIME is installed"
+  else
+    fail "pinned iOS simulator runtime $BOGA_IOS_SIM_RUNTIME is not installed; every Maestro lane fails until it is: xcodebuild -downloadPlatform iOS -buildVersion ${BOGA_IOS_SIM_RUNTIME##iOS }"
+    return 0
+  fi
+
+  configured_udid="$(boga_maestro_env_value IOS_SIM_UDID "$env_file")"
+  if [[ -n "$configured_udid" ]]; then
+    ok "Maestro env pins IOS_SIM_UDID=$configured_udid; that simulator is used as found, runtime included"
+    return 0
+  fi
+
+  configured_name="$(boga_maestro_env_value IOS_SIM_DEVICE "$env_file")"
+  if [[ -z "$configured_name" ]]; then
+    warn "Maestro env sets neither IOS_SIM_DEVICE nor IOS_SIM_UDID; run ./boga worktree start"
+    return 0
+  fi
+
+  fields="$(boga_ios_sim_device "$configured_name" "$runtime_id")"
+  if [[ -z "$fields" ]]; then
+    ok "slot simulator '$configured_name' does not exist yet; the next lane run creates it on $BOGA_IOS_SIM_RUNTIME"
+    return 0
+  fi
+
+  IFS=$'\t' read -r udid device_runtime _ <<<"$fields"
+  if [[ "$device_runtime" == "$runtime_id" ]]; then
+    ok "slot simulator '$configured_name' ($udid) runs the pinned $BOGA_IOS_SIM_RUNTIME"
+  elif boga_is_lane_sim_name "$configured_name"; then
+    warn "slot simulator '$configured_name' ($udid) runs $(boga_ios_sim_runtime_label "$device_runtime"), not the pinned $BOGA_IOS_SIM_RUNTIME; will be recreated on next lane run"
+  else
+    warn "simulator '$configured_name' ($udid) runs $(boga_ios_sim_runtime_label "$device_runtime"), not the pinned $BOGA_IOS_SIM_RUNTIME; it is not a slot-named lane sim, so lanes use it as found"
+  fi
+}
+
 check_port_listener() {
   local label="$1"
   local port="$2"
@@ -156,6 +205,7 @@ if [[ -f "$MAESTRO_ENV" ]]; then
   else
     warn "Maestro env exists but may not use expected Expo port $(boga_port_for_slot expo "$slot")"
   fi
+  check_ios_sim_runtime "$MAESTRO_ENV"
 else
   fail "missing $MAESTRO_ENV; run ./boga worktree start"
 fi

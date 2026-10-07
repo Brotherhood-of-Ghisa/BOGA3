@@ -684,6 +684,40 @@ describe('SegmentedControl', () => {
     expect(flatStyle(screen.getByTestId('view-last')).flex).toBeUndefined();
   });
 
+  it('uses the theme accent with a surface label when requested, retaining disabled styling', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<SegmentedControl selectedGround="accent" onChange={onChange}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.accent);
+    expect(flatStyle(within(screen.getByTestId('view-records')).getByText('Records')).color).toBe(uiRoles.surface);
+    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(uiRoles.surface);
+    expect(screen.getByTestId('view-records')).toHaveProp('accessibilityState', { selected: true });
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).toHaveBeenCalledWith('last');
+
+    onChange.mockClear();
+    rerender(<SegmentedControl disabled selectedGround="accent" onChange={onChange}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(uiRoles.inkGhost);
+    fireEvent.press(screen.getByTestId('view-last'));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('supports a palette-grade selection with ink text and retains unselected surfaces', () => {
+    const { rerender } = render(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
+      options={OPTIONS} testIDPrefix="view" value="records" />);
+    expect(screen.getByTestId('view-records')).toHaveStyle({ backgroundColor: uiRoles.viz4 });
+    expect(screen.getByText('Records')).toHaveStyle({ color: uiRoles.ink });
+    expect(screen.getByTestId('view-last')).toHaveStyle({ backgroundColor: uiRoles.surface });
+    expect(screen.getByText('Last')).toHaveStyle({ color: uiRoles.inkMuted });
+
+    rerender(<SegmentedControl selectedGround="viz" onChange={jest.fn()}
+      options={OPTIONS} testIDPrefix="view" value="last" />);
+    expect(screen.getByTestId('view-records')).toHaveStyle({ backgroundColor: uiRoles.surface });
+    expect(screen.getByTestId('view-last')).toHaveStyle({ backgroundColor: uiRoles.viz4 });
+    expect(screen.getByText('Last')).toHaveStyle({ color: uiRoles.ink });
+  });
+
   it('spans the row with label-sized segments that share the rest when fit', () => {
     render(<SegmentedControl layout="fit" onChange={jest.fn()} options={OPTIONS} testIDPrefix="view" value="last" />);
     expect(flatStyle(screen.getByTestId('view-last'))).toMatchObject({ flexGrow: 1 });
@@ -799,14 +833,13 @@ describe('Notice', () => {
 });
 
 describe('PageHeader / SectionHeader', () => {
-  it('titles a tab screen in Archivo 800 with a muted intro', () => {
-    render(<PageHeader intro="At a glance." title="Today" />);
+  it('titles a tab screen in Archivo 800, alone', () => {
+    render(<PageHeader title="Today" />);
     expect(flatStyle(screen.getByRole('header', { name: 'Today' }))).toMatchObject({
       fontFamily: 'Archivo',
       fontWeight: '800',
       fontSize: uiTypography.size.xxl,
     });
-    expect(flatStyle(screen.getByText('At a glance.')).color).toBe(uiRoles.inkMuted);
   });
 
   it('heads a section with an optional caps text action, never a primary', () => {

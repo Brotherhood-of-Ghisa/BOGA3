@@ -31,15 +31,16 @@ specs. They are optional and ephemeral and live under `docs/plans/` (see
 
 These apply to every persistent doc, meaning everything outside `docs/plans/**`
 and `docs/brainstorms/**`. `docs-check` (`scripts/gen-docs.sh`) enforces rules
-1, 2 and 4.
+1, 2 and 4, and rule 5 for product facts.
 
 1. **Word budget.** An agent can load `AGENTS.md` and every doc reachable from
    it through a Markdown link or an inline-code `.md` path. Each of those docs
    has a budget in `scripts/doc-budgets.tsv`: 2,000 words for `AGENTS.md`,
    2,500 for each always-load spec, and 3,000 for the rest, counted as
-   `wc -w` counts. Design targets (`docs/specs/ui/design-targets/`) are exempt.
+   `wc -w` counts.
    `./boga docs budgets` prints every doc's count, its budget, and the doc
-   that first links to it.
+   that first links to it. `docs/product/` is loaded whole, so its docs also
+   share one `corpus` budget (6,000 words).
 2. **Over budget: split or trim.** Ask of every section: does it repeat another
    doc, or repeat what the code already says? Does an agent need it at all?
    Does it need this level of detail? Cut what fails, or split the doc into
@@ -63,4 +64,6 @@ and `docs/brainstorms/**`. `docs-check` (`scripts/gen-docs.sh`) enforces rules
 5. **One place per fact.** State a rule in the doc that owns it and link to it
    from elsewhere. When code or a registry is the source (for example
    `scripts/lanes.tsv`), the doc links to it or is generated from it; it never
-   restates it.
+   restates it. A product decision is a fact in `docs/product/`, cited as
+   `[[<id>]]`; `docs-check` fails a doc that repeats a fact's `Signature:`
+   text in a paragraph without that citation.

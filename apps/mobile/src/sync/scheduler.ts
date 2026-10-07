@@ -24,6 +24,7 @@ import NetInfo, { type NetInfoState } from '@react-native-community/netinfo';
 
 import { logEvent } from '@/src/logging/logEvent';
 import { runSyncCycle, type SyncCycleOutcome } from '@/src/sync/cycle';
+import { SYNC_VERSION_MISMATCH_MESSAGE } from '@/src/sync/cycle-error-signal';
 import { getSyncProgress, type SyncProgress } from '@/src/sync/progress';
 import { subscribeToLocalWrites } from '@/src/sync/write-nudge';
 
@@ -293,7 +294,7 @@ const describeOutcome = (outcome: Exclude<SyncCycleOutcome, 'converged'>): strin
     case 'fk-violation':
       return 'Sync could not reconcile your data (structural conflict).';
     case 'update-required':
-      return 'Update BoGa to continue syncing. Your data remains on this device.';
+      return SYNC_VERSION_MISMATCH_MESSAGE;
     case 'internal':
       return 'Sync did not complete; it will retry automatically.';
     default:

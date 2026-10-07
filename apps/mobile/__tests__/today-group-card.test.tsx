@@ -68,6 +68,10 @@ import TodayRoute from '../app/(tabs)/today';
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 const ME = 'me';
 
+// The clock is pinned to local midday, built from local fields (spec 09), so
+// every fixture instant below falls on today whatever the real time is.
+const NOW = new Date(2026, 9, 6, 12, 0);
+
 const group = (groupId: string, name: string): GroupSummary => ({
   group_id: groupId,
   name,
@@ -135,6 +139,8 @@ const byId = (testID: string) => screen.getByTestId(testID);
 
 beforeEach(() => {
   resetLocalData();
+  jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'performance', 'queueMicrotask', 'hrtime'] });
+  jest.setSystemTime(NOW);
   mockPush.mockReset();
   mockInitialOnline = null;
   setLastViewedGroupId(null);
@@ -144,6 +150,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   closeLocalData();
 });
 
@@ -266,7 +273,7 @@ describe('Today: the group card', () => {
     // The shared session row, under the member's name and the training-now mark.
     expect(byId('today-group-latest-training-member')).toHaveTextContent('maria');
     expect(within(byId('today-group-latest-training-training-now')).getByText('Training now')).toBeTruthy();
-    expect(byId('today-group-latest-training-start')).toHaveTextContent(/^Started \d\d:\d\d$/);
+    expect(byId('today-group-latest-training-start')).toHaveTextContent('Started 11:30');
     expect(screen.queryByTestId('today-group-latest-training-record')).toBeNull();
     fireEvent.press(byId('today-group-latest-training'));
     expect(mockPush).toHaveBeenLastCalledWith('/group-session/maria/maria-live?groupId=g1');

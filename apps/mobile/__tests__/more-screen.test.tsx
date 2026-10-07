@@ -71,9 +71,7 @@ describe('More screen', () => {
 
     const row = screen.getByTestId('more-connect-agent-row');
     expect(row.props.accessibilityRole).toBe('link');
-    expect(row.props.accessibilityLabel).toBe(
-      'Connect an AI coach. Set up an MCP-compatible coach with read-only training access.',
-    );
+    expect(row.props.accessibilityLabel).toBe('Connect an AI coach');
     expect(row.props.accessibilityHint).toContain('system browser');
     fireEvent.press(row);
 
@@ -82,12 +80,14 @@ describe('More screen', () => {
     });
   });
 
-  it('includes each destination description in its screen-reader label', () => {
+  it('names each destination by its label alone, with no description line', () => {
     render(<MoreScreen />);
 
     expect(screen.getByTestId('more-exercise-database-row').props.accessibilityLabel).toBe(
-      'Exercise database. Search, create, edit, archive, and restore exercises.',
+      'Exercise database',
     );
+    expect(screen.queryByText('Search, create, edit, archive, and restore exercises.')).toBeNull();
+    expect(screen.queryByText(/stay close without crowding/)).toBeNull();
   });
 
   it('shows an inline error when the MCP setup page cannot open', async () => {

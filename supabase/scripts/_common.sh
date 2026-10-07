@@ -171,6 +171,11 @@ resolve_db_container() {
 load_supabase_status_env() {
   local line key value
   local output
+  # run-suite.sh loads the env once for all of its bodies (a `supabase status`
+  # costs ~1 s); a stack's URLs and keys do not change while it is up.
+  if [[ -n "${API_URL:-}" && "${BOGA_STATUS_ENV_LOADED_FOR:-}" == "${BOGA_SUPABASE_WORKDIR:-${REPO_ROOT}}" ]]; then
+    return 0
+  fi
   output="$(run_supabase status -o env)"
 
   while IFS= read -r line; do
@@ -203,6 +208,54 @@ curl_health() {
     -H "Authorization: Bearer ${ANON_KEY}" \
     "$@" \
     "${url}"
+}
+
+# Supabase CLI 2.76 may recreate the Edge Runtime container during db reset
+# without refreshing Kong's cached upstream IP. The functions are healthy inside
+# Docker, but the public /functions/v1 route then returns 502 forever. Restart
+# only this worktree's proxy and wait for the real public health route. Kong's
+# stop signal (SIGQUIT) is a graceful quit that waits out Docker's 10s stop
+# timeout; Kong keeps no state (declarative config), so stop it after 1s.
+refresh_edge_proxy_after_reset() {
+  local project_id kong_container started_at now
+  project_id="$(worktree_project_id)"
+  if [[ -z "${project_id}" ]] ||
+    ! kong_container="$(resolve_worktree_container kong "${project_id}" "$(worktree_config_port api)")"; then
+    echo "[supabase] could not resolve this worktree's Kong container after reset" >&2
+    echo "[supabase]   project_id: ${project_id:-<empty>}" >&2
+    echo "[supabase]   running kong containers:" >&2
+    docker ps --format '{{.Names}}' | grep '^supabase_kong_' >&2 || echo "[supabase]   (none)" >&2
+    return 1
+  fi
+  echo "[supabase] refreshing Edge Function proxy routing after reset"
+  docker restart -t 1 "${kong_container}" >/dev/null
+  load_supabase_status_env
+  started_at="$(date +%s)"
+  until curl_health --max-time 2 >/dev/null 2>&1; do
+    now="$(date +%s)"
+    if (( now - started_at >= 45 )); then
+      echo "[supabase] timed out waiting for the public health function after reset" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+# A body that takes a one-way action on this slot's stack (protocol-4
+# activation, a reset to an old migration) marks it before it starts and does
+# not restore it. The next baseline preflight resets a marked stack
+# (ensure-local-runtime-baseline.sh); a successful reset-local.sh clears it.
+stack_reset_marker() {
+  printf '%s/.temp/stack-needs-reset' "${SUPABASE_DIR}"
+}
+
+mark_stack_needs_reset() {
+  ensure_tmp_dir
+  printf '%s\n' "$1" >>"$(stack_reset_marker)"
+}
+
+clear_stack_reset_marker() {
+  rm -f "$(stack_reset_marker)"
 }
 
 # Stop this worktree's edge function server: the whole npx process tree plus

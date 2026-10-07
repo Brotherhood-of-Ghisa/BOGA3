@@ -114,7 +114,9 @@ describe('exercise records from the facts', () => {
     expect(records.oneRepMax?.value).toBeCloseTo(estimateOneRepMax(100, 5) as number, 8);
     expect(records.maxWeight).toMatchObject({ weight: 100, reps: 5, completedAt: day(1) });
     expect(records.volume).toMatchObject({ value: 100 * 5 + 90 * 8, setCount: 2, completedAt: day(1) });
-    expect(recordBaselineOf(records)).toEqual({ oneRepMax: records.oneRepMax!.value, weight: { weight: 100, reps: 5 } });
+    expect(recordBaselineOf(records)).toEqual({
+      oneRepMax: records.oneRepMax!.value, weight: { weight: 100, reps: 5 }, volume: 100 * 5 + 90 * 8,
+    });
   });
 
   it('gives a tie across sessions to the earliest session; an equal top weight goes to more reps', async () => {
@@ -130,20 +132,24 @@ describe('exercise records from the facts', () => {
     expect((await loadExerciseBests({ exerciseDefinitionId: BENCH })).topWeight).toMatchObject({ sessionId: 's4', weight: 100, reps: 6 });
   });
 
-  it('takes the best volume from complete sessions only', async () => {
+  it('takes the best stored volume, and a row without one holds no volume record', async () => {
     insertSession('s1', 1, bench(['100', '5']));
     insertSession('s2', 2, [{ definitionId: SQUAT, sets: [['100', '5']] }]);
+    insertSession('s3', 3, [{ definitionId: SQUAT, sets: [['100', '5']] }]);
     drainExerciseSessionFacts(db() as unknown as LocalDatabase);
-    // A larger known subtotal whose total is unknown never holds the record.
-    db().insert(exerciseSessionFacts).values({
-      sessionId: 's2', exerciseDefinitionId: BENCH, achievedAt: day(2), volumeKg: 9000,
-      volumeComplete: false, workingSets: 3, prE1rm: false, prWeight: false, prVolume: false,
-    }).run();
+    // A stored volume is the sum of the sets whose load was known: it competes
+    // whatever it left out ([[copy.no-inline-explanation]]). Null (an overflowed sum) never does.
+    db().insert(exerciseSessionFacts).values([
+      { sessionId: 's2', exerciseDefinitionId: BENCH, achievedAt: day(2), volumeKg: 9000,
+        workingSets: 3, prE1rm: false, prWeight: false, prVolume: true },
+      { sessionId: 's3', exerciseDefinitionId: BENCH, achievedAt: day(3), volumeKg: null,
+        workingSets: 1, prE1rm: false, prWeight: false, prVolume: false },
+    ]).run();
 
     const bests = await loadExerciseBests({ exerciseDefinitionId: BENCH });
 
-    expect(bests.volume).toMatchObject({ sessionId: 's1', value: 500, workingSets: 1 });
-    expect(bests.latest?.sessionId).toBe('s2');
+    expect(bests.volume).toMatchObject({ sessionId: 's2', value: 9000, workingSets: 3 });
+    expect(bests.latest?.sessionId).toBe('s3');
   });
 
   it('scopes to one gym, or to sessions with no gym', async () => {
@@ -203,7 +209,7 @@ describe('exercise records from the facts', () => {
       expect.objectContaining({ setType: 'rir_0', weight: 90, reps: 8, volume: 720 }),
     ]);
     expect(last?.sets[0].oneRepMax).toBeCloseTo(estimateOneRepMax(140, 3) as number, 8);
-    expect(last).toMatchObject({ maxWeight: 100, volume: 1220, knownVolume: 1220, volumeComplete: true });
+    expect(last).toMatchObject({ maxWeight: 100, volume: 1220 });
     expect(records.maxWeight?.weight).toBe(100);
   });
 

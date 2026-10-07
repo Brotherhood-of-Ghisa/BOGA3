@@ -91,6 +91,11 @@ export const ICON_GLYPHS = {
     ),
     path('m15 5 4 4'),
   ],
+  // Lucide `copy`: duplicate an item.
+  copy: [
+    path('M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z'),
+    path('M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'),
+  ],
   // Lucide `arrow-left-right`: replace one thing with another (swap exercise).
   swap: [path('M8 3 4 7l4 4'), path('M4 7h16'), path('m16 21 4-4-4-4'), path('M20 17H4')],
   // Lucide `trash-2`: remove. Coloured `danger` by its caller.

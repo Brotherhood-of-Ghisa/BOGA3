@@ -40,8 +40,8 @@ export const parseCalculationSet = (set: CalculationSetInput): ParsedCalculation
  *
  * Chosen because it is asymptotic — it caps near ~2.05·w as reps grow
  * rather than ballooning linearly (Epley) or diverging (Brzycki at r≥37) —
- * while remaining near-exact at r=1 (1.013·w) and ranking among the most
- * accurate predictors in LeSuer et al. (1997) and Reynolds et al. (2006).
+ * and ranks among the most accurate predictors in LeSuer et al. (1997) and
+ * Reynolds et al. (2006). A single is not estimated ([[1rm.formula]]).
  *
  * Returns `null` when inputs are not a valid `(non-negative weight,
  * positive integer reps)` pair so callers can short-circuit cleanly.
@@ -50,6 +50,7 @@ export const estimateOneRepMax = (weight: number, reps: number): number | null =
   if (!Number.isFinite(weight) || weight < 0) return null;
   if (!Number.isInteger(reps) || reps <= 0) return null;
   if (weight === 0) return 0;
+  if (reps === 1) return weight;
   const denominator = 48.8 + 53.8 * Math.exp(-0.075 * reps);
   return (100 * weight) / denominator;
 };

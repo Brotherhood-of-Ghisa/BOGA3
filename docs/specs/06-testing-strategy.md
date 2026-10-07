@@ -49,6 +49,37 @@ owns the risk.** Two standing cases:
   session handoff and trigger-wiring bugs — the classes that shipped during sync
   v2 — surface only in the device lane.
 
+## Lane design rules
+
+The cheapest-layer rule in *Test layers* above is the first of these, and the
+one this suite drifts from fastest. These five keep a lane's cost proportional
+to what only that lane can prove.
+
+1. **Name a lane for what it proves**, not for the feature it touches. A name
+   that tracks a screen or a domain stops describing the lane's contents the
+   first time either moves.
+2. **One canonical assertion per fact.** No fact is proved in two lanes. A
+   duplicate is invisible — it reads as thoroughness — and costs its full
+   runtime on every run.
+3. **Quarantine destructive work.** A body that rebuilds the database, stops a
+   container, or takes a one-way action with no rollback belongs in an `extra`
+   lane routed by `scripts/triggers.tsv`, never in a default gate. Within a
+   lane it runs **last**: it leaves no configured baseline for the bodies after
+   it, and a body that needs one then fails for a reason that looks nothing
+   like the cause. It marks the stack first (`mark_stack_needs_reset`) and
+   never resets on exit; the next preflight resets it.
+4. **Bodies are chapters; lanes are concepts.** Split a large surface into
+   several bodies in one lane for readability. Splitting it into lanes instead
+   makes every piece pay the baseline preflight again.
+5. **A lane's cost is justified by what only it can prove.** Cost per assertion
+   is the signal: an outlier is a design smell to investigate, not a property
+   of the subject. Measure with `./boga timings`; never estimate.
+
+Setup is where rule 5 goes wrong in practice. A body that drives the full
+production path dozens of times to *reach* the state it asserts on has moved
+its cost into setup, where nobody reads it. Seed that state directly, and keep
+the real path only where the path itself is under test.
+
 ## Default testing practice
 
 - **Jest is always required.** Every code change adds or updates Jest coverage
@@ -169,8 +200,9 @@ the name does not give away.
 | `groups-contract` | The group domain rules of `docs/specs/tech/groups-contract.md`: the share ledger across join/leave/rejoin, stream and session detail, edit/tombstone flow-through, share-trigger failure isolation, and the membership RPC matrix including error tokens and direct-PostgREST denial. Hermetic — it provisions and deletes its own users. |
 | `groups-leaderboards` | The evaluator: boards, certification, bodyweight policies, week summary, with Edge assertions made deterministic by direct-drain mode. |
 | `groups-api-live` | The app's own groups client (`apps/mobile/src/groups/api.ts`) against the live server, so a drifted RPC name, parameter or response shape fails here instead of on a device. |
-| `sync-drift` | Client Drizzle schemas vs the introspected server schema: indexes, triggers, RLS policy inventory and body hashes, soft-delete and sync columns, topological FK order. `--strict` promotes warn-only to failure. |
-| `sync-v2-e2e` | Integration assertions across the as-built stack, including push→pull parity over every data-scope entity and tombstone visibility. |
+| `groups-protocol4` | The one-way competition cutover of `docs/specs/tech/group-competition-contract.md`: the populated pre-cutover→protocol-4 upgrade, publication and public privacy, plus the client's protocol-4 wire. An `extra` lane, not in `boga test backend`: activation has no rollback RPC, so the next preflight rebuilds the stack. Run it for competition migrations and scoring changes (`boga test for` prints it). |
+| `sync-drift` | Client Drizzle schemas vs the introspected server schema: indexes, triggers, RLS policy inventory and body hashes, soft-delete and sync columns, topological FK order. `--strict` promotes warn-only to failure. It resets the local database itself, so it is the gate's single positive drift check — `sync-v2-e2e` proves only the negative (synthetic drift) case. |
+| `sync-v2-e2e` | Integration assertions across the as-built stack, including push→pull parity over every data-scope entity and tombstone visibility. Its drift body proves only the checker's CLI wiring, with no database reset: synthetic drift fails the run, and the mutated file is restored byte-exactly. The column rules are unit-tested; the positive case is `sync-drift`'s. |
 | `sync-infra` | The cross-stack layer above — the one lane whose body is frontend and whose infra is backend. Runs last in the backend gate. |
 | `mcp-smoke` | Protocol-to-data proof for the MCP service: OAuth/PKCE consent, tool discovery and calls, returned fixture ids, account-data exclusion, artifact cleanup. |
 | `dev-wipe-my-data` | The developer-only RPC's guards: auth, non-production environment, owner-scoped deletion only. |
@@ -190,9 +222,20 @@ Applies to every lane that hits a running stack rather than a mocked client.
 
 - **Enforcement:** `supabase/scripts/ensure-local-runtime-baseline.sh` runs
   before any real-instance lane (the wrappers call it). Runtime down → start,
-  reset/seed, provision fixtures. Runtime up → reuse as-is with **no reset**,
+  reset/seed, provision fixtures. Runtime up → reuse as-is with **no reset**
+  (a marked or protocol-4-active stack is reset),
   refresh stale Edge Function routing, apply pending migrations, verify baseline
   rows, re-provision fixtures idempotently.
+- **Once per gate:** `./boga test <gate>` exports one `BOGA_GATE_RUN_ID`. The
+  full path ends by stamping it in `public.local_runtime_bootstrap_markers`
+  with a hash of its inputs (migrations, seed, fixture constants) and one of the
+  state it repaired (applied migrations, fixture principals and auth users, the
+  group-eval kick URL). A later lane of that gate still checks reachability and
+  Edge routing, then skips the repairs only while the stamp and both hashes
+  match. A reset truncates the stamp (`seed.sql`) and any changed hash means
+  the full path, so a skip never rests on unchecked state. A lane run by name
+  has no gate id and always runs the full path
+  (`scripts/tests/baseline-stamp.test.sh`).
 - **Expected baseline:** the stack is reachable and
   `public.dev_fixture_principals` holds at least `anonymous`, `user_a`, `user_b`,
   provisioned with the known credentials.
@@ -210,7 +253,13 @@ Applies to every lane that hits a running stack rather than a mocked client.
 ## CI posture
 
 `.github/workflows/ci.yml` runs the infra-free lanes only (the `CI?` column of
-the lane matrix in `02`). Two consequences are policy, not trivia:
+the lane matrix in `02`). A PR that changes only `docs/**` or root-level `*.md`
+runs `docs-check` alone; every later step is skipped in the same job, and push
+to `main` always runs everything. `scripts/ci-docs-only.sh` owns that rule and
+`scripts/tests/ci-docs-only.test.sh` pins it — a doc that a test or script
+reads at runtime must live outside `docs/`. The one exception is
+`docs/product/`, whose fact tables Jest runs: a change there runs everything. Two consequences are policy, not
+trivia:
 
 - **"Not in CI" means you run it here.** This machine boots the iOS simulator and
   local Supabase; `./boga doctor` proves it. Never record a slow lane as

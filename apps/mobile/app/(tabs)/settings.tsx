@@ -183,7 +183,7 @@ export default function SettingsScreen() {
             accessibilityHint="Opens your account screen"
             accessibilityLabel="Open Account"
             density="list"
-            description={user?.email?.trim() || 'Sign in and manage your account.'}
+            description={user?.email?.trim() || undefined}
             divider={false}
             label="Account"
             leading={<Icon color={uiRoles.inkMuted} name="user" />}
@@ -196,16 +196,12 @@ export default function SettingsScreen() {
 
       <View style={styles.section} testID="settings-section-ai-coaching">
         <SectionLabel title="AI coaching" />
-        <Text allowFontScaling={false} style={styles.sectionIntro}>
-          Coaches get read-only training access that you can revoke at any time.
-        </Text>
         <Card>
           <ListRow
             accessibilityHint="Opens setup instructions in your system browser"
             accessibilityLabel="Connect an AI coach, opens in browser"
             accessibilityRole="link"
             density="list"
-            description="See setup instructions for your MCP-compatible client."
             divider={false}
             label="Connect an AI coach"
             leading={<Icon color={uiRoles.inkMuted} name="sparkles" />}
@@ -229,7 +225,6 @@ export default function SettingsScreen() {
               accessibilityHint="Opens the list of authorized coaching agents"
               accessibilityLabel="Open Connected Agents"
               density="list"
-              description="Review access and revoke existing connections."
               label="Connected agents"
               leading={<Icon color={uiRoles.inkMuted} name="shield-check" />}
               onPress={() => router.push('/connected-agents')}
@@ -245,9 +240,6 @@ export default function SettingsScreen() {
         <Card><AppearanceSettingsRow /></Card>
         <Card><BodyWeightSettingsRow /></Card>
         <Card style={styles.cardBody} testID="settings-preferences-card">
-          <Text allowFontScaling={false} style={styles.bodyMuted}>
-            Configure how dates and other details are displayed throughout BoGa.
-          </Text>
           <View style={styles.preference}>
             <Text allowFontScaling={false} style={styles.fieldLabel}>Date format</Text>
             <SegmentedControl
@@ -435,13 +427,6 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxs,
     letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
-  sectionIntro: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.inkMuted,
   },
   // A card holding prose and controls rather than rows.

@@ -3,6 +3,7 @@ import {
   captureSessionShareImage,
   createCompletedSessionInsightsRepository,
   deriveExercisePersonalRecord,
+  personalRecordCount,
   deriveSessionExerciseVolumeComparisons,
   deriveSessionPersonalRecords,
   shareSessionImage,
@@ -147,7 +148,6 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(summary).toEqual({
       state: "empty",
-      volumeComplete: true,
       workingSetCount: 0,
       mappedSetCount: 0,
       unmappedSetCount: 0,
@@ -561,7 +561,6 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         // nor volume.
         workingSetCount: 1,
         currentVolume: 600,
-        knownVolume: 600,
         historicalSessionCount: 3,
         medianVolume: 700,
         percentile5Volume: 520,
@@ -569,6 +568,42 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         state: "distribution",
       },
     ]);
+  });
+
+  it("leaves an uncalculable block out of the Volume and skips an overflowed baseline with no count", () => {
+    const corrupt = { policy: "personal" as const, bodyweightContribution: 0, loadInputMode: "sideways" as "total_load" };
+    const huge = `1${"0".repeat(306)}`;
+    const target = completedSession({
+      sessionId: "target",
+      exercises: [
+        insightExercise({ id: "t-a", exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+          sets: [insightSet("t-a-1", { weightValue: "100", repsValue: "5" })] }),
+        insightExercise({ id: "t-b", orderIndex: 1, exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+          loadContext: corrupt, sets: [insightSet("t-b-1", { weightValue: "300", repsValue: "5" })] }),
+      ],
+    });
+    const overflowed = completedSession({
+      sessionId: "history-overflow",
+      completedAt: new Date("2026-09-01T10:00:00.000Z"),
+      exercises: [insightExercise({ id: "h-o", exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+        sets: ["1", "2", "3"].map(id => insightSet(`h-o-${id}`, { weightValue: huge, repsValue: "60" })) })],
+    });
+    const known = completedSession({
+      sessionId: "history-known",
+      completedAt: new Date("2026-09-02T10:00:00.000Z"),
+      exercises: [insightExercise({ id: "h-k", exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+        sets: [insightSet("h-k-1", { weightValue: "80", repsValue: "5" })] })],
+    });
+
+    const [comparison] = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [overflowed, known] });
+    expect(comparison).toEqual(expect.objectContaining({
+      workingSetCount: 2, currentVolume: 500, historicalSessionCount: 1, medianVolume: 400, state: "single-baseline",
+    }));
+    expect(comparison).not.toHaveProperty("excludedHistoricalSessionCount");
+    // A target whose own sum overflows has no comparison.
+    expect(deriveSessionExerciseVolumeComparisons({
+      targetSession: { ...overflowed, sessionId: "later", completedAt: AT }, historicalSessions: [known],
+    })[0]).toEqual(expect.objectContaining({ currentVolume: null, historicalSessionCount: 0, state: "unavailable" }));
   });
 
   it("compares no warm-up-only exercise and takes no baseline from one", () => {
@@ -754,9 +789,10 @@ describe("deriveExercisePersonalRecord", () => {
     sets: [insightSet("set-b", { weightValue: "110", repsValue: "5" })],
   });
 
-  const baselineOf = (oneRepMax: number, weight: number, reps: number) => ({
+  const baselineOf = (oneRepMax: number, weight: number, reps: number, volume: number | null = null) => ({
     oneRepMax,
     weight: { weight, reps },
+    volume,
   });
 
   it("returns the best entered set only for a strict improvement over an existing baseline", () => {
@@ -767,29 +803,35 @@ describe("deriveExercisePersonalRecord", () => {
       baseline: baselineOf(historicalBest, 120, 1),
     });
 
-    expect(record).toEqual(
-      expect.objectContaining({
-        kind: "oneRepMax",
-        weightRecord: false,
-        exerciseDefinitionId: "bench",
-        exerciseName: "Bench Press",
+    expect(record).toEqual({
+      exerciseDefinitionId: "bench",
+      exerciseName: "Bench Press",
+      sessionExerciseId: "bench-row",
+      sessionExerciseOrderIndex: 0,
+      sets: [{
         sessionExerciseId: "bench-row",
         setId: "set-b",
+        setOrderIndex: 0,
         weight: 110,
         reps: 5,
-        baseline: baselineOf(historicalBest, 120, 1),
-      }),
-    );
-    expect(record?.estimatedOneRepMax).toBeCloseTo(
+        estimatedOneRepMax: expect.any(Number),
+        oneRepMax: true,
+        topWeight: false,
+      }],
+      volume: null,
+      baseline: baselineOf(historicalBest, 120, 1),
+    });
+    expect(record?.sets[0].estimatedOneRepMax).toBeCloseTo(
       estimateOneRepMax(110, 5) as number,
     );
+    expect(personalRecordCount(record!)).toBe(1);
   });
 
   it.each([
-    ["an equal 1RM and Weight", baselineOf(estimateOneRepMax(110, 5) as number, 110, 5)],
-    ["a 1RM and Weight above current", baselineOf((estimateOneRepMax(110, 5) as number) + 1, 110, 6)],
+    ["an equal 1RM, Weight and Volume", baselineOf(estimateOneRepMax(110, 5) as number, 110, 5, 550)],
+    ["a 1RM, Weight and Volume above current", baselineOf((estimateOneRepMax(110, 5) as number) + 1, 110, 6, 551)],
     ["no baseline", null],
-    ["a zero baseline", baselineOf(0, 0, 10)],
+    ["a zero baseline", baselineOf(0, 0, 10, 0)],
   ])(
     "does not label %s as a PR",
     (_label, baseline) => {
@@ -803,27 +845,78 @@ describe("deriveExercisePersonalRecord", () => {
     },
   );
 
-  it("falls back to a Weight record when no 1RM beats the record, comparing weight then reps", () => {
+  it("takes a Weight record on its own, comparing weight then reps", () => {
     const above1rm = (estimateOneRepMax(110, 5) as number) + 1;
     expect(deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [exercise],
       baseline: baselineOf(above1rm, 110, 4),
-    })).toMatchObject({ kind: "weight", weightRecord: true, setId: "set-b", weight: 110, reps: 5 });
+    })).toMatchObject({ sets: [{ setId: "set-b", oneRepMax: false, topWeight: true, weight: 110, reps: 5 }], volume: null });
     // A 1RM-only baseline (no earlier Weight) has nothing for a Weight to beat.
     expect(deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [exercise],
-      baseline: { oneRepMax: above1rm, weight: null },
+      baseline: { oneRepMax: above1rm, weight: null, volume: null },
     })).toBeNull();
   });
 
-  it("marks a 1RM record set that is also heavier than the Weight record", () => {
-    expect(deriveExercisePersonalRecord({
+  it("names one set once when it takes both the 1RM and the Weight record", () => {
+    const record = deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
       exercises: [exercise],
       baseline: baselineOf(estimateOneRepMax(100, 5) as number, 100, 5),
-    })).toMatchObject({ kind: "oneRepMax", weightRecord: true, setId: "set-b" });
+    });
+    expect(record?.sets).toEqual([expect.objectContaining({ setId: "set-b", oneRepMax: true, topWeight: true })]);
+    expect(personalRecordCount(record!)).toBe(2);
+  });
+
+  it("takes every record: the best 1RM's set, then the top Weight's, then the Volume", () => {
+    const mixed = insightExercise({
+      ...exercise,
+      sets: [
+        insightSet("heavy", { orderIndex: 0, weightValue: "120", repsValue: "1" }),
+        insightSet("reps", { orderIndex: 1, weightValue: "100", repsValue: "10" }),
+      ],
+    });
+    const record = deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [mixed],
+      baseline: baselineOf(estimateOneRepMax(100, 5) as number, 110, 1, 1000),
+    });
+    expect(record?.sets).toEqual([
+      expect.objectContaining({ setId: "reps", oneRepMax: true, topWeight: false }),
+      expect.objectContaining({ setId: "heavy", oneRepMax: false, topWeight: true }),
+    ]);
+    expect(record?.volume).toBe(1120);
+    expect(personalRecordCount(record!)).toBe(3);
+  });
+
+  it("takes a Volume record with no strength record, on the exercise's first block", () => {
+    const record = deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [exercise],
+      baseline: baselineOf(1000, 200, 1, 500),
+    });
+    expect(record).toMatchObject({ sessionExerciseId: "bench-row", sets: [], volume: 550 });
+    expect(personalRecordCount(record!)).toBe(1);
+  });
+
+  it("takes a Volume record from a session that left an uncalculable block out ([[copy.no-inline-explanation]])", () => {
+    const corrupt = insightExercise({
+      id: "bench-corrupt",
+      orderIndex: 1,
+      exerciseDefinitionId: "bench",
+      exerciseName: "Bench Press",
+      loadContext: { policy: "personal", bodyweightContribution: 0, loadInputMode: "sideways" as "total_load" },
+      sets: [insightSet("set-corrupt", { weightValue: "50", repsValue: "5" })],
+    });
+    const record = deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [exercise, corrupt],
+      baseline: baselineOf(1000, 200, 1, 500),
+    });
+    // 110 × 5 = 550 beats 500; the 50 × 5 block is left out, not a blocker.
+    expect(record).toMatchObject({ sets: [], volume: 550 });
   });
 
   it("ignores unconfirmed work and resolves ties by set order then stable set id", () => {
@@ -859,7 +952,7 @@ describe("deriveExercisePersonalRecord", () => {
       baseline: baselineOf(1, 1, 1),
     });
 
-    expect(record?.setId).toBe("set-a");
+    expect(record?.sets.map((set) => set.setId)).toEqual(["set-a"]);
   });
 
   it("never takes a warm-up heavier than the working sets as the PR set", () => {
@@ -876,7 +969,7 @@ describe("deriveExercisePersonalRecord", () => {
       exerciseDefinitionId: "bench",
       exercises: [warmUpHeavier],
       baseline: baselineOf(historicalBest, 100, 5),
-    })).toMatchObject({ setId: "working", weight: 110 });
+    })).toMatchObject({ sets: [{ setId: "working", weight: 110 }] });
     // Only a warm-up beats the baseline: no PR.
     expect(deriveExercisePersonalRecord({
       exerciseDefinitionId: "bench",
@@ -923,9 +1016,13 @@ describe("deriveSessionPersonalRecords", () => {
       ],
     });
 
-    expect(records).toEqual([expect.objectContaining({ setId: "target-set", weight: 110 })]);
+    expect(records).toEqual([expect.objectContaining({
+      sets: [expect.objectContaining({ setId: "target-set", weight: 110 })],
+    })]);
     expect(records[0].baseline.oneRepMax).toBeCloseTo(estimateOneRepMax(100, 5) as number);
     expect(records[0].baseline.weight).toEqual({ weight: 100, reps: 5 });
+    // The working set's volume only: the warm-ups add none.
+    expect(records[0].baseline.volume).toBe(500);
   });
 
   it("uses only earlier completed, non-deleted history in (completedAt, sessionId) order", () => {
@@ -1004,7 +1101,10 @@ describe("deriveSessionPersonalRecords", () => {
       })],
     });
 
-    expect(records).toEqual([expect.objectContaining({ kind: "weight", weightRecord: true, setId: "target-set" })]);
+    expect(records).toEqual([expect.objectContaining({
+      sets: [expect.objectContaining({ setId: "target-set", oneRepMax: false, topWeight: true })],
+      volume: null,
+    })]);
     expect(records[0].baseline.weight).toEqual({ weight: 100, reps: 10 });
   });
 
@@ -1071,8 +1171,8 @@ describe("deriveSessionPersonalRecords", () => {
     expect(records[1]).toEqual(
       expect.objectContaining({
         sessionExerciseOrderIndex: 1,
-        sessionExerciseId: "bench-row-b",
-        setId: "bench-set-b",
+        sessionExerciseId: "bench-row-a",
+        sets: [expect.objectContaining({ sessionExerciseId: "bench-row-b", setId: "bench-set-b" })],
       }),
     );
   });
@@ -1113,7 +1213,7 @@ describe("deriveSessionPersonalRecords", () => {
 
     const [record] = deriveSessionPersonalRecords({ targetSession: target, historicalSessions: [history] });
 
-    expect(record).toEqual(expect.objectContaining({ sessionExerciseId: "bench-row-a", setId: "bench-a-2" }));
+    expect(record.sets).toEqual([expect.objectContaining({ sessionExerciseId: "bench-row-a", setId: "bench-a-2" })]);
   });
 
   it("omits no-baseline exercises and deleted target work", () => {
@@ -1221,7 +1321,7 @@ describe("createCompletedSessionInsightsRepository", () => {
         },
       ]),
       loadEarlierRecordBaselines: jest.fn().mockResolvedValue(
-        new Map([["bench", { oneRepMax: 100, weight: { weight: 100, reps: 5 } }]]),
+        new Map([["bench", { oneRepMax: 100, weight: { weight: 100, reps: 5 }, volume: 500 }]]),
       ),
     });
     const repository = createCompletedSessionInsightsRepository(store);
@@ -1241,8 +1341,9 @@ describe("createCompletedSessionInsightsRepository", () => {
       personalRecords: [
         expect.objectContaining({
           exerciseDefinitionId: "bench",
-          setId: "target-set",
-          baseline: { oneRepMax: 100, weight: { weight: 100, reps: 5 } },
+          sets: [expect.objectContaining({ setId: "target-set", oneRepMax: true, topWeight: true })],
+          volume: 550,
+          baseline: { oneRepMax: 100, weight: { weight: 100, reps: 5 }, volume: 500 },
         }),
       ],
       exerciseVolumeComparisons: [

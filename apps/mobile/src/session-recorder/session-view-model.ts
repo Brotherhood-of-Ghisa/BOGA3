@@ -1,12 +1,12 @@
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
-import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
+import { sumVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
+import { calculateAnalyticsSetMetrics, ordinaryLoadContext, formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import type { Session, SessionSet } from '@/components/session-recorder/types';
 import { formatSessionSetType, normalizeSessionSetType } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { deriveExercisePersonalRecord, type ExercisePersonalRecord } from '@/src/session-insights';
-import { recordBand, type RecordBand } from '@/src/session-insights/record-band';
+import { recordBandLines, type RecordLine } from '@/src/session-insights/record-band';
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import {
@@ -31,9 +31,9 @@ export type SessionViewSetRow = {
   volume: string;
   // A confirmed performed set; every other row is shown faded as planned.
   done: boolean;
-  // The session's record set (`training-metrics-contract.md` §3): its 1RM,
-  // and its Weight, when they beat the records — the only figures a card
-  // highlights. A 1RM record set may also set the Weight record.
+  // The session's record sets (`training-metrics-contract.md` §3): the 1RM
+  // record's 1RM and the Weight record's set — the only figures a card
+  // highlights. One set may hold both.
   oneRepMaxRecord: boolean;
   weightRecord: boolean;
 };
@@ -44,8 +44,8 @@ export type SessionViewExerciseCard = {
   doneCount: number;
   totalCount: number;
   rows: SessionViewSetRow[];
-  // The card's `record` band when the exercise's record set is in it.
-  record: RecordBand | null;
+  // The card's `record` band: a line per record it holds, empty without one.
+  record: RecordLine[];
 };
 
 export type SessionViewModel = {
@@ -53,7 +53,6 @@ export type SessionViewModel = {
   // The summary's `Sets`: the performed working sets (`training-metrics-contract.md` "Counted set").
   workingSetCount: number;
   volume: string;
-  volumeNote?: string;
 };
 
 
@@ -101,21 +100,21 @@ export const formatSetRow = ({
   };
 };
 
-/** A row's record flags: whether it is the card's record set, and which figures it highlights. */
+/** A row's record flags: which of its figures took a record. */
 export const recordFlagsFor = (
   record: ExercisePersonalRecord | null,
   setId: string,
 ): Pick<SessionViewSetRow, 'oneRepMaxRecord' | 'weightRecord'> => {
-  const isRecordSet = record !== null && record.setId === setId;
+  const recordSet = record?.sets.find((set) => set.setId === setId);
   return {
-    oneRepMaxRecord: isRecordSet && record.kind === 'oneRepMax',
-    weightRecord: isRecordSet && record.weightRecord,
+    oneRepMaxRecord: recordSet?.oneRepMax ?? false,
+    weightRecord: recordSet?.topWeight ?? false,
   };
 };
 
-/** The card's band: only on the block holding the exercise's record set. */
-export const cardRecordBand = (record: ExercisePersonalRecord | null, blockId: string): RecordBand | null =>
-  record !== null && record.sessionExerciseId === blockId ? recordBand(record) : null;
+/** The card's band: the records held by this block of the exercise. */
+export const cardRecordBand = (record: ExercisePersonalRecord | null, blockId: string): RecordLine[] =>
+  record === null ? [] : recordBandLines(record, blockId);
 
 type ShownValues = { weight: number | null; reps: number | null; setType: string | null };
 
@@ -172,7 +171,7 @@ export const buildSessionViewModel = (
   const cards = session.exercises.map((exercise): SessionViewExerciseCard => {
     const context = exercise.loadContext ?? ordinaryLoadContext();
     const figures = exercise.sets.map(set => toRowFigures(set, context));
-    // One record set per exercise, across every block of it in the session.
+    // One record of each kind per exercise, across every block of it in the session.
     const record = deriveExercisePersonalRecord({
       exerciseDefinitionId: exercise.exerciseDefinitionId,
       exercises: insightExercises,
@@ -201,7 +200,7 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, workingSetCount, ...sessionVolumeSummary(summarizeVolume(volumeMetrics)) };
+  return { cards, workingSetCount, volume: formatVolumeFigure(sumVolume(volumeMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */
@@ -225,3 +224,12 @@ export const sessionTitleForStart = (startedAt: Date): string => {
   if (hour >= 17 && hour < 21) return 'Evening training';
   return 'Night training';
 };
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+
+/**
+ * A finished session's title: the active title with its local start date
+ * where the elapsed time was (`Afternoon training · 19 Feb`).
+ */
+export const completedSessionTitle = (startedAt: Date): string =>
+  `${sessionTitleForStart(startedAt)} · ${startedAt.getDate()} ${MONTHS[startedAt.getMonth()]}`;

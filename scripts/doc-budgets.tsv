@@ -8,6 +8,8 @@
 # Rows (tab-separated):
 #   budget   <doc|*>  <words>   a doc's limit; `*` is the default for the rest
 #   exempt   <prefix>           docs under this prefix are reported, not budgeted
+#   corpus   <dir/>   <words>   a directory loaded whole: its persistent docs'
+#                               combined limit, on top of each doc's own
 #   ceiling  <doc>    <words>   grandfathered: the doc was over budget when the
 #                               budgets landed. It may not grow; `./boga docs gen`
 #                               lowers it as the doc shrinks and drops it once the
@@ -18,4 +20,4 @@ budget	docs/specs/02-quality-and-test-gates.md	2500
 budget	docs/specs/03-technical-architecture.md	2500
 budget	docs/specs/09-project-structure.md	2500
 budget	*	3000
-exempt	docs/specs/ui/design-targets/
+corpus	docs/product/	6000

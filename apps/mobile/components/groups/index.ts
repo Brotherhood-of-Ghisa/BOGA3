@@ -3,7 +3,6 @@ export { GroupActionSheet, type GroupActionSheetItem } from './group-action-shee
 export { GroupBoardHistoryItem } from './group-board-history-item';
 export { GroupBoardRow } from './group-board-row';
 export { GroupCertificationStatus } from './certification-status';
-export { GroupExerciseForm } from './group-exercise-form';
 export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';
 export { GroupExerciseRow } from './group-exercise-row';
 export { GroupExercisesPage } from './group-exercises-page';

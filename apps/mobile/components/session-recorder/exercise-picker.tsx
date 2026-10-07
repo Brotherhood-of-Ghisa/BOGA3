@@ -15,6 +15,7 @@ import { PickerPlannerToggle, PlannerBlockSection } from '@/components/session-r
 import { PickerPreselectionCard } from '@/components/session-recorder/picker-preselection-card';
 import { IconButton } from '@/components/ui';
 import { Notice } from '@/components/ui/notice';
+import { PageSheetHeader } from '@/components/ui/page-sheet';
 import { SearchField } from '@/components/ui/search-field';
 import { StatePanel } from '@/components/ui/state-panel';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
@@ -307,33 +308,29 @@ export function ExercisePicker({
   return (
     <>
       <View style={[styles.screen, { paddingBottom: insets.bottom }]} testID="exercise-picker">
-        {/* The page sheet's own grabber: swiping down closes it. */}
-        <View style={styles.handleArea}>
-          <View style={styles.handle} />
-        </View>
-        <View style={styles.header} testID="exercise-picker-header">
-          <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={styles.title}>
-            Select Exercise
-          </Text>
-          <IconButton
-            accessibilityLabel="Open exercise catalog manage flow"
-            name="list"
-            onPress={openManage}
-            testID="exercise-picker-manage-button"
-          />
-          <IconButton
-            accessibilityLabel="Open inline exercise create"
-            name="plus"
-            onPress={openInlineCreate}
-            testID="exercise-picker-create-button"
-          />
-          <IconButton
-            accessibilityLabel="Close exercise picker"
-            name="x"
-            onPress={onClose}
-            testID="exercise-picker-close"
-          />
-        </View>
+        <PageSheetHeader
+          actions={
+            <>
+              <IconButton
+                accessibilityLabel="Open exercise catalog manage flow"
+                name="list"
+                onPress={openManage}
+                testID="exercise-picker-manage-button"
+              />
+              <IconButton
+                accessibilityLabel="Open inline exercise create"
+                name="plus"
+                onPress={openInlineCreate}
+                testID="exercise-picker-create-button"
+              />
+            </>
+          }
+          closeLabel="Close exercise picker"
+          closeTestID="exercise-picker-close"
+          onClose={onClose}
+          testID="exercise-picker-header"
+          title="Select Exercise"
+        />
         <View style={styles.controls}>
           <SearchField
             accessibilityLabel="Exercise filter input"
@@ -445,33 +442,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: uiRoles.surface,
-  },
-  handleArea: {
-    alignItems: 'center',
-    paddingTop: uiSpace.sm,
-    paddingBottom: uiSpace.sm,
-  },
-  handle: {
-    width: uiGeometry.sheetHandle.width,
-    height: uiGeometry.sheetHandle.height,
-    borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.rule,
-  },
-  // As the Sheet's title row: the controls bring their own 44pt targets.
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: uiSpace.lg,
-    paddingRight: uiSpace.sm,
-    paddingBottom: uiSpace.sm,
-  },
-  title: {
-    flex: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
   controls: {
     gap: uiSpace.sm,

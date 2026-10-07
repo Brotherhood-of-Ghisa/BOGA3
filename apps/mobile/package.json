@@ -46,7 +46,7 @@
     "@expo-google-fonts/source-sans-3": "^0.4.1",
     "@react-native-community/netinfo": "12.0.1",
     "@supabase/supabase-js": "^2.98.0",
-    "drizzle-orm": "^0.44.6",
+    "drizzle-orm": "^0.45.3",
     "expo": "~58.0.3",
     "expo-application": "~58.0.3",
     "expo-background-task": "~58.0.10",

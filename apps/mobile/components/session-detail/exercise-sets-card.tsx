@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { RecordBand } from '@/src/session-insights/record-band';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
+import { RecordBand } from './record-band';
 import { SetSummaryRow } from './set-summary-row';
 
 type ExerciseSetsCardBaseProps = {
@@ -20,16 +20,13 @@ type ExerciseSetsCardBaseProps = {
   countMuted?: boolean;
   rows: SessionViewSetRow[];
   hideDerivedMetrics?: boolean;
-  // The `record` band when the exercise's record set is in this card.
-  record: RecordBand | null;
+  // The `record` band, one line per record this card holds; empty for none.
+  record?: readonly RecordLine[];
   // Under the header, before the set rows (exercise history's gym, tags and
   // session stats). It brings its own insets.
   summary?: ReactNode;
   // An inline glyph after the count (the session view's chevron).
   accessory?: ReactNode;
-  // A 44pt control closing the header (View Session's ⋮); it sits flush with
-  // the card's edge and brings its own height.
-  control?: ReactNode;
   // `<testID>-count`, `-set-<n>` and `-record` hang off it.
   testID: string;
   // A row's testID, when a caller has its own (the group view keeps
@@ -44,8 +41,8 @@ type ExerciseSetsCardProps = ExerciseSetsCardBaseProps &
     | { onPress: () => void; accessibilityLabel: string }
   );
 
-// One exercise's sets as a card: name · count · accessory or control, the set
-// rows, and a `record` band when the exercise's record set is in it. The session
+// One exercise's sets as a card: name · count · accessory, the set
+// rows, and a `record` band with a line per record the card holds. The session
 // view, View Session and the group session view all draw an exercise with it.
 export function ExerciseSetsCard({
   name,
@@ -54,10 +51,9 @@ export function ExerciseSetsCard({
   countMuted = false,
   rows,
   hideDerivedMetrics = false,
-  record,
+  record = [],
   summary,
   accessory,
-  control,
   testID,
   rowTestID,
   onPress,
@@ -65,7 +61,7 @@ export function ExerciseSetsCard({
 }: ExerciseSetsCardProps) {
   const content = (
     <>
-      <View style={[styles.header, control ? styles.headerWithControl : null]}>
+      <View style={styles.header}>
         <Text allowFontScaling={false} numberOfLines={1} style={[styles.name, nameFace === 'figure' ? styles.nameFigure : null]}>
           {name}
         </Text>
@@ -73,7 +69,6 @@ export function ExerciseSetsCard({
           {count}
         </Text>
         {accessory}
-        {control}
       </View>
       {summary}
       {rows.length > 0 ? (
@@ -88,12 +83,7 @@ export function ExerciseSetsCard({
           ))}
         </View>
       ) : null}
-      {record ? (
-        <View style={styles.band} testID={`${testID}-record`}>
-          <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} style={styles.bandLabel}>{record.label}</Text>
-        </View>
-      ) : null}
+      <RecordBand lines={record} placement="footer" testID={`${testID}-record`} />
     </>
   );
 
@@ -116,11 +106,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.xs,
-  },
-  headerWithControl: {
-    paddingRight: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
   },
   name: {
     flex: 1,
@@ -147,24 +132,5 @@ const styles = StyleSheet.create({
   rows: {
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.sm,
-  },
-  band: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.recordWash,
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.recordRule,
-  },
-  bandLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.record,
   },
 });

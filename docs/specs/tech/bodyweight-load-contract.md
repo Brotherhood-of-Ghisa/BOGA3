@@ -142,12 +142,14 @@ Settings presents `Bodyweight calculations` with an On/Off control and a separat
 always-visible `Body weight log` row that opens dated kg history. Disabling the
 toggle hides the exercise-editor contribution field but never hides reading
 management or deletes anything. The personal exercise editor shows only
-`Bodyweight contribution (%)` plus a short hint while enabled.
+`Bodyweight contribution (%)` while enabled, with no hint under it
+([[copy.no-inline-explanation]]).
 
 The logger always says `Weight`; rows, records, History, Stats, completion and
 share surfaces use `Top weight`, `1RM` and `Volume`. They do not expose the
-calculation breakdown or prompt for a reading during a workout. Numeric zero
-renders as `0`, not unavailable. Raw top Weight stays independent from derived
+calculation breakdown or prompt for a reading during a workout. A valid zero
+renders as a number in its figure's format (`training-metrics-contract.md` §4,
+[[1rm.formula]]), not as unavailable. Raw top Weight stays independent from derived
 1RM and Volume.
 
 Repository adapters batch the synced preference, current exercise definition
@@ -233,8 +235,9 @@ invalidation. Coaching/import tests cover preference gating and clean kg payload
 
 Component/native evidence covers the Settings row, repeated toggle persistence,
 kg history, conditional contribution fields, ordinary/bodyweight-aware logging,
-numeric zero, historical refresh and group administration. The UI target
-is [the bodyweight design target](../ui/design-targets/bodyweight.md).
+numeric zero, historical refresh and group administration. Screen behaviour
+is `../ui/screen-map.md` (`/body-weight`) and the tests of
+`components/bodyweight/` and the exercise editor.
 
 ## 10. Versioned public competition units
 

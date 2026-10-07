@@ -408,12 +408,13 @@ describe('Add exercise route', () => {
     const seed = SYSTEM_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
     api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: BENCH });
     await renderNew();
-    expect(screen.getByTestId('group-exercise-pick-hint')).toBeTruthy();
+    expect(screen.queryByTestId('group-exercise-form')).toBeNull();
+    expect(screen.queryByText('Pick a standard exercise to copy.')).toBeNull();
 
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
     fireEvent.press(screen.getByTestId(`group-standard-exercise-${seed.id}`));
     expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe(seed.name);
-    expect(screen.getByTestId('group-exercise-form-note')).toHaveTextContent(seed.name, { exact: false });
+    expect(screen.queryByText(/Copies the standard exercise/)).toBeNull();
 
     await submit();
     expect(api.createCompetitionExercise).toHaveBeenCalledWith({ groupId: GROUP_ID,
@@ -528,6 +529,20 @@ describe('Edit exercise route', () => {
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
+  it('saves a weight-entry change on the first press, against the revision it was edited on', async () => {
+    api.updateCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: ROW });
+    renderEdit('ge-row');
+    fireEvent.press(await screen.findByTestId('group-exercise-form-load-mode-total_load'));
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Save changes');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    });
+    expect(api.updateCompetitionExercise).toHaveBeenCalledTimes(1);
+    expect(api.updateCompetitionExercise).toHaveBeenCalledWith({ groupId: GROUP_ID,exerciseId: 'ge-row',revision: 1,
+      name: 'Cable Row', mode: 'total_load', contribution: 0, metric: 'e1rm' });
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
   it('shows a server VALIDATION refusal next to the form and stays', async () => {
     api.updateCompetitionExercise.mockRejectedValue(
       new GroupApiError('VALIDATION', 'an archived group exercise is read-only; unarchive it first'),
@@ -620,7 +635,7 @@ describe('Every exercise write: offline refusal and server failure', () => {
     await pressSubmit();
     expect(api.createCompetitionExercise).not.toHaveBeenCalled();
     expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_OFFLINE_ACTION_MESSAGE);
-    expect(screen.getByTestId('group-exercise-form-note')).toBeTruthy();
+    expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('Barbell Bench Press');
   });
 
   it('catalogue add: a server failure shows "nothing changed" and stays', async () => {

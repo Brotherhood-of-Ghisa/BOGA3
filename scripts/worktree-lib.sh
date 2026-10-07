@@ -443,6 +443,120 @@ boga_xcode_at_least_min() {
   [[ -n "$version" ]] && boga_version_at_least "$version" "$BOGA_XCODE_MIN_VERSION"
 }
 
+# ---------- iOS simulator runtime pin ----------
+
+# The one iOS runtime every Maestro lane's simulator runs, whatever slot a
+# worktree leases. A per-slot runtime shows up as flakiness, not as a version
+# problem: the same flow behaves differently per runtime (iOS 26.2 labels the
+# native back button with the previous screen's title, iOS 27 labels it "Back").
+# So `apps/mobile/scripts/ios-sim-boot.sh` recreates a lane simulator that is on
+# another runtime, and never falls back to a different one.
+# To move the host to a new runtime, install it and edit this line:
+#   xcodebuild -downloadPlatform iOS -buildVersion <version>
+# IOS_SIM_RUNTIME in the environment targets another runtime for one run.
+# Rule: docs/specs/11-maestro-runtime-and-testing-conventions.md.
+BOGA_IOS_SIM_RUNTIME="${IOS_SIM_RUNTIME:-iOS 27.0}"
+
+# The lane simulator `./boga worktree start` writes into the worktree's Maestro
+# env, and the only name shape ios-sim-boot.sh may delete and recreate. A
+# hand-made sim ("BOGA wt10 ios26") or the stock default ("iPhone 17 Pro") does
+# not match, so it is used as found.
+boga_ios_sim_name_for_slot() {
+  printf 'BOGA wt%s\n' "$1"
+}
+
+boga_is_lane_sim_name() {
+  [[ "${1:-}" =~ ^BOGA\ wt[0-9]+$ ]]
+}
+
+# The pinned runtime's simctl identifier; fails (printing nothing) when that
+# runtime is not installed or not available.
+boga_ios_sim_runtime_id() {
+  command -v xcrun >/dev/null 2>&1 || return 1
+  xcrun simctl list runtimes -j 2>/dev/null | node -e '
+    const raw = require("fs").readFileSync(0, "utf8");
+    const data = raw ? JSON.parse(raw) : {};
+    const wanted = process.argv[1];
+    const match = (data.runtimes ?? []).find(
+      (runtime) => runtime.isAvailable && runtime.name === wanted,
+    );
+    if (!match?.identifier) process.exit(1);
+    process.stdout.write(match.identifier);
+  ' "$BOGA_IOS_SIM_RUNTIME"
+}
+
+# Installed iOS runtimes, one per line, for a failure message.
+boga_ios_sim_installed_runtimes() {
+  command -v xcrun >/dev/null 2>&1 || return 1
+  xcrun simctl list runtimes -j 2>/dev/null | node -e '
+    const raw = require("fs").readFileSync(0, "utf8");
+    const data = raw ? JSON.parse(raw) : {};
+    for (const runtime of data.runtimes ?? []) {
+      if (!/^iOS/.test(runtime.name ?? "")) continue;
+      process.stdout.write(`${runtime.name}${runtime.isAvailable ? "" : " (unavailable)"}\n`);
+    }
+  '
+}
+
+# boga_ios_sim_device <name> [preferred-runtime-id]: the first AVAILABLE
+# simulator named exactly <name>, as
+# "<udid><TAB><runtime-identifier><TAB><device-type-identifier>"; prints nothing
+# when there is none. A device on <preferred-runtime-id> wins, so a duplicate
+# name on another runtime is never the one a caller acts on.
+boga_ios_sim_device() {
+  command -v xcrun >/dev/null 2>&1 || return 1
+  xcrun simctl list devices -j 2>/dev/null | node -e '
+    const raw = require("fs").readFileSync(0, "utf8");
+    const data = raw ? JSON.parse(raw) : {};
+    const [name, preferred] = process.argv.slice(1);
+    const found = [];
+    for (const [runtime, devices] of Object.entries(data.devices ?? {})) {
+      for (const device of devices ?? []) {
+        if (device.isAvailable && device.name === name && device.udid) {
+          found.push([device.udid, runtime, device.deviceTypeIdentifier ?? ""]);
+        }
+      }
+    }
+    found.sort((a, b) => (b[1] === preferred ? 1 : 0) - (a[1] === preferred ? 1 : 0));
+    if (found[0]) process.stdout.write(found[0].join("\t"));
+  ' "$1" "${2:-}"
+}
+
+# boga_ios_sim_runtime_supports <runtime-id> <device-type-id>
+boga_ios_sim_runtime_supports() {
+  command -v xcrun >/dev/null 2>&1 || return 1
+  xcrun simctl list runtimes -j 2>/dev/null | node -e '
+    const raw = require("fs").readFileSync(0, "utf8");
+    const data = raw ? JSON.parse(raw) : {};
+    const [runtimeId, deviceType] = process.argv.slice(1);
+    const runtime = (data.runtimes ?? []).find((entry) => entry.identifier === runtimeId);
+    const supported = (runtime?.supportedDeviceTypes ?? []).some(
+      (entry) => entry.identifier === deviceType,
+    );
+    process.exit(supported ? 0 : 1);
+  ' "$1" "$2"
+}
+
+# A runtime identifier as simctl names it: ...SimRuntime.iOS-26-2 -> "iOS 26.2".
+boga_ios_sim_runtime_label() {
+  local suffix="${1##*.SimRuntime.}"
+  printf '%s\n' "$suffix" | sed -e 's/-/ /' -e 's/-/./g'
+}
+
+# boga_maestro_env_value <key> <file>: the effective value of a key in a
+# generated Maestro env, written either as `K="v"` or as `K="${K:-v}"`.
+boga_maestro_env_value() {
+  local key="$1" file="$2" raw
+  raw="$(sed -n -E "s/^[[:space:]]*(export[[:space:]]+)?${key}=(.*)$/\2/p" "$file" | tail -n 1)"
+  raw="${raw#\"}"
+  raw="${raw%\"}"
+  if [[ "$raw" == "\${${key}:-"*"}" ]]; then
+    raw="${raw#"\${${key}:-"}"
+    raw="${raw%\}}"
+  fi
+  printf '%s\n' "$raw"
+}
+
 # boga_version_at_least <version> <minimum>: numeric major.minor.patch compare
 # (a -beta.N suffix is ignored). Non-semver input such as "latest" fails.
 boga_version_at_least() {

@@ -1,6 +1,6 @@
-import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
+import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
-import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -68,7 +68,6 @@ export type ExerciseListItem = {
   name: string;
   workingSetCount: number;
   totalVolume: number | null;
-  knownVolume?: number | null;
   estimatedOneRepMax: number | null;
   lastCompletedAt: Date | null;
 };
@@ -202,10 +201,6 @@ export const sortExerciseListItems = (
     return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
   });
 
-// Full figures in Plex Mono, never `2.5k`: the numbers are the point
-// (`design-language.md` §6).
-const formatTotalWeight = (value: number | null): string => value === null ? '— · incomplete' : formatVolume(value);
-
 export type StatsScreenShellProps = {
   summary: ProgressComparisons | null;
   onRetry?: () => void;
@@ -330,39 +325,40 @@ export function StatsScreenShell({
     setExerciseSortMode((activeMode) => nextExerciseSortMode(activeMode, header));
   }, []);
 
-  // The view switch stays reachable; comparison controls scroll with the data.
   const scrollTestID = viewMode === 'exercise' ? 'stats-exercise-list-scroll' : 'stats-scroll';
 
   return (
     <Screen testID="stats-history-screen">
-      <View style={styles.viewSwitch} testID="stats-view-switch">
-        <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
-          value={viewMode} onChange={onSelectViewMode} testIDPrefix="stats-view-mode-chip" />
-      </View>
-      <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
+      <View style={styles.controls} testID="stats-controls">
+        <View testID="stats-view-switch">
+          <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
+            value={viewMode} onChange={onSelectViewMode} selectedGround="viz" testIDPrefix="stats-view-mode-chip" />
+        </View>
         <SegmentedControl
           accessibilityLabel="Select stats time range"
-          options={targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
-            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }]}
-          value={periodDays} onChange={onSelectPeriod} testIDPrefix="stats-period-chip" />
-        {viewMode === 'muscle' ? <>
+          options={(targetWindowWeeks === 1 ? [{ value: 7, label: 'This week' }] : [
+            { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }])
+            .map(option => ({ ...option, accessibilityLabel:
+              `${option.label}, ${formatPeriodComparison(option.value)}, same elapsed calendar span` }))}
+          value={periodDays} onChange={onSelectPeriod} selectedGround="viz" testIDPrefix="stats-period-chip" />
+        {viewMode === 'muscle' ? (
           <SegmentedControl accessibilityLabel="Select progress metric"
             options={[{ value: 'workingSetCount', label: 'Working sets' }, { value: 'totalVolume', label: 'Volume' }]}
-            value={tableMetric} onChange={setTableMetric} testIDPrefix="stats-metric-chip" />
-          <Text allowFontScaling={false} style={styles.comparison}
-            accessibilityLabel={`${formatPeriodComparison(periodDays)}, same elapsed calendar span`}
-            testID="stats-comparison-label">{formatPeriodComparison(periodDays)}</Text>
-        </> : null}
+            value={tableMetric} onChange={setTableMetric} selectedGround="viz" testIDPrefix="stats-metric-chip" />
+        ) : (
+          <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
+            onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+        )}
+      </View>
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID={scrollTestID}>
         {errorMessage ? <StatePanel fill={false} kind="error" title="Could not load progress"
           testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
         {isLoading && !summary && !errorMessage ? <StatePanel body="Loading progress…" fill={false}
           kind="loading" testID="stats-loading-state" /> : null}
-        {viewMode === 'exercise' ? <>
-          <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
-            onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
+        {viewMode === 'exercise' ? (
           <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
             isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
-        </> : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
+        ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
           weeks={periodDays / 7} weeklyTarget={weeklyWorkingSetTarget} onSelect={showContributions}
           onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
           onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
@@ -489,9 +485,7 @@ function ExerciseListView({
           ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
           accessibilityLabel={`Open ${item.name} heatmap. ${String(
             item.workingSetCount
-          )} sets. Volume ${formatVolumeWithCoverage(
-            item.totalVolume, item.knownVolume
-          )}${
+          )} sets. Volume ${formatVolumeFigure(item.totalVolume)}${
             item.estimatedOneRepMax === null
               ? '. Estimated one rep max unavailable'
               : `. Estimated one rep max ${formatOneRepMax(item.estimatedOneRepMax)} kg`
@@ -509,7 +503,7 @@ function ExerciseListView({
                 allowFontScaling={false}
                 style={[styles.tableFigure, styles.volumeColumn]}
                 testID={`stats-exercise-volume-${item.id}`}>
-                {item.totalVolume !== null ? formatTotalWeight(item.totalVolume) : item.knownVolume != null && item.knownVolume > 0 ? formatTotalWeight(item.knownVolume) : '—'}
+                {formatVolumeFigure(item.totalVolume)}
               </Text>
               <Text
                 allowFontScaling={false}
@@ -524,8 +518,6 @@ function ExerciseListView({
           <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
           </Text>
-          {item.totalVolume === null ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}
-            testID={`stats-exercise-coverage-${item.id}`}>Volume incomplete</Text> : null}
         </ListRow>
       ))}
     </Card>
@@ -644,7 +636,7 @@ function StatsContent() {
     .map(item => {
       const aggregate = stats.aggregatesById.get(item.id)!;
       return { id: item.id, name: item.name, workingSetCount: aggregate.workingSetCount,
-        totalVolume: aggregate.totalVolume, knownVolume: aggregate.knownVolume,
+        totalVolume: aggregate.totalVolume,
         estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
     }), [catalog.exercises, stats]);
   return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
@@ -678,9 +670,7 @@ const microLabel = {
 
 // The screen body, in the design language.
 const styles = StyleSheet.create({
-  viewSwitch: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg },
-  comparison: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted },
+  controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
   tableHeader: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -745,12 +735,6 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
     paddingVertical: uiSpace.xs,
-  },
-  exerciseMetricNote: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
   tableFigure: {
     fontFamily: uiFonts.figure.family,

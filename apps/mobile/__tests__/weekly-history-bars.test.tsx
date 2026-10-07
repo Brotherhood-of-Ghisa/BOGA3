@@ -84,7 +84,8 @@ it('keeps rest, known-zero and unavailable training separate, tappable and unfil
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('?');
   expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('Rest');
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toContain('unavailable or incomplete');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 2026-09-28, Volume unavailable');
+  expect(screen.getByText('?: unavailable; excluded from the average')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', borderWidth: 2 });
   expect(style('bars-heatmap-bar-2026-09-21')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
   fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-21'));
@@ -101,6 +102,10 @@ it('retains target colour independently of length and bounds long formatted valu
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ width: 96, textAlign: 'right' });
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('100% of weekly muscle target');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).not.toContain('averaged');
+  // The ramp names the target and its ends; no sentence explains the colour.
+  for (const text of ['Weekly target', '0%', '100%']) expect(screen.getByText(text)).toBeTruthy();
+  expect(screen.queryByText(/Less|More|Full colour|Colour:/)).toBeNull();
 });
 
 it('retains the complete 520-week window while initially rendering a small recent subset', () => {
@@ -135,8 +140,8 @@ it('shows only the selected banner, preserves full coverage copy and uses one ac
       metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
       view="weekly" lookbackWeeks={8} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
       selectedWeekKey={key} onSelectWeek={setKey} todayDateKey={TODAY}
-      dailyMetrics={[{ ...day('2026-09-28', null), knownVolume: 40 }]}
-      weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, knownVolume: 40, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />;
+      dailyMetrics={[day('2026-09-28', null)]}
+      weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />;
   }
   render(<SelectedSheet />);
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
@@ -147,7 +152,7 @@ it('shows only the selected banner, preserves full coverage copy and uses one ac
   expect(weekly.parent?.type).not.toBe(ScrollView);
   fireEvent.press(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28'));
   expect(screen.getByTestId('stats-exercise-history-week-banner-range')).toHaveTextContent('28 Sept 2026 – 4 Oct 2026');
-  expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent('Volume: 40 · incomplete');
+  expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent('Volume: —');
   fireEvent.press(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28'));
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
 });
@@ -167,11 +172,12 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
     fireEvent.press(screen.getByTestId('stats-exercise-history-retry'));
     expect(retry).toHaveBeenCalledTimes(1);
   } else expect(screen.queryByTestId('stats-exercise-history-retry')).toBeNull();
-  // Back starts the exit; native completion closes once even after escape.
-  fireEvent(screen.UNSAFE_getByType(Modal), 'requestClose');
-  expect(dismiss).not.toHaveBeenCalled();
-  fireEvent(screen.UNSAFE_getByType(Modal), 'accessibilityEscape');
-  fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
+  // An iOS swipe has already taken the page sheet away: the host hears once,
+  // and a late native dismissal of the swiped modal is not a second close.
+  const swiped = screen.UNSAFE_getByType(Modal);
+  fireEvent(swiped, 'requestClose');
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  fireEvent(swiped, 'dismiss');
   expect(dismiss).toHaveBeenCalledTimes(1);
 });
 

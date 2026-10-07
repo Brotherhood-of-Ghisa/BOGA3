@@ -26,6 +26,9 @@ export const planStartCardId = (ownerId: string | null, planExerciseId: string):
 export const planStartSetId = (ownerId: string | null, planSetId: string): string =>
   `${planMaterializationOwnerId(ownerId)}:${planSetId.trim()}:start`;
 
+export const planAttachedSetId = (cardId: string, planSetId: string): string =>
+  `${cardId.trim()}:${planSetId.trim()}:attached`;
+
 /**
  * Reads the owner the materialization IDs must be composed from. Returns
  * null when no account is signed in; call sites pass that through and the

@@ -85,6 +85,8 @@ describe('editing an existing exercise', () => {
     renderEditor({ editingExercise: exercise({ bodyweightContribution: 0.25 }) });
     expect(screen.getByTestId('exercise-editor-name-input')).toHaveProp('value', 'Bench Press');
     expect(screen.getByTestId('exercise-editor-bodyweight-percentage')).toHaveProp('value', '25');
+    expect(screen.queryByText(/applicable dated weight/)).toBeNull();
+    expect(screen.queryByText(/shared across both sides/)).toBeNull();
     await save();
     expect(onSave).toHaveBeenCalledWith({
       bodyweightContribution: 0.25,
@@ -280,9 +282,10 @@ describe('muscle selector', () => {
 });
 
 describe('closing', () => {
-  it('closes on dismiss', () => {
+  it('opens as a page sheet that its X closes', () => {
     renderEditor({ editingExercise: exercise() });
-    fireEvent.press(screen.getByTestId('exercise-editor-backdrop', { includeHiddenElements: true }));
+    expect(screen.getByTestId('exercise-editor-modal')).toHaveProp('presentationStyle', 'pageSheet');
+    fireEvent.press(screen.getByLabelText('Close exercise editor'));
     expect(onRequestClose).toHaveBeenCalledTimes(1);
   });
 
@@ -291,7 +294,9 @@ describe('closing', () => {
     onSave.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     renderEditor({ editingExercise: exercise() });
     fireEvent.press(screen.getByLabelText('Save exercise definition'));
-    fireEvent.press(screen.getByTestId('exercise-editor-backdrop', { includeHiddenElements: true }));
+    expect(screen.getByTestId('exercise-editor-modal')).toHaveProp('allowSwipeDismissal', false);
+    expect(screen.getByLabelText('Close exercise editor')).toBeDisabled();
+    fireEvent.press(screen.getByLabelText('Close exercise editor'));
     expect(onRequestClose).not.toHaveBeenCalled();
     await act(async () => finish(exercise()));
     expect(onSaved).toHaveBeenCalledTimes(1);

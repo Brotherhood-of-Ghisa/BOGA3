@@ -163,9 +163,6 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
           {groupName ? `Invite friends to ${groupName}` : 'Invite friends'}
         </Text>
-        <Text allowFontScaling={false} style={styles.body}>
-          Anyone with this code can join. It works until you regenerate it.
-        </Text>
         {codeArea}
       </Card>
       {feedback ? <GroupWriteNotice message={feedback.message} testID="group-invite-feedback" tone={feedback.tone} /> : null}
@@ -193,13 +190,6 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.lg,
     lineHeight: uiTypography.lineHeight.lg,
     color: uiRoles.ink,
-  },
-  body: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   // A figure: Plex Mono 700, spaced so each character reads apart.
   code: {

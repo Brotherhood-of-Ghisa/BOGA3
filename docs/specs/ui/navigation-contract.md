@@ -147,7 +147,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `/sync-setup` | `/sign-in` | the latest cycle outcome is `AUTH_REQUIRED` (no Retry offered) |
 | `/today` ↔ `/train` ↔ `/progress` ↔ `/more` | | `MainTabBar` |
 | any tab strip | `/session/<sessionId>` | the Train tab with a workout in progress: `push` from the tab bar and `exercise-history`, `dismissTo` from a completed session view, and nothing on that session's own view |
-| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch, Sessions' review/complete, and the completed screen's `Append to current session`, which pushes the id the append returns. Train rechecks for an existing draft first and `apps/mobile/src/session-entry/coordinator.ts` serialises simultaneous requests, so two drafts cannot appear |
+| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch and Sessions' review/complete. Train rechecks for an existing draft first and `apps/mobile/src/session-entry/coordinator.ts` serialises simultaneous requests, so two drafts cannot appear |
 | `/session/<id>` | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`replace`) |
 | `/session/<id>` | `/train` or another tab | Abandon after its confirmation, or the bottom bar (`dismissTo`, so the tab below is reused rather than stacked) |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |
@@ -186,11 +186,11 @@ Nothing outside this table navigates. A route not listed as a source
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | `View groups`, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
 
-Progress’s pinned By Exercise / By Muscle switch changes content in-route;
+Progress’s frozen controls change content in-route;
 Sessions is the final scrolling link in both views. A muscle chevron toggles
 its contribution block directly below that row. Muscle/exercise names open
-the full-height header-swipe history popup. Dismissal preserves underlying
-state and scroll, restoring accessible focus after the native modal closes.
+the history page sheet. Dismissal preserves underlying state and scroll,
+restoring accessible focus after the native modal closes.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

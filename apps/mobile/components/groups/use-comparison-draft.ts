@@ -24,7 +24,6 @@ export function useComparisonDraft(prefill: GroupExerciseRules, existing: GroupM
   const [defaultMetric, setDefaultMetric] = useState<GroupMetric>(prefill.defaultMetric);
   const [dirty, setDirty] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
-  const [reviewed, setReviewed] = useState(false);
   const prefillKey = JSON.stringify([prefill, existing?.rules.rules_revision]);
   const [followedKey, setFollowedKey] = useState<string | null>(prefillKey);
   if (!dirty && followedKey !== prefillKey) {
@@ -35,11 +34,11 @@ export function useComparisonDraft(prefill: GroupExerciseRules, existing: GroupM
     setContributionField(contributionFieldFromRules(prefill));
     setDefaultMetric(prefill.defaultMetric);
   }
-  /** Any edit stops following the prefill and voids a review. */
-  const edit = <T,>(set: (value: T) => void) => (value: T) => { setDirty(true); setReviewed(false); set(value); };
+  /** Any edit stops following the prefill. */
+  const edit = <T,>(set: (value: T) => void) => (value: T) => { setDirty(true); set(value); };
 
   return {
-    baseline, name, loadInputMode, contributionField, defaultMetric, dirty, showErrors, reviewed,
+    baseline, name, loadInputMode, contributionField, defaultMetric, dirty, showErrors,
     // Preserve the exact server number while the percentage field is unchanged.
     contribution: contributionField.percentage === contributionFieldFromRules(baseline.rules).percentage
       ? baseline.rules.bodyweightContribution : parseContributionPercent(contributionField.percentage) / 100,
@@ -48,8 +47,7 @@ export function useComparisonDraft(prefill: GroupExerciseRules, existing: GroupM
     changeContribution: edit(setContributionField),
     changeDefaultMetric: edit(setDefaultMetric),
     revealErrors: () => setShowErrors(true),
-    markReviewed: () => setReviewed(true),
     /** Drop the edits and follow the current prefill again. */
-    reload: () => { setDirty(false); setFollowedKey(null); setReviewed(false); setShowErrors(false); },
+    reload: () => { setDirty(false); setFollowedKey(null); setShowErrors(false); },
   };
 }

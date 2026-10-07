@@ -24,9 +24,10 @@ it('the scripted counterparty links and polls protocol-4 single-set Volume',()=>
   expect(calls.every(call=>call.headers['x-boga-group-contract']==='4' && call.headers['x-boga-sync-protocol']==='4')).toBe(true);
 });
 
-/** Mock the local tool boundary, then execute the real wrapper to prove its
- * one-way activation cleanup on command failure and its preservation of an
- * already-active local stack. No real stack or credential is accessed. */
+/** Mock the local tool boundary, then execute the real wrapper to prove it
+ * marks an initially pending stack for the next baseline preflight's reset
+ * (never resetting it itself), and leaves an already-active local stack
+ * unmarked. No real stack or credential is accessed. */
 describe('temporary local competition runtime',()=>{
   let directory: string;
   beforeEach(()=>{
@@ -37,6 +38,7 @@ describe('temporary local competition runtime',()=>{
       'REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"',
       'load_supabase_status_env() { API_URL=http://127.0.0.1:1234; ANON_KEY=fixture; SERVICE_ROLE_KEY=fixture; }',
       'resolve_db_container() { printf "fixture-db"; }',
+      'mark_stack_needs_reset() { printf "mark %s\\n" "$1" >> "$FIXTURE_LOG"; }',
     ].join('\n'));
     fs.writeFileSync(path.join(directory,'boga'),'#!/bin/bash\nprintf "reset\\n" >> "$FIXTURE_LOG"\n');
     fs.chmodSync(path.join(directory,'boga'),0o755);
@@ -51,14 +53,15 @@ describe('temporary local competition runtime',()=>{
     path.join(directory,'supabase/scripts/runtime.sh'),'/bin/bash','-c',`exit ${commandStatus}`,
   ],{ env: { ...process.env,PATH: `${directory}/bin:${process.env.PATH}`,FIXTURE_ACTIVE: active,FIXTURE_HTTP: http,
     FIXTURE_LOG: `${directory}/cleanup.log` },encoding: 'utf8' });
-  it('restores an initially pending local stack and preserves a failed command status',()=>{
-    expect(run('f','200',7).status).toBe(7);expect(fs.readFileSync(`${directory}/cleanup.log`,'utf8')).toBe('reset\n');
+  const marked='mark with-local-group-competitions.sh activated protocol 4\n';
+  it('marks an initially pending local stack, never resets it, and preserves a failed command status',()=>{
+    expect(run('f','200',7).status).toBe(7);expect(fs.readFileSync(`${directory}/cleanup.log`,'utf8')).toBe(marked);
   });
-  it('does not reset an already-active local stack',()=>{
+  it('neither marks nor resets an already-active local stack',()=>{
     expect(run('t','200',0).status).toBe(0);expect(fs.existsSync(`${directory}/cleanup.log`)).toBe(false);
   });
-  it('restores pending state after an unsuccessful activation without running the command',()=>{
+  it('marks the stack before an unsuccessful activation and does not run the command',()=>{
     const result=run('f','503',7);expect(result.status).toBe(1);expect(result.stderr).toContain('local activation failed');
-    expect(fs.readFileSync(`${directory}/cleanup.log`,'utf8')).toBe('reset\n');
+    expect(fs.readFileSync(`${directory}/cleanup.log`,'utf8')).toBe(marked);
   });
 });

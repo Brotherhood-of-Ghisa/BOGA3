@@ -9,14 +9,21 @@ appId: com.dinoderek.mobile
 #   1. the records panel's `History` pushes Exercise history, which lists the
 #      newer fixture session, and the native back returns to the page;
 #   2. the logger takes reps on the keyboard, commits set 3 as `82.5 × 5`, and
-#      marks it performed.
+#      marks it performed;
+#   3. the ⋮ menu (a `Sheet`) springs back from a short drag of its title row
+#      and its rows still tap; Swap opens a page sheet that closes on a swipe
+#      down and presents again afterwards.
 # Why device:
 #   1. a stack push and the native back button;
-#   2. the keyboard.
+#   2. the keyboard;
+#   3. the drag runs as a UI-thread worklet, which Jest's reanimated mock runs
+#      on JS (a worklet calling JS crashed only on device), and a swiped native
+#      page sheet must be re-created to present again.
 # Jest counterpart: __tests__/exercise-page-screen.test.tsx (the page over
 #   the same fixture: records, Last, effort cycle and sheet, menu, swap,
 #   `+ Add set`, Complete's warning, discarded planned sets read back from the
-#   database), __tests__/exercise-page-model.test.ts (effort inheritance),
+#   database), __tests__/ui-sheet-drag.test.tsx, __tests__/ui-page-sheet.test.tsx,
+#   __tests__/exercise-page-model.test.ts (effort inheritance),
 #   __tests__/exercise-history-screen.test.tsx (periods, bests, cards).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-page&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
@@ -71,3 +78,56 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "exercise-set-3-values"
     text: "82.5 × 5"
+
+# --- 3. ⋮ menu: a short drag springs back; Swap's page sheet swipes closed and reopens ---
+- tapOn:
+    id: "exercise-page-options"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-options-sheet-header"
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 4000
+# Short and slow: under the 120pt release distance and the flick velocity.
+- swipe:
+    start: "50%,73%"
+    end: "50%,77%"
+    duration: 900
+- waitForAnimationToEnd:
+    timeout: 4000
+- assertVisible:
+    id: "exercise-options-sheet-header"
+- tapOn:
+    id: "exercise-options-swap"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-swap-sheet-header"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: "exercise-swap-page-sheet"
+- swipe:
+    start: "50%,12%"
+    end: "50%,92%"
+    duration: 500
+- extendedWaitUntil:
+    notVisible:
+      id: "exercise-swap-sheet-header"
+    timeout: 10000
+- tapOn:
+    id: "exercise-page-options"
+- tapOn:
+    id: "exercise-options-swap"
+- extendedWaitUntil:
+    visible:
+      id: "exercise-swap-sheet-header"
+    timeout: 10000
+- tapOn:
+    id: "exercise-swap-sheet-close"
+- extendedWaitUntil:
+    notVisible:
+      id: "exercise-swap-sheet-header"
+    timeout: 10000
+- assertVisible:
+    id: "exercise-page-title"
+    text: "Barbell Bench Press"

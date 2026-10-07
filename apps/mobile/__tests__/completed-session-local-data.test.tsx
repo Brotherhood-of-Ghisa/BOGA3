@@ -80,6 +80,8 @@ import { uiRoles } from '@/components/ui/tokens';
 import { exerciseDefinitions, exerciseSets, sessions } from '@/src/data/schema';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
+import { configurePersonalEffortPolicy } from '@/src/config/personal-effort';
+import { DEFAULT_PERSONAL_EFFORT_POLICY } from '@/src/exercise-calculations/effort-policy';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import {
   bootLocalApp,
@@ -305,7 +307,9 @@ describe('completion presentation over real data', () => {
     expect(await screen.findByTestId(SQUAT_PR)).toBeTruthy();
     expect(screen.getByTestId('session-completion-pr-seed_barbell_bench_press')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
-    expect(screen.getByText('Exercise volume')).toBeTruthy();
+    // One fixed heading above the grouping; no subtitle.
+    expect(screen.getByText('Volume')).toBeTruthy();
+    expect(screen.queryByText('Session vs history')).toBeNull();
     // The squat has completed history in the fixture, so it is compared, not "no history".
     expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat')).toHaveTextContent(
       /\d+% (above|below) median|At median/
@@ -358,7 +362,7 @@ describe('completed-session detail over real data', () => {
 
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByTestId('session-completion-muscle-comparison-quads')).toBeTruthy();
-    expect(screen.getByText('Muscle volume')).toBeTruthy();
+    expect(screen.queryByText('Muscle volume')).toBeNull();
     // The share image compares exercises whatever the on-screen grouping.
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
     expect(screen.getByTestId(`session-share-exercise-${ONE_PR_SQUAT}`)).toBeTruthy();
@@ -425,32 +429,6 @@ describe('completed-session detail over real data', () => {
     expect(deletedAt()).toBeNull();
   });
 
-  it('appends an exercise block to a new active session and opens it', async () => {
-    await openSession({ sessionId: ONE_PR });
-    await openSets();
-    fireEvent.press(
-      await screen.findByTestId(`completed-session-detail-exercise-options-${ONE_PR_SQUAT}`)
-    );
-    const sheet = within(screen.getByTestId('completed-session-detail-exercise-sheet'));
-    expect(sheet.getByText('Barbell Back Squat')).toBeTruthy();
-    expect(sheet.getByLabelText('Append Barbell Back Squat block to current session')).toBeTruthy();
-    await act(async () => {
-      fireEvent.press(
-        screen.getByTestId(`completed-session-detail-append-exercise-button-${ONE_PR_SQUAT}`)
-      );
-    });
-
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
-    const active = localDatabase()
-      .select({ id: sessions.id })
-      .from(sessions)
-      .where(eq(sessions.status, 'active'))
-      .all();
-    expect(active).toHaveLength(1);
-    expect(mockPush).toHaveBeenCalledWith(`/session/${active[0].id}`);
-    expect(screen.queryByTestId('completed-session-detail-exercise-sheet')).toBeNull();
-  });
-
   it('reads edits back from the database when the screen regains focus', async () => {
     await openSession({ sessionId: ONE_PR });
     await openSets();
@@ -488,12 +466,15 @@ describe('a session written through the app', () => {
     expect(mockStackScreen).toHaveBeenLastCalledWith({
       options: { title: 'View Session', headerShown: false },
     });
-    expect(screen.getByText('View Session')).toBeTruthy();
+    // The bar names the session by when it started.
+    expect(screen.getByTestId('completed-session-detail-title'))
+      .toHaveTextContent(/^(Morning|Afternoon|Evening|Night) training · \d{1,2} [A-Z][a-z]{2}$/);
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
     expect(label('completed-session-detail-times-start')).toMatch(/^Start \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-    expect(label('completed-session-detail-times-end')).toMatch(/^End \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-    expect(label('completed-session-detail-duration')).toBe('Duration 58m');
+    expect(label('completed-session-detail-times-duration')).toBe('Duration 58m');
+    expect(screen.queryByTestId('completed-session-detail-times-end')).toBeNull();
     expect(label('completed-session-detail-gym')).toBe('Gym Westside Barbell Club');
+    expect(label('completed-session-detail-exercises')).toBe('Exercises 2');
     // Working sets only: 185×8 + 185×6 + 185×5 + 120×12, no thousands
     // separator; the 135×8 warm-up is neither a set nor volume.
     expect(label('completed-session-detail-sets')).toBe('Sets 4');
@@ -524,7 +505,7 @@ describe('a session written through the app', () => {
     );
     // No effort reads as an em dash, not `-`.
     expect(pulldown.getByText('—')).toBeTruthy();
-    // No collapse, no set table, no tags; Append sits behind each card's ⋮.
+    // No collapse, no set table, no tags, and no Append.
     expect(screen.queryByText('Weight')).toBeNull();
     expect(screen.queryByText('Append')).toBeNull();
     expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
@@ -577,6 +558,23 @@ describe('a session written through the app', () => {
     expect(screen.queryByText('500.0 × 10')).toBeNull();
     expect(screen.queryByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}`)).toBeNull();
     expect(label('completed-session-detail-sets')).toBe('Sets 4');
+  });
+
+  it("counts Sets under the account's effort policy, not the fixed group rule", async () => {
+    // By default the technique set is no working set (`Sets 4`); this account counts it.
+    configurePersonalEffortPolicy({
+      workingSetEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.workingSetEfforts, 'technique'],
+      volumeEfforts: DEFAULT_PERSONAL_EFFORT_POLICY.volumeEfforts,
+    });
+    try {
+      await openDesignSession(
+        { presentation: 'completion' },
+        { benchSets: [...BENCH_SETS, { weight: '100', reps: '5', type: 'technique' }] }
+      );
+      expect(label('session-completion-sets')).toBe('Sets 5');
+    } finally {
+      configurePersonalEffortPolicy(DEFAULT_PERSONAL_EFFORT_POLICY);
+    }
   });
 
   it('renders the no-PR completion hierarchy and hides ordinary detail actions', async () => {
@@ -709,9 +707,9 @@ describe('records, sharing and deleted sessions over real data', () => {
       expect(screen.getByTestId('session-completion-pr-seed_barbell_bench_press')).toBeTruthy();
       expect(screen.queryByTestId('session-completion-pr-pager')).toBeNull();
       expect(screen.queryByText('Share PR')).toBeNull();
-      // Records in the language's one superlative, without `kg` or "est.".
+      // Every record in plain words, without `kg` or "est.".
       expect(
-        within(squat).getByLabelText(/^New 1RM record for Barbell Back Squat: \d+\.\d × \d+, 1RM \d+\.\d$/)
+        within(squat).getByLabelText(/^Barbell Back Squat, 2 records: 1RM \d+\.\d and Top weight, \d+\.\d × \d+$/)
       ).toBeTruthy();
 
       fireEvent.press(screen.getByTestId('session-completion-share-session'));
@@ -725,14 +723,14 @@ describe('records, sharing and deleted sessions over real data', () => {
     }
   );
 
-  it('marks the set whose 1RM beats every earlier session with a record band', async () => {
+  it('bands the set whose 1RM and Weight beat every earlier session on one line', async () => {
     await openSession({ sessionId: ONE_PR });
     await openSets();
 
     const band = await screen.findByTestId(`completed-session-detail-exercise-${ONE_PR_SQUAT}-record`);
-    expect(band).toHaveTextContent(/^New 1RM record · \d+\.\d$/);
+    expect(band).toHaveTextContent(/^New 1RM · \d+\.\d \+ top weight275\.0 × 5$/);
     expect(label(`completed-session-detail-exercise-${ONE_PR_SQUAT}`)).toMatch(
-      /^Barbell Back Squat, 1 set, new 1RM record \d+\.\d$/
+      /^Barbell Back Squat, 1 set, new 1RM \d+\.\d and top weight 275\.0 × 5$/
     );
   });
 
@@ -749,11 +747,14 @@ describe('records, sharing and deleted sessions over real data', () => {
 
     const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
     const pulldown = screen.getByTestId(`session-completion-pr-${DESIGN.pulldownExerciseId}`);
-    // Its 185 × 8 is heavier than 180 × 12 but its 1RM 236.2 is below 254.7: a Weight record.
-    expect(within(bench).getByLabelText('New top weight for Barbell Bench Press: 185.0 × 8, 1RM 236.2')).toBeTruthy();
-    expect(within(bench).getByText('New top weight · 185.0 × 8')).toBeTruthy();
-    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-set')).toHaveStyle({ color: uiRoles.record });
-    expect(within(pulldown).getByLabelText(/^New 1RM record for Lat Pulldown: 120\.0 × 12, 1RM \d+\.\d$/)).toBeTruthy();
+    // Its 185 × 8 is heavier than 180 × 12 but its 1RM 236.2 is below 254.7: a
+    // Weight record; its 3515 volume beats 2160 too.
+    expect(within(bench).getByLabelText('Barbell Bench Press, 2 records: Top weight, 185.0 × 8; Volume 3515')).toBeTruthy();
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-line-1')).toHaveTextContent('Top weight185.0 × 8');
+    expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-line-2')).toHaveTextContent('Volume 3515');
+    // A plain list: no `record` emphasis.
+    expect(within(bench).getByText('185.0 × 8')).toHaveStyle({ color: uiRoles.ink });
+    expect(within(pulldown).getByLabelText(/^Lat Pulldown, 3 records: 1RM \d+\.\d and Top weight, 120\.0 × 12; Volume 1440$/)).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
     expect(within(screen.getByTestId('session-share-card-personal-records')).getByText('2 new records')).toBeTruthy();
@@ -762,18 +763,20 @@ describe('records, sharing and deleted sessions over real data', () => {
     );
     expect(screen.getByTestId(`session-share-card-pr-${DESIGN.pulldownExerciseId}-kind`)).toHaveTextContent('1RM');
 
-    // The detail's set cards band the same record sets.
+    // The detail's set cards band the same records, a line each.
     screen.unmount();
     mockParams = { sessionId: DESIGN.sessionId };
     render(<CompletedSessionDetailRoute />);
     await openSets();
-    expect(await screen.findByTestId(`completed-session-detail-exercise-${DESIGN.bench}-record`))
-      .toHaveTextContent('New top weight · 185.0 × 8');
+    expect(await screen.findByTestId(`completed-session-detail-exercise-${DESIGN.bench}-record-1`))
+      .toHaveTextContent('New top weight185.0 × 8');
+    expect(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.bench}-record-2`))
+      .toHaveTextContent('New volume record · 3515');
     expect(label(`completed-session-detail-exercise-${DESIGN.bench}`)).toBe(
-      'Barbell Bench Press, 3 sets, new top weight 185.0 × 8'
+      'Barbell Bench Press, 3 sets, new top weight 185.0 × 8, new volume record 3515'
     );
-    expect(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}-record`))
-      .toHaveTextContent(/^New 1RM record · \d+\.\d$/);
+    expect(screen.getByTestId(`completed-session-detail-exercise-${DESIGN.pulldown}-record-1`))
+      .toHaveTextContent(/^New 1RM · \d+\.\d \+ top weight120\.0 × 12$/);
   });
 
   it('opens a deleted session with its band, in Summary, and restores Edit and comparisons on undelete', async () => {

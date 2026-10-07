@@ -71,7 +71,7 @@ const readAndReconcile = async () => {
     for (const muscle of result.muscles) {
       const summary = oracle[period].totals.muscleFamilies.flatMap(family => family.muscles).find(row => row.muscleGroupId === muscle.muscleGroupId)!;
       expect(muscle[period]).toMatchObject({ workingSetCount: summary.workingSetCount,
-        totalVolume: summary.totalVolume, knownVolume: summary.knownVolume });
+        totalVolume: summary.totalVolume });
       expect(muscle.exercises.reduce((sum, row) => sum + row[period].workingSetCount, 0)).toBe(muscle[period].workingSetCount);
       expect(muscle.exercises.reduce((sum, row) => sum + row.workingSetChange, 0)).toBe(muscle.workingSetChange);
       if (muscle[period].totalVolume !== null) {
@@ -129,18 +129,18 @@ it('refreshes both periods after edits, mapping reinterpretation, tombstones and
   expect((await readAndReconcile()).previous.workingSetCount).toBe(0);
 });
 
-it('retains incomplete coverage and legitimate zero Volume under the same saved policy', async () => {
+it('leaves uncalculable sets out and keeps legitimate zero Volume under the same saved policy', async () => {
   const db = mockFixture.database;
   db.update(userSettings).set({ bodyweightCalculationsEnabled: true }).run();
   db.update(exerciseDefinitions).set({ bodyweightContribution: 2 }).where(eq(exerciseDefinitions.id, 'lift')).run();
   setAccountLocalPreferences({ volumeEfforts: [...DEFAULT_PERSONAL_EFFORT_POLICY.volumeEfforts, 'warm_up'] });
   const row = await readAndReconcile();
-  expect(row.current).toMatchObject({ totalVolume: null, knownVolume: 200, volumeSetCount: 3, knownVolumeSetCount: 1 });
-  expect(row.previous).toMatchObject({ totalVolume: null, knownVolume: 0, volumeSetCount: 2, knownVolumeSetCount: 1 });
-  expect(row.volumeChange).toEqual({ kind: 'incomplete' });
+  expect(row.current).toMatchObject({ totalVolume: 200, volumeSetCount: 3 });
+  expect(row.previous).toMatchObject({ totalVolume: 0, volumeSetCount: 2 });
+  expect(row.volumeChange).toEqual({ kind: 'new' });
   db.update(exerciseSets).set({ weightValue: '' }).where(eq(exerciseSets.id, 'volume-set')).run();
   expect((await readAndReconcile()).exercises.find(exercise => exercise.exerciseDefinitionId === 'volume-only')?.current)
-    .toMatchObject({ workingSetCount: 0, totalVolume: 0, volumeSetCount: 1, knownVolumeSetCount: 1 });
+    .toMatchObject({ workingSetCount: 0, totalVolume: 0, volumeSetCount: 1 });
 });
 
 it('restores account-local policy on relaunch and account switches without reusing a prior result', async () => {

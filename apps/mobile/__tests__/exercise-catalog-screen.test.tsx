@@ -330,11 +330,41 @@ describe('ExerciseCatalogScreen', () => {
     await screen.findByTestId('exercise-catalog-actions-sheet');
     // A deleted exercise cannot be edited; Undelete replaces Delete.
     expect(screen.getByLabelText('Edit exercise from actions')).toBeDisabled();
+    expect(screen.getByLabelText('Duplicate exercise from actions')).toBeDisabled();
     expect(screen.queryByTestId('exercise-action-delete')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-action-undelete'));
 
     expect(await screen.findByText('Exercise restored.')).toBeTruthy();
     expect(definitionNamed('Barbell Bench Press')?.deletedAt).toBeNull();
+  });
+
+  it('duplicates an exercise from its actions with prefilled data and (Copy) in name', async () => {
+    await openCatalog();
+    await expandFamily('Chest');
+    fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
+    expect(await screen.findByRole('header', { name: 'Barbell Bench Press' })).toBeTruthy();
+    expect(screen.getByTestId('exercise-action-duplicate')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Duplicate exercise from actions'));
+
+    expect(await screen.findByRole('header', { name: 'Duplicate Exercise' })).toBeTruthy();
+    expect(screen.getByDisplayValue('Barbell Bench Press (Copy)')).toBeTruthy();
+
+    fireEvent.press(screen.getByLabelText('Save exercise definition'));
+
+    expect(await screen.findByText('Exercise created.')).toBeTruthy();
+    const copyDef = definitionNamed('Barbell Bench Press (Copy)');
+    expect(copyDef).toBeTruthy();
+    expect(copyDef?.deletedAt).toBeNull();
+    const origDef = definitionNamed('Barbell Bench Press');
+    expect(origDef).toBeTruthy();
+    expect(copyDef?.id).not.toBe(origDef?.id);
+
+    const copyMappings = activeMappingsOf(copyDef!.id);
+    const origMappings = activeMappingsOf(origDef!.id);
+    expect(copyMappings.map((m) => ({ muscleGroupId: m.muscleGroupId, role: m.role }))).toEqual(
+      origMappings.map((m) => ({ muscleGroupId: m.muscleGroupId, role: m.role }))
+    );
   });
 
   describe('design language', () => {
@@ -373,6 +403,8 @@ describe('ExerciseCatalogScreen', () => {
 
       expect(await screen.findByTestId('exercise-catalog-actions-sheet')).toBeTruthy();
       expect(screen.getByRole('header', { name: 'Barbell Bench Press' })).toBeTruthy();
+      expect(screen.getByTestId('exercise-action-edit')).toBeTruthy();
+      expect(screen.getByTestId('exercise-action-duplicate')).toBeTruthy();
       expect(screen.getByTestId('exercise-action-delete')).toBeTruthy();
       expect(screen.getByText('Delete')).toHaveStyle({ color: uiRoles.danger });
       fireEvent.press(
@@ -404,7 +436,7 @@ describe('ExerciseCatalogScreen', () => {
       ).toHaveLength(1);
     });
 
-    it('opens the editor as a sheet with Save as its one accent, dismissed by the backdrop', async () => {
+    it('opens the editor as a page sheet with Save as its one accent, closed by its X', async () => {
       await openCatalog();
 
       fireEvent.press(screen.getByLabelText('Create new exercise'));
@@ -415,7 +447,7 @@ describe('ExerciseCatalogScreen', () => {
       expect(editorAccents).toHaveLength(1);
       expect(editorAccents[0].props.accessibilityLabel).toBe('Save exercise definition');
 
-      fireEvent.press(screen.getByLabelText('Dismiss exercise editor overlay', { includeHiddenElements: true }));
+      fireEvent.press(screen.getByLabelText('Close exercise editor'));
       expect(screen.queryByTestId('exercise-editor')).toBeNull();
     });
 

@@ -19,7 +19,6 @@ import {
   formatSessionListCompactDuration,
   loadLocalGymById,
   loadSessionSnapshotById,
-  appendCompletedSessionExerciseAsPlanned as appendCompletedSessionExerciseAsPlannedDraft,
   normalizeSessionSetType,
   setSessionDeletedState,
   type SessionSetTypeValue,
@@ -30,6 +29,7 @@ import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { buildCompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
+import { completedSessionTitle } from '@/src/session-recorder/session-view-model';
 import {
   isConfirmedPerformedSet,
   isWorkingSet,
@@ -85,10 +85,6 @@ export type CompletedSessionDetailDataClient = {
     session: { sessionId: string; completedAt: Date },
     exerciseDefinitionIds: string[]
   ): Promise<ReadonlyMap<string, RecordBaseline>>;
-  appendCompletedSessionExerciseAsPlanned(
-    sessionId: string,
-    sessionExerciseId: string
-  ): Promise<{ sessionId: string }>;
   setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
 };
 
@@ -230,9 +226,6 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
   },
   async loadHistoricalBests(session, exerciseDefinitionIds) {
     return recordBaselinesOf(await loadEarlierBestsByDefinition(session, exerciseDefinitionIds));
-  },
-  async appendCompletedSessionExerciseAsPlanned(sessionId, sessionExerciseId) {
-    return appendCompletedSessionExerciseAsPlannedDraft(sessionId, sessionExerciseId);
   },
   async setCompletedSessionDeletedState(sessionId, isDeleted) {
     await setSessionDeletedState(sessionId, isDeleted);
@@ -383,10 +376,6 @@ export function CompletedSessionDetailScreenShell({
     () => (session ? formatDateTimeStamp(session.startedAt) : '—'),
     [session]
   );
-  const formattedCompletedAt = useMemo(
-    () => (session ? formatDateTimeStamp(session.completedAt) : '—'),
-    [session]
-  );
   const performedExercises = useMemo(
     () =>
       session?.exercises
@@ -401,7 +390,7 @@ export function CompletedSessionDetailScreenShell({
     () =>
       performedExercises.reduce(
         (count, exercise) =>
-          count + exercise.sets.filter((set) => isWorkingSet(set)).length,
+          count + exercise.sets.filter((set) => isWorkingSet(set, exercise.loadContext?.effortPolicy)).length,
         0
       ),
     [performedExercises]
@@ -524,22 +513,6 @@ export function CompletedSessionDetailScreenShell({
     }
 
     router.push(sessionViewHref(session.id));
-  };
-
-  const handleAppendExercise = (sessionExerciseId: string) => {
-    if (!session) {
-      return;
-    }
-
-    setActionFeedback(null);
-    void dataClient
-      .appendCompletedSessionExerciseAsPlanned(session.id, sessionExerciseId)
-      .then(({ sessionId: activeSessionId }) => {
-        router.push(sessionViewHref(activeSessionId));
-      })
-      .catch((error) => {
-        setActionFeedback(error instanceof Error ? error.message : 'Unable to append exercise block');
-      });
   };
 
   const handleToggleDeletedState = () => {
@@ -681,13 +654,12 @@ export function CompletedSessionDetailScreenShell({
         }
         error={actionFeedback ?? errorMessage}
         model={buildCompletedSessionDetailModel(session.exercises, historicalBests)}
-        onAppend={handleAppendExercise}
         onBack={handleBack}
         onEdit={handleEdit}
         onToggleDeleted={handleToggleDeletedState}
         summary={{
+          title: completedSessionTitle(new Date(session.startedAt)),
           start: formattedStartedAt,
-          end: formattedCompletedAt,
           duration: session.durationDisplay,
           gymName: session.gymName,
           deleted: session.deletedAt !== null,

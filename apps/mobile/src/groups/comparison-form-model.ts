@@ -1,7 +1,5 @@
-// The group comparison form's derived state, as plain data: inline errors,
-// whether the calculation changed (and so needs a reviewed new revision), the
-// stale-revision warning, the preview copy and the submit label.
-import { formatContributionPercent } from './competition-view-model';
+// The group comparison form's derived state, as plain data: rule validation,
+// inline errors and the stale-revision warning.
 import { validateExerciseCore } from '@/src/exercise-core';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 import { isCompetitionMetric, type CompetitionRules as GroupExerciseRules } from './competition-contract';
@@ -30,56 +28,29 @@ export const baselineFrom = (rules: GroupExerciseRules, existing: GroupMetricExe
 export const parseContributionPercent = (text: string): number =>
   text.trim() === '' ? NaN : Number(text.replace(',', '.'));
 
-const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
-  left.loadInputMode === right.loadInputMode &&
-  (left.bodyweightCalculationsEnabled && left.bodyweightContribution > 0) ===
-    (right.bodyweightCalculationsEnabled && right.bodyweightContribution > 0) &&
-  left.bodyweightContribution === right.bodyweightContribution;
-
-export type ComparisonPreview = { summary: string; attestationNote: string };
-
-const describeRulesChange = (baseline: ComparisonBaseline, next: GroupExerciseRules): ComparisonPreview => ({
-  summary: `Apply rules revision ${(baseline.revision ?? 0) + 1}: ${formatContributionPercent(baseline.rules.bodyweightContribution)}% → ${formatContributionPercent(next.bodyweightContribution)}% bodyweight contribution, ${next.loadInputMode === 'per_side_load' ? 'per-side' : 'total'} Weight. The whole board will rebuild together. Previous scores stay in their original rules history; this is not a new performed record.`,
-  attestationNote: 'Certifications of unchanged witnessed sets keep the same witness and time. Ineligible scores return when eligible under the rules. Personal exercise settings stay unchanged.',
-});
-
 export type ComparisonFormStatusInput = {
   validation: GroupRulesValidation;
   baseline: ComparisonBaseline;
   existing: GroupMetricExerciseWire | undefined;
   dirty: boolean;
   showErrors: boolean;
-  reviewed: boolean;
 };
 
 export type ComparisonFormStatus = {
-  /** An existing comparison's calculation changed: submitting first asks for a review. */
-  calculationChanged: boolean;
   nameError: string | null;
   rulesError: string | null;
   /** Edits started on an older revision than the one now loaded. */
   stale: boolean;
-  preview: ComparisonPreview | null;
 };
 
 export function deriveComparisonFormStatus({
-  validation, baseline, existing, dirty, showErrors, reviewed,
+  validation, baseline, existing, dirty, showErrors,
 }: ComparisonFormStatusInput): ComparisonFormStatus {
-  const calculationChanged = baseline.revision !== null && validation.ok && !sameCalculation(baseline.rules, validation.value);
   const shownError = showErrors && !validation.ok ? validation : null;
   return {
-    calculationChanged,
     nameError: shownError?.field === 'name' ? shownError.message : null,
     rulesError: shownError && shownError.field !== 'name' ? shownError.message : null,
     stale: Boolean(dirty && existing && existing.rules.rules_revision !== baseline.revision),
-    preview: reviewed && calculationChanged && validation.ok ? describeRulesChange(baseline, validation.value) : null,
   };
 }
 
-export const comparisonSubmitLabel = ({ pending, calculationChanged, reviewed, pendingLabel, submitLabel }: {
-  pending: boolean; calculationChanged: boolean; reviewed: boolean; pendingLabel: string; submitLabel: string;
-}): string => {
-  if (pending) return pendingLabel;
-  if (!calculationChanged) return submitLabel;
-  return reviewed ? 'Apply group rules' : 'Review rule changes';
-};

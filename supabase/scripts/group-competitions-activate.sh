@@ -9,7 +9,7 @@
 # only a reset restores a pending schema. Idempotent: an active stack is left
 # alone. Targets whichever stack the caller engaged (the dev baseline engages
 # BOGA-dev); the gate lanes use with-local-group-competitions.sh instead, which
-# resets the stack afterwards.
+# marks the stack so the next baseline preflight resets it.
 
 set -euo pipefail
 

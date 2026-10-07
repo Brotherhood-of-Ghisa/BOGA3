@@ -11,6 +11,7 @@ import {
   uiTypography,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { SYNC_VERSION_MISMATCH_MESSAGE } from '@/src/sync/cycle-error-signal';
 import { PULL_LAYER_COUNT, type SyncPhase, type SyncProgress } from '@/src/sync/progress';
 import { requestSync } from '@/src/sync/scheduler';
 import { selectSyncGateMode } from '@/src/sync/sync-gate-decision';
@@ -41,7 +42,7 @@ const PHASE_LABELS: Record<SyncPhase, string> = {
  * went wrong without leaking internal error tokens.
  */
 const ERROR_MESSAGES: Record<'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL', string> = {
-  UPDATE_REQUIRED: 'Update BoGa to continue syncing. Your data remains on this device.',
+  UPDATE_REQUIRED: SYNC_VERSION_MISMATCH_MESSAGE,
   INTERNAL: 'We could not finish setting up your data. Check your connection and try again.',
   FK_VIOLATION: 'Something went wrong while setting up your data. Please try again.',
   LOCAL_FK_VIOLATION: 'Something went wrong while setting up your data. Please try again.',
@@ -73,7 +74,7 @@ export function SyncSetupScreen() {
     <Screen style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>
       <Card style={styles.card}>
         <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
-          {mode.kind === 'error' && mode.errorCode === 'UPDATE_REQUIRED' ? 'App update required' : 'Setting up your data…'}
+          {mode.kind === 'error' && mode.errorCode === 'UPDATE_REQUIRED' ? 'Sync version mismatch' : 'Setting up your data…'}
         </Text>
 
         {mode.kind === 'error' ? (

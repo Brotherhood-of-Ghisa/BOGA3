@@ -19,8 +19,9 @@ the names of its Jest tests are the specification of that component.
 | Route params, query values, transitions, header titles | `navigation-contract.md` |
 | A primitive or shared component's API and variants | the component file; `components-catalog.md` says which component to reach for |
 | Colour roles, type, surfaces, emphasis, figure formatting | `design-language.md` |
-| A screen with an accepted design target | its record under `design-targets/` |
-| What counts as a working set, a counted session or a record; figure formats | `docs/specs/tech/training-metrics-contract.md` |
+| A screen's own layout and behaviour | its component's header comment and Jest tests |
+| What counts as a performed or working set, how set counts and set rows show | `docs/product/set.md` |
+| A counted session, a record, figure formats, and how code implements the facts | `docs/specs/tech/training-metrics-contract.md` |
 | Optional bodyweight calculations, personal or group | `docs/specs/tech/bodyweight-load-contract.md` |
 | Group screens, group writes, boards and certification | `docs/specs/tech/groups-contract.md`, `docs/specs/tech/group-competition-contract.md` |
 | A reusable interaction pattern (stream card, offline marker, online-only write, row logger, link card) | `docs/specs/08-ux-delivery-standard.md` "UX patterns" |
@@ -30,8 +31,8 @@ the names of its Jest tests are the specification of that component.
 
 1. **One primary per screen**, the screen's one `accent` action
    (`design-language.md` "Emphasis"): `Finish`, `Done`, `Edit`, `Save
-   Exercise`, a start disc. Train with a ready plan shows the planned start as
-   the primary and the empty start as an outline.
+   Exercise`, a start disc. Train's disc (an empty start) stays the primary
+   even with a ready plan, whose `Start` is an outline.
 2. **Everything else is an outline or a text button.** Dismissal is never a
    button inside a sheet (see Sheets).
 3. **Destructive actions are `danger`** and visually distinct from the
@@ -48,19 +49,26 @@ the names of its Jest tests are the specification of that component.
 
 ## Sheets
 
-1. **A sheet is state within its route, not navigation.** Secondary workflows
-   (row actions, management options, pickers of one value, editors) open a
-   design-language `Sheet` over the current screen. Do not document opening one
-   as a route transition.
-2. **No Cancel, no Close.** The backdrop, Android back and the VoiceOver escape
-   dismiss a sheet and write nothing. A sheet may refuse dismissal only while
-   its own write or capture is in flight.
-   Full-height Progress history uses header drag and an accessible dismiss
-   action; its reachable backdrop still dismisses (`components/stats/history-popup.tsx`).
-3. **Never stack sheets.** A choice made inside a sheet (an editor's muscle
+1. **A sheet is state within its route, not navigation.** There are two
+   kinds. A **picker or menu** (row actions, management options, a choice of
+   one value, a short form) opens a design-language `Sheet` over the current
+   screen, sized to its content. A **sub-page** (a browser, an editor, a
+   preview: Swap exercise, the exercise editor, Share session, Progress
+   history) opens a `PageSheet`, the native iOS page sheet the exercise picker
+   uses. Do not document opening either as a route transition.
+2. **Dragging down closes every sheet, and dismissal writes nothing.** A
+   `Sheet` follows a drag from its handle and title row, closes on a
+   deliberate release and springs back otherwise; its body scrolls and taps
+   without dragging. Its backdrop, Android Back and the VoiceOver escape close
+   it too, and it has no Cancel or Close. A `PageSheet` swipes down from
+   anywhere and carries an X, since it has no backdrop. A sheet may refuse
+   dismissal only while its own write or capture is in flight; a refused drag
+   springs back.
+3. **Pickers never stack.** A choice made inside a sheet (an editor's muscle
    list) swaps the sheet's body, with a `chevron-left` back to the previous
-   body. A confirmation that follows a sheet opens once the sheet has gone
-   (`Sheet.onDismissed`).
+   body. A sub-page may open over a sub-page, which iOS stacks as cards. A
+   confirmation that follows a sheet opens once the sheet has gone
+   (`onDismissed`).
 4. **The keyboard closes before a sheet opens**, so a sheet never opens under
    it, and a sheet holding fields lifts above the keyboard.
 5. **Confirm what cannot be undone, not what can.** A soft delete (exercise,
@@ -68,10 +76,9 @@ the names of its Jest tests are the specification of that component.
    `Undelete` / `Unarchive`. Discarding an active session, removing an
    exercise from a session, and destructive group writes confirm first in a
    native `Alert` with a destructive button.
-6. **The exception is the exercise picker**, a route
-   (`/session/<id>/add-exercise`) presented as a full-height iOS page sheet,
-   because it hosts its own editor and pick sheets. Swiping it down leaves
-   without adding.
+6. **The exercise picker is the one sub-page with a route**
+   (`/session/<id>/add-exercise`, presented as a page sheet), because Manage
+   pushes the catalogue over it. Swiping it down leaves without adding.
 
 ## Lists and rows
 
@@ -115,24 +122,22 @@ the names of its Jest tests are the specification of that component.
 
 ## Sets and figures
 
-What a set *is* (valid values, confirmed performed, working set,
-volume-included set, counted session, record) is
+What a set *is* and which sets count are [[set.performed]] and
+[[set.eligibility]]; counted sessions and records are
 `docs/specs/tech/training-metrics-contract.md`; how the session recorder
 keeps, defaults and cleans up rows is `src/session-recorder/session-model.ts`
 and spec 05's session invariants. The UI adds:
 
-1. **An unqualified `Sets` is working sets**, on every screen and in the share
-   image. Only plain row counts count every row: the session view card's
-   `n of m sets done` and the remove-exercise alert's `its N sets`.
+1. **Set counts** follow [[set.count-display]]; the session view card's row
+   count is its plain-row exception.
 2. **Set inputs show validity by visual cues only** (field frame, a disabled
    commit control); there is no inline validation text inside a set row.
 3. **A planned row is matched or modified by its prescribed Weight and Reps
    only**; changing effort does not make it modified.
-4. **Every row shows every figure it can compute**, planned and warm-up rows
-   included, faded when not performed (`design-language.md` "Presenting
-   data"). The only highlight is the exercise's one record set in `record`,
-   with the `record` band on its card or set list (`design-language.md`
-   "Emphasis"; which set, training-metrics "Records").
+4. **Set rows** follow [[set.row-figures]]; fading is `design-language.md`
+   "Presenting data". Record sets are in `record`, with the `record` band on
+   their card or set list (`design-language.md` "Emphasis"; which sets,
+   training-metrics "Records").
 5. **One vocabulary and one format.** `Weight`, `Top weight`, `1RM`,
    `Volume`; the formats of training-metrics "Calculations", never `k`, never
    a thousands separator, `—` only for a missing value.
@@ -171,7 +176,7 @@ audit, and `--update-budgets` after a cleanup.
 ## Appearance
 
 Every theme is light; the presets, their seeds and why the choice applies at
-next launch are `design-language.md` "Presets" and the decision register in
+next launch are `design-language.md` "Choosing one" and the decision register in
 `docs/specs/03-technical-architecture.md`. Outside the roles: `app/_layout.tsx`
 keeps `<StatusBar style="dark" />`; the splash is a fixed white
 (`app.config.ts`); neither reads a role. The stack header takes `surface`

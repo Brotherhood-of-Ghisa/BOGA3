@@ -20,7 +20,7 @@ const as=async <T>(user: LiveClient,call: () => Promise<T>) => {
   try { return await call(); } finally { mockActiveClient=null; }
 };
 const poll=async <T>(read: () => Promise<T>,ready: (value: T) => boolean): Promise<T> => {
-  // A rules-only rebuild can rely on the five-minute cron sweep. Allow one
+  // A rebuild can rely on the five-minute cron sweep. Allow one
   // complete interval plus processing time rather than depending on its phase.
   const deadline=Date.now()+360_000;
   for (;;) {
@@ -92,13 +92,15 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const certId=certified.certification.certification_id;
   expect((await as(owner,() => getCompetitionCertification(groupId,certId,'volume'))).certification.ended_at_ms).toBeNull();
   expect((await as(owner,() => endCompetitionCertification(groupId,certId,'volume','withdraw'))).certification.end_reason).toBe('withdrawn');
-  const refreshed=await readBoard();
-  const recertified=await as(owner,() => certifyCompetition({ ...args,token: refreshed.entries[0].write_token }));
-  expect((await as(owner,() => endCompetitionCertification(groupId,recertified.certification.certification_id,'volume','cancel'))).certification.end_reason).toBe('cancelled');
+  // The client passes the end action through unchanged, so 'cancel' adds no wire;
+  // its end reason, and the ordinary board a rules update rebuilds, are proven
+  // server-side in groups-competitions.sh and their values in the Jest
+  // contract/evaluation suites. Here: the update call's own wire.
   const updated=await as(owner,() => updateCompetitionExercise({ groupId,exerciseId,revision: board.rules.rules_revision,
     name: 'Ordinary pull-up',mode: 'total_load',contribution: 0,metric: 'e1rm' }));
-  const ordinary=await poll(readBoard,result => result.state==='ready' && result.rules.rules_revision===updated.exercise.rules.rules_revision && result.entries.length===1);
-  expect(ordinary.entries[0]).toMatchObject({ unit: 'kg_reps',value: 100,performance: { visibility: 'ordinary',weight_value: '20' } });
+  expect(updated.exercise).toMatchObject({ name: 'Ordinary pull-up',
+    rules: { bodyweight_contribution: 0,default_metric: 'e1rm' } });
+  expect(updated.exercise.rules.rules_revision).toBeGreaterThan(board.rules.rules_revision);
   expect((await as(owner,() => archiveCompetitionExercise(groupId,exerciseId,true))).exercise.archived_at_ms).not.toBeNull();
   expect((await as(owner,() => archiveCompetitionExercise(groupId,exerciseId,false))).exercise.archived_at_ms).toBeNull();
 },840_000);

@@ -262,4 +262,28 @@ describe('programme progress and next block', () => {
     expect(during[0].blockCounts.attached).toBe(1);
     expect(during[0].id).toBe(programmeId);
   });
+
+  it('skips pending blocks without an exercise definition when selecting programme progression', async () => {
+    const created = await planRepository.createProgramme(
+      {
+        name: 'Mixed Programme',
+        description: 'First block has no definition',
+        plans: [
+          planDraft('P1', {
+            exercises: [
+              exercise('Custom Movement', { exerciseDefinitionId: null }),
+              exercise('Bench', { exerciseDefinitionId: 'def-bench' }),
+            ],
+          }),
+          planDraft('P2'),
+        ],
+      },
+      T0,
+    );
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const next = await planQueries.findNextProgrammeBlock(created.id);
+    expect(next).not.toBeNull();
+    expect(next?.name).toBe('Bench');
+    expect(next?.exerciseDefinitionId).toBe('def-bench');
+  });
 });

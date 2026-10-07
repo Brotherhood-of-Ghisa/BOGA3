@@ -1,13 +1,13 @@
 import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { HistoryPopup } from './history-popup';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import {
+  PageSheet,
   SegmentedControl,
   StatePanel,
   uiFonts,
@@ -22,8 +22,8 @@ import type {
   SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 
-// The history of one exercise or one muscle on Progress: a
-// full-height popup holding the metric control, saved view/window, week banner and daily
+// The history of one exercise or one muscle on Progress: a sub-page
+// (`PageSheet`) holding the metric control, saved view/window, week banner and daily
 // or weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
@@ -74,14 +74,14 @@ const formatWeekDateRange = (weekStartDateKey: string): string => {
 
 const formatWeekValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
-    case 'totalVolume': return formatVolumeWithCoverage(week.totalVolume, week.knownVolume);
+    case 'totalVolume': return formatVolumeFigure(week.totalVolume);
     case 'workingSetCount': return String(week.workingSetCount);
     case 'estimatedRM1': return week.estimatedRM1 !== null ? formatOneRepMax(week.estimatedRM1) : '—';
     case 'highestWeight': return week.highestWeight !== null ? formatWeight(week.highestWeight) : '—';
   }
 };
 
-// One day's value for the daily heatmap's detail card, in its metric's format.
+// One day's value inside its calendar tile, in the metric's format.
 const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
     case 'workingSetCount': return String(value);
@@ -151,7 +151,7 @@ function HistoryHeatmap({
   status: ReactNode;
   chartHidden: boolean;
 }) {
-  // Both views span the saved window; only Daily scrolls horizontally.
+  // Both views span the saved window and scroll vertically.
   const data = useMemo(
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: lookbackWeeks, muscleTargets }),
     [dailyMetrics, metric, todayDateKey, lookbackWeeks, muscleTargets]
@@ -197,7 +197,7 @@ function HistoryHeatmap({
         pointerEvents={dailyVisible ? 'auto' : 'none'}
         style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive]}
         testID={`${testIDPrefix}-heatmap-panel-daily`}>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
+        <ScrollView contentContainerStyle={styles.dailyContent} showsVerticalScrollIndicator={false}
           style={styles.scroll} testID={`${testIDPrefix}-scroll`}>
           {status}
           <View accessibilityElementsHidden={chartHidden} importantForAccessibility={chartHidden ? 'no-hide-descendants' : 'auto'}
@@ -241,7 +241,8 @@ export type HistorySheetProps<TMetric extends CalendarHeatmapMetric> = {
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   selectedWeekKey: string | null;
   onSelectWeek: (weekKey: string | null) => void;
-  // Called after the full-height popup has closed; no visible close button.
+  // Called once the sheet has gone (X, swipe down, Back or escape), so the host
+  // clears its target and restores focus after the native modal has closed.
   onDismiss: () => void;
   onRetry?: () => void;
   todayDateKey?: string;
@@ -269,22 +270,12 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
 }: HistorySheetProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
+  // The host mounts the sheet open and unmounts it from `onDismiss`.
+  const [visible, setVisible] = useState(true);
 
   return (
-    <HistoryPopup dismissLabel={`Dismiss ${kind} history`} accessibilityLabel={`${eyebrow}: ${title}`}
-      onDismiss={onDismiss} testID={prefix}
-      header={<View style={styles.header}>
-          <Text allowFontScaling={false} style={styles.eyebrow}>
-            {eyebrow}
-          </Text>
-          <Text
-            accessibilityRole="header"
-            allowFontScaling={false}
-            style={styles.title}
-            testID={`${prefix}-title`}>
-            {title}
-          </Text>
-        </View>}>
+    <PageSheet closeLabel={`Close ${kind} history`} eyebrow={eyebrow} onDismiss={() => setVisible(false)}
+      onDismissed={onDismiss} testID={prefix} title={title} visible={visible}>
       <View style={styles.body} testID={`${prefix}-overlay`}>
         <View style={styles.controls}>
           <Text allowFontScaling={false} style={styles.controlLabel} testID={`${prefix}-window`}>
@@ -298,6 +289,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
               accessibilityLabel="Select effort metric"
               // Four metrics: `Top weight` outgrows an equal quarter.
               layout="fit"
+              selectedGround="accent"
               onChange={onSelectMetric}
               options={metricOptions}
               testIDPrefix={`${prefix}-metric-chip`}
@@ -327,7 +319,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           testIDPrefix={prefix}
           todayDateKey={todayDateKey}
           view={view}
-          chartHidden={!!errorMessage}
+          chartHidden={!!errorMessage || (isLoading && dailyMetrics.length === 0)}
           status={<>
           {isLoading ? (
             <StatePanel body={`Loading ${title} history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
@@ -356,7 +348,7 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           </>}
         />
       </View>
-    </HistoryPopup>
+    </PageSheet>
   );
 }
 
@@ -373,19 +365,6 @@ const microLabel = {
 const styles = StyleSheet.create({
   body: {
     flex: 1,
-  },
-  header: {
-    gap: uiSpace.xs,
-    paddingHorizontal: uiSpace.lg,
-    paddingBottom: uiSpace.md,
-  },
-  eyebrow: microLabel,
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '800',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
   },
   controls: {
     gap: uiSpace.md,
@@ -435,6 +414,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     padding: uiSpace.lg,
   },
+  dailyContent: { gap: uiSpace.lg, paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm },
   hiddenChart: { height: 0, opacity: 0, overflow: 'hidden' },
   weeklyChart: { flex: 1 },
   hiddenWeeklyChart: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, opacity: 0 },

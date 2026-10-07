@@ -47,7 +47,6 @@ export type ExerciseBlockHistoryBlock = {
   sessionExerciseIds: string[];
   estimatedOneRepMax: number | null;
   totalVolume: number | null;
-  knownVolume?: number | null;
   highestWeight: number | null;
   workingSetCount: number;
 };
@@ -226,8 +225,7 @@ export const aggregateExerciseBlockHistory = (
       daysAgo: computeDaysAgo(session.completedAt, input.now),
       sessionExerciseIds: matchingSessionExercises.map((row) => row.sessionExerciseId),
       estimatedOneRepMax: summary.estimatedOneRepMax,
-      totalVolume: summary.volumeCoverage.totalVolumeKgReps,
-      knownVolume: summary.volumeCoverage.knownVolumeKgReps,
+      totalVolume: summary.volumeKgReps,
       highestWeight: summary.topWeightSet?.weight ?? null,
       workingSetCount: workingRows.length,
     });

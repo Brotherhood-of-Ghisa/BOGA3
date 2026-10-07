@@ -1,6 +1,7 @@
 import { formatWeight } from '@/src/exercise-calculations/format';
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
+import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import {
   addSet,
   buildSetRows,
@@ -53,7 +54,7 @@ const plannedSet = (
   performanceStatus: 'planned' as const,
 });
 
-// The accepted target's `V5-Quiet` list: two performed, three planned.
+// The exercise page's default list: two performed, three planned.
 const quietSets = (): SessionDraftSetSnapshot[] => [
   performedSet('s1', '60', '10', 'warm_up'),
   performedSet('s2', '80', '8', 'rir_2'),
@@ -67,6 +68,12 @@ const rowsFor = (
   baseline: ExerciseRecordBaseline | null = null,
   session: SetRowSession | null = null,
 ) => buildSetRows(sets, baseline, ordinaryLoadContext(), session);
+
+const bandFor = (
+  sets: SessionDraftSetSnapshot[],
+  baseline: ExerciseRecordBaseline | null = null,
+  session: SetRowSession | null = null,
+) => recordBandFor(sets, baseline, ordinaryLoadContext(), session);
 
 describe('exercise page model', () => {
   it('puts the cursor on the first set not performed', () => {
@@ -111,7 +118,7 @@ describe('exercise page model', () => {
   it('marks a weight or 1RM beating the all-time best as a record, and never a planned row', () => {
     const rows = rowsFor([...quietSets(), performedSet('s6', '90', '6', 'rir_0')], {
       oneRepMax: 102.2,
-      weight: { weight: 85, reps: 5 },
+      weight: { weight: 85, reps: 5 }, volume: null,
     });
     expect(rows[5]).toMatchObject({ weightRecord: true, oneRepMaxRecord: true });
     // 80 × 8 (1RM 102.14) is today's top volume and 1RM, but beats neither record.
@@ -120,7 +127,7 @@ describe('exercise page model', () => {
     expect(rows[4]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
 
     // A weight record without a 1RM record is marked on its own.
-    const heavy = rowsFor([performedSet('h', '87.5', '1', 'rir_0')], { oneRepMax: 102.2, weight: { weight: 85, reps: 5 } });
+    const heavy = rowsFor([performedSet('h', '87.5', '1', 'rir_0')], { oneRepMax: 102.2, weight: { weight: 85, reps: 5 }, volume: null });
     expect(heavy[0]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
 
     // No history, no records.
@@ -130,18 +137,25 @@ describe('exercise page model', () => {
     });
   });
 
-  it('highlights only the best record set of the session, not every qualifying one', () => {
+  it('highlights the 1RM record\'s set and the Weight record\'s set, not every qualifying one', () => {
     // Both sets beat the baseline; the best 1RM wins (Epley: 90×8 ≈ 114, 100×6 ≈ 120).
-    const rows = rowsFor(
-      [
-        performedSet('a', '90', '8', 'rir_1'),
-        performedSet('b', '100', '6', 'rir_0'),
-      ],
-      { oneRepMax: 100, weight: { weight: 85, reps: 5 } }
-    );
+    const both = [performedSet('a', '90', '8', 'rir_1'), performedSet('b', '100', '6', 'rir_0')];
+    const bothBaseline = { oneRepMax: 100, weight: { weight: 85, reps: 5 }, volume: null };
+    const rows = rowsFor(both, bothBaseline);
     expect(rows[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
     expect(rows[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: true });
-    expect(recordBandFor(rows)).toMatchObject({ kind: 'oneRepMax' });
+    expect(bandFor(both, bothBaseline).map(({ label, set }) => [label, set]))
+      .toEqual([[expect.stringMatching(/^New 1RM · \d+\.\d \+ top weight$/), '100.0 × 6']]);
+
+    // The best 1RM and the top Weight on different sets: each set, a line each.
+    const split = [performedSet('reps', '100', '8', 'rir_1'), performedSet('heavy', '110', '1', 'rir_0')];
+    const splitBaseline = { oneRepMax: 100, weight: { weight: 105, reps: 5 }, volume: null };
+    expect(rowsFor(split, splitBaseline).map(({ weightRecord, oneRepMaxRecord }) => ({ weightRecord, oneRepMaxRecord })))
+      .toEqual([{ weightRecord: false, oneRepMaxRecord: true }, { weightRecord: true, oneRepMaxRecord: false }]);
+    expect(bandFor(split, splitBaseline).map(({ label, set }) => [label, set])).toEqual([
+      [expect.stringMatching(/^New 1RM record · \d+\.\d$/), '100.0 × 8'],
+      ['New top weight', '110.0 × 1'],
+    ]);
 
     // A tie on the best 1RM keeps the set that reached it first.
     const tied = rowsFor(
@@ -149,64 +163,65 @@ describe('exercise page model', () => {
         performedSet('a', '100', '3', 'rir_0'),
         performedSet('b', '100', '3', 'rir_0'),
       ],
-      { oneRepMax: 90, weight: { weight: 90, reps: 5 } }
+      { oneRepMax: 90, weight: { weight: 90, reps: 5 }, volume: null }
     );
     expect(tied[0]).toMatchObject({ oneRepMaxRecord: true });
     expect(tied[1]).toMatchObject({ oneRepMaxRecord: false });
 
-    // No 1RM beats the baseline: the heaviest qualifying weight wins, and its
-    // band is the top-weight one.
-    const heavy = rowsFor(
-      [
-        performedSet('a', '90', '3', 'rir_0'),
-        performedSet('b', '95', '1', 'rir_0'),
-      ],
-      { oneRepMax: 120, weight: { weight: 85, reps: 5 } }
-    );
+    // No 1RM beats the baseline: the heaviest qualifying weight is the one
+    // record, and its line is the top-weight one.
+    const heavySets = [performedSet('a', '90', '3', 'rir_0'), performedSet('b', '95', '1', 'rir_0')];
+    const heavyBaseline = { oneRepMax: 120, weight: { weight: 85, reps: 5 }, volume: null };
+    const heavy = rowsFor(heavySets, heavyBaseline);
     expect(heavy[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
     expect(heavy[1]).toMatchObject({ weightRecord: true, oneRepMaxRecord: false });
-    expect(recordBandFor(heavy)).toEqual({
-      kind: 'weight', label: 'New top weight · 95.0 × 1', spoken: 'new top weight 95.0 × 1',
-    });
+    expect(bandFor(heavySets, heavyBaseline)).toEqual([
+      { key: 'b', label: 'New top weight', set: '95.0 × 1', spoken: 'new top weight 95.0 × 1' },
+    ]);
   });
 
   it('makes a Weight record of more reps at the record weight, never of a zero', () => {
-    const baseline = { oneRepMax: 200, weight: { weight: 100, reps: 5 } };
+    const baseline = { oneRepMax: 200, weight: { weight: 100, reps: 5 }, volume: null };
     expect(rowsFor([performedSet('more', '100', '6', 'rir_0')], baseline)[0]).toMatchObject({ weightRecord: true });
     expect(rowsFor([performedSet('same', '100', '5', 'rir_0')], baseline)[0]).toMatchObject({ weightRecord: false });
 
     // A zero record is no baseline: nothing beats it, and a zero beats nothing.
-    expect(rowsFor([performedSet('z', '20', '5', 'rir_0')], { oneRepMax: 0, weight: { weight: 0, reps: 10 } })[0])
+    expect(rowsFor([performedSet('z', '20', '5', 'rir_0')], { oneRepMax: 0, weight: { weight: 0, reps: 10 }, volume: null })[0])
       .toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
-    expect(rowsFor([performedSet('b', '', '12', 'rir_0')], { oneRepMax: 0, weight: { weight: 0, reps: 10 } })[0])
+    expect(rowsFor([performedSet('b', '', '12', 'rir_0')], { oneRepMax: 0, weight: { weight: 0, reps: 10 }, volume: null })[0])
       .toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
   });
 
   it('uses Working set for Weight records independently of Volume, retaining every row figure', () => {
     const sets = [performedSet('technique', '100', '6', 'technique')];
-    const baseline = { oneRepMax: 200, weight: { weight: 100, reps: 5 } };
-    const volumeOnly = buildSetRows(sets, baseline, {
+    const baseline = { oneRepMax: 200, weight: { weight: 100, reps: 5 }, volume: null };
+    const volumeContext: LoadContext = {
       ...ordinaryLoadContext(), effortPolicy: { workingSetEfforts: [], volumeEfforts: ['technique'] },
-    });
+    };
+    const volumeOnly = buildSetRows(sets, baseline, volumeContext);
     expect(volumeOnly[0]).toMatchObject({ weight: 100, reps: 6, volume: 600, weightRecord: false, oneRepMaxRecord: false });
-    expect(recordBandFor(volumeOnly)).toBeNull();
+    expect(recordBandFor(sets, baseline, volumeContext)).toEqual([]);
 
-    const workingOnly = buildSetRows(sets, baseline, {
+    const workingContext: LoadContext = {
       ...ordinaryLoadContext(), effortPolicy: { workingSetEfforts: ['technique'], volumeEfforts: [] },
-    });
+    };
+    const workingOnly = buildSetRows(sets, baseline, workingContext);
     expect(workingOnly[0]).toMatchObject({ volume: 600, weightRecord: true, oneRepMaxRecord: false });
-    expect(recordBandFor(workingOnly)?.kind).toBe('weight');
+    expect(recordBandFor(sets, baseline, workingContext).map((line) => line.label)).toEqual(['New top weight']);
   });
 
   it('picks the session\'s record set across every block of the exercise', () => {
-    const baseline = { oneRepMax: 100, weight: { weight: 85, reps: 5 } };
+    const baseline = { oneRepMax: 100, weight: { weight: 85, reps: 5 }, volume: null };
     const earlierBlock = { id: 'block-1', sets: [performedSet('e', '110', '5', 'rir_0')] };
     const thisBlock = [performedSet('t', '100', '6', 'rir_0')];
     const session = { blockId: 'block-2', blocks: [earlierBlock, { id: 'block-2', sets: thisBlock }] };
 
-    // The earlier block holds the session's best 1RM, so this block shows no record.
+    // The earlier block holds the session's best 1RM and top Weight, so this
+    // block shows no record, and no band: its lines sit on the earlier block.
     expect(rowsFor(thisBlock, baseline, session)[0]).toMatchObject({ weightRecord: false, oneRepMaxRecord: false });
+    expect(bandFor(thisBlock, baseline, session)).toEqual([]);
     expect(rowsFor(thisBlock, baseline)[0]).toMatchObject({ oneRepMaxRecord: true });
+    expect(bandFor(thisBlock, baseline).map((line) => line.key)).toEqual(['t']);
   });
 
   it('groups the session\'s blocks by the exercise the page shows now, a swap included', () => {
@@ -224,22 +239,26 @@ describe('exercise page model', () => {
       .toEqual({ blockId: 'new', blocks: [{ id: 'new', sets: [] }] });
   });
 
-  it('announces the best record with a band, or none at all', () => {
-    expect(recordBandFor(rowsFor(quietSets()))).toBeNull();
+  it('announces every record with the session card\'s band lines, or none at all', () => {
+    expect(bandFor(quietSets())).toEqual([]);
 
-    const oneRepMax = rowsFor([performedSet('a', '100', '3', 'rir_0')], { oneRepMax: 100, weight: { weight: 200, reps: 5 } });
-    expect(recordBandFor(oneRepMax)).toEqual({
-      kind: 'oneRepMax', label: 'New 1RM record · 109.0', spoken: 'new 1RM record 109.0',
-    });
+    const set = [performedSet('a', '100', '3', 'rir_0')];
+    expect(bandFor(set, { oneRepMax: 100, weight: { weight: 200, reps: 5 }, volume: null })).toEqual([
+      { key: 'a', label: 'New 1RM record · 109.0', set: '100.0 × 3', spoken: 'new 1RM record 109.0 on 100.0 × 3' },
+    ]);
+    // The exercise's session volume (100 × 3) beats the Volume record.
+    expect(bandFor(set, { oneRepMax: 500, weight: { weight: 200, reps: 5 }, volume: 250 })).toEqual([
+      { key: 'volume', label: 'New volume record · 300', set: null, spoken: 'new volume record 300' },
+    ]);
 
-    expect(recordBandFor([])).toBeNull();
+    expect(bandFor([], { oneRepMax: 100, weight: { weight: 200, reps: 5 }, volume: 1 })).toEqual([]);
   });
 
   it('never marks a warm-up as a record, though it keeps its own figures', () => {
     const rows = rowsFor([
       performedSet('w', '120', '5', 'warm_up'),
       performedSet('k', '90', '5', 'rir_1'),
-    ], { oneRepMax: 102.2, weight: { weight: 85, reps: 5 } });
+    ], { oneRepMax: 102.2, weight: { weight: 85, reps: 5 }, volume: null });
 
     // The warm-up beats both records on its figures, which still show.
     expect(rows[0]).toMatchObject({ setType: 'warm_up', weight: 120, reps: 5, volume: 600 });

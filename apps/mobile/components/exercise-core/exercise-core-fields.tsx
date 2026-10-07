@@ -12,7 +12,6 @@ export type BodyweightContributionFieldValue = {
 type ExerciseCoreFieldsProps = {
   bodyweightContribution?: {
     value: BodyweightContributionFieldValue;
-    scope?: 'personal' | 'group';
     onChange: (value: BodyweightContributionFieldValue) => void;
     error?: string | null;
   };
@@ -81,11 +80,6 @@ export function ExerciseCoreFields({
           testIDPrefix={`${testIDPrefix}-load-mode`}
           value={loadInputMode}
         />
-        <Text allowFontScaling={false} style={styles.helperText}>
-          {bodyweightContribution?.scope === 'group'
-            ? 'Choose whether entered Weight is shared across both sides or entered per side.'
-            : 'Choose whether the weight you enter is shared across both sides or already represents one side.'}
-        </Text>
       </View>
       {bodyweightContribution ? (
         <View style={styles.group}>
@@ -99,11 +93,6 @@ export function ExerciseCoreFields({
             testID={`${testIDPrefix}-bodyweight-percentage`}
             value={bodyweightContribution.value.percentage}
           />
-          <Text allowFontScaling={false} style={styles.helperText}>
-            {bodyweightContribution.scope === 'group'
-              ? 'The group uses this share of each member’s applicable weight. Personal exercise settings stay independent.'
-              : 'The calculation uses this share of your applicable dated weight. Changes recalculate personal history.'}
-          </Text>
           {bodyweightContribution.error ? <Text allowFontScaling={false} accessibilityLiveRegion="polite"
             style={styles.errorText} testID={`${testIDPrefix}-bodyweight-error`}>{bodyweightContribution.error}</Text> : null}
         </View>
@@ -137,12 +126,5 @@ const styles = StyleSheet.create({
     fontFamily: uiFonts.body.family,
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
-  },
-  helperText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
   },
 });

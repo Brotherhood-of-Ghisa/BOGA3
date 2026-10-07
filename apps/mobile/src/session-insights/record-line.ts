@@ -1,5 +1,5 @@
 /**
- * The record line under a session summary (`design-targets/today-landing.md`):
+ * The record line under a session summary on Today's cards:
  * one PR names itself, more than one is only counted. A session's PRs are one
  * per record kind (`training-metrics-contract.md` §3); a group session's are
  * its group records, one per board taken (`groups-contract.md`).

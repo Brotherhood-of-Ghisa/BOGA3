@@ -103,6 +103,8 @@ it('offers nine fixed labels and independent Display, Working set and Volume con
   expect(screen.queryByTestId('settings-add-rir-input')).toBeNull();
   expect(screen.queryByText('Add')).toBeNull();
   expect(screen.getAllByRole('checkbox')).toHaveLength(27);
+  // The column headers name each choice; no sentence explains them (copy.no-inline-explanation).
+  expect(within(screen.getByTestId('settings-effort-selections')).queryByText(/Display chooses|Groups keep/)).toBeNull();
   expect(screen.getAllByRole('checkbox').slice(-6).map(checkbox => checkbox.props.accessibilityLabel)).toEqual([
     'Technique, Display', 'Technique, Working set', 'Technique, Volume',
     'Cooldown, Display', 'Cooldown, Working set', 'Cooldown, Volume',

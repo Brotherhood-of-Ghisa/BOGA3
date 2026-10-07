@@ -1,8 +1,9 @@
 # Training metrics contract
 
-The one definition of what counts toward a training statistic, for the app, the
-group evaluator and the coaching API. Other specs say which figures a screen
-shows and link here for what they mean; they do not restate these rules.
+How the app, the group evaluator and the coaching API implement the product
+facts on sets and 1RM (`docs/product/`), and the rules for sessions, records
+and totals that have no fact yet. A fact is cited as `[[id]]`, never restated
+here; other specs link here for the code.
 
 | § | Definition | Code |
 | --- | --- | --- |
@@ -12,46 +13,35 @@ shows and link here for what they mean; they do not restate these rules.
 | 4 | Calculations and display (parse, load, Volume, 1RM, top weight, precision) | `parse.ts`, `load-metrics.ts`, `index.ts` (`estimateOneRepMax`), `format.ts` in `apps/mobile/src/exercise-calculations/` |
 
 `apps/mobile/__tests__/metrics-single-source.test.ts` fails when the rules
-below are re-implemented. It checks for a `'warm_up'` comparison outside
-§1's code, `isWorkingSetType` read alone outside the settled-performance
+below are re-implemented. It checks for an effort-label comparison outside
+the effort labels, `isWorkingSetType` read alone outside the settled-performance
 sites, and the Wathan constants outside the 1RM estimate.
 
 ## 1. Counted set
 
-Personal statistics have two independent eligibility rules. A **working set**
-controls set/session counts, 1RM and Weight records. A **volume-included set**
-controls aggregate volume and Volume records. Both must be **confirmed performed**.
-Groups and coaching retain the shared default: every confirmed performed set
-except `warm_up` contributes to every aggregate.
+What a confirmed performed set is: [[set.performed]]. Which of them are
+*working sets* and *volume-included sets*, personally and for groups and
+coaching: [[set.eligibility]].
 
-- **Confirmed performed** means valid reps and Weight, and no
-  `performance_status`. Planned, unperformed and legacy-skipped rows are not
-  sets for any statistic.
-- **Valid** is decided by one parser, `apps/mobile/src/exercise-calculations/parse.ts`.
-  - Weight is digits with an optional decimal point (`42.` and `.5` are
-    valid; `1e3`, `0x10` and negatives are not).
-  - Blank Weight with valid reps is `0`.
-  - Reps is a positive integer.
-
-  The input fields' validation, the performed check and every calculation all
-  call this parser, so a value is valid everywhere or nowhere.
-- **Personal effort policy**: Settings has fixed Warm-up, Unspecified, RIR-4
-  through RIR-0, Technique and Cooldown rows, with independent Display,
-  Working set and Volume columns. All labels default displayed. Unspecified/RIR
-  rows default on for both calculation columns; Warm-up/Technique/Cooldown
-  default off. At least one Display choice is required; either calculation
-  column may be empty. Hidden labels can contribute, and visible labels can
-  be excluded. Historical canonical RIR above four follows the RIR-4 checkboxes; unknown
-  stored labels follow Unspecified. Their recorded labels stay intact and do
-  not become selectable options.
+- **Valid** is decided by one parser, `apps/mobile/src/exercise-calculations/parse.ts`
+  ([[set.performed]]): `42.` and `.5` are valid Weights; `1e3`, `0x10` and
+  negatives are not. The input fields' validation, the performed check and
+  every calculation all call it.
+- **Personal effort policy** ([[set.eligibility]] gives its defaults):
+  Settings has fixed Warm-up, Unspecified, RIR-4 through RIR-0, Technique and
+  Cooldown rows, with independent Display, Working set and Volume columns.
+  All labels default displayed. At least one Display choice is required;
+  either calculation column may be empty. Hidden labels can contribute, and
+  visible labels can be excluded. Recorded labels stay intact and do not
+  become selectable options.
 - **Scope**: these choices are account-local on this device. Personal adapters
   pass the durable active policy explicitly to the kernel. Groups and coaching
-  receive no device policy and continue excluding only `warm_up`; no group
-  settings are displayed. The weekly muscle target grades working-set counts
-  and never changes eligibility.
-- Every performed row keeps its own per-set 1RM and volume, regardless of
-  either calculation checkbox (`calculateSetMetrics`). Changing the policy
-  recalculates personal history and records without rewriting workouts.
+  receive no device policy: the kernel's default, `SHARED_EFFORT_POLICY`
+  (`effort-policy.ts`), applies; no group settings are displayed. The weekly
+  muscle target grades working-set counts and never changes eligibility.
+- Per-set figures ignore the policy ([[set.row-figures]],
+  `calculateSetMetrics`). Changing the policy recalculates personal history
+  and records without rewriting workouts.
 
 **Code.** The predicates are `isWorkingSet` and `isVolumeSet`, taking an optional
 explicit effort policy. Its working-set effort half, `isWorkingSetType`,
@@ -69,19 +59,16 @@ Aggregations apply the two policies at the source:
 
 The agent API imports the same modules with the shared default. SQL never
 re-implements the rule: group functions read the evaluator's `working` flag
-(`tech/groups-contract.md`). Changing the shared group rule needs a
-`GROUP_EVAL_RULES_VERSION` bump. Changing personal derivation bumps
+(`tech/groups-contract.md`). A change to the shared rule reaches stored group
+facts only as that contract's rules-version section says. Changing personal derivation bumps
 `EXERCISE_SESSION_FACTS_RULES_VERSION`; each facts read also compares its stored
 canonical policy key, rebuilding all definitions when the active choices differ.
 
 ## 2. Counted session
 
-A completed, non-deleted session counts toward a statistic when it holds **at
-least one working set** (§1).
-
-Scoped to one exercise, or to one muscle, the session counts for that scope
-when it holds a working set of that exercise, or a working set mapped to that
-muscle. A scope with no working set adds no counted session, working-set cell,
+A completed, non-deleted session counts as [[set.eligibility]] says. Scoped
+to one exercise, or to one muscle, the same rule applies to that exercise's
+sets, or to the sets mapped to that muscle. A scope with no working set adds no counted session, working-set cell,
 strength record, comparison baseline or `Last` date. It may still contribute to
 volume totals, volume heatmap cells and Volume records when it has a
 volume-included set. A scope with neither kind contributes nothing.
@@ -123,15 +110,15 @@ and gym chips count rows with a performed set.
 
 ## 3. Records
 
-A record is a lifter's all-time best for one exercise definition. Strength
-records use working sets; Volume records independently use volume-included
-sets (§1), including sessions with zero working sets. There are three kinds:
+A record is a lifter's all-time best for one exercise definition. Which sets
+can take each kind is [[set.eligibility]]; a Volume record may come from a
+session with zero working sets. There are three kinds:
 
 | Record | A session's value | Beats the record when |
 | --- | --- | --- |
-| 1RM | its best estimated 1RM (§4 formula), over every block | strictly higher |
+| 1RM | its best estimated 1RM ([[1rm.formula]]), over every block | strictly higher |
 | Weight | its top Weight: the highest raw entered kg, and at that kg the most reps | heavier, or as heavy with more reps |
-| Volume | its total volume-included volume, every block summed; only when complete | strictly higher |
+| Volume | its total volume-included volume, every block summed (§4 Totals) | strictly higher |
 
 - **Order.** Sessions are folded by `completed_at`, then session id. Within a
   session, a tie between sets goes to the first set in session order (block,
@@ -139,9 +126,10 @@ sets (§1), including sessions with zero working sets. There are three kinds:
 - **Baseline.** The first session with a value sets the record and is not a
   record itself. A tie never takes a record, so a record tied across sessions
   belongs to the earliest session.
-- **Zero.** A zero 1RM, Weight or Volume is never a record, never a baseline
-  and never ranks. Nothing beats a zero, and a zero beats nothing. An
-  incomplete volume neither sets nor raises the Volume record.
+- **Zero.** A zero 1RM ([[1rm.formula]]), Weight or Volume is never a record,
+  never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
+  Volume that left out sets whose load cannot be calculated competes like
+  any other (§4); one whose sum is not finite has no value.
 - **Scope.** By default every gym's sessions count. Where a screen offers the
   current-gym filter (today only the exercise page), only that gym's sessions
   count. A completed session being edited, and an active session, are compared
@@ -151,12 +139,16 @@ sets (§1), including sessions with zero working sets. There are three kinds:
   a session's PRs, or PRs over a period, counts these
   (`sessionRecordKinds`). A group session's count is its group records, one
   per board taken (`tech/groups-contract.md`).
-- **The record set of a session** is the one set a screen highlights
-  (`design-language.md` §5). Among the session's working sets of the exercise,
+- **The record set of a session** is the one set the share image lists for an
+  exercise. Among the session's working sets of the exercise,
   across every block, it is the highest 1RM that beats the 1RM record. When no
   1RM does, it is the heaviest Weight that beats the Weight record. A tie keeps
   the set that reached the value first. Volume has no set: its record is a
   whole session's.
+- **A session's record sets** ([[set.row-figures]]) are every set that took a
+  record: the session's best 1RM when it beats the 1RM record, and its top
+  Weight when it beats the Weight record. One set may take both. Volume adds no set
+  (`deriveExercisePersonalRecord`).
 
 **Code.** `records.ts` holds the whole rule:
 
@@ -165,7 +157,8 @@ sets (§1), including sessions with zero working sets. There are three kinds:
 - `createRecordBook` is the fold. It returns each session's flags and the
   holders;
 - `sessionRecordKinds` lists the PRs an exercise's flags make;
-- `pickSessionRecordSet` picks the record set;
+- `deriveExercisePersonalRecord` (`session-insights`) takes a session's
+  record sets and Volume;
 - `compareRecordOrder` is the fold's order.
 
 `summarizeSessionBests` (`best-set.ts`) gives a session's values. These all
@@ -175,7 +168,8 @@ read the rule:
 - the records panel and all-time bests (`loadExerciseBests`);
 - the comparison baselines (`loadEarlierBestsByDefinition`);
 - the exercise page, session view and completion markers;
-- the agent API's `personal_records`.
+- the agent API's `personal_records`, except Volume: its `max_session_volume`
+  still skips a session with an uncalculable set (§4 Totals).
 
 Changing personal derivation bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`.
 Changing the shared coaching rule also bumps the agent API's `metric_revision`.
@@ -184,14 +178,13 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 
 | Screen | Records shown |
 | --- | --- |
-| Exercise page set list and band | The record set: 1RM, else Weight |
 | Exercise page records panel, exercise history `All-time bests` | All three holders, each with its session and gym |
-| Session view, completed-session cards, completion and share | The record set: 1RM, else Weight (`deriveExercisePersonalRecord`, from `loadEarlierBestsByDefinition`) |
+| Exercise page set list, session view, completed-session cards and completion | Every record kind: the record sets and Volume (`deriveExercisePersonalRecord`; the session cards from `loadEarlierBestsByDefinition`) |
+| Share image | The record set: 1RM, else Weight. An exercise with only a Volume record is not listed |
 | Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |
 
-Every screen that shows the record set highlights the figures it beat. A 1RM
-record set that is also heavier (or as heavy with more reps) than the Weight
-record highlights both. Every band reads the same words
+Every screen that shows a record set highlights it as [[set.row-figures]]
+says: the 1RM record's 1RM and the Weight record's Weight. Every band reads the same words
 (`session-insights/record-band.ts`).
 
 Group boards keep their own contract (`tech/groups-contract.md`), but follow
@@ -199,11 +192,10 @@ the same zero rule.
 
 ## 4. Calculations
 
-**Parsing** (`parse.ts`). Weight is digits with an optional decimal point, and
-must be non-negative. Reps is a positive integer. A performed set with blank
-Weight and valid reps has Weight `0` (`canonicalizeWeightForReps`). Invalid
-input never becomes zero. The parser is the only one: field validation, the
-performed check (§1) and every figure call it.
+**Parsing** (`parse.ts`) implements the validity of [[set.performed]]; blank
+Weight becomes `0` in `canonicalizeWeightForReps`. Invalid input never becomes
+zero. The parser is the only one: field validation, the performed check (§1)
+and every figure call it.
 
 **Load** (`load-metrics.ts`). The definitions:
 
@@ -237,11 +229,7 @@ Bodyweight is counted once. Per-side entry doubles only the external Weight in
 the positive-contribution branch. Screens show Weight, 1RM and Volume, never
 the calculated-load breakdown.
 
-**1RM** (`estimateOneRepMax`, `index.ts`) is Wathan:
-
-```text
-1RM = 100 × load / (48.8 + 53.8 × exp(-0.075 × reps))
-```
+**1RM** (`estimateOneRepMax`, `index.ts`) implements [[1rm.formula]].
 
 - Only positive integer reps are eligible.
 - Negative or non-finite Weight is rejected, as are a contribution outside
@@ -249,8 +237,7 @@ the calculated-load breakdown.
   The contribution range and the load-mode check also guard the exercise
   editor in `src/exercise-core`. That layer stays import-free for Deno, so it
   keeps its own one-line copy on purpose (agreed 2026-10-03).
-- A zero load gives Volume `0` and 1RM `0`. Both are valid figures, but never
-  records (§3).
+- A zero load gives Volume `0` too: valid, but never a record (§3).
 
 **Top weight** is the highest raw entered Weight in kg, and at that weight the
 most reps among working sets (§3). It never includes the bodyweight contribution.
@@ -260,9 +247,13 @@ choices may change which recorded set qualifies.
 **Totals.**
 
 - A session's or exercise's Volume is the sum over its volume-included sets (§1)
-  (`summarizeVolume`).
-- When a set's load is unknown, the total is a known subtotal, with coverage
-  shown as `Known subtotal from X of Y included sets`.
+  whose load can be calculated (`sumVolume`); [[copy.no-inline-explanation]]
+  decides the rest. A personal load is uncalculable only with corrupt stored
+  context, an invalid reading or an overflowing set (`resolveCalculatedLoad`).
+- A sum that is not finite is `null`: shown `—`, never a record or a
+  comparison baseline.
+- The coaching API keeps the coverage counts (`summarizeVolume`): its `value`
+  is `null` when a set was left out (`supabase/functions/agent-api/README.md`).
 
 **Muscle volume.**
 
@@ -273,20 +264,20 @@ choices may change which recorded set qualifies.
   then halves it.
 - The mapping role factor (primary `1`, secondary `0.5`) applies afterwards.
 
-**Sets by muscle** (a session's summary) applies the same role factor to
-working sets: a muscle's sets are its primary sets plus half its secondary
-sets. A set counts once per muscle, at its strongest role; a stabilizer adds
-nothing (`summarizeCurrentSessionMuscleLoad`).
-
-**Progress muscle comparisons** count physical working sets: each source set
-adds one to each mapped primary/secondary muscle, regardless of role. The role
-factor applies only to Volume. Duplicate mappings use the strongest role for
-that exercise/muscle pair. Family counts deduplicate physical sets; overlapping
-individual muscle counts must never be summed into a global total.
+**A muscle's set count** is [[muscle.set-count]], an open fact: today the
+session summary's Sets by muscle and Progress muscle comparisons count
+differently, as its table shows. In both, a set counts once per muscle at its
+strongest role (duplicate mappings use the strongest role for that
+exercise/muscle pair), and a stabilizer adds nothing
+(`summarizeCurrentSessionMuscleLoad`; `progress-comparisons.ts`). In
+Progress the role factor applies only to Volume. Family counts deduplicate
+physical sets; overlapping individual muscle counts must never be summed into
+a global total.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
-durable active effort-policy snapshot in one read transaction for both calendar periods, using the
-same bounds as `computeStatsSummary`. `aggregateProgressComparisons`
+durable active effort-policy snapshot in one read transaction for both
+periods of [[comparison.window]], using the same bounds as
+`computeStatsSummary`. `aggregateProgressComparisons`
 (`src/data/progress-comparisons.ts`) derives individual muscles and their
 exercise contributions together. It retains the whole taxonomy, joins repeated
 blocks by definition ID, and keeps the union of contributing exercises in
@@ -295,13 +286,12 @@ fallback, never an identity join. Current mappings reinterpret both periods.
 Unlinked sets contribute no muscle/exercise row, as in the existing muscle
 analytics. A volume-only exercise remains a contributor even at zero load.
 
-Every period exposes working-set count, complete Volume or `null`, known
-subtotal, and known/included Volume-set counts. Counts, Volume and coverage
-reconcile with the contribution rows; unknown Volume stays incomplete rather
-than becoming zero. Working-set changes are signed absolute differences.
-Volume changes use each row's own baseline: `empty` for two zeros, `new` for
-positive Volume after zero, rounded percentage otherwise, `incomplete` when
-either total is unknown, and `increased` if the percentage overflows. Row
+Every period exposes working-set count, Volume (§4 Totals) and the included
+Volume-set count; counts and Volume reconcile with the contribution rows.
+Changes are shown as [[comparison.change-display]]; each row's Volume change
+uses its own baseline, and the code's states are `empty`, `new`, a percentage,
+`unavailable` (`—`) when either sum is not finite, and `increased` if the
+percentage overflows. Row
 percentages are never summed. Calculation-column eligibility is independent
 of Display (§1); zero working sets alone cannot establish Volume emptiness.
 
@@ -314,7 +304,7 @@ adds ` kg` itself.
 | Figure | Format | Example |
 | --- | --- | --- |
 | Weight (entered, top, group Weight) | as entered, one decimal on whole kg | `60.0`, `82.5`, `2.25` |
-| 1RM (personal and group) | one decimal | `104.7` |
+| 1RM (personal and group) | one decimal ([[1rm.formula]]) | `104.7` |
 | Volume | whole kg·reps | `2560` |
 
 The agent API, the group evaluator and the SQL group functions call this

@@ -6,9 +6,8 @@ import { StyleSheet } from 'react-native';
 
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
-// Marks on a `viz` cell are `ink` (`design-language.md` §2): today (or the
-// current week) is a 1px ring, the selected cell a 2px border, so the two stay
-// distinct when they fall on different cells.
+// Weekly marks on a `viz` row are `ink` (`design-language.md` §2): the current
+// week is a 1px ring, the selected row a 2px border. Daily tiles are read-only.
 export const HEAT_MARK = {
   color: uiRoles.ink,
   todayWidth: 1,

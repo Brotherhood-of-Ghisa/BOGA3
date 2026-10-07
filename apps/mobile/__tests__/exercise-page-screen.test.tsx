@@ -137,7 +137,7 @@ describe('ExercisePageScreen', () => {
     closeLocalData();
   });
 
-  it('renders the V5-Quiet state: records collapsed, set list, logger on the current set', async () => {
+  it('renders the default state: records collapsed, set list, logger on the current set', async () => {
     await openPage();
 
     expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
@@ -196,8 +196,8 @@ describe('ExercisePageScreen', () => {
     expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: uiRoles.record });
     expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
 
-    // The best record of the session earns the set list its band.
-    expect(screen.getByTestId('exercise-record-band')).toHaveTextContent('New 1RM record · 108.3');
+    // The set list's band reads the session card's words: one set, both records.
+    expect(screen.getByTestId('exercise-record-band-1')).toHaveTextContent('New 1RM · 108.3 + top weight90.0 × 6');
   });
 
   it('keeps both swipe symbols inside the exposed edge of the opaque logger', async () => {
@@ -758,6 +758,20 @@ describe('ExercisePageScreen', () => {
     );
     expect(await benchSets()).toHaveLength(5);
     expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Incline Barbell Bench Press');
+  });
+
+  it('opens swap as a page sheet whose X leaves the exercise unchanged', async () => {
+    await openPage();
+
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    fireEvent.press(await screen.findByTestId('exercise-options-swap'));
+    await screen.findByTestId('exercise-swap-sheet');
+    expect(screen.getByTestId('exercise-swap-sheet-modal')).toHaveProp('presentationStyle', 'pageSheet');
+    fireEvent.press(screen.getByLabelText('Close swap exercise'));
+
+    await waitFor(() => expect(screen.queryByTestId('exercise-swap-sheet')).toBeNull());
+    expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
+    expect((await readSession())?.exercises[0]).toMatchObject({ exerciseDefinitionId: BENCH_DEF });
   });
 
   it('says so when the exercise or the session is gone, or the session was deleted', async () => {

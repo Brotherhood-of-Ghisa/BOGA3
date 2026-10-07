@@ -19,7 +19,15 @@ import {
 } from '@/src/sync/cycle';
 import { findPushBatchFkViolations } from '@/src/sync/fk-graph';
 import type { Transaction } from '@/src/data/clock';
-import { exerciseDefinitions, gyms, muscleGroups, sessions } from '@/src/data/schema';
+import {
+  exerciseDefinitions,
+  gyms,
+  muscleGroups,
+  sessionExercises,
+  sessionPlanExercises,
+  sessionPlans,
+  sessions,
+} from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -87,6 +95,51 @@ describe('selectPushBatch ordering and batching', () => {
     const batch = database.transaction((tx) => selectPushBatch(tx as Transaction, BATCH_CAP));
 
     expect(batch.map((entity) => entity.id)).toEqual(['gym-early', 'gym-mid', 'gym-late']);
+  });
+
+  it('orders claim releases before claim acquisitions within session_exercises', () => {
+    insertSession('sess-1', 10);
+    insertExerciseDefinition('def-1', 10);
+    database.insert(sessionPlans).values({ id: 'plan-1', title: 'Plan 1' }).run();
+    database
+      .insert(sessionPlanExercises)
+      .values({ id: 'block-1', sessionPlanId: 'plan-1', exerciseDefinitionId: 'def-1', orderIndex: 0, name: 'Squat' })
+      .run();
+    // An older card acquiring a block claim (e.g. reattached to an older card)
+    database
+      .insert(sessionExercises)
+      .values({
+        id: 'card-acquire',
+        sessionId: 'sess-1',
+        exerciseDefinitionId: 'def-1',
+        name: 'Squat',
+        orderIndex: 0,
+        sourcePlanExerciseId: 'block-1',
+        localDirty: true,
+        localUpdatedAtMs: 100, // older timestamp
+      })
+      .run();
+    // A newer card tombstoning / releasing the claim
+    database
+      .insert(sessionExercises)
+      .values({
+        id: 'card-release',
+        sessionId: 'sess-1',
+        exerciseDefinitionId: 'def-1',
+        name: 'Squat',
+        orderIndex: 1,
+        sourcePlanExerciseId: 'block-1',
+        deletedAt: new Date(200),
+        localDirty: true,
+        localUpdatedAtMs: 200, // newer timestamp
+      })
+      .run();
+
+    const batch = database.transaction((tx) => selectPushBatch(tx as Transaction, BATCH_CAP));
+    const exerciseBatch = batch.filter((entity) => entity.type === 'session_exercises');
+
+    // card-release must come before card-acquire despite having a higher localUpdatedAtMs
+    expect(exerciseBatch.map((entity) => entity.id)).toEqual(['card-release', 'card-acquire']);
   });
 
   it('skips clean rows', () => {

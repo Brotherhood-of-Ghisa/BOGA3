@@ -1,5 +1,5 @@
 import { parseSetReps, parseSetWeight } from './parse.ts';
-import { includesEffort, type EffortCalculationPolicy } from './effort-policy.ts';
+import { includesEffort, SHARED_EFFORT_POLICY, type EffortCalculationPolicy } from './effort-policy.ts';
 
 export type SetValueInput = {
   reps: string;
@@ -37,13 +37,13 @@ export const isConfirmedPerformedSet = (set: SetPerformanceInput): boolean =>
 
 /**
  * The effort half of the counted-set rule. Without a personal policy, the
- * shared group/coaching rule excludes only warm-up. Read it alone
+ * shared group/coaching rule (`SHARED_EFFORT_POLICY`) applies. Read it alone
  * only where performance is already settled (a stored flag, a projection of
  * performed sets); otherwise use `isWorkingSet`. The group evaluator stores it
- * on every set fact: changing it needs a `GROUP_EVAL_RULES_VERSION` bump.
+ * on every set fact: changing it bumps `GROUP_EVAL_RULES_VERSION`.
  */
-export const isWorkingSetType = (setType: unknown, policy?: EffortCalculationPolicy): boolean =>
-  policy ? includesEffort(policy.workingSetEfforts, setType) : setType !== 'warm_up';
+export const isWorkingSetType = (setType: unknown, policy: EffortCalculationPolicy = SHARED_EFFORT_POLICY): boolean =>
+  includesEffort(policy.workingSetEfforts, setType);
 
 export type WorkingSetInput = SetPerformanceInput & { setType?: unknown };
 
@@ -56,9 +56,8 @@ export const isWorkingSet = (set: WorkingSetInput, policy?: EffortCalculationPol
   isConfirmedPerformedSet(set) && isWorkingSetType(set.setType, policy);
 
 /** Volume eligibility is independent of working-set eligibility in personal calculations. */
-export const isVolumeSet = (set: WorkingSetInput, policy?: EffortCalculationPolicy): boolean =>
-  isConfirmedPerformedSet(set) && (policy
-    ? includesEffort(policy.volumeEfforts, set.setType) : isWorkingSetType(set.setType));
+export const isVolumeSet = (set: WorkingSetInput, policy: EffortCalculationPolicy = SHARED_EFFORT_POLICY): boolean =>
+  isConfirmedPerformedSet(set) && includesEffort(policy.volumeEfforts, set.setType);
 
 /**
  * The counted-session rule (`training-metrics-contract.md` §2): a session —

@@ -46,6 +46,7 @@ load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" && -n "${JWT_SECRET:-}" ]] ||
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_WEEK_SUMMARY_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -89,6 +90,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
@@ -121,13 +123,7 @@ expect_sql() {
 }
 
 drain() {
-  local out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
-    -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+  eval_drain
   expect_ok "group-eval drain: $1"
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
@@ -365,11 +361,8 @@ sess "${ATHLETE_TOKEN}" "${T}-a1" completed "$(at 2)" "${T}-a-bench" \
   a1:90:5:rir_0 a2:90:5:rir_3 a4:90:5:rir_1:planned "a5:90:5:rir_2::$(at 2)" \
   a6:90:5:rir_0 a7:60:10:warm_up a8:90:5:working a9:90:5:rir_3000000000
 drain "A1"
-expect_sql "facts store the working-set rule (w), independent of performed (!)" \
-  "select string_agg(replace(set_id, '${T}-', '') || '=' || (case when working then 'w' else '-' end)
-                     || (case when performed then '' else '!' end), ',' order by set_id)
-     from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-a1';" \
-  "a1=w,a2=w,a4=w!,a5=w,a6=w,a7=-,a8=w,a9=w"
+# Each label's working/performed fact is the TS rule (groups-set-facts.test.ts);
+# the counts below prove the summary reads it.
 # One predicate for `working`: a fact the evaluator has not re-normalized yet
 # (working null) counts as working in the week counts and on the boards, and
 # is never a warm-up. R1's warm-up r1c, read as such a fact, in a rolled-back
@@ -488,7 +481,9 @@ expect_board "R=1/5/4,A=2/5/2,M=3/3/5,X=4/0/0,O=4/0/0" "the end is exclusive"
 pass "working sets by the app rule, performed, live and present; group records non-voided, one per #1 board, completed; ranks, ties, edges"
 
 # The late member: a session that started before their join is never shared.
-sleep 2
+# The join must land inside the window, which opened 1 s after setup began.
+for _ in $(seq 1 30); do (( $(now_ms) > WS + 1 )) && break; sleep 0.1; done
+(( $(now_ms) > WS + 1 )) || fail "the server clock did not pass the window start ${WS}"
 rpc "${LATE_TOKEN}" group_join "$(jq -nc --arg c "${INVITE_CODE}" '{p_code: $c}')"
 expect_ok "late join"
 LATE_JOINED="$(run_psql "select floor(extract(epoch from joined_at) * 1000)::bigint from app_public.group_memberships

@@ -24,7 +24,6 @@ export interface DayCell {
   level: CalendarHeatmapBucket;
   value: number;
   unavailable?: boolean;
-  knownValue?: number | null;
   hasTraining?: boolean;
   targetAttainment?: number;
   workingSetCountsByMuscle?: Record<string, number>;
@@ -39,7 +38,6 @@ export interface WeekCell {
   level: CalendarHeatmapBucket;
   value: number;
   unavailable?: boolean;
-  knownValue?: number | null;
   hasTraining?: boolean;
   targetAttainment?: number;
 }
@@ -48,7 +46,8 @@ export interface HeatmapData {
   daily: DayCell[];
   weekly: WeekCell[];
   todayDateKey: string;
-  targetLegend?: string;
+  /** Set when colour grades the weekly muscle target; `averaged` across several muscles. */
+  targetGrading?: { averaged: boolean };
 }
 
 export interface BuildHeatmapDataOptions {
@@ -165,8 +164,6 @@ const toDayCell = (
     unavailable,
     hasTraining: source !== undefined,
     workingSetCountsByMuscle: source?.workingSetCountsByMuscle,
-    // A volume day with some unknown load still reports the volume it does know.
-    knownValue: unavailable && metric === 'totalVolume' ? source?.knownVolume : value,
   };
 };
 
@@ -174,7 +171,6 @@ type WeekTotals = {
   monday: Date;
   sessions: number;
   value: number;
-  knownValue: number | null;
   unavailable: boolean;
   hasKnown: boolean;
   workingSetCountsByMuscle: Record<string, number>;
@@ -184,7 +180,6 @@ const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
   monday: dateKeyToUtcDate(weekStartDateKey),
   sessions: 0,
   value: 0,
-  knownValue: 0,
   unavailable: false,
   hasKnown: false,
   workingSetCountsByMuscle: {},
@@ -198,7 +193,6 @@ const addDayToWeek = (week: WeekTotals, day: DayCell, metric: CalendarHeatmapMet
   if (day.hasTraining) week.sessions++;
   if (day.hasTraining && !day.unavailable) week.hasKnown = true;
   if (metric === 'totalVolume' && day.unavailable) week.unavailable = true;
-  week.knownValue = combine(week.knownValue, day.knownValue === undefined ? day.value : day.knownValue);
   if (day.value > 0) {
     const next = combine(week.value, day.value);
     if (next === null) week.unavailable = true;
@@ -230,7 +224,6 @@ const toWeekCell = (weekStartDateKey: string, week: WeekTotals, todayWeekKey: st
     sessions: week.sessions,
     value: unavailable ? 0 : week.value,
     unavailable,
-    knownValue: week.knownValue,
     hasTraining: week.sessions > 0,
   };
 };
@@ -267,7 +260,7 @@ export function buildHeatmapData(
   const targetDaily = daily.map(day => withTargetLevel(day, grade(day.workingSetCountsByMuscle)));
   const targetWeekly = weekly.map(week => withTargetLevel(week, grade(totals.get(week.weekStartDateKey)?.workingSetCountsByMuscle)));
   return { daily: targetDaily, weekly: targetWeekly, todayDateKey,
-    targetLegend: target.muscleIds.length === 1 ? 'Colour: share of weekly muscle target' : 'Colour: average share of muscle targets' };
+    targetGrading: { averaged: target.muscleIds.length > 1 } };
 }
 
 const withTargetLevel = <T extends { level: CalendarHeatmapBucket }>(cell: T, targetAttainment: number) =>

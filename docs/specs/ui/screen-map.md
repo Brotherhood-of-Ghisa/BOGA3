@@ -2,8 +2,8 @@
 
 What screens exist, what each one is for, and which are reachable at all. Load
 this when you add, remove, rename or repurpose a route. Paths, params and
-transitions: `navigation-contract.md`. Visual language: `design-language.md`
-and `design-targets/`. Render logic: the route file.
+transitions: `navigation-contract.md`. Visual language: `design-language.md`.
+Render logic: the route file.
 
 Routes are `expo-router` file routes under `apps/mobile/app/`; the file column
 below is relative to that directory. Components live beside the route, under
@@ -26,7 +26,7 @@ draws the same fixed bar on every screen that shows tabs.
 | --- | --- | --- |
 | `/today` | Landing page: how this week and month are going, the latest session, and one joined group's week — each linking to its full screen. Starts and resumes nothing | `(tabs)/today.tsx`, `components/today/`, `apps/mobile/src/progress-summary/` |
 | `/train` | The single entry surface for starting a personal workout (and, when it ships, planning it) | `(tabs)/train.tsx` |
-| `/progress` | Pinned By Exercise / By Muscle switch; comparisons with one row contribution accordion; full-height per-muscle / per-exercise history popup; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
+| `/progress` | Frozen breakdown, period and metric/search controls; comparisons with one row contribution accordion; per-muscle / per-exercise history page sheet; Sessions last in either scrolling body | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four: Community, Tools, Library & account | `(tabs)/more.tsx` |
 
 ### Preserved tab roots
@@ -52,7 +52,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/sessions` | The planning hub: **Active** (the live session's row), **Upcoming** (scheduled one-off plans, soonest first), **Unscheduled** (standalone plans, most recently updated first) and **Completed** history, each with its own states; the quiet `Plan session` action is the hub's persistent entry and the empty planning sections' inline action. Plans never affect the completed history's count, filters or row actions | `sessions.tsx`, `components/session-planner/plan-sections.tsx` |
 | `/session-plan/new` | The shared plan editor: title, optional schedule (`YYYY-MM-DD HH:mm`, blank = unscheduled) and gym, ordered exercise blocks with ordered target sets, inline field-addressable validation. `?edit=<planId>` edits that plan in place (its guarded sync refuses to touch a consumed block, writing nothing); `?from=<planId>` prefills a duplicate and Save creates a new plan | `session-plan/new.tsx`, `components/session-planner/plan-form-screen.tsx` |
 | `/session-plan/[planId]` | One plan: targets, derived progress, provenance; **Start all** (an active-session conflict offers one Resume and creates nothing), per-block **Add to session** (several compatible cards offer a choice sheet that writes nothing until one is picked), **Skip without doing it** on pending blocks, **Duplicate**, and confirmed **Delete** while no block pins the plan. Consumed blocks are read-only and link to their performed session | `session-plan/[planId].tsx` |
-| `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit`, delete/undelete and per-exercise append. `presentation=completion` instead draws the post-Finish summary (sets by muscle, record cards, volume vs median, Share) | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
+| `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit` and delete/undelete. `presentation=completion` instead draws the post-Finish summary (sets by muscle, record cards, volume vs median, Share) | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
 | `/exercise-history` | One `exercise_definitions` row's history: period and tag filters, all-time bests, one card per session | `exercise-history.tsx` |
 
 ## Account, library and tools
@@ -167,7 +167,9 @@ addressable, each resolving to a canonical owner for tab selection.
   place — Settings' Data & sync `Error` row, retried by its `Refresh` — so no
   preference control or exercise browser grows its own error box.
 - An Appearance preset reads `<Preset> from next launch` until the app reopens
-  (`design-language.md`, "Presets").
+  (`design-language.md`, "Choosing one"); meanwhile its checked sheet row reads
+  `Next launch`, and a saved custom colour's button `Saved · next launch`. No
+  sentence explains the restart ([[copy.no-inline-explanation]]).
 - `Body weight log` sits on Settings regardless of the bodyweight-calculation
   preference, and no session, detail or logger surface shows or links to a
   reading.
@@ -186,4 +188,4 @@ addressable, each resolving to a canonical owner for tab selection.
   boards and podiums then show explicit `kg·reps` / `kg` or `%BW·reps` / `%BW`
   units; record detail and history retain public witness state and original
   units, and normalized sessions omit raw loads and all session aggregate
-  volume. See `design-targets/group-competitions.md`.
+  volume. See `docs/specs/tech/group-competition-contract.md`.

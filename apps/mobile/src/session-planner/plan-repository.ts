@@ -137,6 +137,38 @@ const consumedBlockIdsInGraph = async (graph: PlanGraph): Promise<Set<string>> =
   return consumed;
 };
 
+/**
+ * Duplicates are authored plans: fresh pending blocks, unscheduled unless the
+ * caller says otherwise, with the authored gym carried over. The default title
+ * appends " (copy)", truncating the original so the result fits the name limit.
+ */
+const toDuplicatePlanInput = (
+  graph: PlanGraph,
+  patch: Parameters<PlanRepository['duplicatePlan']>[1],
+): SaveSessionPlanGraphInput => {
+  const copySuffix = ' (copy)';
+  const maxBaseLength = PLAN_LIMITS.name.max - copySuffix.length;
+  const defaultTitle =
+    graph.plan.title.length > maxBaseLength
+      ? `${graph.plan.title.slice(0, maxBaseLength)}${copySuffix}`
+      : `${graph.plan.title}${copySuffix}`;
+  return {
+    gymId: graph.plan.gymId,
+    title: patch?.title ?? defaultTitle,
+    scheduledFor: patch?.scheduledFor === undefined ? null : patch.scheduledFor,
+    exercises: graph.exercises.map((exercise) => ({
+      exerciseDefinitionId: exercise.exerciseDefinitionId,
+      name: exercise.name,
+      machineName: exercise.machineName,
+      sets: exercise.sets.map((set) => ({
+        targetWeightValue: set.targetWeightValue,
+        targetReps: set.targetReps,
+        targetSetType: normalizeSessionSetType(set.targetSetType),
+      })),
+    })),
+  };
+};
+
 export const createPlanRepository = (): PlanRepository => ({
   async createPlan(draft, now = new Date()) {
     const validation = validatePlanDraft(draft);
@@ -259,23 +291,7 @@ export const createPlanRepository = (): PlanRepository => ({
     if (!graph) {
       return { status: 'not-found' };
     }
-    // Duplicates are authored plans: fresh pending blocks, unscheduled unless
-    // the caller says otherwise, with the authored gym carried over.
-    const duplicate: SaveSessionPlanGraphInput = {
-      gymId: graph.plan.gymId,
-      title: patch?.title ?? `${graph.plan.title} (copy)`,
-      scheduledFor: patch?.scheduledFor === undefined ? null : patch.scheduledFor,
-      exercises: graph.exercises.map((exercise) => ({
-        exerciseDefinitionId: exercise.exerciseDefinitionId,
-        name: exercise.name,
-        machineName: exercise.machineName,
-        sets: exercise.sets.map((set) => ({
-          targetWeightValue: set.targetWeightValue,
-          targetReps: set.targetReps,
-          targetSetType: normalizeSessionSetType(set.targetSetType),
-        })),
-      })),
-    };
+    const duplicate = toDuplicatePlanInput(graph, patch);
     const validation = validatePlanMetaFields(duplicate.title, duplicate.scheduledFor);
     if (!validation.ok) {
       return { status: 'validation-failed', errors: validation.errors };

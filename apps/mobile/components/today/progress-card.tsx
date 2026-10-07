@@ -43,8 +43,8 @@ function LatestSessionRow({ latest, onPress }: { latest: LatestSessionSummary; o
   );
 }
 
-// Today's Progress card (`design-targets/today-landing.md`): this week against
-// last week, the month against the previous month's pace, the latest session.
+// Today's Progress card: this week against last week, the month against the
+// previous month's pace, the latest session.
 export function TodayProgressCard({ progress, onOpenSessions, onOpenSession }: TodayProgressCardProps) {
   return (
     <Card style={styles.card} testID="today-progress-card">

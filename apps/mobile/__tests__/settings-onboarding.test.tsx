@@ -149,7 +149,11 @@ describe('settings onboarding surface', () => {
     mockUseAuth.mockReturnValue({ user: null });
     await renderSettings();
 
-    expect(screen.getByText('Sign in and manage your account.')).toBeTruthy();
+    expect(screen.getByTestId('settings-profile-row')).toBeTruthy();
+    expect(screen.queryByText('Sign in and manage your account.')).toBeNull();
+    expect(screen.queryByText('See setup instructions for your MCP-compatible client.')).toBeNull();
+    expect(screen.queryByText(/Coaches get read-only training access/)).toBeNull();
+    expect(screen.queryByText(/Configure how dates and other details/)).toBeNull();
     expect(screen.getByTestId('settings-connect-agent-row')).toBeTruthy();
     expect(screen.queryByTestId('settings-connected-agents-row')).toBeNull();
     expect(screen.getByTestId('settings-sync-signed-out-card')).toBeTruthy();

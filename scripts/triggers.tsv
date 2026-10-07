@@ -80,6 +80,12 @@ supabase/functions/group-eval/**	groups-leaderboards	group evaluator function
 supabase/tests/**	backend	backend test bodies
 supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-api-live	shared group lane fixtures
 supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
+supabase/migrations/*competition*	groups-protocol4	protocol-4 representation / cutover (one-way activation ⇒ its own lane)
+supabase/scripts/with-local-group-competitions.sh	groups-protocol4	the protocol-4 activation wrapper
+supabase/tests/groups-competitions.sh	groups-protocol4	the protocol-4 populated-upgrade lane body
+supabase/tests/groups-competition-live.sh	groups-protocol4	the protocol-4 client live lane body
+apps/mobile/src/groups/competition-*.ts	groups-protocol4	protocol-4 scoring / wire / reader guards
+apps/mobile/__tests__/groups-competition-api-live.test.ts	groups-protocol4	the protocol-4 client live suite
 apps/mobile/__tests__/groups-api-live.test.ts	groups-api-live	the groups client live suite
 apps/mobile/__tests__/helpers/groups-live-endpoint.ts	groups-api-live	the groups client live suite's endpoint helper
 supabase/scripts/**	backend	backend wrappers / runtime scripts
@@ -94,6 +100,7 @@ scripts/lanes.tsv	docs-check	lane registry (regenerate the matrix: ./boga docs g
 scripts/triggers.tsv	docs-check,meta-tests	trigger registry
 scripts/gen-docs.sh	docs-check,meta-tests	docs generator/checker
 scripts/doc-budgets.tsv	docs-check	doc word budgets
+scripts/product-fact-restatements.tsv	docs-check	product-fact restatements
 scripts/plan-ref-exempt.txt	docs-check	plan-ID exemptions
 scripts/test-for.sh	meta-tests	trigger matcher
 scripts/full-sweep.sh	meta-tests	full sweep (full-sweep meta-test)
@@ -102,11 +109,13 @@ scripts/test-timings.sh	meta-tests	timings reader / import (lane-timing meta-tes
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint
 scripts/pr-wait.sh	meta-tests	PR merge waiter (lifecycle meta-test)
+scripts/ci-docs-only.sh	meta-tests	CI docs-only fast-path classifier (ci-docs-only meta-test)
 scripts/boga-config-init.sh	meta-tests	machine config seeding (run by worktree start)
 scripts/tests/**	meta-tests	meta-tooling tests
 .github/workflows/**	docs-check	CI definition (update spec 02 CI posture)
 .github/pull_request_template.md	docs-check	PR template
 AGENTS.md	docs-check	agent entrypoint
+docs/product/**	jest-full	product fact tables (Jest runs them)
 docs/**	docs-check	curated docs
 *.md	docs-check	root markdown
 **/*.md	docs-check	markdown anywhere

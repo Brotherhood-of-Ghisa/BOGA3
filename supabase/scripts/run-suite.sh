@@ -38,6 +38,15 @@ if [[ "${ensure_baseline}" == "1" ]]; then
   "${SCRIPT_DIR}/ensure-local-runtime-baseline.sh"
 fi
 
+# One `supabase status` for every body (each would otherwise run its own). A
+# --no-baseline body manages the runtime itself, so it loads its own.
+if [[ "${ensure_baseline}" == "1" ]]; then
+  # shellcheck disable=SC1091
+  source "${SCRIPT_DIR}/_common.sh"
+  load_supabase_status_env
+  export BOGA_STATUS_ENV_LOADED_FOR="${BOGA_SUPABASE_WORKDIR:-${REPO_ROOT}}"
+fi
+
 for body in "$@"; do
   echo "[run-suite] running ${body}"
   "${TESTS_DIR}/${body}"

@@ -467,3 +467,48 @@ maestro_capture_simulator_logs() {
 
   xcrun simctl spawn "$udid" log show --style compact --last "$lookback" >"$output_file" 2>&1
 }
+
+# Copy the dev client's crash reports from this run into the artifact root and
+# name each crash on stdout. When the dev client crashes, the simulator falls
+# back to the home screen. simulator-system.log is filtered to the app's own
+# process, and SpringBoard is the process that logs the exit, so that log shows
+# no crash. Without this step a crash reads as a flow that "lost" the app.
+# A report belongs to this run when it is newer than the run's start marker, and
+# to this slot when its procPath runs through this simulator's
+# CoreSimulator/Devices/<UDID>/ (real reports escape the slashes as `\/`; the
+# bare UDID is not enough, as reports also carry other UUIDs): every worktree's
+# simulators write to the same host directory. This only reports: the flow's
+# own assertions still decide pass or fail.
+maestro_collect_crash_reports() {
+  local udid="$1"
+  local executable_name="$2"
+  local since_marker="$3"
+  local output_dir="$4"
+  local reports_dir="${MAESTRO_CRASH_REPORTS_DIR:-$HOME/Library/Logs/DiagnosticReports}"
+  local report
+
+  [[ -n "$udid" && -n "$executable_name" && -f "$since_marker" && -d "$reports_dir" ]] || return 0
+
+  while IFS= read -r report; do
+    grep -qF -e "Devices/$udid/" -e "Devices\\/$udid\\/" -- "$report" || continue
+    mkdir -p "$output_dir"
+    cp "$report" "$output_dir/"
+    echo "[maestro] dev client CRASHED during this run: $(maestro_crash_report_summary "$report")"
+    echo "[maestro]   crash report: $output_dir/$(basename -- "$report")"
+  done < <(find "$reports_dir" -maxdepth 1 -name "$executable_name-*.ips" -newer "$since_marker" 2>/dev/null | sort)
+}
+
+# One line per .ips report: the signal, the crashed thread and its top symbol.
+maestro_crash_report_summary() {
+  node -e '
+    const fs = require("fs");
+    const text = fs.readFileSync(process.argv[1], "utf8");
+    const report = JSON.parse(text.slice(text.indexOf("\n") + 1));
+    const exception = report.exception ?? {};
+    const thread = report.threads?.[report.faultingThread] ?? {};
+    const symbol = (thread.frames ?? []).find((frame) => frame.symbol)?.symbol ?? "an unsymbolicated frame";
+    const signal = exception.signal ?? exception.type ?? "unknown signal";
+    const threadName = thread.name ?? thread.queue ?? `#${report.faultingThread}`;
+    console.log(`${signal} on thread ${threadName} in ${symbol.replace(/\(.*$/s, "")}`);
+  ' "$1" 2>/dev/null || echo "unreadable report $(basename -- "$1")"
+}

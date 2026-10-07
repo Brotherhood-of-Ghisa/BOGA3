@@ -20,7 +20,6 @@ export type MoreRoute =
 export type MoreDestination = {
   key: MoreDestinationKey;
   label: string;
-  description: string;
   icon: IconName;
   accessibilityHint: string;
   testID: `more-${MoreDestinationKey}-row`;
@@ -43,7 +42,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'groups',
         label: 'Groups',
-        description: 'Join, create, and manage your training groups.',
         icon: 'users',
         accessibilityHint: 'Opens group discovery and management',
         testID: 'more-groups-row',
@@ -58,7 +56,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'connect-agent',
         label: 'Connect an AI coach',
-        description: 'Set up an MCP-compatible coach with read-only training access.',
         icon: 'sparkles',
         accessibilityHint: 'Opens MCP setup instructions in your system browser',
         testID: 'more-connect-agent-row',
@@ -67,7 +64,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'connected-agents',
         label: 'Connected agents',
-        description: 'Review and revoke coaching access.',
         icon: 'shield-check',
         accessibilityHint: 'Opens the list of authorized coaching agents',
         testID: 'more-connected-agents-row',
@@ -77,7 +73,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'gyms',
         label: 'Gyms',
-        description: 'Add gyms, save their locations, and archive old ones.',
         icon: 'location',
         accessibilityHint: 'Opens gym management',
         testID: 'more-gyms-row',
@@ -86,7 +81,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'developer-logs',
         label: 'Developer logs',
-        description: 'Inspect in-app diagnostic events for this session.',
         icon: 'code',
         accessibilityHint: 'Opens the development-only in-app log viewer',
         testID: 'more-developer-logs-row',
@@ -102,7 +96,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'exercise-database',
         label: 'Exercise database',
-        description: 'Search, create, edit, archive, and restore exercises.',
         icon: 'database',
         accessibilityHint: 'Opens exercise database management',
         testID: 'more-exercise-database-row',
@@ -111,7 +104,6 @@ const MORE_SECTIONS: readonly MoreSection[] = [
       {
         key: 'settings',
         label: 'Settings & account',
-        description: 'Manage your profile, preferences, sync, and app data.',
         icon: 'settings',
         accessibilityHint: 'Opens settings and account management',
         testID: 'more-settings-row',

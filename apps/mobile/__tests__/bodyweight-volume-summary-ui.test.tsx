@@ -1,32 +1,29 @@
 import { render, screen } from '@testing-library/react-native';
 import { SessionSummaryCard } from '@/components/session-view/session-summary-card';
 import { ViewSessionScreen } from '@/components/view-session/view-session-screen';
-import { sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
-import type { VolumeCoverage } from '@/src/exercise-calculations/load-metrics';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 
-const partial: VolumeCoverage = { knownVolumeKgReps: 500, totalVolumeKgReps: null,
-  eligibleSetCount: 2, knownSetCount: 1, missingSetCount: 1, invalidSetCount: 0, complete: false, overflow: false };
-const note = 'Volume incomplete. Known subtotal from 1 of 2 included sets.';
-
-it('keeps an active session subtotal compact and its incomplete coverage readable', () => {
+// A Volume that left out a set whose load cannot be calculated reads like any
+// other: no `Known vol` label and no coverage note ([[copy.no-inline-explanation]]).
+it('shows an active session Volume under its plain label, with no note', () => {
   render(<SessionSummaryCard gymName={null} exerciseCount={1} workingSetCount={2}
-    {...sessionVolumeSummary(partial)} onPressGym={() => {}} />);
-  expect(screen.getByTestId('session-view-summary-volume').props.accessibilityLabel).toBe('Known vol 500');
-  expect(screen.getByTestId('session-view-summary-volume-note')).toHaveTextContent(note);
+    volume={formatVolumeFigure(500)} onPressGym={() => {}} />);
+  expect(screen.getByTestId('session-view-summary-volume').props.accessibilityLabel).toBe('Volume 500');
+  expect(screen.queryByTestId('session-view-summary-volume-note')).toBeNull();
 });
 
-it('keeps the same coverage visible on a completed session', () => {
+it('shows a completed session Volume under its plain label, with no note', () => {
   render(<ViewSessionScreen section="sets" onSectionChange={() => {}} summaryContent={null}
-    summary={{ start: '2026-09-20 12:00', end: '2026-09-20 13:00', duration: '1h', gymName: null, deleted: false }}
-    model={{ cards: [], workingSetCount: 2, ...sessionVolumeSummary(partial) }} error={null}
-    onBack={() => {}} onEdit={() => {}} onToggleDeleted={() => {}} onAppend={() => {}} />);
-  expect(screen.getByTestId('completed-session-detail-volume').props.accessibilityLabel).toBe('Known vol 500');
-  expect(screen.getByTestId('completed-session-detail-summary-note')).toHaveTextContent(note);
+    summary={{ title: 'Afternoon training · 20 Sep', start: '2026-09-20 12:00', duration: '1h', gymName: null, deleted: false }}
+    model={{ cards: [], workingSetCount: 2, volume: formatVolumeFigure(500) }} error={null}
+    onBack={() => {}} onEdit={() => {}} onToggleDeleted={() => {}} />);
+  expect(screen.getByTestId('completed-session-detail-volume').props.accessibilityLabel).toBe('Volume 500');
+  expect(screen.queryByTestId('completed-session-detail-summary-note')).toBeNull();
 });
 
-it('distinguishes a known zero subtotal from entirely unavailable or complete volume', () => {
-  expect(sessionVolumeSummary({ ...partial, knownVolumeKgReps: 0 })).toEqual({ volume: '0', volumeNote: note });
-  expect(sessionVolumeSummary({ ...partial, knownVolumeKgReps: null, overflow: true }).volume).toBe('—');
-  expect(sessionVolumeSummary({ ...partial, knownSetCount: 0 }).volumeNote).toContain('Volume unavailable');
-  expect(sessionVolumeSummary({ ...partial, totalVolumeKgReps: 0, complete: true })).toEqual({ volume: '0' });
+it('formats a known zero and dashes a sum that is not finite', () => {
+  expect(formatVolumeFigure(0)).toBe('0');
+  expect(formatVolumeFigure(1220.4)).toBe('1220');
+  expect(formatVolumeFigure(null)).toBe('—');
+  expect(formatVolumeFigure(Infinity)).toBe('—');
 });

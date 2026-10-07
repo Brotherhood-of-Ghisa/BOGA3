@@ -170,8 +170,8 @@ by another user and a nonexistent exercise produce the same `404` envelope.
 ```
 
 Personal-record and volume calculations import the canonical mobile domain
-calculation module and read [working sets only](#working-sets-only): the
-warm-up above is listed but feeds no session or record figure. BoGa has no
+calculation module and read [working sets only](#working-sets-only)
+([[set.eligibility]]), so the warm-up above is listed but feeds no figure. BoGa has no
 canonical user-authored note field or failed-set meaning, so this API reports
 those fields unavailable instead of inventing semantics.
 
@@ -209,15 +209,16 @@ At most 50 compact exercise blocks are embedded per workout; `truncated` makes
 any internal safety cap explicit. `exercises` lists every block, while
 `exercise_count` counts only blocks with at least one working set, and
 `completed_set_count`, `set_count` and every volume count working sets
-([working sets only](#working-sets-only)).
+([working sets only](#working-sets-only), [[set.eligibility]]).
 
 ## Working sets only
 
 The API reads the app's own rule for which sets and sessions count
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §1–§2), through the shared calculation modules, so coaching and app figures
-agree. In short, only `set_type: "warm_up"` and unconfirmed rows are left out.
-This section lists the fields that rule governs.
+agree. Coaching uses the fixed group and coaching rule of [[set.eligibility]],
+never a device's effort settings. This section lists the fields that rule
+governs.
 
 - Every derived figure reads working sets only: `personal_records`
   (1RM, top weight, max session volume), each performance's `volume` and
@@ -226,19 +227,23 @@ This section lists the fields that rule governs.
   rest).
 - Every count does too: `completed_set_count`, `exercises[].set_count`, and
   `exercise_count` (blocks with at least one working set).
-- A warm-up stays in the raw per-set output with its `set_type` and its own
-  `calculated_load`, `estimated_one_rep_max` and `volume`. Those describe that
-  set only.
-- In exercise context, a session where the exercise had only warm-ups has no
+- A set that is not a working set ([[set.eligibility]]) stays in the raw per-set
+  output with its `set_type` and its own `calculated_load`,
+  `estimated_one_rep_max` and `volume`. Those describe that set only.
+- In exercise context, a session where the exercise had no working set has no
   stat footprint: it is absent from `recent_performances` and `volume_series`,
   sets no `last_performed_at`, and is not an excluded-volume session.
 
 `personal_records` follow the app's record rules
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
 §3): `top_weight` is the heaviest Weight and, at that weight, the most reps; a
-tie keeps the earliest session; a zero result is never a record.
+tie keeps the earliest session; a zero result is never a record
+([[1rm.formula]] for a zero 1RM).
 
-`metric_revision: "working_sets_v2"` marks this meaning. `"working_sets_v1"`
+`metric_revision: "working_sets_v4"` marks this meaning, with 1RM per
+[[1rm.formula]] (`docs/product/1rm.md`). `"working_sets_v3"` estimated a
+single's 1RM; `"working_sets_v2"`
+counted technique and cooldown sets as working sets; `"working_sets_v1"`
 let a zero 1RM, Weight or Volume stand as a record; the earlier
 `"bodyweight_optional_v1"` counted warm-ups in every figure.
 
@@ -247,7 +252,7 @@ let a zero 1RM, Weight or Volume stand as a record; the earlier
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v2"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v4"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 
@@ -297,7 +302,7 @@ Performed sets use ordinary vocabulary and separate raw/derived values:
 
 Parsing, the zero rule and the load, Volume and 1RM formulas are the app's
 ([training-metrics contract](../../../docs/specs/tech/training-metrics-contract.md)
-§4); planned, skipped, unperformed, invalid and deleted rows do not
+§4); only confirmed performed rows ([[set.performed]]) that are not deleted
 contribute. The breakdown is an API interpretation aid, not a user-facing label.
 
 Volume coverage remains explicit for invalid/overflow/truncated input. Missing

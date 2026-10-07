@@ -1,10 +1,10 @@
 /**
  * The one record definition (`training-metrics-contract.md` §3): what beats a
- * record, how the all-time best is folded over sessions, and which set of a
- * session holds its record. Exercise session facts (PR flags), the records
- * panel, the exercise page and session view markers, the completion screen and
- * the coaching API all read these. Values are the session bests of working
- * sets (§1); this module never decides which sets count.
+ * record and how the all-time best is folded over sessions. Exercise session
+ * facts (PR flags), the records panel, the session records of the exercise
+ * page, session view and completion, and the coaching API all read these.
+ * Values are the session bests of working sets (§1); this module never
+ * decides which sets count.
  */
 
 /** A Weight record compares the pair: heavier, or as heavy with more reps. */
@@ -91,54 +91,10 @@ export const compareRecordOrder = (
   left.completedAt.getTime() - right.completedAt.getTime() ||
   left.sessionId.localeCompare(right.sessionId);
 
-/** The records a session's sets are compared with: the bests before it. */
+/** The records a session is compared with: the bests before it. */
 export type RecordBaseline = {
   oneRepMax: number | null;
   weight: WeightRecordValue | null;
-};
-
-export type RecordSetCandidate = {
-  id: string;
-  oneRepMax: number | null;
-  weight: number | null;
-  reps: number | null;
-};
-
-/** The winning set, and which of its records it sets (a 1RM winner may set both). */
-export type SessionRecordSet = { id: string; oneRepMax: boolean; weight: boolean };
-
-/**
- * The one set of a session (one exercise, every block) whose record is shown
- * (`design-language.md` §5: one superlative). `candidates` are the session's
- * working sets of that exercise in session order. The highest 1RM that beats
- * the baseline wins; with none, the heaviest Weight that beats it; a tie keeps
- * the set that reached it first.
- */
-export const pickSessionRecordSet = (
-  candidates: readonly RecordSetCandidate[],
-  baseline: RecordBaseline | null,
-): SessionRecordSet | null => {
-  if (baseline === null) return null;
-  let oneRepMax: RecordSetCandidate | null = null;
-  let weight: (RecordSetCandidate & WeightRecordValue) | null = null;
-  for (const candidate of candidates) {
-    if (beatsRecord(candidate.oneRepMax, baseline.oneRepMax) &&
-      (oneRepMax === null || (candidate.oneRepMax as number) > (oneRepMax.oneRepMax as number))) {
-      oneRepMax = candidate;
-    }
-    const value = candidate.weight === null || candidate.reps === null
-      ? null : { weight: candidate.weight, reps: candidate.reps };
-    if (value && beatsWeightRecord(value, baseline.weight) &&
-      (weight === null || compareWeightRecord(value, weight) > 0)) {
-      weight = { ...candidate, ...value };
-    }
-  }
-  const winner = oneRepMax ?? weight;
-  if (winner === null) return null;
-  return {
-    id: winner.id,
-    oneRepMax: oneRepMax !== null,
-    weight: winner.weight !== null && winner.reps !== null &&
-      beatsWeightRecord({ weight: winner.weight, reps: winner.reps }, baseline.weight),
-  };
+  // The best Volume; null when its sum is not finite.
+  volume: number | null;
 };

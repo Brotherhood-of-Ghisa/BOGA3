@@ -483,7 +483,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v2"
+  .data.metric_revision == "working_sets_v4"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -509,7 +509,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v2"
+  .data.metric_revision == "working_sets_v4"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -541,7 +541,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v2"
+  .data.metric_revision == "working_sets_v4"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325
@@ -572,6 +572,7 @@ update_training_fixture "
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
   .data.exercise.bodyweight_contribution == 1
+  and .data.exercise.load_input_mode == "total_load"
   and .data.recent_performances[0].session_body_weight.value == 80
   and .data.recent_performances[0].session_body_weight.status == "known"
   and .data.recent_performances[0].volume.value == 1440
@@ -591,52 +592,14 @@ assert_training_payload '.data.workouts[0].total_volume.value == 1440
   and .data.workouts[0].exercises[0].bodyweight_contribution == 1
 ' 'workout and exercise totals agree'
 
-echo "[agent-api-test] verifying per-side adjustment and current personal contribution"
-update_training_fixture "
-  update app_public.exercise_definitions set bodyweight_contribution=0.7,load_input_mode='per_side_load'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
-  update app_public.exercise_sets set weight_value='10',performance_status=null
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
-  update app_public.exercise_sets set performance_status='unperformed'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A2}';
-" >/dev/null
-agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].sets[0].calculated_load.value == 76
-  and .data.recent_performances[0].volume.value == 608
-  and .data.recent_performances[0].sets[0].load.value == 10
-' 'body contribution is counted once before the per-side external adjustment'
-
-echo "[agent-api-test] verifying missing-reading personal fallback"
-update_training_fixture "
-  update app_public.body_weight_measurements set deleted_at=${NOW_MS}
-    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
-" >/dev/null
-agent_get "exercises/${EXERCISE_A}/context"
-assert_training_payload '.data.recent_performances[0].session_body_weight.status == "missing"
-  and .data.recent_performances[0].volume.value == 160
-  and .data.recent_performances[0].volume.complete == true
-  and .data.recent_performances[0].volume.eligible_set_count == 1
-  and .data.recent_performances[0].sets[0].calculated_load.value == 20
-  and .data.personal_records.estimated_one_rep_max != null
-  and .data.personal_records.excluded_incomplete_volume_sessions == 0
-' 'missing B uses the personal zero fallback without erasing performed sets'
-agent_get "workouts/recent?limit=1"
-assert_training_payload '.data.workouts[0].completed_set_count == 1
-  and .data.workouts[0].total_volume.value == 160
-  and .data.workouts[0].total_volume.known_subtotal == 160
-  and .data.workouts[0].total_volume.known_set_count == 1
-  and .data.workouts[0].total_volume.eligible_set_count == 1
-  and .data.workouts[0].total_volume.complete == true
-' 'workout totals use the same missing-reading fallback'
-
+# The per-side adjustment (body contribution counted once, then 2 × the entered
+# load), the personal zero fallback for a session with no reading and the
+# known/missing/invalid reading payload are the shared TS projection's, in
+# apps/mobile/__tests__/agent-api-training-metrics.test.ts.
 echo "[agent-api-test] verifying dated readings, correction and future exclusion"
 update_training_fixture "
-  update app_public.exercise_definitions set bodyweight_contribution=1,load_input_mode='total_load'
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${EXERCISE_A}';
-  update app_public.exercise_sets set weight_value='20',performance_status=null
-    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A1}';
-  update app_public.body_weight_measurements set deleted_at=null
-    where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-asof';
+  update app_public.exercise_sets set performance_status='unperformed'
+    where owner_user_id='${USER_A_UUID}'::uuid and id='${SET_A2}';
   insert into app_public.body_weight_measurements
     (owner_user_id,id,weight_kg,measured_at,created_at,updated_at,client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-reading',90,

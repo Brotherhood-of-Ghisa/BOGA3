@@ -39,29 +39,44 @@ export interface InMemoryDatabaseFixture {
 // convention the Expo migrator uses (see src/data/migrations/index.ts).
 const migrationKeyForIndex = (idx: number): string => `m${String(idx).padStart(4, '0')}`;
 
+type MigrationBundle = {
+  journal: { entries: readonly { idx: number; tag: string }[] };
+  migrations: Readonly<Record<string, string>>;
+};
+
 /**
- * Applies all bundled migrations, in journal order, to a raw better-sqlite3
- * client. Each migration's SQL is split on drizzle's
- * `--> statement-breakpoint` markers and executed statement by statement.
+ * Applies a migration bundle, in journal order, to a raw better-sqlite3 client
+ * the way the device does. Drizzle's Expo migrator splits each migration on
+ * `--> statement-breakpoint` and hands every chunk to expo-sqlite's
+ * `prepareSync`, which compiles only the chunk's FIRST statement (it passes no
+ * tail pointer to `sqlite3_prepare_v2`) and silently skips the rest. Running
+ * each chunk through `prepare().run()` keeps that contract: better-sqlite3
+ * rejects a chunk with more than one statement, or none, instead of `exec`
+ * running it all and hiding a schema the device never gets.
  */
-export const applyAllMigrations = (client: Database.Database): void => {
-  const { journal, migrations } = generatedMigrationBundle;
-  const orderedEntries = [...journal.entries].sort((a, b) => a.idx - b.idx);
+export const applyMigrationBundle = (client: Database.Database, bundle: MigrationBundle): void => {
+  const orderedEntries = [...bundle.journal.entries].sort((a, b) => a.idx - b.idx);
 
   for (const entry of orderedEntries) {
     const key = migrationKeyForIndex(entry.idx);
-    const sql = (migrations as Record<string, string | undefined>)[key];
+    const sql = bundle.migrations[key];
     if (sql === undefined) {
       throw new Error(`Migration bundle is missing SQL for journal entry "${entry.tag}" (${key}).`);
     }
 
-    for (const rawStatement of sql.split('--> statement-breakpoint')) {
-      const statement = rawStatement.trim();
-      if (statement.length > 0) {
-        client.exec(statement);
+    sql.split('--> statement-breakpoint').forEach((chunk, chunkIndex) => {
+      try {
+        client.prepare(chunk).run();
+      } catch (error) {
+        throw new Error(`Migration "${entry.tag}" chunk ${chunkIndex}: ${(error as Error).message}`);
       }
-    }
+    });
   }
+};
+
+/** Applies every shipped migration, as the device does. */
+export const applyAllMigrations = (client: Database.Database): void => {
+  applyMigrationBundle(client, generatedMigrationBundle);
 };
 
 // One migrated database per test file (Jest gives each file its own module

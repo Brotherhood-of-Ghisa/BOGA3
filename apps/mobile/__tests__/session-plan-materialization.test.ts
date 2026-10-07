@@ -285,6 +285,37 @@ describe('startSessionPlan', () => {
     const result = await startSessionPlan(created.id, T1);
     expect(result).toEqual({ status: 'plan-not-found' });
   });
+
+  it('materializes new pending work into a writable session when previous start is completed', async () => {
+    const created = await planRepository.createPlan(planDraft(), T0);
+    if (created.status !== 'saved') throw new Error('seed failed');
+
+    // 1. Start the plan
+    const started = await startSessionPlan(created.id, T0);
+    expect(started.status).toBe('started');
+    if (started.status !== 'started') throw new Error(String(started));
+
+    // 2. Mark the started session completed
+    db().update(sessions).set({ status: 'completed', completedAt: T1 }).where(eq(sessions.id, started.sessionId)).run();
+    db().update(sessionPlanExercises).set({ progressStatus: 'completed' }).where(eq(sessionPlanExercises.sessionPlanId, created.id)).run();
+
+    // 3. Add a new block to the plan
+    const addResult = await planRepository.addPlanBlock(
+      created.id,
+      exercise('Bench', { exerciseDefinitionId: 'def-bench' }),
+      T1,
+    );
+    expect(addResult.status).toBe('saved');
+
+    // 4. Start again: should materialize the new work into a writable session rather than failing on completed session
+    const startedAgain = await startSessionPlan(created.id, T1);
+    expect(startedAgain.status).toBe('started');
+    if (startedAgain.status !== 'started') throw new Error(String(startedAgain));
+    expect(startedAgain.sessionId).not.toBe(started.sessionId);
+
+    const newSession = sessionRows().find((row) => row.id === startedAgain.sessionId);
+    expect(newSession?.status).toBe('active');
+  });
 });
 
 describe('addPlanBlockToSession', () => {
@@ -560,5 +591,54 @@ describe('addPlanBlockToSession', () => {
     expect(sets.map((row) => row.setType)).toEqual([null, null, 'warm_up']);
     expect(sets.slice(0, 2).map((row) => [row.id, row.sourcePlanSetId])).toEqual(plannedSetsBefore);
     expect(sets[2].sourcePlanSetId).toBeNull();
+  });
+
+  it('releases discarded child claims and allows re-attaching block to a new session', async () => {
+    const { blockId } = await createdPlanWithBlock();
+    // 1. Attach block to session 1
+    const firstAttach = await addPlanBlockToSession(blockId, undefined, T0);
+    expect(firstAttach.status).toBe('attached');
+    if (firstAttach.status !== 'attached') throw new Error(String(firstAttach));
+
+    // 2. Discard session 1 (soft delete the session row)
+    db().update(sessions).set({ deletedAt: T1 }).where(eq(sessions.id, firstAttach.sessionId)).run();
+
+    // 3. Attach the same block again (in a new session): must not fail with UNIQUE constraint on source_plan_exercise_id
+    const secondAttach = await addPlanBlockToSession(blockId, undefined, T1);
+    expect(secondAttach.status).toBe('attached');
+    if (secondAttach.status !== 'attached') throw new Error(String(secondAttach));
+    expect(secondAttach.sessionId).not.toBe(firstAttach.sessionId);
+  });
+
+  it('generates distinct set ids for attachments to different cards', async () => {
+    const { blockId } = await createdPlanWithBlock();
+    const sessionA = await seedActiveSession('def-squat', 'Squat A', [], 'card-A');
+
+    // Attach to card A
+    const attachA = await addPlanBlockToSession(blockId, sessionA.cardId, T0);
+    expect(attachA.status).toBe('attached');
+
+    // Sets on card A
+    const setsA = performedSetRows().filter((s) => s.sessionExerciseId === sessionA.cardId);
+
+    // Complete session A and clear its card's and sets' claim so session B can be active on Device B
+    db().update(sessions).set({ status: 'completed', completedAt: T1 }).where(eq(sessions.id, sessionA.sessionId)).run();
+    db().update(sessionExercises).set({ sourcePlanExerciseId: null }).where(eq(sessionExercises.id, sessionA.cardId)).run();
+    db().update(exerciseSets).set({ sourcePlanSetId: null }).where(eq(exerciseSets.sessionExerciseId, sessionA.cardId)).run();
+
+    const sessionB = await seedActiveSession('def-squat', 'Squat B', [], 'card-B');
+
+    // Attach same block to card B
+    const attachB = await addPlanBlockToSession(blockId, sessionB.cardId, T1);
+    expect(attachB.status).toBe('attached');
+
+    const setsB = performedSetRows().filter((s) => s.sessionExerciseId === sessionB.cardId);
+
+    expect(setsA.length).toBeGreaterThan(0);
+    expect(setsB.length).toBeGreaterThan(0);
+    const idsA = new Set(setsA.map((s) => s.id));
+    for (const setB of setsB) {
+      expect(idsA.has(setB.id)).toBe(false);
+    }
   });
 });

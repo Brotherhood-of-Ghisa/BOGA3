@@ -4,7 +4,9 @@
 # apps/mobile's groups-api-live Jest suite against this worktree's local
 # Supabase, then deletes the users and everything they made. The server rules
 # are the groups-contract / groups-leaderboards lanes'; this lane proves the
-# app's RPC names, parameters and response guards match the server.
+# app's RPC names, parameters and response guards match the server. The
+# protocol-4 client wire is groups-competition-live.sh (lane groups-protocol4):
+# activating competitions is one-way and forces a stack rebuild.
 # Execute only through its Boga lane.
 set -euo pipefail
 
@@ -76,7 +78,6 @@ echo "[${LANE_LABEL}] running the groups client suite against ${API_URL}"
   export GROUPS_LIVE_PASSWORD="${PASSWORD}"
   export GROUPS_LIVE_RUN_TAG="${RUN_TAG}"
   npm run --silent test:groups:live
-  "${SUPABASE_DIR}/scripts/with-local-group-competitions.sh" npm run --silent test:groups:competition-live
 )
 COMPLETED=1
 pass "the groups client's calls match the live server (run ${RUN_TAG})"

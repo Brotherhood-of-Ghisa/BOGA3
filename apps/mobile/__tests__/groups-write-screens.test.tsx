@@ -218,6 +218,7 @@ describe('Create group (flow 1)', () => {
 
     await screen.findByTestId('group-username-gate');
     expect(screen.queryByTestId('group-form')).toBeNull();
+    expect(screen.queryByText(/see you by your username/)).toBeNull();
     fireEvent.press(screen.getByTestId('group-username-save'));
     expect(screen.getByTestId('group-username-error').props.children).toBe('Enter a username.');
     expect(profile.saveUsername).not.toHaveBeenCalled();
@@ -376,6 +377,7 @@ describe('Invite (flow 2)', () => {
     expect(await screen.findByTestId('group-invite-code')).toHaveTextContent('ABCD2345');
     expect(screen.getByTestId('group-invite-link')).toHaveTextContent('boga3://group/join?code=ABCD2345');
     await waitFor(() => expect(screen.getByText('Invite friends to Garage Gym')).toBeTruthy());
+    expect(screen.queryByText(/Anyone with this code can join/)).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByTestId('group-invite-share'));
     });
@@ -454,7 +456,7 @@ describe('Edit group (flow 5)', () => {
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
-  it('requires a review before an effective group switch and retains typed input through catalogue retirement',async()=>{
+  it('applies an effective group switch in one press and retains typed input through catalogue retirement',async()=>{
     writeGroupCache(fixture.database,{ cacheKey: groupCacheKeys.groupExercises(GROUP_ID),userId: USER_ID,fetchedAtMs: 0,
       payload: { contract_version: 4,exercises: [{ ...competitionExercise,rules: { ...competitionExercise.rules,bodyweight_contribution: 0,bodyweight_calculations_enabled: false } }] } });
     let resolve!: (value: Parameters<typeof api.listCompetitionExercises.mockResolvedValue>[0])=>void;
@@ -466,21 +468,27 @@ describe('Edit group (flow 5)', () => {
     await waitFor(()=>expect(screen.getByTestId('group-form-bodyweight-calculations-on')).not.toBeDisabled());
     expect(screen.getByTestId('group-form-name-input')).toHaveProp('value','Typed group name');
     fireEvent.press(screen.getByTestId('group-form-bodyweight-calculations-on'));
-    fireEvent.press(screen.getByTestId('group-form-submit'));
-    expect(api.updateGroup).not.toHaveBeenCalled();expect(screen.getByTestId('group-policy-preview')).toHaveTextContent(/Existing certifications retain their witness/);
+    expect(screen.getByTestId('group-form-submit')).toHaveTextContent('Save changes');
     api.updateGroup.mockRejectedValue(new GroupApiError('FORBIDDEN','forbidden'));
     await act(async()=>fireEvent.press(screen.getByTestId('group-form-submit')));
+    expect(api.updateGroup).toHaveBeenCalledTimes(1);
     expect(api.updateGroup).toHaveBeenCalledWith(GROUP_ID,expect.objectContaining({ name: 'Typed group name',bodyweightCalculationsEnabled: true }));
     expect(screen.getByTestId('group-form-name-input')).toHaveProp('value','Typed group name');
   });
-  it('saves a zero-contribution switch without promising a rebuild',async()=>{
+  it('holds the bodyweight switch until the group exercises load',async()=>{
+    api.listCompetitionExercises.mockReturnValueOnce(new Promise(()=>{}));
+    render(<EditGroupRoute />);await screen.findByTestId('group-form');
+    expect(screen.getByTestId('group-form-bodyweight-calculations-on')).toBeDisabled();
+  });
+  it('saves a zero-contribution switch in one press',async()=>{
     render(<EditGroupRoute />);await screen.findByTestId('group-form');
     await waitFor(()=>expect(screen.getByTestId('group-form-bodyweight-calculations-on')).not.toBeDisabled());
     fireEvent.press(screen.getByTestId('group-form-bodyweight-calculations-on'));
-    expect(screen.getByTestId('group-policy-zero-effect')).toHaveTextContent(/Score revisions stay unchanged/);
+    expect(screen.getByTestId('group-form-submit')).toHaveTextContent('Save changes');
     api.updateGroup.mockResolvedValue({ group: summary('owner') });
     await act(async()=>fireEvent.press(screen.getByTestId('group-form-submit')));
-    expect(api.updateGroup).toHaveBeenCalledTimes(1);expect(screen.queryByTestId('group-policy-preview')).toBeNull();
+    expect(api.updateGroup).toHaveBeenCalledTimes(1);
+    expect(api.updateGroup).toHaveBeenCalledWith(GROUP_ID,expect.objectContaining({ bodyweightCalculationsEnabled: true }));
   });
   it('refuses offline and changes nothing', async () => {
     render(<EditGroupRoute />);

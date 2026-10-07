@@ -1,5 +1,9 @@
+import Database from 'better-sqlite3';
+
 import * as schema from '@/src/data/schema';
 import { localRuntimeMigrations } from '@/src/data/migrations';
+
+import { applyAllMigrations, applyMigrationBundle } from './helpers/in-memory-db';
 
 describe('domain schema and runtime migrations', () => {
   it('exports domain tables and no longer exports smoke table from schema index', () => {
@@ -131,8 +135,9 @@ describe('domain schema and runtime migrations', () => {
     // exercise_group_links is m0006, the kg-only cutover is m0010, the
     // derived exercise session facts are m0011 (tables) and m0012 (triggers),
     // the local store's owning account (`account_user_id`) is m0015, and the
-    // session planning schema (0016) plus pull-cursor reset (0017) append after it.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(18);
+    // session planning schema (0016) plus pull-cursor reset (0017) append after it,
+    // and m0018 drops the facts' volume completeness flag.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(19);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -180,7 +185,14 @@ describe('domain schema and runtime migrations', () => {
       'm0015',
       'm0016',
       'm0017',
+      'm0018',
     ]);
+  });
+
+  it('drops the facts volume completeness flag in m0018', () => {
+    expect(localRuntimeMigrations.migrations.m0018).toContain(
+      'ALTER TABLE `exercise_session_facts` DROP COLUMN `volume_complete`;',
+    );
   });
 
   it('records the owning account of the local store in m0015', () => {
@@ -340,5 +352,46 @@ describe('muscle_groups lives in the squashed baseline and adds no migration of 
       expect(sql).not.toContain('`muscle_groups`');
       expect(sql).not.toContain('muscle_groups');
     }
+  });
+});
+
+// The device migrator prepares each `--> statement-breakpoint` chunk once, and
+// SQLite compiles only its first statement; the helper runs chunks the same way.
+describe('migration chunks run one prepared statement each, as on the device', () => {
+  const bundleOf = (sql: string) => ({
+    journal: { entries: [{ idx: 0, tag: '0000_probe' }] },
+    migrations: { m0000: sql },
+  });
+
+  it('applies every shipped migration chunk as a single statement', () => {
+    const client = new Database(':memory:');
+    expect(() => applyAllMigrations(client)).not.toThrow();
+    client.close();
+  });
+
+  it('rejects a chunk holding two statements, whose second the device would skip', () => {
+    const client = new Database(':memory:');
+    expect(() =>
+      applyMigrationBundle(client, bundleOf('CREATE TABLE `a` (`id` integer);\nCREATE TABLE `b` (`id` integer);'))
+    ).toThrow('Migration "0000_probe" chunk 0: The supplied SQL string contains more than one statement');
+    client.close();
+  });
+
+  it('rejects a comment-only chunk, which prepares to no statement', () => {
+    const client = new Database(':memory:');
+    expect(() =>
+      applyMigrationBundle(client, bundleOf('CREATE TABLE `a` (`id` integer);\n--> statement-breakpoint\n-- nothing here\n'))
+    ).toThrow('Migration "0000_probe" chunk 1: The supplied SQL string contains no statements');
+    client.close();
+  });
+
+  it('applies a statement led by comments, wiki-link brackets included', () => {
+    const client = new Database(':memory:');
+    applyMigrationBundle(
+      client,
+      bundleOf('-- cites ([[copy.no-inline-explanation]])\nCREATE TABLE `a` (`id` integer);\n')
+    );
+    expect(client.prepare("SELECT name FROM sqlite_master WHERE name = 'a'").get()).toEqual({ name: 'a' });
+    client.close();
   });
 });

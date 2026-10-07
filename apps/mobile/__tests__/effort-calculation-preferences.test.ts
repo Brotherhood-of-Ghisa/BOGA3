@@ -67,12 +67,13 @@ const read = async () => {
     view: buildSessionViewModel(session, new Map()), detail: buildCompletedSessionDetailModel(session.exercises, new Map()) };
 };
 
-it.each(EFFORT_CHOICES)('defaults $label independently while groups keep only Warm-up excluded', ({ id }) => {
+it.each(EFFORT_CHOICES)('defaults $label personally and in the fixed group rule alike', ({ id }) => {
   const set = { weight: '40', reps: '5', setType: id === 'unspecified' ? null : id };
   const expected = DEFAULT_PERSONAL_EFFORT_POLICY.workingSetEfforts.includes(id);
   expect(isWorkingSet(set, DEFAULT_PERSONAL_EFFORT_POLICY)).toBe(expected);
   expect(isVolumeSet(set, DEFAULT_PERSONAL_EFFORT_POLICY)).toBe(expected);
-  expect(isWorkingSet(set)).toBe(id !== 'warm_up');
+  expect(isWorkingSet(set)).toBe(expected);
+  expect(isVolumeSet(set)).toBe(expected);
   expect(isWorkingSet({ ...set, performanceStatus: 'planned' }, DEFAULT_PERSONAL_EFFORT_POLICY)).toBe(false);
 });
 
@@ -148,7 +149,8 @@ it('isolates groups and assigns historical custom RIR to RIR-4 without rewriting
   configure([], []);
   const sets = localDatabase().select().from(exerciseSets).all();
   const group = summarizeExerciseLoad(sets.map(set => ({ ...set, performanceStatus: null })), groupLoadContext(false, { bodyweightContribution: 0, loadInputMode: 'total_load' }, null));
-  expect(group.volumeCoverage.totalVolumeKgReps).toBe(400); // RIR + Cooldown + Technique.
+  // The fixed group rule, not the empty personal choices: the RIR set only.
+  expect(group.volumeCoverage.totalVolumeKgReps).toBe(250);
   expect(group.topWeightSet?.weight).toBe(50);
   expect(isWorkingSet({ weight: '80', reps: '5', setType: 'rir_12' }, { workingSetEfforts: [], volumeEfforts: [] })).toBe(false);
   expect(isVolumeSet({ weight: '80', reps: '5', setType: 'rir_12' }, { workingSetEfforts: [], volumeEfforts: [] })).toBe(false);

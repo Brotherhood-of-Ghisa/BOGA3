@@ -6,12 +6,21 @@
 # detect a client schema change with no paired server migration and exit
 # non-zero in --strict mode with a useful failure message.
 #
+# This body is the checker's CLI wiring, proved once against the real stack: a
+# drifted Drizzle file reaches the column diff and fails the run. The diff's
+# rules (missing, mistyped and server-only columns, exemptions, the fix
+# template) are unit-tested in apps/mobile/__tests__/sync/drift-columns.test.ts.
+# It passes --skip-reset: the lane's baseline preflight has already applied
+# every migration, and the server only has to lack the injected column, so a
+# reset here would rebuild the database inside a default gate for nothing.
+#
 # This script:
 #   1. Saves the current content of
 #      apps/mobile/src/data/schema/exercise-sets.ts to a temp file.
 #   2. Programmatically appends a `notes: text('notes')` column to the
 #      schema definition.
-#   3. Runs `npm run check:sync-drift -- --strict` against the modified tree.
+#   3. Runs `npm run check:sync-drift -- --strict --skip-reset` against the
+#      modified tree.
 #   4. Asserts the exit code is non-zero AND the failure output contains:
 #        - the literal string `exercise_sets`
 #        - the literal string `notes`
@@ -99,7 +108,7 @@ cd "${REPO_ROOT}"
 # we can grep without losing the exit code.
 OUTPUT_FILE="$(mktemp)"
 set +e
-(cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict) >"${OUTPUT_FILE}" 2>&1
+(cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict --skip-reset) >"${OUTPUT_FILE}" 2>&1
 DRIFT_RC=$?
 set -e
 
@@ -147,23 +156,10 @@ pass "drift — hermetic: schema file restored to pre-test contents"
 
 rm -f "${OUTPUT_FILE}" "${ORIGINAL_COMPARE}"
 
-# ---------------------------------------------------------------------------
-# Positive case — folded into this script: after restoring, the drift checker
-# against the unmodified tree must exit 0 in --strict mode.
-# ---------------------------------------------------------------------------
-echo "[sync-v2-drift-synthetic] positive case — drift checker on unmodified tree"
-POS_OUTPUT_FILE="$(mktemp)"
-set +e
-(cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict) >"${POS_OUTPUT_FILE}" 2>&1
-POS_RC=$?
-set -e
-echo "[sync-v2-drift-synthetic] positive-case rc=${POS_RC}; tail of output:"
-tail -n 20 "${POS_OUTPUT_FILE}" || true
-if [[ "${POS_RC}" != "0" ]]; then
-  fail "drift checker on the unmodified tree exited rc=${POS_RC}; expected 0 (as-built schema must pass)"
-fi
-rm -f "${POS_OUTPUT_FILE}"
-pass "drift positive — drift checker exits 0 on the as-built tree"
+# The positive case (checker exits 0 on the as-built tree) is the `sync-drift`
+# lane's job, so it is not repeated here: this script's own `cmp` above already
+# proves the restore byte-exact, which is what the positive re-run was standing
+# in for.
 
 COMPLETED=1
 echo "[sync-v2-drift-synthetic] all assertions passed"

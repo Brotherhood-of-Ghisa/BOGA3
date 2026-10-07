@@ -45,7 +45,6 @@ export type StatsMusclePerformance = {
   sortOrder: number;
   workingSetCount: number;
   totalVolume: number | null;
-  knownVolume?: number | null;
 };
 
 export type StatsMuscleFamilyPerformance = {
@@ -53,7 +52,6 @@ export type StatsMuscleFamilyPerformance = {
   sortOrder: number;
   workingSetCount: number;
   totalVolume: number | null;
-  knownVolume?: number | null;
   muscles: StatsMusclePerformance[];
 };
 
@@ -134,7 +132,6 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   type MuscleAccumulator = {
     workingSetIdentities: Set<string>;
     totalVolume: number | null;
-  knownVolume?: number | null;
   };
   const accumulatorsByMuscleId = new Map<string, MuscleAccumulator>();
 
@@ -143,12 +140,11 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
     const accumulator = accumulatorsByMuscleId.get(contribution.muscleGroupId) ?? {
       workingSetIdentities: new Set<string>(),
       totalVolume: 0,
-      knownVolume: 0,
     };
     accumulatorsByMuscleId.set(contribution.muscleGroupId, accumulator);
     if (contribution.working !== false) accumulator.workingSetIdentities.add(contribution.setIdentity);
-    accumulator.knownVolume = addFiniteVolume(accumulator.knownVolume, contribution.weightedVolume ?? 0);
-    accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume);
+    // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
+    accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume ?? 0);
   }
 
   const musclesByFamily = new Map<string, StatsMusclePerformance[]>();
@@ -161,7 +157,6 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
       sortOrder: group.sortOrder,
       workingSetCount: accumulator?.workingSetIdentities.size ?? 0,
       totalVolume: accumulator ? accumulator.totalVolume : 0,
-      knownVolume: accumulator ? accumulator.knownVolume : 0,
     };
     const bucket = musclesByFamily.get(group.familyName) ?? [];
     bucket.push(muscle);
@@ -172,10 +167,8 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
     .map(([familyName, muscles]) => {
       const familyWorkingSetIdentities = new Set<string>();
       let familyTotalVolume: number | null = 0;
-      let familyKnownVolume: number | null = 0;
       let familySortOrder = Number.POSITIVE_INFINITY;
       for (const muscle of muscles) {
-        familyKnownVolume = addFiniteVolume(familyKnownVolume, muscle.knownVolume === undefined ? muscle.totalVolume : muscle.knownVolume);
         familyTotalVolume = addFiniteVolume(familyTotalVolume, muscle.totalVolume);
         if (muscle.sortOrder < familySortOrder) familySortOrder = muscle.sortOrder;
         const accumulator = accumulatorsByMuscleId.get(muscle.muscleGroupId);
@@ -193,7 +186,7 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
         familyName,
         sortOrder: Number.isFinite(familySortOrder) ? familySortOrder : 0,
         workingSetCount: familyWorkingSetIdentities.size,
-        totalVolume: familyTotalVolume, knownVolume: familyKnownVolume,
+        totalVolume: familyTotalVolume,
         muscles: sortedMuscles,
       };
     })

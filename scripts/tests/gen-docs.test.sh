@@ -230,6 +230,20 @@ sed -i.bak '/test steady`/s/~10s |$/~99m |/' "${FSPEC}"
 rm -f "${FSPEC}.bak"
 fgen check || fail "check must ignore the median column"
 
+# Design targets are build inputs: any file under docs/specs/ui/design-targets/
+# fails check. The probe is an untracked file there, removed straight after.
+DT_DIR="${REPO_ROOT}/docs/specs/ui/design-targets"
+DT_PROBE="${DT_DIR}/.gen-docs-probe.md"
+mkdir -p "${DT_DIR}"
+printf '# probe\n' > "${DT_PROBE}"
+if out="$("${GD}" check 2>&1)"; then
+  rm -f "${DT_PROBE}"; rmdir "${DT_DIR}" 2>/dev/null || true
+  fail "a file under docs/specs/ui/design-targets/ must fail check"
+fi
+rm -f "${DT_PROBE}"; rmdir "${DT_DIR}" 2>/dev/null || true
+grep -q "design-targets/.gen-docs-probe.md: design targets are build inputs" <<<"${out}" \
+  || fail "the design-target failure must name the file: ${out}"
+
 # gen must introduce no STRUCTURAL change on a current tree (lanes, gates, CI
 # flags) — only the median column may refresh, and that is ignored. Guard: only
 # run this half when the generated file is clean in git, so a developer's

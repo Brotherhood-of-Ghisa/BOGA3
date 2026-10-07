@@ -96,9 +96,9 @@ The service-only `session_weight_contexts(owner,session_ids)` helper resolves
 only already-authorized sessions. Normal authenticated/OAuth clients cannot call
 it directly, and no endpoint exposes the measurement timeline. All payload
 weights are kg and removed unit/mode/movement/loading fields are absent.
-`metric_revision: working_sets_v2` identifies the current response: derived
-figures and counts read working sets only
-([training-metrics contract](tech/training-metrics-contract.md) §1–§2).
+`metric_revision: working_sets_v4` identifies the current response: derived
+figures and counts read working sets only ([[set.eligibility]];
+[training-metrics contract](tech/training-metrics-contract.md) §1–§2).
 Live OAuth grant validation, non-member/nonexistent equivalence, read-only routes,
 direct-table denial and existing MCP tools remain enforced. Full response
 semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).

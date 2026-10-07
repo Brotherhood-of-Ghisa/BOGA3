@@ -19,6 +19,11 @@ millisecond.
 - Never hand-roll DB setup or copy DDL into a test: driving the schema from the
   generated bundle is what makes every test track the real shipped schema when a
   new migration lands.
+- The fixture runs each `--> statement-breakpoint` chunk as one
+  `prepare().run()`, as the device does: expo-sqlite prepares a chunk once and
+  SQLite skips every statement after the first. A chunk with two statements,
+  or only comments, fails Jest rather than shipping a schema the device never
+  gets. Never switch it back to `exec`.
 - `createInMemoryDatabase()` in `beforeEach`, `close()` in `afterEach`. Pass
   `{ foreignKeys: false }` only to plant a deliberate orphan, with the reason at
   the call site.
@@ -81,6 +86,23 @@ the test is about the UTC instant itself.
   own `jest.mock`.
 - Any test that opens a real connection (e.g. a `better-sqlite3` `:memory:`
   handle) closes it in `afterEach`.
+
+## Backend test bodies (`supabase/tests/**`)
+
+A body's cost is processes, not SQL: a `docker exec psql` per statement costs
+~40 ms against ~1 ms of query, and every extra `mktemp`/`cat`/`jq` adds a
+process. The group bodies built on `supabase/tests/lib/groups-fixtures.sh` therefore:
+
+- call `psql_session_start` once, so `run_psql` shares one psql session. Each
+  call ends with `discard all` (fresh settings, temp tables and session locks;
+  a transaction left open fails), and an `ERROR` fails the call as before.
+- use `run_psql_once` for SQL that must be its own connection: a lock holder
+  run in the background, or the exit-trap cleanup (`psql_session_stop` first).
+- read HTTP replies with `http_call` / `eval_drain`, never a temp file.
+- never wait out a fixed sleep: end a background holder explicitly, poll a
+  condition with a deadline.
+
+`run-suite.sh` loads `supabase status` once for all of a lane's bodies.
 
 ## Maestro flows: four load-bearing rules
 

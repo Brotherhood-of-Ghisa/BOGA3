@@ -13,7 +13,7 @@
 | Protocol-4 units, disclosure, activation (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
-| Routes, screens, wording (changing group UI) | `docs/specs/ui/screen-map.md`, `docs/specs/ui/design-targets/groups.md` |
+| Routes, screens, wording (changing group UI) | `docs/specs/ui/screen-map.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
 | Performed / working / parsing rules | [training-metrics-contract.md](training-metrics-contract.md) |
 | Diagnostics triage and repair | `RUNBOOK.md` |
 | Lanes and what they prove | spec `06`; the `supabase/tests/groups-*.sh` and flow headers |
@@ -132,10 +132,11 @@ is the competition contract's. Once it is active, unsafe older RPCs return
 settings RPCs.
 
 **Week summary.** The client sends its local week (≤ 8 days): the server never
-guesses a time zone. It counts completed, untombstoned sessions shared to the
-group by current members and started in the window; their performed, live,
-working facts whose rows still exist (trailing the evaluator); and non-voided
-group records, one per board taken. Every current member is ranked, zeros
+guesses a time zone. It reads completed, untombstoned sessions shared to the
+group by current members and started in the window, and counts their
+performed, live, working facts whose rows still exist (trailing the
+evaluator; [[set.eligibility]]) and their non-voided group records, one per
+board taken. It reports no session count. Every current member is ranked, zeros
 included, on `(working_sets desc, group_records desc)`. Training now is an
 active session written within 2 h (max `server_received_at` over session,
 exercises, sets); latest completed is any time.
@@ -145,8 +146,8 @@ exercises, sets); latest completed is any time.
 Session cards and the friend view count on the viewing device
 (`buildCompetitionSession`,
 `apps/mobile/src/groups/competition-session-view-model.ts`) with the session
-screens' TS. Counts come only from permitted set context: `Sets` is the
-performed working rows, `exercises` those holding one. A normalized exercise
+screens' TS. Counts come only from permitted set context: `Sets` as
+[[set.count-display]], `exercises` those holding a working set. A normalized exercise
 shows reps and effort, never a load figure, and no session total is
 reconstructed. Nothing is mirrored in SQL: SQL mirrors once duplicated set
 rules in two languages. The cost: a co-member's device receives every permitted
@@ -180,10 +181,17 @@ Postgres (shared secret, no JWT); it has no client API.
 linked or not, so a new link is a re-apply. `apps/mobile/src/groups/set-facts.ts`
 is the one implementation of the group set rules; device session cards parse
 with the same kernel.
-`fingerprint` hashes raw synced values and interprets nothing. Every reader
-reads `working` as `working is not false`. Changing the set rules (including
-`isWorkingSetType`) bumps `GROUP_EVAL_RULES_VERSION`; drains re-queue older
-facts as a silent `rules` recompute.
+`fingerprint` hashes raw synced values and interprets nothing. `working` is
+the fixed group rule of [[set.eligibility]] (`isWorkingSetType` with no
+policy); every reader reads it as `working is not false`, so a non-working
+set is excluded like a warm-up. A set-rule or kernel change bumps
+`GROUP_EVAL_RULES_VERSION`, and drains re-queue older facts as a silent
+`rules` recompute, a bounded batch per run. Each run records its version
+(`group_eval_rules_state`); the sweep also kicks while a shared session with
+older facts has no queued job, so once the new function has run once, a bump
+finishes without member activity. Comparisons are not stamped with it: the
+same change ships a migration enqueuing a `rules` evaluation of every live
+comparison.
 
 **Live target:** the member is active in a non-deleted group that owns the
 unarchived group exercise. Any other board is frozen.

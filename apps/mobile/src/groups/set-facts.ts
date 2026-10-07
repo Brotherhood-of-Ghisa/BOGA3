@@ -10,7 +10,7 @@ import {
 } from '../exercise-calculations/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
-export const GROUP_EVAL_RULES_VERSION = 5;
+export const GROUP_EVAL_RULES_VERSION = 6;
 
 export type GroupRawSetValues = {
   weight_value: string;
@@ -46,7 +46,7 @@ export type GroupEvalSetRow = GroupRawSetValues & {
   exercise_definition_id: string | null;
   exercise_order_index: number;
   set_order_index: number;
-  /** The synced effort (`warm_up`, `rir_<n>` or null), as stored. */
+  /** The synced effort label (for example `warm_up`, `rir_<n>`, `technique` or null), as stored. */
   set_type: string | null;
   live: boolean;
   fingerprint: string;

@@ -5,7 +5,7 @@ import {
   sessionRecordLineText,
 } from '@/src/session-insights/record-line';
 
-// One PR names itself; more than one is only counted (today-landing.md).
+// One PR names itself; more than one is only counted.
 describe('buildSessionRecordLine', () => {
   const describeRecord = (name: string) => `${name} 1RM 102.5`;
 

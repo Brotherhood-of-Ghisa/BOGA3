@@ -4,16 +4,16 @@ appId: com.dinoderek.mobile
 #
 # Proves:
 #   1. the completion screen's share preview opens the native share sheet,
-#      which dismisses without a destination, and the preview's backdrop
-#      closes it.
+#      which dismisses without a destination while the preview stays open,
+#      then the preview's X closes it.
 # Why device:
 #   1. the native share sheet (the preview captured to an image and handed to
-#      expo-sharing in the installed binary) and a real sheet backdrop.
+#      expo-sharing in the installed binary) and stacked native sheets.
 # Jest counterpart: __tests__/completed-session-local-data.test.tsx
 #   (every completion and detail state over the fixtures: records, grouping,
 #   no-history and unmapped copy, missing sessions, delete/undelete, append,
 #   share preview, edit read-back), __tests__/completed-session-detail-screen.test.tsx
-#   (the capture and share calls, share failure and retry, backdrop dismissal),
+#   (the capture and share calls, share failure and retry, preview dismissal),
 #   __tests__/session-view-screen.test.tsx ("editing a completed session":
 #   Start/End validation, autosave pause, an exercise-page edit saved by Done).
 
@@ -44,17 +44,23 @@ appId: com.dinoderek.mobile
     visible: "Copy"
     timeout: 10000
 - takeScreenshot: "session-share-platform-share-sheet"
+# Start inside the floating native panel, below the preview behind it.
 # Dismiss without selecting a destination; this proves image launch/cancel only.
 - swipe:
-    start: "50%,55%"
+    start: "50%,70%"
     end: "50%,95%"
     duration: 500
 - extendedWaitUntil:
     notVisible: "Copy"
     timeout: 10000
-# The share sheet has no Cancel: tap the backdrop above it.
+- assertVisible:
+    id: "session-share-preview"
+- assertVisible:
+    id: "session-share-image"
+- takeScreenshot: "session-share-preview-after-cancel"
+# The share preview is a page sheet: its X closes it.
 - tapOn:
-    point: "50%,8%"
+    id: "session-share-preview-close"
 - extendedWaitUntil:
     notVisible:
       id: "session-share-preview"

@@ -253,7 +253,6 @@ const factColumns = {
   topWeightKg: exerciseSessionFacts.topWeightKg,
   topWeightSetId: exerciseSessionFacts.topWeightSetId,
   volumeKg: exerciseSessionFacts.volumeKg,
-  volumeComplete: exerciseSessionFacts.volumeComplete,
   workingSets: exerciseSessionFacts.workingSets,
   volumeSets: exerciseSessionFacts.volumeSets,
   prE1rm: exerciseSessionFacts.prE1rm,
@@ -324,7 +323,7 @@ export type ExerciseBestSession = {
 export type ExerciseBests = {
   oneRepMax: (ExerciseBestSession & { value: number; weight: number; reps: number }) | null;
   topWeight: (ExerciseBestSession & { weight: number; reps: number }) | null;
-  /** The best complete session volume. */
+  /** The best session volume. */
   volume: (ExerciseBestSession & { value: number; workingSets: number; volumeSets?: number }) | null;
   /** The newest session in scope with at least one working set. */
   latest: ExerciseBestSession | null;
@@ -344,7 +343,6 @@ const bestsColumns = {
   topWeightKg: exerciseSessionFacts.topWeightKg,
   topWeightRepsValue: topWeightSet.repsValue,
   volumeKg: exerciseSessionFacts.volumeKg,
-  volumeComplete: exerciseSessionFacts.volumeComplete,
   workingSets: exerciseSessionFacts.workingSets,
   volumeSets: exerciseSessionFacts.volumeSets,
 };
@@ -361,7 +359,6 @@ type BestsRow = {
   topWeightKg: number | null;
   topWeightRepsValue: string | null;
   volumeKg: number | null;
-  volumeComplete: boolean;
   workingSets: number;
   volumeSets: number;
 };
@@ -413,7 +410,7 @@ const pickBests = (rows: BestsRow[]): ExerciseBests => {
         reps: bestSetReps(row.e1rmRepsValue),
       },
       weight: row.topWeightKg === null ? null : { ...session, weight: row.topWeightKg, reps: bestSetReps(row.topWeightRepsValue) },
-      volume: row.volumeComplete && row.volumeKg !== null ? { ...session, value: row.volumeKg, workingSets: row.workingSets, volumeSets: row.volumeSets } : null,
+      volume: row.volumeKg === null ? null : { ...session, value: row.volumeKg, workingSets: row.workingSets, volumeSets: row.volumeSets },
     });
     if (row.workingSets > 0) latest = session;
   }
@@ -433,7 +430,7 @@ const selectBestsRows = (database: LocalDatabase, where: SQL | undefined) =>
     .sort(compareFactSessionOrder);
 
 /**
- * One exercise's all-time 1RM, top weight and best complete volume, each with
+ * One exercise's all-time 1RM, top weight and best volume, each with
  * its session, gym and (for 1RM and top weight) the set that holds it, plus
  * the newest session in scope.
  */
@@ -479,13 +476,14 @@ export const loadEarlierBestsByDefinition = async (
 };
 
 /**
- * The records a session's sets are compared with (`pickSessionRecordSet`),
- * per definition, from `loadEarlierBestsByDefinition`.
+ * The records a session is compared with (`deriveExercisePersonalRecords`,
+ * `pickSessionRecordSet`), per definition, from `loadEarlierBestsByDefinition`.
  */
 export const recordBaselinesOf = (
   bestsByDefinition: ReadonlyMap<string, ExerciseBests>,
 ): Map<string, RecordBaseline> =>
-  new Map(Array.from(bestsByDefinition, ([definitionId, { oneRepMax, topWeight }]) => [definitionId, {
+  new Map(Array.from(bestsByDefinition, ([definitionId, { oneRepMax, topWeight, volume }]) => [definitionId, {
     oneRepMax: oneRepMax?.value ?? null,
     weight: topWeight ? { weight: topWeight.weight, reps: topWeight.reps } : null,
+    volume: volume?.value ?? null,
   }]));

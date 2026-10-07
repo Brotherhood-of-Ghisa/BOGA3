@@ -1,9 +1,9 @@
-import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
-import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
+import { sumVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
+import { calculateAnalyticsSetMetrics, ordinaryLoadContext, formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { deriveExercisePersonalRecord, type SessionInsightExerciseInput } from '@/src/session-insights';
-import type { RecordBand } from '@/src/session-insights/record-band';
+import type { RecordLine } from '@/src/session-insights/record-band';
 
 import {
   cardRecordBand,
@@ -18,8 +18,8 @@ import {
 /**
  * View Session's presentation model: what a finished session did, set by set.
  * Only confirmed sets with valid values are shown, and an exercise with none is
- * left out. A record is the session view's (`session-view-model.ts`): the
- * exercise's record set against every completed session before this one. Pure — the
+ * left out. Records are the session view's (`session-view-model.ts`): the
+ * exercise's records against every completed session before this one. Pure — the
  * route loads the session and the history and renders what this returns.
  */
 
@@ -45,8 +45,8 @@ export type CompletedSessionDetailCard = {
   // The card's `<n> sets`: its working sets (`training-metrics-contract.md` "Counted set").
   setCount: number;
   rows: SessionViewSetRow[];
-  // The card's `record` band when the exercise's record set is in it.
-  record: RecordBand | null;
+  // The card's `record` band: a line per record it holds, empty without one.
+  record: RecordLine[];
 };
 
 export type CompletedSessionDetailModel = {
@@ -54,7 +54,6 @@ export type CompletedSessionDetailModel = {
   // The summary's `Sets`: the performed working sets.
   workingSetCount: number;
   volume: string;
-  volumeNote?: string;
 };
 
 const performedFigures = (set: CompletedSessionDetailSetInput) => {
@@ -144,5 +143,5 @@ export const buildCompletedSessionDetailModel = (
     ];
   });
 
-  return { cards, workingSetCount, ...sessionVolumeSummary(summarizeVolume(metrics)) };
+  return { cards, workingSetCount, volume: formatVolumeFigure(sumVolume(metrics)) };
 };

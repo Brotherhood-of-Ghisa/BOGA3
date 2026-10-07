@@ -30,7 +30,8 @@ import { THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 
 // Settings → Preferences → Appearance (`docs/specs/ui/design-language.md` "Presets"): a row
 // naming the chosen theme, and a sheet listing the presets. A choice is saved
-// at once and applies on the next launch; the app cannot restart itself. The
+// at once and applies on the next launch; the app cannot restart itself, so a
+// pending choice is labelled `Next launch` on the row and in the sheet. The
 // last row opens the custom colour picker.
 export function AppearanceSettingsRow() {
   const router = useRouter();
@@ -90,34 +91,39 @@ export function AppearanceSettingsRow() {
         testID="settings-appearance-sheet"
         title="Appearance"
         visible={sheetVisible}>
-        {themePresets.map((preset, index) => (
-          <ListRow
-            accessibilityLabel={preset.id === DEFAULT_THEME_PRESET_ID ? `${preset.label}, default` : preset.label}
-            checked={preset.id === chosenId}
-            divider={index > 0}
-            key={preset.id}
-            leading={<Icon color={uiRoles.ink} name={preset.id === chosenId ? 'radio-on' : 'radio-off'} />}
-            meta={<PresetSwatch preset={preset} />}
-            onPress={() => {
-              void choose(preset.id);
-            }}
-            testID={`settings-appearance-option-${preset.id}`}>
-            <View style={styles.optionText}>
-              <Text allowFontScaling={false} style={styles.optionLabel}>
-                {preset.label}
-              </Text>
-              {preset.id === DEFAULT_THEME_PRESET_ID ? (
-                <Text allowFontScaling={false} style={styles.detail}>
-                  Default
+        {themePresets.map((preset, index) => {
+          const details = presetDetails(preset.id, chosenId, pending);
+          return (
+            <ListRow
+              accessibilityLabel={[preset.label, ...details.map((detail) => detail.toLowerCase())].join(', ')}
+              checked={preset.id === chosenId}
+              divider={index > 0}
+              key={preset.id}
+              leading={<Icon color={uiRoles.ink} name={preset.id === chosenId ? 'radio-on' : 'radio-off'} />}
+              meta={<PresetSwatch preset={preset} />}
+              onPress={() => {
+                void choose(preset.id);
+              }}
+              testID={`settings-appearance-option-${preset.id}`}>
+              <View style={styles.optionText}>
+                <Text allowFontScaling={false} style={styles.optionLabel}>
+                  {preset.label}
                 </Text>
-              ) : null}
-            </View>
-          </ListRow>
-        ))}
+                {details.length > 0 ? (
+                  <Text allowFontScaling={false} style={styles.detail}>
+                    {details.join(' · ')}
+                  </Text>
+                ) : null}
+              </View>
+            </ListRow>
+          );
+        })}
         <ListRow
           accessibilityHint="Opens the colour picker"
           checked={customHue !== null}
-          description={customHue !== null ? `${hueName(customHue)}, ${customHue}°` : 'Pick any colour'}
+          description={
+            customHue !== null ? `${hueName(customHue)}, ${customHue}°${pending ? ' · Next launch' : ''}` : undefined
+          }
           divider
           label="Custom colour"
           leading={<Icon color={uiRoles.ink} name={customHue !== null ? 'radio-on' : 'radio-off'} />}
@@ -128,20 +134,11 @@ export function AppearanceSettingsRow() {
           testID="settings-appearance-option-custom"
           trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
         />
-        <View style={styles.footer}>
-          {saveError ? (
+        {saveError ? (
+          <View style={styles.footer}>
             <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" />
-          ) : null}
-          <Text
-            accessibilityLiveRegion="polite"
-            allowFontScaling={false}
-            style={styles.note}
-            testID="settings-appearance-note">
-            {pending
-              ? `${chosenLabel} applies the next time you open BoGa. Close BoGa fully, then open it again.`
-              : 'A new theme applies the next time you open BoGa.'}
-          </Text>
-        </View>
+          </View>
+        ) : null}
       </Sheet>
     </>
   );
@@ -161,6 +158,15 @@ function readChosenId(): string {
     });
     return storedThemeId(launchTheme.preset);
   }
+}
+
+// The words under a preset's name: `Default`, and `Next launch` on the chosen
+// preset while it waits for the next launch.
+function presetDetails(id: ThemePresetId, chosenId: string, pending: boolean): string[] {
+  return [
+    ...(id === DEFAULT_THEME_PRESET_ID ? ['Default'] : []),
+    ...(id === chosenId && pending ? ['Next launch'] : []),
+  ];
 }
 
 function themeLabel(id: string): string {
@@ -227,12 +233,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.md,
-  },
-  note: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

@@ -4,13 +4,13 @@ import {
 } from '@/src/exercise-calculations/analytics';
 import {
   compareSessionPosition,
-  eligibleSetsByBlockInSessionOrder,
   summarizeSessionBests,
 } from '@/src/exercise-calculations/best-set';
 import {
   compareRecordOrder,
   createRecordBook,
-  pickSessionRecordSet,
+  beatsRecord,
+  beatsWeightRecord,
   type RecordBaseline,
 } from '@/src/exercise-calculations/records';
 import {
@@ -95,7 +95,6 @@ export type CurrentSessionMuscleSummary = {
   mappedSetCount: number;
   unmappedSetCount: number;
   contributingMuscleCount: number;
-  volumeComplete?: boolean;
   muscles: SessionMuscleLoadEntry[];
   workingSetsByMuscle: SessionMuscleWorkingSetEntry[];
 };
@@ -107,27 +106,37 @@ export type ExercisePersonalRecordInput = {
   baseline: RecordBaseline | null;
 };
 
-/** Which record the record set is shown for: its 1RM, else its Weight. */
-export type PersonalRecordKind = "oneRepMax" | "weight";
-
 /**
- * One exercise's record set in a session (`training-metrics-contract.md` §3):
- * the one set a screen highlights.
+ * A set of the session that took a record (`training-metrics-contract.md`
+ * §3): the session's best 1RM, its top Weight, or both when one set is both.
  */
-export type ExercisePersonalRecord = {
-  kind: PersonalRecordKind;
-  // The set also beats the Weight record; always true for a Weight record.
-  weightRecord: boolean;
-  exerciseDefinitionId: string;
-  exerciseName: string;
+export type ExerciseRecordSet = {
   sessionExerciseId: string;
-  sessionExerciseOrderIndex: number;
   setId: string;
   setOrderIndex: number;
   weight: number;
   reps: number;
   // Null only for a Weight record whose load is unknown (no bodyweight reading).
   estimatedOneRepMax: number | null;
+  oneRepMax: boolean;
+  topWeight: boolean;
+};
+
+/**
+ * Every record one exercise took in a session: one per kind, so up to three
+ * (`sessionRecordKinds`). Strength records name their set; Volume is the
+ * exercise's whole session.
+ */
+export type ExercisePersonalRecord = {
+  exerciseDefinitionId: string;
+  exerciseName: string;
+  // The exercise's first block, where a card shows its Volume record.
+  sessionExerciseId: string;
+  sessionExerciseOrderIndex: number;
+  // The 1RM record's set, then the Weight record's when it is another set.
+  sets: ExerciseRecordSet[];
+  // The exercise's complete session volume, when it beat the Volume record.
+  volume: number | null;
   baseline: RecordBaseline;
 };
 
@@ -150,8 +159,9 @@ export type SessionPersonalRecordsFromBestsInput = {
   recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>;
 };
 
+// `unavailable`: the session's Volume sum is not finite.
 export type ExerciseVolumeComparisonState =
-  | "incomplete"
+  | "unavailable"
   | "no-history"
   | "single-baseline"
   | "constant-baseline"
@@ -164,9 +174,7 @@ export type ExerciseVolumeComparison = {
   sessionExerciseOrderIndex: number;
   workingSetCount: number;
   currentVolume: number | null;
-  knownVolume?: number | null;
   historicalSessionCount: number;
-  excludedHistoricalSessionCount?: number;
   medianVolume: number | null;
   percentile5Volume: number | null;
   percentile95Volume: number | null;
@@ -291,7 +299,7 @@ export const summarizeCurrentSessionMuscleLoad = (
     if (!muscleGroupById.has(contribution.muscleGroupId)) continue;
     weightedVolumeByMuscle.set(
       contribution.muscleGroupId,
-      addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume),
+      addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume ?? 0),
     );
     if (contribution.working === false) continue;
     const workingSetIdentities =
@@ -383,7 +391,6 @@ export const summarizeCurrentSessionMuscleLoad = (
     mappedSetCount,
     unmappedSetCount: Math.max(0, workingSetCount - mappedSetCount),
     contributingMuscleCount: muscles.length,
-    volumeComplete: Array.from(weightedVolumeByMuscle.values()).every(volume => volume !== null),
     muscles,
     workingSetsByMuscle,
   };
@@ -398,46 +405,56 @@ const definitionBlocks = (exerciseDefinitionId: string, exercises: SessionInsigh
     .map((exercise) => ({ ...exercise, loadContext: exercise.loadContext ?? ordinaryLoadContext() }));
 
 /**
- * The session's record set for one definition (`pickSessionRecordSet`), over
- * its working sets across every block: the highest 1RM that beats the 1RM
- * record, else the heaviest Weight that beats the Weight record. Null without
- * a baseline, or when nothing beats it.
+ * The records one definition took in the session, over every block of it:
+ * its best 1RM, top Weight and Volume (`summarizeSessionBests`), each
+ * where it beats the record before. Null without a baseline, or when nothing
+ * beats it.
  */
 export const deriveExercisePersonalRecord = (
   input: ExercisePersonalRecordInput,
 ): ExercisePersonalRecord | null => {
   const blocks = definitionBlocks(input.exerciseDefinitionId, input.exercises);
-  const groupOrderIndex = blocks[0]?.orderIndex;
-  if (groupOrderIndex === undefined || input.baseline === null) return null;
-  const sets = eligibleSetsByBlockInSessionOrder(blocks).flat().map((eligible) => ({
-    ...eligible,
-    candidate: {
-      id: eligible.set.id,
-      oneRepMax: eligible.metric.estimatedOneRepMaxKg,
-      weight: enteredWeightKg(eligible.set),
-      reps: eligible.metric.reps,
-    },
-  }));
-  const winner = pickSessionRecordSet(sets.map(({ candidate }) => candidate), input.baseline);
-  const best = winner && sets.find(({ set }) => set.id === winner.id);
-  if (!winner || !best) return null;
-  // A working set always has a valid Weight (§1).
-  if (best.candidate.weight === null) throw new Error(`record set ${best.set.id} has no Weight`);
+  const firstBlock = blocks[0];
+  const bests = summarizeSessionBests(blocks);
+  if (firstBlock === undefined || input.baseline === null || bests === null) return null;
+  const oneRepMax = bests.oneRepMax !== null &&
+    beatsRecord(bests.oneRepMax.estimatedOneRepMaxKg, input.baseline.oneRepMax) ? bests.oneRepMax : null;
+  const topWeight = bests.topWeight !== null &&
+    beatsWeightRecord(bests.topWeight, input.baseline.weight) ? bests.topWeight : null;
+  const volume = beatsRecord(bests.volumeKg, input.baseline.volume) ? bests.volumeKg : null;
+  const sets: ExerciseRecordSet[] = [];
+  for (const best of [oneRepMax, topWeight]) {
+    if (best === null || sets.some((entry) => entry.setId === best.set.id)) continue;
+    const weight = enteredWeightKg(best.set);
+    // A working set always has a valid Weight (§1).
+    if (weight === null) throw new Error(`record set ${best.set.id} has no Weight`);
+    sets.push({
+      sessionExerciseId: best.block.id,
+      setId: best.set.id,
+      setOrderIndex: best.set.orderIndex,
+      weight,
+      reps: best.metric.reps,
+      estimatedOneRepMax: best.metric.estimatedOneRepMaxKg,
+      oneRepMax: best.set.id === oneRepMax?.set.id,
+      topWeight: best.set.id === topWeight?.set.id,
+    });
+  }
+  if (sets.length === 0 && volume === null) return null;
   return {
-    kind: winner.oneRepMax ? "oneRepMax" : "weight",
-    weightRecord: winner.weight,
     exerciseDefinitionId: input.exerciseDefinitionId,
-    exerciseName: best.block.exerciseName,
-    sessionExerciseId: best.block.id,
-    sessionExerciseOrderIndex: groupOrderIndex,
-    setId: best.set.id,
-    setOrderIndex: best.set.orderIndex,
-    weight: best.candidate.weight,
-    reps: best.candidate.reps,
-    estimatedOneRepMax: best.candidate.oneRepMax,
+    exerciseName: firstBlock.exerciseName,
+    sessionExerciseId: firstBlock.id,
+    sessionExerciseOrderIndex: firstBlock.orderIndex,
+    sets,
+    volume,
     baseline: input.baseline,
   };
 };
+
+/** The PRs an exercise's records count: one per kind (`sessionRecordKinds`). */
+export const personalRecordCount = (record: ExercisePersonalRecord): number =>
+  record.sets.reduce((count, set) => count + Number(set.oneRepMax) + Number(set.topWeight), 0) +
+  (record.volume === null ? 0 : 1);
 
 /** Both sessions completed, and `session` first in record order (`compareRecordOrder`). */
 const isBeforeInRecordOrder = (
@@ -450,7 +467,7 @@ const isBeforeInRecordOrder = (
     { sessionId: target.sessionId, completedAt: target.completedAt },
   ) < 0;
 
-/** The replay reference's earlier 1RM and Weight records, folded by the record book from raw sets. */
+/** The replay reference's earlier records, folded by the record book from raw sets. */
 const collectRecordBaselineByExerciseDefinition = (
   targetSession: PersonalRecordSessionInput,
   historicalSessions: PersonalRecordSessionInput[],
@@ -481,7 +498,7 @@ const collectRecordBaselineByExerciseDefinition = (
       book.add({
         oneRepMax: bests.oneRepMax ? { value: bests.oneRepMax.estimatedOneRepMaxKg } : null,
         weight: bests.topWeight ? { weight: bests.topWeight.weight, reps: bests.topWeight.reps } : null,
-        volume: null,
+        volume: bests.volumeKg === null ? null : { value: bests.volumeKg },
       });
     }
   }
@@ -491,6 +508,7 @@ const collectRecordBaselineByExerciseDefinition = (
     baselineByDefinition.set(exerciseDefinitionId, {
       oneRepMax: holders.oneRepMax?.value ?? null,
       weight: holders.weight,
+      volume: holders.volume?.value ?? null,
     });
   }
   return baselineByDefinition;
@@ -509,8 +527,8 @@ const isLiveCompletedTarget = (target: PersonalRecordSessionInput): boolean => {
 };
 
 /**
- * The target's record sets (1RM, else Weight) against each definition's
- * records from earlier completed sessions, in first-exercise order. A
+ * Each definition's records in the target against its records from earlier
+ * completed sessions, in first-exercise order. A
  * definition absent from the map has no earlier record and so no PR.
  */
 export const deriveSessionPersonalRecordsFromBests = (
@@ -568,7 +586,6 @@ type ExerciseVolumeObservation = {
   sessionExerciseOrderIndex: number;
   workingSetCount: number;
   volume: number | null;
-  knownVolume: number | null;
 };
 
 const collectExerciseVolumeObservations = (
@@ -595,14 +612,13 @@ const collectExerciseVolumeObservations = (
       sessionExerciseOrderIndex: exercise.orderIndex,
       workingSetCount: 0,
       volume: 0,
-      knownVolume: 0,
     };
 
     current.sessionExerciseIds.push(exercise.id);
     current.workingSetCount += workingSets.length;
-    const coverage = summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeCoverage;
-    current.knownVolume = addFiniteVolume(current.knownVolume, coverage.knownVolumeKgReps);
-    current.volume = addFiniteVolume(current.volume, coverage.totalVolumeKgReps);
+    current.volume = addFiniteVolume(
+      current.volume, summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeKgReps,
+    );
     observationsByIdentity.set(identity, current);
   }
 
@@ -635,7 +651,6 @@ export const deriveSessionExerciseVolumeComparisons = (
   ensureValidDate(target.completedAt, "target completedAt");
 
   const historicalVolumesByDefinition = new Map<string, number[]>();
-  const excludedByDefinition = new Map<string, number>();
   for (const session of input.historicalSessions) {
     if (
       session.status !== "completed" ||
@@ -651,10 +666,8 @@ export const deriveSessionExerciseVolumeComparisons = (
       session.exercises,
     )) {
       if (!observation.exerciseDefinitionId) continue;
-      if (observation.volume === null) {
-        excludedByDefinition.set(observation.exerciseDefinitionId, (excludedByDefinition.get(observation.exerciseDefinitionId) ?? 0) + 1);
-        continue;
-      }
+      // A Volume sum that is not finite has no place in a distribution.
+      if (observation.volume === null) continue;
       const bucket =
         historicalVolumesByDefinition.get(observation.exerciseDefinitionId) ??
         [];
@@ -669,8 +682,6 @@ export const deriveSessionExerciseVolumeComparisons = (
   return collectExerciseVolumeObservations(target.exercises).map(
     (observation) => {
       const { volume, ...exerciseSummary } = observation;
-      const excluded = observation.exerciseDefinitionId ? excludedByDefinition.get(observation.exerciseDefinitionId) ?? 0 : 0;
-      const excludedCoverage = excluded > 0 ? { excludedHistoricalSessionCount: excluded } : {};
       const historicalVolumes = observation.exerciseDefinitionId
         ? [
             ...(historicalVolumesByDefinition.get(
@@ -681,13 +692,12 @@ export const deriveSessionExerciseVolumeComparisons = (
       if (volume === null || historicalVolumes.length === 0) {
         return {
           ...exerciseSummary,
-          ...excludedCoverage,
           currentVolume: volume,
           historicalSessionCount: 0,
           medianVolume: null,
           percentile5Volume: null,
           percentile95Volume: null,
-          state: volume === null ? "incomplete" as const : "no-history" as const,
+          state: volume === null ? "unavailable" as const : "no-history" as const,
         };
       }
 
@@ -709,7 +719,6 @@ export const deriveSessionExerciseVolumeComparisons = (
 
       return {
         ...exerciseSummary,
-        ...excludedCoverage,
         currentVolume: volume,
         historicalSessionCount: historicalVolumes.length,
         medianVolume,
@@ -756,35 +765,30 @@ export const deriveSessionMuscleVolumeComparisons = (
     );
     const byMuscle = new Map<string, {
       weightedVolume: number | null;
-      knownVolume: number | null;
       workingSetIds: Set<string>;
     }>();
     for (const contribution of contributions) {
       if (!groupById.has(contribution.muscleGroupId)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
         weightedVolume: 0,
-        knownVolume: 0,
         workingSetIds: new Set<string>(),
       };
       byMuscle.set(contribution.muscleGroupId, observation);
-      observation.knownVolume = addFiniteVolume(observation.knownVolume, contribution.weightedVolume ?? 0);
-      observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume);
+      observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume ?? 0);
       if (contribution.working !== false) observation.workingSetIds.add(contribution.setIdentity);
     }
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,
       weightedVolume: observation.weightedVolume,
-      knownVolume: observation.knownVolume,
       workingSetCount: observation.workingSetIds.size,
     })).filter((muscle) => muscle.workingSetCount > 0).sort((left, right) =>
-      (right.knownVolume ?? -1) - (left.knownVolume ?? -1) ||
+      (right.weightedVolume ?? -1) - (left.weightedVolume ?? -1) ||
       left.sortOrder - right.sortOrder ||
       left.displayName.localeCompare(right.displayName) ||
       left.id.localeCompare(right.id),
     );
   };
   const historyByMuscle = new Map<string, number[]>();
-  const excludedByMuscle = new Map<string, number>();
   for (const session of input.historicalSessions) {
     if (
       session.status !== "completed" ||
@@ -794,10 +798,7 @@ export const deriveSessionMuscleVolumeComparisons = (
     )
       continue;
     for (const muscle of observe(session)) {
-      if (muscle.weightedVolume === null) {
-        excludedByMuscle.set(muscle.id, (excludedByMuscle.get(muscle.id) ?? 0) + 1);
-        continue;
-      }
+      if (muscle.weightedVolume === null) continue;
       const values = historyByMuscle.get(muscle.id) ?? [];
       values.push(muscle.weightedVolume);
       historyByMuscle.set(muscle.id, values);
@@ -824,14 +825,12 @@ export const deriveSessionMuscleVolumeComparisons = (
       sessionExerciseOrderIndex: index,
       workingSetCount: muscle.workingSetCount,
       currentVolume: muscle.weightedVolume,
-      knownVolume: muscle.knownVolume,
-      ...((excludedByMuscle.get(muscle.id) ?? 0) > 0 ? { excludedHistoricalSessionCount: excludedByMuscle.get(muscle.id) } : {}),
       historicalSessionCount: history.length,
       medianVolume: median,
       percentile5Volume: low,
       percentile95Volume: high,
       state:
-        muscle.weightedVolume === null ? "incomplete" : history.length === 0
+        muscle.weightedVolume === null ? "unavailable" : history.length === 0
           ? "no-history"
           : history.length === 1
             ? "single-baseline"

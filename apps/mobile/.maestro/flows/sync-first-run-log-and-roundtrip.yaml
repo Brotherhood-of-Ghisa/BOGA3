@@ -113,10 +113,10 @@ appId: com.dinoderek.mobile
     visible: { id: "weight-entry-value" }
     timeout: 15000
 - inputText: "80"
-- scrollUntilVisible:
-    element: { id: "weight-entry-save" }
-    direction: DOWN
-    centerElement: true
+# Tap Save in place, never scroll to it: the keyboard-avoiding Sheet keeps it
+# on screen with the keyboard up or minimised (a sim that has seen the Mac
+# keyboard), and a scroll swipes from mid-screen, which with the panel low is
+# the backdrop, so the swipe lands as a tap there and dismisses the sheet.
 - tapOn: { id: "weight-entry-save" }
 - extendedWaitUntil:
     notVisible: { id: "weight-entry-sheet" }

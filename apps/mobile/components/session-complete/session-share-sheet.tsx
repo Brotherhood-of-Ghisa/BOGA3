@@ -1,16 +1,17 @@
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ViewInstance, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
-import { Sheet } from '@/components/ui/sheet';
+import { PageSheet } from '@/components/ui/page-sheet';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   captureSessionShareImage,
   releaseSessionShareImage,
   shareSessionImage,
   type ExercisePersonalRecord,
+  type ExerciseRecordSet,
   type ExerciseVolumeComparison,
   type SessionShareCaptureDimensions,
 } from '@/src/session-insights';
@@ -55,9 +56,16 @@ const formatSessionDate = (isoTimestamp: string): string => {
   }).format(parsed);
 };
 
+type ShareRecord = { record: ExercisePersonalRecord; set: ExerciseRecordSet };
+
+// The image lists one set per exercise: its 1RM record's set, else its Weight
+// record's. An exercise whose only record is Volume is not listed.
+const shareRecordsOf = (records: ExercisePersonalRecord[]): ShareRecord[] =>
+  records.flatMap((record) => (record.sets[0] ? [{ record, set: record.sets[0] }] : []));
+
 /** One record line: the kind in words (the image has no screen reader), the figures it set in `record`. */
-function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
-  const oneRepMax = record.estimatedOneRepMax === null ? '—' : formatOneRepMax(record.estimatedOneRepMax);
+function ShareRecordRow({ record, set }: ShareRecord) {
+  const oneRepMax = set.estimatedOneRepMax === null ? '—' : formatOneRepMax(set.estimatedOneRepMax);
   return (
     <View style={styles.recordRow} testID={`session-share-card-pr-${record.exerciseDefinitionId}`}>
       <View style={styles.recordNameRow}>
@@ -68,15 +76,15 @@ function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
           allowFontScaling={false}
           style={styles.recordKind}
           testID={`session-share-card-pr-${record.exerciseDefinitionId}-kind`}>
-          {record.kind === 'oneRepMax' ? '1RM' : 'Top weight'}
+          {set.oneRepMax ? '1RM' : 'Top weight'}
         </Text>
       </View>
       <Text allowFontScaling={false} style={styles.recordFact}>
-        <Text allowFontScaling={false} style={record.weightRecord ? styles.recordFigure : null}>
-          {`${formatWeight(record.weight)} × ${record.reps}`}
+        <Text allowFontScaling={false} style={set.topWeight ? styles.recordFigure : null}>
+          {`${formatWeight(set.weight)} × ${set.reps}`}
         </Text>
         {'  1RM '}
-        <Text allowFontScaling={false} style={record.kind === 'oneRepMax' ? styles.recordFigure : null}>
+        <Text allowFontScaling={false} style={set.oneRepMax ? styles.recordFigure : null}>
           {oneRepMax}
         </Text>
       </Text>
@@ -89,6 +97,7 @@ function ShareRecordRow({ record }: { record: ExercisePersonalRecord }) {
  * the design language. It never shows the gym or any location.
  */
 export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot }) {
+  const shareRecords = shareRecordsOf(snapshot.personalRecords);
   return (
     <View style={styles.shareCard} testID="session-share-card">
       <View style={styles.brandRow}>
@@ -106,16 +115,16 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
         {formatSessionDate(snapshot.completedAt)}
       </Text>
 
-      {snapshot.personalRecords.length > 0 ? (
+      {shareRecords.length > 0 ? (
         <View style={styles.records} testID="session-share-card-personal-records">
           <View style={styles.recordsHeading}>
             <Icon color={uiRoles.record} name="arrow-up" size="xs" />
             <Text allowFontScaling={false} style={styles.recordsTitle}>
-              {formatCount(snapshot.personalRecords.length, 'new record')}
+              {formatCount(shareRecords.length, 'new record')}
             </Text>
           </View>
-          {snapshot.personalRecords.map((record) => (
-            <ShareRecordRow key={record.setId} record={record} />
+          {shareRecords.map(({ record, set }) => (
+            <ShareRecordRow key={set.setId} record={record} set={set} />
           ))}
         </View>
       ) : null}
@@ -137,10 +146,10 @@ export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot 
 }
 
 /**
- * `Share session`: a `Sheet` previewing the exact image, with `Share image` as
- * its one action. The backdrop, Android back and the VoiceOver escape close it,
- * except while an image is being prepared. Native-sheet cancel is silent; a
- * capture or launch failure shows inline and can be retried.
+ * `Share session`: a `PageSheet` previewing the exact image, with `Share image`
+ * as its one action. Swiping down, the X, Android back and the VoiceOver escape
+ * close it, except while an image is being prepared. Native-sheet cancel is
+ * silent; a capture or launch failure shows inline and can be retried.
  */
 export function SessionShareSheet({
   visible,
@@ -151,7 +160,6 @@ export function SessionShareSheet({
   shareImageAction = shareSessionImage,
   releaseImageAction = releaseSessionShareImage,
 }: SessionShareSheetProps) {
-  const { height } = useWindowDimensions();
   const shareCardRef = useRef<ViewInstance | null>(null);
   const hasFailedShareRef = useRef(false);
   const [cardDimensions, setCardDimensions] = useState<SessionShareCaptureDimensions | null>(null);
@@ -201,15 +209,16 @@ export function SessionShareSheet({
   };
 
   return (
-    <Sheet
-      dismissLabel="Close session share preview"
+    <PageSheet
+      closeLabel="Close session share preview"
+      dismissDisabled={isSharing}
       onDismiss={closePreview}
       testID="session-share-preview"
       title="Share session"
       visible={visible}>
       <ScrollView
         contentContainerStyle={styles.previewContent}
-        style={{ maxHeight: height * 0.6 }}
+        style={styles.preview}
         testID="session-share-preview-scroll">
         <View
           collapsable={false}
@@ -237,7 +246,7 @@ export function SessionShareSheet({
           variant="primary"
         />
       </View>
-    </Sheet>
+    </PageSheet>
   );
 }
 
@@ -254,6 +263,9 @@ const styles = StyleSheet.create({
   previewContent: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
+  },
+  preview: {
+    flex: 1,
   },
   captureTarget: {
     width: '100%',

@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
+# For the pinned iOS runtime (BOGA_IOS_SIM_RUNTIME, honouring IOS_SIM_RUNTIME)
+# and the simctl queries below. Sourcing it has no side effects and needs no
+# slot lease. Deliberately NOT re-resolving the pin here: one place decides it.
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/worktree-lib.sh"
+
 IOS_SIM_DEVICE="${IOS_SIM_DEVICE:-iPhone 17 Pro}"
 IOS_SIM_UDID="${IOS_SIM_UDID:-}"
 IOS_SIM_AUTO_CREATE="${IOS_SIM_AUTO_CREATE:-0}"
@@ -9,6 +17,10 @@ IOS_SIM_AUTO_CREATE="${IOS_SIM_AUTO_CREATE:-0}"
 # crash-looping) would otherwise hang the gate forever. Measured cold boot is
 # seconds; a freshly created device's first boot is well under a minute.
 IOS_SIM_BOOT_TIMEOUT_SECONDS="${IOS_SIM_BOOT_TIMEOUT_SECONDS:-120}"
+# Separate bound for the create/delete/shutdown calls that put the device on the
+# pinned runtime. Deleting a simulator discards gigabytes of its data directory,
+# so it is slower than a boot and must not eat the boot budget.
+IOS_SIM_CREATE_TIMEOUT_SECONDS="${IOS_SIM_CREATE_TIMEOUT_SECONDS:-300}"
 MODE="${1:-boot}"
 
 # run_bounded <seconds> <cmd...>: run cmd in its own process group; on timeout
@@ -32,30 +44,27 @@ run_bounded() {
   ' "$@" </dev/null
 }
 
-find_udid() {
-  xcrun simctl list devices available \
-    | sed -n "s/^[[:space:]]*${IOS_SIM_DEVICE//\//\\/} (\\([^)]*\\)).*/\\1/p" \
-    | head -n 1
-}
+# The pinned runtime's identifier, or a hard failure naming the install
+# command. Never falls back to another installed runtime: a lane silently
+# running a different iOS version is the bug this pin exists to prevent.
+require_pinned_runtime() {
+  local runtime_id=""
 
-preferred_runtime() {
-  xcrun simctl list runtimes -j | node -e '
-    const fs = require("fs");
-    const data = JSON.parse(fs.readFileSync(0, "utf8"));
-    const runtimes = (data.runtimes ?? [])
-      .filter((runtime) => runtime.isAvailable && /^iOS/.test(runtime.name ?? ""));
-    runtimes.sort((a, b) => {
-      const av = String(a.version ?? "").split(".").map(Number);
-      const bv = String(b.version ?? "").split(".").map(Number);
-      for (let i = 0; i < Math.max(av.length, bv.length); i += 1) {
-        const delta = (bv[i] ?? 0) - (av[i] ?? 0);
-        if (delta !== 0) return delta;
-      }
-      return String(b.name ?? "").localeCompare(String(a.name ?? ""));
-    });
-    if (!runtimes[0]?.identifier) process.exit(1);
-    process.stdout.write(runtimes[0].identifier);
-  '
+  runtime_id="$(boga_ios_sim_runtime_id)" || runtime_id=""
+  if [[ -n "$runtime_id" ]]; then
+    printf '%s\n' "$runtime_id"
+    return 0
+  fi
+
+  {
+    echo "[ios-sim-boot] FAIL: the pinned iOS simulator runtime '${BOGA_IOS_SIM_RUNTIME}' is not installed."
+    echo "  install it:  xcodebuild -downloadPlatform iOS -buildVersion ${BOGA_IOS_SIM_RUNTIME##iOS }"
+    echo "  installed iOS runtimes:"
+    boga_ios_sim_installed_runtimes | sed 's/^/    /'
+    echo "  the pin is BOGA_IOS_SIM_RUNTIME in scripts/worktree-lib.sh; export IOS_SIM_RUNTIME to"
+    echo "  target another installed runtime for this run on purpose."
+  } >&2
+  return 1
 }
 
 preferred_device_type() {
@@ -78,25 +87,68 @@ preferred_device_type() {
 }
 
 create_simulator() {
-  local runtime_id device_type_id
+  local device_type_id
 
-  runtime_id="$(preferred_runtime)" || {
-    echo "Unable to resolve an available iOS simulator runtime." >&2
-    return 1
-  }
   device_type_id="$(preferred_device_type)" || {
     echo "Unable to resolve an available iPhone simulator device type." >&2
     return 1
   }
 
-  echo "[maestro] sim \"${IOS_SIM_DEVICE}\" not found — creating (deviceType=${device_type_id}, runtime=${runtime_id})" >&2
-  xcrun simctl create "$IOS_SIM_DEVICE" "$device_type_id" "$runtime_id"
+  echo "[maestro] sim \"${IOS_SIM_DEVICE}\" not found — creating it on the pinned ${BOGA_IOS_SIM_RUNTIME} (deviceType=${device_type_id})" >&2
+  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl create "$IOS_SIM_DEVICE" "$device_type_id" "$PINNED_RUNTIME_ID"
+}
+
+# A lane simulator left on another runtime is disposable: every lane reinstalls
+# the dev client and resets app data anyway, so it is deleted and recreated
+# under the same name on the pinned runtime, keeping its device type when the
+# pin supports it. Reached only for a name matching boga_is_lane_sim_name, so
+# another slot's sim, a hand-made one ("BOGA wt10 ios26") and the stock default
+# are never deleted.
+recreate_on_pinned_runtime() {
+  local udid="$1" from_runtime_id="$2" device_type_id="$3"
+  local target_type="$device_type_id"
+
+  if [[ -z "$target_type" ]] || ! boga_ios_sim_runtime_supports "$PINNED_RUNTIME_ID" "$target_type"; then
+    target_type="$(preferred_device_type)" || {
+      echo "Unable to resolve an available iPhone simulator device type." >&2
+      return 1
+    }
+  fi
+
+  echo "[maestro] sim \"${IOS_SIM_DEVICE}\" ($udid) runs $(boga_ios_sim_runtime_label "$from_runtime_id"), not the pinned ${BOGA_IOS_SIM_RUNTIME} — deleting it and recreating it on the pin (deviceType=${target_type})" >&2
+
+  # Shut it down first so a running device is not torn out from under
+  # Simulator.app: measured, `simctl delete` does succeed on a booted device,
+  # but shutdown-then-delete is the orderly path. Shutting down an
+  # already-shutdown device exits non-zero (SimError 405), so of the two only
+  # the delete has to succeed.
+  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
+  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl delete "$udid" >/dev/null || {
+    echo "[ios-sim-boot] FAIL: could not delete simulator \"${IOS_SIM_DEVICE}\" ($udid) to recreate it on ${BOGA_IOS_SIM_RUNTIME}." >&2
+    return 1
+  }
+  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl create "$IOS_SIM_DEVICE" "$target_type" "$PINNED_RUNTIME_ID"
 }
 
 SIM_UDID="$IOS_SIM_UDID"
+PINNED_RUNTIME_ID=""
 
+# An explicit IOS_SIM_UDID is an operator override: that device is used exactly
+# as given, runtime included. Resolving by name is the lane path, and it owns
+# the runtime pin.
 if [[ -z "$SIM_UDID" ]]; then
-  SIM_UDID="$(find_udid)"
+  PINNED_RUNTIME_ID="$(require_pinned_runtime)" || exit 1
+  DEVICE_FIELDS="$(boga_ios_sim_device "$IOS_SIM_DEVICE" "$PINNED_RUNTIME_ID")"
+  if [[ -n "$DEVICE_FIELDS" ]]; then
+    IFS=$'\t' read -r SIM_UDID FOUND_RUNTIME_ID FOUND_DEVICE_TYPE <<<"$DEVICE_FIELDS"
+    if [[ "$FOUND_RUNTIME_ID" != "$PINNED_RUNTIME_ID" ]]; then
+      if boga_is_lane_sim_name "$IOS_SIM_DEVICE"; then
+        SIM_UDID="$(recreate_on_pinned_runtime "$SIM_UDID" "$FOUND_RUNTIME_ID" "$FOUND_DEVICE_TYPE")" || exit 1
+      else
+        echo "[maestro] sim \"${IOS_SIM_DEVICE}\" ($SIM_UDID) runs $(boga_ios_sim_runtime_label "$FOUND_RUNTIME_ID"), not the pinned ${BOGA_IOS_SIM_RUNTIME} — using it as found, because only a slot-named lane sim (BOGA wt<slot>) is ever recreated" >&2
+      fi
+    fi
+  fi
 fi
 
 if [[ -z "$SIM_UDID" && "$IOS_SIM_AUTO_CREATE" == "1" ]]; then
