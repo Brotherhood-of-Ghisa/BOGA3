@@ -128,8 +128,9 @@ apply_pending_local_migrations() {
 #   - any db reset re-runs seed.sql, which truncates the markers table, so the
 #     stamp dies with the database whichever path reset it;
 #   - the state hash covers everything the repairs fix (applied migrations,
-#     fixture principals, the fixture auth users, the group-eval kick URL), so
-#     a body that changed any of it sends the next lane down the full path.
+#     fixture principals, the fixture auth users, the group-eval kick URL,
+#     group-competition activation), so a body that changed any of it — a reset
+#     leaves competitions pending — sends the next lane down the full path.
 # No gate id (a lane run by name, a direct script call) → always the full path.
 BASELINE_STAMP_MARKER="baseline_ready"
 
@@ -167,7 +168,8 @@ select coalesce((select details from public.local_runtime_bootstrap_markers wher
        from public.dev_fixture_principals p),
     (select string_agg(row(u.id, u.email, u.encrypted_password, u.email_confirmed_at, u.banned_until, u.deleted_at)::text, ';' order by u.email)
        from auth.users u where u.email = any(string_to_array(:'emails', ','))),
-    app_public.group_eval_config('group_eval_url')
+    app_public.group_eval_config('group_eval_url'),
+    app_public.group_competition_active()
   )::text);
 SQL
 }
@@ -221,29 +223,16 @@ SQL
 
 # ---------- restoring a stack a one-way body left behind ----------
 #
-# Destructive bodies (protocol-4 activation, a reset to an old migration) do not
-# restore the stack themselves: they mark it first (mark_stack_needs_reset,
-# _common.sh) and this preflight resets it before the next lane, so a killed run
-# cannot hand that lane a broken baseline. Protocol 4 active without a mark —
-# activated by hand, or by a script that predates the mark — is reset too.
-# A lane of protocol-4 bodies (run-suite.sh --protocol4 exports
-# BOGA_STACK_ACCEPTS_PROTOCOL4=1) keeps a stack whose only mark is protocol-4
-# activation: its bodies activate anyway, so a reset would buy nothing.
+# Destructive bodies (a reset to an old migration) do not restore the stack
+# themselves: they mark it first (mark_stack_needs_reset, _common.sh) and this
+# preflight resets it before the next lane, so a killed run cannot hand that
+# lane a broken baseline.
 # Prints why the stack needs a reset; false when it does not.
 stack_reset_reason() {
-  local marker container
+  local marker
   marker="$(stack_reset_marker)"
-  if [[ "${BOGA_STACK_ACCEPTS_PROTOCOL4:-0}" == 1 ]]; then
-    [[ -s "${marker}" ]] && grep -qvxF "${PROTOCOL4_ACTIVATION_MARK}" "${marker}" || return 1
-  fi
-  if [[ -s "${marker}" ]]; then
-    tr '\n' ';' <"${marker}" | sed 's/;$//'
-    return 0
-  fi
-  container="$(resolve_db_container 2>/dev/null)" || return 1
-  [[ "$(docker exec -i "${container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq \
-    <<<'select app_public.group_competition_active();' 2>/dev/null)" == t ]] || return 1
-  printf 'group-competition protocol 4 is active'
+  [[ -s "${marker}" ]] || return 1
+  tr '\n' ';' <"${marker}" | sed 's/;$//'
 }
 
 ensure_runtime_and_baseline() {
@@ -289,6 +278,10 @@ ensure_runtime_and_baseline() {
 
   echo "[supabase] verifying baseline fixtures after auth provisioning"
   "${SCRIPT_DIR}/smoke-seed.sh"
+
+  # Group competitions run protocol 4, as production does. Migrations install
+  # it pending and a reset returns it there; activation is idempotent.
+  "${SCRIPT_DIR}/group-competitions-activate.sh"
 
   write_baseline_stamp
   echo "[supabase] local runtime baseline ready"

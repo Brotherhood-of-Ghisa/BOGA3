@@ -31,8 +31,8 @@
 #     group_competition_exercise_create and the table CHECKs, the role matrix,
 #     targets, rule-neutral update, and the archive round trip.
 #
-# Runs on a protocol-4-active stack: it activates group competitions first
-# (activate_group_competitions, groups-fixtures.sh).
+# Runs on the protocol-4-active baseline (require_active_group_competitions,
+# groups-fixtures.sh).
 #
 # Hermetic: every run provisions its own seven users (owner, admin, member,
 # outsider, joiner, athlete, viewer) with a per-run tag, never reads fixture
@@ -65,7 +65,7 @@ load_supabase_status_env
   fail "JWT_SECRET missing from 'supabase status'; it is required to mint the client_id probe token"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-activate_group_competitions
+require_active_group_competitions
 
 RUN_TAG="${GROUPS_CONTRACT_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"

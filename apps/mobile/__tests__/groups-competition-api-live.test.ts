@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 /** Actual protocol-4 client RPCs and guards against this worktree's leased local
- * stack (supabase/tests/groups-competition-live.sh, lane groups-protocol4, which
- * activates protocol 4 first). Server arithmetic/privacy vectors remain in
+ * stack (supabase/tests/groups-competition-live.sh, lane groups-api-live), whose
+ * baseline runs protocol 4. Server arithmetic/privacy vectors remain in
  * backend fixtures. */
 import { readGroupsLiveEnv, signInLiveClient, type LiveClient } from './helpers/groups-live-endpoint';
 let mockActiveClient: LiveClient['client'] | null = null;

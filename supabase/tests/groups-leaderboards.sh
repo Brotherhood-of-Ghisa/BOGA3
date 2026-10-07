@@ -25,8 +25,8 @@
 #     group_eval_retry_parked revives it;
 #   - the sweep drains a missed kick; the pg_net smoke (one kick per push).
 #
-# Runs on a protocol-4-active stack: it activates group competitions first
-# (activate_group_competitions, groups-fixtures.sh), so every comparison is a
+# Runs on the protocol-4-active baseline (require_active_group_competitions,
+# groups-fixtures.sh), so every comparison is a
 # protocol-4 one and a session job's targets include every exercise the member
 # already has board state on (group_eval_session_targets).
 #
@@ -56,7 +56,7 @@ load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" ]] || fail "local Supabase status env is incomplete (API_URL/ANON_KEY)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-activate_group_competitions
+require_active_group_competitions
 
 RUN_TAG="${GROUPS_LEADERBOARDS_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"

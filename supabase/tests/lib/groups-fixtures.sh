@@ -155,13 +155,12 @@ eval_drain() {
     --data '{}' "${API_URL}/functions/v1/group-eval"
 }
 
-# activate_group_competitions: protocol 4 on this slot's stack before a body that
-# asserts V4 behaviour. One-way: the wrapper marks the stack, and the next lane's
-# baseline preflight resets it unless that lane runs protocol-4 bodies too
-# (run-suite.sh --protocol4).
-activate_group_competitions() {
-  "${SUPABASE_DIR}/scripts/with-local-group-competitions.sh" true >/dev/null ||
-    fail "activating group competitions on the local stack"
+# require_active_group_competitions: the bodies assert protocol 4, which the
+# baseline preflight activates (ensure-local-runtime-baseline.sh). A pending
+# stack (reset since the last preflight) fails here, not on the first RPC.
+require_active_group_competitions() {
+  [[ "$(run_psql "select app_public.group_competition_active();")" == t ]] ||
+    fail "group competitions are pending on this stack; run the lane through ./boga test (its baseline preflight activates them)"
 }
 
 expect_ok() {

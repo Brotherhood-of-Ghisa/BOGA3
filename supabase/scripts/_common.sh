@@ -241,17 +241,13 @@ refresh_edge_proxy_after_reset() {
   done
 }
 
-# A body that takes a one-way action on this slot's stack (protocol-4
-# activation, a reset to an old migration) marks it before it starts and does
+# A body that takes a one-way action on this slot's stack (a reset to an old
+# migration) marks it before it starts and does
 # not restore it. The next baseline preflight resets a marked stack
 # (ensure-local-runtime-baseline.sh); a successful reset-local.sh clears it.
 stack_reset_marker() {
   printf '%s/.temp/stack-needs-reset' "${SUPABASE_DIR}"
 }
-
-# The mark with-local-group-competitions.sh leaves: the one mark a protocol-4
-# lane's preflight may keep (ensure-local-runtime-baseline.sh).
-PROTOCOL4_ACTIVATION_MARK='with-local-group-competitions.sh activated protocol 4'
 
 mark_stack_needs_reset() {
   ensure_tmp_dir

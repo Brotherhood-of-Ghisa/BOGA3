@@ -154,8 +154,7 @@ case "$lane" in
     MAESTRO_GROUPS_SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \
     MAESTRO_GROUPS_SUPABASE_ANON_KEY="$EXPO_PUBLIC_SUPABASE_ANON_KEY" \
     MAESTRO_RESET_STRATEGY=full \
-    "$REPO_ROOT/supabase/scripts/with-local-group-competitions.sh" \
-      "$SCRIPT_DIR/maestro-ios-run-flow.sh" --scenario "Two-user groups stream" \
+    "$SCRIPT_DIR/maestro-ios-run-flow.sh" --scenario "Two-user groups stream" \
       --flow "$APP_DIR/.maestro/flows/groups-two-user-stream.yaml"
     ;;
 
