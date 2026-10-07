@@ -19,6 +19,24 @@ instead of restating this contract.
    client. Expo Go is not a supported automation runtime.
 2. The user-facing runners (`npm run test:e2e:ios:*`) are thin wrappers over the
    shared toolkit; they must not duplicate runtime orchestration logic.
+3. **The iOS runtime is pinned, host-wide.** One checked-in value —
+   `BOGA_IOS_SIM_RUNTIME` in `scripts/worktree-lib.sh` — names the iOS version
+   every lane simulator runs, so a lane behaves the same whichever slot a
+   worktree leased. Changing it is that one line.
+   `apps/mobile/scripts/ios-sim-boot.sh` enforces it: it creates a missing
+   slot sim on the pin, and when the slot's existing sim is on another runtime
+   it shuts that sim down, deletes it and recreates it on the pin under the same
+   name and device type, logging one line. Only the slot-named lane sim
+   (`BOGA wt<slot>`) is ever recreated — never another slot's, and never a
+   hand-made one. A missing pinned runtime fails the run with the install
+   command; there is no fallback to another installed runtime, because a lane
+   silently running a different iOS version is what this pin prevents (it
+   produced failures that read as flakiness: iOS 26.2 labels the native back
+   button with the previous screen's title, iOS 27 labels it "Back"). An
+   explicit `IOS_SIM_UDID` is an operator override and is used as found, as is
+   `IOS_SIM_RUNTIME` in the environment for a deliberate one-off run.
+   `./boga doctor` reports whether the pin is installed and whether this slot's
+   sim matches (a mismatch is a warning: the next lane run recreates it).
 
 ## 2. Config files
 
