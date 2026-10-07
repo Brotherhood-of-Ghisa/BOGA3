@@ -180,8 +180,8 @@ const buildSummary = (): ProgressComparisons => {
   return { ...summary, muscles: summary.current.totals.muscleFamilies.flatMap(family => family.muscles).map(row => {
     const old = previous.get(row.muscleGroupId);
     return { muscleGroupId: row.muscleGroupId, displayName: row.displayName, familyName: row.familyName, sortOrder: row.sortOrder,
-      current: { workingSetCount: row.workingSetCount, totalVolume: row.totalVolume, knownVolume: row.totalVolume, volumeSetCount: row.totalVolume ? 1 : 0, knownVolumeSetCount: row.totalVolume ? 1 : 0 },
-      previous: { workingSetCount: old?.workingSetCount ?? 0, totalVolume: old?.totalVolume ?? 0, knownVolume: old?.totalVolume ?? 0, volumeSetCount: old?.totalVolume ? 1 : 0, knownVolumeSetCount: old?.totalVolume ? 1 : 0 },
+      current: { workingSetCount: row.workingSetCount, totalVolume: row.totalVolume, volumeSetCount: row.totalVolume ? 1 : 0 },
+      previous: { workingSetCount: old?.workingSetCount ?? 0, totalVolume: old?.totalVolume ?? 0, volumeSetCount: old?.totalVolume ? 1 : 0 },
       workingSetChange: row.workingSetCount - (old?.workingSetCount ?? 0), volumeChange: compareProgressVolume(row.totalVolume, old?.totalVolume ?? 0), exercises: [] };
   }) };
 };
@@ -1055,16 +1055,23 @@ describe('StatsScreenShell — search & filtering', () => {
 
 });
 
-it('keeps partial volume readable and uses ordinary strength copy for bodyweight arithmetic', () => {
+it('shows Volume with no coverage note and uses ordinary strength copy for bodyweight arithmetic', () => {
   render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseListItems: [{
     id: 'bw', name: 'Pull-up', workingSetCount: 2,
-    totalVolume: null, knownVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
+    totalVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
+  }, {
+    id: 'huge', name: 'Overflowed', workingSetCount: 1,
+    totalVolume: null, estimatedOneRepMax: null, lastCompletedAt: null,
   }] })} />);
   expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');
-  expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
+  expect(screen.queryByTestId('stats-exercise-coverage-bw')).toBeNull();
   expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
-    .toBe('Open Pull-up heatmap. 2 sets. Volume 800 · incomplete. Estimated one rep max 127.7 kg');
+    .toBe('Open Pull-up heatmap. 2 sets. Volume 800. Estimated one rep max 127.7 kg');
+  // A sum that is not finite is dashed, never explained ([[copy.no-inline-explanation]]).
+  expect(screen.getByTestId('stats-exercise-volume-huge')).toHaveTextContent('—');
+  expect(screen.queryByTestId('stats-exercise-coverage-huge')).toBeNull();
+  expect(screen.queryByText(/incomplete/i)).toBeNull();
 });
 
 

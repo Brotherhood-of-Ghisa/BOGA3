@@ -1,6 +1,6 @@
 import { aggregateStats } from '@/src/data/stats';
 import { buildHeatmapData } from '@/components/heatmaps/heatmapData';
-import { personalLoadContext, addFiniteVolume, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
+import { personalLoadContext, addFiniteVolume, formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import type { Session } from '@/components/session-recorder/types';
 import { aggregateExerciseDailyEffort, aggregateExerciseWeeklyEffort } from '@/src/data/exercise-analytics';
 import { aggregateExerciseBlockHistory } from '@/src/data/exercise-block-history';
@@ -78,7 +78,7 @@ it.each([
   // The records panel's volume record reads the facts' session volume.
   const fact = summarizeFactSession('pull', { sessionId: 'session', completedAt: day,
     blocks: [{ id: 'exercise', orderIndex: 0, loadContext: f.context, sets: [f.set] }] });
-  equalMetric(fact?.volumeComplete ? fact.volumeKg : null, volume);
+  equalMetric(fact?.volumeKg, volume);
   expect(daily.estimatedRM1).toBe(entry.estimatedOneRepMax);
   expect(blocks.blocks[0].estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
   expect(catalog.estimatedOneRepMax).toBe(entry.estimatedOneRepMax);
@@ -88,43 +88,74 @@ it.each([
   expect(buildCompletedSessionDetailModel([f.uiExercise], new Map()).volume).toBe(shown);
 });
 
-it('keeps partial volume out of baselines and never awards an unavailable strength record', () => {
+it('leaves a set whose load cannot be calculated out of every Volume total ([[copy.no-inline-explanation]])', () => {
+  const invalid = fixture(80, Number.NaN, '100');
+  const known = fixture(80, 1, '20');
+  // A load context belongs to a block: the invalid set and a known 800 kg·reps
+  // set sit in two blocks of the same day.
+  const knownSet = { ...known.set, id: 'known', setId: 'known', orderIndex: 1 };
+  const sets = [invalid.set, knownSet];
+  const contextFor = (set: typeof knownSet) => set.id === 'known' ? known.context : invalid.context;
+  const daily = aggregateExerciseDailyEffort(sets.map(set => ({ completedAt: day, loadContext: contextFor(set), sets: [set] })))[0];
+  expect(daily).toMatchObject({ totalVolume: 800, workingSetCount: 2 });
+  expect(aggregateExerciseWeeklyEffort(sets.map(set => ({ completedAt: day, loadContext: contextFor(set), sets: [set] })))[0])
+    .toMatchObject({ totalVolume: 800 });
+  // A block whose context is invalid is left out entirely: Volume 0, its sets still count.
+  expect(invalid.history.sessions[0]).toMatchObject({ totalVolume: 0, workingSetCount: 1 });
+  expect(deriveLastSession(invalid.history.sessions)?.volume).toBe(0);
+  const catalog = aggregateExerciseCatalogStats({ bodyweightCalculationsEnabled: true, sessions: invalid.muscle.sessions,
+    exerciseDefinitions: [invalid.definition], sessionExercises: invalid.muscle.sessionExercises, exerciseSets: [invalid.set] }, 'all', now)
+    .aggregatesById.get('pull');
+  expect(catalog).toMatchObject({ totalVolume: 0, workingSetCount: 1 });
+  expect(aggregateStats(invalid.muscle).muscleFamilies[0]).toMatchObject({ totalVolume: 0, workingSetCount: 1 });
+  expect(aggregateSelectedMuscleDailyEffort(invalid.muscle, { muscleGroupIds: ['left'] })[0]).toMatchObject({ totalWeight: 0, setCount: 1 });
+  const blocks = aggregateExerciseBlockHistory({ now, sessions: [{ sessionId: 'session', completedAt: day, loadContext: invalid.context }],
+    sessionExercises: [{ sessionExerciseId: 'exercise', sessionId: 'session', orderIndex: 0 }], setsBySessionExerciseId: { exercise: [invalid.set] } });
+  expect(blocks.blocks[0]).toMatchObject({ totalVolume: 0, workingSetCount: 1 });
+  // The session models total the known exercise beside the invalid one.
+  const both = [{ ...invalid.uiExercise, id: 'invalid' }, known.uiExercise];
+  expect(buildSessionViewModel({ ...invalid.session, exercises: both }, new Map()).volume).toBe('800');
+  expect(buildCompletedSessionDetailModel(both, new Map()).volume).toBe('800');
+});
+
+it('leaves an uncalculable set out of Volume and never awards an unavailable strength record', () => {
   const known = fixture(80, 1, '0');
   const invalid = fixture(80, Number.NaN, '100');
   const target = { ...known.performance, sessionId: 'later', completedAt: now };
-  const incomplete = deriveSessionExerciseVolumeComparisons({ targetSession: invalid.performance, historicalSessions: [] })[0];
-  expect(incomplete).toMatchObject({ currentVolume: null, state: 'incomplete', workingSetCount: 1 });
+  // Its only set is left out: a Volume of 0 ([[copy.no-inline-explanation]]).
+  const leftOut = deriveSessionExerciseVolumeComparisons({ targetSession: invalid.performance, historicalSessions: [] })[0];
+  expect(leftOut).toMatchObject({ currentVolume: 0, state: 'no-history', workingSetCount: 1 });
   const baseline = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [invalid.performance] })[0];
-  expect(baseline).toMatchObject({ currentVolume: 640, historicalSessionCount: 0, excludedHistoricalSessionCount: 1, state: 'no-history' });
+  expect(baseline).toMatchObject({ currentVolume: 640, historicalSessionCount: 1, medianVolume: 0, state: 'single-baseline' });
   expect(deriveSessionPersonalRecords({ targetSession: { ...invalid.performance, sessionId: 'later', completedAt: now }, historicalSessions: [known.performance] })).toEqual([]);
   expect(deriveSessionPersonalRecords({ targetSession: target, historicalSessions: [] })).toEqual([]);
 });
 
-it('withholds overflowing aggregates without losing independent counts or later resetting an unknown subtotal', () => {
+it('withholds overflowing aggregates without losing independent counts', () => {
   const f = fixture(null, 0, '1' + '0'.repeat(306));
   const sets = Array.from({ length: 50 }, (_, index) => ({ ...f.set, id: `set-${index}`, setId: `set-${index}`, orderIndex: index }));
   const raw = [{ completedAt: day, loadContext: f.context, sets }];
-  expect(aggregateExerciseDailyEffort(raw)[0]).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
-  expect(aggregateExerciseWeeklyEffort(raw)[0]).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
+  expect(aggregateExerciseDailyEffort(raw)[0]).toMatchObject({ totalVolume: null, workingSetCount: 50 });
+  expect(aggregateExerciseWeeklyEffort(raw)[0]).toMatchObject({ totalVolume: null, workingSetCount: 50 });
   const muscle = { ...f.muscle, exerciseSets: sets };
   expect(aggregateSelectedMuscleDailyEffort(muscle, { muscleGroupIds: ['left'] })[0])
-    .toMatchObject({ totalWeight: null, knownWeight: null, setCount: 50 });
+    .toMatchObject({ totalWeight: null, setCount: 50 });
   expect(aggregateSelectedMuscleWeeklyEffort(aggregateSelectedMuscleDailyEffort(muscle, { muscleGroupIds: ['left'] }))[0])
-    .toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
-  expect(aggregateStats(muscle).muscleFamilies[0]).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
+    .toMatchObject({ totalVolume: null, workingSetCount: 50 });
+  expect(aggregateStats(muscle).muscleFamilies[0]).toMatchObject({ totalVolume: null, workingSetCount: 50 });
   const target = { ...f.performance, exercises: [{ ...f.performance.exercises[0], sets }] };
   expect(deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [] })[0])
-    .toMatchObject({ currentVolume: null, knownVolume: null, state: 'incomplete', workingSetCount: 50 });
+    .toMatchObject({ currentVolume: null, state: 'unavailable', workingSetCount: 50 });
   const catalog = aggregateExerciseCatalogStats({ ...muscle, exerciseDefinitions: [f.definition] }, 'all', now).aggregatesById.get('pull');
-  expect(catalog).toMatchObject({ totalVolume: null, knownVolume: null, workingSetCount: 50 });
+  expect(catalog).toMatchObject({ totalVolume: null, workingSetCount: 50 });
   expect(addFiniteVolume(null, 20)).toBeNull();
-  expect(formatVolumeWithCoverage(null, null)).toBe('— · unavailable');
+  expect(formatVolumeFigure(null)).toBe('—');
 });
 
 it('does not render an overflowing weekly heatmap sum as a complete or infinite value', () => {
   const days = ['2026-09-14', '2026-09-15', '2026-09-16'].map(dateKey => ({ dateKey,
-    totalVolume: 8e307, knownVolume: 8e307, workingSetCount: 1, estimatedRM1: 1e307, highestWeight: 1e307 }));
+    totalVolume: 8e307, workingSetCount: 1, estimatedRM1: 1e307, highestWeight: 1e307 }));
   const data = buildHeatmapData(days, 'totalVolume', { todayDateKey: '2026-09-20', weeks: 1 });
-  expect(data.weekly[0]).toMatchObject({ value: 0, knownValue: null, unavailable: true, hasTraining: true });
+  expect(data.weekly[0]).toMatchObject({ value: 0, unavailable: true, hasTraining: true });
   expect(data.daily.filter(day => day.hasTraining).every(day => !day.unavailable)).toBe(true);
 });

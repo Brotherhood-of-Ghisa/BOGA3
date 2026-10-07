@@ -357,7 +357,6 @@ export function SessionViewScreen({ sessionId }: SessionViewScreenProps) {
               : undefined
           }
           volume={model.volume}
-          volumeNote={model.volumeNote}
         />
         {model.cards.map((card) => (
           <SessionExerciseCard

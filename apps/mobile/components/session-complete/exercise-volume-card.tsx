@@ -1,5 +1,4 @@
 import { formatVolume } from '@/src/exercise-calculations/format';
-import { compactVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -15,14 +14,13 @@ type ExerciseVolumeCardProps = {
 
 
 // The spoken form keeps the unit: a screen reader has no legend to lean on.
-const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable or incomplete' : `${formatVolume(value)} kg reps`;
+const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable' : `${formatVolume(value)} kg reps`;
 
 export const formatExerciseSetCount = (workingSetCount: number): string =>
   `${workingSetCount} ${workingSetCount === 1 ? 'set' : 'sets'}`;
 
 export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeComparison): string => {
-  if (comparison.currentVolume === null) return 'Incomplete · comparison unavailable';
-  if (comparison.medianVolume === null && (comparison.excludedHistoricalSessionCount ?? 0) > 0) return 'No complete comparison history';
+  if (comparison.currentVolume === null) return '—';
   if (comparison.medianVolume === null) return 'No comparison history yet';
   const delta = comparison.currentVolume - comparison.medianVolume;
   if (delta === 0) return 'At median';
@@ -36,9 +34,8 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
 };
 
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
-  const excluded = comparison.excludedHistoricalSessionCount ?? 0;
-  const base = `${comparison.exerciseName}, ${formatExerciseSetCount(comparison.workingSetCount)}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.${excluded > 0 ? ` ${excluded} earlier ${excluded === 1 ? 'session excluded' : 'sessions excluded'} because volume is incomplete.` : ''}`;
-  if (comparison.currentVolume === null) return `${base} Missing load context prevents comparison. Reps and set counts remain available.`;
+  const base = `${comparison.exerciseName}, ${formatExerciseSetCount(comparison.workingSetCount)}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.`;
+  if (comparison.currentVolume === null) return base;
   if (
     comparison.medianVolume === null ||
     comparison.percentile5Volume === null ||
@@ -104,8 +101,8 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
         </View>
         <View style={styles.valueRow}>
           <View style={styles.legend}>
-            <Text allowFontScaling={false} style={styles.microLabel}>{comparison.currentVolume === null && (comparison.knownVolume ?? 0) > 0 ? 'Known vol' : 'Vol'}</Text>
-            <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? compactVolumeFigure(null, comparison.knownVolume) : formatVolume(comparison.currentVolume)}</Text>
+            <Text allowFontScaling={false} style={styles.microLabel}>Vol</Text>
+            <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
           </View>
           <Text allowFontScaling={false} style={comparison.medianVolume === null ? styles.deltaMuted : styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
@@ -149,12 +146,9 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
               } · baseline ${formatVolume(comparison.medianVolume as number)}`}
             </Text>
           </View>
-        ) : (
-          <Text allowFontScaling={false} style={styles.history}>{comparison.currentVolume === null ? 'Missing load context. This session is excluded from volume comparisons until corrected.' : 'This is the first comparable completed session.'}</Text>
+        ) : comparison.currentVolume === null ? null : (
+          <Text allowFontScaling={false} style={styles.history}>This is the first comparable completed session.</Text>
         )}
-        {(comparison.excludedHistoricalSessionCount ?? 0) > 0 ? <Text allowFontScaling={false} style={styles.history}>
-          {`${comparison.excludedHistoricalSessionCount} earlier ${comparison.excludedHistoricalSessionCount === 1 ? 'session excluded' : 'sessions excluded'} · incomplete volume`}
-        </Text> : null}
       </View>
     </Card>
   );

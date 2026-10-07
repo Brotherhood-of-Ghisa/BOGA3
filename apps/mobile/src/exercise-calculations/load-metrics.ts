@@ -178,6 +178,10 @@ export const calculateSetMetrics = (input: SetMetricInput): SetMetrics => {
   };
 };
 
+/**
+ * The coaching API's Volume with its coverage counts. Screens and records use
+ * `sumVolume` instead.
+ */
 export const summarizeVolume = (sets: readonly SetMetrics[]): VolumeCoverage => {
   let knownVolumeKgReps = 0;
   let eligibleSetCount = 0;
@@ -211,3 +215,11 @@ export const summarizeVolume = (sets: readonly SetMetrics[]): VolumeCoverage => 
     overflow,
   };
 };
+
+/**
+ * A Volume figure: the sum over the sets whose load can be calculated; a set
+ * whose load cannot is left out ([[copy.no-inline-explanation]]). Null only
+ * when the sum is not finite.
+ */
+export const sumVolume = (sets: readonly SetMetrics[]): number | null =>
+  summarizeVolume(sets).knownVolumeKgReps;

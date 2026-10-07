@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 
 import { SessionTimesFields, type SessionTimesFieldsProps } from './session-times-fields';
 
@@ -11,7 +11,6 @@ type SessionSummaryCardProps = {
   exerciseCount: number;
   workingSetCount: number;
   volume: string;
-  volumeNote?: string;
   // Opens the gym picker; the whole Gym cell is the target.
   onPressGym: () => void;
   // A completed session being edited: its Start/End fields, above the row.
@@ -26,7 +25,6 @@ export function SessionSummaryCard({
   exerciseCount,
   workingSetCount,
   volume,
-  volumeNote,
   onPressGym,
   times,
 }: SessionSummaryCardProps) {
@@ -46,10 +44,8 @@ export function SessionSummaryCard({
         </Pressable>
         <Stat label="Ex" spokenLabel="Exercises" testID="session-view-summary-exercises" value={String(exerciseCount)} />
         <Stat label="Sets" testID="session-view-summary-sets" value={String(workingSetCount)} />
-        <Stat align="end" label={volumeNote && volume !== '—' ? 'Known vol' : 'Volume'} testID="session-view-summary-volume" value={volume} />
+        <Stat align="end" label="Volume" testID="session-view-summary-volume" value={volume} />
       </View>
-      {volumeNote ? <Text allowFontScaling={false} style={styles.coverageNote}
-        testID="session-view-summary-volume-note">{volumeNote}</Text> : null}
     </Card>
   );
 }
@@ -61,11 +57,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-  },
-  coverageNote: {
-    paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted,
   },
   gym: {
     flex: 1,

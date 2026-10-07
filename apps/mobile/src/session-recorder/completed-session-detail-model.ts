@@ -1,5 +1,5 @@
-import { summarizeVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
-import { calculateAnalyticsSetMetrics, ordinaryLoadContext, sessionVolumeSummary } from '@/src/exercise-calculations/analytics';
+import { sumVolume, type LoadContext, type SetMetrics } from '@/src/exercise-calculations/load-metrics';
+import { calculateAnalyticsSetMetrics, ordinaryLoadContext, formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { deriveExercisePersonalRecord, type SessionInsightExerciseInput } from '@/src/session-insights';
@@ -54,7 +54,6 @@ export type CompletedSessionDetailModel = {
   // The summary's `Sets`: the performed working sets.
   workingSetCount: number;
   volume: string;
-  volumeNote?: string;
 };
 
 const performedFigures = (set: CompletedSessionDetailSetInput) => {
@@ -144,5 +143,5 @@ export const buildCompletedSessionDetailModel = (
     ];
   });
 
-  return { cards, workingSetCount, ...sessionVolumeSummary(summarizeVolume(metrics)) };
+  return { cards, workingSetCount, volume: formatVolumeFigure(sumVolume(metrics)) };
 };

@@ -64,7 +64,6 @@ const startOfMondayWeek = (date: Date): Date => {
 
 type DayAccumulator = {
   totalVolume: number | null;
-  knownVolume: number | null;
   workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
@@ -74,7 +73,6 @@ type WeekAccumulator = {
   weekStartDateKey: string;
   monthKey: string;
   totalVolume: number | null;
-  knownVolume: number | null;
   workingSetCount: number;
   bestRM1: number | null;
   highestWeight: number | null;
@@ -90,7 +88,6 @@ export const aggregateExerciseDailyEffort = (
     const dateKey = formatLocalDateKey(session.completedAt, timeZone);
     const day: DayAccumulator = dayMap.get(dateKey) ?? {
       totalVolume: 0,
-      knownVolume: 0,
       workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
@@ -100,8 +97,7 @@ export const aggregateExerciseDailyEffort = (
     const working = workingSetsOnly(session.sets, context.effortPolicy);
     const summary = summarizeExerciseLoad(session.sets, context);
     if (summary.volumeCoverage.eligibleSetCount === 0 && working.length === 0) continue;
-    day.knownVolume = addFiniteVolume(day.knownVolume, summary.volumeCoverage.knownVolumeKgReps);
-    day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeCoverage.totalVolumeKgReps);
+    day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeKgReps);
     day.workingSetCount += working.length;
     if (summary.topWeightSet !== null) day.highestWeight = Math.max(day.highestWeight ?? 0, summary.topWeightSet.weight);
     if (summary.estimatedOneRepMax !== null) day.bestRM1 = Math.max(day.bestRM1 ?? 0, summary.estimatedOneRepMax);
@@ -111,7 +107,7 @@ export const aggregateExerciseDailyEffort = (
   return Array.from(dayMap.entries())
     .map(([dateKey, day]) => ({
       dateKey,
-      totalVolume: day.totalVolume, knownVolume: day.knownVolume,
+      totalVolume: day.totalVolume,
       workingSetCount: day.workingSetCount,
       estimatedRM1: day.bestRM1,
       highestWeight: day.highestWeight,
@@ -136,13 +132,11 @@ export const aggregateExerciseWeeklyEffort = (
       weekStartDateKey,
       monthKey,
       totalVolume: 0,
-      knownVolume: 0,
       workingSetCount: 0,
       bestRM1: null,
       highestWeight: null,
     };
 
-    acc.knownVolume = addFiniteVolume(acc.knownVolume, day.knownVolume === undefined ? day.totalVolume : day.knownVolume);
     acc.totalVolume = addFiniteVolume(acc.totalVolume, day.totalVolume);
     acc.workingSetCount += day.workingSetCount;
 
@@ -178,7 +172,7 @@ export const aggregateExerciseWeeklyEffort = (
       weekStartDateKey: week.weekStartDateKey,
       monthKey: week.monthKey,
       weekOfMonth,
-      totalVolume: week.totalVolume, knownVolume: week.knownVolume,
+      totalVolume: week.totalVolume,
       workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,

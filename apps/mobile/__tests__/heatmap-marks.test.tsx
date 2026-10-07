@@ -113,7 +113,7 @@ describe('Bodyweight heatmap coverage', () => {
   it('distinguishes zero-load training, unknown load and rest in daily tiles', () => {
     const coverage = buildHeatmapData([
       day('2026-05-11', 0),
-      { ...day('2026-05-12', 0), totalVolume: null, knownVolume: 0 },
+      { ...day('2026-05-12', 0), totalVolume: null },
     ], 'totalVolume', { todayDateKey: TODAY });
     render(<DailyHeatmap data={coverage} formatValue={String} metricLabel="Volume" testIDPrefix={PREFIX} />);
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityLabel', '2026-05-11, Volume 0');

@@ -4,7 +4,7 @@
 // the same eligible sets. Only working sets compete.
 
 import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg } from './analytics.ts';
-import { summarizeVolume, type LoadContext, type SetMetrics } from './load-metrics.ts';
+import { sumVolume, type LoadContext, type SetMetrics } from './load-metrics.ts';
 import { compareWeightRecord } from './records.ts';
 import { isWorkingSet, isVolumeSet, type SessionSetPerformanceStatus } from './set-semantics.ts';
 
@@ -107,19 +107,13 @@ export const summarizeSessionBests = <S extends BestSetSetInput, B extends BestS
     weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
   }, block.loadContext.effortPolicy)).map(set => calculateAnalyticsSetMetrics({ ...set, ...block.loadContext })));
   if (sets.length === 0 && volumeByBlock.every(metrics => metrics.length === 0)) return null;
-  let knownVolume: number | null = 0;
-  let totalVolume: number | null = 0;
+  let volumeKg: number | null = 0;
   // Each block sums alone, as the completed-session volume comparison does.
-  for (const metrics of volumeByBlock) {
-    const coverage = summarizeVolume(metrics);
-    knownVolume = addFiniteVolume(knownVolume, coverage.knownVolumeKgReps);
-    totalVolume = addFiniteVolume(totalVolume, coverage.totalVolumeKgReps);
-  }
+  for (const metrics of volumeByBlock) volumeKg = addFiniteVolume(volumeKg, sumVolume(metrics));
   return {
     oneRepMax: pickBestEstimatedOneRepMaxSet(sets),
     topWeight: pickTopWeightSet(sets),
-    volumeKg: totalVolume ?? knownVolume,
-    volumeComplete: totalVolume !== null,
+    volumeKg,
     workingSets: sets.length,
     volumeSets: volumeByBlock.reduce((count, metrics) => count + metrics.length, 0),
   };

@@ -190,7 +190,7 @@ describe('aggregateStats', () => {
     const chest = flattenMuscles(totals).find((entry) => entry.muscleGroupId === 'chest_sternal');
     expect(totals.sessionCount).toBe(0);
     expect(totals.workingSetCount).toBe(0);
-    expect(chest).toMatchObject({ workingSetCount: 0, totalVolume: 0, knownVolume: 0 });
+    expect(chest).toMatchObject({ workingSetCount: 0, totalVolume: 0 });
     expect(chest).not.toHaveProperty('setCount');
   });
 

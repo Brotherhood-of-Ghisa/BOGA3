@@ -720,7 +720,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
   });
 
-  it('shows unavailable coverage in the muscle and contribution without inventing a percentage', async () => {
+  it('leaves sets whose load cannot be calculated out of Volume, with no coverage note', async () => {
     await renderMuscles();
     const db = localDataClient();
     db.prepare("INSERT OR REPLACE INTO user_settings (id, bodyweight_calculations_enabled) VALUES ('settings', 1)").run();
@@ -728,19 +728,16 @@ describe('Stats over real data', () => {
     await replayFocus();
     select('quads');
     fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-    await waitFor(() => expect(value('quads', 'change')).toHaveTextContent('Incomplete'));
-    expect(value('quads', 'now')).toHaveTextContent('—');
-    expect(contribution('change')).toHaveTextContent('Incomplete');
-    expect(screen.queryByTestId('stats-contributions-total')).toBeNull();
-    expect(within(screen.getByTestId(`stats-contribution-${SQUAT}`)).getAllByText(/Volume incomplete. Known subtotal from 0 of/)).toHaveLength(2);
-    // Coverage must use the row width, not the narrow numeric column that
-    // broke words and made the native contribution row excessively tall.
+    // Squat, the only quads lift, is left out in both periods ([[copy.no-inline-explanation]]):
+    // a Volume of 0 against 0, never a note or an invented percentage.
+    await waitFor(() => expect(contribution('now')).toHaveTextContent('0'));
+    expect(value('quads', 'now')).toHaveTextContent('0');
+    expect(value('quads', 'previous')).toHaveTextContent('0');
+    expect(value('quads', 'change')).toHaveTextContent('—');
+    expect(contribution('change')).toHaveTextContent('—');
+    expect(screen.queryByText(/incomplete|Known subtotal/i)).toBeNull();
     for (const prefix of ['stats-muscle-row-quads', `stats-contribution-${SQUAT}`]) {
-      const coverage = screen.getByTestId(`${prefix}-coverage`);
-      expect(coverage).toHaveStyle({ width: '100%', alignSelf: 'stretch' });
-      expect(within(coverage).getByText(/^Now: Volume incomplete/)).toBeTruthy();
-      expect(within(coverage).getByText(/^Previous: Volume incomplete/)).toBeTruthy();
-      expect(within(screen.getByTestId(`${prefix}-values`)).queryByText(/Volume incomplete/)).toBeNull();
+      expect(screen.queryByTestId(`${prefix}-coverage`)).toBeNull();
     }
   });
 

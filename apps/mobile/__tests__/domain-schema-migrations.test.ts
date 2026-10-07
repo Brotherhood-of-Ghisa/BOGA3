@@ -131,8 +131,9 @@ describe('domain schema and runtime migrations', () => {
     // exercise_group_links is m0006, the kg-only cutover is m0010, the
     // derived exercise session facts are m0011 (tables) and m0012 (triggers),
     // the local store's owning account (`account_user_id`) is m0015, and the
-    // session planning schema (0016) plus pull-cursor reset (0017) append after it.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(18);
+    // session planning schema (0016) plus pull-cursor reset (0017) append after it,
+    // and m0018 drops the facts' volume completeness flag.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(19);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -180,7 +181,14 @@ describe('domain schema and runtime migrations', () => {
       'm0015',
       'm0016',
       'm0017',
+      'm0018',
     ]);
+  });
+
+  it('drops the facts volume completeness flag in m0018', () => {
+    expect(localRuntimeMigrations.migrations.m0018).toContain(
+      'ALTER TABLE `exercise_session_facts` DROP COLUMN `volume_complete`;',
+    );
   });
 
   it('records the owning account of the local store in m0015', () => {

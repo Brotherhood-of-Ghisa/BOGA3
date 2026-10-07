@@ -28,13 +28,12 @@ type SessionFactsCardProps = {
   facts: SessionFact[] | SessionFact[][];
   // Below the facts: the completion's muscle breakdown.
   children?: ReactNode;
-  note?: string;
   testID?: string;
 };
 
 // A session's facts as stacked `Stat`s in one `Card` (View Session's Gym / Ex /
 // Sets / Volume), shared by View Session, completion and the group session view.
-export function SessionFactsCard({ header, times, facts, children, note, testID }: SessionFactsCardProps) {
+export function SessionFactsCard({ header, times, facts, children, testID }: SessionFactsCardProps) {
   const rows = (Array.isArray(facts[0]) ? facts : [facts]) as SessionFact[][];
   return (
     <Card testID={testID}>
@@ -69,8 +68,6 @@ export function SessionFactsCard({ header, times, facts, children, note, testID 
           ))}
         </View>
       ))}
-      {note ? <Text allowFontScaling={false} style={styles.note}
-        testID={testID ? `${testID}-note` : undefined}>{note}</Text> : null}
       {children}
     </Card>
   );
@@ -122,11 +119,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-  },
-  note: {
-    paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm, color: uiRoles.inkMuted,
   },
   flexible: {
     flex: 1,
