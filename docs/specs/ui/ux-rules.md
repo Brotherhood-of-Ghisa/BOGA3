@@ -136,9 +136,9 @@ and spec 05's session invariants. The UI adds:
    only**; changing effort does not make it modified.
 4. **Every row shows every figure it can compute**, planned and warm-up rows
    included, faded when not performed (`design-language.md` "Presenting
-   data"). The only highlight is the exercise's one record set in `record`,
+   data"). The only highlights are the exercise's record sets in `record`,
    with the `record` band on its card or set list (`design-language.md`
-   "Emphasis"; which set, training-metrics "Records").
+   "Emphasis"; which sets, training-metrics "Records").
 5. **One vocabulary and one format.** `Weight`, `Top weight`, `1RM`,
    `Volume`; the formats of training-metrics "Calculations", never `k`, never
    a thousands separator, `—` only for a missing value.

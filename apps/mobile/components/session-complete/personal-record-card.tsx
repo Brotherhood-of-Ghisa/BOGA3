@@ -1,102 +1,92 @@
-import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { Icon } from '@/components/ui/icon';
-import { Stat } from '@/components/ui/stat';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
-import type { ExercisePersonalRecord } from '@/src/session-insights';
-import { recordBand } from '@/src/session-insights/record-band';
+import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { personalRecordCount, type ExercisePersonalRecord } from '@/src/session-insights';
+import { personalRecordLines } from '@/src/session-insights/record-band';
 
 type PersonalRecordCardProps = {
   personalRecord: ExercisePersonalRecord;
   testID: string;
 };
 
+const formatRecordCount = (count: number): string => `${count} ${count === 1 ? 'record' : 'records'}`;
+
 /**
- * One exercise's record set on the completion screen, in the language's one
- * superlative: a `record` band (`New 1RM record` or `New top weight`), then
- * the exercise and the set, with the figures it set bold `record`
- * (`design-language.md` §5). A Weight record's 1RM stays in `ink`.
+ * One exercise's records in a session summary (View Session and completion):
+ * the exercise and its PR count, then a line per record set — what it took,
+ * then the set — and a Volume line. A plain list in `ink`: the section heading
+ * already says these are records, so no band or `record` emphasis.
  */
 export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCardProps) {
-  const band = recordBand(personalRecord);
-  const oneRepMax =
-    personalRecord.estimatedOneRepMax === null ? '—' : formatOneRepMax(personalRecord.estimatedOneRepMax);
-  const set = `${formatWeight(personalRecord.weight)} × ${personalRecord.reps}`;
-  const heading = personalRecord.kind === 'oneRepMax' ? 'New 1RM record' : 'New top weight';
+  const count = formatRecordCount(personalRecordCount(personalRecord));
+  const lines = personalRecordLines(personalRecord);
 
   return (
     <Card testID={testID}>
       <View
-        accessibilityLabel={`${heading} for ${personalRecord.exerciseName}: ${set}, 1RM ${oneRepMax}`}
-        accessible>
-        <View style={styles.band}>
-          <Icon color={uiRoles.record} name="arrow-up" size="xs" />
-          <Text allowFontScaling={false} style={styles.bandLabel}>{band.label}</Text>
-        </View>
-        <View style={styles.body}>
+        accessibilityLabel={`${personalRecord.exerciseName}, ${count}: ${lines.map((line) => line.spoken).join('; ')}`}
+        accessible
+        style={styles.body}>
+        <View style={styles.header}>
           <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {personalRecord.exerciseName}
           </Text>
-          <View style={styles.row}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.set, personalRecord.weightRecord ? styles.setRecord : null]}
-              testID={`${testID}-set`}>
-              {set}
-            </Text>
-            <Stat
-              emphasis={personalRecord.kind === 'oneRepMax' ? 'record' : 'none'}
-              label="1RM"
-              layout="inline"
-              testID={`${testID}-1rm`}
-              value={oneRepMax}
-            />
-          </View>
+          <Text allowFontScaling={false} style={styles.count} testID={`${testID}-count`}>{count}</Text>
         </View>
+        {lines.map((line, index) => (
+          <View key={line.key} style={styles.line} testID={`${testID}-line-${index + 1}`}>
+            <Text allowFontScaling={false} style={styles.label}>{line.label}</Text>
+            {line.set ? (
+              <Text allowFontScaling={false} numberOfLines={1} style={styles.set}>{line.set}</Text>
+            ) : null}
+          </View>
+        ))}
       </View>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  band: {
+  body: {
+    paddingHorizontal: uiSpace.md,
+    paddingTop: uiSpace.sm,
+    paddingBottom: uiSpace.sm,
+  },
+  // The exercise card's header (`ExerciseSetsCard`): name, then its count.
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.recordWash,
-    borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.recordRule,
-  },
-  bandLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.record,
-  },
-  body: {
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    gap: uiSpace.xs,
+    paddingBottom: uiSpace.xs,
   },
   name: {
+    flex: 1,
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  count: {
+    fontFamily: uiFonts.figure.family,
+    fontWeight: '500',
+    fontSize: uiTypography.size.xs,
+    lineHeight: uiTypography.lineHeight.xs,
+    color: uiRoles.inkMuted,
+  },
+  line: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: uiSpace.sm,
+  },
+  label: {
+    flex: 1,
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
   },
   set: {
     fontFamily: uiFonts.figure.family,
@@ -104,9 +94,5 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.ink,
-  },
-  setRecord: {
-    fontWeight: '700',
-    color: uiRoles.record,
   },
 });

@@ -7,6 +7,8 @@ import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/component
 
 export type SessionFact = {
   label: string;
+  // The label read aloud, when `label` is abbreviated (`Ex` → `Exercises`).
+  spokenLabel?: string;
   value: string;
   // `text` sets a name (a gym) in the body face; it takes the row's spare width.
   kind?: 'figure' | 'text';
@@ -18,9 +20,10 @@ export type SessionFact = {
 type SessionFactsCardProps = {
   // Above everything: the group view's member and status.
   header?: ReactNode;
-  // A finished session's Start and End, as `YYYY-MM-DD HH:mm`: the layout of the
-  // completed edit's Start/End fields (`session-times-fields.tsx`), read-only.
-  times?: { start: string; end: string; testID?: string };
+  // A session's Start (`YYYY-MM-DD HH:mm`) beside its End or its Duration: the
+  // layout of the completed edit's Start/End fields (`session-times-fields.tsx`),
+  // read-only. The group view shows End; View Session, Duration.
+  times?: { start: string; testID?: string } & ({ end: string } | { duration: string });
   // One row of facts, or several (the completion card's two).
   facts: SessionFact[] | SessionFact[][];
   // Below the facts: the completion's muscle breakdown.
@@ -29,8 +32,8 @@ type SessionFactsCardProps = {
   testID?: string;
 };
 
-// A session's facts as stacked `Stat`s in one `Card` (Duration / Gym / Sets /
-// Volume), shared by View Session and the group session view.
+// A session's facts as stacked `Stat`s in one `Card` (View Session's Gym / Ex /
+// Sets / Volume), shared by View Session, completion and the group session view.
 export function SessionFactsCard({ header, times, facts, children, note, testID }: SessionFactsCardProps) {
   const rows = (Array.isArray(facts[0]) ? facts : [facts]) as SessionFact[][];
   return (
@@ -39,14 +42,29 @@ export function SessionFactsCard({ header, times, facts, children, note, testID 
       {times ? (
         <View style={styles.times} testID={times.testID}>
           <TimeReadout label="Start" testID={times.testID ? `${times.testID}-start` : undefined} value={times.start} />
-          <TimeReadout label="End" testID={times.testID ? `${times.testID}-end` : undefined} value={times.end} />
+          {'end' in times ? (
+            <TimeReadout label="End" testID={times.testID ? `${times.testID}-end` : undefined} value={times.end} />
+          ) : (
+            <TimeReadout
+              label="Duration"
+              testID={times.testID ? `${times.testID}-duration` : undefined}
+              value={times.duration}
+            />
+          )}
         </View>
       ) : null}
       {rows.map((row) => (
         <View key={row.map((fact) => fact.label).join('|')} style={styles.row}>
           {row.map((fact) => (
             <View key={fact.label} style={fact.kind === 'text' ? styles.flexible : null}>
-              <Stat align={fact.align} kind={fact.kind} label={fact.label} testID={fact.testID} value={fact.value} />
+              <Stat
+                align={fact.align}
+                kind={fact.kind}
+                label={fact.label}
+                spokenLabel={fact.spokenLabel}
+                testID={fact.testID}
+                value={fact.value}
+              />
             </View>
           ))}
         </View>

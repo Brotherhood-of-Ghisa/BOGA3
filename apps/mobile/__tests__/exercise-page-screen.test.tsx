@@ -195,8 +195,8 @@ describe('ExercisePageScreen', () => {
     expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: uiRoles.record });
     expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
 
-    // The best record of the session earns the set list its band.
-    expect(screen.getByTestId('exercise-record-band')).toHaveTextContent('New 1RM record · 108.3');
+    // The set list's band reads the session card's words: one set, both records.
+    expect(screen.getByTestId('exercise-record-band-1')).toHaveTextContent('New 1RM · 108.3 + top weight90.0 × 6');
   });
 
   it('keeps both swipe symbols inside the exposed edge of the opaque logger', async () => {

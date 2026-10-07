@@ -50,7 +50,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/session/[sessionId]/add-exercise` | Exercise picker (iOS page sheet): the catalogue browser in select mode, group exercises, inline create | `session/[sessionId]/add-exercise.tsx`, `components/session-recorder/exercise-picker.tsx` |
 | `/session/[sessionId]/compare` | Session vs history: the open session's exercise / muscle volume against earlier completed history, off the session view so logging stays uncluttered | `session/[sessionId]/compare.tsx` |
 | `/sessions` | The complete session list plus the active session's row, with `Show deleted` and per-row Edit / Append / Delete / Undelete | `sessions.tsx` |
-| `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit`, delete/undelete and per-exercise append. `presentation=completion` instead draws the post-Finish summary (sets by muscle, record cards, volume vs median, Share) | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
+| `/completed-session/[sessionId]` | View Session: a finished session, read-only (`Summary` \| `Sets`), with `Edit` and delete/undelete. `presentation=completion` instead draws the post-Finish summary (sets by muscle, record cards, volume vs median, Share) | `completed-session/[sessionId].tsx`, `components/view-session/`, `components/session-complete/`, `components/session-detail/` |
 | `/exercise-history` | One `exercise_definitions` row's history: period and tag filters, all-time bests, one card per session | `exercise-history.tsx` |
 
 ## Account, library and tools

@@ -20,10 +20,10 @@ completion's states join this record when they are accepted.
 - The detail is read-only. Its one `accent` action is `Edit`, in the top bar
   where the session view's `Done` sits, so the `Edit` → `Done` loop reads as
   one place.
-- Rare actions live behind ⋮s: Delete / Undelete on the session, Append on an
-  exercise. The cards are not links.
-- Start and End appear as the completed edit's fields show them
-  (`YYYY-MM-DD HH:mm`), read-only.
+- Rare actions live behind the session's ⋮: Delete / Undelete. The cards are
+  not links and have no ⋮.
+- Start appears as the completed edit's field shows it (`YYYY-MM-DD HH:mm`),
+  read-only, beside Duration.
 - A deleted session says so in a band and offers no `Edit`.
 
 ## States
@@ -35,7 +35,6 @@ marked ad hoc:
 | Screenshot | State |
 | --- | --- |
 | `view-session-detail` (ad hoc) | summary card and the first exercise card, with a record band |
-| `view-session-exercise-options` (ad hoc) | an exercise's ⋮ sheet (`Append to current session`) |
 | `view-session-options` (ad hoc) | the session ⋮ sheet (`Delete session`) |
 | `view-session-deleted` (ad hoc) | the deleted band, no `Edit` |
 | `view-session-not-found` (ad hoc) | not found, with the top bar's back |
@@ -130,3 +129,25 @@ The accessibility labels use the band words: `…, new top weight 100.0 × 3`,
 and `New top weight for <exercise>: <set>, 1RM <1RM>`. No new role or token.
 The integrated states were captured ad hoc on the simulator; the PR links
 them.
+
+## Revisions (accepted 2026-10-06)
+
+The user accepted a repo-native mock (two rounds) on 2026-10-06. It
+supersedes the bar, facts card and record states above where they differ.
+
+- **Title.** `<Time of day> training · <d Mon>` (`completedSessionTitle`): the
+  active title with the start date where the elapsed time is, shrunk to fit.
+- **Facts card.** Start · Duration, then Gym · Ex · Sets · Volume, the row of
+  the session view's summary card.
+- **Record band** (session view, View Session Sets, the exercise page's set
+  list). One line per record:
+  `New 1RM record · <1RM>`, `New top weight` or `New 1RM · <1RM> + top weight`,
+  with the set right-aligned, and `New volume record · <volume>` on the
+  exercise's first block. Every record set's beaten figure is `record`.
+- **Personal records** (View Session Summary, completion). A plain card per
+  exercise: name and `<n> records`, then a line per record set (`1RM 87.0 ·
+  Top weight` · set) and a `Volume <volume>` line, all `ink`, no band.
+- **Volume.** `Volume` heading, then `By exercise | By muscle`; no subtitle.
+- **No exercise ⋮.** `Append to current session` is gone from View Session.
+- The share image keeps one record set per exercise (state E above).
+

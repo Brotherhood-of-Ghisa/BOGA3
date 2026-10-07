@@ -110,7 +110,7 @@ export function SessionSummaryContent({
           </Text>
           {personalRecords.map((personalRecord) => (
             <PersonalRecordCard
-              key={personalRecord.setId}
+              key={personalRecord.exerciseDefinitionId}
               personalRecord={personalRecord}
               testID={`session-completion-pr-${personalRecord.exerciseDefinitionId}`}
             />

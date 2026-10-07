@@ -37,6 +37,7 @@ export function SessionInsightPresentation({
   const state = historyState !== 'ready' ? historyState : mode === 'muscle' ? muscleCatalogState : 'ready';
   return (
     <View style={styles.section} testID="session-insight-presentation">
+      <SectionHeader title="Volume" />
       <SegmentedControl
         accessibilityLabel="Session comparison grouping"
         onChange={setMode}
@@ -45,8 +46,6 @@ export function SessionInsightPresentation({
         value={mode}
       />
       <View style={styles.section} testID={`${testIdPrefix}-${mode}-volume`}>
-        <SectionHeader title={mode === 'exercise' ? 'Exercise volume' : 'Muscle volume'} />
-        <Text allowFontScaling={false} style={styles.muted}>Session vs history</Text>
         {state === 'ready' && comparisons.length ? comparisons.map((comparison) => (
           <ExerciseVolumeCard
             comparison={comparison}

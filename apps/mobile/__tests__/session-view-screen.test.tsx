@@ -6,7 +6,7 @@
  * caches over the
  * migrated in-memory SQLite database, seeded through the Maestro harness with
  * the `session-view` fixture (helpers/local-data.ts): an active session at the
- * block-history gym (Bench 3/5 with a new 1RM record, Incline 3/3, Cable Flys
+ * block-history gym (Bench 3/5 with all three records, Incline 3/3, Cable Flys
  * 0/3) over the block-history fixture's completed sessions. Every write is
  * read back from the database.
  *
@@ -107,7 +107,8 @@ const SESSION = SESSION_VIEW_FIXTURE.sessionId;
 const BENCH = SESSION_VIEW_FIXTURE.benchExerciseId;
 const FLY = SESSION_VIEW_FIXTURE.flyExerciseId;
 const FIXTURE_GYM = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
-const BENCH_LABEL = 'Barbell Bench Press, 3 of 5 sets done, new 1RM record 204.3';
+const BENCH_LABEL =
+  'Barbell Bench Press, 3 of 5 sets done, new 1RM record 204.3 on 160.0 × 8, new top weight 162.5 × 6, new volume record 2255';
 const FLY_LABEL = 'Cable Flys, 0 of 3 sets done';
 
 const HARBOUR = { latitude: 51.5, longitude: -0.12 };
@@ -1074,8 +1075,11 @@ describe('Session view: editing a completed session', () => {
       await completeBenchSession('bench_after', new Date(2026, 2, 4, 10, 0), '170');
     });
 
-    // Its 160 × 8 (1RM 204.3) beats the earlier 190; counted against itself it would only tie.
-    expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new 1RM record 204.3')).toBeTruthy();
+    // Its 160 × 8 (1RM 204.3, Volume 1280) beats the earlier 150 × 8 on every
+    // record; counted against itself it would only tie.
+    expect(await screen.findByLabelText(
+      'Barbell Bench Press, 1 of 2 sets done, new 1RM 204.3 and top weight 160.0 × 8, new volume record 1280'
+    )).toBeTruthy();
   });
 
   it('bands a Weight record when the set is heavier than every earlier one but no 1RM beats the record', async () => {
@@ -1085,7 +1089,7 @@ describe('Session view: editing a completed session', () => {
     });
 
     expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new top weight 160.0 × 8')).toBeTruthy();
-    expect(screen.getByTestId('session-view-exercise-done_bench-record')).toHaveTextContent('New top weight · 160.0 × 8');
+    expect(screen.getByTestId('session-view-exercise-done_bench-record')).toHaveTextContent('New top weight160.0 × 8');
     expect(screen.getByTestId('session-view-exercise-done_bench-set-1-values')).toHaveStyle({ color: uiRoles.record });
     expect(screen.getByLabelText('1RM 204.3')).toBeTruthy();
   });

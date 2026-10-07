@@ -45,10 +45,11 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - takeScreenshot: "session-share-platform-share-sheet"
 # Dismiss without selecting a destination; this proves image launch/cancel only.
-- swipe:
-    start: "50%,55%"
-    end: "50%,95%"
-    duration: 500
+# Tap outside the share sheet, on the preview's static card: a swipe-down would
+# also drag the preview's page sheet closed where the sheet is a floating panel
+# (iOS 27) rather than a bottom sheet.
+- tapOn:
+    point: "50%,20%"
 - extendedWaitUntil:
     notVisible: "Copy"
     timeout: 10000

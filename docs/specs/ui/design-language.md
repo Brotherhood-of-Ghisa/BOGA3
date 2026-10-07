@@ -144,9 +144,10 @@ bold `record`, and earns a band on the containing card where the screen has one
 (the session view's cards, the exercise page's set list). Every other figure
 takes its row's colour and weight — **no screen bolds the best value in the
 current context**, which read as noise on device; `Stat` offers no `best`
-emphasis. Only the session's one record set is highlighted, never every
-qualifying row; which set that is, and what beats a record, is
-`tech/training-metrics-contract.md` §3.
+emphasis. Only the sets that took a record are highlighted, never every
+qualifying row: the exercise page's set list and the session cards show every
+record set, with one band line per record. Which sets those are, and
+what beats a record, is `tech/training-metrics-contract.md` §3.
 
 **State is carried by a control glyph**, not by a word: a filled check means
 done, an `accent` ring means current, a dashed ring means planned. Planned items

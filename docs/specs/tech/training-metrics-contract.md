@@ -151,12 +151,16 @@ sets (§1), including sessions with zero working sets. There are three kinds:
   a session's PRs, or PRs over a period, counts these
   (`sessionRecordKinds`). A group session's count is its group records, one
   per board taken (`tech/groups-contract.md`).
-- **The record set of a session** is the one set a screen highlights
-  (`design-language.md` §5). Among the session's working sets of the exercise,
+- **The record set of a session** is the one set the share image lists for an
+  exercise. Among the session's working sets of the exercise,
   across every block, it is the highest 1RM that beats the 1RM record. When no
   1RM does, it is the heaviest Weight that beats the Weight record. A tie keeps
   the set that reached the value first. Volume has no set: its record is a
   whole session's.
+- **A session's record sets** are every set that took a record: the session's
+  best 1RM when it beats the 1RM record, and its top Weight when it beats the
+  Weight record. One set may take both. Volume adds no set
+  (`deriveExercisePersonalRecord`).
 
 **Code.** `records.ts` holds the whole rule:
 
@@ -165,7 +169,8 @@ sets (§1), including sessions with zero working sets. There are three kinds:
 - `createRecordBook` is the fold. It returns each session's flags and the
   holders;
 - `sessionRecordKinds` lists the PRs an exercise's flags make;
-- `pickSessionRecordSet` picks the record set;
+- `deriveExercisePersonalRecord` (`session-insights`) takes a session's
+  record sets and Volume;
 - `compareRecordOrder` is the fold's order.
 
 `summarizeSessionBests` (`best-set.ts`) gives a session's values. These all
@@ -184,14 +189,13 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 
 | Screen | Records shown |
 | --- | --- |
-| Exercise page set list and band | The record set: 1RM, else Weight |
 | Exercise page records panel, exercise history `All-time bests` | All three holders, each with its session and gym |
-| Session view, completed-session cards, completion and share | The record set: 1RM, else Weight (`deriveExercisePersonalRecord`, from `loadEarlierBestsByDefinition`) |
+| Exercise page set list, session view, completed-session cards and completion | Every record kind: the record sets and Volume (`deriveExercisePersonalRecord`; the session cards from `loadEarlierBestsByDefinition`) |
+| Share image | The record set: 1RM, else Weight. An exercise with only a Volume record is not listed |
 | Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |
 
-Every screen that shows the record set highlights the figures it beat. A 1RM
-record set that is also heavier (or as heavy with more reps) than the Weight
-record highlights both. Every band reads the same words
+Every screen that shows a record set highlights the figures it beat: the 1RM
+record's 1RM and the Weight record's Weight. Every band reads the same words
 (`session-insights/record-band.ts`).
 
 Group boards keep their own contract (`tech/groups-contract.md`), but follow

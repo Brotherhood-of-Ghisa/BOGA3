@@ -35,33 +35,3 @@ export function ViewSessionOptionsSheet({ visible, deleted, onDismiss, onToggleD
     </Sheet>
   );
 }
-
-type ViewSessionExerciseSheetProps = {
-  // The exercise the sheet is open on; `null` hides it.
-  exercise: { id: string; name: string } | null;
-  onDismiss: () => void;
-  onAppend: (sessionExerciseId: string) => void;
-};
-
-// An exercise's ⋮: `Append to current session` copies its sets into the
-// active session as planned rows. An edge case, so it lives behind the ⋮.
-export function ViewSessionExerciseSheet({ exercise, onDismiss, onAppend }: ViewSessionExerciseSheetProps) {
-  return (
-    <Sheet
-      dismissLabel="Dismiss exercise options"
-      onDismiss={onDismiss}
-      testID="completed-session-detail-exercise-sheet"
-      title={exercise?.name}
-      visible={exercise !== null}>
-      {exercise ? (
-        <ListRow
-          accessibilityLabel={`Append ${exercise.name || 'exercise'} block to current session`}
-          label="Append to current session"
-          leading={<Icon color={uiRoles.ink} name="plus" size="md" />}
-          onPress={() => onAppend(exercise.id)}
-          testID={`completed-session-detail-append-exercise-button-${exercise.id}`}
-        />
-      ) : null}
-    </Sheet>
-  );
-}

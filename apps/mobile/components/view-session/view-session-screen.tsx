@@ -3,19 +3,19 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
-import { IconButton } from '@/components/ui/icon-button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 
-import { ViewSessionExerciseSheet, ViewSessionOptionsSheet } from './view-session-sheets';
+import { ViewSessionOptionsSheet } from './view-session-sheets';
 import { ViewSessionTopBar } from './view-session-top-bar';
 
 export type ViewSessionSummary = {
-  // `YYYY-MM-DD HH:mm`, as the completed edit's Start/End fields show them.
+  // `Afternoon training · 19 Feb` (`completedSessionTitle`).
+  title: string;
+  // `YYYY-MM-DD HH:mm`, as the completed edit's Start field shows it.
   start: string;
-  end: string;
   duration: string;
   gymName: string | null;
   deleted: boolean;
@@ -34,16 +34,14 @@ type ViewSessionScreenProps = {
   onBack: () => void;
   onEdit: () => void;
   onToggleDeleted: () => void;
-  onAppend: (sessionExerciseId: string) => void;
 };
 
 const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
 
 /**
  * View Session: a finished session, read-only (redesign, View Session restyle).
- * Facts, then local Summary / Sets sections. Editing
- * happens on the session view (`Edit`); the ⋮s hold what is rare: delete or
- * undelete the session, append an exercise to the current session.
+ * Facts, then local Summary / Sets sections. Editing happens on the session
+ * view (`Edit`); the ⋮ holds what is rare: delete or undelete the session.
  */
 export function ViewSessionScreen({
   summary,
@@ -55,10 +53,8 @@ export function ViewSessionScreen({
   onBack,
   onEdit,
   onToggleDeleted,
-  onAppend,
 }: ViewSessionScreenProps) {
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
-  const [exerciseSheet, setExerciseSheet] = useState<{ id: string; name: string } | null>(null);
 
   return (
     <Screen>
@@ -66,6 +62,7 @@ export function ViewSessionScreen({
         onBack={onBack}
         onEdit={summary.deleted ? undefined : onEdit}
         onOpenOptions={() => setIsOptionsVisible(true)}
+        title={summary.title}
       />
       <ScreenScroll keyboardShouldPersistTaps="handled" testID="completed-session-detail-screen">
         {summary.deleted ? (
@@ -81,19 +78,19 @@ export function ViewSessionScreen({
         ) : null}
         <SessionFactsCard
           facts={[
-            { label: 'Duration', value: summary.duration, testID: 'completed-session-detail-duration' },
             {
               label: 'Gym',
               value: summary.gymName?.trim() ? summary.gymName : 'No gym',
               kind: 'text',
               testID: 'completed-session-detail-gym',
             },
+            { label: 'Ex', spokenLabel: 'Exercises', value: String(model.cards.length), testID: 'completed-session-detail-exercises' },
             { label: 'Sets', value: String(model.workingSetCount), testID: 'completed-session-detail-sets' },
             { label: model.volumeNote && model.volume !== '—' ? 'Known vol' : 'Volume', value: model.volume, align: 'end', testID: 'completed-session-detail-volume' },
           ]}
           note={model.volumeNote}
           testID="completed-session-detail-summary"
-          times={{ start: summary.start, end: summary.end, testID: 'completed-session-detail-times' }}
+          times={{ start: summary.start, duration: summary.duration, testID: 'completed-session-detail-times' }}
         />
         <SegmentedControl
           accessibilityLabel="Session review section"
@@ -112,20 +109,10 @@ export function ViewSessionScreen({
               accessibilityLabel={[
                 card.name,
                 formatSetCount(card.setCount),
-                card.record?.spoken,
+                ...card.record.map((line) => line.spoken),
               ]
                 .filter(Boolean)
                 .join(', ')}
-              control={
-                <IconButton
-                  accessibilityLabel={`Options for ${card.name}`}
-                  name="more-vertical"
-                  onPress={() => setExerciseSheet({ id: card.id, name: card.name })}
-                  size="sm"
-                  testID={`completed-session-detail-exercise-options-${card.id}`}
-                  tone="muted"
-                />
-              }
               count={formatSetCount(card.setCount)}
               key={card.id}
               name={card.name}
@@ -145,14 +132,6 @@ export function ViewSessionScreen({
           onToggleDeleted();
         }}
         visible={isOptionsVisible}
-      />
-      <ViewSessionExerciseSheet
-        exercise={exerciseSheet}
-        onAppend={(sessionExerciseId) => {
-          setExerciseSheet(null);
-          onAppend(sessionExerciseId);
-        }}
-        onDismiss={() => setExerciseSheet(null)}
       />
     </Screen>
   );

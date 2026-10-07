@@ -479,13 +479,14 @@ export const loadEarlierBestsByDefinition = async (
 };
 
 /**
- * The records a session's sets are compared with (`pickSessionRecordSet`),
- * per definition, from `loadEarlierBestsByDefinition`.
+ * The records a session is compared with (`deriveExercisePersonalRecords`,
+ * `pickSessionRecordSet`), per definition, from `loadEarlierBestsByDefinition`.
  */
 export const recordBaselinesOf = (
   bestsByDefinition: ReadonlyMap<string, ExerciseBests>,
 ): Map<string, RecordBaseline> =>
-  new Map(Array.from(bestsByDefinition, ([definitionId, { oneRepMax, topWeight }]) => [definitionId, {
+  new Map(Array.from(bestsByDefinition, ([definitionId, { oneRepMax, topWeight, volume }]) => [definitionId, {
     oneRepMax: oneRepMax?.value ?? null,
     weight: topWeight ? { weight: topWeight.weight, reps: topWeight.reps } : null,
+    volume: volume?.value ?? null,
   }]));

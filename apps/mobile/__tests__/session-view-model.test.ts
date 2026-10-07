@@ -9,6 +9,7 @@ import {
 } from '@/src/session-recorder/session-model';
 import {
   buildSessionViewModel,
+  completedSessionTitle,
   formatElapsed,
   sessionTitleForStart,
 } from '@/src/session-recorder/session-view-model';
@@ -46,9 +47,10 @@ const blankSet = (id: string): SessionSet => ({
   performanceStatus: 'unperformed',
 });
 
-const baseline = (oneRepMax: number, weight: number, reps: number): RecordBaseline => ({
+const baseline = (oneRepMax: number, weight: number, reps: number, volume: number | null = null): RecordBaseline => ({
   oneRepMax,
   weight: { weight, reps },
+  volume,
 });
 
 const session = (exercises: Session['exercises']): Session => ({
@@ -89,54 +91,89 @@ describe('session view model', () => {
   it('highlights nothing without a record', () => {
     const [card] = buildSessionViewModel(session([bench]), new Map()).cards;
     expect(card.rows.some((row) => row.oneRepMaxRecord || row.weightRecord)).toBe(false);
-    expect(card.record).toBeNull();
+    expect(card.record).toEqual([]);
   });
 
   const flags = (card: { rows: { id: string; oneRepMaxRecord: boolean; weightRecord: boolean }[] }) =>
     card.rows.flatMap(({ id, oneRepMaxRecord, weightRecord }) =>
       oneRepMaxRecord || weightRecord ? [{ id, oneRepMaxRecord, weightRecord }] : []);
+  const labels = (card: { record: { label: string; set: string | null }[] }) =>
+    card.record.map(({ label, set }) => [label, set]);
 
   it('marks the 1RM record set only when today beats the loaded records, and not before they load', () => {
     const beaten = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(197.9, 165, 5)]])).cards[0];
-    expect(beaten.record).toEqual({ kind: 'oneRepMax', label: 'New 1RM record · 204.3', spoken: 'new 1RM record 204.3' });
+    expect(beaten.record).toEqual([{
+      key: 'b2', label: 'New 1RM record · 204.3', set: '160.0 × 8', spoken: 'new 1RM record 204.3 on 160.0 × 8',
+    }]);
     expect(flags(beaten)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
 
     const notBeaten = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(210, 165, 5)]])).cards[0];
-    expect(notBeaten.record).toBeNull();
+    expect(notBeaten.record).toEqual([]);
 
     // No earlier record for the exercise (first time, or not loaded yet): no record.
     const firstTime = buildSessionViewModel(session([bench]), new Map([['def_other', baseline(100, 100, 1)]])).cards[0];
-    expect(firstTime.record).toBeNull();
+    expect(firstTime.record).toEqual([]);
   });
 
-  it('marks a 1RM record set that also sets the Weight record on both figures, under one 1RM band', () => {
+  it('marks the 1RM and Weight records on their own sets, a band line each', () => {
+    // 160 × 8 has the best 1RM; 162.5 × 6 is the top Weight. Both beat.
     const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(197.9, 150, 5)]])).cards;
-    expect(flags(card)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: true }]);
-    expect(card.record?.kind).toBe('oneRepMax');
+    expect(flags(card)).toEqual([
+      { id: 'b2', oneRepMaxRecord: true, weightRecord: false },
+      { id: 'b3', oneRepMaxRecord: false, weightRecord: true },
+    ]);
+    expect(labels(card)).toEqual([['New 1RM record · 204.3', '160.0 × 8'], ['New top weight', '162.5 × 6']]);
+  });
+
+  it('names one set that takes both strength records on one line', () => {
+    const press = { ...bench, sets: [doneSet('p1', '100', '5', 'rir_1'), doneSet('p2', '120', '5', 'rir_1')] };
+    const [card] = buildSessionViewModel(session([press]), new Map([['def_bench', baseline(100, 110, 5)]])).cards;
+    expect(flags(card)).toEqual([{ id: 'p2', oneRepMaxRecord: true, weightRecord: true }]);
+    expect(card.record).toEqual([{
+      key: 'p2',
+      label: `New 1RM · ${card.rows[1].oneRepMax} + top weight`,
+      set: '120.0 × 5',
+      spoken: `new 1RM ${card.rows[1].oneRepMax} and top weight 120.0 × 5`,
+    }]);
   });
 
   it('falls back to the heaviest Weight record when no 1RM beats the record', () => {
     // 160 × 8 beats 160 × 6 on reps, but 162.5 × 6 is heavier: it is the record set.
     const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(210, 160, 6)]])).cards;
     expect(flags(card)).toEqual([{ id: 'b3', oneRepMaxRecord: false, weightRecord: true }]);
-    expect(card.record).toEqual({
-      kind: 'weight', label: 'New top weight · 162.5 × 6', spoken: 'new top weight 162.5 × 6',
-    });
+    expect(card.record).toEqual([{ key: 'b3', label: 'New top weight', set: '162.5 × 6', spoken: 'new top weight 162.5 × 6' }]);
   });
 
-  it('picks one record set across the blocks of an exercise, and bands only its block', () => {
+  it('adds a Volume line on the exercise\'s first block when its session volume beats the record', () => {
+    const later = { ...bench, id: 'bench-2', sets: [doneSet('c1', '150', '8', 'rir_2')] };
+    const model = buildSessionViewModel(session([bench, later]), new Map([['def_bench', baseline(210, 200, 1, 1)]]));
+    expect(labels(model.cards[0])).toEqual([[`New volume record · ${model.volume}`, null]]);
+    expect(model.cards[0].record[0].spoken).toBe(`new volume record ${model.volume}`);
+    expect(model.cards[1].record).toEqual([]);
+
+    const notBeaten = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(210, 200, 1, 1e9)]]));
+    expect(notBeaten.cards[0].record).toEqual([]);
+  });
+
+  it('bands each record on the block holding its set, across the blocks of an exercise', () => {
     const later = { ...bench, id: 'bench-2', sets: [doneSet('c1', '150', '8', 'rir_2')] };
     const cards = buildSessionViewModel(session([bench, later]), new Map([['def_bench', baseline(197.9, 165, 5)]])).cards;
     expect(flags(cards[0])).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
-    expect(cards[0].record?.label).toBe('New 1RM record · 204.3');
+    expect(labels(cards[0])).toEqual([['New 1RM record · 204.3', '160.0 × 8']]);
     expect(flags(cards[1])).toEqual([]);
-    expect(cards[1].record).toBeNull();
+    expect(cards[1].record).toEqual([]);
+
+    const heavierLater = { ...later, sets: [doneSet('c1', '170', '2', 'rir_0')] };
+    const split = buildSessionViewModel(session([bench, heavierLater]), new Map([['def_bench', baseline(197.9, 165, 5)]])).cards;
+    expect(labels(split[0])).toEqual([['New 1RM record · 204.3', '160.0 × 8']]);
+    expect(labels(split[1])).toEqual([['New top weight', '170.0 × 2']]);
+    expect(flags(split[1])).toEqual([{ id: 'c1', oneRepMaxRecord: false, weightRecord: true }]);
   });
 
   it('shows no record against a zero baseline', () => {
-    const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(0, 0, 10)]])).cards;
+    const [card] = buildSessionViewModel(session([bench]), new Map([['def_bench', baseline(0, 0, 10, 0)]])).cards;
     expect(flags(card)).toEqual([]);
-    expect(card.record).toBeNull();
+    expect(card.record).toEqual([]);
   });
 
   it('never marks a warm-up heavier than the working sets as the record', () => {
@@ -146,11 +183,11 @@ describe('session view model', () => {
     // The warm-up keeps its own figures, but the record is the best working set.
     expect(card.rows[0]).toMatchObject({ typeLabel: 'W-Up', weightReps: '250.0 × 5', volume: '1250', oneRepMaxRecord: false, weightRecord: false });
     expect(flags(card)).toEqual([{ id: 'b2', oneRepMaxRecord: true, weightRecord: false }]);
-    expect(card.record?.label).toBe('New 1RM record · 204.3');
+    expect(labels(card)).toEqual([['New 1RM record · 204.3', '160.0 × 8']]);
 
     // Only the warm-up beats the records: no record at all.
     const [onlyWarmUpBeats] = buildSessionViewModel(session([heavyWarmUp]), new Map([['def_bench', baseline(210, 200, 1)]])).cards;
-    expect(onlyWarmUpBeats.record).toBeNull();
+    expect(onlyWarmUpBeats.record).toEqual([]);
     expect(flags(onlyWarmUpBeats)).toEqual([]);
   });
 
@@ -198,6 +235,11 @@ describe('session view model', () => {
     expect(at(20, 59)).toBe('Evening training');
     expect(at(21)).toBe('Night training');
     expect(at(0)).toBe('Night training');
+  });
+
+  it('titles a finished session by its time of day and local start date', () => {
+    expect(completedSessionTitle(new Date(2026, 1, 19, 16, 0))).toBe('Afternoon training · 19 Feb');
+    expect(completedSessionTitle(new Date(2026, 11, 3, 6, 30))).toBe('Morning training · 3 Dec');
   });
 });
 
