@@ -118,6 +118,107 @@ apply_pending_local_migrations() {
   run_supabase db push --local --include-all --yes >/dev/null
 }
 
+# ---------- once-per-gate stamp ----------
+#
+# `./boga test <gate>` exports BOGA_GATE_RUN_ID, one value per gate run. The
+# full path below ends by stamping a `baseline_ready` row in
+# public.local_runtime_bootstrap_markers with that id, a hash of the inputs it
+# applied, and a hash of the state it left. A later lane of the same gate skips
+# the repairs only if the stamp is there and both hashes still match:
+#   - any db reset re-runs seed.sql, which truncates the markers table, so the
+#     stamp dies with the database whichever path reset it;
+#   - the state hash covers everything the repairs fix (applied migrations,
+#     fixture principals, the fixture auth users, the group-eval kick URL), so
+#     a body that changed any of it sends the next lane down the full path.
+# No gate id (a lane run by name, a direct script call) → always the full path.
+BASELINE_STAMP_MARKER="baseline_ready"
+
+# Inputs: what the full path applies (migrations, seed) and the scripts that
+# apply it, fixture constants included.
+baseline_inputs_hash() {
+  cat "${SUPABASE_DIR}"/migrations/*.sql "${SUPABASE_DIR}/seed.sql" \
+    "${SCRIPT_DIR}"/*.sh | shasum -a 1 | cut -c1-16
+}
+
+# Every USER_*_EMAIL in auth-fixture-constants.sh, so a new fixture user is
+# hashed without a second list to keep in step.
+baseline_fixture_emails() {
+  (
+    # shellcheck disable=SC1091
+    source "${SCRIPT_DIR}/auth-fixture-constants.sh"
+    local var
+    for var in ${!USER_@}; do
+      [[ "${var}" == *_EMAIL ]] && printf '%s,' "${!var}"
+    done
+  )
+}
+
+# Prints "<stamp details>|<state hash>"; the details are empty when no stamp.
+baseline_stamp_and_state() {
+  local container
+  container="$(resolve_db_container)" || return 1
+  docker exec -i "${container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq \
+    -v marker="${BASELINE_STAMP_MARKER}" -v emails="$(baseline_fixture_emails)" <<'SQL'
+select coalesce((select details from public.local_runtime_bootstrap_markers where marker = :'marker'), '')
+  || '|' || md5(row(
+    (select string_agg(m.version, ',' order by m.version)
+       from supabase_migrations.schema_migrations m),
+    (select string_agg(row(p.fixture_key, p.subject_uuid, p.subject_kind, p.email)::text, ';' order by p.fixture_key)
+       from public.dev_fixture_principals p),
+    (select string_agg(row(u.id, u.email, u.encrypted_password, u.email_confirmed_at, u.banned_until, u.deleted_at)::text, ';' order by u.email)
+       from auth.users u where u.email = any(string_to_array(:'emails', ','))),
+    app_public.group_eval_config('group_eval_url')
+  )::text);
+SQL
+}
+
+baseline_stamp_details() {
+  printf 'gate=%s inputs=%s state=%s' "${BOGA_GATE_RUN_ID}" "$1" "$2"
+}
+
+# True when this gate already ensured the baseline and nothing has changed it.
+baseline_stamp_current() {
+  [[ -n "${BOGA_GATE_RUN_ID:-}" ]] || return 1
+
+  local out details state
+  if ! out="$(baseline_stamp_and_state)"; then
+    echo "[supabase] baseline stamp check failed; running the full baseline"
+    return 1
+  fi
+  details="${out%|*}"
+  state="${out##*|}"
+
+  if [[ -z "${details}" ]]; then
+    echo "[supabase] no baseline stamp (first lane of this gate, or the database was reset); running the full baseline"
+    return 1
+  fi
+  if [[ "${details}" != "gate=${BOGA_GATE_RUN_ID} "* ]]; then
+    echo "[supabase] baseline stamp is from another gate run; running the full baseline"
+    return 1
+  fi
+  if [[ "${details}" != "$(baseline_stamp_details "$(baseline_inputs_hash)" "${state}")" ]]; then
+    echo "[supabase] baseline changed since this gate stamped it (migrations, seed, fixtures or kick URL); running the full baseline"
+    return 1
+  fi
+  return 0
+}
+
+write_baseline_stamp() {
+  [[ -n "${BOGA_GATE_RUN_ID:-}" ]] || return 0
+
+  local out container
+  out="$(baseline_stamp_and_state)"
+  container="$(resolve_db_container)"
+  docker exec -i "${container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq \
+    -v marker="${BASELINE_STAMP_MARKER}" \
+    -v details="$(baseline_stamp_details "$(baseline_inputs_hash)" "${out##*|}")" >/dev/null <<'SQL'
+insert into public.local_runtime_bootstrap_markers (marker, details)
+values (:'marker', :'details')
+on conflict (marker) do update set details = excluded.details, inserted_at = timezone('utc', now());
+SQL
+  echo "[supabase] stamped baseline for gate ${BOGA_GATE_RUN_ID}"
+}
+
 ensure_runtime_and_baseline() {
   local runtime_was_running=0
 
@@ -132,6 +233,12 @@ ensure_runtime_and_baseline() {
   fi
 
   ensure_function_routes_registered
+
+  if (( runtime_was_running == 1 )) && baseline_stamp_current; then
+    echo "[supabase] local runtime baseline ready (verified against gate ${BOGA_GATE_RUN_ID}'s stamp; repairs skipped)"
+    return 0
+  fi
+
   apply_pending_local_migrations
 
   # The group evaluator's pg_net kick needs this stack's in-network URL (Vault;
@@ -152,6 +259,7 @@ ensure_runtime_and_baseline() {
   echo "[supabase] verifying baseline fixtures after auth provisioning"
   "${SCRIPT_DIR}/smoke-seed.sh"
 
+  write_baseline_stamp
   echo "[supabase] local runtime baseline ready"
 }
 
