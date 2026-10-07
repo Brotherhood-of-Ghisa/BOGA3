@@ -172,16 +172,16 @@ export function PageSheet({
   const dismiss = useCallback(() => {
     if (!dismissDisabled) onDismiss();
   }, [dismissDisabled, onDismiss]);
-  // iOS sends this only for a completed swipe (never while `dismissDisabled`);
-  // Android for Back.
+  // iOS also sends this for a blocked swipe attempt; Android for Back.
   const handleRequestClose = useCallback(() => {
+    if (dismissDisabled) return;
     if (Platform.OS === 'ios') {
       swipedInstance.current = instance;
       onDismiss();
       return;
     }
     dismiss();
-  }, [dismiss, instance, onDismiss]);
+  }, [dismiss, dismissDisabled, instance, onDismiss]);
   const handleNativeDismiss = useCallback(() => {
     // A swiped sheet reported its dismissal when the host hid it.
     if (swipedInstance.current !== instance) onDismissed?.();
