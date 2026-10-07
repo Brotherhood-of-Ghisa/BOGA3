@@ -58,8 +58,9 @@ planned and warm-up rows included. Figures not yet realised (planned rows)
 are faded. A warm-up row shows its real 1RM and Volume, which describe that
 row only. A set feeds records only as [[set.eligibility]] allows: a working
 set can make a 1RM or Weight record, a volume-included set a Volume record,
-and a set that is neither is never a record, PR or best. The only highlight
-on a set list is the exercise's one record set.
+and a set that is neither is never a record, PR or best. The only highlights
+on a set list are the exercise's record sets: the set that took the 1RM record
+and the set that took the Weight record (one set may take both).
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.
