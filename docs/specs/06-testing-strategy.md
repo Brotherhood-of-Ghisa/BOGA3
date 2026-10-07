@@ -66,7 +66,8 @@ to what only that lane can prove.
    lane routed by `scripts/triggers.tsv`, never in a default gate. Within a
    lane it runs **last**: it leaves no configured baseline for the bodies after
    it, and a body that needs one then fails for a reason that looks nothing
-   like the cause.
+   like the cause. It marks the stack first (`mark_stack_needs_reset`) and
+   never resets on exit; the next preflight resets it.
 4. **Bodies are chapters; lanes are concepts.** Split a large surface into
    several bodies in one lane for readability. Splitting it into lanes instead
    makes every piece pay the baseline preflight again.
@@ -199,7 +200,7 @@ the name does not give away.
 | `groups-contract` | The group domain rules of `docs/specs/tech/groups-contract.md`: the share ledger across join/leave/rejoin, stream and session detail, edit/tombstone flow-through, share-trigger failure isolation, and the membership RPC matrix including error tokens and direct-PostgREST denial. Hermetic — it provisions and deletes its own users. |
 | `groups-leaderboards` | The evaluator: boards, certification, bodyweight policies, week summary, with Edge assertions made deterministic by direct-drain mode. |
 | `groups-api-live` | The app's own groups client (`apps/mobile/src/groups/api.ts`) against the live server, so a drifted RPC name, parameter or response shape fails here instead of on a device. |
-| `groups-protocol4` | The one-way competition cutover of `docs/specs/tech/group-competition-contract.md`: the populated pre-cutover→protocol-4 upgrade, publication and public privacy, plus the client's protocol-4 wire. An `extra` lane, not in `boga test backend`: activation has no rollback RPC, so each run rebuilds the stack. Run it for competition migrations and scoring changes (`boga test for` prints it). |
+| `groups-protocol4` | The one-way competition cutover of `docs/specs/tech/group-competition-contract.md`: the populated pre-cutover→protocol-4 upgrade, publication and public privacy, plus the client's protocol-4 wire. An `extra` lane, not in `boga test backend`: activation has no rollback RPC, so the next preflight rebuilds the stack. Run it for competition migrations and scoring changes (`boga test for` prints it). |
 | `sync-drift` | Client Drizzle schemas vs the introspected server schema: indexes, triggers, RLS policy inventory and body hashes, soft-delete and sync columns, topological FK order. `--strict` promotes warn-only to failure. It resets the local database itself, so it is the gate's single positive drift check — `sync-v2-e2e` proves only the negative (synthetic drift) case. |
 | `sync-v2-e2e` | Integration assertions across the as-built stack, including push→pull parity over every data-scope entity and tombstone visibility. Its drift body proves only the checker's CLI wiring, with no database reset: synthetic drift fails the run, and the mutated file is restored byte-exactly. The column rules are unit-tested; the positive case is `sync-drift`'s. |
 | `sync-infra` | The cross-stack layer above — the one lane whose body is frontend and whose infra is backend. Runs last in the backend gate. |
@@ -221,7 +222,8 @@ Applies to every lane that hits a running stack rather than a mocked client.
 
 - **Enforcement:** `supabase/scripts/ensure-local-runtime-baseline.sh` runs
   before any real-instance lane (the wrappers call it). Runtime down → start,
-  reset/seed, provision fixtures. Runtime up → reuse as-is with **no reset**,
+  reset/seed, provision fixtures. Runtime up → reuse as-is with **no reset**
+  (a marked or protocol-4-active stack is reset),
   refresh stale Edge Function routing, apply pending migrations, verify baseline
   rows, re-provision fixtures idempotently.
 - **Once per gate:** `./boga test <gate>` exports one `BOGA_GATE_RUN_ID`. The

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Temporarily activate protocol 4 on this leased local stack for UI/client proof.
-# Activation is one-way; restore an initially pending stack with a full reset.
+# Activate protocol 4 on this leased local stack for UI/client proof, then run
+# the command. Activation is one-way: an initially pending stack is marked first
+# and the next baseline preflight resets it (ensure-local-runtime-baseline.sh).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/_common.sh"
@@ -9,19 +10,8 @@ load_supabase_status_env
 db_container="$(resolve_db_container)"
 was_active="$(docker exec "${db_container}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atqc 'select app_public.group_competition_active();')"
 activation_body="$(mktemp)"
-cleanup() {
-  local status=$?
-  trap - EXIT
-  rm -f "${activation_body}"
-  if [[ "${was_active}" == f ]]; then
-    local reset_log
-    reset_log="$(mktemp)"
-    if ! "${REPO_ROOT}/boga" db reset >"${reset_log}" 2>&1; then cat "${reset_log}" >&2; status=1; fi
-    rm -f "${reset_log}"
-  fi
-  exit "${status}"
-}
-trap cleanup EXIT
+trap 'rm -f "${activation_body}"' EXIT
+[[ "${was_active}" == t ]] || mark_stack_needs_reset 'with-local-group-competitions.sh activated protocol 4'
 activation_status="$(curl --silent --show-error -X POST -H "apikey: ${ANON_KEY}" \
   -H "Authorization: Bearer ${SERVICE_ROLE_KEY}" -H 'Content-Profile: app_public' \
   -H 'Content-Type: application/json' -H 'x-boga-group-contract: 4' \
