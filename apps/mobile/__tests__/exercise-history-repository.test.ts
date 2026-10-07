@@ -164,7 +164,6 @@ describe('aggregateExerciseHistory', () => {
     const warmUpOnly = summary.sessions.find((entry) => entry.sessionId === 's1');
     expect(warmUpOnly?.sets.map((set) => set.setId)).toEqual(['st-1']);
     expect(warmUpOnly).toMatchObject({ workingSetCount: 0, totalVolume: 0, estimatedOneRepMax: null, topWeightSet: null });
-    expect(warmUpOnly?.volumeCoverage).toMatchObject({ eligibleSetCount: 0, complete: true });
   });
 
   it('tie-breaks top weight by max reps at that weight', () => {

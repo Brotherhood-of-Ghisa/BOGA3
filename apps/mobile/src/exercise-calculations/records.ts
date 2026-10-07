@@ -95,6 +95,6 @@ export const compareRecordOrder = (
 export type RecordBaseline = {
   oneRepMax: number | null;
   weight: WeightRecordValue | null;
-  // The best complete Volume.
+  // The best Volume; null when its sum is not finite.
   volume: number | null;
 };

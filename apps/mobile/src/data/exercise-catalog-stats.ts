@@ -26,7 +26,6 @@ export type ExerciseAggregate = {
   sessionCount: number;
   workingSetCount: number;
   totalVolume: number | null;
-  knownVolume?: number | null;
   estimatedOneRepMax: number | null;
 };
 
@@ -182,7 +181,6 @@ const emptyAggregate = (exerciseDefinitionId: string): ExerciseAggregate => ({
   sessionCount: 0,
   workingSetCount: 0,
   totalVolume: 0,
-  knownVolume: 0,
   estimatedOneRepMax: null,
 });
 
@@ -273,8 +271,8 @@ export const aggregateExerciseCatalogStats = (
     const aggregate = aggregatesById.get(defId) ?? emptyAggregate(defId);
     aggregatesById.set(defId, aggregate);
     if (volumeIncluded) {
-      aggregate.knownVolume = addFiniteVolume(aggregate.knownVolume, metric.volumeKgReps ?? 0);
-      aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps);
+      // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
+      aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps ?? 0);
     }
     if (!working) continue;
     addWorkingSetToAggregate(aggregate, metric);

@@ -84,7 +84,8 @@ it('keeps rest, known-zero and unavailable training separate, tappable and unfil
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('?');
   expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('Rest');
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toContain('unavailable or incomplete');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel).toBe('Week of 2026-09-28, Volume unavailable');
+  expect(screen.getByText('?: unavailable; excluded from the average')).toBeTruthy();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', borderWidth: 2 });
   expect(style('bars-heatmap-bar-2026-09-21')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
   fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-21'));
@@ -139,8 +140,8 @@ it('shows only the selected banner, preserves full coverage copy and uses one ac
       metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
       view="weekly" lookbackWeeks={8} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
       selectedWeekKey={key} onSelectWeek={setKey} todayDateKey={TODAY}
-      dailyMetrics={[{ ...day('2026-09-28', null), knownVolume: 40 }]}
-      weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, knownVolume: 40, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />;
+      dailyMetrics={[day('2026-09-28', null)]}
+      weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />;
   }
   render(<SelectedSheet />);
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
@@ -151,7 +152,7 @@ it('shows only the selected banner, preserves full coverage copy and uses one ac
   expect(weekly.parent?.type).not.toBe(ScrollView);
   fireEvent.press(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28'));
   expect(screen.getByTestId('stats-exercise-history-week-banner-range')).toHaveTextContent('28 Sept 2026 – 4 Oct 2026');
-  expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent('Volume: 40 · incomplete');
+  expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent('Volume: —');
   fireEvent.press(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28'));
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
 });

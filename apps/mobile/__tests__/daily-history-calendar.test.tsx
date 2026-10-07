@@ -64,14 +64,15 @@ it('exposes read-only day and week values without selection or black outlines', 
   expect(screen.queryByTestId('calendar-heatmap-day-detail')).toBeNull();
 });
 
-it('distinguishes blank rest, numeric zero, incomplete load, future days and future weeks', () => {
-  draw('totalVolume', [sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null, knownVolume: 123 }]);
+it('distinguishes blank rest, numeric zero, an overflowed volume, future days and future weeks', () => {
+  draw('totalVolume', [sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01-value')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01').props.accessibilityLabel).toContain('Rest');
   expect(screen.queryAllByText('Rest')).toEqual([]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-02-value')).toHaveTextContent('0');
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03-value')).toHaveTextContent('?');
-  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toContain('known subtotal 123');
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toBe('2026-10-03, Volume unavailable');
+  expect(screen.queryByText(/incomplete/)).toBeNull();
   expect(style('calendar-heatmap-cell-2026-10-03').borderStyle).toBe('dashed');
   const future = screen.getByLabelText('2026-10-07, Future, no observed value');
   expect(future).toHaveProp('accessibilityRole', 'text');

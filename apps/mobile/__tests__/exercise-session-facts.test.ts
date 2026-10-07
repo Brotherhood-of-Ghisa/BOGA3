@@ -230,10 +230,10 @@ describe('exercise session facts — rows and reads', () => {
       // The 0 kg Squat session sets no record.
       [SQUAT, { oneRepMax: null, weight: null, volume: null }],
     ]));
-    // A row with eligible sets but no 1RM (an unavailable load) or complete volume sets no bar.
+    // A row with eligible sets but no 1RM (an unavailable load) or volume (an overflowed sum) sets no bar.
     db().insert(exerciseSessionFacts).values({
       sessionId: 'a-early', exerciseDefinitionId: DIP, achievedAt: day(1), bestE1rmKg: null,
-      volumeComplete: false, workingSets: 1, prE1rm: false, prWeight: false, prVolume: false,
+      workingSets: 1, prE1rm: false, prWeight: false, prVolume: false,
     }).run();
     expect(await baselines({ sessionId: 'B-target', completedAt: day(1) }, [DIP]))
       .toEqual(new Map([[DIP, { oneRepMax: null, weight: null, volume: null }]]));
@@ -249,7 +249,7 @@ describe('exercise session facts — rows and reads', () => {
     db().delete(exerciseSessionFactsStale).run();
     db().insert(exerciseSessionFacts).values({
       sessionId: 's1', exerciseDefinitionId: BENCH, achievedAt: day(1),
-      volumeComplete: true, workingSets: 1, prE1rm: true, prWeight: false, prVolume: false,
+      workingSets: 1, prE1rm: true, prWeight: false, prVolume: false,
     }).onConflictDoNothing().run();
 
     expect(await loadExerciseSessionFacts(BENCH)).toEqual([]);

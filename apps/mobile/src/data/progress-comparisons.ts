@@ -3,15 +3,17 @@ import { collectMuscleSetContributions, type MuscleAnalyticsInput, type MuscleSe
 
 export type ProgressPeriodValues = {
   workingSetCount: number;
+  /** Null only when the sum is not finite (`sumVolume`). */
   totalVolume: number | null;
-  knownVolume: number | null;
   volumeSetCount: number;
-  knownVolumeSetCount: number;
 };
 
-/** Same Volume comparison semantics as Progress, without display strings. */
+/**
+ * Same Volume comparison semantics as Progress, without display strings.
+ * `unavailable`: either sum is not finite.
+ */
 export type ProgressVolumeChange =
-  | { kind: 'incomplete' | 'empty' | 'new' | 'increased' }
+  | { kind: 'unavailable' | 'empty' | 'new' | 'increased' }
   | { kind: 'percent'; percent: number };
 
 export type ProgressComparison = {
@@ -42,7 +44,7 @@ export type ProgressComparisonPeriods = {
 
 export const compareProgressVolume = (current: number | null, previous: number | null): ProgressVolumeChange => {
   if (current === null || previous === null || !Number.isFinite(current) || !Number.isFinite(previous)) {
-    return { kind: 'incomplete' };
+    return { kind: 'unavailable' };
   }
   if (current === 0 && previous === 0) return { kind: 'empty' };
   if (previous === 0) return { kind: 'new' };
@@ -52,8 +54,7 @@ export const compareProgressVolume = (current: number | null, previous: number |
 
 type PeriodAccumulator = ProgressPeriodValues & { workingSetIdentities: Set<string> };
 const emptyPeriod = (): PeriodAccumulator => ({
-  workingSetCount: 0, totalVolume: 0, knownVolume: 0,
-  volumeSetCount: 0, knownVolumeSetCount: 0, workingSetIdentities: new Set(),
+  workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, workingSetIdentities: new Set(),
 });
 
 const accumulate = (values: PeriodAccumulator, contribution: MuscleSetContribution): void => {
@@ -61,9 +62,8 @@ const accumulate = (values: PeriodAccumulator, contribution: MuscleSetContributi
   values.workingSetCount = values.workingSetIdentities.size;
   if (!contribution.volumeIncluded) return;
   values.volumeSetCount += 1;
-  if (contribution.weightedVolume !== null) values.knownVolumeSetCount += 1;
-  values.knownVolume = addFiniteVolume(values.knownVolume, contribution.weightedVolume ?? 0);
-  values.totalVolume = addFiniteVolume(values.totalVolume, contribution.weightedVolume);
+  // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
+  values.totalVolume = addFiniteVolume(values.totalVolume, contribution.weightedVolume ?? 0);
 };
 
 const periodValues = ({ workingSetIdentities: _identities, ...values }: PeriodAccumulator): ProgressPeriodValues => values;

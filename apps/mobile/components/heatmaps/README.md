@@ -30,7 +30,7 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: savedLookbackWeeks 
 ```
 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
-highestWeight, knownVolume? }`) comes from the muscle/exercise analytics in `src/data`; the
+highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screen already loads powers the sheet's week banner.
 Muscle history offers per-side, role-weighted `totalVolume`, and
 `workingSetCount` ([[muscle.set-count]]); exercise Volume and 1RM use the current private calculation
@@ -40,7 +40,8 @@ raw entered kg, and every exercise uses the same labels.
 **Exercise metrics and Volume buckets** are min–max over the window (`getCalendarHeatmapBucket`): the
 smallest positive value is bucket 1, the largest bucket 4, and zero is bucket 0.
 `hasTraining` distinguishes a known zero from rest in tiles and accessibility;
-`unavailable` preserves missing or incomplete load instead of treating it as zero.
+`unavailable` marks a figure that cannot be shown (a Volume sum that is not
+finite) instead of treating it as zero.
 Muscle Sets colour uses per-muscle working counts (`workingSetCountsByMuscle`)
 against one shared weekly target, capped before group averaging and including
 zero muscles. Daily and weekly cells use that same target, independent of look-back;
@@ -51,8 +52,8 @@ Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
 unknown load never gets a filled length, rest reads `Rest`, and known zero reads `0`.
 Only known training weeks contribute to the 12-week average (including zeros);
-rest and unavailable weeks do not. Incomplete volume is never plotted as a full
-total: daily cells are dashed, weekly cells show `?`, and accessible labels retain known coverage.
+rest and unavailable weeks do not. A Volume sum that is not finite is never
+plotted: its cells are dashed, show `?`, and read `Volume unavailable`.
 
 ## Props & selection
 

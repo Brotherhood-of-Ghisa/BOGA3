@@ -45,10 +45,9 @@ const reconcile = (rows: ProgressMuscleComparison[], source: StatsAggregationInp
     for (const muscle of rows) {
       const expected = oracle.muscleFamilies.flatMap(family => family.muscles).find(row => row.muscleGroupId === muscle.muscleGroupId);
       expect(muscle[period]).toMatchObject({ workingSetCount: expected!.workingSetCount,
-        totalVolume: expected!.totalVolume, knownVolume: expected!.knownVolume });
+        totalVolume: expected!.totalVolume });
       expect(muscle.exercises.reduce((sum, row) => sum + row[period].workingSetCount, 0)).toBe(muscle[period].workingSetCount);
       expect(muscle.exercises.reduce<number | null>((sum, row) => addFiniteVolume(sum, row[period].totalVolume), 0)).toBe(muscle[period].totalVolume);
-      expect(muscle.exercises.reduce<number | null>((sum, row) => addFiniteVolume(sum, row[period].knownVolume), 0)).toBe(muscle[period].knownVolume);
       expect(muscle.exercises.reduce((sum, row) => sum + row[period].volumeSetCount, 0)).toBe(muscle[period].volumeSetCount);
       expect(muscle.exercises.reduce((sum, row) => sum + row.workingSetChange, 0)).toBe(muscle.workingSetChange);
     }
@@ -117,28 +116,27 @@ it('retains volume-only exercises even at zero load and omits planned, unperform
   source.exerciseSets.push({ id: 'unlinked', sessionExerciseId: 'unlinked', setType: null, weightValue: '100', repsValue: '5' });
   const rows = aggregateProgressComparisons(source, periods);
   expect(rows[0].exercises).toHaveLength(1);
-  expect(rows[0].exercises[0].current).toEqual({ workingSetCount: 0, totalVolume: 0, knownVolume: 0, volumeSetCount: 1, knownVolumeSetCount: 1 });
+  expect(rows[0].exercises[0].current).toEqual({ workingSetCount: 0, totalVolume: 0, volumeSetCount: 1 });
   reconcile(rows, source);
 });
 
-it('keeps incomplete Volume separate from zero and counts included-set coverage', () => {
+it('leaves sets whose load cannot be calculated out of Volume ([[copy.no-inline-explanation]])', () => {
   const source = input();
   source.bodyweightCalculationsEnabled = true;
   source.exerciseDefinitions![0].bodyweightContribution = 2; // Malformed historical metadata: unknown load.
   const rows = aggregateProgressComparisons(source, periods);
-  expect(rows[0]).toMatchObject({ current: { workingSetCount: 2, totalVolume: null,
-    knownVolume: 0, volumeSetCount: 2, knownVolumeSetCount: 0 }, volumeChange: { kind: 'incomplete' } });
-  expect(rows[0].exercises[0].volumeChange).toEqual({ kind: 'incomplete' });
+  expect(rows[0]).toMatchObject({ current: { workingSetCount: 2, totalVolume: 0, volumeSetCount: 2 } });
+  expect(rows[0].volumeChange.kind).not.toBe('unavailable');
   reconcile(rows, source);
 });
 
-it('preserves a known subtotal when one exercise has unknown Volume', () => {
+it('shows the Volume of the rest when one exercise has unknown load', () => {
   const source = input();
   source.bodyweightCalculationsEnabled = true;
   source.exerciseDefinitions![1].bodyweightContribution = 2;
   source.sessions[1].completedAt = new Date('2026-05-20T11:00:00Z');
   const rows = aggregateProgressComparisons(source, periods);
-  expect(rows[0].current).toMatchObject({ totalVolume: null, knownVolume: 125, volumeSetCount: 3, knownVolumeSetCount: 2 });
+  expect(rows[0].current).toMatchObject({ totalVolume: 125, volumeSetCount: 3 });
   reconcile(rows, source);
 });
 
@@ -164,8 +162,8 @@ it('uses stable IDs and falls back to recorded labels only when definition names
 });
 
 it.each([
-  [null, 10, { kind: 'incomplete' }], [10, null, { kind: 'incomplete' }],
-  [Infinity, 10, { kind: 'incomplete' }], [0, 0, { kind: 'empty' }],
+  [null, 10, { kind: 'unavailable' }], [10, null, { kind: 'unavailable' }],
+  [Infinity, 10, { kind: 'unavailable' }], [0, 0, { kind: 'empty' }],
   [10, 0, { kind: 'new' }], [10, 10, { kind: 'percent', percent: 0 }],
   [20, 10, { kind: 'percent', percent: 100 }], [0, 10, { kind: 'percent', percent: -100 }],
   [Number.MAX_VALUE, Number.MIN_VALUE, { kind: 'increased' }],

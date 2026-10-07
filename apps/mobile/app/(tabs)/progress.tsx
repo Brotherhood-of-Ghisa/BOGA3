@@ -1,6 +1,6 @@
-import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
+import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
-import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -68,7 +68,6 @@ export type ExerciseListItem = {
   name: string;
   workingSetCount: number;
   totalVolume: number | null;
-  knownVolume?: number | null;
   estimatedOneRepMax: number | null;
   lastCompletedAt: Date | null;
 };
@@ -201,10 +200,6 @@ export const sortExerciseListItems = (
     }
     return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
   });
-
-// Full figures in Plex Mono, never `2.5k`: the numbers are the point
-// (`design-language.md` §6).
-const formatTotalWeight = (value: number | null): string => value === null ? '— · incomplete' : formatVolume(value);
 
 export type StatsScreenShellProps = {
   summary: ProgressComparisons | null;
@@ -490,9 +485,7 @@ function ExerciseListView({
           ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
           accessibilityLabel={`Open ${item.name} heatmap. ${String(
             item.workingSetCount
-          )} sets. Volume ${formatVolumeWithCoverage(
-            item.totalVolume, item.knownVolume
-          )}${
+          )} sets. Volume ${formatVolumeFigure(item.totalVolume)}${
             item.estimatedOneRepMax === null
               ? '. Estimated one rep max unavailable'
               : `. Estimated one rep max ${formatOneRepMax(item.estimatedOneRepMax)} kg`
@@ -510,7 +503,7 @@ function ExerciseListView({
                 allowFontScaling={false}
                 style={[styles.tableFigure, styles.volumeColumn]}
                 testID={`stats-exercise-volume-${item.id}`}>
-                {item.totalVolume !== null ? formatTotalWeight(item.totalVolume) : item.knownVolume != null && item.knownVolume > 0 ? formatTotalWeight(item.knownVolume) : '—'}
+                {formatVolumeFigure(item.totalVolume)}
               </Text>
               <Text
                 allowFontScaling={false}
@@ -525,8 +518,6 @@ function ExerciseListView({
           <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
           </Text>
-          {item.totalVolume === null ? <Text allowFontScaling={false} style={styles.exerciseMetricNote}
-            testID={`stats-exercise-coverage-${item.id}`}>Volume incomplete</Text> : null}
         </ListRow>
       ))}
     </Card>
@@ -645,7 +636,7 @@ function StatsContent() {
     .map(item => {
       const aggregate = stats.aggregatesById.get(item.id)!;
       return { id: item.id, name: item.name, workingSetCount: aggregate.workingSetCount,
-        totalVolume: aggregate.totalVolume, knownVolume: aggregate.knownVolume,
+        totalVolume: aggregate.totalVolume,
         estimatedOneRepMax: aggregate.estimatedOneRepMax, lastCompletedAt: stats.lastCompletedAtById.get(item.id) ?? null };
     }), [catalog.exercises, stats]);
   return <StatsScreenShell {...summary} periodDays={periodDays} targetWindowWeeks={values.targetWindowWeeks}
@@ -744,12 +735,6 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.ink,
     paddingVertical: uiSpace.xs,
-  },
-  exerciseMetricNote: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
   },
   tableFigure: {
     fontFamily: uiFonts.figure.family,

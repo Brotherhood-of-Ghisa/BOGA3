@@ -115,6 +115,12 @@ export const generatedMigrationBundle = {
     tag: "0017_session_plan_cursor_reset",
     breakpoints: true,
   },
+  {
+    idx: 18,
+    when: 1791374943795,
+    tag: "0018_facts_drop_volume_complete",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -772,6 +778,11 @@ CREATE UNIQUE INDEX \`sessions_owner_source_plan_unique\` ON \`sessions\` (\`sou
 -- protocol 4 (app_public.require_sync_protocol), so a protocol-3 client never
 -- observes the new layer→type mapping.
 UPDATE \`sync_runtime_state\` SET \`pull_cursor\` = '{}';
+`,
+  m0018: `-- Volume leaves out sets whose load cannot be calculated
+-- ([[copy.no-inline-explanation]]), so the completeness flag goes. The rules
+-- version bump in exercise-session-facts-derive.ts rebuilds the rows.
+ALTER TABLE \`exercise_session_facts\` DROP COLUMN \`volume_complete\`;
 `,
   },
 } as const;
