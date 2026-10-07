@@ -72,9 +72,25 @@ it('refuses every dismissal while its write is in flight', () => {
   expect(screen.getByLabelText('Close swap exercise')).toBeDisabled();
   fireEvent.press(screen.getByLabelText('Close swap exercise'));
   fireEvent(screen.getByTestId('swap'), 'accessibilityEscape');
+  fireEvent(modal(), 'requestClose');
   Platform.OS = 'android';
   fireEvent(modal(), 'requestClose');
   expect(dismiss).not.toHaveBeenCalled();
+});
+
+it('keeps a blocked iOS swipe from completing or replacing the modal on a later X close', () => {
+  const dismiss = jest.fn(); const dismissed = jest.fn();
+  const view = render(sheet({ visible: true, onDismiss: dismiss, onDismissed: dismissed, dismissDisabled: true }));
+  const opened = modal();
+  fireEvent(opened, 'requestClose');
+  view.rerender(sheet({ visible: true, onDismiss: dismiss, onDismissed: dismissed, dismissDisabled: false }));
+  fireEvent.press(screen.getByLabelText('Close swap exercise'));
+  view.rerender(sheet({ visible: false, onDismiss: dismiss, onDismissed: dismissed }));
+  expect(dismissed).not.toHaveBeenCalled();
+  expect(modal()).toBe(opened);
+  fireEvent(opened, 'dismiss');
+  expect(dismissed).toHaveBeenCalledTimes(1);
+  expect(dismiss).toHaveBeenCalledTimes(1);
 });
 
 it('closes on Android Back and reports at once, with no native dismissal event', () => {
