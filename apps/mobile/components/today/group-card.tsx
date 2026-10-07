@@ -199,8 +199,8 @@ function LatestActivity({
   );
 }
 
-// Today's Group activity card (`design-targets/today-landing.md`): the group
-// switcher (more than one group), this week's board, the latest activity.
+// Today's Group activity card: the group switcher (more than one group), this
+// week's board, the latest activity.
 export function TodayGroupCard({
   groups,
   selectedGroupId,

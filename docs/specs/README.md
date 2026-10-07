@@ -37,7 +37,7 @@ and `docs/brainstorms/**`. `docs-check` (`scripts/gen-docs.sh`) enforces rules
    it through a Markdown link or an inline-code `.md` path. Each of those docs
    has a budget in `scripts/doc-budgets.tsv`: 2,000 words for `AGENTS.md`,
    2,500 for each always-load spec, and 3,000 for the rest, counted as
-   `wc -w` counts. Design targets (`docs/specs/ui/design-targets/`) are exempt.
+   `wc -w` counts.
    `./boga docs budgets` prints every doc's count, its budget, and the doc
    that first links to it. `docs/product/` is loaded whole, so its docs also
    share one `corpus` budget (6,000 words).

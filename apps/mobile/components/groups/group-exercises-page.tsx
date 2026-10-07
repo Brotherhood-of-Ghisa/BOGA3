@@ -78,6 +78,9 @@ const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', group
  * per-row sheet (Rename, Archive / Unarchive): online-only writes (08
  * pattern 9); Archive confirms first. `Add exercise` is an outline beside the
  * section's micro-label: `Invite` is the group screen's one `accent`.
+ * Unlink… is its own accessible target, separate from the admin row action;
+ * after the unlink confirmation (or the chooser's dismissal) VoiceOver focus
+ * returns to the row that launched it.
  */
 export function GroupExercisesPage({
   groupId,

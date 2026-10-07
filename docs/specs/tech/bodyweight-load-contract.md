@@ -235,8 +235,9 @@ invalidation. Coaching/import tests cover preference gating and clean kg payload
 
 Component/native evidence covers the Settings row, repeated toggle persistence,
 kg history, conditional contribution fields, ordinary/bodyweight-aware logging,
-numeric zero, historical refresh and group administration. The UI target
-is [the bodyweight design target](../ui/design-targets/bodyweight.md).
+numeric zero, historical refresh and group administration. Screen behaviour
+is `../ui/screen-map.md` (`/body-weight`) and the tests of
+`components/bodyweight/` and the exercise editor.
 
 ## 10. Versioned public competition units
 

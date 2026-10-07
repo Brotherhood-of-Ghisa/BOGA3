@@ -18,8 +18,8 @@ Document boundary:
 
 1. This document (`08`) owns cross-task UX process, task contract expectations, UX quality principles, and reusable UX patterns.
 2. `docs/specs/ui/**` owns current app-specific UI reality (routes, navigation behavior, reusable UI component inventory, app-specific semantics/guardrails).
-3. `docs/specs/ui/ai-design-policy.md` owns design-source selection, accepted
-   design targets, artifact boundaries, generated-code integration, and visual
+3. `docs/specs/ui/ai-design-policy.md` owns design-source selection, design
+   targets (build inputs, not specs), artifact boundaries, generated-code integration, and visual
    comparison requirements for human- or AI-assisted design work.
 4. UI docs under `docs/specs/ui/**` should stay synthetic/overview-first and source-linked:
    - summarize what exists and why it matters,
@@ -49,8 +49,8 @@ For UI/UX work, write a `UX Contract` before building: in the plan or task
 card if the work has one (`docs/plans/`, optional), otherwise in the PR body.
 Non-UX work needs none.
 
-For a significant UI task, record the accepted design target defined by
-`docs/specs/ui/ai-design-policy.md` beside the UX Contract.
+For a significant UI task, record its design target (a build input, not a
+spec: `docs/specs/ui/ai-design-policy.md`) beside the UX Contract.
 
 Each UX contract must include:
 
@@ -127,7 +127,7 @@ Use this section as the single source of truth for reusable UX patterns.
 13. Read-only link card pattern
    - Intent: summarise one item of a working set (an exercise in the session) and open it, without editing in place.
    - Usage: the session view's exercise cards (`components/session-view/session-exercise-card.tsx`).
-   - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; what is not yet realised renders faded, never hidden; a record earns a band on the card, not a badge on the row.
+   - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; set rows follow [[set.row-figures]]; a record earns a band on the card, not a badge on the row.
 
 ## Default appearance baseline (MVP)
 

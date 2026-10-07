@@ -54,7 +54,7 @@ const plannedSet = (
   performanceStatus: 'planned' as const,
 });
 
-// The accepted target's `V5-Quiet` list: two performed, three planned.
+// The exercise page's default list: two performed, three planned.
 const quietSets = (): SessionDraftSetSnapshot[] => [
   performedSet('s1', '60', '10', 'warm_up'),
   performedSet('s2', '80', '8', 'rir_2'),

@@ -66,7 +66,7 @@ expect_base() {
 
 # docs tree and root-level markdown → fast path
 expect true  pull_request docs/specs/05-data-model.md
-expect true  pull_request docs/specs/ui/design-targets/daily-history-calendar/reference.png
+expect true  pull_request docs/specs/ui/reference.png
 expect true  pull_request AGENTS.md
 expect true  pull_request CLAUDE.md RUNBOOK.md docs/testing/x.md
 

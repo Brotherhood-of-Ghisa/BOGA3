@@ -261,7 +261,8 @@ the data-model-level invariants.
    `planned_set_type` and `performance_status` ride the existing envelope,
    adding no column, server migration or envelope field. `performance_status`
    is nullable unconstrained text carrying the whole state: `planned`,
-   `unperformed`, and `null` on a valid actual row meaning confirmed/performed.
+   `unperformed`, and `null` on a valid actual row meaning confirmed/performed
+   ([[set.performed]]).
    Legacy `skipped` is still read, as an untouched `planned` row, and never
    written again. On upgrade a valid pre-existing row with legacy `null` stays
    confirmed, while a blank or partial legacy draft row with `null` reads as

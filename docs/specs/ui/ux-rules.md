@@ -19,7 +19,7 @@ the names of its Jest tests are the specification of that component.
 | Route params, query values, transitions, header titles | `navigation-contract.md` |
 | A primitive or shared component's API and variants | the component file; `components-catalog.md` says which component to reach for |
 | Colour roles, type, surfaces, emphasis, figure formatting | `design-language.md` |
-| A screen with an accepted design target | its record under `design-targets/` |
+| A screen's own layout and behaviour | its component's header comment and Jest tests |
 | What counts as a performed or working set, how set counts and set rows show | `docs/product/set.md` |
 | A counted session, a record, figure formats, and how code implements the facts | `docs/specs/tech/training-metrics-contract.md` |
 | Optional bodyweight calculations, personal or group | `docs/specs/tech/bodyweight-load-contract.md` |
@@ -31,8 +31,8 @@ the names of its Jest tests are the specification of that component.
 
 1. **One primary per screen**, the screen's one `accent` action
    (`design-language.md` "Emphasis"): `Finish`, `Done`, `Edit`, `Save
-   Exercise`, a start disc. Train with a ready plan shows the planned start as
-   the primary and the empty start as an outline.
+   Exercise`, a start disc. Train's disc (an empty start) stays the primary
+   even with a ready plan, whose `Start` is an outline.
 2. **Everything else is an outline or a text button.** Dismissal is never a
    button inside a sheet (see Sheets).
 3. **Destructive actions are `danger`** and visually distinct from the

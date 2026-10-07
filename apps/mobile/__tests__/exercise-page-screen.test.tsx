@@ -136,7 +136,7 @@ describe('ExercisePageScreen', () => {
     closeLocalData();
   });
 
-  it('renders the V5-Quiet state: records collapsed, set list, logger on the current set', async () => {
+  it('renders the default state: records collapsed, set list, logger on the current set', async () => {
     await openPage();
 
     expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');

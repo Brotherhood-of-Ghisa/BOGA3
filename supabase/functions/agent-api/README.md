@@ -209,7 +209,7 @@ At most 50 compact exercise blocks are embedded per workout; `truncated` makes
 any internal safety cap explicit. `exercises` lists every block, while
 `exercise_count` counts only blocks with at least one working set, and
 `completed_set_count`, `set_count` and every volume count working sets
-([working sets only](#working-sets-only)).
+([working sets only](#working-sets-only), [[set.eligibility]]).
 
 ## Working sets only
 

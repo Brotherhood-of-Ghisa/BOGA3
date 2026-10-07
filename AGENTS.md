@@ -117,9 +117,10 @@ place each under `docs/specs/**`, routed from here.
 
 For every significant UI/design task, load and follow
 `docs/specs/ui/ai-design-policy.md`. It is the single provider-neutral policy
-for accepted design targets, external-artifact vs repository authority,
+for design targets, external-artifact vs repository authority,
 generated-code integration, screenshot comparison, conflict reporting, and
-commit boundaries.
+commit boundaries. A design target is a build input, kept with the task or PR,
+never a spec of the result: what must outlive the build moves to its owner.
 
 ## Always load (every session)
 

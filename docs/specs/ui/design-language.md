@@ -3,7 +3,7 @@
 > **Owns:** the visual and interaction language of the mobile UI — colour roles,
 > type, surface rules, emphasis, and how data is presented. Screen-agnostic.
 > **Not here:** how a particular screen is laid out → `screen-map.md` and its
-> design target; cross-screen semantics → `ux-rules.md`; component inventory →
+> components; cross-screen semantics → `ux-rules.md`; component inventory →
 > `components-catalog.md`; design-source policy → `ai-design-policy.md`.
 > **Load when:** building or reviewing any screen.
 
@@ -70,9 +70,9 @@ and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
-a `rule` hairline, being only 1.18:1 against `surface`. The operator-authorized
-Progress selectors also use the strongest palette grade for selection; if
-changing them, load `design-targets/progress-tables.md`.
+a `rule` hairline, being only 1.18:1 against `surface`. Progress's selectors
+also use the strongest grade, `viz4` with `ink` text, for selection
+(`SegmentedControl`'s `selectedGround`).
 
 ## 3. Typography
 
@@ -99,8 +99,8 @@ gate, and this spec promises no web parity.
 **The type scale is eight rungs** (`uiTypography.size`), and the raw-literal
 budgets in `apps/mobile/scripts/ui-guardrails.config.js` stay at 0. A size a
 screen cannot express is a case for revising the scale, here and in `tokens.ts`,
-never for an exception (`ux-rules.md` "Styling guardrails"); a design target
-drawn off the scale snaps onto it.
+never for an exception (`ux-rules.md` "Styling guardrails"); a design drawn off
+the scale snaps onto it.
 
 **The 38pt metric column holds** (`uiGeometry.metricValueWidth`, measured on
 device at 390pt): a 1RM up to `999.9` and a five-digit volume both fit with
@@ -108,7 +108,7 @@ their 10px legends, and only a four-digit 1RM overflows, which no lifter
 produces.
 
 **Weight per figure.** Realised figures and option labels sit one embedded
-weight lighter than the accepted target drew them, which read too heavy on iOS,
+weight lighter than the design mocks drew them, which read too heavy on iOS,
 keeping sizes on the scale. Running figures (weight × reps, the inline 1RM, VOL)
 are Plex Mono **500**; a `record` figure is **700**. Sheet option labels are
 Archivo **600**, the selected one **700**; headline figures stay Plex Mono 700,
@@ -129,7 +129,7 @@ micro-labels Archivo 700, sheet titles Archivo 800.
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
   value is for. **A screen derives its measures from these** instead of
   adding values (the logger's Reps field is one field height wide, Effort two
-  tap targets), and spacing a design target draws off-scale snaps to the scale
+  tap targets), and spacing a design draws off-scale snaps to the scale
   (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
 - The primitives implementing all of this live in
   `apps/mobile/components/ui/` (`components-catalog.md`).
@@ -144,10 +144,9 @@ bold `record`, and earns a band on the containing card where the screen has one
 (the session view's cards, the exercise page's set list). Every other figure
 takes its row's colour and weight — **no screen bolds the best value in the
 current context**, which read as noise on device; `Stat` offers no `best`
-emphasis. Only the sets that took a record are highlighted, never every
-qualifying row: the exercise page's set list and the session cards show every
-record set, with one band line per record. Which sets those are, and
-what beats a record, is `tech/training-metrics-contract.md` §3.
+emphasis. Which sets are highlighted is [[set.row-figures]]: the exercise
+page's set list and the session cards draw one band line per record. What
+beats a record is `tech/training-metrics-contract.md` §3.
 
 **State is carried by a control glyph**, not by a word: a filled check means
 done, an `accent` ring means current, a dashed ring means planned. Planned items
@@ -167,6 +166,8 @@ additionally render faded (§6).
   Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
+- **Deltas carry their sign, not a hue.** `+3`, `−12%` and `new` take ink
+  roles, never red or green by direction.
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.

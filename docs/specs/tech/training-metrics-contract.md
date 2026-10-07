@@ -66,11 +66,9 @@ canonical policy key, rebuilding all definitions when the active choices differ.
 
 ## 2. Counted session
 
-A completed, non-deleted session counts as [[set.eligibility]] says.
-
-Scoped to one exercise, or to one muscle, the session counts for that scope
-when it holds a working set of that exercise, or a working set mapped to that
-muscle. A scope with no working set adds no counted session, working-set cell,
+A completed, non-deleted session counts as [[set.eligibility]] says. Scoped
+to one exercise, or to one muscle, the same rule applies to that exercise's
+sets, or to the sets mapped to that muscle. A scope with no working set adds no counted session, working-set cell,
 strength record, comparison baseline or `Last` date. It may still contribute to
 volume totals, volume heatmap cells and Volume records when it has a
 volume-included set. A scope with neither kind contributes nothing.
@@ -183,8 +181,8 @@ Changing the shared coaching rule also bumps the agent API's `metric_revision`.
 | Share image | The record set: 1RM, else Weight. An exercise with only a Volume record is not listed |
 | Today `PRs` and the latest session's PR line | Every record kind (`pr_e1rm`, `pr_weight`, `pr_volume`), one PR each. The line names a single PR (`Bench Press 1RM 102.5 · PR`) and only counts several (`3 PRs`) |
 
-Every screen that shows a record set highlights the figures it beat: the 1RM
-record's 1RM and the Weight record's Weight. Every band reads the same words
+Every screen that shows a record set highlights it as [[set.row-figures]]
+says: the 1RM record's 1RM and the Weight record's Weight. Every band reads the same words
 (`session-insights/record-band.ts`).
 
 Group boards keep their own contract (`tech/groups-contract.md`), but follow

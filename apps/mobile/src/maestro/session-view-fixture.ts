@@ -7,7 +7,7 @@ const MINUTE_MS = 60 * 1000;
 /**
  * The session view's fixture: the block-history fixture's
  * completed history (Bench best 1RM ≈ 197.9 from 155 × 8), plus one active
- * session at its gym drawn like the accepted `V6-Session` artboard:
+ * session at its gym:
  *
  * - Barbell Bench Press: a warm-up, RIR 2 160 × 8 (1RM ≈ 204.3, a new record),
  *   RIR 1 162.5 × 6 — all done — then two planned rows (3/5).

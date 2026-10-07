@@ -2,8 +2,8 @@
 
 What screens exist, what each one is for, and which are reachable at all. Load
 this when you add, remove, rename or repurpose a route. Paths, params and
-transitions: `navigation-contract.md`. Visual language: `design-language.md`
-and `design-targets/`. Render logic: the route file.
+transitions: `navigation-contract.md`. Visual language: `design-language.md`.
+Render logic: the route file.
 
 Routes are `expo-router` file routes under `apps/mobile/app/`; the file column
 below is relative to that directory. Components live beside the route, under
@@ -186,4 +186,4 @@ addressable, each resolving to a canonical owner for tab selection.
   boards and podiums then show explicit `kg·reps` / `kg` or `%BW·reps` / `%BW`
   units; record detail and history retain public witness state and original
   units, and normalized sessions omit raw loads and all session aggregate
-  volume. See `design-targets/group-competitions.md`.
+  volume. See `docs/specs/tech/group-competition-contract.md`.
