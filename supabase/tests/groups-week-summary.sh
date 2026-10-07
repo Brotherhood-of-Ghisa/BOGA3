@@ -365,11 +365,8 @@ sess "${ATHLETE_TOKEN}" "${T}-a1" completed "$(at 2)" "${T}-a-bench" \
   a1:90:5:rir_0 a2:90:5:rir_3 a4:90:5:rir_1:planned "a5:90:5:rir_2::$(at 2)" \
   a6:90:5:rir_0 a7:60:10:warm_up a8:90:5:working a9:90:5:rir_3000000000
 drain "A1"
-expect_sql "facts store the working-set rule (w), independent of performed (!)" \
-  "select string_agg(replace(set_id, '${T}-', '') || '=' || (case when working then 'w' else '-' end)
-                     || (case when performed then '' else '!' end), ',' order by set_id)
-     from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-a1';" \
-  "a1=w,a2=w,a4=w!,a5=w,a6=w,a7=-,a8=w,a9=w"
+# Each label's working/performed fact is the TS rule (groups-set-facts.test.ts);
+# the counts below prove the summary reads it.
 # One predicate for `working`: a fact the evaluator has not re-normalized yet
 # (working null) counts as working in the week counts and on the boards, and
 # is never a warm-up. R1's warm-up r1c, read as such a fact, in a rolled-back

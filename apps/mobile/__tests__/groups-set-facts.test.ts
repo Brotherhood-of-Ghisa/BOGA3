@@ -108,6 +108,10 @@ describe('group evaluator set facts', () => {
     expect(fact.working).toBe(isWorkingSetType(setType));
   });
 
+  it('stores a stored RIR beyond any integer range as working, like every RIR above 4', () => {
+    expect(factOf(row('s1', '90', '5', { set_type: 'rir_3000000000' }))).toMatchObject({ performed: true, working: true });
+  });
+
   it('stores working independently of performed: the summary filters on both', () => {
     expect(factOf(row('s1', '100', '5', { set_type: 'rir_1', performance_status: 'planned' }))).toMatchObject({
       performed: false,
