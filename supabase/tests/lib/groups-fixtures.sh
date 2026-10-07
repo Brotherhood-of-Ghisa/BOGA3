@@ -28,45 +28,126 @@ pass() {
   echo "[${LANE_LABEL}] ok: $*"
 }
 
-run_psql() {
+# run_psql_once <sql>: one psql process for this statement batch (stops at the
+# first error). For SQL that must leave no session state behind: an expected
+# failure, a lock held from the background, the exit-trap cleanup.
+run_psql_once() {
   docker exec -i "${DB_CONTAINER}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq <<<"$1"
+}
+
+# A lane's statements share one psql session (psql_session_start), because a
+# `docker exec` per statement costs ~40 ms of process and connection setup
+# against ~1 ms of SQL. psql's stderr is merged into stdout inside the
+# container, so a diagnostic always arrives before the call's end marker.
+# Diagnostic lines go to stderr; an ERROR/FATAL/PANIC fails the call. An error
+# does not stop the rest of that call's batch (no ON_ERROR_STOP in a session),
+# but the call still fails, and so does the lane under `set -e`. Every call
+# ends with `discard all`, so the next one starts from a fresh session state
+# (settings, temp tables, session locks), and a call that leaves a transaction
+# open fails. Notices are not shown (client_min_messages=warning).
+PSQL_SESSION_DIR=""
+PSQL_SESSION_PID=""
+psql_session_start() {
+  PSQL_SESSION_DIR="$(mktemp -d)"
+  mkfifo "${PSQL_SESSION_DIR}/in" "${PSQL_SESSION_DIR}/out"
+  docker exec -i -e PGOPTIONS='-c client_min_messages=warning' "${DB_CONTAINER}" \
+    sh -c 'exec psql -X -U postgres -d postgres -Atq 2>&1' \
+    <"${PSQL_SESSION_DIR}/in" >"${PSQL_SESSION_DIR}/out" &
+  PSQL_SESSION_PID=$!
+  exec 7>"${PSQL_SESSION_DIR}/in" 8<"${PSQL_SESSION_DIR}/out"
+  [[ "$(run_psql "select 'session';")" == "session" ]] || fail "psql session did not start"
+  # The session must fail a call on an error and on a transaction left open,
+  # or every assertion after this would pass on a broken query.
+  ! run_psql "select 1/0;" >/dev/null 2>&1 || fail "psql session did not fail an ERROR"
+  ! run_psql "begin;" >/dev/null 2>&1 || fail "psql session did not fail an open transaction"
+}
+
+psql_session_stop() {
+  [[ -n "${PSQL_SESSION_DIR}" ]] || return 0
+  exec 7>&- 8<&-
+  rm -rf "${PSQL_SESSION_DIR}"
+  PSQL_SESSION_DIR=""
+}
+
+PSQL_CALLS=0
+PSQL_DIAGNOSTIC_RE='^(psql:[^ ]*: )?(ERROR|FATAL|PANIC|WARNING|NOTICE|INFO|LOG|DETAIL|HINT|CONTEXT|QUERY|STATEMENT|LINE [0-9]+):'
+PSQL_FAILURE_RE='^(psql:[^ ]*: )?(ERROR|FATAL|PANIC):'
+run_psql() {
+  [[ -n "${PSQL_SESSION_DIR}" ]] || { run_psql_once "$1"; return; }
+  local marker line out="" ended=0 failed=0
+  # Writing to a session that has gone would SIGPIPE the shell and skip its
+  # exit-trap cleanup; fail the call instead.
+  kill -0 "${PSQL_SESSION_PID}" 2>/dev/null ||
+    { echo "[${LANE_LABEL}] psql session ended unexpectedly" >&2; return 3; }
+  PSQL_CALLS=$((PSQL_CALLS + 1))
+  marker="__psql_done_${RANDOM}${RANDOM}_${PSQL_CALLS}__"
+  # The `;` line ends an unterminated last statement; psql ignores an empty one.
+  printf '%s\n;\ndiscard all;\n\\echo %s\n' "$1" "${marker}" >&7
+  while IFS= read -r line <&8; do
+    if [[ "${line}" == "${marker}" ]]; then ended=1; break; fi
+    if [[ ${failed} -eq 1 || "${line}" =~ ${PSQL_DIAGNOSTIC_RE} ]]; then
+      printf '%s\n' "${line}" >&2
+      [[ ! "${line}" =~ ${PSQL_FAILURE_RE} ]] || failed=1
+    else
+      out+="${line}"$'\n'
+    fi
+  done
+  [[ ${ended} -eq 1 ]] || { echo "[${LANE_LABEL}] psql session ended unexpectedly" >&2; return 3; }
+  if [[ ${failed} -eq 1 ]]; then
+    # Close any transaction the failed batch left open, so a caller that
+    # expects the failure gets a clean session back.
+    printf 'rollback;\ndiscard all;\n\\echo %s\n' "${marker}_reset" >&7
+    while IFS= read -r line <&8; do [[ "${line}" != "${marker}_reset" ]] || return 3; done
+    echo "[${LANE_LABEL}] psql session ended unexpectedly" >&2
+    return 3
+  fi
+  printf '%s' "${out}"
 }
 
 # --- HTTP helpers --------------------------------------------------------------
 
+# http_call <curl args...>: STATUS and BODY from one curl, no temp file.
+http_call() {
+  local res
+  res="$(curl --silent --show-error -w $'\n%{http_code}' "$@")"
+  STATUS="${res##*$'\n'}"
+  BODY="${res%$'\n'*}"
+  while [[ "${BODY}" == *$'\n' ]]; do BODY="${BODY%$'\n'}"; done
+}
+
 # rpc <bearer> <function> <json-body>
 rpc() {
-  local bearer="$1" name="$2" body="$3" out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
+  local bearer="$1" name="$2" body="$3"
+  http_call -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
     -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "Content-Profile: app_public" \
-    -o "${out}" -w "%{http_code}" \
     --data "${body}" \
-    "${API_URL}/rest/v1/rpc/${name}")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+    "${API_URL}/rest/v1/rpc/${name}"
 }
 
 # rest <method> <bearer> <table> <query> [json-body]
 rest() {
-  local method="$1" bearer="$2" table="$3" query="$4" body="${5:-}" out
-  out="$(mktemp)"
-  local -a args=(--silent --show-error -X "${method}"
+  local method="$1" bearer="$2" table="$3" query="$4" body="${5:-}"
+  local -a args=(-X "${method}"
     -H "apikey: ${ANON_KEY}"
     -H "Authorization: Bearer ${bearer}"
     -H "Accept-Profile: app_public"
     -H "Content-Profile: app_public"
-    -H "Prefer: return=representation"
-    -o "${out}" -w "%{http_code}")
+    -H "Prefer: return=representation")
   if [[ -n "${body}" ]]; then
     args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" --data "${body}")
   fi
-  STATUS="$(curl "${args[@]}" "${API_URL}/rest/v1/${table}?${query}")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+  http_call "${args[@]}" "${API_URL}/rest/v1/${table}?${query}"
+}
+
+# eval_drain [secret]: POST group-eval (direct-drain mode); STATUS/BODY hold the reply.
+eval_drain() {
+  http_call -X POST \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
+    -H "x-group-eval-secret: ${1-${EVAL_SECRET}}" \
+    --data '{}' "${API_URL}/functions/v1/group-eval"
 }
 
 expect_ok() {
@@ -91,15 +172,11 @@ check() {
 # --- users ---------------------------------------------------------------------
 
 sign_in() {
-  local email="$1" out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
+  local email="$1"
+  http_call -X POST \
     -H "apikey: ${ANON_KEY}" -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
-    -o "${out}" -w "%{http_code}" \
     --data "$(jq -nc --arg e "${email}" --arg p "${PASSWORD}" '{email: $e, password: $p}')" \
-    "${API_URL}/auth/v1/token?grant_type=password")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+    "${API_URL}/auth/v1/token?grant_type=password"
   [[ "${STATUS}" == "200" ]] || fail "password sign-in for ${email}"
   jq -er '.access_token' <<<"${BODY}"
 }

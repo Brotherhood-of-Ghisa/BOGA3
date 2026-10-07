@@ -171,6 +171,11 @@ resolve_db_container() {
 load_supabase_status_env() {
   local line key value
   local output
+  # run-suite.sh loads the env once for all of its bodies (a `supabase status`
+  # costs ~1 s); a stack's URLs and keys do not change while it is up.
+  if [[ -n "${API_URL:-}" && "${BOGA_STATUS_ENV_LOADED_FOR:-}" == "${BOGA_SUPABASE_WORKDIR:-${REPO_ROOT}}" ]]; then
+    return 0
+  fi
   output="$(run_supabase status -o env)"
 
   while IFS= read -r line; do

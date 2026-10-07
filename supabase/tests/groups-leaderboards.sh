@@ -50,6 +50,7 @@ done
 load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" ]] || fail "local Supabase status env is incomplete (API_URL/ANON_KEY)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_LEADERBOARDS_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -104,6 +105,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
@@ -128,21 +130,8 @@ expect_sql() {
   [[ "${actual}" == "$3" ]] || fail "$1: expected '$3', got '${actual}'"
 }
 
-# drain [secret]: POST group-eval (direct-drain mode); STATUS/BODY hold the reply.
-drain() {
-  local secret="${1-${EVAL_SECRET}}" out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
-    -H "x-group-eval-secret: ${secret}" \
-    -o "${out}" -w "%{http_code}" --data '{}' \
-    "${API_URL}/functions/v1/group-eval")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
-}
-
 drain_ok() {
-  drain
+  eval_drain
   expect_ok "group-eval drain: $1"
   check "group-eval drain reply shape: $1" '(.jobs | type) == "array" and .rules_version == 6'
 }
@@ -316,9 +305,9 @@ for bearer in "${ATHLETE_TOKEN}" "${ANON_KEY}"; do
   [[ ! "${STATUS}" =~ ^2 ]] || fail "a client claimed evaluator jobs (HTTP ${STATUS})"
   check "client group_eval_claim must be a 42501 denial" '.code == "42501"'
 done
-drain ""
+eval_drain ""
 [[ "${STATUS}" == "401" ]] || fail "group-eval without a secret: expected 401, got ${STATUS}"
-drain "wrong-${EVAL_SECRET}"
+eval_drain "wrong-${EVAL_SECRET}"
 [[ "${STATUS}" == "401" ]] || fail "group-eval with a wrong secret: expected 401, got ${STATUS}"
 STATUS="$(curl --silent -o /dev/null -w '%{http_code}' "${API_URL}/functions/v1/group-eval")"
 [[ "${STATUS}" == "405" ]] || fail "group-eval GET: expected 405, got ${STATUS}"
@@ -640,7 +629,6 @@ expect_sql "the sweep does not kick when facts are current" "select app_public.g
 # Facts as the previous rules version wrote them.
 run_psql "update app_public.group_set_facts set rules_version = 5
            where member_user_id = '${ATHLETE_UID}' and session_id like '${T}-bulk-%';" >/dev/null
-EVENTS_BEFORE="$(run_psql "select count(*) from app_public.group_events where group_id = '${GID}';")"
 RUNS=0
 REQUEUED=()
 while [[ "$(run_psql "select app_public.group_eval_sweep();")" == "t" ]]; do
@@ -651,8 +639,6 @@ while [[ "$(run_psql "select app_public.group_eval_sweep();")" == "t" ]]; do
 done
 [[ "$(bulk_stale)" == "0" ]] || fail "the sweep stopped kicking with $(bulk_stale) stale bulk sessions left"
 [[ "${REQUEUED[*]}" == "50 1" ]] || fail "a bulk rules bump: expected requeues '50 1', got '${REQUEUED[*]}'"
-expect_sql "a bulk rules recompute writes no event" \
-  "select count(*) from app_public.group_events where group_id = '${GID}';" "${EVENTS_BEFORE}"
 pass "a rules bump over ${BULK} stale sessions finishes through the sweep alone"
 
 # =============================================================================

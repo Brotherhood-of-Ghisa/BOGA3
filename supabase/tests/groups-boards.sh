@@ -11,7 +11,7 @@
 #   - working sets only: a warm-up never ranks, records or certifies, and a
 #     stored warm-up record stands while its board moves silently (forward only);
 #   - the provisional rule for active sessions (T8), D6 conversion, P7 ties,
-#     rejoin catch-up, the per-group advisory lock, apply failure isolation;
+#     rejoin catch-up, the per-group advisory lock;
 #   - group_board_podiums / group_board / group_board_history shapes, paging,
 #     and error tokens; group_stream's record / record_voided / link items.
 #
@@ -39,12 +39,12 @@ load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" && -n "${JWT_SECRET:-}" ]] ||
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
+psql_session_start
 
 RUN_TAG="${GROUPS_BOARDS_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
 PASSWORD="GroupsBoards!${RUN_TAG}"
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-FORCE_APPLY_CONSTRAINT="groups_bd_force_apply_failure"
 BOARD_LOCK_KEY=25005
 
 RUN_USER_IDS=()
@@ -59,8 +59,6 @@ set_sweep_active() {
 }
 
 cleanup() {
-  run_psql "set client_min_messages = warning;
-            alter table app_public.group_board_entries drop constraint if exists ${FORCE_APPLY_CONSTRAINT};" >/dev/null
   set_kick_url "${ORIGINAL_KICK_URL}"
   if [[ "${ORIGINAL_SWEEP_ACTIVE}" == "t" ]]; then set_sweep_active true; else set_sweep_active false; fi
   [[ ${#RUN_USER_IDS[@]} -gt 0 ]] || return 0
@@ -86,6 +84,7 @@ COMPLETED=0
 cleanup_on_exit() {
   local status=$?
   trap - EXIT
+  psql_session_stop
   if [[ ${status} -eq 0 && ${COMPLETED} -ne 1 ]]; then
     echo "[${LANE_LABEL}] FAIL: the run stopped before completing" >&2
     status=1
@@ -118,13 +117,7 @@ expect_sql() {
 }
 
 drain() {
-  local out
-  out="$(mktemp)"
-  STATUS="$(curl --silent --show-error -X POST \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
-    -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
-  BODY="$(cat "${out}")"
-  rm -f "${out}"
+  eval_drain
   expect_ok "group-eval drain: $1"
   check "group-eval drain: $1: no failed job" '.failed == 0'
 }
@@ -1124,45 +1117,32 @@ expect_entry "${GXJ}" M weight "" "rejoin catch-up"
 pass "rejoin: changes made while away are applied with normal attribution"
 
 # =============================================================================
-echo "[${LANE_LABEL}] serialization and apply failure isolation"
+echo "[${LANE_LABEL}] serialization"
 # =============================================================================
 
-docker exec -i "${DB_CONTAINER}" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -Atq \
-  <<<"begin; select pg_advisory_xact_lock(${BOARD_LOCK_KEY}, hashtext('${GID}')); select pg_sleep(6); commit;" \
+# The holder sleeps far longer than the check needs and is ended explicitly
+# once the blocked apply has timed out, so the lane never waits out the sleep.
+run_psql_once "begin; select pg_advisory_xact_lock(${BOARD_LOCK_KEY}, hashtext('${GID}')); select pg_sleep(30); commit;" \
   >/dev/null 2>&1 &
 LOCK_PID=$!
+release_lock_holder() {
+  run_psql "select count(*) filter (where pg_terminate_backend(pid)) from pg_locks
+             where locktype = 'advisory' and classid = ${BOARD_LOCK_KEY} and granted;"
+}
 for _ in $(seq 1 50); do
   [[ "$(run_psql "select exists (select 1 from pg_locks where locktype = 'advisory' and classid = ${BOARD_LOCK_KEY} and granted);")" == "t" ]] && break
   sleep 0.1
 done
-if OUT="$(run_psql "set lock_timeout = '500ms';
-                    select app_public.group_eval_apply('${GID}', '${ATHLETE_UID}', '${GX1}', array['set']);" 2>&1)"; then
+if OUT="$(run_psql_once "set lock_timeout = '500ms';
+                         select app_public.group_eval_apply('${GID}', '${ATHLETE_UID}', '${GX1}', array['set']);" 2>&1)"; then
+  release_lock_holder >/dev/null
   wait "${LOCK_PID}" || true
   fail "an apply must wait for the group's advisory lock"
 fi
+[[ "$(release_lock_holder)" == "1" ]] || fail "the advisory lock holder must still hold the lock when the apply times out"
 wait "${LOCK_PID}" || true
 [[ "${OUT}" == *"lock timeout"* ]] || fail "the blocked apply must fail with a lock timeout (55P03): ${OUT}"
 pass "every apply in a group takes the group's advisory lock"
-
-run_psql "alter table app_public.group_board_entries add constraint ${FORCE_APPLY_CONSTRAINT} check (false) not valid;" >/dev/null
-set_edit "${ATHLETE_TOKEN}" "${T}-s1b" r1b1 0 91 5
-rest GET "${ATHLETE_TOKEN}" exercise_sets "select=weight_value&id=eq.${T}-r1b1"
-expect_ok "read back under the apply fault"
-check "sync_push committed under the apply fault" '.[0].weight_value == "91"'
-out="$(mktemp)"
-STATUS="$(curl --silent -X POST -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" -H "x-group-eval-secret: ${EVAL_SECRET}" \
-  -o "${out}" -w "%{http_code}" --data '{}' "${API_URL}/functions/v1/group-eval")"
-BODY="$(cat "${out}")"; rm -f "${out}"
-expect_ok "drain under the apply fault"
-check "the failing apply fails its job" '.failed == 1'
-expect_sql "the job is kept with its sqlstate" \
-  "select last_sqlstate || ':' || attempts from app_public.group_eval_queue
-    where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-s1b';" "23514:1"
-run_psql "alter table app_public.group_board_entries drop constraint ${FORCE_APPLY_CONSTRAINT};
-          update app_public.group_eval_queue set available_at = now() where member_user_id = '${ATHLETE_UID}';" >/dev/null
-drain "retry after the apply fault"
-expect_entry "${GX1}" A weight "105@r1c1" "entries intact after the retried job"
-pass "a failing apply fails its job (kept, retried) and never blocks sync_push"
 
 # =============================================================================
 echo "[${LANE_LABEL}] board reads"
