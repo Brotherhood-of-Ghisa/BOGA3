@@ -30,6 +30,12 @@ appId: com.dinoderek.mobile
 # with a SIGSEGV in Scheduler::uiManagerDidFinishTransaction: the old JS thread
 # renders once more against the scheduler the reload has just freed. The
 # simulator is then left on the home screen, and today-screen never appears.
+# Repro: drop this stopApp and rerun the ios-smoke lane. About 1 run in 20
+# crashed on 2026-10-07; the crash report is a Boga3-*.ips file in
+# ~/Library/Logs/DiagnosticReports. Upstream: react/react-native#58601. The
+# open case is "delegate torn down with no error"; RN removed its opt-in guard
+# in react/react-native#58138; 0.88.0-rc.4 and main still crash. Remove this
+# stopApp once a react-native release fixes #58601.
 - stopApp
 - openLink: "${MAESTRO_IOS_DEV_CLIENT_URL}"
 - extendedWaitUntil:
