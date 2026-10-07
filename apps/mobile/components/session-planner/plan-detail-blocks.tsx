@@ -1,6 +1,6 @@
-import { Alert, StyleSheet, Text } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Card, ListRow, uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { Card, ListRow, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { PlanBlockView, PlanDetailView } from '@/src/session-planner';
 
 export type PlanDetailBlocksProps = {
@@ -38,15 +38,17 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
     <>
       {detail.blocks.map((block, index) => (
         <Card key={block.id} testID={`plan-detail-block-${index + 1}`}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={styles.blockTitle}>
-            {block.name}
-          </Text>
-          <Text allowFontScaling={false} style={styles.meta} testID={`plan-detail-block-${index + 1}-state`}>
-            {blockStateWord(block)} · Block {index + 1} of {detail.blocks.length}
-          </Text>
-          <Text allowFontScaling={false} style={styles.targets} testID={`plan-detail-block-${index + 1}-targets`}>
-            {blockTargetsLine(block)}
-          </Text>
+          <View style={styles.blockHeader}>
+            <Text allowFontScaling={false} accessibilityRole="header" style={styles.blockTitle}>
+              {block.name}
+            </Text>
+            <Text allowFontScaling={false} style={styles.meta} testID={`plan-detail-block-${index + 1}-state`}>
+              {blockStateWord(block)} · Block {index + 1} of {detail.blocks.length}
+            </Text>
+            <Text allowFontScaling={false} style={styles.targets} testID={`plan-detail-block-${index + 1}-targets`}>
+              {blockTargetsLine(block)}
+            </Text>
+          </View>
           {block.status === 'pending' ? (
             <>
               <ListRow
@@ -88,6 +90,12 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
 }
 
 const styles = StyleSheet.create({
+  blockHeader: {
+    gap: uiSpace.xs,
+    paddingHorizontal: uiSpace.md,
+    paddingTop: uiSpace.md,
+    paddingBottom: uiSpace.sm,
+  },
   blockTitle: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
@@ -96,7 +104,7 @@ const styles = StyleSheet.create({
     color: uiRoles.ink,
   },
   meta: {
-    fontFamily: uiFonts.display.family,
+    fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.xs,
     lineHeight: uiTypography.lineHeight.xs,

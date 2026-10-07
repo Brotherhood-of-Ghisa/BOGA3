@@ -38,7 +38,7 @@ const progressLine = (detail: PlanDetailView): string => {
  */
 export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDuplicate, onDelete }: PlanDetailSummaryProps) {
   return (
-    <Card testID="plan-detail-summary">
+    <Card style={styles.card} testID="plan-detail-summary">
       <View style={styles.summaryRow}>
         <View style={styles.summaryText}>
           <Text allowFontScaling={false} accessibilityRole="header" style={styles.title} testID="plan-detail-title">
@@ -90,6 +90,10 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
 }
 
 const styles = StyleSheet.create({
+  card: {
+    padding: uiSpace.md,
+    gap: uiSpace.md,
+  },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
