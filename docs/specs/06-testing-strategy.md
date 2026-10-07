@@ -49,6 +49,36 @@ owns the risk.** Two standing cases:
   session handoff and trigger-wiring bugs — the classes that shipped during sync
   v2 — surface only in the device lane.
 
+## Lane design rules
+
+The cheapest-layer rule in *Test layers* above is the first of these, and the
+one this suite drifts from fastest. These five keep a lane's cost proportional
+to what only that lane can prove.
+
+1. **Name a lane for what it proves**, not for the feature it touches. A name
+   that tracks a screen or a domain stops describing the lane's contents the
+   first time either moves.
+2. **One canonical assertion per fact.** No fact is proved in two lanes. A
+   duplicate is invisible — it reads as thoroughness — and costs its full
+   runtime on every run.
+3. **Quarantine destructive work.** A body that rebuilds the database, stops a
+   container, or takes a one-way action with no rollback belongs in an `extra`
+   lane routed by `scripts/triggers.tsv`, never in a default gate. Within a
+   lane it runs **last**: it leaves no configured baseline for the bodies after
+   it, and a body that needs one then fails for a reason that looks nothing
+   like the cause.
+4. **Bodies are chapters; lanes are concepts.** Split a large surface into
+   several bodies in one lane for readability. Splitting it into lanes instead
+   makes every piece pay the baseline preflight again.
+5. **A lane's cost is justified by what only it can prove.** Cost per assertion
+   is the signal: an outlier is a design smell to investigate, not a property
+   of the subject. Measure with `./boga timings`; never estimate.
+
+Setup is where rule 5 goes wrong in practice. A body that drives the full
+production path dozens of times to *reach* the state it asserts on has moved
+its cost into setup, where nobody reads it. Seed that state directly, and keep
+the real path only where the path itself is under test.
+
 ## Default testing practice
 
 - **Jest is always required.** Every code change adds or updates Jest coverage
