@@ -67,9 +67,7 @@ to what only that lane can prove.
    lane it runs **last**: it leaves no configured baseline for the bodies after
    it, and a body that needs one then fails for a reason that looks nothing
    like the cause. It marks the stack first (`mark_stack_needs_reset`) and
-   never resets on exit; the next preflight resets it. Until the local baseline
-   is protocol-4 active, groups bodies activate it themselves, after a lane's
-   pending bodies; `run-suite.sh --protocol4` lanes keep that mark.
+   never resets on exit; the next preflight resets it.
 4. **Bodies are chapters; lanes are concepts.** Split a large surface into
    several bodies in one lane for readability. Splitting it into lanes instead
    makes every piece pay the baseline preflight again.
@@ -200,10 +198,10 @@ the name does not give away.
 | `backend-fast` | Runtime up + reset (migrations + seed) + schema lint + health endpoint + deterministic seed fixtures. The backend half of the fast gate. |
 | `auth-authz` | Real auth context and RLS: owner success, cross-user denial, validation and unauthorized paths. |
 | `groups-contract` | The group domain rules of `docs/specs/tech/groups-contract.md`: the share ledger across join/leave/rejoin, protocol-4 stream, session detail and group exercises, edit/tombstone flow-through, share-trigger failure isolation, and the membership RPC matrix including error tokens and direct-PostgREST denial. |
-| `groups-leaderboards` | The evaluator: boards, certification, bodyweight (pending), then facts, targets, fault isolation and the week summary (protocol 4); direct-drain mode makes Edge assertions deterministic. |
+| `groups-leaderboards` | The evaluator on protocol 4: boards, certification, bodyweight, facts, targets, fault isolation and the week summary; direct-drain mode makes Edge assertions deterministic. |
 | `groups-competitions` | `docs/specs/tech/group-competition-contract.md` on protocol 4: authorization, payload privacy, the correction matrix, write tokens, publication fences, and stored pre-protocol-4 history. |
-| `groups-api-live` | The app's own groups client (`apps/mobile/src/groups/api.ts`) against the live server, so a drifted RPC name, parameter or response shape fails here instead of on a device. |
-| `groups-protocol4` | The one-way competition cutover: the populated pre-cutover→protocol-4 upgrade, plus the client's protocol-4 wire. `extra`, not in `boga test backend`: it resets the stack to an old migration, so the next preflight rebuilds it. `boga test for` prints it. |
+| `groups-api-live` | The app's own groups client (`apps/mobile/src/groups/api.ts`) against the live server, competition calls included, so a drifted RPC name, parameter or response shape fails here instead of on a device. |
+| `groups-protocol4` | The one-way competition cutover: the populated pre-cutover→protocol-4 upgrade. `extra`, not in `boga test backend`: it resets the stack to an old migration, so the next preflight rebuilds it. `boga test for` prints it. |
 | `sync-drift` | Client Drizzle schemas vs the introspected server schema: indexes, triggers, RLS policy inventory and body hashes, soft-delete and sync columns, topological FK order. `--strict` promotes warn-only to failure. It resets the local database itself, so it is the gate's single positive drift check — `sync-v2-e2e` proves only the negative (synthetic drift) case. |
 | `sync-v2-e2e` | Integration assertions across the as-built stack, including push→pull parity over every data-scope entity and tombstone visibility. Its drift body proves only the checker's CLI wiring, with no database reset: synthetic drift fails the run, and the mutated file is restored byte-exactly. |
 | `sync-infra` | The cross-stack layer above — the one lane whose body is frontend and whose infra is backend. Runs last in the backend gate. |
@@ -226,14 +224,15 @@ Applies to every lane that hits a running stack rather than a mocked client.
 - **Enforcement:** `supabase/scripts/ensure-local-runtime-baseline.sh` runs
   before any real-instance lane (the wrappers call it). Runtime down → start,
   reset/seed, provision fixtures. Runtime up → reuse as-is with **no reset**
-  (a marked or protocol-4-active stack is reset),
+  (a marked stack is reset),
   refresh stale Edge Function routing, apply pending migrations, verify baseline
-  rows, re-provision fixtures idempotently.
+  rows, re-provision fixtures idempotently, activate group competitions
+  (protocol 4, as in production).
 - **Once per gate:** `./boga test <gate>` exports one `BOGA_GATE_RUN_ID`. The
   full path ends by stamping it in `public.local_runtime_bootstrap_markers`
   with a hash of its inputs (migrations, seed, fixture constants) and one of the
   state it repaired (applied migrations, fixture principals and auth users, the
-  group-eval kick URL). A later lane of that gate still checks reachability and
+  group-eval kick URL, group-competition activation). A later lane of that gate still checks reachability and
   Edge routing, then skips the repairs only while the stamp and both hashes
   match. A reset truncates the stamp (`seed.sql`) and any changed hash means
   the full path, so a skip never rests on unchecked state. A lane run by name

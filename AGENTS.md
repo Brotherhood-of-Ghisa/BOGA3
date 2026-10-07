@@ -41,7 +41,7 @@ place each under `docs/specs/**`, routed from here.
    | Sync / boot / auth (`src/sync/**`, `src/auth/**`, scheduler, drizzle/migrations) | `boga test fast` + `boga test backend` + `boga test ios-sync-e2e` (UI↔server e2e) |
    | Backend (`supabase/migrations/**`, functions, RLS, sync RPCs) | `boga test backend` |
    | Groups (`src/groups/**`, `supabase/migrations/*group*`) | the rows above + `boga test groups-api-live` (client ↔ live server) + `boga test ios-groups-e2e` (two-user e2e) |
-| Group competitions (`src/groups/competition-*`, `supabase/migrations/*competition*`) | the Groups row + `boga test groups-protocol4` (the one-way protocol-4 cutover; not in `boga test backend`) |
+| Group competitions (`src/groups/competition-*`, `supabase/migrations/*competition*`) | the Groups row + `boga test groups-competitions`; migrations also `boga test groups-protocol4` (the one-way protocol-4 cutover; not in `boga test backend`) |
    | Agent consent web (`apps/agent-auth-web/**`) | `boga test fast` |
    | MCP service (`services/boga-mcp/**`) | `boga test fast` + `boga test mcp-smoke` |
    | Native iOS dependency / config-plugin change | `./boga ios build-client --force` first, then `boga test frontend` (see `02`) |
