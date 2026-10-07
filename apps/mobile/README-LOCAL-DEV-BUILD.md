@@ -292,48 +292,13 @@ This build is a development client. The teammate still needs access to Metro:
 - Remote teammate: start Metro with the `--tunnel` command in
   `Start Metro For The Phone`.
 
-## Build And Submit Production
+## Build and submit a store signed release
 
-For every production release, first follow "Production mobile release" in
-`docs/runbook-hosted-operations.md`, including its hosted migration, compatibility
-and verification gate. Build and submit from the same pinned commit, starting
-at that checkout's repository root:
-
-```bash
-cd apps/mobile
-mkdir -p ../../artifacts/builds
-
-npx eas-cli build --platform ios --profile prod --local --non-interactive \
-  --output ../../artifacts/builds/boga3-prod.ipa
-npx eas-cli submit --platform ios --profile prod --non-interactive --wait \
-  --path ../../artifacts/builds/boga3-prod.ipa
-```
-
-## Build A Store-Signed Preview IPA
-
-When you need a dev-client build of `com.phano.boga3.dev` for App Store
-Connect/TestFlight, build and submit the `preview` profile instead. It uses
-store signing while keeping the dev bundle ID. This is a release build: first
-run the full sweep on the commit you ship (`./boga sweep`, or
-`./boga sweep --ref origin/<branch>`) and build only from a green sweep
-(`docs/specs/02-quality-and-test-gates.md`).
-
-```bash
-cd /Users/sboschi/Code/BOGA3/apps/mobile
-mkdir -p ../../artifacts/builds
-
-npx eas-cli build \
-  --platform ios \
-  --profile preview \
-  --local \
-  --non-interactive \
-  --output ../../artifacts/builds/boga3-preview.ipa
-
-npx eas-cli submit \
-  --platform ios \
-  --profile preview \
-  --path ../../artifacts/builds/boga3-preview.ipa
-```
+For TestFlight or production builds, follow `docs/procedures/ios-release.md`.
+It provides one guided sequence with `preview`/`prod` options, upfront metadata
+and tagging choices, a pinned release worktree, the database gate, IPA
+inspection and submission. Internal/ad hoc `dev` builds use the earlier
+sections of this document.
 
 ## Troubleshooting
 
