@@ -120,8 +120,6 @@ appId: com.dinoderek.mobile
     visible:
       id: "connected-agents-screen"
     timeout: 15000
-- assertVisible:
-    text: "Agents can read training data only.*"
 - extendedWaitUntil:
     visible:
       id: "connected-agents-empty"

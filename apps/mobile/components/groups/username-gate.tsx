@@ -90,9 +90,6 @@ export function UsernameGate({ userId, notice, onSaved }: UsernameGateProps) {
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.title}>
         Choose a username
       </Text>
-      <Text allowFontScaling={false} style={styles.body}>
-        Group members see you by your username. You can change it later in Profile.
-      </Text>
       {notice ? <GroupWriteNotice message={notice} testID="group-username-gate-notice" tone="error" /> : null}
       <FormField
         accessibilityLabel="Username"
@@ -133,13 +130,5 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.lg,
     lineHeight: uiTypography.lineHeight.lg,
     color: uiRoles.ink,
-  },
-  body: {
-    marginTop: -uiSpace.sm,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
 });

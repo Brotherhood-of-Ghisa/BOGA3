@@ -16,6 +16,6 @@ it.each([
     bodyweightContribution: beforeContribution }, undefined), revision: 1 };
   const next = { ...rules, bodyweightCalculationsEnabled: nextEnabled, bodyweightContribution: nextContribution };
   const status = deriveComparisonFormStatus({ baseline, validation: { ok: true, value: next },
-    existing: undefined, dirty: true, showErrors: false, reviewed: false });
+    existing: undefined, dirty: true, showErrors: false });
   expect(status.calculationChanged).toBe(changed);
 });

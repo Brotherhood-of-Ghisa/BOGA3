@@ -218,6 +218,7 @@ describe('Create group (flow 1)', () => {
 
     await screen.findByTestId('group-username-gate');
     expect(screen.queryByTestId('group-form')).toBeNull();
+    expect(screen.queryByText(/see you by your username/)).toBeNull();
     fireEvent.press(screen.getByTestId('group-username-save'));
     expect(screen.getByTestId('group-username-error').props.children).toBe('Enter a username.');
     expect(profile.saveUsername).not.toHaveBeenCalled();
@@ -376,6 +377,7 @@ describe('Invite (flow 2)', () => {
     expect(await screen.findByTestId('group-invite-code')).toHaveTextContent('ABCD2345');
     expect(screen.getByTestId('group-invite-link')).toHaveTextContent('boga3://group/join?code=ABCD2345');
     await waitFor(() => expect(screen.getByText('Invite friends to Garage Gym')).toBeTruthy());
+    expect(screen.queryByText(/Anyone with this code can join/)).toBeNull();
     await act(async () => {
       fireEvent.press(screen.getByTestId('group-invite-share'));
     });
