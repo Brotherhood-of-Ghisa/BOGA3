@@ -1,7 +1,7 @@
-# M35-T04-Simplify_the_V4_client — Simplify the V4 client
+# M35-T05-Simplify_the_V4_client — Simplify the V4 client
 
 - Status: `planned`
-- Depends on: `M35-T03-Remove_pre_V4_server_code`
+- Depends on: `M35-T04-Remove_pre_V4_server_code`
 - Milestone: `docs/plans/milestones/M35-retire-pre-v4-group-competitions.md`
 - Areas: frontend (`apps/mobile/src/groups`); UI impact: no
 
@@ -12,9 +12,14 @@ scorers or view models, and no dead V4 surface.
 
 ## Scope
 
-- In: protocol-3 TS T03 left behind (candidates: `metric-contract.ts`,
-  `metric-wire.ts`, `metric-wire-guards.ts`, `performance-score.ts`,
-  `metric-view-model.ts` — confirm each has no V4 caller); the unused
+- In: protocol-3 TS T04 left behind. The T01 doc
+  (`docs/plans/M35-pre-v4-inventory-and-test-map.md` §4.9) lists the
+  candidates with their importers: `metric-evaluation.ts`,
+  `performance-score.ts` `scoreGroupPerformance`, `metric-contract.ts`
+  (mixed: link-compatibility rules stay), `metric-wire.ts`,
+  `metric-wire-guards.ts`, `metric-view-model.ts`, the M25 shapes in
+  `types.ts`. Confirm each has no V4 caller. Also the stale comments naming
+  old RPCs (listed in §4's header). The unused
   `getCompetitionContract`; the `pending` branch of the activation-state type
   if nothing decodes it; their tests; complexity/dependency baselines that shrink.
 - Out: V4 wire guards' accepted shapes (M35 D4); UI changes.
@@ -34,7 +39,7 @@ payloads.
 1. No protocol-3 module in `apps/mobile/src/groups`; `jest-coverage`,
    `complexity` and `dependencies` green, suppression/baseline lists shrunk
    where entries went with deleted code.
-2. `groups-api-live` green against the T03 schema.
+2. `groups-api-live` green against the T04 schema.
 
 ## Gates
 
