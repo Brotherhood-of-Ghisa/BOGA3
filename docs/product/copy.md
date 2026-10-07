@@ -51,7 +51,10 @@ formula notes, hints under fields, or "how this works" lines.
     information.` beside a Volume figure: a set whose load cannot be
     calculated is left out and the Volume of the rest is shown, with no note
     (decided 2026-10-07).
+  - The preview under a group's scoring-rules form (`Apply rules revision N:
+    … The whole board will rebuild together. …` and the certification note):
+    removed, with nothing in its place (decided 2026-10-07).
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.
-Pending: the Volume coverage notes still show (`sessionVolumeSummary` in `apps/mobile/src/exercise-calculations/analytics.ts`; `apps/mobile/components/stats/progress-tables.tsx`).
+Pending: the Volume coverage notes still show (`sessionVolumeSummary` in `apps/mobile/src/exercise-calculations/analytics.ts`; `apps/mobile/components/stats/progress-tables.tsx`), and so does the group rules review (`describeRulesChange` in `apps/mobile/src/groups/comparison-form-model.ts`).
