@@ -1,5 +1,4 @@
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -93,7 +92,7 @@ export function RecordsPanel({
   );
 }
 
-type CollapsedStatValues = { oneRepMax: string; maxWeight: string; volume: string; coverageNote?: string };
+type CollapsedStatValues = { oneRepMax: string; maxWeight: string; volume: string };
 
 const NO_STATS: CollapsedStatValues = { oneRepMax: DASH, maxWeight: DASH, volume: DASH };
 
@@ -110,14 +109,13 @@ const collapsedRecordStats = ({ oneRepMax, maxWeight, volume }: ExerciseRecords)
   volume: orDash(volume?.value, formatVolume),
 });
 
-/** The previous session's best 1RM, heaviest set and volume, noting volume it could not total. */
+/** The previous session's best 1RM, heaviest set and volume. */
 const collapsedLastStats = (last: LastSession | null): CollapsedStatValues => {
   if (!last) return NO_STATS;
   return {
     oneRepMax: orDash(last.oneRepMax, formatOneRepMax),
     maxWeight: orDash(last.maxWeight, formatWeight),
     volume: orDash(last.volume, formatVolume),
-    coverageNote: last.volume === null ? formatVolumeWithCoverage(last.volume, last.knownVolume) : undefined,
   };
 };
 
@@ -206,7 +204,7 @@ function LastSessionDetail({ last, dateFormat, now }: { last: LastSession; dateF
           {datedDetail(last.completedAt, last.gymName, formatDaysAgo(last.completedAt, now), dateFormat)}
         </Text>
         <Text allowFontScaling={false} style={pageText.detailFigure}>
-          {`1RM ${orDash(last.oneRepMax, formatOneRepMax)} · VOL ${formatVolumeWithCoverage(last.volume, last.knownVolume)}`}
+          {`1RM ${orDash(last.oneRepMax, formatOneRepMax)} · VOL ${orDash(last.volume, formatVolume)}`}
         </Text>
       </View>
       {last.sets.map((set, index) => (
@@ -220,15 +218,12 @@ function CollapsedStats({
   oneRepMax,
   maxWeight,
   volume,
-  coverageNote,
 }: {
   oneRepMax: string;
   maxWeight: string;
   volume: string;
-  coverageNote?: string;
 }) {
   return (
-    <View>
     <View style={styles.collapsed} testID="exercise-records-collapsed">
       <View style={styles.collapsedCell}>
         <Stat label="1RM" testID="exercise-records-1rm" value={oneRepMax} />
@@ -239,8 +234,6 @@ function CollapsedStats({
       <View style={styles.collapsedCell}>
         <Stat label="Vol" testID="exercise-records-vol" value={volume} />
       </View>
-    </View>
-    {coverageNote ? <Text allowFontScaling={false} style={[pageText.body, styles.message]} testID="exercise-records-volume-coverage">{`Volume: ${coverageNote}`}</Text> : null}
     </View>
   );
 }

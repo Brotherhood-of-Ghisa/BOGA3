@@ -1,8 +1,8 @@
 import { Fragment, useRef, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Icon, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
-import type { ProgressComparison, ProgressExerciseComparison, ProgressMuscleComparison, ProgressPeriodValues } from '@/src/data';
-import { compactVolumeFigure } from '@/src/exercise-calculations/analytics';
+import type { ProgressComparison, ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { muscleTargetAttainment } from '@/src/preferences/targets';
 import { formatCountDelta, formatVolumeDelta } from './comparison-format';
 
@@ -10,13 +10,10 @@ export type ProgressTableMetric = 'workingSetCount' | 'totalVolume';
 const shades = [uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4];
 const figures = (row: ProgressComparison, metric: ProgressTableMetric) => metric === 'workingSetCount'
   ? [String(row.current.workingSetCount), String(row.previous.workingSetCount), formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount).text]
-  : [compactVolumeFigure(row.current.totalVolume, row.current.knownVolume), compactVolumeFigure(row.previous.totalVolume, row.previous.knownVolume), formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume).text];
+  : [formatVolumeFigure(row.current.totalVolume), formatVolumeFigure(row.previous.totalVolume), formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume).text];
 const hasMetric = (row: ProgressComparison, metric: ProgressTableMetric) => metric === 'workingSetCount'
   ? row.current.workingSetCount > 0 || row.previous.workingSetCount > 0
   : row.current.volumeSetCount > 0 || row.previous.volumeSetCount > 0;
-const coverage = (values: ProgressPeriodValues) => values.totalVolume !== null ? null
-  : values.knownVolume === null ? 'Volume unavailable; subtotal exceeds numeric range'
-  : `Volume incomplete. Known subtotal from ${values.knownVolumeSetCount} of ${values.volumeSetCount} included sets`;
 
 type Props = {
   muscles: ProgressMuscleComparison[]; metric: ProgressTableMetric; selectedId: string | null;
@@ -92,17 +89,6 @@ function Values({ row, metric, columns, stacked, vertical, prefix }: { row: Prog
   </View>;
 }
 
-function RowCoverage({ row, metric, prefix }: { row: ProgressComparison; metric: ProgressTableMetric; prefix: string }) {
-  if (metric !== 'totalVolume') return null;
-  const current = coverage(row.current);
-  const previous = coverage(row.previous);
-  if (!current && !previous) return null;
-  return <View style={styles.coverageRow} testID={`${prefix}-coverage`}>
-    {current ? <Text allowFontScaling={false} style={styles.coverage}>Now: {current}</Text> : null}
-    {previous ? <Text allowFontScaling={false} style={styles.coverage}>Previous: {previous}</Text> : null}
-  </View>;
-}
-
 function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, weeklyTarget, onSelect, onHistory }: {
   row: ProgressMuscleComparison; metric: ProgressTableMetric; columns: number[]; stacked: boolean; vertical: boolean; selected: boolean;
   weeks: number; weeklyTarget: number; onSelect: Props['onSelect']; onHistory: Props['onMuscleHistory'];
@@ -119,12 +105,11 @@ function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, w
         <Text allowFontScaling={false} style={styles.name}>{row.displayName}</Text>
       </Pressable>
     </View>
-    <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${metric === 'totalVolume' ? 'kg·reps per side. ' : 'Working sets. '}Colour: ${row.current.workingSetCount} of ${weeklyTarget * weeks} working sets; ${weeklyTarget} per week over ${weeks} weeks${metric === 'totalVolume' ? `. Now ${coverage(row.current) ?? 'complete volume'}. Previous ${coverage(row.previous) ?? 'complete volume'}` : ''}`}
+    <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${metric === 'totalVolume' ? 'kg·reps per side. ' : 'Working sets. '}Colour: ${row.current.workingSetCount} of ${weeklyTarget * weeks} working sets; ${weeklyTarget} per week over ${weeks} weeks`}
       style={stacked ? styles.fullWidth : undefined}>
       <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={prefix} />
     </View>
     <Selection row={row} selected={selected} stacked={stacked} onSelect={onSelect} />
-    <RowCoverage row={row} metric={metric} prefix={prefix} />
   </View>;
 }
 
@@ -148,7 +133,6 @@ function ExerciseRow({ row, metric, columns, stacked, vertical, last, onHistory 
     </Pressable>
     <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={`stats-contribution-${row.exerciseDefinitionId}`} />
     {!stacked ? <View style={styles.actionCell} /> : null}
-    <RowCoverage row={row} metric={metric} prefix={`stats-contribution-${row.exerciseDefinitionId}`} />
   </View>;
 }
 
@@ -188,9 +172,6 @@ const styles = StyleSheet.create({
   numeric: { textAlign: 'right' },
   figure: { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md, color: uiRoles.ink },
-  coverageRow: { width: '100%', alignSelf: 'stretch', paddingBottom: uiSpace.sm },
-  coverage: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs, color: uiRoles.ink },
   role: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.xs,
     lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
 });

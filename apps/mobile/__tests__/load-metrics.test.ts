@@ -3,6 +3,7 @@ import {
   calculateSetMetrics,
   resolveCalculatedLoad,
   summarizeVolume,
+  sumVolume,
   type SetMetricInput,
 } from '@/src/exercise-calculations/load-metrics';
 import vectors from '@/src/exercise-calculations/load-metrics-vectors.json';
@@ -90,6 +91,22 @@ describe('shared load metrics', () => {
       eligibleSetCount: 3, knownSetCount: 1, missingSetCount: 1, invalidSetCount: 1,
       complete: false, overflow: false });
     expect(summarizeVolume([])).toMatchObject({ complete: true, totalVolumeKgReps: 0 });
+  });
+
+  it('sums the Volume of the sets whose load is known, leaving the rest out ([[copy.no-inline-explanation]])', () => {
+    const personal: SetMetricInput = { ...pullUp, policy: 'personal' };
+    expect(sumVolume([
+      calculateSetMetrics(personal),
+      calculateSetMetrics({ ...personal, loadInputMode: 'sideways' as SetMetricInput['loadInputMode'] }),
+      calculateSetMetrics({ ...personal, bodyWeightKg: -1 }),
+      calculateSetMetrics({ ...personal, bodyweightContribution: Number.NaN }),
+    ])).toBe(800);
+    expect(sumVolume([calculateSetMetrics({ ...personal, bodyweightContribution: 2 })])).toBe(0);
+    expect(sumVolume([])).toBe(0);
+    // Null only when the sum itself is not finite: each 6e307 set is finite.
+    const huge = calculateSetMetrics({ ...personal, bodyweightContribution: 0, weightValue: `1${'0'.repeat(306)}`, repsValue: '60' });
+    expect(huge.volumeKgReps).toBe(6e307);
+    expect(sumVolume([huge, huge, huge])).toBeNull();
   });
 
   it('keeps the displayed 1RM in entered-Weight terms', () => {

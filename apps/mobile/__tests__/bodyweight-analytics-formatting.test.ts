@@ -6,7 +6,7 @@ import type { ExerciseVolumeComparison } from '@/src/session-insights';
 it('does not render an infinite percentage from otherwise finite complete volumes', () => {
   expect(formatVolumeDelta(1e308, 1e-308)).toEqual({ text: 'Increased', tone: 'positive' });
   expect(formatVolumeDelta(110, 100)).toEqual({ text: '+10%', tone: 'positive' });
-  expect(formatVolumeDelta(null, 100)).toEqual({ text: 'Incomplete', tone: 'neutral' });
+  expect(formatVolumeDelta(null, 100)).toEqual({ text: '—', tone: 'neutral' });
   expect(formatVolume(1e308)).toBe('1e+308');
   const comparison: ExerciseVolumeComparison = {
     exerciseDefinitionId: 'pull', exerciseName: 'Pull-up', sessionExerciseIds: ['ex'], sessionExerciseOrderIndex: 0,
@@ -14,8 +14,7 @@ it('does not render an infinite percentage from otherwise finite complete volume
     workingSetCount: 1, historicalSessionCount: 1, state: 'single-baseline',
   };
   expect(formatExerciseVolumeComparison(comparison)).toBe('Above median');
-  expect(formatExerciseVolumeComparison({ ...comparison, currentVolume: null, knownVolume: 100 }))
-    .toBe('Incomplete · comparison unavailable');
-  expect(formatExerciseVolumeComparison({ ...comparison, medianVolume: null, excludedHistoricalSessionCount: 1 }))
-    .toBe('No complete comparison history');
+  // An overflowed sum is dashed, never explained ([[copy.no-inline-explanation]]).
+  expect(formatExerciseVolumeComparison({ ...comparison, currentVolume: null, state: 'unavailable' })).toBe('—');
+  expect(formatExerciseVolumeComparison({ ...comparison, medianVolume: null })).toBe('No comparison history yet');
 });

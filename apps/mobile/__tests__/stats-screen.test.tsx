@@ -1055,16 +1055,23 @@ describe('StatsScreenShell — search & filtering', () => {
 
 });
 
-it('keeps partial volume readable and uses ordinary strength copy for bodyweight arithmetic', () => {
+it('shows Volume with no coverage note and uses ordinary strength copy for bodyweight arithmetic', () => {
   render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseListItems: [{
     id: 'bw', name: 'Pull-up', workingSetCount: 2,
-    totalVolume: null, knownVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
+    totalVolume: 800, estimatedOneRepMax: 127.7, lastCompletedAt: null,
+  }, {
+    id: 'huge', name: 'Overflowed', workingSetCount: 1,
+    totalVolume: null, estimatedOneRepMax: null, lastCompletedAt: null,
   }] })} />);
   expect(screen.getByTestId('stats-exercise-volume-bw')).toHaveTextContent('800');
-  expect(screen.getByTestId('stats-exercise-coverage-bw')).toHaveTextContent('Volume incomplete');
+  expect(screen.queryByTestId('stats-exercise-coverage-bw')).toBeNull();
   expect(screen.queryByText(/Added 1RM|BW \+/i)).toBeNull();
   expect(screen.getByTestId('stats-exercise-row-bw').props.accessibilityLabel)
-    .toBe('Open Pull-up heatmap. 2 sets. Volume 800 · incomplete. Estimated one rep max 127.7 kg');
+    .toBe('Open Pull-up heatmap. 2 sets. Volume 800. Estimated one rep max 127.7 kg');
+  // A sum that is not finite is dashed, never explained ([[copy.no-inline-explanation]]).
+  expect(screen.getByTestId('stats-exercise-volume-huge')).toHaveTextContent('—');
+  expect(screen.queryByTestId('stats-exercise-coverage-huge')).toBeNull();
+  expect(screen.queryByText(/incomplete/i)).toBeNull();
 });
 
 

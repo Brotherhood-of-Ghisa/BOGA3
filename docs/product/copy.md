@@ -75,4 +75,3 @@ formula notes, hints under fields, or "how this works" lines.
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.
-Pending: the Volume coverage notes still show (`sessionVolumeSummary` in `apps/mobile/src/exercise-calculations/analytics.ts`; `apps/mobile/components/stats/progress-tables.tsx`).

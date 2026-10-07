@@ -118,7 +118,7 @@ session with zero working sets. There are three kinds:
 | --- | --- | --- |
 | 1RM | its best estimated 1RM ([[1rm.formula]]), over every block | strictly higher |
 | Weight | its top Weight: the highest raw entered kg, and at that kg the most reps | heavier, or as heavy with more reps |
-| Volume | its total volume-included volume, every block summed; only when complete | strictly higher |
+| Volume | its total volume-included volume, every block summed (§4 Totals) | strictly higher |
 
 - **Order.** Sessions are folded by `completed_at`, then session id. Within a
   session, a tie between sets goes to the first set in session order (block,
@@ -128,7 +128,8 @@ session with zero working sets. There are three kinds:
   belongs to the earliest session.
 - **Zero.** A zero 1RM ([[1rm.formula]]), Weight or Volume is never a record,
   never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
-  incomplete volume neither sets nor raises the Volume record.
+  Volume that left out sets whose load cannot be calculated competes like
+  any other (§4); one whose sum is not finite has no value.
 - **Scope.** By default every gym's sessions count. Where a screen offers the
   current-gym filter (today only the exercise page), only that gym's sessions
   count. A completed session being edited, and an active session, are compared
@@ -167,7 +168,8 @@ read the rule:
 - the records panel and all-time bests (`loadExerciseBests`);
 - the comparison baselines (`loadEarlierBestsByDefinition`);
 - the exercise page, session view and completion markers;
-- the agent API's `personal_records`.
+- the agent API's `personal_records`, except Volume: its `max_session_volume`
+  still skips a session with an uncalculable set (§4 Totals).
 
 Changing personal derivation bumps `EXERCISE_SESSION_FACTS_RULES_VERSION`.
 Changing the shared coaching rule also bumps the agent API's `metric_revision`.
@@ -245,11 +247,13 @@ choices may change which recorded set qualifies.
 **Totals.**
 
 - A session's or exercise's Volume is the sum over its volume-included sets (§1)
-  (`summarizeVolume`).
-- When a set's load is unknown, the total is a known subtotal, with coverage
-  shown as `Known subtotal from X of Y included sets`. Decided to go: such a
-  set is left out and no note shows ([[copy.no-inline-explanation]],
-  `Pending:`).
+  whose load can be calculated (`sumVolume`); [[copy.no-inline-explanation]]
+  decides the rest. A personal load is uncalculable only with corrupt stored
+  context, an invalid reading or an overflowing set (`resolveCalculatedLoad`).
+- A sum that is not finite is `null`: shown `—`, never a record or a
+  comparison baseline.
+- The coaching API keeps the coverage counts (`summarizeVolume`): its `value`
+  is `null` when a set was left out (`supabase/functions/agent-api/README.md`).
 
 **Muscle volume.**
 
@@ -282,14 +286,12 @@ fallback, never an identity join. Current mappings reinterpret both periods.
 Unlinked sets contribute no muscle/exercise row, as in the existing muscle
 analytics. A volume-only exercise remains a contributor even at zero load.
 
-Every period exposes working-set count, complete Volume or `null`, known
-subtotal, and known/included Volume-set counts. Counts, Volume and coverage
-reconcile with the contribution rows; unknown Volume stays incomplete rather
-than becoming zero (today's code; the decision to leave such sets out is
-[[copy.no-inline-explanation]], `Pending:`). Changes are shown as
-[[comparison.change-display]]; each row's Volume change uses its own baseline,
-and the code's states are `empty`, `new`, a percentage, `incomplete` when
-either total is unknown, and `increased` if the percentage overflows. Row
+Every period exposes working-set count, Volume (§4 Totals) and the included
+Volume-set count; counts and Volume reconcile with the contribution rows.
+Changes are shown as [[comparison.change-display]]; each row's Volume change
+uses its own baseline, and the code's states are `empty`, `new`, a percentage,
+`unavailable` (`—`) when either sum is not finite, and `increased` if the
+percentage overflows. Row
 percentages are never summed. Calculation-column eligibility is independent
 of Display (§1); zero working sets alone cannot establish Volume emptiness.
 

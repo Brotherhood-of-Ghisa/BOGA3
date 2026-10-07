@@ -24,9 +24,8 @@ export const exerciseSessionFacts = sqliteTable(
     /** Raw entered kg. */
     topWeightKg: real('top_weight_kg'),
     topWeightSetId: text('top_weight_set_id'),
-    /** The known subtotal; the full total only when `volume_complete`. */
+    /** Null only when the sum is not finite (`sumVolume`). */
     volumeKg: real('volume_kg'),
-    volumeComplete: integer('volume_complete', { mode: 'boolean' }).notNull(),
     workingSets: integer('working_sets').notNull(),
     volumeSets: integer('volume_sets').notNull().default(0),
     prE1rm: integer('pr_e1rm', { mode: 'boolean' }).notNull(),
