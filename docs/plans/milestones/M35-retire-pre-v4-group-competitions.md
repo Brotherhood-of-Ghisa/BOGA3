@@ -93,7 +93,7 @@ group data (no silent skip of the cutover).
 | --- | --- | --- | --- |
 | M35-T01-Inventory_and_test_map | Pre-V4 object inventory with callers, hosted verification, assertion port/delete map ([results](../M35-pre-v4-inventory-and-test-map.md)) | none | completed |
 | M35-T02-Port_light_suites_to_V4 | Header; port groups-contract, leaderboards, week-summary; V4 competitions chapters to a default lane (`groups-competitions`); SQL-seeded history fixture; fix found on the way: publish reps cast (`20261007180000`) | T01 | completed |
-| [M35-T03-Port_heavy_suites_and_flip_the_baseline](../tasks/M35-T03-Port_heavy_suites_and_flip_the_baseline.md) | Port boards, certification, bodyweight; local baseline active; groups-protocol4 down to cutover chapters | T02 | planned |
+| M35-T03-Port_heavy_suites_and_flip_the_baseline | Port boards, certification, bodyweight; local baseline active (preflight activates, stamp hashes activation); V4 client suite moved to groups-api-live; groups-protocol4 down to cutover chapters | T02 | completed |
 | [M35-T04-Remove_pre_V4_server_code](../tasks/M35-T04-Remove_pre_V4_server_code.md) | Removal migration, group-eval protocol-3 path, activation tooling, specs | T03 | planned |
 | [M35-T05-Simplify_the_V4_client](../tasks/M35-T05-Simplify_the_V4_client.md) | Delete protocol-3 TS and dead V4 client surface | T04 | planned |
 | [M35-T06-Hosted_rollout](../tasks/M35-T06-Hosted_rollout.md) | Operator-authorised hosted deploy and verification of T04 | T04 | planned |
