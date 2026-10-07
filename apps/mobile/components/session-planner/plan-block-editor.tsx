@@ -79,38 +79,40 @@ export function PlanBlockEditor({
 
   return (
     <View style={styles.block} testID={`plan-form-block-${index + 1}`}>
-      <ListRow
-        accessibilityLabel={block.name.length > 0 ? `Exercise ${block.name}` : 'Choose exercise'}
-        density="list"
-        divider={false}
-        label={block.name.length > 0 ? block.name : 'Choose exercise'}
-        onPress={() => onPickExercise(block.id)}
-        testID={`plan-form-block-${index + 1}-pick`}
-        trailing={
-          <View style={styles.blockActions}>
-            <IconButton
-              accessibilityLabel={`Move ${block.name || 'exercise'} up`}
-              disabled={index === 0}
-              name="arrow-up"
-              onPress={() => onMoveBlock(block.id, -1)}
-              testID={`plan-form-block-${index + 1}-up`}
-            />
-            <IconButton
-              accessibilityLabel={`Move ${block.name || 'exercise'} down`}
-              disabled={index === count - 1}
-              name="arrow-down"
-              onPress={() => onMoveBlock(block.id, 1)}
-              testID={`plan-form-block-${index + 1}-down`}
-            />
-            <IconButton
-              accessibilityLabel={`Remove ${block.name || 'exercise'} from the plan`}
-              name="x"
-              onPress={() => onRemoveBlock(block.id)}
-              testID={`plan-form-block-${index + 1}-remove`}
-            />
-          </View>
-        }
-      />
+      <View style={styles.blockHeader}>
+        <Pressable
+          accessibilityLabel={block.name.length > 0 ? `Exercise ${block.name}` : 'Choose exercise'}
+          accessibilityRole="button"
+          onPress={() => onPickExercise(block.id)}
+          style={styles.blockPick}
+          testID={`plan-form-block-${index + 1}-pick`}>
+          <Text allowFontScaling={false} numberOfLines={1} style={styles.blockName}>
+            {block.name.length > 0 ? block.name : 'Choose exercise'}
+          </Text>
+        </Pressable>
+        <View style={styles.blockActions}>
+          <IconButton
+            accessibilityLabel={`Move ${block.name || 'exercise'} up`}
+            disabled={index === 0}
+            name="arrow-up"
+            onPress={() => onMoveBlock(block.id, -1)}
+            testID={`plan-form-block-${index + 1}-up`}
+          />
+          <IconButton
+            accessibilityLabel={`Move ${block.name || 'exercise'} down`}
+            disabled={index === count - 1}
+            name="arrow-down"
+            onPress={() => onMoveBlock(block.id, 1)}
+            testID={`plan-form-block-${index + 1}-down`}
+          />
+          <IconButton
+            accessibilityLabel={`Remove ${block.name || 'exercise'} from the plan`}
+            name="x"
+            onPress={() => onRemoveBlock(block.id)}
+            testID={`plan-form-block-${index + 1}-remove`}
+          />
+        </View>
+      </View>
       {errors.get(`${blockPath}.name`) ? (
         <Text allowFontScaling={false} style={styles.error} testID={`plan-form-block-${index + 1}-name-error`}>
           {errors.get(`${blockPath}.name`)}
@@ -124,49 +126,75 @@ export function PlanBlockEditor({
         testID={`plan-form-block-${index + 1}-machine`}
         value={block.machineName}
       />
-      {block.sets.map((set, setIndex) => (
-        <View key={set.id} style={styles.setRow}>
-          <TypeField
-            blockIndex={index}
-            setIndex={setIndex}
-            onCycle={() =>
-              onChangeSet(block.id, set.id, {
-                targetSetType: nextSessionSetType(set.targetSetType as SessionSetTypeValue, displayEfforts),
-              })
-            }
-            setType={set.targetSetType as SessionSetTypeValue}
-          />
-          <FormField
-            accessibilityLabel={`Set ${setIndex + 1} target weight in kilograms`}
-            containerStyle={styles.weightField}
-            error={errors.get(`${blockPath}.sets.${setIndex}.targetWeight`)}
-            keyboardType="decimal-pad"
-            label={weightLabel}
-            onChangeText={(text) => onChangeSet(block.id, set.id, { targetWeightText: text })}
-            testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-weight`}
-            value={set.targetWeightText}
-          />
-          <FormField
-            accessibilityLabel={`Set ${setIndex + 1} target reps`}
-            containerStyle={styles.repsField}
-            error={errors.get(`${blockPath}.sets.${setIndex}.targetReps`)}
-            keyboardType="number-pad"
-            label="Reps"
-            onChangeText={(text) => onChangeSet(block.id, set.id, { targetRepsText: text })}
-            testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-reps`}
-            value={set.targetRepsText}
-          />
-          <View style={styles.setRemove}>
-            <IconButton
-              accessibilityLabel={`Remove set ${setIndex + 1}`}
-              disabled={block.sets.length === 1}
-              name="x"
-              onPress={() => onRemoveSet(block.id, set.id)}
-              testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-remove`}
-            />
+      {block.sets.map((set, setIndex) => {
+        const weightError = errors.get(`${blockPath}.sets.${setIndex}.targetWeight`);
+        const repsError = errors.get(`${blockPath}.sets.${setIndex}.targetReps`);
+        return (
+          <View key={set.id} style={styles.setBlock}>
+            <View style={styles.setRow}>
+              <TypeField
+                blockIndex={index}
+                setIndex={setIndex}
+                onCycle={() =>
+                  onChangeSet(block.id, set.id, {
+                    targetSetType: nextSessionSetType(set.targetSetType as SessionSetTypeValue, displayEfforts),
+                  })
+                }
+                setType={set.targetSetType as SessionSetTypeValue}
+              />
+              <FormField
+                accessibilityLabel={`Set ${setIndex + 1} target weight in kilograms`}
+                containerStyle={styles.weightField}
+                error={weightError}
+                keyboardType="decimal-pad"
+                label={weightLabel}
+                onChangeText={(text) => onChangeSet(block.id, set.id, { targetWeightText: text })}
+                showErrorText={false}
+                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-weight`}
+                value={set.targetWeightText}
+              />
+              <FormField
+                accessibilityLabel={`Set ${setIndex + 1} target reps`}
+                containerStyle={styles.repsField}
+                error={repsError}
+                keyboardType="number-pad"
+                label="Reps"
+                onChangeText={(text) => onChangeSet(block.id, set.id, { targetRepsText: text })}
+                showErrorText={false}
+                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-reps`}
+                value={set.targetRepsText}
+              />
+              <View style={styles.setRemove}>
+                <IconButton
+                  accessibilityLabel={`Remove set ${setIndex + 1}`}
+                  disabled={block.sets.length === 1}
+                  name="x"
+                  onPress={() => onRemoveSet(block.id, set.id)}
+                  testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-remove`}
+                />
+              </View>
+            </View>
+            {weightError ? (
+              <Text
+                allowFontScaling={false}
+                accessibilityLiveRegion="polite"
+                style={styles.error}
+                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-weight-error`}>
+                {weightError}
+              </Text>
+            ) : null}
+            {repsError ? (
+              <Text
+                allowFontScaling={false}
+                accessibilityLiveRegion="polite"
+                style={styles.error}
+                testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-reps-error`}>
+                {repsError}
+              </Text>
+            ) : null}
           </View>
-        </View>
-      ))}
+        );
+      })}
       {errors.get(`${blockPath}.sets`) ? (
         <Text allowFontScaling={false} style={styles.error}>{errors.get(`${blockPath}.sets`)}</Text>
       ) : null}
@@ -195,10 +223,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  blockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+    minHeight: uiGeometry.tapTarget,
+  },
+  blockPick: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: uiGeometry.tapTarget,
+    justifyContent: 'center',
+  },
+  blockName: {
+    fontFamily: uiFonts.display.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.lg,
+    lineHeight: uiTypography.lineHeight.lg,
+    color: uiRoles.ink,
+  },
+  setBlock: {
+    gap: uiSpace.xs,
+  },
   setRow: {
     flexDirection: 'row',
     gap: uiSpace.sm,
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   typeField: {
     width: 96,
@@ -241,14 +291,15 @@ const styles = StyleSheet.create({
   },
   setRemove: {
     width: 44,
+    height: uiGeometry.fieldHeight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   error: {
     fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.danger,
   },
 });
