@@ -1,5 +1,5 @@
 // The Progress card's words and chart geometry (pure). The figures come from
-// `src/progress-summary`; this file only says them (`design-targets/today-landing.md`).
+// `src/progress-summary`; this file only says them.
 
 import type { LatestSessionSummary, SessionPersonalRecord, TodayProgressMonth } from '@/src/progress-summary';
 import type { LocalWindow } from '@/src/utils/local-calendar';

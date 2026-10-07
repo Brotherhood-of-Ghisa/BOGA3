@@ -9,7 +9,7 @@ import { launchTheme } from '@/components/ui/theme-launch';
 export const uiRoles = generateRoles(launchTheme.preset.seeds);
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
-// widths and label tracking the accepted target is drawn with. Decided
+// widths and label tracking every screen is drawn with. Decided
 // 2026-09-22.
 export const uiGeometry = {
   radius: {
@@ -18,7 +18,7 @@ export const uiGeometry = {
     // A sheet's two top corners.
     sheet: 16,
     // Controls inside a screen: input fields, a segmented selector, an outline
-    // button. The target drew 4 and 5, a difference with no name, so one value.
+    // button. Controls had used 4 and 5, a difference with no name, so one value.
     // Added 2026-09-23 (exercise page).
     control: 4,
     // Fully rounded ends: pills, tags and handles.
@@ -54,7 +54,7 @@ export const uiSpace = {
 // Eight sizes, down from the fourteen that used to ship. `base` stays at 14:
 // density while logging was chosen over gym-floor legibility. `xxs` (10) was
 // added 2026-09-22 for micro-labels — legends, units, tertiary labels — which
-// the accepted design target drew at 8/9px; both lift to 10 rather than earning
+// were first drawn at 8/9px; both lift to 10 rather than earning
 // rungs of their own, since 8px body-adjacent text was poor for accessibility.
 // No other rung moved.
 export const uiTypography = {

@@ -46,6 +46,12 @@ formula notes, hints under fields, or "how this works" lines.
   - `Pick any colour` under Custom colour and `… applies the next time you
     open BoGa. Close BoGa fully, then open it again.` under the Appearance
     presets; the pending row reads `Next launch` (#585).
+  - `Volume incomplete. Known subtotal from X of Y included sets.` and
+    `Volume unavailable. Some included sets have missing or invalid load
+    information.` beside a Volume figure: a set whose load cannot be
+    calculated is left out and the Volume of the rest is shown, with no note
+    (decided 2026-10-07).
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.
+Pending: the Volume coverage notes still show (`sessionVolumeSummary` in `apps/mobile/src/exercise-calculations/analytics.ts`; `apps/mobile/components/stats/progress-tables.tsx`).

@@ -18,8 +18,8 @@ Document boundary:
 
 1. This document (`08`) owns cross-task UX process, task contract expectations, UX quality principles, and reusable UX patterns.
 2. `docs/specs/ui/**` owns current app-specific UI reality (routes, navigation behavior, reusable UI component inventory, app-specific semantics/guardrails).
-3. `docs/specs/ui/ai-design-policy.md` owns design-source selection, accepted
-   design targets, artifact boundaries, generated-code integration, and visual
+3. `docs/specs/ui/ai-design-policy.md` owns design-source selection, design
+   targets (build inputs, not specs), artifact boundaries, generated-code integration, and visual
    comparison requirements for human- or AI-assisted design work.
 4. UI docs under `docs/specs/ui/**` should stay synthetic/overview-first and source-linked:
    - summarize what exists and why it matters,
@@ -49,8 +49,8 @@ For UI/UX work, write a `UX Contract` before building: in the plan or task
 card if the work has one (`docs/plans/`, optional), otherwise in the PR body.
 Non-UX work needs none.
 
-For a significant UI task, record the accepted design target defined by
-`docs/specs/ui/ai-design-policy.md` beside the UX Contract.
+For a significant UI task, record its design target (a build input, not a
+spec: `docs/specs/ui/ai-design-policy.md`) beside the UX Contract.
 
 Each UX contract must include:
 
@@ -94,7 +94,7 @@ Use this section as the single source of truth for reusable UX patterns.
 5. Explicit row confirmation pattern
    - Intent: keep entered/defaulted values separate from the user's assertion that a repeated item was actually completed.
    - Usage: normal and prescribed set rows on the exercise page, for an active or a completed session (`components/exercise-page/set-row.tsx`).
-   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values; allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
+   - Rules: use a dedicated mobile-sized checkbox-like target independent of row editing; show distinct unchecked and checked shapes so color is supplemental; confirm only valid values ([[set.performed]]); allow confirmation to be undone without clearing values; exclude unchecked items from completion metrics; require an explicit discard decision when valid unchecked work would be removed at submit/save; and keep source identity separate from confirmation status (for example, inactive planned rows use a semantic surface and accessible source wording remains available when the shared selected-row surface temporarily overrides it, while the hollow/tick control communicates performance).
 6. Stream card pattern
    - Intent: scan other people's recent activity at a glance and drill into one item.
    - Usage: the group stream (`components/groups/group-stream-list.tsx`): session cards (`stream-session-card.tsx`) and competition event cards (`group-metric-stream-card.tsx`).
@@ -127,7 +127,7 @@ Use this section as the single source of truth for reusable UX patterns.
 13. Read-only link card pattern
    - Intent: summarise one item of a working set (an exercise in the session) and open it, without editing in place.
    - Usage: the session view's exercise cards (`components/session-view/session-exercise-card.tsx`).
-   - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; what is not yet realised renders faded, never hidden; a record earns a band on the card, not a badge on the row.
+   - Rules: the whole card is one `Card` link with an accessibility label that states the summary (name, done count, record); no controls inside it; editing and removal live on the destination; set rows follow [[set.row-figures]]; a record earns a band on the card, not a badge on the row.
 
 ## Default appearance baseline (MVP)
 
@@ -138,7 +138,7 @@ Use this section as the single source of truth for reusable UX patterns.
 2. Typography
    - Body and input text should remain readable without zoom.
    - Titles and section labels should be visually distinct from body text.
-   - Use a subtitle only when the title alone cannot communicate the item's purpose or action. Do not add subtitles that merely repeat the title, preview details that become clear after opening the item, or state units the destination already makes evident.
+   - Titles stand alone: [[copy.no-subtitles]].
 3. Touch targets
    - Primary interactive elements must meet mobile tap-target expectations.
    - Destructive actions must be visually distinguishable from primary actions.

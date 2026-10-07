@@ -32,8 +32,8 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: savedLookbackWeeks 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
 highestWeight, knownVolume? }`) comes from the muscle/exercise analytics in `src/data`; the
 weekly effort the same screen already loads powers the sheet's week banner.
-Muscle history offers per-side, role-weighted `totalVolume` and
-`workingSetCount`; exercise Volume and 1RM use the current private calculation
+Muscle history offers per-side, role-weighted `totalVolume`, and
+`workingSetCount` ([[muscle.set-count]]); exercise Volume and 1RM use the current private calculation
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
 raw entered kg, and every exercise uses the same labels.
 

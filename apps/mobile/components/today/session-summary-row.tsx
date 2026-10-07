@@ -79,10 +79,11 @@ function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string 
 }
 
 /**
- * One session as a link row, the same on both Today cards
- * (`design-targets/today-landing.md`): the summary line (stamp · duration @
- * gym), `sets · exercises`, then its PRs. The Group card adds the member and
- * the training-now mark above it.
+ * One session as a link row, the same on both Today cards: the summary line
+ * (stamp · duration @ gym), `sets · exercises`, then its PRs. The Group card
+ * adds the member and the training-now mark above it. No group tags: the
+ * server decides which groups a session was shared to (from membership
+ * history), so the device cannot show them.
  */
 export function SessionSummaryRow({
   member,

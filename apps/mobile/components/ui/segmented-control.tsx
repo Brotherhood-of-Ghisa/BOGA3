@@ -23,6 +23,9 @@ export type SegmentedControlProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
+  // The selected segment: `ink` (default); `viz` is `viz4` with `ink` text,
+  // for Progress's selectors; `accent` with `surface` text, for the history
+  // metric control.
   selectedGround?: 'ink' | 'viz' | 'accent';
   hitSlop?: number;
   // Every segment inert and faded, e.g. while the form it belongs to saves.

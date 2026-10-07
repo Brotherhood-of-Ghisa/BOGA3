@@ -24,8 +24,8 @@ export type TodayScreenProps = {
 
 const systemNow = () => new Date();
 
-// Today has no title and no primary action (`design-targets/today-landing.md`):
-// it opens on the Progress card, then the group activity.
+// Today has no title (the tab names the page) and no primary action, so no
+// `accent`: it opens on the Progress card, then the group activity.
 export function TodayScreen({ isFocused = true, loadProgress, now = systemNow, groupState }: TodayScreenProps) {
   const router = useRouter();
   const { state: progressState, retry: retryProgress } = useTodayProgress({ isFocused, load: loadProgress, now });

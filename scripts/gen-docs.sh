@@ -36,7 +36,9 @@
 #        IDs are unique, every `[[id]]` and fact-table marker names a fact,
 #        and a fact's `Signature:` text appears outside docs/product/ only in
 #        a paragraph that cites it (grandfathered restatements:
-#        scripts/product-fact-restatements.tsv, which only shrinks).
+#        scripts/product-fact-restatements.tsv, which only shrinks),
+#      - no file under docs/specs/ui/design-targets/: a design target is a
+#        build input, kept with the task or PR (docs/specs/ui/ai-design-policy.md).
 
 set -euo pipefail
 
@@ -719,6 +721,14 @@ for key in sorted(set(found) | set(grandfathered)):
     elif len(hits) < allowed:
         problems.append(f"{RESTATEMENTS_REL}: '{rel}' restates [[{fid}]] in {len(hits)} paragraph(s), "
                         f"not {allowed} — lower the row (drop it at 0); it only shrinks")
+
+# 10. design targets are build inputs, never specs (ui/ai-design-policy.md):
+#     nothing tracked or new lives under docs/specs/ui/design-targets/.
+DESIGN_TARGETS = "docs/specs/ui/design-targets/"
+for rel in sorted(r for r in listed if r.startswith(DESIGN_TARGETS)
+                  and os.path.exists(os.path.join(root, r))):
+    problems.append(f"{rel}: design targets are build inputs, not specs — keep the brief in the task "
+                    "or PR and move what must last to its owner (docs/specs/ui/ai-design-policy.md)")
 
 if mode == "budgets":
     print(f"{'words':>6}  {'budget':>6}  {'ceiling':>7}  {'status':<13}  doc  (loaded via)")

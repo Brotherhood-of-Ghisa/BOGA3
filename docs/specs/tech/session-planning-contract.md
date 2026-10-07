@@ -10,7 +10,7 @@ block lifecycle, set reordering, or the agent plan-write API and MCP tools.
    live workout state; `sessions.status` stays strictly `active | completed`.
    Plan and programme rows are excluded from performed history, volume
    analytics, personal records and group activity feeds — only materialized rows
-   confirmed in the performed graph count.
+   count, as [[set.performed]] says.
 2. **Materialization uses standard entities.** Starting a plan or consuming a
    block creates ordinary `session_exercises` and `exercise_sets` rows. There is
    no recorder "planning mode", so draft and autosave mechanics are unchanged.

@@ -25,6 +25,13 @@ type Props = {
   onExerciseHistory: (row: ProgressExerciseComparison, target: ComponentRef<typeof View> | null) => void;
 };
 
+// Progress's muscle comparison table. A muscle's name opens its history and a
+// separate trailing chevron discloses one contribution block directly under
+// the row: sibling targets of at least 44pt, never one pressable row.
+// Contributors reconcile with their muscle row in both periods, but no Total
+// row is drawn. Figures never shrink or abbreviate: when they do not fit they
+// move to a full-width second line, then to labelled Now/Previous/Change
+// lines. The selection rule stays distinct from target-attainment shading.
 export function ProgressTables(props: Props) {
   const { muscles, metric, selectedId, weeks, weeklyTarget, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();
