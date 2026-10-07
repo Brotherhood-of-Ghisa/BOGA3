@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiRoles, uiSpace } from '@/components/ui';
+import { ActionButton, Card, FormField, ListRow, Notice, Sheet, StatePanel, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePick } from '@/components/session-planner/plan-exercise-pick-sheet';
 import {
@@ -280,9 +280,17 @@ const styles = StyleSheet.create({
     padding: uiSpace.lg,
   },
   hint: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.inkMuted,
   },
   error: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.danger,
   },
 });

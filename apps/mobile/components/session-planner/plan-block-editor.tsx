@@ -186,10 +186,10 @@ const styles = StyleSheet.create({
   block: {
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: uiRoles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ruleSoft,
-    borderRadius: uiSpace.sm,
+    borderColor: uiRoles.rule,
+    borderRadius: uiGeometry.radius.card,
   },
   blockActions: {
     flexDirection: 'row',
@@ -245,6 +245,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   error: {
+    fontFamily: uiFonts.body.family,
+    fontWeight: '600',
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: uiRoles.danger,
   },
 });

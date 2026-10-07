@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     color: uiRoles.ink,
   },
   meta: {
-    fontFamily: uiFonts.display.family,
+    fontFamily: uiFonts.body.family,
     fontWeight: '400',
     fontSize: uiTypography.size.xs,
     lineHeight: uiTypography.lineHeight.xs,

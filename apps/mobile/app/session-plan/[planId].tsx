@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
 
-import { ActionButton, Notice, StatePanel, uiSpace } from '@/components/ui';
+import { ActionButton, Notice, StatePanel } from '@/components/ui';
+import { ScreenScroll } from '@/components/ui/screen';
 import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choice-sheet';
 import { PlanDetailBlocks } from '@/components/session-planner/plan-detail-blocks';
 import { PlanDetailSummary } from '@/components/session-planner/plan-detail-summary';
@@ -32,7 +32,7 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
   if (detail === 'loading' || detail === null) {
     const unavailable = detail === null;
     return (
-      <>
+      <ScreenScroll testID="plan-detail-scroll">
         <Stack.Screen options={{ title: 'Plan' }} />
         <StatePanel
           body={unavailable ? 'This plan is no longer available.' : 'Loading the plan...'}
@@ -40,7 +40,7 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
           kind={unavailable ? undefined : 'loading'}
           testID={unavailable ? 'plan-detail-unavailable' : 'plan-detail-loading'}
         />
-      </>
+      </ScreenScroll>
     );
   }
 
@@ -51,7 +51,7 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
     <>
       {/* The data-dependent title convention: the plan's title once it loads. */}
       <Stack.Screen options={{ title: detail.title }} />
-      <View style={styles.screen} testID="plan-detail">
+      <ScreenScroll testID="plan-detail">
         {notice ? (
           <Notice
             action={
@@ -91,7 +91,7 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
           onConfirm={controller.attachToChosenCard}
           onDismiss={() => controller.setChoice(null)}
         />
-      </View>
+      </ScreenScroll>
     </>
   );
 }
@@ -100,11 +100,3 @@ export default function SessionPlanDetailRoute() {
   const params = useLocalSearchParams<{ planId?: string | string[] }>();
   return <SessionPlanDetailScreen planId={coerceParam(params.planId)} />;
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    gap: uiSpace.md,
-    padding: uiSpace.lg,
-  },
-});
