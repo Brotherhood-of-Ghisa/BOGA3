@@ -51,6 +51,21 @@ const recordForeignKeyBootstrapFailure = (context: Record<string, unknown>, erro
   }).catch(() => undefined);
 };
 
+// The root layout boots the data layer under `Promise.allSettled`, so a failed
+// migration would otherwise leave no trace: the app still renders and only the
+// screens' reads fail. Log it where it happens, for every caller.
+const recordRuntimeMigrationFailure = (error: unknown) => {
+  void logEvent({
+    level: 'error',
+    source: 'database',
+    event: 'data.local_migrations_failed',
+    message: 'Local SQLite migrations failed',
+    context: {
+      error_message: sanitizeErrorMessage(error),
+    },
+  }).catch(() => undefined);
+};
+
 const readForeignKeyPragma = (database: SQLiteDatabase): number => {
   const row = database.getFirstSync<ForeignKeyPragmaRow>('PRAGMA foreign_keys');
   const rawValue = row?.foreign_keys;
@@ -135,6 +150,7 @@ const runRuntimeMigrations = async (database: LocalDatabase) => {
       })
       .catch((error) => {
         runtimeMigrationPromise = null;
+        recordRuntimeMigrationFailure(error);
         throw error;
       });
   }

@@ -196,6 +196,32 @@ describe('bootstrapLocalDataLayer', () => {
     expect(mockMigrate).toHaveBeenCalledTimes(2);
   });
 
+  it('logs a failed runtime migration, since the root layout does not surface the rejection', async () => {
+    mockOpenDatabaseSync.mockReturnValue(createSqliteClient('sqlite-client'));
+    mockDrizzle.mockReturnValue({ name: 'local-db' });
+    mockMigrate.mockRejectedValueOnce(new Error("Failed to run the query 'SELEC broken;'"));
+
+    await expect(bootstrapLocalDataLayer()).rejects.toThrow('SELEC broken');
+
+    expect(mockLogEvent).toHaveBeenCalledTimes(1);
+    expect(mockLogEvent).toHaveBeenCalledWith({
+      level: 'error',
+      source: 'database',
+      event: 'data.local_migrations_failed',
+      message: 'Local SQLite migrations failed',
+      context: { error_message: "Failed to run the query 'SELEC broken;'" },
+    });
+  });
+
+  it('does not let diagnostic logging failure mask the original migration failure', async () => {
+    mockOpenDatabaseSync.mockReturnValue(createSqliteClient('sqlite-client'));
+    mockDrizzle.mockReturnValue({ name: 'local-db' });
+    mockMigrate.mockRejectedValueOnce(new Error('migration failed'));
+    mockLogEvent.mockRejectedValueOnce(new Error('log sink down'));
+
+    await expect(bootstrapLocalDataLayer()).rejects.toThrow('migration failed');
+  });
+
   it('resets runtime app data by closing the database, deleting it, and re-running bootstrap', async () => {
     const sqliteClient = createSqliteClient('sqlite-client');
     const resetSqliteClient = createSqliteClient('sqlite-client-after-reset');
