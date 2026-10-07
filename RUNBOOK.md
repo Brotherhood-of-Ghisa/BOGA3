@@ -261,7 +261,8 @@ If only **Last access** is missing, grant management still works — inspect the
 - **Maestro artifacts:**
   `apps/mobile/artifacts/maestro/<task-id-or-ad-hoc>/<timestamp>/` — `runtime.env`,
   `provision.log`, `launch.log`, `teardown.log`, `expo-start.log`,
-  `simulator-system.log`, `maestro-junit.xml`.
+  `simulator-system.log`, `maestro-junit.xml`, and `crash-reports/` (the
+  dev client's `.ips` reports, only when it crashed during the run).
 - **Live simulator process log:**
 
   ```bash

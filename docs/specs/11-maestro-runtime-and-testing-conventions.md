@@ -147,11 +147,16 @@ subdirectory of it.
 Every run must emit, into that root: `runtime.env`, `provision.log`,
 `launch.log`, `teardown.log`, `expo-start.log` (raw Expo process log),
 `simulator-system.log` (`simctl log show`, for post-failure native diagnostics),
-`maestro-junit.xml`, `maestro-output/` and `maestro-debug/`.
+`maestro-junit.xml`, `maestro-output/` and `maestro-debug/`. When the dev
+client crashed during the run, the runner copies the slot's crash reports
+into `crash-reports/` and prints a `dev client CRASHED` line with the signal
+and top frame. `simulator-system.log` shows no crash, because SpringBoard logs
+the exit, not the app.
 
 `runtime.env` carries the run's state from provision through teardown; its key
 set is `maestro_runtime_keys` in `apps/mobile/scripts/maestro-ios-runtime.sh`.
-When a run fails, start with `runtime.env`, `launch.log` and `expo-start.log`.
+When a run fails, check for a `dev client CRASHED` line first, then read
+`runtime.env`, `launch.log` and `expo-start.log`.
 
 ## 6. Parallel isolation
 
