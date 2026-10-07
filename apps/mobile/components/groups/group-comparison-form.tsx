@@ -2,11 +2,7 @@ import { Text } from 'react-native';
 
 import { ExerciseCoreFields } from '@/components/exercise-core/exercise-core-fields';
 import { ActionButton, Card, SegmentedControl, uiSpace } from '@/components/ui';
-import {
-  comparisonSubmitLabel,
-  deriveComparisonFormStatus,
-  validateCompetitionFormRules,
-} from '@/src/groups/comparison-form-model';
+import { deriveComparisonFormStatus, validateCompetitionFormRules } from '@/src/groups/comparison-form-model';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS, type CompetitionRules as GroupExerciseRules, type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import type { CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 
@@ -41,7 +37,7 @@ const METRIC_OPTIONS = GROUP_METRICS.map(metric => ({
   value: metric, label: metricLabels[metric], accessibilityLabel: metricLabels[metric],
 }));
 
-/** Shared field recipe, with a version-bound preview for group-wide changes. */
+/** Shared field recipe; edits submit against the revision they started from. */
 export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRules = emptyComparisonRules, existing,
   submitLabel, pendingLabel, pending, errorMessage, onSubmit }: Props) {
   const prefill = existing ? comparisonRulesFromWire(existing) : { ...initialRules, bodyweightCalculationsEnabled };
@@ -60,7 +56,6 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
   const submit = () => {
     draft.revealErrors();
     if (!validation.ok || pending) return;
-    if (status.calculationChanged && !draft.reviewed) { draft.markReviewed(); return; }
     onSubmit(validation.value, draft.baseline.revision);
   };
   return (
@@ -82,7 +77,7 @@ export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existi
       {status.stale ? <StaleRulesNotice onReload={draft.reload} pending={pending} /> : null}
       {errorMessage ? <GroupWriteNotice message={errorMessage} testID="group-exercise-form-error" tone="error" /> : null}
       <ActionButton variant="primary" disabled={pending || status.stale}
-        label={comparisonSubmitLabel({ pending, calculationChanged: status.calculationChanged, reviewed: draft.reviewed, pendingLabel, submitLabel })}
+        label={pending ? pendingLabel : submitLabel}
         onPress={submit} testID="group-exercise-form-submit" />
     </Card>
   );

@@ -529,6 +529,20 @@ describe('Edit exercise route', () => {
     expect(mockRouter.back).toHaveBeenCalled();
   });
 
+  it('saves a weight-entry change on the first press, against the revision it was edited on', async () => {
+    api.updateCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: ROW });
+    renderEdit('ge-row');
+    fireEvent.press(await screen.findByTestId('group-exercise-form-load-mode-total_load'));
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Save changes');
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    });
+    expect(api.updateCompetitionExercise).toHaveBeenCalledTimes(1);
+    expect(api.updateCompetitionExercise).toHaveBeenCalledWith({ groupId: GROUP_ID,exerciseId: 'ge-row',revision: 1,
+      name: 'Cable Row', mode: 'total_load', contribution: 0, metric: 'e1rm' });
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
   it('shows a server VALIDATION refusal next to the form and stays', async () => {
     api.updateCompetitionExercise.mockRejectedValue(
       new GroupApiError('VALIDATION', 'an archived group exercise is read-only; unarchive it first'),
