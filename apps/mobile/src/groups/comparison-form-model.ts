@@ -1,6 +1,5 @@
 // The group comparison form's derived state, as plain data: inline errors,
-// whether the calculation changed (and so needs a reviewed new revision), the
-// stale-revision warning and the submit label.
+// the stale-revision warning and the submit label.
 import { validateExerciseCore } from '@/src/exercise-core';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 import { isCompetitionMetric, type CompetitionRules as GroupExerciseRules } from './competition-contract';
@@ -29,12 +28,6 @@ export const baselineFrom = (rules: GroupExerciseRules, existing: GroupMetricExe
 export const parseContributionPercent = (text: string): number =>
   text.trim() === '' ? NaN : Number(text.replace(',', '.'));
 
-const sameCalculation = (left: GroupExerciseRules, right: GroupExerciseRules) =>
-  left.loadInputMode === right.loadInputMode &&
-  (left.bodyweightCalculationsEnabled && left.bodyweightContribution > 0) ===
-    (right.bodyweightCalculationsEnabled && right.bodyweightContribution > 0) &&
-  left.bodyweightContribution === right.bodyweightContribution;
-
 export type ComparisonFormStatusInput = {
   validation: GroupRulesValidation;
   baseline: ComparisonBaseline;
@@ -44,8 +37,6 @@ export type ComparisonFormStatusInput = {
 };
 
 export type ComparisonFormStatus = {
-  /** An existing comparison's calculation changed: submitting first asks for a review. */
-  calculationChanged: boolean;
   nameError: string | null;
   rulesError: string | null;
   /** Edits started on an older revision than the one now loaded. */
@@ -55,20 +46,11 @@ export type ComparisonFormStatus = {
 export function deriveComparisonFormStatus({
   validation, baseline, existing, dirty, showErrors,
 }: ComparisonFormStatusInput): ComparisonFormStatus {
-  const calculationChanged = baseline.revision !== null && validation.ok && !sameCalculation(baseline.rules, validation.value);
   const shownError = showErrors && !validation.ok ? validation : null;
   return {
-    calculationChanged,
     nameError: shownError?.field === 'name' ? shownError.message : null,
     rulesError: shownError && shownError.field !== 'name' ? shownError.message : null,
     stale: Boolean(dirty && existing && existing.rules.rules_revision !== baseline.revision),
   };
 }
 
-export const comparisonSubmitLabel = ({ pending, calculationChanged, reviewed, pendingLabel, submitLabel }: {
-  pending: boolean; calculationChanged: boolean; reviewed: boolean; pendingLabel: string; submitLabel: string;
-}): string => {
-  if (pending) return pendingLabel;
-  if (!calculationChanged) return submitLabel;
-  return reviewed ? 'Apply group rules' : 'Review rule changes';
-};
