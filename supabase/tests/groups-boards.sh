@@ -131,9 +131,11 @@ drain() {
 
 # e1rm <weight> <reps>: the 1RM ([[1rm.formula]]), rounded like the boards (6 dp, trimmed).
 e1rm() {
-  node -e 'const [w, r, f] = process.argv.slice(1).map(Number);
-           const v = (r === 1 ? w : 100 * w / (48.8 + 53.8 * Math.exp(-0.075 * r))) * (f || 1);
-           process.stdout.write(String(Number(v.toFixed(6))));' "$1" "$2" "${3:-1}"
+  # awk, not node: the same doubles, without a process start per assertion.
+  awk -v w="$1" -v r="$2" -v f="${3:-1}" 'BEGIN {
+    v = sprintf("%.6f", (r == 1 ? w : 100 * w / (48.8 + 53.8 * exp(-0.075 * r))) * f)
+    sub(/0+$/, "", v); sub(/\.$/, "", v); printf "%s", v
+  }'
 }
 
 # who <uuid>: the short label the event and entry summaries print.
@@ -898,10 +900,8 @@ mark
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-sz" completed "${DAZ}" "z1:0:5" "z2::8"
 drain "Z only 0 kg sets"
-expect_sql "Z the facts store no e1RM at 0 kg" \
-  "select string_agg(replace(set_id, '${T}-', '') || '=' || weight_kg || '/' || coalesce(e1rm_kg::text, 'null'), ',' order by set_id)
-     from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and session_id = '${T}-sz';" \
-  "z1=0/null,z2=0/null"
+# A 0 kg set storing no e1RM is the TS fact rule (groups-set-facts.test.ts);
+# here: the boards never rank it.
 expect_entry "${GXZ}" A weight "" "Z a 0 kg set has no Weight"
 expect_entry "${GXZ}" A e1rm "" "Z a 0 kg set has no 1RM"
 expect_since "${GXZ}" "" "Z a 0 kg set makes no record or lead change"

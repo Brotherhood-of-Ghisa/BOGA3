@@ -6,12 +6,21 @@
 # detect a client schema change with no paired server migration and exit
 # non-zero in --strict mode with a useful failure message.
 #
+# This body is the checker's CLI wiring, proved once against the real stack: a
+# drifted Drizzle file reaches the column diff and fails the run. The diff's
+# rules (missing, mistyped and server-only columns, exemptions, the fix
+# template) are unit-tested in apps/mobile/__tests__/sync/drift-columns.test.ts.
+# It passes --skip-reset: the lane's baseline preflight has already applied
+# every migration, and the server only has to lack the injected column, so a
+# reset here would rebuild the database inside a default gate for nothing.
+#
 # This script:
 #   1. Saves the current content of
 #      apps/mobile/src/data/schema/exercise-sets.ts to a temp file.
 #   2. Programmatically appends a `notes: text('notes')` column to the
 #      schema definition.
-#   3. Runs `npm run check:sync-drift -- --strict` against the modified tree.
+#   3. Runs `npm run check:sync-drift -- --strict --skip-reset` against the
+#      modified tree.
 #   4. Asserts the exit code is non-zero AND the failure output contains:
 #        - the literal string `exercise_sets`
 #        - the literal string `notes`
@@ -99,7 +108,7 @@ cd "${REPO_ROOT}"
 # we can grep without losing the exit code.
 OUTPUT_FILE="$(mktemp)"
 set +e
-(cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict) >"${OUTPUT_FILE}" 2>&1
+(cd "${MOBILE_DIR}" && npm run check:sync-drift -- --strict --skip-reset) >"${OUTPUT_FILE}" 2>&1
 DRIFT_RC=$?
 set -e
 

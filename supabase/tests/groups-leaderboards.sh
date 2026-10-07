@@ -187,9 +187,9 @@ fingerprint_of() {
              where member_user_id = '${ATHLETE_UID}' and set_id = '$1';"
 }
 # e1rm <weight> <reps>: the 1RM ([[1rm.formula]]), as the oracle for the TS value.
+# awk, not node: the same doubles, without a process start per assertion.
 e1rm() {
-  node -e 'const [w, r] = process.argv.slice(1).map(Number);
-           process.stdout.write((r === 1 ? w : 100 * w / (48.8 + 53.8 * Math.exp(-0.075 * r))).toFixed(6));' "$1" "$2"
+  awk -v w="$1" -v r="$2" 'BEGIN { printf "%.6f", (r == 1 ? w : 100 * w / (48.8 + 53.8 * exp(-0.075 * r))) }'
 }
 
 # wait_until <context> <sql returning t|f> <timeout-seconds>
@@ -401,17 +401,13 @@ expect_fact() {
   actual="$(fact "${T}-$1")"
   [[ "${actual}" == "$2" ]] || fail "fact $1: expected '$2', got '${actual}'"
 }
+# The parser's edge cases (b2, b4-b8, ba: 0 kg, each non-performed status,
+# malformed numbers, blanks) are pure TS rules unit-tested in
+# apps/mobile/__tests__/groups-set-facts.test.ts. Here: one performed and one
+# not-performed set prove the facts land, plus the facts only SQL decides.
 expect_fact b1 "true:true:102.5:5:$(e1rm 102.5 5)"
-# A 0 kg set is performed but has no e1RM: a zero 1RM is never a result.
-expect_fact b2 "true:true:0:8:-"
 expect_fact b3 "false:true:-:-:-"
-expect_fact b4 "false:true:-:-:-"
-expect_fact b5 "false:true:-:-:-"
-expect_fact b6 "false:true:-:-:-"
-expect_fact b7 "false:true:-:-:-"
-expect_fact b8 "false:true:-:-:-"
 expect_fact b9 "true:false:60:10:$(e1rm 60 10)"
-expect_fact ba "false:true:-:-:-"
 # Any reps text the TS parser accepts must be storable, or the job would fail
 # on every retry.
 expect_fact bb "true:true:100:10000000000:$(e1rm 100 10000000000)"
@@ -430,7 +426,7 @@ expect_sql "exercise identity and order carried per set" \
   "select string_agg(set_id || '=' || coalesce(exercise_definition_id, '-') || '@' || exercise_order_index, ',' order by set_id)
      from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and set_id in ('${T}-b1', '${T}-d1', '${T}-g1');" \
   "${T}-b1=${DEF_BENCH}@0,${T}-d1=${DEF_DB}@1,${T}-g1=${DEF_ROW}@2"
-pass "facts: performed rule, parsing, 0 kg blank weight, per-side entered mode, e1RM, live, fingerprint"
+pass "facts: performed rule, per-side entered mode, e1RM, live, fingerprint"
 
 # --- fingerprint and live flow-through ---------------------------------------------
 
