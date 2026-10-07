@@ -45,6 +45,12 @@ const session = (id: string, day: number, blocks: FactsBlockInput[]): FactsSessi
   blocks,
 });
 
+// Corrupt stored context: the one way a personal set's load cannot be calculated.
+const corrupt: LoadContext = { policy: 'personal', bodyweightContribution: 0, loadInputMode: 'sideways' as LoadContext['loadInputMode'] };
+
+// 1e306 kg: one set's Volume and 1RM stay finite, three sets' Volume does not.
+const HUGE = `1${'0'.repeat(306)}`;
+
 const flags = (rows: ReturnType<typeof deriveExerciseSessionFacts>) =>
   rows.map(({ sessionId, prE1rm, prWeight, prVolume }) => ({ sessionId, prE1rm, prWeight, prVolume }));
 
@@ -69,7 +75,6 @@ describe('exercise session facts — metrics', () => {
       topWeightSetId: 'b1-s1',
       topWeightReps: 5,
       volumeKg: 100 * 5,
-      volumeComplete: true,
       workingSets: 1,
       volumeSets: 1,
     });
@@ -131,18 +136,27 @@ describe('exercise session facts — metrics', () => {
     const bests = summarizeFactSession(DEFINITION, session('s1', 1, [block('b1', 0, [['10', '5']], personal)]));
 
     // 1RM excludes the bodyweight part again; volume counts calculated load.
-    expect(bests).toMatchObject({ topWeightKg: 10, volumeKg: 90 * 5, volumeComplete: true });
+    expect(bests).toMatchObject({ topWeightKg: 10, volumeKg: 90 * 5 });
     expect(bests?.bestE1rmKg).toBeCloseTo((estimateOneRepMax(90, 5) as number) - 80);
   });
 
-  it('marks volume incomplete when a set has no calculated load and keeps the known subtotal', () => {
-    const missing: LoadContext = { policy: 'group', bodyweightContribution: 1, loadInputMode: 'total_load', bodyWeightKg: null };
+  it('leaves a set whose load cannot be calculated out of the volume ([[copy.no-inline-explanation]])', () => {
     const bests = summarizeFactSession(DEFINITION, session('s1', 1, [
       block('b1', 0, [['100', '5']]),
-      block('b2', 1, [['10', '5']], missing),
+      block('b2', 1, [['10', '5']], corrupt),
     ]));
 
-    expect(bests).toMatchObject({ volumeKg: 500, volumeComplete: false, topWeightKg: 100, workingSets: 2 });
+    expect(bests).toMatchObject({ volumeKg: 500, topWeightKg: 100, workingSets: 2, volumeSets: 2 });
+  });
+
+  it('has no volume when the sum is not finite', () => {
+    // Each set is finite (6e307); their sum is not.
+    const bests = summarizeFactSession(DEFINITION, session('s1', 1, [
+      block('b1', 0, [[HUGE, '60'], [HUGE, '60']]),
+      block('b2', 1, [[HUGE, '60']]),
+    ]));
+
+    expect(bests?.volumeKg).toBeNull();
   });
 
   it('has no row for a session without an eligible set', () => {
@@ -220,19 +234,28 @@ describe('exercise session facts — PR flags', () => {
     });
   });
 
-  it('never makes an incomplete volume a PR or lets it raise the bar', () => {
-    const missing: LoadContext = { policy: 'group', bodyweightContribution: 1, loadInputMode: 'total_load', bodyWeightKg: null };
+  it('lets a volume that left a set out take and raise the volume record', () => {
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s1', 1, [block('a1', 0, [['100', '10']])]), // 1000
-      session('s2', 2, [block('b1', 0, [['100', '50']]), block('b2', 1, [['1', '1']], missing)]), // 5000 known, incomplete
-      session('s3', 3, [block('c1', 0, [['100', '15']])]), // 1500 beats 1000
+      session('s2', 2, [block('b1', 0, [['100', '50']]), block('b2', 1, [['1', '1']], corrupt)]), // 5000, b2 left out
+      session('s3', 3, [block('c1', 0, [['100', '15']])]), // 1500 does not beat 5000
     ]);
 
-    expect(rows.map((row) => [row.volumeKg, row.volumeComplete, row.prVolume])).toEqual([
-      [1000, true, false],
-      [5000, false, false],
-      [1500, true, true],
+    expect(rows.map((row) => [row.volumeKg, row.prVolume])).toEqual([
+      [1000, false],
+      [5000, true],
+      [1500, false],
     ]);
+  });
+
+  it('never makes a volume whose sum is not finite a PR', () => {
+    const rows = deriveExerciseSessionFacts(DEFINITION, [
+      session('s1', 1, [block('a1', 0, [['100', '10']])]),
+      session('s2', 2, [block('b1', 0, [[HUGE, '60'], [HUGE, '60'], [HUGE, '60']])]),
+      session('s3', 3, [block('c1', 0, [['100', '15']])]),
+    ]);
+
+    expect(rows.map((row) => [row.volumeKg, row.prVolume])).toEqual([[1000, false], [null, false], [1500, true]]);
   });
 
   it('skips sessions without a value when setting the baseline', () => {
@@ -258,7 +281,7 @@ describe('exercise session facts — rules version', () => {
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(6);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(7);
     const rows = deriveExerciseSessionFacts(DEFINITION, [
       session('s1', 1, [block('a1', 0, [['100', '5', 'rir_3'], ['60', '10', 'warm_up'], ['90', '8', 'rir_4']])]),
       session('s2', 2, [block('b1', 0, [['', '12', 'rir_0'], ['102.5', '5', null], ['110', '1', 'rir_1', 'planned'], ['130', '2', 'warm_up']])]),
@@ -267,6 +290,9 @@ describe('exercise session facts — rules version', () => {
       session('s4', 4, [block('d1', 0, [['102.5', '6', 'rir_0']])]),
       // Version 6: [[1rm.formula]], so 123 × 1 no longer beats s4.
       session('s5', 5, [block('e1', 0, [['123', '1', 'rir_0']])]),
+      // Version 7: a set whose load cannot be calculated is left out, and the
+      // rest can take the Volume record ([[copy.no-inline-explanation]]).
+      session('s6', 6, [block('f1', 0, [['130', '10', 'rir_2']]), block('f2', 1, [['50', '5', 'rir_2']], corrupt)]),
     ]);
 
     expect(rows.map(({ achievedAt: _achievedAt, bestE1rmKg, volumeKg, ...row }) => ({
@@ -276,23 +302,28 @@ describe('exercise session facts — rules version', () => {
     }))).toEqual([
       {
         sessionId: 's1', exerciseDefinitionId: DEFINITION, bestE1rmKg: 116.5825, bestE1rmSetId: 'a1-s0',
-        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, volumeComplete: true, workingSets: 2, volumeSets: 2,
+        topWeightKg: 100, topWeightSetId: 'a1-s0', volumeKg: 1220, workingSets: 2, volumeSets: 2,
         prE1rm: false, prWeight: false, prVolume: false,
       },
       {
         sessionId: 's2', exerciseDefinitionId: DEFINITION, bestE1rmKg: 119.4971, bestE1rmSetId: 'b1-s1',
-        topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, volumeComplete: true, workingSets: 2, volumeSets: 2,
+        topWeightKg: 102.5, topWeightSetId: 'b1-s1', volumeKg: 512.5, workingSets: 2, volumeSets: 2,
         prE1rm: true, prWeight: true, prVolume: false,
       },
       {
         sessionId: 's4', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123.3388, bestE1rmSetId: 'd1-s0',
-        topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, volumeComplete: true, workingSets: 1, volumeSets: 1,
+        topWeightKg: 102.5, topWeightSetId: 'd1-s0', volumeKg: 615, workingSets: 1, volumeSets: 1,
         prE1rm: true, prWeight: true, prVolume: false,
       },
       {
         sessionId: 's5', exerciseDefinitionId: DEFINITION, bestE1rmKg: 123, bestE1rmSetId: 'e1-s0',
-        topWeightKg: 123, topWeightSetId: 'e1-s0', volumeKg: 123, volumeComplete: true, workingSets: 1, volumeSets: 1,
+        topWeightKg: 123, topWeightSetId: 'e1-s0', volumeKg: 123, workingSets: 1, volumeSets: 1,
         prE1rm: false, prWeight: true, prVolume: false,
+      },
+      {
+        sessionId: 's6', exerciseDefinitionId: DEFINITION, bestE1rmKg: 175.1707, bestE1rmSetId: 'f1-s0',
+        topWeightKg: 130, topWeightSetId: 'f1-s0', volumeKg: 1300, workingSets: 2, volumeSets: 2,
+        prE1rm: true, prWeight: true, prVolume: true,
       },
     ]);
   });

@@ -61,8 +61,6 @@ export type LastSession = {
   volume: number | null;
   /** Every performed line; aggregate figures apply the two independent policies. */
   sets: RecordSet[];
-  knownVolume?: number | null;
-  volumeComplete?: boolean;
 };
 
 export type ExerciseRecordsSummary = {
@@ -131,11 +129,9 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
     .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime());
 };
 
-const sumVolume = (sets: RecordSet[]): number | null => {
-  if (sets.some(set => set.volume === null)) return null;
-  const total = sets.reduce((sum, set) => sum + (set.volume ?? 0), 0);
-  return Number.isFinite(total) ? total : null;
-};
+// A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
+const sumVolume = (sets: RecordSet[]): number | null =>
+  sets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0);
 
 const bestOneRepMax = (sets: RecordSet[]) =>
   sets.reduce<number | null>(
@@ -165,16 +161,13 @@ export const exerciseRecordsFrom = (bests: ExerciseBests): ExerciseRecords => ({
 export const deriveLastSession = (entries: ExerciseHistorySessionEntry[]): LastSession | null => {
   const newest = groupBySession(entries)[0];
   if (!newest) return null;
-  const volume = sumVolume(newest.volumeSets);
   return {
     completedAt: newest.completedAt,
     gymId: newest.gymId,
     gymName: newest.gymName,
     oneRepMax: bestOneRepMax(newest.workingSets),
     maxWeight: Math.max(...newest.workingSets.map((set) => set.weight)),
-    volume,
-    knownVolume: newest.volumeSets.reduce<number | null>((sum, set) => addFiniteVolume(sum, set.volume ?? 0), 0),
-    volumeComplete: volume !== null,
+    volume: sumVolume(newest.volumeSets),
     sets: newest.sets,
   };
 };

@@ -102,8 +102,9 @@ different rules versions never mix values.
 
 - **Grain.** Repeated blocks of one definition in a session fold into one row;
   unlinked legacy session exercises, active sessions and deleted sessions have
-  none. A row with zero working sets may still hold a Volume record, and
-  `volume_kg` is a subtotal, not a total, when `volume_complete` is false.
+  none. A row with zero working sets may still hold a Volume record;
+  `volume_kg` is the training-metrics §4 Volume, null only when its sum is
+  not finite.
 - **Records are always read from strictly earlier sessions** — those before the
   viewed session's `completed_at`, or before now while it is active — so a
   session never counts toward its own markers and later sessions never count.

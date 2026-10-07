@@ -304,7 +304,7 @@ describe('sign-out / account-switch local wipe', () => {
     db().insert(exerciseSessionFactsState).values({ id: 'facts', rulesVersion: 1 }).run();
     db().insert(exerciseSessionFacts).values({
       sessionId: 'session-a', exerciseDefinitionId: 'definition-a', achievedAt: new Date(1),
-      volumeComplete: true, workingSets: 1, prE1rm: false, prWeight: false, prVolume: false,
+      workingSets: 1, prE1rm: false, prWeight: false, prVolume: false,
     }).run();
     db().insert(exerciseSessionFactsStale).values({ exerciseDefinitionId: 'definition-a' }).run();
 

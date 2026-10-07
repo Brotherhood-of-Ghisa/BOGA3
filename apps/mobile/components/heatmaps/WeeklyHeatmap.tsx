@@ -60,7 +60,7 @@ function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetAv
   const year = week.monday.getUTCFullYear();
   const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
   const value = weekValue(week, formatValue);
-  const description = week.unavailable ? `${metricLabel} unavailable or incomplete` : value === 'Rest' ? 'Rest week' : `${metricLabel} ${value}`;
+  const description = week.unavailable ? `${metricLabel} unavailable` : value === 'Rest' ? 'Rest week' : `${metricLabel} ${value}`;
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }}
     accessibilityLabel={`Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
     onPress={onPress} testID={`${testID}-cell-${week.weekStartDateKey}`} style={styles.row}>
@@ -134,7 +134,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
       max={max} averagePosition={averagePosition} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
       <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
-      {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={styles.note}>?: unavailable or incomplete load; excluded from the average</Text> : null}
+      {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={styles.note}>?: unavailable; excluded from the average</Text> : null}
     </View>}
   />;
 }

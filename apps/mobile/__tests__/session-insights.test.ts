@@ -148,7 +148,6 @@ describe("summarizeCurrentSessionMuscleLoad", () => {
 
     expect(summary).toEqual({
       state: "empty",
-      volumeComplete: true,
       workingSetCount: 0,
       mappedSetCount: 0,
       unmappedSetCount: 0,
@@ -562,7 +561,6 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         // nor volume.
         workingSetCount: 1,
         currentVolume: 600,
-        knownVolume: 600,
         historicalSessionCount: 3,
         medianVolume: 700,
         percentile5Volume: 520,
@@ -570,6 +568,42 @@ describe("deriveSessionExerciseVolumeComparisons", () => {
         state: "distribution",
       },
     ]);
+  });
+
+  it("leaves an uncalculable block out of the Volume and skips an overflowed baseline with no count", () => {
+    const corrupt = { policy: "personal" as const, bodyweightContribution: 0, loadInputMode: "sideways" as "total_load" };
+    const huge = `1${"0".repeat(306)}`;
+    const target = completedSession({
+      sessionId: "target",
+      exercises: [
+        insightExercise({ id: "t-a", exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+          sets: [insightSet("t-a-1", { weightValue: "100", repsValue: "5" })] }),
+        insightExercise({ id: "t-b", orderIndex: 1, exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+          loadContext: corrupt, sets: [insightSet("t-b-1", { weightValue: "300", repsValue: "5" })] }),
+      ],
+    });
+    const overflowed = completedSession({
+      sessionId: "history-overflow",
+      completedAt: new Date("2026-09-01T10:00:00.000Z"),
+      exercises: [insightExercise({ id: "h-o", exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+        sets: ["1", "2", "3"].map(id => insightSet(`h-o-${id}`, { weightValue: huge, repsValue: "60" })) })],
+    });
+    const known = completedSession({
+      sessionId: "history-known",
+      completedAt: new Date("2026-09-02T10:00:00.000Z"),
+      exercises: [insightExercise({ id: "h-k", exerciseDefinitionId: "bench", exerciseName: "Bench Press",
+        sets: [insightSet("h-k-1", { weightValue: "80", repsValue: "5" })] })],
+    });
+
+    const [comparison] = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [overflowed, known] });
+    expect(comparison).toEqual(expect.objectContaining({
+      workingSetCount: 2, currentVolume: 500, historicalSessionCount: 1, medianVolume: 400, state: "single-baseline",
+    }));
+    expect(comparison).not.toHaveProperty("excludedHistoricalSessionCount");
+    // A target whose own sum overflows has no comparison.
+    expect(deriveSessionExerciseVolumeComparisons({
+      targetSession: { ...overflowed, sessionId: "later", completedAt: AT }, historicalSessions: [known],
+    })[0]).toEqual(expect.objectContaining({ currentVolume: null, historicalSessionCount: 0, state: "unavailable" }));
   });
 
   it("compares no warm-up-only exercise and takes no baseline from one", () => {
@@ -865,6 +899,24 @@ describe("deriveExercisePersonalRecord", () => {
     });
     expect(record).toMatchObject({ sessionExerciseId: "bench-row", sets: [], volume: 550 });
     expect(personalRecordCount(record!)).toBe(1);
+  });
+
+  it("takes a Volume record from a session that left an uncalculable block out ([[copy.no-inline-explanation]])", () => {
+    const corrupt = insightExercise({
+      id: "bench-corrupt",
+      orderIndex: 1,
+      exerciseDefinitionId: "bench",
+      exerciseName: "Bench Press",
+      loadContext: { policy: "personal", bodyweightContribution: 0, loadInputMode: "sideways" as "total_load" },
+      sets: [insightSet("set-corrupt", { weightValue: "50", repsValue: "5" })],
+    });
+    const record = deriveExercisePersonalRecord({
+      exerciseDefinitionId: "bench",
+      exercises: [exercise, corrupt],
+      baseline: baselineOf(1000, 200, 1, 500),
+    });
+    // 110 × 5 = 550 beats 500; the 50 × 5 block is left out, not a blocker.
+    expect(record).toMatchObject({ sets: [], volume: 550 });
   });
 
   it("ignores unconfirmed work and resolves ties by set order then stable set id", () => {

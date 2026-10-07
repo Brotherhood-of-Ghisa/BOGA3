@@ -1,7 +1,7 @@
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
-import { compactVolumeFigure, formatVolumeWithCoverage } from '@/src/exercise-calculations/analytics';
+import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -354,14 +354,9 @@ function SessionCard({
           <View style={styles.stats}>
             <Stat label="1RM" rank="secondary" value={formatOptionalOneRepMax(entry.estimatedOneRepMax)} />
             <Stat label="Top set" rank="secondary" value={formatTopSet(entry.topWeightSet)} />
-            <Stat label={entry.totalVolume === null && (entry.volumeCoverage?.knownVolumeKgReps ?? 0) > 0 ? "Known vol" : "Vol"}
-              rank="secondary" value={compactVolumeFigure(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)} />
+            <Stat label="Vol" rank="secondary" value={formatVolumeFigure(entry.totalVolume)} />
             <Stat label="Sets" rank="secondary" value={String(entry.workingSetCount)} />
           </View>
-          {entry.totalVolume === null ? <Text allowFontScaling={false} style={styles.gym}
-            testID={`exercise-history-coverage-${entry.sessionExerciseId}`}>
-            {`Volume ${formatVolumeWithCoverage(entry.totalVolume, entry.volumeCoverage?.knownVolumeKgReps)}`}
-          </Text> : null}
         </View>
       }
       testID={`exercise-history-session-card-${entry.sessionExerciseId}`}
