@@ -1,4 +1,5 @@
 import { formatVolume } from '@/src/exercise-calculations/format';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -69,13 +70,26 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
  * delta after six known prior observations. The linear scale centers the
  * median, vertical rules mark the references, and a black dot marks current.
  * Equal quartiles collapse to a rule; low history shows "Building history".
- * Reference labels sit above the bar, values below; sets sit beside the name.
+ * Labels and values center on their rules, above and below the bar. Crowded
+ * annotations reduce to the median; sets sit beside the name in every state.
  * Shared by the session summary, live comparison and captured share image.
  */
 export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: ExerciseVolumeCardProps) {
   const hasDistribution = hasVolumeReference(comparison);
   const low = hasDistribution ? markerPosition(comparison.percentile25Volume as number, comparison) : 50;
   const high = hasDistribution ? markerPosition(comparison.percentile75Volume as number, comparison) : 50;
+  const [plotWidth, setPlotWidth] = useState(0);
+  const [annotationWidths, setAnnotationWidths] = useState([0, 0, 0]);
+  const references = [
+    { id: 'p25', label: 'P25', value: comparison.percentile25Volume, position: low },
+    { id: 'median', label: 'Median', value: comparison.medianVolume, position: 50 },
+    { id: 'p75', label: 'P75', value: comparison.percentile75Volume, position: high },
+  ];
+  const showQuartileLabels = annotationWidths.every(width => width > 0) &&
+    (50 - low) / 100 * plotWidth >= (annotationWidths[0] + annotationWidths[1]) / 2 + uiSpace.sm &&
+    (high - 50) / 100 * plotWidth >= (annotationWidths[1] + annotationWidths[2]) / 2 + uiSpace.sm &&
+    low / 100 * plotWidth >= annotationWidths[0] / 2 &&
+    (100 - high) / 100 * plotWidth >= annotationWidths[2] / 2;
 
   return (
     <Card style={variant === 'share' ? styles.shareCard : null} testID={testID}>
@@ -99,12 +113,28 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
         </View>
 
         {hasDistribution ? (
-          <View style={styles.distribution} testID={testID ? `${testID}-distribution` : undefined}>
-            <View style={styles.rangeLabels}>
-              <Text allowFontScaling={false} style={[styles.microLabel, styles.rangeCell]}>P25</Text>
-              <Text allowFontScaling={false} style={[styles.microLabel, styles.rangeCell, styles.centerCell]}>Median</Text>
-              <Text allowFontScaling={false} style={[styles.microLabel, styles.rangeCell, styles.endCell]}>P75</Text>
-            </View>
+          <View style={styles.distribution} onLayout={event => setPlotWidth(event.nativeEvent.layout.width)} testID={testID ? `${testID}-distribution` : undefined}>
+            {references.map((reference, index) => (
+              <View key={reference.id} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+                testID={testID ? `${testID}-${reference.id}-annotation` : undefined}
+                onLayout={event => {
+                  const width = event.nativeEvent.layout.width;
+                  setAnnotationWidths(previous => {
+                    if (previous[index] === width) return previous;
+                    const next = [...previous];
+                    next[index] = width;
+                    return next;
+                  });
+                }}
+                style={[styles.annotation, {
+                  transform: [{ translateX: reference.position / 100 * plotWidth - annotationWidths[index] / 2 }],
+                  opacity: plotWidth > 0 && (index === 1 || showQuartileLabels) ? 1 : 0,
+                }]}>
+                <Text allowFontScaling={false} style={styles.microLabel}>{reference.label}</Text>
+                <View style={styles.annotationGap} />
+                <Text allowFontScaling={false} style={styles.legendValue}>{formatVolume(reference.value as number)}</Text>
+              </View>
+            ))}
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackWrap}>
               <View style={styles.track} />
               <View style={[styles.interval, { left: `${low}%`, width: `${high - low}%` }]} />
@@ -112,11 +142,6 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
               <View style={[styles.referenceMarker, { left: '50%' }]} testID={testID ? `${testID}-median` : undefined} />
               <View style={[styles.referenceMarker, { left: `${high}%` }]} testID={testID ? `${testID}-p75` : undefined} />
               <View style={[styles.currentMarker, { left: `${markerPosition(comparison.currentVolume as number, comparison)}%` }]} testID={testID ? `${testID}-current` : undefined} />
-            </View>
-            <View style={styles.rangeLabels}>
-              <Text allowFontScaling={false} style={[styles.legendValue, styles.rangeCell]}>{formatVolume(comparison.percentile25Volume as number)}</Text>
-              <Text allowFontScaling={false} style={[styles.legendValue, styles.rangeCell, styles.centerCell]}>{formatVolume(comparison.medianVolume as number)}</Text>
-              <Text allowFontScaling={false} style={[styles.legendValue, styles.rangeCell, styles.endCell]}>{formatVolume(comparison.percentile75Volume as number)}</Text>
             </View>
           </View>
         ) : null}
@@ -211,18 +236,20 @@ const styles = StyleSheet.create({
     color: uiRoles.inkMuted,
   },
   distribution: {
+    height: uiTypography.lineHeight.xxs + uiSpace.xs * 2 + uiSpace.lg + uiTypography.lineHeight.xs,
+    marginHorizontal: uiSpace.xs,
+  },
+  annotation: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    alignItems: 'center',
     gap: uiSpace.xs,
   },
-  rangeLabels: {
-    flexDirection: 'row',
-    gap: uiSpace.xs,
-  },
-  rangeCell: { flex: 1 },
-  centerCell: { textAlign: 'center' },
-  endCell: { textAlign: 'right' },
+  annotationGap: { height: uiSpace.lg },
   trackWrap: {
     height: uiSpace.lg,
-    marginHorizontal: uiSpace.xs,
+    marginTop: uiTypography.lineHeight.xxs + uiSpace.xs,
     justifyContent: 'center',
   },
   track: {
