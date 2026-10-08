@@ -207,14 +207,12 @@ stateDiagram-v2
 
 - **Pending:** available for use; eligible unattached blocks stay fully editable.
 - **Attached:** materialized onto an active session card, and read-only.
-- **Completed:** requires explicit user completion after at least one confirmed
-  source-derived set (`exercise_sets.source_plan_set_id IS NOT NULL`). Manual
-  warm-ups alone cannot complete a block; target deviations in reps or weight do
-  not prevent completion.
-- **Skipped:** explicitly skipped from programme detail, creating no performed
-  rows.
-- **Derived progress:** parent progress (`planned | in_progress | completed`) is
-  computed from child block states, never stored.
+- **Completed:** requires explicit user completion after ≥1 confirmed
+  source-derived set (`source_plan_set_id IS NOT NULL`). Manual warm-ups alone
+  cannot complete a block; target deviations do not prevent completion.
+- **Skipped:** explicitly skipped from programme detail (no performed rows).
+- **Derived progress:** parent progress (`planned | in_progress | completed`)
+  is computed on the fly from child block states, never stored.
 
 ### 4.2 Start All (`startSessionPlan`)
 
@@ -223,17 +221,12 @@ stateDiagram-v2
    **Resume Active Session** and never replaces or auto-completes it.
 2. **One local transaction.** With no qualifying block, return typed
    `NO_PENDING_BLOCKS` and create nothing. Otherwise create the `sessions` row
-   (`source_plan_id = plan.id`, `gym_id = plan.gym_id`, `status = 'active'`,
-   `started_at = Date.now()`), then per eligible block — `progress_status =
-   'pending'`, `deleted_at IS NULL`, in `order_index` order — a
-   `session_exercises` row (`source_plan_exercise_id`, name and machine
-   snapshots, `order_index`), and per non-deleted `session_plan_sets` row an
-   `exercise_sets` row with `source_plan_set_id`, the plan set's `order_index`,
-   targets copied into `planned_weight_value` / `planned_reps_value` /
-   `planned_set_type`, blank actuals (`weight_value = ''`, `reps_value = ''`,
-   `set_type = 'work'`) and `performance_status = 'planned'`.
-   Completed and skipped blocks are never re-materialized — that would violate
-   source-block uniqueness and re-materialize skipped work.
+   (`source_plan_id = plan.id`, `gym_id = plan.gym_id`, `status = 'active'`),
+   then per eligible pending block create a `session_exercises` row
+   (`source_plan_exercise_id`, snapshots), and per non-deleted plan set an
+   `exercise_sets` row with `source_plan_set_id`, targets copied to planned
+   columns, blank actuals, and `performance_status = 'planned'`.
+   Completed and skipped blocks are never re-materialized.
 3. **Deterministic IDs.** Reuse the deterministic text-ID pattern
    (`exerciseGroupLinkId` in `apps/mobile/src/data/exercise-group-links.ts`),
    composed from owner and source ID — `` `${ownerId}:${plan.id}:start` ``,
@@ -331,6 +324,18 @@ path is defined so the permitted operation can never block sync.
   local violation; the push leg inside its recovery pull).
 - **Reorder.** Two-phase: lift above every parent row (tombstones included),
   then dense `0..n-1`; provenance, targets, and state untouched.
+- **Mobile training programmes.** `programme-form-model.ts` validates draft
+  graphs (>=2 child plans). Authoring (`/programme/new`) edits child sessions via
+  `ProgrammeSessionEditSheet` sub-sheet. Detail (`/programme/[programmeId]`,
+  `useProgrammeDetail.ts`) surfaces `nextBlock` (first unresolved block across
+  plans in programme then exercise order); Add attaches via
+  `addPlanBlockToSession` and Skip advances via `skipPlanBlock`. Reordering
+  (`reorderProgrammePlans`) updates `programme_order_index`. Delete
+  (`deleteProgramme`) soft-deletes the programme and detaches child plans
+  (`programme_id = null`) as standalone plans, preserving performed history.
+  `listAvailablePlanBlocks` includes unconsumed programme blocks for picker
+  selection.
+
 
 ## 5. UI and UX Contracts
 
@@ -382,22 +387,15 @@ the base read-only grant.
 
 ### 6.2 MCP Tool Surface (`services/boga-mcp/`)
 
-Nine tools. Seven read-only:
+Nine tools. Seven read-only: `get_training_profile`, `search_exercises`
+(database filtering, no preselection cap), `get_exercise_context` (lifetime
+PRs/totals), `get_recent_workouts` (exact workout counts/volume),
+`get_exercise_history` (pageable performed sets), `get_workout_detail` (header
+and sets), `get_upcoming_session_plans` (plan queues).
 
-- `get_training_profile`
-- `search_exercises` — database-side filtering, no candidate preselection cap
-- `get_exercise_context` — exact lifetime PRs and totals, invariant under page size
-- `get_recent_workouts` — exact workout counts and volume
-- `get_exercise_history` — pageable exhaustive performed-set history
-- `get_workout_detail` — exact workout header, paginated performed sets
-- `get_upcoming_session_plans` — upcoming and unscheduled plan queues
-
-Two create-only, each requiring plan permission and declaring
-`readOnlyHint: false`, `idempotentHint: true`, `destructiveHint: false`,
-`openWorldHint: false`:
-
-- `create_session_plan` — one complete plan
-- `create_training_programme` — one multi-session programme
+Two create-only (`readOnlyHint: false`, `idempotentHint: true`,
+`destructiveHint: false`, `openWorldHint: false`), requiring plan permission:
+`create_session_plan`, `create_training_programme`.
 
 ## 7. Error Tokens and Validation Limits
 

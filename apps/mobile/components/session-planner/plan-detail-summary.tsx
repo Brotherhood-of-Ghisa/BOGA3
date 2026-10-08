@@ -50,6 +50,11 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
           <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-progress">
             {progressLine(detail)}
           </Text>
+          {detail.programmeId !== null ? (
+            <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-programme-badge">
+              Programme session{detail.programmeOrderIndex !== null ? ` · Session ${detail.programmeOrderIndex + 1}` : ''}
+            </Text>
+          ) : null}
           {PROVENANCE_LABEL[detail.provenance] ? (
             <Text allowFontScaling={false} style={styles.meta} testID="plan-detail-provenance">
               {PROVENANCE_LABEL[detail.provenance]}

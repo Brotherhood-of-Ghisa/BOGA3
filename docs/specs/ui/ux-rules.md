@@ -213,17 +213,45 @@ rows never enter, nor are affected by, the completed history's count, filters,
 row actions or deleted toggle; a schedule is optional and Unscheduled is never
 disguised as "today". The picker's completed-history action is **Repeat last**
 (yesterday's session, appended as planned sets) and is separate from **From
-planner**, which offers authored one-off blocks still available (pending,
-definition-bearing, target-bearing). A block attaches to the active session's
-unsourced card of the same exercise: one match attaches, several offer an
-accessible choice sheet that writes nothing until confirmed, none creates a
-card. **Start all** with another active session offers one Resume and creates
-nothing. Complete is explicit — the sourced card's `Complete block`, refused
-inline until one of the block's planned sets is confirmed; attachment alone
-never advances; skip uses non-performance wording. Set reordering never
+planner**, which offers authored one-off blocks and available programme blocks
+still available (pending, definition-bearing, target-bearing). A block attaches
+to the active session's unsourced card of the same exercise: one match attaches,
+several offer an accessible choice sheet that writes nothing until confirmed,
+none creates a card. **Start all** with another active session offers one Resume
+and creates nothing. Complete is explicit — the sourced card's `Complete block`,
+refused inline until one of the block's planned sets is confirmed; attachment
+alone never advances; skip uses non-performance wording. Set reordering never
 changes provenance, targets or actuals. Code: `src/session-planner/`
-(`plan-form-model`, `plan-edit-sync`, `available-blocks`), the plan routes'
-screen files.
+(`plan-form-model`, `programme-form-model`, `plan-edit-sync`,
+`available-blocks`), the plan and programme routes' screen files.
+
+### Training programmes and multi-session plans
+
+Decided with mobile training programmes.
+- **Sequence without dates.** A programme represents an ordered sequence of
+  two or more child sessions (e.g. a 6-week wave, an A/B split). Child sessions
+  can each have an optional schedule and gym, but programme order is strictly
+  sequenced and independent of calendar dates.
+- **Queue and authoring hub.** `/sessions` displays programmes alongside
+  standalone plans under Unscheduled, ordered by recency. Persistent
+  `Plan session` and `New programme` action rows provide direct authoring entry.
+- **Child session editing.** Editing child sessions in the programme form uses
+  a focused sub-sheet (`ProgrammeSessionEditSheet`) rather than an unbounded
+  mega-form, preventing scroll fatigue and preserving field validation focus.
+- **Next unresolved block.** Programme detail (`/programme/[programmeId]`)
+  determines progress and deterministically surfaces the next unresolved block
+  in programme order, then exercise order. **Add to session** attaches the block
+  to an active session (with candidate card choice when ambiguous) or creates a
+  new session; explicit **Skip** advances to the next unresolved block without
+  recording performed work.
+- **Playlist-style session reordering.** Child sessions reorder with accessible
+  Move controls in both the programme form and programme detail; order indexes
+  update deterministically.
+- **Detached deletion invariant.** Deleting a programme soft-deletes the
+  programme record and detaches all child plans (`programme_id = null`,
+  `programme_order_index = null`), preserving them as standalone plans. Performed
+  session rows, workouts, and recorded sets are never deleted.
+
 
 ### Reordering sets in the recorder
 

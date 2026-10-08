@@ -432,4 +432,29 @@ describe('Sessions planning sections', () => {
     fireEvent.press(screen.getByTestId('sessions-plan-session-action'));
     expect(mockPush).toHaveBeenCalledWith('/session-plan/new');
   });
+
+  it('surfaces training programmes in Unscheduled and supports creating programmes', async () => {
+    await openSessions(async () => {
+      await planRepository.createProgramme({
+        name: 'Block Periodization',
+        description: '4 weeks',
+        plans: [
+          planDraft({ title: 'Accumulation A' }),
+          planDraft({ title: 'Accumulation B' }),
+        ],
+      });
+    });
+
+    const programmeRow = screen.getByTestId(/^sessions-plan-section-unscheduled-programme-/);
+    expect(programmeRow).toBeTruthy();
+    expect(programmeRow.props.accessibilityLabel).toContain('Block Periodization');
+    expect(programmeRow.props.accessibilityLabel).toContain('2 sessions');
+
+    fireEvent.press(programmeRow);
+    const progId = String(programmeRow.props.testID).replace('sessions-plan-section-unscheduled-programme-', '');
+    expect(mockPush).toHaveBeenCalledWith(`/programme/${progId}`);
+
+    fireEvent.press(screen.getByTestId('sessions-new-programme-action'));
+    expect(mockPush).toHaveBeenCalledWith('/programme/new');
+  });
 });

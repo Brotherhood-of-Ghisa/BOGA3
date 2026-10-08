@@ -27,7 +27,7 @@ export type SaveOutcome =
   | { status: 'saved'; planId: string | null }
   | { status: 'failed'; message: string | null };
 
-function PlanGymSheet({
+export function PlanGymSheet({
   gyms,
   visible,
   onDismiss,

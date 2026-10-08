@@ -18,6 +18,8 @@ export type PlanBlockEditorProps = {
   onRemoveBlock: (blockId: string) => void;
   onMoveBlock: (blockId: string, step: -1 | 1) => void;
   onPickExercise: (blockId: string) => void;
+  /** Custom error path prefix, e.g. 'plans.0.exercises'. Defaults to 'exercises'. */
+  errorPrefix?: string;
   /** The account's displayed efforts, cycling the type field like the recorder. */
   displayEfforts?: readonly EffortChoice[];
 };
@@ -72,10 +74,12 @@ export function PlanBlockEditor({
   onRemoveBlock,
   onMoveBlock,
   onPickExercise,
+  errorPrefix,
   displayEfforts,
 }: PlanBlockEditorProps) {
   const weightLabel = block.loadInputMode === 'per_side_load' ? 'Weight per side · kg' : 'Weight · kg';
-  const blockPath = `exercises.${index}`;
+  const prefix = errorPrefix ?? 'exercises';
+  const blockPath = `${prefix}.${index}`;
 
   return (
     <View style={styles.block} testID={`plan-form-block-${index + 1}`}>
