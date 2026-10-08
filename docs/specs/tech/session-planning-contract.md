@@ -41,9 +41,9 @@ block lifecycle, set reordering, or the agent plan-write API and MCP tools.
 ### 2.1 Synced Entity Tables (Sync v2)
 
 Four entities, all user-owned, composite-keyed `(owner_user_id, id)` with ULID
-`id`, carrying the standard Sync v2 server fields (`client_updated_at_ms`,
-`server_received_at`, `deleted_at`) plus client `createdAt` / `updatedAt` /
-`deletedAt` epoch-ms columns, with foreign keys `DEFERRABLE INITIALLY DEFERRED`.
+`id`, carrying the standard Sync v2 server fields plus client
+`createdAt` / `updatedAt` / `deletedAt` epoch-ms columns; foreign keys are
+`DEFERRABLE INITIALLY DEFERRED`.
 Every composite FK below is `(owner_user_id, <col>) -> <parent>(owner_user_id,
 id)`; camelCase ↔ snake_case mapping follows `apps/mobile/src/data/schema/`.
 
@@ -115,8 +115,8 @@ that plan set's parent `session_plan_exercise_id`.
 Neither table is a synced entity.
 
 **`public.agent_plan_permissions`** — one row per connected coaching client,
-PK `(owner_user_id, client_id)`, with `plan_access_enabled boolean not null
-default false`, `granted_at timestamptz not null`, created/updated timestamps.
+PK `(owner_user_id, client_id)`, `plan_access_enabled boolean not null default
+false`, `granted_at timestamptz not null`, created/updated timestamps.
 
 - Direct table access only for authenticated users where
   `auth.uid() = owner_user_id` **and** `(auth.jwt() ->> 'client_id') IS NULL` —
@@ -290,15 +290,15 @@ path is defined so the permitted operation can never block sync.
    `session_exercises` — or the same `source_plan_set_id` on `exercise_sets` —
    the whole batch fails with typed `BLOCK_ALREADY_ATTACHED` carrying the winning
    card ID. Server commit order is the only tiebreak.
-2. **Loser repair (deterministic).** On `BLOCK_ALREADY_ATTACHED` the client pulls
-   first so the winning card is visible, then clears `source_plan_exercise_id` on
-   its losing card and `source_plan_set_id` on that card's source-derived sets,
-   and re-pushes. Entered actuals and manual sets are preserved; the card returns
-   to unsourced, keeping the Cross-Level Provenance Invariant intact.
-3. **Convergence.** Every device ends with exactly one live card carrying the
-   provenance link, while the losing card keeps all user work as unsourced rows.
-   Whole-plan starts need no arbitration: their deterministic IDs (§4.2) make a
-   competing Start all resolve to the same row, not a second one.
+2. **Loser repair (deterministic).** On `BLOCK_ALREADY_ATTACHED` the client
+   pulls, clears `source_plan_exercise_id` on its losing card and
+   `source_plan_set_id` on that card's source-derived sets, and re-pushes.
+   Entered actuals and manual sets are preserved; the card returns to
+   unsourced, keeping the Cross-Level Provenance Invariant intact.
+3. **Convergence.** Every device ends with one live card carrying the
+   provenance link; the losing card keeps all user work as unsourced rows.
+   Whole-plan starts need no arbitration: deterministic IDs (§4.2) make a
+   competing Start all resolve to the same row.
 
 ### 4.6 As-built: mobile module map and deviations
 
@@ -311,6 +311,10 @@ path is defined so the permitted operation can never block sync.
   the plan/programme repository, read models, `startSessionPlan`,
   `addPlanBlockToSession`, `reorderSessionExerciseSets`, and
   `completePlanBlock` / `skipPlanBlock`. Screens never write plan tables.
+  As-built UI: `/sessions`' planning sections, the two `/session-plan/…`
+  routes (create/edit/duplicate via `plan-edit-sync`), the picker's
+  **Repeat last**/**From planner** entries, and the recorder's handle-drag
+  set reorder with **Complete block** on sourced cards.
 - **Deterministic IDs.** `` `${ownerId}:${sourceId}:start` `` as §4.2; a
   signed-out device uses the `local` owner (nothing syncs, keys only need
   local stability).
@@ -320,10 +324,11 @@ path is defined so the permitted operation can never block sync.
 - **Add block.** The created-session id is a fresh local id, not the
   §4.2 recipe: its `source_plan_id` stays null and a retry reuses the
   existing active session; card/set ids still follow §4.2 so Start all and
-  Add block converge on the same rows.- **Arbitration.** The token message carries the failed constraint name, not
+  Add block converge on the same rows.
+- **Arbitration.** The token message carries the failed constraint name, not
   the winning id — the repair needs no id: pull, clear every live local
-  claimant of exactly the pulled claims, re-push. The pull leg repairs on
-  the local violation; the push leg repairs inside its recovery pull.
+  claimant of exactly the pulled claims, re-push (the pull leg repairs on the
+  local violation; the push leg inside its recovery pull).
 - **Reorder.** Two-phase: lift above every parent row (tombstones included),
   then dense `0..n-1`; provenance, targets, and state untouched.
 
@@ -333,24 +338,22 @@ path is defined so the permitted operation can never block sync.
 
 | Route | Contract |
 | :--- | :--- |
-| `/sessions` (Planning Hub) | Four sections — **Active**, **Upcoming** (scheduled plans by date), **Unscheduled** (plans and programmes by updated time), **Completed** (performed history). Queue management and authoring live here. |
-| `/session-plan/new` | Author a one-off plan; target loads show the load input mode (`per_side_load` vs `total_load`). |
+| `/sessions` (Planning Hub) | Four sections — **Active**, **Upcoming** (scheduled plans by date), **Unscheduled** (plans and programmes by updated time), **Completed** (performed history). Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
+| `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target loads show the load input mode (`per_side_load` vs `total_load`). |
 | `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Consumed blocks are read-only and link to their performed session. |
 | `/programme/new` | Author an ordered programme; minimum 2 child plans. |
 | `/programme/[programmeId]` | Overall progress, next unresolved block in sequence, child plan summaries. |
 
-- **Today tab:** surfaces the next upcoming scheduled workout or programme block
-  as a primary card with a direct Start action.
+- **Today tab:** surfaces the next scheduled workout or programme block as a primary Start card.
 - **Exercise picker:** the historical **Append plan** action is renamed **Repeat
   last**, and a new **From planner** entry selects available authored blocks.
 
 ### 5.2 Set Reordering UX
 
-- Sets in the recorder carry a subtle trailing grab handle; drag and drop lifts
-  the row with clear insertion feedback, with no separate modal "Edit" mode.
-- Non-drag accessibility: VoiceOver custom actions **Move earlier** and **Move
-  later** on each set row.
-- Reduced motion disables lift animations, keeping full reorder functionality.
+Recorder sets reorder playlist-style: a quiet trailing grab handle starts the
+drag — no separate "Edit" mode; VoiceOver custom actions **Move earlier** /
+**Move later**; reduced motion drops only the lift. Full rules:
+`docs/specs/ui/ux-rules.md`, "Reordering sets in the recorder".
 
 ## 6. Agent API and MCP Tools
 

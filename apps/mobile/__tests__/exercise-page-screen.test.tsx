@@ -46,10 +46,22 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
   useGroupLinkingUserId: () => mockLinkingUserId,
 }));
 
+jest.mock('@/src/session-planner', () => {
+  const actual = jest.requireActual('@/src/session-planner');
+  return {
+    ...actual,
+    reorderSessionExerciseSets: jest.fn((...args: unknown[]) =>
+      (actual.reorderSessionExerciseSets as any)(...args)
+    ),
+  };
+});
+
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
+import * as sessionPlanner from '@/src/session-planner';
 import { Icon } from '@/components/ui/icon';
 import { uiIconSize, uiRoles } from '@/components/ui/tokens';
+import { defaultSessionExerciseDraftClient, type SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { sessions } from '@/src/data/schema';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
@@ -232,14 +244,15 @@ describe('ExercisePageScreen', () => {
       (screen.getByTestId('exercise-set-logger-header').props.accessibilityActions as { name: string }[])
         .map((action) => action.name);
 
-    // Untouched planned set: its plan confirms, but there is nothing to drop.
+    // Untouched planned set: its plan confirms, but there is nothing to drop;
+    // the row's reorder moves ride along (it is neither first nor last).
     expect(swipeSymbols()).toEqual(['check']);
-    expect(actions()).toEqual(['confirm']);
+    expect(actions()).toEqual(['move-earlier', 'move-later', 'confirm']);
 
     // Invalid reps: droppable, not confirmable.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '0');
     await waitFor(() => expect(swipeSymbols()).toEqual(['x']));
-    expect(actions()).toEqual(['discard']);
+    expect(actions()).toEqual(['move-earlier', 'move-later', 'discard']);
   });
 
   it('confirms the in-progress set from the swipe action, advancing like the tick', async () => {
@@ -342,8 +355,11 @@ describe('ExercisePageScreen', () => {
     );
     expect(screen.getByTestId('exercise-set-swipe-4')).toBeTruthy();
     expect(screen.queryByTestId('exercise-set-swipe-3')).toBeNull();
-    // The collapsed cursor row offers no swipe equivalents either.
-    expect(screen.getByTestId('exercise-set-3-open').props.accessibilityActions).toBeUndefined();
+    // The collapsed cursor row offers no swipe equivalents; the reorder moves
+    // stay on it, as on every closed row.
+    expect(screen.getByTestId('exercise-set-3-open').props.accessibilityActions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'move-earlier' })]),
+    );
 
     // Confirming the open row commits Set 4, leaving Set 3 as it was.
     fireEvent(screen.getByTestId('exercise-set-logger-header'), 'accessibilityAction', {
@@ -818,6 +834,181 @@ describe('ExercisePageScreen', () => {
     expect(await screen.findByTestId('exercise-records-empty')).toHaveTextContent(
       'No completed sessions for this gym yet.'
     );
+  });
+});
+
+describe('exercise page set reordering', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetLocalData();
+    __resetExerciseListPreferencesForTests();
+    mockLinkingUserId = null;
+    mockRouteParams = {};
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    closeLocalData();
+  });
+
+  const liveSetIds = async () => (await benchSets()).map((set) => set.id);
+
+  const rowActionNames = (setNumber: number) => {
+    const actions = screen.getByTestId(`exercise-set-${setNumber}-open`).props.accessibilityActions ?? [];
+    return actions.map((action: { name: string }) => action.name);
+  };
+
+  // A save that always fails: the flush failure path, with every read real.
+  const failingSaveClient = (): SessionExerciseDraftClient => ({
+    ...defaultSessionExerciseDraftClient,
+    persistSessionDraftSnapshot: async () => {
+      throw new Error('disk full');
+    },
+  });
+
+  it('every closed row carries a quiet grab handle and the Move actions; the open row and a one-set card carry none', async () => {
+    await openPage();
+
+    for (const setNumber of [1, 2, 4, 5]) {
+      expect(screen.getByTestId(`exercise-set-${setNumber}-reorder-handle`)).toBeTruthy();
+      expect(screen.getByLabelText(`Reorder set ${setNumber}`)).toBeTruthy();
+    }
+    // The open row is mid-edit: its reorder is the logger's actions.
+    expect(screen.queryByTestId('exercise-set-3-reorder-handle')).toBeNull();
+    // Boundary rows: the first cannot move earlier, the last cannot move later.
+    expect(rowActionNames(1)).toEqual(['move-later']);
+    expect(rowActionNames(2)).toEqual(['move-earlier', 'move-later']);
+    expect(rowActionNames(5)).toEqual(['move-earlier']);
+    // The open row moves through the logger's actions, not a drag.
+    expect(screen.getByTestId('exercise-set-logger-header').props.accessibilityActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'move-earlier' }),
+        expect.objectContaining({ name: 'move-later' }),
+      ]),
+    );
+
+    // One set: nothing to reorder, so no handle chrome.
+    render(<ExercisePageScreen sessionExerciseId={SQUAT} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-page');
+    expect(screen.queryByLabelText(/Reorder set/)).toBeNull();
+  });
+
+  it('Move earlier writes the permutation through the reorder operation and reads it back', async () => {
+    await openPage();
+    const before = await liveSetIds();
+    expect(before).toHaveLength(5);
+
+    const row = screen.getByTestId('exercise-set-2-open');
+    act(() => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'move-earlier' } });
+    });
+
+    await waitFor(async () => {
+      expect(await liveSetIds()).toEqual([before[1], before[0], before[2], before[3], before[4]]);
+    });
+    expect(screen.getByTestId('exercise-set-reorder-announcement')).toHaveTextContent('Set moved to position 1 of 5');
+    // Provenance and values ride along untouched: same rows, new order only.
+    const beforeById = new Map((await benchSets()).map((set) => [set.id, set]));
+    const after = await benchSets();
+    expect(after.map((set) => set.weightValue)).toEqual(
+      [before[1], before[0], before[2], before[3], before[4]].map((id) => beforeById.get(id)?.weightValue),
+    );
+  });
+
+  it('a failed flush leaves the persisted order untouched and says so', async () => {
+    await seedPage();
+    render(
+      <ExercisePageScreen
+        draftClient={failingSaveClient()}
+        sessionExerciseId={BENCH}
+        sessionId={SESSION}
+      />
+    );
+    await screen.findByTestId('exercise-page');
+    await waitFor(() => expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1'));
+    const before = await liveSetIds();
+
+    // A pending typed edit makes the flush a real write, which fails.
+    fireEvent.press(screen.getByTestId('exercise-set-1-open'));
+    await screen.findByTestId('exercise-set-logger');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '55');
+
+    const row = screen.getByTestId('exercise-set-2-open');
+    act(() => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'move-earlier' } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-set-reorder-announcement')).toHaveTextContent(
+        'Not saved. The previous order stays.'
+      );
+    });
+    expect(await liveSetIds()).toEqual(before);
+  });
+
+  it('clears the drag overlay and announces failure when reorder write throws', async () => {
+    await openPage();
+    const before = await liveSetIds();
+    (sessionPlanner.reorderSessionExerciseSets as jest.Mock).mockRejectedValueOnce(new Error('SQLITE_FULL'));
+
+    const row = screen.getByTestId('exercise-set-2-open');
+    act(() => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'move-earlier' } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-set-reorder-announcement')).toHaveTextContent(
+        "Couldn't save the new order. The previous order stays."
+      );
+    });
+    expect(await liveSetIds()).toEqual(before);
+  });
+
+  it('serializes set reordering with draft edits so draft reload does not undo reorder', async () => {
+    await openPage();
+    const before = await liveSetIds();
+
+    let resolveReorder: (val: any) => void;
+    const reorderPromise = new Promise((resolve) => {
+      resolveReorder = resolve;
+    });
+
+    (sessionPlanner.reorderSessionExerciseSets as jest.Mock).mockImplementationOnce(
+      () => reorderPromise as any
+    );
+
+    // Trigger reorder [before[1], before[0], ...]
+    const row = screen.getByTestId('exercise-set-2-open');
+    act(() => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'move-earlier' } });
+    });
+
+    // While reorder is in flight, edit set 1 weight
+    fireEvent.press(screen.getByTestId('exercise-set-1-open'));
+    await screen.findByTestId('exercise-set-logger');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '55');
+
+    // Resolve reorder write in database
+    await act(async () => {
+      const realResult = await jest.requireActual('@/src/session-planner').reorderSessionExerciseSets(
+        BENCH,
+        [before[1], before[0], before[2], before[3], before[4]]
+      );
+      resolveReorder!(realResult);
+    });
+
+    await waitFor(async () => {
+      expect(await liveSetIds()).toEqual([before[1], before[0], before[2], before[3], before[4]]);
+    });
+
+    // Wait for the queued draft edit to flush
+    await waitFor(async () => {
+      const sets = await benchSets();
+      const set1 = sets.find((s) => s.id === before[0]);
+      expect(set1?.weightValue).toBe('55');
+      expect(sets.map((s) => s.id)).toEqual([before[1], before[0], before[2], before[3], before[4]]);
+    });
   });
 });
 

@@ -431,7 +431,7 @@ describe('Session view', () => {
     fireEvent.press(await screen.findByLabelText(`Select exercise ${squat}`));
     await screen.findByTestId('exercise-picker-plan-source');
     await act(async () => {
-      fireEvent.press(screen.getByLabelText(`Append historical plan for ${squat}`));
+      fireEvent.press(screen.getByLabelText(`Repeat last workout for ${squat}`));
     });
     await waitFor(() => expect(screen.queryByTestId('exercise-picker')).toBeNull());
 

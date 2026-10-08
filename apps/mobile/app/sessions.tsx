@@ -1,4 +1,4 @@
-import { useIsFocused, useRouter } from 'expo-router';
+import { useIsFocused, useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
@@ -11,6 +11,8 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
+import { PlanSection, PlanSessionAction, usePlanSections } from '@/components/session-planner/plan-sections';
+import { StatePanel } from '@/components/ui/state-panel';
 import { Screen, ScreenScroll, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
 import { appendCompletedSessionAsPlanned } from '@/src/data';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
@@ -37,6 +39,7 @@ export function SessionsScreen({
       showDeletedSessions,
       isFocused,
     });
+  const planSections = usePlanSections();
 
   const activeSession = sessions.find(
     (session) => session.status === 'active' && session.deletedAt === null
@@ -50,8 +53,18 @@ export function SessionsScreen({
       return rightTime - leftTime;
     });
 
+  const planningEmpty =
+    !planSections.isLoading &&
+    !planSections.loadErrorMessage &&
+    planSections.upcoming.length === 0 &&
+    planSections.unscheduled.length === 0;
+
   const showGlobalEmptyState =
-    !isLoadingSessions && !loadErrorMessage && !activeSession && completedSessions.length === 0;
+    !isLoadingSessions &&
+    !loadErrorMessage &&
+    !activeSession &&
+    planningEmpty &&
+    completedSessions.length === 0;
 
   useEffect(() => {
     if (!activeSession) {
@@ -111,6 +124,15 @@ export function SessionsScreen({
     router.push(sessionViewHref(sessionId));
   };
 
+  const openPlanNew = () => {
+    // The routes land with the plan form and detail; the cast falls away then.
+    router.push('/session-plan/new' as Href);
+  };
+
+  const openPlan = (planId: string) => {
+    router.push(`/session-plan/${encodeURIComponent(planId)}` as Href);
+  };
+
   const openCompletedSessionSummary = (sessionId: string) => {
     router.push(`/completed-session/${encodeURIComponent(sessionId)}`);
   };
@@ -147,6 +169,30 @@ export function SessionsScreen({
             />
           </>
         ) : null}
+
+        {/* The hub's persistent authoring entry; the planning sections' rows
+            open the plan detail. */}
+        <PlanSessionAction onPress={openPlanNew} testID="sessions-plan-session-action" />
+        {planSections.loadErrorMessage ? (
+          <StatePanel
+            body={planSections.loadErrorMessage}
+            fill={false}
+            kind="error"
+            testID="sessions-plans-error"
+          />
+        ) : null}
+        <PlanSection
+          label="Upcoming"
+          onOpenPlan={openPlan}
+          plans={planSections.upcoming}
+          testID="sessions-plan-section-upcoming"
+        />
+        <PlanSection
+          label="Unscheduled"
+          onOpenPlan={openPlan}
+          plans={planSections.unscheduled}
+          testID="sessions-plan-section-unscheduled"
+        />
 
         <HistoryList
           sessions={completedSessions}

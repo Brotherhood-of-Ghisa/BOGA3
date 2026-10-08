@@ -1,4 +1,3 @@
-import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,19 +11,18 @@ import {
 import { GroupExercisePickSheet, type GroupExercisePickTarget } from '@/components/groups/group-exercise-pick-sheet';
 import { pickInlineError } from '@/components/groups/group-state-view';
 import { PickerGroupSectionList, PickerGroupsToggle } from '@/components/groups/picker-group-section';
-import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
-import { ActionButton } from '@/components/ui/action-button';
-import { Card } from '@/components/ui/card';
-import { IconButton } from '@/components/ui/icon-button';
+import { PickerPlannerToggle, PlannerBlockSection } from '@/components/session-recorder/planner-block-section';
+import { PickerPreselectionCard } from '@/components/session-recorder/picker-preselection-card';
+import { IconButton } from '@/components/ui';
 import { Notice } from '@/components/ui/notice';
 import { PageSheetHeader } from '@/components/ui/page-sheet';
 import { SearchField } from '@/components/ui/search-field';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { loadSuggestedExercisePlan, type ExerciseBlockHistorySuggestedPlan } from '@/src/data';
+import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
 import { type ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -36,16 +34,9 @@ import {
   resolvePickerGroupSelection,
   type LinkableExercise,
   type PickerGroupRow,
+  type PickerGroupSection,
 } from '@/src/groups/link-view-model';
 import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-import { formatCurrentDateTime } from '@/src/utils/local-time';
-import { formatSetRow } from '@/src/session-recorder/session-view-model';
-
-export type ExercisePickerPreselectionState = {
-  exercise: ExerciseListItem;
-  status: 'loading' | 'ready' | 'error';
-  suggestion: ExerciseBlockHistorySuggestedPlan | null;
-};
 
 export type ExercisePickerProps = {
   onClose: () => void;
@@ -54,32 +45,56 @@ export type ExercisePickerProps = {
     exercise: { id: string; name: string },
     suggestion: ExerciseBlockHistorySuggestedPlan
   ) => void;
+  // The host attaches the picked authored plan block to the active session.
+  onAddPlanBlock: (planExerciseId: string) => void;
+  /** Planned blocks join the active session only; a completed session's
+   * picker hides the From planner entry. */
+  plannerEnabled?: boolean;
   // The host navigates to the catalogue; its back returns to the picker as left.
   onOpenManage: () => void;
   // The host's failed add, shown above the list.
   notice?: string | null;
 };
 
+function GroupsOnlyBody({
+  sections,
+  emptyText,
+  onPressRow,
+}: {
+  sections: PickerGroupSection[];
+  emptyText: string;
+  onPressRow: (row: PickerGroupRow) => void;
+}) {
+  if (sections.length === 0) {
+    return <StatePanel body={emptyText} fill={false} testID="exercise-picker-group-empty" />;
+  }
+  return <PickerGroupSectionList sections={sections} onPressRow={onPressRow} />;
+}
+
 /**
  * The session's exercise picker, the body of its own route
  * (`app/session/[sessionId]/add-exercise.tsx`, an iOS page sheet: swipe down
  * or Close to leave): a filtered catalogue list with the shared one-row
- * filters, the add preselection (Add empty set / Append plan), `From your
- * groups` with its pick sheet, inline create, and a Manage exit. A
- * pick closes the keyboard, and scrolling the list does too.
+ * filters, the add preselection (Add empty set / Repeat last), the `From
+ * planner` toggle with its authored one-off blocks, `From your groups` with
+ * its pick sheet, inline create, and a Manage exit. A pick closes the
+ * keyboard, and scrolling the list does too.
  */
 export function ExercisePicker({
   onClose,
   onSelectExercise,
   onAppendPlan,
+  onAddPlanBlock,
   onOpenManage,
   notice = null,
+  plannerEnabled = true,
 }: ExercisePickerProps) {
   const groupLinkingUserId = useGroupLinkingUserId();
   const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
   const [searchValue, setSearchValue] = useState('');
   const [preselection, setPreselection] = useState<ExercisePickerPreselectionState | null>(null);
   const [groupsOnly, setGroupsOnly] = useState(false);
+  const [plannerOnly, setPlannerOnly] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [groupPickTarget, setGroupPickTarget] = useState<GroupExercisePickTarget | null>(null);
   const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercisePickTarget | null>(null);
@@ -217,6 +232,17 @@ export function ExercisePicker({
     setGroupsOnly((current) => !current);
   };
 
+  const togglePlannerOnly = () => {
+    clearPreselection();
+    setPlannerOnly((current) => !current);
+  };
+
+  const pickPlannerBlock = (planExerciseId: string) => {
+    Keyboard.dismiss();
+    clearPreselection();
+    onAddPlanBlock(planExerciseId);
+  };
+
   const selectGroupRow = (row: PickerGroupRow) => {
     Keyboard.dismiss();
     const selection = resolvePickerGroupSelection(row);
@@ -314,6 +340,7 @@ export function ExercisePicker({
             value={searchValue}
           />
           <ExerciseListPreferenceControls preferences={listPreferences} onChangePreferences={setListPreferences}>
+            {plannerEnabled ? <PickerPlannerToggle active={plannerOnly} onToggle={togglePlannerOnly} /> : null}
             {groupLinkingUserId ? <PickerGroupsToggle active={groupsOnly} onToggle={toggleGroupsOnly} /> : null}
           </ExerciseListPreferenceControls>
           {notice ? <Notice live message={notice} testID="exercise-picker-notice" tone="danger" /> : null}
@@ -338,57 +365,12 @@ export function ExercisePicker({
             ) : null}
             {!isCatalogLoading && !catalogLoadError && preselection ? (
               <>
-                <Card testID="exercise-picker-preselection-panel">
-                  <Text allowFontScaling={false} style={styles.preselectionTitle}>{preselection.exercise.name}</Text>
-                  {preselection.suggestion ? (
-                    <View style={styles.plan}>
-                      <Text allowFontScaling={false} style={styles.planSource} testID="exercise-picker-plan-source">
-                        From {formatCurrentDateTime(preselection.suggestion.completedAt)}
-                      </Text>
-                      <ScrollView
-                        contentContainerStyle={styles.planRows}
-                        nestedScrollEnabled
-                        style={styles.planRowList}>
-                        {preselection.suggestion.sets.map((set, index) => (
-                          <SetSummaryRow
-                            key={set.setId}
-                            row={formatSetRow({
-                              id: set.setId,
-                              weight: parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)),
-                              reps: parseSetReps(set.repsValue),
-                              setType: set.setType,
-                              loadContext: preselection.suggestion?.loadContext,
-                              done: false,
-                            })}
-                            testID={`exercise-picker-plan-set-row-${index + 1}`}
-                          />
-                        ))}
-                      </ScrollView>
-                    </View>
-                  ) : null}
-                  {/* The sheet's one `accent`: Append plan. */}
-                  <View style={styles.actions}>
-                    <View style={styles.action}>
-                      <ActionButton
-                        accessibilityLabel={`Add empty set for ${preselection.exercise.name}`}
-                        label="Add empty set"
-                        onPress={() => selectExercise(preselection.exercise.id, preselection.exercise.name)}
-                        testID="exercise-picker-add-empty-set-button"
-                        variant="outline"
-                      />
-                    </View>
-                    <View style={styles.action}>
-                      <ActionButton
-                        accessibilityLabel={`Append historical plan for ${preselection.exercise.name}`}
-                        disabled={appendDisabled}
-                        label="Append plan"
-                        onPress={() => appendPlan(preselection)}
-                        testID="exercise-picker-append-plan-button"
-                        variant="primary"
-                      />
-                    </View>
-                  </View>
-                </Card>
+                <PickerPreselectionCard
+                  onAddEmptySet={() => selectExercise(preselection.exercise.id, preselection.exercise.name)}
+                  onRepeat={() => appendPlan(preselection)}
+                  repeatDisabled={appendDisabled}
+                  state={preselection}
+                />
                 <Pressable
                   accessibilityLabel="Dismiss exercise preselection"
                   style={styles.preselectionDismissArea}
@@ -398,12 +380,14 @@ export function ExercisePicker({
               </>
             ) : null}
             {!isCatalogLoading && !catalogLoadError && !preselection ? (
-              groupsOnly ? (
-                groupSections.length > 0 ? (
-                  <PickerGroupSectionList sections={groupSections} onPressRow={selectGroupRow} />
-                ) : (
-                  <StatePanel body={groupEmptyText} fill={false} testID="exercise-picker-group-empty" />
-                )
+              plannerOnly && plannerEnabled ? (
+                <PlannerBlockSection onPickBlock={pickPlannerBlock} />
+              ) : groupsOnly ? (
+                <GroupsOnlyBody
+                  emptyText={groupEmptyText}
+                  onPressRow={selectGroupRow}
+                  sections={groupSections}
+                />
               ) : (
                 <>
                   <ExerciseListContent
@@ -471,49 +455,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.md,
   },
-  preselectionTitle: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.md,
-    paddingBottom: uiSpace.sm,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  plan: {
-    gap: uiSpace.xs,
-    paddingHorizontal: uiSpace.md,
-    paddingBottom: uiSpace.md,
-  },
-  planSource: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
-  },
   // Long plans scroll inside the card; the actions stay in view.
-  planRowList: {
-    maxHeight: 238,
-  },
-  planRows: {
-    gap: uiSpace.xs,
-  },
   // The card's action strip.
-  actions: {
-    flexDirection: 'row',
-    gap: uiSpace.sm,
-    padding: uiSpace.md,
-    backgroundColor: uiRoles.paper,
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
-  },
-  action: {
-    flex: 1,
-  },
   preselectionDismissArea: {
     minHeight: 120,
   },

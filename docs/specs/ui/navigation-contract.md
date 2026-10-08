@@ -118,6 +118,9 @@ access level, and `useRootRouteAccess`
 | `/groups` | `groupId` | selects that group when it is in My groups, else the one last shown this app session, else the first by name |
 | `/group/join` | `code` | prefills the code field and runs the preview once the username gate is satisfied |
 | `/group-session/[memberId]/[sessionId]` | `groupId` | required authorised scope, read through the group-scoped safe reader/cache; missing renders generic session unavailable |
+| `/session-plan/new` | `edit` | edits that plan: prefill, then the guarded per-operation sync; back returns to the plan detail |
+| | `from` | prefills a duplicate; Save creates a new plan, never an in-place copy |
+| `/session-plan/[planId]` | `planId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
 | `…/history` | `revision` | the positive rules revision the board carried; recorded units are kept, and a retired revision's scores are unavailable |
 
@@ -157,6 +160,9 @@ Nothing outside this table navigates. A route not listed as a source
 | `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History. Progress's own muscle and exercise names open in-route history sheets, not this route |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row, and its overflow `Edit` (`push`). `/sessions` never completes an active session directly |
+| `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
+| `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
+| `/session-plan/new` | `/session-plan/new?edit=`, `?from=` | the detail's `Edit` (pencil) and duplicate actions (`push`) |
 | `/today` | `/progress`, `/sessions`, `/completed-session/<id>`, `/train` | the Progress card's `View progress`, `All sessions`, latest-session row, and the empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |

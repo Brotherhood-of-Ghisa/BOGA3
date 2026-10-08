@@ -206,6 +206,40 @@ the non-gesture path, under the same conditions. Code:
 `components/exercise-page/swipe-set-row.tsx`, `canDropSet` and `dropSet` in
 `src/session-recorder/exercise-page-model.ts`.
 
+### Planned sessions on Sessions and the plan screens
+
+Decided with the one-off planner. `/sessions` owns queue management: planned
+rows never enter, nor are affected by, the completed history's count, filters,
+row actions or deleted toggle; a schedule is optional and Unscheduled is never
+disguised as "today". The picker's completed-history action is **Repeat last**
+(yesterday's session, appended as planned sets) and is separate from **From
+planner**, which offers authored one-off blocks still available (pending,
+definition-bearing, target-bearing). A block attaches to the active session's
+unsourced card of the same exercise: one match attaches, several offer an
+accessible choice sheet that writes nothing until confirmed, none creates a
+card. **Start all** with another active session offers one Resume and creates
+nothing. Complete is explicit — the sourced card's `Complete block`, refused
+inline until one of the block's planned sets is confirmed; attachment alone
+never advances; skip uses non-performance wording. Set reordering never
+changes provenance, targets or actuals. Code: `src/session-planner/`
+(`plan-form-model`, `plan-edit-sync`, `available-blocks`), the plan routes'
+screen files.
+
+### Reordering sets in the recorder
+
+The set list reorders playlist-style: a quiet trailing grab handle per closed
+row is the only persistent chrome, and it signals the drag — there is no
+separate edit mode and the row does not lift and follow the finger; the rows
+reflow under the pointer to show the insertion position. Drags start on the
+handle only (never row content, never the open logger row); a cancellation or
+a failed atomic write restores the prior order with a lightweight
+announcement. VoiceOver/switch users get `Move set N earlier/later` custom
+actions with an announced result — absent at a boundary — and reduced motion
+suppresses only the handle's lift animation. The handle never steals taps
+from set fields or the removal swipe. Code:
+`components/exercise-page/set-reorder-handle.tsx`, `set-reorder-geometry.ts`,
+`use-set-reorder.ts`.
+
 ## Maintenance
 
 When a change alters a rule above, update this doc in the same change; for

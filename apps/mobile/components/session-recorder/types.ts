@@ -1,6 +1,15 @@
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
+import type { ExerciseListItem } from '@/src/exercise-catalog/list-model';
+import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
 import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
+
+/** The picker's picked row while its historical plan preview loads. */
+export type ExercisePickerPreselectionState = {
+  exercise: ExerciseListItem;
+  status: 'loading' | 'ready' | 'error';
+  suggestion: ExerciseBlockHistorySuggestedPlan | null;
+};
 
 export type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 

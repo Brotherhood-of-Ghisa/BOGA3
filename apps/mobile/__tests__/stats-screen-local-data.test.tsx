@@ -199,6 +199,9 @@ describe('Stats over real data', () => {
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
   });
 
+  // The 104-week heatmap re-render trips the default ceiling when jest
+  // workers run alongside the fast aggregate's other lanes; this test alone
+  // needs ~18 s worst-case and the lane's load has cost it 40-90 s.
   it('updates read-only daily tiles when the saved history window is shortened', async () => {
     await renderSeededStats();
     act(() => updatePreferences({ historyLookbackWeeks: 104, heatmapView: 'daily' }));
@@ -216,7 +219,7 @@ describe('Stats over real data', () => {
     expect(screen.queryByTestId(`stats-exercise-history-heatmap-cell-${dateKey}`)).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
-  }, 30_000);
+  }, 120_000);
 
   it('shows the empty state on an empty database', async () => {
     await renderStats();

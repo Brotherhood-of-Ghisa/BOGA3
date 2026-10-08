@@ -58,6 +58,8 @@ export function RootStack() {
         {/* Draws its own top bar (`Stack.Screen` options in the screen). */}
         <Stack.Screen name="completed-session/[sessionId]" />
         <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
+        <Stack.Screen name="session-plan/new" options={{ title: 'New session plan' }} />
+        <Stack.Screen name="session-plan/[planId]" options={{ title: 'Plan' }} />
         <Stack.Screen name="profile" options={{ title: 'Profile' }} />
         <Stack.Screen
           name="connected-agents"
