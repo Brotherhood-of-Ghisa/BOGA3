@@ -9,10 +9,10 @@ count it.
 | Element | Shown |
 | --- | --- |
 | Week heading | `This week` and `Last week` with Today's range, then the count (`Mon 6 – Sun 12 · 2 sessions`); an older week is its range with the month (and the year when not this one), then the count |
-| Count | the sessions that count ([[set.eligibility]]); a deleted session shown by `Show deleted`, or one without a working set, is listed, never counted |
+| Count | the sessions that count ([[set.eligibility]]); a deleted session shown by `Show deleted sessions`, or one without a working set, is listed, never counted |
 | Empty weeks | no heading: each run of them is one line, `No sessions · N weeks`, above the next listed week, and above the first when the weeks since it are empty |
 | Row | Today's session row (stamp · duration @ gym, working sets · exercises, the PR line) without a chevron; the whole row opens the completed session and has no other action |
-| Show deleted | a switch behind the header's ⋮; a deleted row is faded and tagged `Deleted`, and is restored on the completed session |
+| Show deleted sessions | a switch row behind the header's ⋮; a deleted row is faded and tagged `Deleted`, and is restored on the completed session |
 
 Examples, read on Thu 8 Oct 2026 at 12:00, sessions completing at 18:00
 unless a time is given; `/` separates the lines shown, top to bottom.
