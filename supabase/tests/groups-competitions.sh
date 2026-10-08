@@ -138,7 +138,7 @@ assert_wire() {
   [[ "${verdict}" == ok ]] || fail "actual $1 decoder: ${verdict}"
 }
 # Canary: the decoder must be able to say no, or every assert_wire is a no-op.
-BODY='{}'; [[ "$(wire_verdict isCompetitionContractWire)" == 'rejected {}' ]] || fail 'decoder accepted an empty contract'
+BODY='{}'; [[ "$(wire_verdict isCompetitionBoardWire)" == 'rejected {}' ]] || fail 'decoder accepted an empty board'
 BODY=''
 expect_sql() { local actual; actual="$(run_psql "$2")"; [[ "${actual}" == "$3" ]] || fail "$1: expected '$3', got '$actual'"; }
 drain() {
@@ -223,7 +223,9 @@ rpc "${FROZEN_TOKEN}" group_leave "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
 # Turning bodyweight calculations on changes GX's rules: one rules_change event.
 policy true; drain 'bodyweight calculations on'
 rpc "${OWNER_TOKEN}" group_competition_contract "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_ok contract
-assert_wire isCompetitionContractWire; check active '.activation_state=="active"'
+# No client decodes the contract; its shape stays frozen and activation_state reads active.
+check 'contract shape' '. == {contract_version:4,activation_state:"active",cache_version:5,metrics:["volume","e1rm"],
+  ordinary_units:{volume:"kg_reps",e1rm:"kg"},normalized_units:{volume:"percent_bw_reps",e1rm:"percent_bw"},default_metric:"e1rm"}'
 board volume; check 'best single-set normalized Volume' \
   '.state=="ready" and .rules.default_metric=="volume" and .entry_count==2 and all(.entries[];.unit=="percent_bw_reps" and .performance.visibility=="normalized")'
 check 'normalized values use the private as-of reading' \

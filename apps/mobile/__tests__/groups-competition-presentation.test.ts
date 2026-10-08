@@ -1,5 +1,5 @@
 import { buildCompetitionRow, buildCompetitionPodiums, competitionViewLabel, describeCompetitionRules,
-  formatCompetitionValue, formatCompetitionPerformance, competitionExerciseCore } from '@/src/groups/competition-view-model';
+  formatCompetitionValue, formatCompetitionPerformance, competitionLinkExercise } from '@/src/groups/competition-view-model';
 import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
 import { competitionBoard,competitionExercise,competitionRow,competitionSession } from './helpers/competition-fixtures';
 
@@ -25,8 +25,8 @@ test('Off and c=0 use ordinary units independently of a saved positive contribut
   expect(competitionViewLabel('e1rm',{ ...competitionExercise.rules,bodyweight_contribution: 0 })).toBe('1RM kg');
   expect(competitionViewLabel('volume',competitionExercise.rules)).toBe('Volume %BW·reps');
   expect(describeCompetitionRules(competitionExercise)).toContain('100% contribution');
-  expect(competitionExerciseCore(competitionExercise)).toEqual({ group_exercise_id: 'ge1',name: 'Pull-up',source_exercise_id: null,
-    archived_at_ms: null,load_input_mode: 'total_load' });
+  expect(competitionLinkExercise(competitionExercise)).toEqual({ group_exercise_id: 'ge1',name: 'Pull-up',source_exercise_id: null,
+    archived_at_ms: null,load_input_mode: 'total_load',standard: describeCompetitionRules(competitionExercise) });
 });
 test('podiums preserve server order, unit and default metric; rebuilding has no stale figures', () => {
   const payload={ contract_version: 4 as const,certified: false,podiums: [{ exercise: competitionExercise,board: competitionBoard }] };

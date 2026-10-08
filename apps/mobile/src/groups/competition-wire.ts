@@ -2,15 +2,6 @@ import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
 import type { GroupMemberRef } from './types.ts';
 
-export type CompetitionContractWire = {
-  contract_version: 4;
-  activation_state: 'pending' | 'active';
-  cache_version: 5;
-  metrics: ['volume', 'e1rm'];
-  ordinary_units: { volume: 'kg_reps'; e1rm: 'kg' };
-  normalized_units: { volume: 'percent_bw_reps'; e1rm: 'percent_bw' };
-  default_metric: 'e1rm';
-};
 export type CompetitionRulesWire = {
   bodyweight_calculations_enabled: boolean;
   bodyweight_contribution: number;

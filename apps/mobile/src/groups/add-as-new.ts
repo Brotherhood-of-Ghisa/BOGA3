@@ -9,7 +9,6 @@ import { SYSTEM_EXERCISE_MUSCLE_MAPPING_SEEDS } from '@/src/data/exercise-catalo
 import type { LoadInputMode } from '@/src/exercise-core';
 
 import { groupExerciseCore } from './api';
-import { describeGroupLinkIncompatibility } from './link-view-model';
 import type { GroupExercise } from './types';
 
 export type AddAsNewPrefill = {
@@ -28,10 +27,3 @@ export const buildAddAsNewPrefill = (groupExercise: GroupExercise): AddAsNewPref
     : [];
   return { name, loadInputMode, mappings };
 };
-
-/** Recheck the reviewed editor input before creating both the exercise and its link. */
-export function requireAddAsNewCompatibility(input: { name: string; loadInputMode: LoadInputMode }, target: GroupExercise): void {
-  const reason = describeGroupLinkIncompatibility({ id: '', name: input.name, deletedAt: null,
-    loadInputMode: input.loadInputMode }, target);
-  if (reason) throw new Error(reason);
-}

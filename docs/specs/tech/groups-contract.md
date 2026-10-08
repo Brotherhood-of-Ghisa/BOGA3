@@ -9,7 +9,7 @@
 | If you need… | Source |
 | --- | --- |
 | Tables, constraints, grants, function bodies | the group migrations in `supabase/migrations/` |
-| Wire shapes | `apps/mobile/src/groups/types.ts`, `metric-wire.ts`, `competition-wire.ts` |
+| Wire shapes | `apps/mobile/src/groups/types.ts`, `competition-wire.ts` |
 | Protocol-4 metrics, units, disclosure, history (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
@@ -281,8 +281,7 @@ never a Sync v2 trigger.
 - Rule-only changes keep a witness; set edits and deletes void it; a
   private-reading correction ends only the dependent projection.
 - `competition-wire-guards.ts` rejects private fields, mixed revisions and
-  wrong units before the cache; `metric-wire-guards.ts` rejects private fields
-  in a comparison's rules.
+  wrong units before the cache.
 
 ## Mobile client
 

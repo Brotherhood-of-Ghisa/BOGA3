@@ -17,7 +17,7 @@ import { GroupMissingDataState, GroupStateView } from './group-state-view';
 type GroupLeaderboardsPageProps = {
   groupId: string;
   userId: string;
-  /** `group_board_podiums` through `useGroupResource` (`boards:<groupId>`), owned by the group screen. */
+  /** `group_competition_podiums` through `useGroupResource` (`boards:v5:<groupId>`), owned by the group screen. */
   boards: GroupResourceState<GroupMetricPodiumWire>;
   offline: boolean;
   error: GroupApiError | null;

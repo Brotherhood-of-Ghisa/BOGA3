@@ -466,7 +466,7 @@ describe('Groups tab', () => {
   it('shows the error inline, above cached cards, when data is already on screen', async () => {
     seed(groupCacheKeys.mine,{ groups: [GROUP_A,GROUP_B] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
-    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_stream returned an unexpected payload.'));
+    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'group_competition_stream returned an unexpected competition payload.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-inline-error')).toBeTruthy();
     expect(screen.getByTestId(cardID('friend-1:s-1'))).toBeTruthy();
