@@ -1,19 +1,15 @@
 import { competitionUnit, isCompetitionMetric, isCompetitionValue, isNormalizedCompetition,
   validateCompetitionRules, type CompetitionRules } from '@/src/groups/competition-contract';
-import { scoreCompetitionPerformance } from '@/src/groups/competition-score';
-import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionContractWire,
+import { scoreCompetitionPerformance, type CompetitionPerformanceInput } from '@/src/groups/competition-score';
+import { isCompetitionBoardWire, isCompetitionCertificationWire,
   isCompetitionPerformanceWire, isCompetitionRulesWire } from '@/src/groups/competition-wire-guards';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
-import type { GroupPerformanceInput } from '@/src/groups/performance-score';
 
 const rules: CompetitionRules = { name: 'Pull-up', loadInputMode: 'total_load', defaultMetric: 'e1rm',
   bodyweightCalculationsEnabled: true, bodyweightContribution: 1 };
-const performance: GroupPerformanceInput = { live: true, weightValue: '20', repsValue: '5', performanceStatus: null,
+const performance: CompetitionPerformanceInput = { live: true, weightValue: '20', repsValue: '5', performanceStatus: null,
   source: { loadInputMode: 'total_load' }, bodyWeightKg: 80, bodyWeightMeasurementId: 'reading',
   bodyWeightMeasuredAt: new Date(1000), bodyWeightSource: 'reading' };
-const contract = { contract_version: 4, activation_state: 'pending', cache_version: 5, metrics: ['volume','e1rm'],
-  default_metric: 'e1rm', ordinary_units: { volume: 'kg_reps', e1rm: 'kg' },
-  normalized_units: { volume: 'percent_bw_reps', e1rm: 'percent_bw' } };
 const publicSet = { visibility: 'normalized', session_id: 's', session_exercise_id: 'se', exercise_definition_id: 'd',
   set_id: 'set', reps: 5, performance_status: null, source_load_input_mode: 'total_load', achieved_at_ms: 1000,
   exercise_order_index: 0, set_order_index: 0 };
@@ -77,21 +73,11 @@ it.each([{ bodyWeightKg: null }, { bodyWeightKg: 0 }, { bodyWeightKg: Infinity }
   { bodyWeightMeasurementId: null }, { bodyWeightMeasuredAt: new Date(NaN) }, { live: false },
   { performanceStatus: 'planned' }, { source: { loadInputMode: 'invalid' } },
   { weightValue: '-5' }, { repsValue: '1.5' }])('omits unavailable/invalid performance %j', patch => {
-  expect(scoreCompetitionPerformance({ ...performance, ...patch } as GroupPerformanceInput,rules)).toEqual([]);
+  expect(scoreCompetitionPerformance({ ...performance, ...patch } as CompetitionPerformanceInput,rules)).toEqual([]);
 });
 it('omits zero ordinary scores and invalid group rules', () => {
   expect(scoreCompetitionPerformance({ ...performance, weightValue: '0' },{ ...rules, bodyweightContribution: 0 })).toEqual([]);
   expect(scoreCompetitionPerformance(performance,{ ...rules, bodyweightContribution: NaN })).toEqual([]);
-});
-it('negotiates only exact supported contract/unit/cache versions', () => {
-  expect(isCompetitionContractWire(contract)).toBe(true);
-  expect(isCompetitionContractWire({ ...contract, activation_state: 'active' })).toBe(true);
-  for (const patch of [{ contract_version: 3 },{ cache_version: 4 },{ activation_state: 'ready' },
-    { metrics: ['weight','e1rm'] },{ ordinary_units: { volume: 'kg', e1rm: 'kg' } },
-    { normalized_units: { volume: 'percent_bw_reps', e1rm: 'kg' } },{ body_weight_kg: 80 }]) {
-    expect(isCompetitionContractWire({ ...contract, ...patch })).toBe(false);
-  }
-  expect(isCompetitionContractWire(null)).toBe(false);
 });
 it('validates public certification audit metadata without absolute audit values or private causes', () => {
   expect(isCompetitionCertificationWire(certificate)).toBe(true);

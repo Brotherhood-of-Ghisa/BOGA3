@@ -151,19 +151,19 @@ reading never creates an unavailable state.
 
 ## Strict group bodyweight coverage
 
-`groups-metric-contract.test.ts`, `groups-performance-score.test.ts` and
-`groups-metric-evaluation.test.ts` must cover independent group preference and
-contribution, raw Weight, strict 1RM/Volume, kg total/per-side input, missing or
+`groups-competition-contract.test.ts` and
+`groups-competition-evaluation.test.ts` must cover independent group preference and
+contribution, strict 1RM/Volume, kg total/per-side input, missing or
 invalid reading omission, performed eligibility and zero ranking exclusion.
-Retained protocol-3 mode-mismatch vectors keep Weight raw, derive source-mode
-1RM before target conversion, and leave legacy aggregate Volume unconverted.
-Current protocol-4 vectors convert ordinary single-set Volume/1RM to the target
-and use physical total load for normalized percentages; mode changes rebuild. Off/zero vectors must prove no private-reading lookup or invalidation;
+Ordinary single-set Volume/1RM convert to the target (the load-factor vectors in
+`groups-link-compatibility.test.ts`) and normalized percentages use physical
+total load; mode changes rebuild. Off/zero vectors must prove no private-reading lookup or invalidation;
 positive+missing must rebuild when a first applicable reading arrives. Personal
 preference/contribution must never affect group results.
 
-`groups-metric-wire-guards.test.ts` must fail closed if any reading
-value/date/id/provenance or dependency digest enters a comparison's rules.
+`groups-competition-contract.test.ts` must fail closed if any reading
+value/date/id/provenance or dependency digest enters a board, its rules, a row,
+a performance or a certification.
 Cache tests must prove old projections are evicted.
 `groups-competition-presentation.test.ts` must prove a session's permitted raw
 activity survives an absent derived score.

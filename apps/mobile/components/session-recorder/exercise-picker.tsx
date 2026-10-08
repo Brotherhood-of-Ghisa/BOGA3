@@ -29,7 +29,7 @@ import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildExerciseListModel, type ExerciseListItem } from '@/src/exercise-catalog/list-model';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { useExerciseCatalogStats } from '@/src/exercise-catalog/stats-cache';
-import { buildAddAsNewPrefill, requireAddAsNewCompatibility } from '@/src/groups/add-as-new';
+import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
 import {
   buildPickerGroupSections,
   groupExercisesLoaded,
@@ -262,7 +262,6 @@ export function ExercisePicker({
     if (!target) {
       throw new Error('No group exercise selected.');
     }
-    requireAddAsNewCompatibility(input, target.groupExercise);
     const { exercise } = await createExerciseWithGroupLink(input, {
       groupId: target.groupId,
       groupExerciseId: target.groupExercise.group_exercise_id,

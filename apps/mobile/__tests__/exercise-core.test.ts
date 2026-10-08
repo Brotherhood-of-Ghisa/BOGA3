@@ -1,6 +1,6 @@
 /**
  * The shared ExerciseCore validator (T1). The vectors are shared
- * with `groups-contract`, which runs them against `group_exercise_create` and
+ * with `groups-contract`, which runs them against `group_competition_exercise_create` and
  * the `group_exercises` CHECKs, so the device and the server apply one rule.
  */
 

@@ -164,7 +164,7 @@ RPCs. Private helpers have no client or service execute grants.
 
 `group_competition_contract(group)` checks app user, OAuth denial and active
 membership and returns protocol/unit/cache metadata. Its `activation_state` is
-always `active`; the field stays because shipped clients decode it. Minimum
+always `active`; the shape is frozen, though no client reads it. Minimum
 client capability is contract 4 plus cache generation 5; private Sync v2
 protocols are separate. No bodyweight or performance read, Sync v2 entity,
 snapshot, reading schema or stored achievement belongs to it.

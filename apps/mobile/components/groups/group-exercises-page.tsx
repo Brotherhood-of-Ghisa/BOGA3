@@ -37,7 +37,7 @@ import {
   type GroupRole,
   type LinkableExercise,
 } from '@/src/groups';
-import { buildAddAsNewPrefill, requireAddAsNewCompatibility } from '@/src/groups/add-as-new';
+import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
 import { archiveCompetitionExercise } from '@/src/groups/api';
 import { competitionLinkExercise,describeCompetitionRules } from '@/src/groups/competition-view-model';
 import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
@@ -196,7 +196,6 @@ export function GroupExercisesPage({
     if (!target) {
       throw new Error('No group exercise selected.');
     }
-    requireAddAsNewCompatibility(input, target);
     const { exercise } = await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id });
     return exercise;
   };

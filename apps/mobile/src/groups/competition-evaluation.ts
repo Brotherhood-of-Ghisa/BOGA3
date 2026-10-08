@@ -1,22 +1,75 @@
 // Service-only adapter. SQL owns source/pin checks and atomic publication;
 // public readers must construct allowlisted protocol-4 projections separately.
 import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
+import type { LoadInputMode } from '../exercise-core/index.ts';
 import { isNormalizedCompetition, validateCompetitionRules, type CompetitionMetric,
   type CompetitionValue } from './competition-contract.ts';
 import { scoreCompetitionPerformance } from './competition-score.ts';
 import type { CompetitionRulesWire } from './competition-wire.ts';
-import type { EvaluatedGroupMetricSet, GroupMetricEvaluationGraph, GroupMetricSourceSet } from './metric-evaluation.ts';
-import type { GroupPerformanceSnapshotWire } from './metric-wire.ts';
 
-export type CompetitionSourceSet = Omit<GroupMetricSourceSet, 'fingerprints'> & {
+/** The performed set an evaluated score came from; private calculation context never is. */
+export type CompetitionPerformanceSnapshot = {
+  session_id: string;
+  session_exercise_id: string;
+  exercise_definition_id: string;
+  set_id: string;
+  weight_value: string;
+  reps_value: string;
+  reps: number;
+  performance_status: string | null;
+  source_load_input_mode: LoadInputMode;
+  achieved_at_ms: number;
+  exercise_order_index: number;
+  set_order_index: number;
+};
+/** Service-only graph row. Private reading fields are consumed here and never
+ * copied into the public performance snapshot or persisted group payloads. */
+export type CompetitionSourceSet = Omit<CompetitionPerformanceSnapshot, 'reps'> & {
+  member_user_id: string;
+  body_weight_kg: number | null;
+  body_weight_source: string | null;
+  body_weight_measurement_id: string | null;
+  body_weight_measured_at_ms: number | null;
+  /** The synced effort label (for example `warm_up`, `rir_<n>`, `technique` or null), as stored. */
+  set_type: string | null;
+  live: boolean;
+  /** SQL-owned live membership, shared-session and current-link eligibility.
+   * Unlinked sources remain in the graph for record/certification validation. */
+  counting: boolean;
+  set_created_at_ms: number;
+  /** SQL-only witness pins. Never copied to scores or public snapshots. */
+  observed_set_pin?: string;
+  reading_pin?: string | null;
+  // A scoring fingerprint includes the dependencies of its metric.
   fingerprints: Partial<Record<CompetitionMetric, string>>;
 };
-export type CompetitionEvaluationGraph = Omit<GroupMetricEvaluationGraph, 'rules' | 'sets'> & {
+export type CompetitionEvaluationGraph = {
   contract_version: 4;
+  group_id: string;
+  group_exercise_id: string;
+  name: string;
   rules: CompetitionRulesWire;
+  source_token: string;
   sets: CompetitionSourceSet[];
 };
-export type EvaluatedCompetitionSet = Omit<EvaluatedGroupMetricSet, 'metric' | 'value' | 'unit'> & CompetitionValue;
+export type EvaluatedCompetitionSet = CompetitionValue & {
+  member_user_id: string;
+  set_id: string;
+  session_id: string;
+  session_exercise_id: string;
+  exercise_definition_id: string;
+  achieved_at_ms: number;
+  exercise_order_index: number;
+  set_order_index: number;
+  set_created_at_ms: number;
+  fingerprint: string;
+  counting: boolean;
+  /** The app's working-set rule over the set's effort. A score that is not
+   * working keeps its row (stored records are checked against it) but never
+   * counts on a board, so it can never become a record. */
+  working: boolean;
+  performance: CompetitionPerformanceSnapshot;
+};
 export type CompetitionEvaluation = {
   contract_version: 4;
   group_id: string;
@@ -35,7 +88,7 @@ function privateContext(row: CompetitionSourceSet, normalized: boolean) {
     bodyWeightMeasuredAt: row.body_weight_measured_at_ms === null ? null : new Date(row.body_weight_measured_at_ms) };
 }
 
-function performanceSnapshot(row: CompetitionSourceSet): GroupPerformanceSnapshotWire {
+function performanceSnapshot(row: CompetitionSourceSet): CompetitionPerformanceSnapshot {
   return { session_id: row.session_id, session_exercise_id: row.session_exercise_id,
     exercise_definition_id: row.exercise_definition_id, set_id: row.set_id,
     weight_value: row.weight_value, reps_value: row.reps_value, reps: Number(row.reps_value),

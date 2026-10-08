@@ -7,17 +7,13 @@
 // when an entry is missing.
 
 import { normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
-import type { LoadInputMode } from '@/src/exercise-core';
 
 import type { GroupExercise } from './types';
-import { checkGroupLinkCompatibility } from './metric-contract';
-import { isGroupMetricExerciseWire } from './metric-wire-guards';
 
 /** A personal exercise as the linking UI needs it (a subset of the catalogue row). */
 export type LinkableExercise = {
   id: string;
   name: string;
-  loadInputMode?: LoadInputMode;
   deletedAt: Date | null;
 };
 
@@ -32,7 +28,7 @@ export type LinkRef = {
 export type GroupExerciseCatalog = {
   groupId: string;
   groupName: string;
-  exercises: (GroupExercise & { standard?: string })[] | null;
+  exercises: GroupExercise[] | null;
 };
 
 /**
@@ -99,46 +95,9 @@ export const describeUnlinkSuccess = (context: ExerciseUnlinkContext, offline: b
 
 export const describeAlreadyLinkedIn = (groupName: string): string => `already linked in ${groupName}`;
 
-/** Weight stays raw; only 1RM is converted when source and target modes differ. */
-export const describeLoadModeNote = (
-  myMode: LoadInputMode | undefined,
-  groupMode: LoadInputMode,
-): string | null => {
-  const mine = myMode ?? 'total_load';
-  if (mine === groupMode) {
-    return null;
-  }
-  return mine === 'per_side_load'
-    ? 'Weight stays as logged. 1RM is compared in total-load terms.'
-    : 'Weight stays as logged. 1RM is compared in per-side terms.';
-};
-
-/** Linking never changes personal metadata. Incompatible variants need a separate exercise. */
-export function describeGroupLinkIncompatibility(exercise: LinkableExercise, target: GroupExercise): string | null {
-  if (!isGroupMetricExerciseWire(target) || target.legacy) return null;
-  const result = checkGroupLinkCompatibility({
-    loadInputMode: exercise.loadInputMode ?? 'total_load',
-  }, {
-    name: target.name, loadInputMode: target.load_input_mode,
-    bodyweightCalculationsEnabled: target.bodyweight_calculations_enabled,
-    bodyweightContribution: target.bodyweight_contribution, defaultMetric: target.default_metric,
-  });
-  if (result.compatible) return null;
-  switch (result.reason) {
-    case 'load_input_mode_invalid': return 'Review this exercise’s weight entry before linking.';
-  }
-}
-
-export function describeGroupLinkLoadNote(exercise: LinkableExercise, target: GroupExercise & { standard?: string }): string | null {
-  if (target.standard) return `${target.standard}. Your personal exercise settings stay unchanged.`;
-  const incompatible = describeGroupLinkIncompatibility(exercise, target);
-  if (incompatible) return `Not counted: ${incompatible}`;
-  if (!isGroupMetricExerciseWire(target) || target.legacy || !target.bodyweight_calculations_enabled ||
-    target.bodyweight_contribution === 0) {
-    return describeLoadModeNote(exercise.loadInputMode, target.load_input_mode);
-  }
-  return `The group applies a ${Number((target.bodyweight_contribution * 100).toFixed(2))}% bodyweight contribution using its own calculation settings. Your personal exercise settings stay unchanged.`;
-}
+/** Linking consumes the group's shared standard; it never copies personal settings. */
+export const describeGroupLinkLoadNote = (target: Pick<GroupExercise, 'standard'>): string =>
+  `${target.standard}. Your personal exercise settings stay unchanged.`;
 
 // ---- Shared lookups ---------------------------------------------------------
 
@@ -189,7 +148,7 @@ export const suggestExerciseForGroupExercise = ({
   links: readonly LinkRef[];
 }): LinkableExercise | null => {
   const linkedInGroup = linkedExerciseIdsInGroup(groupId, links);
-  const candidates = exercises.filter((exercise) => isLive(exercise) && !linkedInGroup.has(exercise.id) && !describeGroupLinkIncompatibility(exercise, groupExercise));
+  const candidates = exercises.filter((exercise) => isLive(exercise) && !linkedInGroup.has(exercise.id));
 
   const sourceMatch = groupExercise.source_exercise_id
     ? candidates.find((exercise) => exercise.id === groupExercise.source_exercise_id)
@@ -343,7 +302,7 @@ export const buildPickSheetModel = ({
     .sort(byName)
     .map((exercise) => ({
       exercise,
-      unavailableReason: linkedInGroup.has(exercise.id) ? describeAlreadyLinkedIn(groupName) : describeGroupLinkIncompatibility(exercise, groupExercise),
+      unavailableReason: linkedInGroup.has(exercise.id) ? describeAlreadyLinkedIn(groupName) : null,
     }));
   return { suggestion, choices, defaultOption: suggestion ? 'suggested' : 'add-new' };
 };
@@ -435,7 +394,7 @@ export const buildLinkScreenModel = ({
         archived,
         inactive,
         statusLabel: [inactive ? INACTIVE_LINK_LABEL : null, archived ? ARCHIVED_LINK_LABEL : null].filter(Boolean).join(' · ') || null,
-        loadModeNote: groupExercise ? describeGroupLinkLoadNote(exercise, groupExercise) : null,
+        loadModeNote: groupExercise ? describeGroupLinkLoadNote(groupExercise) : null,
       };
     })
     .sort((left, right) => left.groupName.localeCompare(right.groupName) || left.groupExerciseName.localeCompare(right.groupExerciseName));
@@ -462,8 +421,8 @@ export const buildLinkScreenModel = ({
           groupId: catalog.groupId,
           groupName: catalog.groupName,
           groupExercise,
-          unavailableReason: linkedGroupIds.has(catalog.groupId) ? describeAlreadyLinkedIn(catalog.groupName) : describeGroupLinkIncompatibility(exercise, groupExercise),
-          loadModeNote: describeGroupLinkLoadNote(exercise, groupExercise),
+          unavailableReason: linkedGroupIds.has(catalog.groupId) ? describeAlreadyLinkedIn(catalog.groupName) : null,
+          loadModeNote: describeGroupLinkLoadNote(groupExercise),
         }),
       );
     for (const row of rows) {

@@ -118,8 +118,6 @@ test('readers check nested scope/revision/scope-state coherence', () => {
   expect(guards.isCompetitionPodiumsWire({ ...podiums,podiums: [{ exercise: { ...exercise,rules: { ...rules,bodyweight_contribution: 0.5 } },board }] })).toBe(false);
 });
 
-const contract = { contract_version: 4, activation_state: 'pending', cache_version: 5, metrics: ['volume','e1rm'], default_metric: 'e1rm',
-  ordinary_units: { volume: 'kg_reps', e1rm: 'kg' }, normalized_units: { volume: 'percent_bw_reps', e1rm: 'percent_bw' } };
 describe('request-scoped protocol-4 API', () => {
   const rpc = jest.fn(), setHeader = jest.fn();
   const respond = (data: unknown, error: unknown = null, status = 200) => {
@@ -128,7 +126,6 @@ describe('request-scoped protocol-4 API', () => {
   };
   beforeEach(() => { rpc.mockReset(); setHeader.mockReset(); mockClient.mockReset(); mockClient.mockReturnValue({ schema: jest.fn().mockReturnValue({ rpc }) }); });
   const calls = [
-    ['contract',() => api.getCompetitionContract('g'),contract],
     ['exercise_list',() => api.listCompetitionExercises('g'),{ contract_version: 4, exercises: [exercise] }],
     ['board',() => api.getCompetitionBoard({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm' }),board],
     ['podiums',() => api.getCompetitionPodiums('g'),podiums],
@@ -168,11 +165,11 @@ describe('request-scoped protocol-4 API', () => {
   });
   test('unsupported/authorization and transport errors stay typed; no legacy retry', async () => {
     respond(null,{ message: 'UPDATE_REQUIRED: unavailable' },400);
-    await expect(api.getCompetitionContract('g')).rejects.toMatchObject({ code: 'UPDATE_REQUIRED' }); expect(rpc).toHaveBeenCalledTimes(1);
-    respond(null,{ message: 'FORBIDDEN: denied' },403); await expect(api.getCompetitionContract('g')).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    mockClient.mockImplementation(() => { throw new Error('unconfigured'); }); await expect(api.getCompetitionContract('g')).rejects.toMatchObject({ code: 'INTERNAL' });
+    await expect(api.listCompetitionExercises('g')).rejects.toMatchObject({ code: 'UPDATE_REQUIRED' }); expect(rpc).toHaveBeenCalledTimes(1);
+    respond(null,{ message: 'FORBIDDEN: denied' },403); await expect(api.listCompetitionExercises('g')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    mockClient.mockImplementation(() => { throw new Error('unconfigured'); }); await expect(api.listCompetitionExercises('g')).rejects.toMatchObject({ code: 'INTERNAL' });
     mockClient.mockReturnValue({ schema: () => ({ rpc: () => { throw new Error('offline'); } }) });
-    await expect(api.getCompetitionContract('g')).rejects.toMatchObject({ code: 'NETWORK' });
+    await expect(api.listCompetitionExercises('g')).rejects.toMatchObject({ code: 'NETWORK' });
   });
   test('server-normalized names on committed creates/updates are accepted', async () => {
     const payload = { contract_version: 4,exercise };
