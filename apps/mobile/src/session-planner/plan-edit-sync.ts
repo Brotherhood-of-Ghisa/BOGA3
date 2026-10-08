@@ -71,17 +71,14 @@ export const savePlanEdits = async (
   }
 
   // The intended final order is the form's order — a block added between
-  // kept blocks must land there, not appended after them. The pre-write
-  // refusal above guarantees a plan with a consumed block never reaches
-  // this reorder.
-  const intendedOrder = form.blocks
-    .map((block, index) => block.sourceBlockId ?? addedIdsByFormIndex.get(index) ?? null)
-    .filter((id): id is string => id !== null);
-  const originalOrder = detail.blocks.map((block) => block.id).filter((id) => intendedOrder.includes(id));
-  const orderChanged =
-    intendedOrder.length !== originalOrder.length ||
-    intendedOrder.some((id, index) => id !== originalOrder[index]);
-  if (orderChanged) {
+  // kept blocks must land there, not appended after them. When blocks are only
+  // appended at the end and kept blocks retain their order, no reorder is needed
+  // (new blocks are naturally appended by addPlanBlock), avoiding refusal on
+  // plans containing consumed blocks.
+  if (plan.orderChanged) {
+    const intendedOrder = form.blocks
+      .map((block, index) => block.sourceBlockId ?? addedIdsByFormIndex.get(index) ?? null)
+      .filter((id): id is string => id !== null);
     const reordered = await planRepository.reorderPlanBlocks(planId, intendedOrder);
     if (reordered.status !== 'saved' && reordered.status !== 'updated') {
       return reordered;
@@ -100,6 +97,7 @@ type PlanBlockDiff =
       kind: 'planned';
       operations: BlockOp[];
       touchesConsumed: boolean;
+      orderChanged: boolean;
     }
   | { kind: 'validation-failed'; errors: PlanFieldError[] };
 
@@ -112,13 +110,16 @@ const planBlockOperations = (
   const blocksById = new Map(detail.blocks.map((block) => [block.id, block]));
   const keptIds: string[] = [];
   const addedFormIndexes: number[] = [];
-  const operations: BlockOp[] = [];
+  const adds: BlockOp[] = [];
+  const updates: BlockOp[] = [];
+  const deletes: BlockOp[] = [];
+
   for (let index = 0; index < form.blocks.length; index += 1) {
     const sourceId = form.blocks[index].sourceBlockId ?? null;
     const draft = drafts[index];
     const existing = sourceId !== null ? blocksById.get(sourceId) : undefined;
     if (existing === undefined) {
-      operations.push({ kind: 'add', formIndex: index, draft });
+      adds.push({ kind: 'add', formIndex: index, draft });
       addedFormIndexes.push(index);
       continue;
     }
@@ -127,15 +128,18 @@ const planBlockOperations = (
       return { kind: 'validation-failed', errors: normalized.errors };
     }
     if (blockDiffers(existing, normalized.value.exercise)) {
-      operations.push({ kind: 'update', id: existing.id, draft });
+      updates.push({ kind: 'update', id: existing.id, draft });
     }
     keptIds.push(existing.id);
   }
   for (const block of detail.blocks) {
     if (!keptIds.includes(block.id)) {
-      operations.push({ kind: 'delete', id: block.id });
+      deletes.push({ kind: 'delete', id: block.id });
     }
   }
+  // Delete removed blocks before adding new ones so replacements stay under the plan's block limit.
+  const operations: BlockOp[] = [...deletes, ...updates, ...adds];
+
   const updateOrDeleteTouchesConsumed = operations.some(
     (op) =>
       (op.kind === 'update' || op.kind === 'delete') &&
@@ -156,7 +160,7 @@ const planBlockOperations = (
   const touchesConsumed =
     updateOrDeleteTouchesConsumed ||
     (orderChanged && detail.blocks.some((block) => block.status !== 'pending'));
-  return { kind: 'planned', operations, touchesConsumed };
+  return { kind: 'planned', operations, touchesConsumed, orderChanged };
 };
 
 const blockDiffers = (

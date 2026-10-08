@@ -66,8 +66,31 @@ export const emptyPlanForm = (): PlanFormState => ({
   blocks: [emptyPlanFormBlock()],
 });
 
+export type LoadInputModeLookup =
+  | { id: string; loadInputMode?: 'total_load' | 'per_side_load' | null }[]
+  | ((exerciseDefinitionId: string | null) => 'total_load' | 'per_side_load' | null)
+  | Map<string, 'total_load' | 'per_side_load'>
+  | Record<string, 'total_load' | 'per_side_load'>;
+
+const resolveBlockLoadInputMode = (
+  definitionId: string | null,
+  lookup?: LoadInputModeLookup | null,
+): 'total_load' | 'per_side_load' | null => {
+  if (!definitionId || !lookup) return null;
+  if (typeof lookup === 'function') return lookup(definitionId);
+  if (lookup instanceof Map) return lookup.get(definitionId) ?? null;
+  if (Array.isArray(lookup)) {
+    const matched = lookup.find((candidate) => candidate.id === definitionId);
+    return matched?.loadInputMode ?? null;
+  }
+  return lookup[definitionId] ?? null;
+};
+
 /** The editor's prefill from a loaded plan (edit in place, or duplicate). */
-export const planFormFromDetail = (detail: PlanDetailView): PlanFormState => ({
+export const planFormFromDetail = (
+  detail: PlanDetailView,
+  catalogExercises?: LoadInputModeLookup | null,
+): PlanFormState => ({
   title: detail.title,
   scheduleText:
     detail.scheduledFor !== null ? formatScheduleText(detail.scheduledFor) : '',
@@ -78,7 +101,7 @@ export const planFormFromDetail = (detail: PlanDetailView): PlanFormState => ({
     exerciseDefinitionId: block.exerciseDefinitionId,
     name: block.name,
     machineName: block.machineName ?? '',
-    loadInputMode: null,
+    loadInputMode: resolveBlockLoadInputMode(block.exerciseDefinitionId, catalogExercises),
     sets: block.targets.map((target) => ({
       id: nextKey('set'),
       targetWeightText: target.targetWeightValue ?? '',

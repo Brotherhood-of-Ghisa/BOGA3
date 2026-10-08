@@ -37,11 +37,17 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
   if (shownKey !== targetKey) {
     setShownKey(targetKey);
     setSelectedId(null);
+    setPending(false);
   }
 
   if (!blockName || candidates.length === 0) {
     return null;
   }
+
+  const dismiss = () => {
+    setPending(false);
+    onDismiss();
+  };
 
   const confirm = () => {
     if (selectedId === null || pending) {
@@ -55,7 +61,7 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
   return (
     <Sheet
       dismissLabel="Dismiss card choice"
-      onDismiss={onDismiss}
+      onDismiss={dismiss}
       testID="plan-card-choice-sheet"
       title={blockName}
       visible>

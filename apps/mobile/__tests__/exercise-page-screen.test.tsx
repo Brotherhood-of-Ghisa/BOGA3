@@ -46,8 +46,19 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
   useGroupLinkingUserId: () => mockLinkingUserId,
 }));
 
+jest.mock('@/src/session-planner', () => {
+  const actual = jest.requireActual('@/src/session-planner');
+  return {
+    ...actual,
+    reorderSessionExerciseSets: jest.fn((...args: unknown[]) =>
+      (actual.reorderSessionExerciseSets as any)(...args)
+    ),
+  };
+});
+
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
+import * as sessionPlanner from '@/src/session-planner';
 import { Icon } from '@/components/ui/icon';
 import { uiIconSize, uiRoles } from '@/components/ui/tokens';
 import { defaultSessionExerciseDraftClient, type SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
@@ -934,6 +945,70 @@ describe('exercise page set reordering', () => {
       );
     });
     expect(await liveSetIds()).toEqual(before);
+  });
+
+  it('clears the drag overlay and announces failure when reorder write throws', async () => {
+    await openPage();
+    const before = await liveSetIds();
+    (sessionPlanner.reorderSessionExerciseSets as jest.Mock).mockRejectedValueOnce(new Error('SQLITE_FULL'));
+
+    const row = screen.getByTestId('exercise-set-2-open');
+    act(() => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'move-earlier' } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('exercise-set-reorder-announcement')).toHaveTextContent(
+        "Couldn't save the new order. The previous order stays."
+      );
+    });
+    expect(await liveSetIds()).toEqual(before);
+  });
+
+  it('serializes set reordering with draft edits so draft reload does not undo reorder', async () => {
+    await openPage();
+    const before = await liveSetIds();
+
+    let resolveReorder: (val: any) => void;
+    const reorderPromise = new Promise((resolve) => {
+      resolveReorder = resolve;
+    });
+
+    (sessionPlanner.reorderSessionExerciseSets as jest.Mock).mockImplementationOnce(
+      () => reorderPromise as any
+    );
+
+    // Trigger reorder [before[1], before[0], ...]
+    const row = screen.getByTestId('exercise-set-2-open');
+    act(() => {
+      fireEvent(row, 'accessibilityAction', { nativeEvent: { actionName: 'move-earlier' } });
+    });
+
+    // While reorder is in flight, edit set 1 weight
+    fireEvent.press(screen.getByTestId('exercise-set-1-open'));
+    await screen.findByTestId('exercise-set-logger');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '55');
+
+    // Resolve reorder write in database
+    await act(async () => {
+      const realResult = await jest.requireActual('@/src/session-planner').reorderSessionExerciseSets(
+        BENCH,
+        [before[1], before[0], before[2], before[3], before[4]]
+      );
+      resolveReorder!(realResult);
+    });
+
+    await waitFor(async () => {
+      expect(await liveSetIds()).toEqual([before[1], before[0], before[2], before[3], before[4]]);
+    });
+
+    // Wait for the queued draft edit to flush
+    await waitFor(async () => {
+      const sets = await benchSets();
+      const set1 = sets.find((s) => s.id === before[0]);
+      expect(set1?.weightValue).toBe('55');
+      expect(sets.map((s) => s.id)).toEqual([before[1], before[0], before[2], before[3], before[4]]);
+    });
   });
 });
 

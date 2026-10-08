@@ -50,8 +50,10 @@ import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { sessions } from '@/src/data/schema';
+import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choice-sheet';
+import { PlanFormScreen } from '@/components/session-planner/plan-form-screen';
 import { planRepository, savePlanEdits, startSessionPlan } from '@/src/session-planner';
-import type { PlanFormState } from '@/src/session-planner/plan-form-model';
+import { planFormFromDetail, type PlanFormState } from '@/src/session-planner/plan-form-model';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
@@ -495,14 +497,10 @@ describe('recorder: complete block on a sourced card', () => {
       expect((await planQueries.loadPlanDetail(planId))?.blocks[0].status).toBe('completed');
     });
 
-    // The page renders again over the same, now resolved card: no offer.
-    const view = render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
-    await view.findByTestId('exercise-page');
-    await act(async () => {});
-    fireEvent.press(view.getByTestId('exercise-page-options'));
-    await view.findByTestId('exercise-options-sheet');
-    expect(view.queryByTestId('exercise-options-complete-block')).toBeNull();
-    view.unmount();
+    // Reopening options on the same page never offers Complete block again (blockStatus refreshed to resolved).
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    await screen.findByTestId('exercise-options-sheet');
+    expect(screen.queryByTestId('exercise-options-complete-block')).toBeNull();
   });
 });
 
@@ -717,5 +715,191 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     await act(async () => {});
     expect(enabled.getByTestId('exercise-picker-planner-toggle')).toBeTruthy();
     enabled.unmount();
+  });
+
+  it('appending after a consumed block commits the append without reordering the consumed plan', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository({ title: 'Consumed Plan' });
+    await startSessionPlan(planId);
+    const detail = await planQueries.loadPlanDetail(planId);
+    expect(detail?.blocks[0].status).toBe('attached');
+
+    const form: PlanFormState = {
+      title: 'Consumed Plan',
+      scheduleText: '',
+      gymId: null,
+      blocks: [
+        {
+          id: 'kept-block',
+          sourceBlockId: detail?.blocks[0].id ?? null,
+          exerciseDefinitionId: 'ex-squat',
+          name: 'Barbell Squat',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+        },
+        {
+          id: 'new-block',
+          sourceBlockId: null,
+          exerciseDefinitionId: 'ex-bench',
+          name: 'Bench Press',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 's2', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
+        },
+      ],
+    };
+    const result = await savePlanEdits(planId, form);
+    expect(result.status).toBe('updated');
+    const after = await planQueries.loadPlanDetail(planId);
+    expect(after?.blocks).toHaveLength(2);
+    expect(after?.blocks.map((b) => b.name)).toEqual(['Barbell Squat', 'Bench Press']);
+    expect(after?.blocks[0].status).toBe('attached');
+    expect(after?.blocks[1].status).toBe('pending');
+  });
+
+  it('replacing a block in a 30-block plan deletes removed blocks before checking addition limits', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository({ title: 'Max Blocks' });
+    for (let i = 2; i <= 30; i += 1) {
+      await planRepository.addPlanBlock(planId, {
+        exerciseDefinitionId: 'ex-squat',
+        name: `Squat ${i}`,
+        machineName: '',
+        sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+      });
+    }
+    const before = await planQueries.loadPlanDetail(planId);
+    expect(before?.blocks).toHaveLength(30);
+
+    const form: PlanFormState = {
+      title: 'Max Blocks',
+      scheduleText: '',
+      gymId: null,
+      blocks: [
+        ...before!.blocks.slice(0, 29).map((b, idx) => ({
+          id: `kept-${idx}`,
+          sourceBlockId: b.id,
+          exerciseDefinitionId: b.exerciseDefinitionId,
+          name: b.name,
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: `s-${idx}`, targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+        })),
+        {
+          id: 'new-30',
+          sourceBlockId: null,
+          exerciseDefinitionId: 'ex-bench',
+          name: 'Bench Press',
+          machineName: '',
+          loadInputMode: null,
+          sets: [{ id: 's-new', targetWeightText: '60', targetRepsText: '8', targetSetType: null }],
+        },
+      ],
+    };
+    const result = await savePlanEdits(planId, form);
+    expect(result.status).toBe('updated');
+    const after = await planQueries.loadPlanDetail(planId);
+    expect(after?.blocks).toHaveLength(30);
+    expect(after?.blocks[29].name).toBe('Bench Press');
+  });
+
+  it('choice sheet resets pending state on reopening so confirmation is re-enabled', () => {
+    const onConfirm = jest.fn();
+    const onDismiss = jest.fn();
+    const candidates = [
+      { id: 'c1', exerciseName: 'Bench Press', setCount: 3 },
+      { id: 'c2', exerciseName: 'Bench Press', setCount: 2 },
+    ];
+    const { rerender } = render(
+      <PlanCardChoiceSheet
+        blockName="Bench Press"
+        candidates={candidates}
+        onConfirm={onConfirm}
+        onDismiss={onDismiss}
+      />
+    );
+    fireEvent.press(screen.getByTestId('plan-card-choice-c1'));
+    fireEvent.press(screen.getByTestId('plan-card-choice-confirm'));
+    expect(onConfirm).toHaveBeenCalledWith('c1');
+    expect(onDismiss).toHaveBeenCalled();
+
+    rerender(
+      <PlanCardChoiceSheet
+        blockName={null}
+        candidates={[]}
+        onConfirm={onConfirm}
+        onDismiss={onDismiss}
+      />
+    );
+    rerender(
+      <PlanCardChoiceSheet
+        blockName="Bench Press"
+        candidates={candidates}
+        onConfirm={onConfirm}
+        onDismiss={onDismiss}
+      />
+    );
+    fireEvent.press(screen.getByTestId('plan-card-choice-c2'));
+    const confirmButton = screen.getByTestId('plan-card-choice-confirm');
+    expect(confirmButton).toHaveProp('accessibilityState', { disabled: false });
+    fireEvent.press(confirmButton);
+    expect(onConfirm).toHaveBeenCalledWith('c2');
+  });
+
+  it('prefilling plans from detail preserves loadInputMode for per-side load exercises', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository({ title: 'Per Side Plan' });
+    const detail = await planQueries.loadPlanDetail(planId);
+    expect(detail).toBeTruthy();
+    const form = planFormFromDetail(detail!, [
+      { id: 'ex-squat', loadInputMode: 'per_side_load' },
+    ]);
+    expect(form.blocks[0].loadInputMode).toBe('per_side_load');
+  });
+
+  it('displays machine-note validation errors when exceeding 100 characters', async () => {
+    await seedCatalog();
+    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    await screen.findByTestId('plan-form-title');
+    fillTitle('Valid Title');
+    await fillBlockName(1, 'Barbell Squat');
+    fillSet(1, 1, '100', '5');
+    const tooLongNote = 'a'.repeat(101);
+    fireEvent.changeText(screen.getByTestId('plan-form-block-1-machine'), tooLongNote);
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    expect(await screen.findByTestId('plan-form-block-1-machine-error')).toHaveTextContent(
+      'Use at most 100 characters.'
+    );
+  });
+
+  it('catches rejected planner saves and displays error notice', async () => {
+    const onSave = jest.fn().mockRejectedValueOnce(new Error('SQLITE_FULL'));
+    render(
+      <PlanFormScreen
+        initialForm={{
+          title: 'Test Plan',
+          scheduleText: '',
+          gymId: null,
+          blocks: [
+            {
+              id: 'b1',
+              sourceBlockId: null,
+              exerciseDefinitionId: 'ex-1',
+              name: 'Squat',
+              machineName: '',
+              loadInputMode: null,
+              sets: [{ id: 's1', targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+            },
+          ],
+        }}
+        onSave={onSave}
+        saveLabel="Save"
+      />
+    );
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    expect(await screen.findByTestId('plan-form-notice')).toHaveTextContent(
+      "Couldn't save the plan. Try again."
+    );
   });
 });

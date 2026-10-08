@@ -160,6 +160,8 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
       if (outcome.status !== 'saved') {
         setSaveNotice(outcome.message ?? "Couldn't save the plan. Try again.");
       }
+    } catch {
+      setSaveNotice("Couldn't save the plan. Try again.");
     } finally {
       setSaving(false);
     }

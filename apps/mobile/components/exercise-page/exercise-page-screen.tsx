@@ -45,9 +45,10 @@ import {
   updateLoggerValues,
 } from '@/src/session-recorder/exercise-page-model';
 import { recordBaselineOf } from '@/src/session-recorder/exercise-records';
+import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import type { SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { useExerciseRecords, type LoadExerciseRecords } from '@/src/session-recorder/use-exercise-records';
-import { useSessionExerciseDraft } from '@/src/session-recorder/use-session-exercise-draft';
+import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src/session-recorder/use-session-exercise-draft';
 
 import { EffortSheet, ExerciseOptionsSheet } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
@@ -160,6 +161,8 @@ export function ExercisePageScreen({
   // block is still pending, never after it is resolved.
   const [blockStatus, setBlockStatus] = useState<'pending' | 'resolved' | null>(null);
   const reorderWriteRef = useRef(false);
+  const inFlightReorderRef = useRef<Promise<void> | null>(null);
+  const draftQueueRef = useRef<Promise<void>>(Promise.resolve());
   const weightInputRef = useRef<TextInputInstance>(null);
 
   // The sourced card's block state decides whether Complete block is
@@ -215,13 +218,33 @@ export function ExercisePageScreen({
     sets.find((set) => set.id === openSetId) ?? (cursorIndex !== null ? sets[cursorIndex] : undefined);
   const loggerValues = openSet ? loggerValuesFor(openSet) : null;
 
+  const queueDraftUpdate = useCallback(
+    (
+      recipe: (exercise: SessionDraftExerciseSnapshot) => SessionDraftExerciseSnapshot,
+      kind: SessionExerciseMutationKind,
+    ) => {
+      const apply = () => {
+        draft.update(recipe, kind);
+      };
+      if (inFlightReorderRef.current) {
+        draftQueueRef.current = draftQueueRef.current
+          .then(() => inFlightReorderRef.current)
+          .catch(() => {})
+          .then(apply);
+        return;
+      }
+      apply();
+    },
+    [draft]
+  );
+
   const updateSets = useCallback(
-    (recipe: (current: typeof sets) => typeof sets, kind: 'text' | 'structural') =>
-      draft.update((current) => {
+    (recipe: (current: typeof sets) => typeof sets, kind: SessionExerciseMutationKind) =>
+      queueDraftUpdate((current) => {
         const nextSets = recipe(current.sets);
         return nextSets === current.sets ? current : { ...current, sets: nextSets };
       }, kind),
-    [draft]
+    [queueDraftUpdate]
   );
 
   const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
@@ -299,6 +322,7 @@ export function ExercisePageScreen({
     if (!next.some((set) => set.id === setId)) setOpenSetId(null);
   };
 
+
   /**
    * A committed drag drop or Move earlier/later, persisted through the
    * reorder operation — never the draft graph, so the two writers cannot
@@ -312,12 +336,17 @@ export function ExercisePageScreen({
       return;
     }
     reorderWriteRef.current = true;
+    let resolveInFlight: () => void;
+    inFlightReorderRef.current = new Promise<void>((resolve) => {
+      resolveInFlight = resolve;
+    });
     try {
       if (isSameOrder(orderedIds, setOrderIds)) {
         reorder.clearDrag();
         return;
       }
       if (announcement) reorder.announce(announcement);
+      await draftQueueRef.current;
       if (!(await draft.flush())) {
         reorder.clearDrag();
         reorder.announce('Not saved. The previous order stays.');
@@ -338,14 +367,20 @@ export function ExercisePageScreen({
         return;
       }
       reorder.clearDrag();
+    } catch {
+      reorder.clearDrag();
+      reorder.announce("Couldn't save the new order. The previous order stays.");
     } finally {
       reorderWriteRef.current = false;
+      resolveInFlight!();
+      inFlightReorderRef.current = null;
     }
   };
 
   const finishComplete = async (nextSets: typeof sets) => {
     setIsCompleting(true);
     updateSets(() => nextSets, 'structural');
+    await draftQueueRef.current;
     const saved = await draft.flush();
     setIsCompleting(false);
     if (saved) goBack();
@@ -406,6 +441,9 @@ export function ExercisePageScreen({
     const sourceId = exercise?.sourcePlanExerciseId;
     if (!sourceId) return;
     void completePlanBlock(sourceId).then((result) => {
+      if (result.status === 'completed') {
+        setBlockStatus('resolved');
+      }
       setBlockNotice(blockResolutionNotice(result.status, blockStatus));
     });
   };
@@ -560,7 +598,7 @@ export function ExercisePageScreen({
         onDismiss={() => setOpenSheet('none')}
         onSelect={(picked) => {
           setOpenSheet('none');
-          draft.update(
+          queueDraftUpdate(
             (current) => ({
               ...current,
               exerciseDefinitionId: picked.id,

@@ -7,6 +7,7 @@ import { ScreenScroll } from '@/components/ui/screen';
 import { planRepository } from '@/src/session-planner';
 import { savePlanEdits } from '@/src/session-planner/plan-edit-sync';
 import { emptyPlanForm, planFormFromDetail, planFormToDraft, type PlanFormState } from '@/src/session-planner/plan-form-model';
+import { ensureExerciseCatalogLoaded, getExerciseCatalogSnapshot, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { planQueries } from '@/src/session-planner/plan-queries';
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
@@ -29,6 +30,7 @@ export type SessionPlanNewScreenProps = {
  */
 export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewScreenProps) {
   const router = useRouter();
+  const catalog = useExerciseCatalog();
   const isEdit = editPlanId !== null;
   const prefillPlanId = fromPlanId ?? editPlanId;
   const [initialForm, setInitialForm] = useState<PlanFormState | 'loading' | 'unavailable'>(
@@ -38,14 +40,18 @@ export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewS
   useEffect(() => {
     if (prefillPlanId === null) return;
     let cancelled = false;
-    planQueries.loadPlanDetail(prefillPlanId).then((detail) => {
+    void Promise.all([
+      planQueries.loadPlanDetail(prefillPlanId),
+      ensureExerciseCatalogLoaded().then(() => getExerciseCatalogSnapshot().exercises).catch(() => []),
+    ]).then(([detail, loadedExercises]) => {
       if (cancelled) return;
-      setInitialForm(detail !== null ? planFormFromDetail(detail) : 'unavailable');
+      const exercises = loadedExercises.length > 0 ? loadedExercises : catalog.exercises;
+      setInitialForm(detail !== null ? planFormFromDetail(detail, exercises) : 'unavailable');
     });
     return () => {
       cancelled = true;
     };
-  }, [prefillPlanId]);
+  }, [prefillPlanId, catalog.exercises]);
 
   const onSave = async (form: PlanFormState): Promise<SaveOutcome> => {
     if (isEdit && editPlanId !== null) {
