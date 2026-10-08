@@ -26,6 +26,7 @@ const exercise = (id: string, name: string, overrides: Partial<GroupExercise> = 
   load_input_mode: 'total_load',
   source_exercise_id: null,
   archived_at_ms: null,
+  standard: 'Rules 1',
   ...overrides,
 });
 

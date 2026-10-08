@@ -10,7 +10,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
   return mockActiveClient;
 } }));
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
-  getCompetitionBoard,getCompetitionCertification,getCompetitionContract,getCompetitionHistory,getCompetitionPodiums,
+  getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
   getCompetitionRevisions,getCompetitionSession,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup } from '@/src/groups/api';
 
@@ -62,7 +62,6 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const { group_id: groupId }=await as(owner,() => createGroup({ name: 'Live competition',description: null }));
   const { code }=await as(owner,() => getGroupInviteCode(groupId));
   await as(member,() => joinGroup(code));
-  expect(await as(member,() => getCompetitionContract(groupId))).toMatchObject({ activation_state: 'active',cache_version: 5 });
   await as(owner,() => updateGroup(groupId,{ name: 'Live competition',description: null,bodyweightCalculationsEnabled: true }));
   expect((await as(member,() => getGroup(groupId))).group.bodyweight_calculations_enabled).toBe(true);
   expect((await as(member,() => listMyGroups())).groups.some(group => group.group_id===groupId)).toBe(true);

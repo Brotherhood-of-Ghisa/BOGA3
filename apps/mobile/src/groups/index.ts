@@ -76,7 +76,7 @@ export {
 } from './use-group-online-pages';
 export {
   archiveCompetitionExercise, certifyCompetition, createCompetitionExercise, endCompetitionCertification,
-  getCompetitionBoard, getCompetitionCertification, getCompetitionContract, getCompetitionHistory,
+  getCompetitionBoard, getCompetitionCertification, getCompetitionHistory,
   getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionStream,
   getCompetitionWeek, listCompetitionExercises, updateCompetitionExercise,
 } from './api';

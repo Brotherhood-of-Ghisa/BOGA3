@@ -47,8 +47,8 @@ describe('formatting', () => {
     expect(parseBoardScopeParam('everything')).toBe('certified');
     expect(parseBoardScopeParam(undefined)).toBe('certified');
     expect(groupBoardPath('g1', 'ge1')).toBe('/group/g1/leaderboards/ge1');
-    expect(groupBoardPath('g1', 'ge1', { metric: 'weight', scope: 'all' })).toBe(
-      '/group/g1/leaderboards/ge1?metric=weight&scope=all',
+    expect(groupBoardPath('g1', 'ge1', { metric: 'volume', scope: 'all' })).toBe(
+      '/group/g1/leaderboards/ge1?metric=volume&scope=all',
     );
   });
 

@@ -309,7 +309,7 @@ adds ` kg` itself.
 
 The agent API, the group evaluator and the SQL group functions call this
 kernel rather than copying it; the SQL load factor matches
-`metric-contract.ts` (`groups-bodyweight.sh` vector).
+`link-compatibility.ts` (`groups-bodyweight.sh` vector).
 
 ## 5. Versioned group competition representation
 
