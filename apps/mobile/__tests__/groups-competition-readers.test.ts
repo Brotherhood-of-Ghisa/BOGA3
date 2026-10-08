@@ -34,6 +34,8 @@ const board = { contract_version: 4, group_exercise_id: 'ge', rules, metric: 'e1
     performance, write_token: 'random-uuid', certification }], entry_count: 1, me: null, next_cursor: null };
 const history = { contract_version: 4, exercise, revision, metric: 'e1rm', certified: false, events: [event], next_cursor: null };
 const detail = { contract_version: 4, group_id: 'g', session };
+const records = { contract_version: 4, group_id: 'g', member_user_id: 'u1', session_id: 's',
+  records: [{ event, boards: [{ metric: 'e1rm', leader: { user_id: 'u2', username: 'Rival' }, leads: false }] }] };
 const stream = { contract_version: 4, items: [
   { kind: 'competition', key: 'ev', sort_at_ms: 100, event },
   { kind: 'session', key: 'u1:s', sort_at_ms: 100, groups: [{ group_id: 'g', name: 'Crew' }], session },
@@ -55,6 +57,7 @@ test('every new reader accepts only its exact versioned envelope', () => {
     [guards.isCompetitionPodiumsWire,podiums], [guards.isCompetitionRevisionWire,revision], [guards.isCompetitionEventWire,event],
     [guards.isCompetitionHistoryWire,history], [guards.isCompetitionRevisionsWire,{ contract_version: 4, exercise, revisions: [revision] }],
     [guards.isCompetitionSessionWire,session], [guards.isCompetitionSessionDetailWire,detail],
+    [guards.isCompetitionSessionRecordsWire,records],
     [guards.isCompetitionStreamWire,stream], [guards.isCompetitionWeekSummaryWire,week],
   ] as const;
   for (const [guard,value] of cases) {
@@ -107,6 +110,33 @@ test('group-bound sessions keep ordinary context while rejecting normalized kg a
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ kind: 'future', key: 'k' }] })).toBe(false);
 });
 
+test('session records name only this session\'s records, one board each, never a leading board without a leader', () => {
+  const record = records.records[0];
+  const variant = (patch: Record<string, unknown>) => ({ ...records, records: [{ ...record, ...patch }] });
+  expect(guards.isCompetitionSessionRecordsWire({ ...records, records: [] })).toBe(true);
+  expect(guards.isCompetitionSessionRecordsWire(variant({ boards: [{ metric: 'e1rm', leader: member, leads: true }] }))).toBe(true);
+  expect(guards.isCompetitionSessionRecordsWire(variant({ boards: [{ metric: 'e1rm', leader: null, leads: false }] }))).toBe(true);
+  // A legacy record's historic Weight board has no current leader.
+  expect(guards.isCompetitionSessionRecordsWire(variant({ event: { ...event, values: [{ ...historicalValue, metric: 'weight', unit: 'kg', value: null, unavailable: true }] },
+    boards: [{ metric: 'weight', leader: null, leads: false }] }))).toBe(true);
+  // No current board has a Weight leader.
+  expect(guards.isCompetitionSessionRecordsWire(variant({ event: { ...event, values: [{ ...historicalValue, metric: 'weight', unit: 'kg', value: null, unavailable: true }] },
+    boards: [{ metric: 'weight', leader: member, leads: false }] }))).toBe(false);
+  for (const rejected of [
+    variant({ boards: [] }),
+    variant({ boards: [{ metric: 'e1rm', leader: null, leads: true }] }),
+    variant({ boards: [{ metric: 'volume', leader: null, leads: false }] }),
+    variant({ boards: [{ metric: 'e1rm', leader: null, leads: false }, { metric: 'e1rm', leader: null, leads: false }] }),
+    variant({ boards: [{ metric: 'e1rm', leader: { ...member, private_reading: 80 }, leads: false }] }),
+    variant({ event: { ...event, kind: 'lead_change' } }),
+    variant({ event: { ...event, session_id: 'other' } }),
+    variant({ event: { ...event, member: { user_id: 'u2', username: null } } }),
+    variant({ event: { ...event, group: { group_id: 'other', name: 'Crew' } } }),
+    variant({ event: { ...event, voided: true } }),
+    variant({ boards: [{ metric: 'e1rm', leader: { user_id: 'u2', username: 'Rival' }, leads: true }] }),
+  ]) expect(guards.isCompetitionSessionRecordsWire(rejected)).toBe(false);
+});
+
 test('readers check nested scope/revision/scope-state coherence', () => {
   expect(guards.isCompetitionExerciseWire({ ...exercise, rebuilding: true })).toBe(false);
   expect(guards.isCompetitionExerciseWire({ ...exercise, published_revision: 3 })).toBe(false);
@@ -133,6 +163,7 @@ describe('request-scoped protocol-4 API', () => {
     ['history',() => api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),history],
     ['stream',() => api.getCompetitionStream('g'),stream],
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
+    ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],
     ['certify',() => api.certifyCompetition({ groupId: 'g',exerciseId: 'ge',memberId: 'u1',setId: 'set',metric: 'e1rm',revision: 2,token: 'random-uuid' }),{ contract_version: 4, certification, created: true }],
     ['certification_get',() => api.getCompetitionCertification('g','c1','e1rm'),{ contract_version: 4, certification }],
@@ -151,6 +182,8 @@ describe('request-scoped protocol-4 API', () => {
   test('decoded but foreign group/revision/metric responses never escape the request boundary', async () => {
     respond({ ...board,group_exercise_id: 'other' }); await expect(api.getCompetitionBoard({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm' })).rejects.toMatchObject({ code: 'INTERNAL' });
     respond({ ...detail,group_id: 'other' }); await expect(api.getCompetitionSession('g','u1','s')).rejects.toMatchObject({ code: 'INTERNAL' });
+    respond({ ...records,session_id: 'other',records: [] }); await expect(api.getCompetitionSessionRecords('g','u1','s')).rejects.toMatchObject({ code: 'INTERNAL' });
+    respond({ ...records,group_id: 'other',records: [] }); await expect(api.getCompetitionSessionRecords('g','u1','s')).rejects.toMatchObject({ code: 'INTERNAL' });
     respond({ ...history,certified: true }); await expect(api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false })).rejects.toMatchObject({ code: 'INTERNAL' });
     respond({ ...week,group_id: 'other' }); await expect(api.getCompetitionWeek('g',0,1000)).rejects.toMatchObject({ code: 'INTERNAL' });
     for (const item of stream.items) {

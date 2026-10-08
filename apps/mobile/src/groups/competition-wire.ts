@@ -118,6 +118,13 @@ export type CompetitionSessionWire = {
   exercises: CompetitionSessionExerciseWire[];
 };
 export type CompetitionSessionDetailWire = { contract_version: 4; group_id: string; session: CompetitionSessionWire };
+/** One #1 board a session's record took, and that All board's current leader (null when the record's revision or metric has no current board). */
+export type CompetitionSessionRecordBoardWire = { metric: CompetitionHistoricalMetric; leader: GroupMemberRef | null; leads: boolean };
+/** A record event whose `record` values are the #1 boards only, one `boards` entry each. */
+export type CompetitionSessionRecordWire = { event: CompetitionEventWire; boards: CompetitionSessionRecordBoardWire[] };
+export type CompetitionSessionRecordsWire = {
+  contract_version: 4; group_id: string; member_user_id: string; session_id: string; records: CompetitionSessionRecordWire[];
+};
 export type CompetitionStreamItemWire =
   | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }

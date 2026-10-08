@@ -11,7 +11,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
 } }));
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
   getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
-  getCompetitionRevisions,getCompetitionSession,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
+  getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup } from '@/src/groups/api';
 
 const env=readGroupsLiveEnv();
@@ -80,6 +80,11 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   const detail=await as(owner,() => getCompetitionSession(groupId,member.userId,sessionId));
   expect(detail.session.exercises[0].visibility).toBe('normalized');
   expect(detail.session.exercises[0].sets[0]).not.toHaveProperty('weight_value');
+  const { records }=await as(owner,() => getCompetitionSessionRecords(groupId,member.userId,sessionId));
+  expect(records).toHaveLength(1);
+  expect(records[0].event).toMatchObject({ kind: 'record',set_id: setId,visibility: 'normalized' });
+  expect(records[0].boards.map(b => [b.metric,b.leads,b.leader?.user_id])).toEqual([['e1rm',true,member.userId],['volume',true,member.userId]]);
+  expect(records[0].event.values.every(value => value.unit==='percent_bw' || value.unit==='percent_bw_reps')).toBe(true);
   const stream=await as(owner,() => getCompetitionStream(groupId));
   expect(stream.items.some(item => item.kind==='session' && item.session.session_id===sessionId)).toBe(true);
   expect(await as(owner,() => getCompetitionWeek(groupId,joined.sort_at_ms-1,joined.sort_at_ms+120_000))).toMatchObject({ contract_version: 4,group_id: groupId });
