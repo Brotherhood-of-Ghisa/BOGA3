@@ -3,12 +3,14 @@
 ### set.performed · definition · accepted
 
 A set counts for any figure only when it is **confirmed performed**: valid
-reps (a positive integer), valid Weight (digits with an optional decimal
-point; blank Weight with valid reps is `0`), and no performance status.
+reps (a positive integer, at most 999), valid Weight (digits with an optional
+decimal point; blank Weight with valid reps is `0`), and no performance status.
 Planned, unperformed and skipped rows never count for any figure.
 
-Why: one validity rule means a value is valid everywhere or nowhere.
-Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser in `apps/mobile/src/exercise-calculations/parse.ts`.
+Why: one validity rule means a value is valid everywhere or nowhere. The reps
+cap keeps every count exact on every device and server; no real set comes
+near it.
+Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser and `MAX_SET_REPS` in `apps/mobile/src/exercise-calculations/parse.ts`.
 
 ### set.eligibility · definition · accepted
 

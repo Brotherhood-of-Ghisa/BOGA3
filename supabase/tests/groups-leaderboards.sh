@@ -384,10 +384,11 @@ push "${ATHLETE_TOKEN}" "shared session S1" \
   "$(e_set "${T}-b8" "${SE_B}" 7 100 2.5 "" "${CUAM}")" \
   "$(e_set "${T}-b9" "${SE_B}" 8 60 10 "" "${CUAM}" "${DEL}" warm_up)" \
   "$(e_set "${T}-ba" "${SE_B}" 9 "" "" "" "${CUAM}")" \
-  "$(e_set "${T}-bb" "${SE_B}" 10 100 10000000000 "" "${CUAM}")" \
+  "$(e_set "${T}-bb" "${SE_B}" 10 100 999 "" "${CUAM}")" \
+  "$(e_set "${T}-bc" "${SE_B}" 11 100 99999999999999999999 "" "${CUAM}")" \
   "$(e_set "${T}-d1" "${SE_D}" 0 30 10 "" "${CUAM}")" \
   "$(e_set "${T}-g1" "${SE_G}" 0 50 5 "" "${CUAM}")"
-expect_sql "a 17-row push coalesces into one session job" \
+expect_sql "an 18-row push coalesces into one session job" \
   "select count(*) from app_public.group_eval_queue where member_user_id = '${ATHLETE_UID}';" "1"
 [[ "$(queue_of)" == "session:${S1}:set" ]] || fail "queue after S1: got '$(queue_of)'"
 
@@ -408,9 +409,10 @@ expect_fact() {
 expect_fact b1 "true:true:102.5:5:$(e1rm 102.5 5)"
 expect_fact b3 "false:true:-:-:-"
 expect_fact b9 "true:false:60:10:$(e1rm 60 10)"
-# Any reps text the TS parser accepts must be storable, or the job would fail
-# on every retry.
-expect_fact bb "true:true:100:10000000000:$(e1rm 100 10000000000)"
+# The reps cap ([[set.performed]]): bb at the cap is performed; bc above it is
+# not, so its reps never reach a fact or a board.
+expect_fact bb "true:true:100:999:$(e1rm 100 999)"
+expect_fact bc "false:true:-:-:-"
 expect_fact d1 "true:true:30:10:$(e1rm 30 10)"
 expect_fact g1 "true:false:50:5:$(e1rm 50 5)"
 expect_sql "every S1 fact: position, session start, rules version, SQL fingerprint of the raw row" \
@@ -421,7 +423,7 @@ expect_sql "every S1 fact: position, session start, rules version, SQL fingerpri
                                                                 es.performance_status, es.deleted_at))
      from app_public.group_set_facts f
      join app_public.exercise_sets es on es.owner_user_id = f.member_user_id and es.id = f.set_id
-    where f.member_user_id = '${ATHLETE_UID}';" "13:true"
+    where f.member_user_id = '${ATHLETE_UID}';" "14:true"
 expect_sql "exercise identity and order carried per set" \
   "select string_agg(set_id || '=' || coalesce(exercise_definition_id, '-') || '@' || exercise_order_index, ',' order by set_id)
      from app_public.group_set_facts where member_user_id = '${ATHLETE_UID}' and set_id in ('${T}-b1', '${T}-d1', '${T}-g1');" \
@@ -515,12 +517,16 @@ expect_mine "link → GX" "[{key: \"${GX}\", kind: \"target\", outcome: \"comple
 push_b1 106
 drain_ok "set change with a link"
 expect_mine "session job resolves the linked target" "[{key: \"${S1}\", kind: \"session\", outcome: \"completed\", causes: [\"set\"], targets: [\"${GX}\"]}]"
-# Any reps the parser accepts must publish too: bb's 10^10 reps exceed int4.
-check "the comparison job publishes a set with more reps than int4 holds" \
+# Reps at the cap publish exactly; reps above it (bc) are not a performed set,
+# so no comparison score carries them and every board passes the client guard.
+check "the comparison job publishes with a set at the reps cap" \
   "[.metric_jobs[] | select(.group_exercise_id == \"${GX}\") | .outcome] | length > 0 and all(. == \"completed\")"
 expect_sql "bb's comparison scores carry its exact reps" \
   "select string_agg(distinct performance ->> 'reps', ',') from app_public.group_metric_set_scores
-    where group_exercise_id = '${GX}' and set_id = '${T}-bb';" "10000000000"
+    where group_exercise_id = '${GX}' and set_id = '${T}-bb';" "999"
+expect_sql "no comparison score carries bc's reps above the cap" \
+  "select count(*) from app_public.group_metric_set_scores
+    where group_exercise_id = '${GX}' and set_id = '${T}-bc';" "0"
 
 MISSING_A="$(new_uuid)"
 MISSING_B="$(new_uuid)"
