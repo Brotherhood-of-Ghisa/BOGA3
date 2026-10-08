@@ -17,10 +17,14 @@ cutover lane retire.
   - The removal migration.
   - The protocol-3 dispatch in `supabase/functions/group-eval`, and the TS
     only it imports (T01 doc §4.8).
-  - The activation tooling: `group-competitions-activate.sh`,
-    `with-local-group-competitions.sh` and its pins (incl.
-    `apps/mobile/__tests__/groups-runtime-fixture.test.ts`), the
-    dev-baseline and local-baseline activation steps.
+  - The activation tooling: `group-competitions-activate.sh` and the two
+    steps that run it (`ensure-dev-baseline.sh`; the local baseline's full
+    path in `ensure-local-runtime-baseline.sh`, plus the
+    `group_competition_active()` term in its stamp state hash and the matching
+    pins in `scripts/tests/baseline-stamp.test.sh`), and the bodies' guard
+    `require_active_group_competitions` (`supabase/tests/lib/groups-fixtures.sh`
+    and its callers). T03 already removed `with-local-group-competitions.sh`
+    and its pins.
   - Retire the groups-protocol4 lane (its trigger rows in
     `scripts/triggers.tsv`, and the cutover-only rows in map §8.1).
   - Specs.

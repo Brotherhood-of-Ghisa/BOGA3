@@ -24,8 +24,8 @@
 #   - a removed member leaves the board, training now and the latest session,
 #     and reads NOT_FOUND.
 #
-# Runs on a protocol-4-active stack: it activates group competitions first
-# (activate_group_competitions, groups-fixtures.sh), so every comparison ranks
+# Runs on the protocol-4-active baseline (require_active_group_competitions,
+# groups-fixtures.sh), so every comparison ranks
 # Volume (kg × reps) and 1RM. Direct-drain mode as groups-boards.sh: the kick
 # URL is unset and the sweep paused for the run; the lane POSTs group-eval
 # itself. Hermetic: per-run users, deleted on exit with everything they own.
@@ -51,7 +51,7 @@ load_supabase_status_env
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-activate_group_competitions
+require_active_group_competitions
 
 RUN_TAG="${GROUPS_WEEK_SUMMARY_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"

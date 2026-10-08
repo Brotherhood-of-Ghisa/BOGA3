@@ -151,8 +151,4 @@ echo "[dev-baseline] seeding the Dev crew group (history@ owner, b@ member) and 
 echo "[dev-baseline] activating group competitions (protocol 4; idempotent)"
 "${SCRIPT_DIR}/group-competitions-activate.sh"
 
-if [[ "${TARGET}" == "slot" ]]; then
-  echo "[dev-baseline] note: this slot stack now runs protocol 4; the groups gates expect it pending — ./boga db reset before them"
-fi
-
 echo "[dev-baseline] dev baseline ready on the ${TARGET} stack — dev data preserved, no reset performed"

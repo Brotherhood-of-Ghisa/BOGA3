@@ -6,8 +6,8 @@
 # week summary's record values, and stored protocol-3-era history read through
 # the protocol-4 readers (an SQL-seeded fixture).
 #
-# Contract: docs/specs/tech/group-competition-contract.md. Activates group
-# competitions first (activate_group_competitions, groups-fixtures.sh).
+# Contract: docs/specs/tech/group-competition-contract.md. Runs on the
+# protocol-4-active baseline (require_active_group_competitions, groups-fixtures.sh).
 # Direct-drain mode: the kick URL is unset and the sweep paused for the run,
 # both restored on exit. Hermetic: per-run users, deleted on exit with
 # everything they own.
@@ -29,7 +29,7 @@ load_supabase_status_env
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-activate_group_competitions
+require_active_group_competitions
 
 RUN_TAG="$(date +%s)-$$-${RANDOM}"
 PASSWORD="Competition!${RUN_TAG}"

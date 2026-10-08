@@ -221,7 +221,7 @@ port, and project-id derivation, placement and lease guards; sourced, never
 run). Supabase runtime helpers, all lease-checked:
 `supabase/scripts/local-runtime-up.sh` (start stack, serve functions, sync
 `apps/mobile/.env.local`), `ensure-local-runtime-baseline.sh` (idempotent up +
-migrate + seed + auth fixtures, lock-serialized), `reset-local.sh`,
+migrate + seed + auth fixtures + group-competition activation, lock-serialized), `reset-local.sh`,
 `local-runtime-down.sh`.
 
 ### The edge function server has no PID

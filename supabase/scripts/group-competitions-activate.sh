@@ -7,9 +7,9 @@
 # through it, so a pending stack shows every group as "Group comparisons
 # unavailable". Activation is service-only and one-way (groups-contract §12):
 # only a reset restores a pending schema. Idempotent: an active stack is left
-# alone. Targets whichever stack the caller engaged (the dev baseline engages
-# BOGA-dev); the gate lanes use with-local-group-competitions.sh instead, which
-# marks the stack so the next baseline preflight resets it.
+# alone. Targets whichever stack the caller engaged: the gate baseline
+# (ensure-local-runtime-baseline.sh) runs it on this slot's stack, the dev
+# baseline on BOGA-dev.
 
 set -euo pipefail
 

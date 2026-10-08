@@ -6,15 +6,11 @@
 # shared local runtime baseline, run one body). Lane names and which body each
 # lane runs live in scripts/lanes.tsv; run lanes via `./boga test <lane>`.
 #
-#   ./supabase/scripts/run-suite.sh [--no-baseline | --protocol4] <body.sh> [<body.sh>...]
+#   ./supabase/scripts/run-suite.sh [--no-baseline] <body.sh> [<body.sh>...]
 #
 # --no-baseline skips the shared baseline preflight, for bodies that manage the
 # runtime themselves (local-runtime-smoke.sh boots + resets the stack on its
 # own; running the baseline first would double the work).
-# --protocol4 marks a lane whose every body activates group competitions
-# (protocol 4) first: its preflight keeps a stack an earlier lane left marked
-# only by that activation, instead of resetting it (stack_reset_reason,
-# ensure-local-runtime-baseline.sh).
 #
 # Group wrappers with real ordering/logic (test-sync-v2-e2e.sh) and lanes with
 # special env plumbing (test-sync-infra.sh) keep their own scripts.
@@ -28,10 +24,9 @@ TESTS_DIR="${SUPABASE_DIR}/tests"
 ensure_baseline=1
 case "${1:-}" in
   --no-baseline) ensure_baseline=0; shift ;;
-  --protocol4) export BOGA_STACK_ACCEPTS_PROTOCOL4=1; shift ;;
 esac
 
-[[ $# -ge 1 ]] || { echo "usage: $0 [--no-baseline | --protocol4] <body.sh> [<body.sh>...]" >&2; exit 2; }
+[[ $# -ge 1 ]] || { echo "usage: $0 [--no-baseline] <body.sh> [<body.sh>...]" >&2; exit 2; }
 
 for body in "$@"; do
   [[ -x "${TESTS_DIR}/${body}" ]] || { echo "[run-suite] FAIL: ${TESTS_DIR}/${body} is missing or not executable" >&2; exit 1; }
