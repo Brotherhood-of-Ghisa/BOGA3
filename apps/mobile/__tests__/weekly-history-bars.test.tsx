@@ -44,15 +44,15 @@ it.each([15, 52])('uses the full %i-week history for displayed weeks and referen
   expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(weeks);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', `${weeks}-week median 30`);
   expect(style('bars-heatmap-median').left).toBe('3%');
-  expect(Number.parseFloat(style('bars-heatmap-p5').left)).toBeCloseTo(0.3);
-  expect(Number.parseFloat(style('bars-heatmap-p95').left)).toBeCloseTo(76);
+  expect(Number.parseFloat(style('bars-heatmap-p25').left)).toBeCloseTo(1.5);
+  expect(Number.parseFloat(style('bars-heatmap-p75').left)).toBeCloseTo(15);
 
   rerender(chart(data(days, 12)));
   expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(12);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '12-week median 25');
   expect(style('bars-heatmap-median').left).toBe('12.5%');
-  expect(style('bars-heatmap-p5').left).toBe('1.25%');
-  expect(style('bars-heatmap-p95').left).toBe('87.5%');
+  expect(style('bars-heatmap-p25').left).toBe('6.25%');
+  expect(style('bars-heatmap-p75').left).toBe('41.25%');
 });
 
 it('counts eligible older training weeks across the saved window and omits references when excluded', () => {
@@ -62,7 +62,7 @@ it('counts eligible older training weeks across the saved window and omits refer
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '52-week median 50');
   expect(style('bars-heatmap-median').left).toBe('50%');
   rerender(chart(data(days, 12)));
-  for (const id of ['median', 'p5', 'p95']) expect(screen.queryByTestId(`bars-heatmap-${id}`)).toBeNull();
+  for (const id of ['median', 'p25', 'p75']) expect(screen.queryByTestId(`bars-heatmap-${id}`)).toBeNull();
 });
 
 it.each([[], [0, 0, 0, 0, 0, 0], [20, 20, 20, 20, 20, 20], [10]].map(values => ({ values })))('keeps empty, zero, equal and short windows finite ($values)', ({ values }) => {
@@ -209,22 +209,22 @@ it('formats fractional Top weight references to one decimal without floating-poi
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" lookbackWeeks={6} isLoading={false} errorMessage={null} onDismiss={jest.fn()}
     selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} weeklyEffort={[]}
-    dailyMetrics={dates.map((date, index) => ({ ...day(date, 1), highestWeight: index === 5 ? 11 : 10 }))} />);
+    dailyMetrics={dates.map((date, index) => ({ ...day(date, 1), highestWeight: index >= 4 ? 11 : 10 }))} />);
   expect(screen.getByTestId('stats-exercise-history-heatmap-median')).toHaveProp('accessibilityLabel', '6-week median 10.0');
-  expect(screen.getByTestId('stats-exercise-history-heatmap-p5')).toHaveProp('accessibilityLabel', '6-week 5th percentile 10.0');
-  expect(screen.getByTestId('stats-exercise-history-heatmap-p95')).toHaveProp('accessibilityLabel', '6-week 95th percentile 10.8');
+  expect(screen.getByTestId('stats-exercise-history-heatmap-p25')).toHaveProp('accessibilityLabel', '6-week 25th percentile 10.0');
+  expect(screen.getByTestId('stats-exercise-history-heatmap-p75')).toHaveProp('accessibilityLabel', '6-week 75th percentile 10.8');
   expect(screen.getByTestId(`stats-exercise-history-heatmap-value-${TODAY}`)).toHaveTextContent('11.0');
 });
 
 it('retains coincident reference positions and accessible values without visible labels', () => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
   render(chart(data(dates.map(date => day(date, 20)))));
-  for (const [id, description] of [['p5', '5th percentile'], ['median', 'median'], ['p95', '95th percentile']]) {
+  for (const [id, description] of [['p25', '25th percentile'], ['median', 'median'], ['p75', '75th percentile']]) {
     expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `8-week ${description} 20`);
     expect(style(`bars-heatmap-${id}`).left).toBe('100%');
     expect(style(`bars-heatmap-reference-${id}-${TODAY}`).left).toBe('100%');
   }
-  expect(screen.queryByText(/P5|Median|P95/)).toBeNull();
+  expect(screen.queryByText(/P\d+|Median/)).toBeNull();
   expect(screen.queryByTestId('bars-heatmap-average')).toBeNull();
   expect(screen.queryByText(/Volume.*per week/)).toBeNull();
 });
@@ -239,10 +239,10 @@ it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s hist
   const prefix = `stats-${kind}-history`;
   expect(screen.getByTestId(`${prefix}-heatmap-median`)).toHaveProp('accessibilityLabel', '6-week median 5.0');
   expect(style(`${prefix}-heatmap-median`).left).toBe('50%');
-  expect(screen.queryByTestId(`${prefix}-heatmap-p5`)).toBeNull();
-  expect(screen.queryByTestId(`${prefix}-heatmap-p95`)).toBeNull();
+  expect(screen.queryByTestId(`${prefix}-heatmap-p25`)).toBeNull();
+  expect(screen.queryByTestId(`${prefix}-heatmap-p75`)).toBeNull();
   expect(screen.queryByTestId(`${prefix}-window`)).toBeNull();
-  expect(screen.queryByText(/^(Metric|P5.*|Median.*|P95.*)$/)).toBeNull();
+  expect(screen.queryByText(/^(Metric|P\d+.*|Median.*)$/)).toBeNull();
   expect(screen.getByTestId(`${prefix}-metric-chip-workingSetCount`)).toHaveStyle({ backgroundColor: '#000000' });
   expect(screen.getByText('Sets')).toHaveStyle({ color: '#FFFFFF' });
 });

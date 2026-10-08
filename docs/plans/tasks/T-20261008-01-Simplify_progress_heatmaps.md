@@ -31,7 +31,8 @@ contracts govern everything outside these changes.
   selected segment also uses fixed black with white text in every theme.
 - Remove the window subtitle (e.g. Daily/Weekly · 12 weeks), Metric caption,
   metric subtitle under the training-load title, and visible reference-label
-  stack (P5/Median/P95). Keep accurate reference identities and values accessible.
+  stack. No visible percentile labels or subtitles. Keep accurate reference
+  identities and values accessible.
 - Draw no black outline around tiles/bars, including today/current week and
   selected states. Keep selection accessible and use the existing caret for
   the selected Weekly row. Neutral rules and unavailable-value styling remain.
@@ -72,8 +73,8 @@ contracts govern everything outside these changes.
 - No visible Rest indicator, question mark or substitute dash/zero for an empty
   or unavailable week. Keep unavailable values distinct through accessibility.
 - Sets: one dashed median reference line only.
-- Volume, 1RM and Top weight: dashed median, P5 and P95 lines, aligned to the
-  bars' shared zero-based scale. No visible P5/Median/P95 subtitles; preserve
+- Volume, 1RM and Top weight: dashed P25, median and P75 lines, aligned to the
+  bars' shared zero-based scale. No visible reference labels or subtitles; preserve
   exact calculated positions and accurate accessible values when lines coincide.
 - Preserve the virtualized newest-first list, selection toggling and current
   week semantics without borders.
@@ -86,7 +87,7 @@ number of weeks saved in Settings, with the same Monday-aligned window.
 Accessible reference labels name that window accurately. Require six eligible
 weeks and a positive window maximum. Include genuine zeros; exclude rest, future and unknown values. All-zero
 and sparse histories omit references. Reuse `calculateLinearPercentile` in
-`apps/mobile/src/session-insights/calculations.ts` on a sorted copy for P50/P5/P95;
+`apps/mobile/src/session-insights/calculations.ts` on a sorted copy for P25/P50/P75;
 no new statistics dependency.
 
 ## UX contract
@@ -95,7 +96,7 @@ no new statistics dependency.
 | --- | --- | --- | --- |
 | Compare Progress | Open Progress; change period/metric; expand contributions | Neutral rows, black/white active filters, separate name and chevron actions | Zero/previous-only, loading/error, long figures and narrow rows preserve meaning |
 | Inspect Daily | Set Daily in Settings; open either history; choose every metric | Own-month days and rows newest first, seven-day Week totals beside Sunday, including today on Sunday, wider centred rule and small Monday dates | Partial months, year boundaries, rest/unavailable stay blank, future tiles are absent and genuine zero remains accessible |
-| Inspect Weekly | Set Weekly in Settings; open either history; choose every metric and select rows | No banner/subtitles/black outlines; Sets median only, other metrics three lines; selection caret | Blank rest/unavailable values, sparse/zero/coincident references, long windows and narrow screens remain usable |
+| Inspect Weekly | Set Weekly in Settings; open either history; choose every metric and select rows | No banner/subtitles/black outlines; Sets median only, other metrics P25/median/P75; selection caret | Blank rest/unavailable values, sparse/zero/coincident references, long windows and narrow screens remain usable |
 | Change history window | Change History look-back (weeks) while history is open or reopen it | Read, displayed weeks and median/percentile calculations follow the same saved setting | Old out-of-range figures disappear; future day tiles remain absent |
 | Human review | Agent commits and supplies worktree/native preview; operator tests both views | Explicit human-testing-complete confirmation precedes automated validation | Human review pending; automated tests not run; requested UI fixes precede gates |
 
@@ -112,7 +113,8 @@ No new chart framework, dependency, durable preference or Maestro flow.
   coverage for reversed month rows, unique day tiles, Sunday-only cross-month
   Week totals, first partial weeks, rest-day coverage, Sunday inclusion,
   absent future tiles, full-window bounds/references, window changes,
-  omitted references, removed copy/borders and fixed active colours.
+  P25/median/P75 positions and accessible values, omitted references, removed
+  copy/borders and fixed active colours.
   Author tests now; execute none before human testing is complete.
 - Commit locally with test hooks disabled. Starting the app and manual native
   captures and publishing the branch are authorized. No Jest, Maestro, quality
@@ -125,6 +127,7 @@ No new chart framework, dependency, durable preference or Maestro flow.
   stop the stack after PR opening and release the worktree after merge.
 
 ## Current handoff
+
 - Worktree: `/Users/sboschi/Projects/boga-worktrees/codex-plan-progress-heatmap-ui`.
 - Native preview: slot 29, simulator `BOGA wt29`, Metro 8111. Run
   `./boga ios start` in the worktree. Development data is seeded on that simulator.
@@ -132,7 +135,7 @@ No new chart framework, dependency, durable preference or Maestro flow.
   Native previews have been inspected; `./boga doctor` passed. **Human review
   pending; automated tests not run.** No quality gates or PR yet.
 - Preview files: Daily in `apps/mobile/artifacts/heatmap-ui/no-future-days/`;
-  Weekly in `apps/mobile/artifacts/heatmap-ui/revised/`. Temporary capture code
+  Weekly in `apps/mobile/artifacts/heatmap-ui/quartiles/`. Temporary capture code
   and the temporary small simulator have been removed.
 
 Next: human testing of the committed native preview. Automated validation starts

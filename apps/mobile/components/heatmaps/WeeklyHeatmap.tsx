@@ -1,6 +1,7 @@
 // Newest-first weekly rows. Length uses a shared zero origin; colour retains
 // the adapter's independent intensity/target meaning. Known training weeks
-// across the saved history window supply references; rest/unknown values stay blank.
+// across the saved history window supply unlabelled P25/median/P75 references
+// (Sets: median only); rest/unknown values stay blank.
 import React, { useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -30,7 +31,7 @@ interface Props {
 }
 
 type Reference = { id: string; label: string; value: string; position: number };
-const REFERENCE_PERCENTILES = [['p5', 'P5', .05], ['median', 'Median', .5], ['p95', 'P95', .95]] as const;
+const REFERENCE_PERCENTILES = [['p25', '25th percentile', .25], ['median', 'median', .5], ['p75', '75th percentile', .75]] as const;
 
 const isKnownTraining = (week: WeekCell) => !week.unavailable && (week.hasTraining ?? week.value > 0);
 
@@ -109,7 +110,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
           {(max > 0 ? [0, 0.5, 1] : [0]).map(fraction => <Text key={fraction} allowFontScaling={false} style={[styles.axisLabel, { textAlign: fraction === 0 ? 'left' : fraction === 1 ? 'right' : 'center' }]}>{formatValue(max * fraction)}</Text>)}
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
             accessible accessibilityRole="text"
-            accessibilityLabel={`${data.weekly.length}-week ${reference.label === 'Median' ? 'median' : reference.label === 'P5' ? '5th percentile' : '95th percentile'} ${reference.value}`}
+            accessibilityLabel={`${data.weekly.length}-week ${reference.label} ${reference.value}`}
             style={[styles.axisReference, { left: `${reference.position}%` }]} />)}
         </View>
         <View style={{ width: valueWidth }} />

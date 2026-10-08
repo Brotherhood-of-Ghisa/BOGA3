@@ -133,7 +133,7 @@ describe('Bodyweight heatmap coverage', () => {
     render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
     expect(screen.getByTestId(`${PREFIX}-heatmap-median`)).toHaveProp('accessibilityLabel', `52-week median ~${median}`);
     expect(style(`${PREFIX}-heatmap-median`).left).toBe('0%');
-    expect(style(`${PREFIX}-heatmap-p5`).left).toBe('0%');
-    expect(style(`${PREFIX}-heatmap-p95`).left).toBe('87.5%');
+    expect(style(`${PREFIX}-heatmap-p25`).left).toBe('0%');
+    expect(style(`${PREFIX}-heatmap-p75`).left).toBe('37.5%');
   });
 });

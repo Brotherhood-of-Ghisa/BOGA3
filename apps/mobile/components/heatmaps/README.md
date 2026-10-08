@@ -51,7 +51,7 @@ eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
 unknown load never gets a filled length; rest and unknown values are blank, and known zero reads `0`.
-Sets uses median only; other metrics use median, P5 and P95 from known training weeks
+Sets uses median only; other metrics use P25, median and P75 from known training weeks
 (including zeros) across the full saved history window; rest, future and
 unavailable weeks do not contribute. A Volume sum that is not finite is never
 plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
@@ -139,5 +139,5 @@ the current week when excluded and survives look-back edits while in range.
   reference and value accessibly, including coincident references; no visible
   label stack is drawn. References and displayed weeks use the same look-back.
 - Daily and Weekly share title typography. Window/Metric captions, metric
-  subtitles and visible P5/Median/P95 labels are omitted. Selected metric controls
+  subtitles and visible reference labels are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.
