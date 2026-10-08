@@ -69,7 +69,7 @@ it('exposes read-only day and week values without selection or black outlines', 
 });
 
 it('leaves rest and unavailable figures blank, retains numeric zero and clips future weeks', () => {
-  draw('totalVolume', [sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
+  draw('totalVolume', [sample('2026-09-28', 0), sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01-value')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01').props.accessibilityLabel).toContain('Rest');
   expect(screen.queryAllByText('Rest')).toEqual([]);
@@ -99,12 +99,27 @@ it('uses empty spacers instead of adjoining-month day tiles or an in-progress We
   expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-05')).toBeNull();
 });
 
-it.each(['2026-10-11', '2026-10-12'])('adds a completed Week tile only after Sunday (%s)', date => {
+it.each(['2026-10-10', '2026-10-11', '2026-10-12'])('adds a seven-day Week tile on Sunday and afterwards (%s)', date => {
   const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: date, weeks: 2 });
   render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
   const id = 'calendar-heatmap-week-2026-10-2026-10-05';
-  if (date === '2026-10-11') expect(screen.queryByTestId(id)).toBeNull();
-  else expect(screen.getByTestId(`${id}-value`)).toHaveTextContent('3400');
+  if (date === '2026-10-10') expect(screen.queryByTestId(id)).toBeNull();
+  else {
+    expect(screen.getByTestId(`${id}-value`)).toHaveTextContent('3400');
+    expect(screen.getByTestId(id).props.accessibilityLabel.includes('Current week')).toBe(date === '2026-10-11');
+    expect(style(id)).toMatchObject({ borderWidth: StyleSheet.hairlineWidth, borderColor: uiRoles.rule });
+  }
+});
+
+it('keeps daily figures but omits a first partial Week tile, then includes a Sunday week with rest days', () => {
+  const data = buildHeatmapData([sample('2026-09-29', 100), sample('2026-10-05', 200)],
+    'totalVolume', { todayDateKey: '2026-10-11', weeks: 3 });
+  render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-09-29-value')).toHaveTextContent('100');
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-09-28')).toBeNull();
+  expect(style('calendar-heatmap-empty-week-2026-10-2026-09-28').backgroundColor).toBeUndefined();
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-21')).toBeNull();
+  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-05-value')).toHaveTextContent('200');
 });
 
 it('preserves muscle target grading on daily and weekly tiles', () => {

@@ -41,10 +41,11 @@ it('clips the current month to its current week with blank future days and no We
   expect(months[0].weeks[0].days[2]).toMatchObject({ dateKey: '2026-10-07', future: true, day: undefined });
 });
 
-it.each(['2026-10-06', '2026-10-11', '2026-10-12'])('shows a Week tile only after Sunday has elapsed (%s)', todayDateKey => {
+it.each(['2026-10-06', '2026-10-11', '2026-10-12'])('shows a seven-day Week tile on Sunday and afterwards (%s)', todayDateKey => {
   const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey, weeks: 2 });
   const row = buildCalendarMonths(data)[0].weeks.find(week => week.weekStartDateKey === '2026-10-05')!;
-  expect(row.week).toBe(todayDateKey === '2026-10-12' ? data.weekly[0] : undefined);
+  expect(row.week).toBe(todayDateKey >= '2026-10-11'
+    ? data.weekly.find(week => week.weekStartDateKey === '2026-10-05') : undefined);
 });
 
 it('keeps known zero, unavailable and completed-week target values unchanged', () => {
@@ -65,7 +66,7 @@ it('handles leap February, Sunday month starts, year transitions and long window
   const leap = buildCalendarMonths(buildHeatmapData([], 'totalVolume', { todayDateKey: '2024-02-29', weeks: 6 }));
   expect(leap[0].weeks[0].days[3].dateKey).toBe('2024-02-29');
   expect(leap[0].weeks[0].week).toBeUndefined();
-  const sunday = buildCalendarMonths(buildHeatmapData([], 'totalVolume', { todayDateKey: '2026-02-02', weeks: 104 }));
+  const sunday = buildCalendarMonths(buildHeatmapData([source('2026-01-26', 100)], 'totalVolume', { todayDateKey: '2026-02-02', weeks: 104 }));
   expect(sunday[0].weeks[1].days[6]).toMatchObject({ dateKey: '2026-02-01', inMonth: true });
   expect(sunday[0].weeks[1].week?.weekStartDateKey).toBe('2026-01-26');
   expect(sunday.some(month => month.title === 'December 2025')).toBe(true);
@@ -84,5 +85,32 @@ it.each([1, 4, 52, 104])('keeps rows and unique completed Week tiles inside the 
   const rows = buildCalendarMonths(data).flatMap(month => month.weeks);
   expect([...new Set(rows.map(row => row.weekStartDateKey))].sort()).toEqual(data.weekly.map(week => week.weekStartDateKey));
   const displayed = rows.filter(row => row.week).map(row => row.weekStartDateKey).sort();
-  expect(displayed).toEqual(data.weekly.filter(week => !week.isCurrentWeek).map(week => week.weekStartDateKey));
+  const firstRecordedKey = data.daily.find(day => day.hasTraining)!.dateKey;
+  expect(displayed).toEqual(data.weekly.filter(week => !week.isCurrentWeek && week.weekStartDateKey >= firstRecordedKey)
+    .map(week => week.weekStartDateKey));
+});
+
+it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
+  'omits the first partial %s week and counts rest days in subsequent seven-day weeks', metric => {
+    const data = buildHeatmapData([source('2026-09-29', 100), source('2026-10-05', 200)],
+      metric, { todayDateKey: '2026-10-11', weeks: 3 });
+    const months = buildCalendarMonths(data);
+    expect(months[0].weeks[1].week).toBeUndefined();
+    expect(months[1].weeks[0].days[1].day?.value).toBe(100);
+    expect(months[0].weeks[0].week).toBe(data.weekly.find(week => week.weekStartDateKey === '2026-10-05'));
+    expect(months[0].weeks[0].week?.sessions).toBe(1);
+  });
+
+it('counts rest days from a Monday workout, including across months, but rejects any absent calendar day', () => {
+  const data = buildHeatmapData([source('2026-09-28', 100)], 'totalVolume', { todayDateKey: '2026-10-04', weeks: 1 });
+  expect(buildCalendarMonths(data)[0].weeks[0].week).toBe(data.weekly[0]);
+  data.daily = data.daily.filter(day => day.dateKey !== '2026-10-01');
+  expect(buildCalendarMonths(data)[0].weeks[0].week).toBeUndefined();
+});
+
+it('does not invent Week coverage before any recorded workout, or for a first workout on Sunday', () => {
+  for (const input of [[], [source('2026-10-11', 100)]]) {
+    const data = buildHeatmapData(input, 'totalVolume', { todayDateKey: '2026-10-11', weeks: 2 });
+    expect(buildCalendarMonths(data).flatMap(month => month.weeks).every(row => row.week === undefined)).toBe(true);
+  }
 });

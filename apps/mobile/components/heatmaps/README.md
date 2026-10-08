@@ -84,12 +84,14 @@ Daily tiles are read-only; Weekly bars select a row:
 - **Daily** orders months and their week rows newest first: the month's first
   day is in the bottom row, its last observed week in the top row. Each month
   shows only its own day tiles; adjoining-month positions are empty spacers.
-  A Week tile appears only for a completed week beside that month's Sunday,
-  retaining the complete Monday–Sunday adapter value/colour across month
-  boundaries. No Week tile is shown for the current week or beside a row whose
-  Sunday belongs to the next month. Tiles are read-only, without selection or
-  black outlines. Rest is blank, zero is
-  numeric, unknown load is blank, and current-week future days are blank.
+  A Week tile appears beside that month's Sunday once Sunday has arrived,
+  provided all seven calendar days are covered from the first recorded workout
+  onwards. Rest days count; a partial first week and missing days omit the tile.
+  The complete Monday–Sunday adapter value/colour spans month boundaries.
+  The current Week tile appears only on Sunday; rows whose Sunday is in the
+  next month have no Week tile. Tiles are read-only, without selection or black
+  outlines. Rest and unknown load are blank, zero is numeric, and current-week
+  future days are blank.
   No visible Rest wording or question mark is displayed.
   No future week rows extend the saved history window.
   A vertical `rule` centres in a wider Sun/Week gap through each header and row;

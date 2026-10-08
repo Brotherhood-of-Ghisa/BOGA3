@@ -1,6 +1,7 @@
 // Months and their week rows run newest first; each month shows only its own
-// day tiles. Completed-week totals sit beside an in-month Sunday and include the full
-// Monday–Sunday adapter week across month boundaries. The host owns scrolling;
+// day tiles. Week totals require seven covered days since the first recorded
+// workout, including rest days, and appear beside an in-month Sunday once that
+// Sunday arrives. Totals span month boundaries. The host owns scrolling;
 // rest/future/unknown figures stay blank, and known zero stays numeric.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
