@@ -295,6 +295,15 @@ describe('Groups tab', () => {
     expect(api.getCompetitionStream).not.toHaveBeenCalled();
   });
 
+  it('shows no group picker with a single group, and its stream and leaderboards still open', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
+    render(<GroupsTabRoute />);
+    expect(await screen.findByTestId('groups-segment-stream')).toBeTruthy();
+    await waitFor(() => expect(api.getCompetitionStream).toHaveBeenCalledWith('group-a'));
+    expect(screen.queryByTestId('groups-stream-filter-row')).toBeNull();
+    expect(screen.queryByTestId('groups-stream-filter-group-a')).toBeNull();
+  });
+
   it("renders the first group's cached stream at once, then newest-first cards", async () => {
     seed(groupCacheKeys.mine, { groups: [GROUP_A, GROUP_B] });
     seed(groupCacheKeys.stream('group-a'), page([completedItem()]));
@@ -680,6 +689,18 @@ describe("Friend's session view", () => {
     api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
     fireEvent.press(screen.getByTestId('group-session-records-error-retry'));
     await waitFor(() => expect(screen.queryByTestId('group-session-records-error')).toBeNull());
+  });
+
+  it('a refused certify swaps Certify for Refresh, which re-reads the records', async () => {
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    api.certifyCompetition.mockRejectedValue(new GroupApiError('CONFLICT', 'Performance changed. Refresh and review.'));
+    render(<GroupSessionRoute />);
+    fireEvent.press(await screen.findByTestId('group-session-record-ev-1:e1rm-certify'));
+    expect(await screen.findByTestId('group-session-record-ev-1:e1rm-notice')).toHaveTextContent(/The score changed/);
+    expect(screen.queryByTestId('group-session-record-ev-1:e1rm-certify')).toBeNull();
+    const reads = api.getCompetitionSessionRecords.mock.calls.length;
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-refresh'));
+    await waitFor(() => expect(api.getCompetitionSessionRecords.mock.calls.length).toBeGreaterThan(reads));
   });
 
   it('withdraws my certification after the confirmation, with the same button', async () => {

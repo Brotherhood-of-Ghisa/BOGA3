@@ -44,7 +44,7 @@ const firstParam = (value: string | string[] | undefined): string | null =>
 
 /**
  * The Groups screen (groups contract): one group at a time, picked with
- * the group chips, showing its Stream or Leaderboards. Managing groups (join,
+ * the group chips (none with a single group), showing its Stream or Leaderboards. Managing groups (join,
  * create, the group page) lives behind My groups. `?groupId=` preselects a
  * group.
  */
@@ -137,7 +137,8 @@ function GroupsTabContent({ userId }: { userId: string }) {
       ) : null}
       {hasGroups ? (
         <>
-          <GroupFilterChips groups={groups} onChange={pickGroup} selectedGroupId={selectedGroupId} />
+          {/* One group needs no picker. */}
+          {groups.length > 1 ? <GroupFilterChips groups={groups} onChange={pickGroup} selectedGroupId={selectedGroupId} /> : null}
           <SegmentedControl
             accessibilityLabel="Stream or leaderboards"
             onChange={setSegment}

@@ -1,10 +1,10 @@
 import { buildCompetitionPodiums as buildGroupMetricPodiums } from '@/src/groups/competition-view-model';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Card, SearchField, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import {
   groupBoardPath,
   type GroupApiError,
@@ -26,12 +26,13 @@ type GroupLeaderboardsPageProps = {
 
 /**
  * The group page's Leaderboards segment (product E1.1, P8, D11): one podium
- * card per group exercise on Certified · 1RM, archived exercises last. A card
- * opens its full board.
+ * card per group exercise on Certified · 1RM, archived exercises last, under a
+ * search box that narrows them by exercise name. A card opens its full board.
  */
 export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error, onRetry }: GroupLeaderboardsPageProps) {
   const router = useRouter();
   const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId) : null), [boards.data, userId]);
+  const [query, setQuery] = useState('');
 
   if (!cards) {
     return <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-leaderboards" />;
@@ -45,9 +46,20 @@ export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error,
       />
     );
   }
+  const shown = filterPodiumCards(cards, query);
   return (
     <View style={styles.list} testID="group-leaderboards-page">
-      {cards.map((card) => (
+      <SearchField
+        accessibilityLabel="Search leaderboards"
+        onChangeText={setQuery}
+        placeholder="Search exercises"
+        testID="group-leaderboards-search"
+        value={query}
+      />
+      {shown.length === 0 ? (
+        <GroupStateView testID="group-leaderboards-no-match" title="No exercises match" />
+      ) : null}
+      {shown.map((card) => (
         <GroupPodiumCard
           card={card}
           key={card.exerciseId}
@@ -56,6 +68,12 @@ export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error,
       ))}
     </View>
   );
+}
+
+/** The cards whose exercise name contains the search text, ignoring case and outer spaces. */
+export function filterPodiumCards<T extends { name: string }>(cards: readonly T[], query: string): T[] {
+  const needle = query.trim().toLocaleLowerCase();
+  return needle ? cards.filter((card) => card.name.toLocaleLowerCase().includes(needle)) : [...cards];
 }
 
 /**

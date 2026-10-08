@@ -52,7 +52,6 @@ const groupExercise = {
   load_input_mode: 'total_load' as const,
   source_exercise_id: null,
   archived_at_ms: null,
-  standard: 'Rules 1',
 };
 
 describe('groups api client', () => {

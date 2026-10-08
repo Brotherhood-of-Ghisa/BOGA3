@@ -122,7 +122,6 @@ access level, and `useRootRouteAccess`
 | | `from` | prefills a duplicate; Save creates a new plan, never an in-place copy |
 | `/session-plan/[planId]` | `planId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
-| `…/history` | `revision` | the positive rules revision the board carried; recorded units are kept, and a retired revision's scores are unavailable |
 
 `source=more` is a navigation marker, not screen state:
 `apps/mobile/components/navigation/more-hub-back-button.tsx` renders the

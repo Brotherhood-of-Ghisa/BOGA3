@@ -141,6 +141,10 @@ included, on `(working_sets desc, group_records desc)`. Training now is an
 active session written within 2 h (max `server_received_at` over session,
 exercises, sets); latest completed is any time.
 
+**Record stream** (`group_competition_stream_v2`) adds each record's
+`record`: its set, and per board taken the previous #1 (holder and set, or
+the lifter's own prior value).
+
 **Session records** (`group_competition_session_records`) sit beside the
 session detail, not in it: exact readers reject a new key. One shared session's
 non-voided records that took #1 in the group, as stream events whose `record`
@@ -257,10 +261,11 @@ converges.
 
 ## Certification
 
-Attests the raw synced values of a record set (a current All entry or a
-non-voided record), by a current member other than the lifter, on an
-unarchived exercise. It pins the live fingerprint; a mismatch is `CONFLICT`.
-One active per target × set; a repeat returns it (`created: false`). Only the
+Implements [[groups.certification]]: attests the raw synced values of a
+record set (a current All entry or a non-voided record) on an unarchived
+exercise, stored as a row per current score under one public id. Certify takes
+any score's token and checks every score's live fingerprint (`CONFLICT`); a
+repeat returns it (`created: false`). Ending any row ends them all. Only the
 certifier withdraws; owners and admins cancel; both are idempotent. Ended rows
 never reopen, and undelete revives nothing. Writers: the RPCs and the apply,
 never a Sync v2 trigger.

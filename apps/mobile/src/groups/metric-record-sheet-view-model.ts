@@ -32,7 +32,6 @@ export type MetricRecordSheetModel = {
   /** Writes are refused while one is pending, offline, read-only or awaiting review. */
   blocked: boolean;
   statusText: string;
-  observedRulesNote: string | null;
   readOnlyNote: string | null;
   offlineNote: string | null;
   ownPerformanceNote: string | null;
@@ -69,9 +68,6 @@ type CertificationState = {
 };
 
 const describeNotes = (input: MetricRecordSheetInput, { active, certified, readOnly, isMine }: CertificationState) => ({
-  observedRulesNote: active && active.observed_rules_revision !== input.exercise.rules.rules_revision
-    ? `Observed under rules ${active.observed_rules_revision}; unchanged performance inputs remain attested.`
-    : null,
   readOnlyNote: readOnly ? `Read-only · ${readOnlyCause(input)}` : null,
   offlineNote: input.online === false ? 'Reconnect to change certification.' : null,
   ownPerformanceNote: isMine && !certified ? 'Another group member can certify your performance.' : null,

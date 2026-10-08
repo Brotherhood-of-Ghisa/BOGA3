@@ -5,8 +5,8 @@ calculated, what a set row shows, how screens use words. Each decision is
 stated once, here, with a stable ID. Specs describe how the code implements a
 fact; they cite it and never restate it.
 
-**Pilot status.** This corpus covers sets, 1RM, muscle set counts and screen
-copy. Where a spec and a fact disagree, the fact records the decision and the
+**Pilot status.** This corpus covers sets, 1RM, muscle set counts, group
+certification and screen copy. Where a spec and a fact disagree, the fact records the decision and the
 spec records today's code (see each fact's `Pending:` line).
 
 ## Subjects
@@ -24,6 +24,7 @@ purpose, in its own PR.
 | `comparison` | `comparison.md` | Which periods are compared and how a change between them is shown |
 | `notifications` | `notifications.md` | Group workout alerts, recipients, defaults, batching and freshness |
 | `session` | `session.md` | How the completed session history is grouped and shown |
+| `groups` | `groups.md` | Group competition: what certification covers and how it ends |
 
 Not yet here: volume totals, records, session counts, bodyweight, groups-only
 scoring. Until they move in, `docs/specs/tech/training-metrics-contract.md`

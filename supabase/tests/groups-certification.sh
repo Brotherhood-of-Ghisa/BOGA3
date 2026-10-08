@@ -178,15 +178,19 @@ expect_csince() {
   actual="$(csince)"
   [[ "${actual}" == "$1" ]] || fail "$2: Certified lead changes expected '$1', got '${actual}'"
 }
-# last_lc_cert <metric>: the latest Certified lead change's payload certification_id.
+# last_lc_cert <metric>: the public certification id (the set's witness) of the
+# latest Certified lead change's payload certification_id.
 last_lc_cert() {
-  run_psql "select coalesce(payload ->> 'certification_id', '') from app_public.group_events
-             where group_exercise_id = '${GX}' and kind = 'lead_change' and certified and metric = '$1'
-             order by seq desc limit 1;"
+  run_psql "select coalesce((select coalesce(c.legacy_certification_id, c.witness_certification_id, c.id)::text
+                               from app_public.group_metric_certifications c where c.id::text = e.payload ->> 'certification_id'), '')
+              from app_public.group_events e
+             where e.group_exercise_id = '${GX}' and e.kind = 'lead_change' and e.certified and e.metric = '$1'
+             order by e.seq desc limit 1;"
 }
 
-# A certified set holds one certification per metric; <prefix>_volume and
-# <prefix>_e1rm name them. cert_id <prefix> <metric> echoes one.
+# A certified set holds one witness: one public certification id, with a row
+# per metric. <prefix>_volume and <prefix>_e1rm both name it (each metric's
+# reads report it). cert_id <prefix> <metric> echoes one.
 cert_id() { local name="$1_$2"; printf '%s' "${!name}"; }
 # expect_lc_certs <prefix> <context>: each metric's latest Certified lead change
 # names that metric's certification of the set.
@@ -196,10 +200,13 @@ expect_lc_certs() {
     [[ "$(last_lc_cert "${metric}")" == "$(cert_id "$1" "${metric}")" ]] || fail "$2 (${metric})"
   done
 }
-# cert_col <certification-id> <column-sql>
-cert_col() { run_psql "select $2 from app_public.group_metric_certifications where id = '$1';"; }
+# cert_col <certification-id> <column-sql> <metric>: that witness's row for the metric.
+cert_col() {
+  run_psql "select $2 from app_public.group_metric_certifications
+             where coalesce(legacy_certification_id, witness_certification_id, id) = '$1' and metric = '$3';"
+}
 # certs_col <prefix> <column-sql>: the column for both metrics, as `volume,e1rm`.
-certs_col() { echo "$(cert_col "$(cert_id "$1" volume)" "$2"),$(cert_col "$(cert_id "$1" e1rm)" "$2")"; }
+certs_col() { echo "$(cert_col "$(cert_id "$1" volume)" "$2" volume),$(cert_col "$(cert_id "$1" e1rm)" "$2" e1rm)"; }
 active_certs() { # active_certs <set-suffix>: active certifications as `volume:e1rm`
   run_psql "select count(*) filter (where metric = 'volume') || ':' || count(*) filter (where metric = 'e1rm')
               from app_public.group_metric_certifications
@@ -277,28 +284,23 @@ certify() {
       '{p_group_id: $g, p_group_exercise_id: $x, p_member_user_id: $m, p_set_id: $s, p_metric: $metric,
         p_expected_revision: $r, p_write_token: (if $t == "" then null else $t end)}')"
 }
-# certify_set <token> <member-uid> <set-suffix> <prefix>: certifies the set on
-# both metrics with its score tokens; sets <prefix>_volume and <prefix>_e1rm.
+# certify_set <token> <member-uid> <set-suffix> <prefix>: certifies the set once
+# (with its Volume score token); sets <prefix>_volume and <prefix>_e1rm.
 certify_set() {
-  local metric
-  for metric in "${METRICS[@]}"; do
-    certify "$1" "$2" "$3" "${metric}" "$(score_token "$2" "$3" "${metric}")"
-    expect_ok "certify $3 (${metric})"
-    printf -v "$4_${metric}" '%s' "$(jq -er '.certification.certification_id' <<<"${BODY}")"
-  done
+  certify "$1" "$2" "$3" volume "$(score_token "$2" "$3" volume)"
+  expect_ok "certify $3"
+  printf -v "$4_volume" '%s' "$(jq -er '.certification.certification_id' <<<"${BODY}")"
+  printf -v "$4_e1rm" '%s' "$(jq -er '.certification.certification_id' <<<"${BODY}")"
 }
 # end_cert <token> <action-json> <metric-json> <certification-id-json>
 end_cert() {
   rpc "$1" group_competition_certification_end "$(jq -nc --arg g "${GID}" --argjson a "$2" --argjson m "$3" --argjson c "$4" \
       '{p_group_id: $g, p_certification_id: $c, p_metric: $m, p_action: $a}')"
 }
-# end_set <token> <withdraw|cancel> <prefix>: ends both metrics' certifications.
+# end_set <token> <withdraw|cancel> <prefix>: ends the set's witness (through its Volume row).
 end_set() {
-  local metric
-  for metric in "${METRICS[@]}"; do
-    end_cert "$1" "$(q "$2")" "$(q "${metric}")" "$(q "$(cert_id "$3" "${metric}")")"
-    expect_ok "$2 $3 (${metric})"
-  done
+  end_cert "$1" "$(q "$2")" '"volume"' "$(q "$(cert_id "$3" volume)")"
+  expect_ok "$2 $3"
 }
 q() { printf '"%s"' "$1"; } # a JSON string
 
@@ -320,6 +322,10 @@ podiums() {
 stream() {
   rpc "$1" group_competition_stream "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
   expect_ok "group_competition_stream"
+}
+stream_v2() {
+  rpc "$1" group_competition_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
+  expect_ok "group_competition_stream_v2"
 }
 # jq: the stream's record items for set $s.
 RECORDS='[.items[] | select(.kind == "competition" and .event.kind == "record" and .event.set_id == $s)]'
@@ -393,6 +399,29 @@ drain "setup sessions"
 expect_sql "setup: records for a1, a2, r1 only" \
   "select string_agg(replace(set_id, '${T}-', ''), ',' order by set_id) from app_public.group_events
     where group_exercise_id = '${GX}' and kind = 'record';" "a1,a2,r1"
+# The record stream: each record's set, and the group's previous #1 on each
+# board it took. a1 was the first #1 (no previous). a2 and r1 apply in the
+# same drain, in either order: a2 first beats A's own #1 (A at 90, no set
+# kept) and r1 takes no #1; r1 first takes #1 from A's a1, then a2 from r1.
+stream_v2 "${RIVAL_TOKEN}"
+check_args "v2: a record item carries its set" --arg s "${T}-a2" \
+  "${RECORDS}"' | length == 1 and (.[0] | keys) == ["event","key","kind","record","sort_at_ms"]
+   and (.[0].record.performance | .visibility == "ordinary" and .reps == 1 and (.weight_value | tonumber) == 100
+        and .set_id == $s)'
+check_args "v2: the previous #1 on each board, in either apply order" \
+  --arg T "${T}" --arg A "${ATHLETE_UID}" --arg R "${RIVAL_UID}" \
+  'def prev($s): [.items[] | select(.kind == "competition" and .event.kind == "record" and .event.set_id == ($T + "-" + $s))][0]
+     .record.previous | map({m: .value.metric, role: .value.role, v: .value.value, who: .value.member.user_id,
+       set: .performance.set_id, w: (.performance.weight_value // null)});
+   def both($v; $who; $set; $w): [{m: "e1rm", role: "previous", v: $v, who: $who, set: $set, w: $w},
+                                  {m: "volume", role: "previous", v: $v, who: $who, set: $set, w: $w}];
+   prev("a1") == [] and (
+     (prev("a2") == both(90; $A; null; null) and prev("r1") == [])
+     or (prev("r1") == both(90; $A; ($T + "-a1"); "90") and prev("a2") == both(95; $R; ($T + "-r1"); "95")))'
+check "v2: non-record items are unchanged" \
+  'all(.items[]; (.kind == "competition" and .event.kind == "record") == has("record"))'
+stream "${RIVAL_TOKEN}"
+check "v1: no record key (installed builds)" 'all(.items[]; has("record") | not)'
 pass "users (owner, admin, athlete A, rival R, certifier C, removed, outsider), group G, All boards A 100 · R 95"
 
 # =============================================================================
@@ -525,26 +554,29 @@ echo "[${LANE_LABEL}] certify: pinned rows, Certified entries, reads, lead_chang
 
 # The tokens come from R's All board entries, as the app certifies a board row.
 mark
-for metric in "${METRICS[@]}"; do
-  board "${CERTIFIER_TOKEN}" "${metric}" false
-  token="$(board_token "${RIVAL_UID}" r1)"
-  certify "${CERTIFIER_TOKEN}" "${RIVAL_UID}" r1 "${metric}" "${token}"
-  expect_ok "C certifies R's r1 (${metric})"
-  check_args "certify returns the new certification (${metric})" --arg c "${CERTIFIER_UID}" --arg m "${metric}" \
-      --arg rev "$(revision)" \
-    '.created == true
-     and (.certification | keys) == ["certification_id","certified_at_ms","certified_by","end_reason","ended_at_ms",
-                                     "metric","observed_rules_revision"]
-     and .certification.metric == $m and .certification.certified_by.user_id == $c
-     and (.certification.observed_rules_revision | tostring) == $rev
-     and .certification.end_reason == null and .certification.ended_at_ms == null'
-  printf -v "R1_${metric}" '%s' "$(jq -er '.certification.certification_id' <<<"${BODY}")"
-done
+board "${CERTIFIER_TOKEN}" volume false
+token="$(board_token "${RIVAL_UID}" r1)"
+certify "${CERTIFIER_TOKEN}" "${RIVAL_UID}" r1 volume "${token}"
+expect_ok "C certifies R's r1"
+check_args "certify returns the new certification" --arg c "${CERTIFIER_UID}" --arg rev "$(revision)" \
+  '.created == true
+   and (.certification | keys) == ["certification_id","certified_at_ms","certified_by","end_reason","ended_at_ms",
+                                   "metric","observed_rules_revision"]
+   and .certification.metric == "volume" and .certification.certified_by.user_id == $c
+   and (.certification.observed_rules_revision | tostring) == $rev
+   and .certification.end_reason == null and .certification.ended_at_ms == null'
+R1_volume="$(jq -er '.certification.certification_id' <<<"${BODY}")"
+R1_e1rm="${R1_volume}"
+expect_sql "one certify covers the set: a row per metric, one witness, one certifier, one instant" \
+  "select count(*) || ':' || count(distinct coalesce(witness_certification_id, id)) || ':'
+          || bool_and(certified_by = '${CERTIFIER_UID}') || ':' || count(distinct certified_at)
+     from app_public.group_metric_certifications
+    where group_exercise_id = '${GX}' and set_id = '${T}-r1' and ended_at is null;" "2:1:true:1"
 expect_sql "each pin is the live set's observed pin" \
   "select count(*) || ':' || bool_and(c.observed_set_pin = r ->> 'observed_set_pin')
      from app_public.group_metric_certifications c
      cross join lateral jsonb_array_elements(app_public.group_metric_eval_source_graph('${GID}', '${GX}') -> 'sets') r
-    where c.id in ('${R1_volume}', '${R1_e1rm}')
+    where coalesce(c.witness_certification_id, c.id) = '${R1_volume}'
       and r ->> 'member_user_id' = c.member_user_id::text and r ->> 'set_id' = c.set_id;" "2:true"
 expect_centry R volume "" "no Certified entry before the evaluator runs"
 board "${ATHLETE_TOKEN}" volume false
@@ -683,13 +715,17 @@ expect_sql "an emptied board's lead change has a null leader" \
     where group_exercise_id = '${GX}' and kind = 'lead_change' and certified order by seq desc limit 1;" "null"
 
 mark
-for metric in "${METRICS[@]}"; do
-  certify "${CERTIFIER_TOKEN}" "${RIVAL_UID}" r1 "${metric}" "$(score_token "${RIVAL_UID}" r1 "${metric}")"
-  expect_ok "re-certify a cancelled set (${metric})"
-  check_args "re-certifying creates a new row (${metric})" --arg old "$(cert_id R1 "${metric}")" \
-    '.created == true and .certification.certification_id != $old'
-  printf -v "R1B_${metric}" '%s' "$(jq -er '.certification.certification_id' <<<"${BODY}")"
-done
+certify "${CERTIFIER_TOKEN}" "${RIVAL_UID}" r1 e1rm "$(score_token "${RIVAL_UID}" r1 e1rm)"
+expect_ok "re-certify a cancelled set"
+check_args "re-certifying creates a new witness" --arg old "$(cert_id R1 e1rm)" \
+  '.created == true and .certification.certification_id != $old and .certification.metric == "e1rm"'
+R1B_e1rm="$(jq -er '.certification.certification_id' <<<"${BODY}")"
+certify "${ADMIN_TOKEN}" "${RIVAL_UID}" r1 volume "$(score_token "${RIVAL_UID}" r1 volume)"
+expect_ok "certify the re-certified set through its other score"
+check_args "the set is already certified: the same witness, on Volume too" --arg id "${R1B_e1rm}" --arg c "${CERTIFIER_UID}" \
+  '.created == false and .certification.certification_id == $id and .certification.metric == "volume"
+   and .certification.certified_by.user_id == $c'
+R1B_volume="${R1B_e1rm}"
 [[ "$(certs_col R1 end_reason)" == "cancelled,cancelled" ]] || fail "the cancelled rows stay cancelled"
 drain "re-certify r1"
 expect_centry R volume "95@r1" "the Certified entry returns"
@@ -860,11 +896,11 @@ run_psql "alter table app_public.group_metric_eval_queue add constraint ${FORCE_
 certify_set "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" a4 A4B
 run_psql "alter table app_public.group_metric_eval_queue drop constraint ${FORCE_ENQUEUE_CONSTRAINT};" >/dev/null
 [[ "$(certs_col A4B "ended_at is null")" == "t,t" ]] || fail "the certifications committed"
-expect_sql "one sanitized enqueue failure row per certification" \
+expect_sql "one sanitized enqueue failure row for the set's certification" \
   "select count(*) || ':' || bool_and(context = jsonb_build_object('group_id', '${GID}', 'group_exercise_id', '${GX}',
                                                                    'kind', 'exercise', 'sqlstate', '23514'))
      from public.app_logs where event = 'group.eval_enqueue_failed' and user_id = '${CERTIFIER_UID}';" \
-  "2:true"
+  "1:true"
 expect_sql "no job was queued" \
   "select count(*) from app_public.group_metric_eval_queue where group_exercise_id = '${GX}';" "0"
 drain "nothing queued"
@@ -881,6 +917,78 @@ check_args "the raw-edited record reads certified" --arg s "${T}-a4" --arg v "${
   "${RECORDS}"'[0].event.record_context.metrics
    | (map({key: .metric, value: .certification.certification_id}) | from_entries) == {volume: $v, e1rm: $e}'
 pass "a failed enqueue logs once per certification and commits; the next job repairs; a frozen stale entry masks no lead change"
+
+# =============================================================================
+echo "[${LANE_LABEL}] one witness per set: any row's end ends it; merging per-metric witnesses"
+# =============================================================================
+
+# An evaluator void (a reading correction) can end one projection; the set's
+# whole witness ends with it.
+run_psql "update app_public.group_metric_certifications set ended_at = now(), end_reason = 'voided'
+            where coalesce(witness_certification_id, id) = '${A4B_volume}' and metric = 'e1rm' and ended_at is null;" >/dev/null
+[[ "$(certs_col A4B "end_reason || ':' || coalesce(ended_by::text, 'null')")" == "voided:null,voided:null" ]] ||
+  fail "ending the 1RM row ends the Volume row of the same witness"
+
+# Before set-level certification a set could hold a witness per metric, from
+# different members. Seed that: C on 1RM (earlier), R on Volume (later).
+run_psql "insert into app_public.group_metric_certifications(group_id, group_exercise_id, member_user_id, set_id, session_id,
+            metric, observed_rules_revision, observed_value, unit, pinned_fingerprint, current_fingerprint, performance,
+            certified_by, certified_at, observed_set_pin)
+          select s.group_id, s.group_exercise_id, s.member_user_id, s.set_id, s.session_id, s.metric, s.rules_revision,
+            s.value, s.unit, s.fingerprint, s.fingerprint, s.performance,
+            case s.metric when 'e1rm' then '${CERTIFIER_UID}'::uuid else '${RIVAL_UID}'::uuid end,
+            now() - case s.metric when 'e1rm' then interval '2 minutes' else interval '1 minute' end,
+            r ->> 'observed_set_pin'
+            from app_public.group_metric_set_scores s
+            cross join lateral jsonb_array_elements(app_public.group_metric_eval_source_graph('${GID}', '${GX}') -> 'sets') r
+           where s.group_exercise_id = '${GX}' and s.rules_revision = $(revision) and s.member_user_id = '${ATHLETE_UID}'
+             and s.set_id = '${T}-a4' and s.metric in ('volume', 'e1rm')
+             and r ->> 'member_user_id' = s.member_user_id::text and r ->> 'set_id' = s.set_id;" >/dev/null
+[[ "$(active_certs a4)" == "1:1" ]] || fail "seeded: one 1RM and one Volume witness of a4"
+run_psql "select app_public.group_competition_merge_set_witnesses();" >/dev/null
+expect_sql "the merge keeps the earliest witness (C, on 1RM) and aliases it on Volume" \
+  "select count(*) || ':' || count(distinct coalesce(witness_certification_id, id)) || ':'
+          || bool_and(certified_by = '${CERTIFIER_UID}') || ':'
+          || count(*) filter (where metric = 'volume' and witness_certification_id is not null)
+     from app_public.group_metric_certifications
+    where group_exercise_id = '${GX}' and set_id = '${T}-a4' and ended_at is null;" "2:1:true:1"
+expect_sql "the later witness (R) ends, cancelled with no actor" \
+  "select string_agg(end_reason || ':' || coalesce(ended_by::text, 'null'), ',')
+     from app_public.group_metric_certifications
+    where group_exercise_id = '${GX}' and set_id = '${T}-a4' and certified_by = '${RIVAL_UID}';" "cancelled:null"
+expect_sql "the merge re-queues the comparison" \
+  "select count(*) from app_public.group_metric_eval_queue where group_exercise_id = '${GX}';" "1"
+drain "merge a4"
+expect_centry A volume "111@a4" "the merged witness puts a4 on the Certified Volume board"
+expect_centry A e1rm "$(run_psql "select value from app_public.group_metric_board_entries
+  where group_exercise_id = '${GX}' and rules_revision = $(revision) and member_user_id = '${ATHLETE_UID}'
+    and metric = 'e1rm' and not certified;")@a4" "and on Certified 1RM"
+A4C_volume="$(run_psql "select coalesce(witness_certification_id, id) from app_public.group_metric_certifications
+  where group_exercise_id = '${GX}' and set_id = '${T}-a4' and ended_at is null and metric = 'volume';")"
+end_cert "${CERTIFIER_TOKEN}" '"withdraw"' '"e1rm"' "$(q "${A4C_volume}")"
+expect_ok "the earliest certifier withdraws the merged witness"
+[[ "$(active_certs a4)" == "0:0" ]] || fail "a withdrawal through 1RM ends the Volume alias too"
+certify_set "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" a4 A4D
+drain "re-certify a4"
+expect_centry A volume "111@a4" "re-certified for the rebuild below"
+
+# A record that takes #1 from another member names them as the previous #1,
+# with their set.
+# (R has left the group; C lifts.)
+DC="${T}-dC"
+def "${CERTIFIER_TOKEN}" "${DC}" total_load
+link "${CERTIFIER_TOKEN}" "${DC}"
+next_session_at
+sess "${CERTIFIER_TOKEN}" "${T}-c5s" completed "${DC}" "c5:120:1"
+drain "c5 takes #1"
+stream_v2 "${ATHLETE_TOKEN}"
+check_args "v2: c5's previous #1 is A, with A's set" --arg s "${T}-c5" --arg a "${ATHLETE_UID}" --arg p "${T}-a4" \
+  "${RECORDS}"'[0].record | (.performance | .reps == 1 and (.weight_value | tonumber) == 120)
+   and (.previous | map({metric: .value.metric, value: .value.value, member: .value.member.user_id,
+          set: .performance.set_id, weight: (.performance.weight_value | tonumber)})
+        | (map(.metric) == ["e1rm", "volume"]) and all(.[]; .member == $a and .set == $p and .weight == 111)
+          and (.[1].value == 111))'
+pass "one witness per set: a projection's end, the merge (earliest wins, alias, re-queue), withdraw through either metric; v2 previous #1"
 
 # =============================================================================
 echo "[${LANE_LABEL}] a rules-revision rebuild republishes silently"

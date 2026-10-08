@@ -425,11 +425,10 @@ describe('pick sheet (E0.2)', () => {
     expect(within(squat).getByText('already linked in Tuesday Crew')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-seed_barbell_bench_press'));
-    expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(
-      'Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load. Your personal exercise settings stay unchanged.',
-    );
+    expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
+    expect(screen.queryByText(/Rules \d|Bodyweight scoring|personal exercise settings/)).toBeNull();
     fireEvent.press(screen.getByTestId('group-pick-sheet-choice-ex-hotel'));
-    expect(screen.getByTestId('group-pick-sheet-load-mode-note')).toHaveTextContent(/Rules 1.*Bodyweight scoring Off/);
+    expect(screen.queryByTestId('group-pick-sheet-load-mode-note')).toBeNull();
   });
 
   it('with no suggestion, Add as new is preselected; dismissing returns to the picker', async () => {

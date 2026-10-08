@@ -509,9 +509,19 @@ rpc "${RIVAL_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${GI
 rpc "${OWNER_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${GID}" --arg c "${V_PUBLIC}" \
   '{p_group_id:$g,p_certification_id:$c,p_metric:"volume",p_action:"withdraw"}')"; expect_ok 'witness withdrawal'; assert_wire isCompetitionCertificationResultWire
 check 'safe withdrawal metadata' '.certification.certification_id==$c and .certification.end_reason=="withdrawn"' --arg c "${V_PUBLIC}"
+# One witness per set: the 1RM projection ended with it.
+[[ "${R_PUBLIC}" == "${V_PUBLIC}" ]] || fail 'one public certification id per set'
+rpc "${OWNER_TOKEN}" group_competition_certification_get "$(jq -nc --arg g "${GID}" --arg c "${R_PUBLIC}" \
+  '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm"}')"; expect_ok 'read the 1RM projection'
+check 'a withdrawal through Volume ends 1RM too' '.certification.metric=="e1rm" and .certification.end_reason=="withdrawn"'
+drain 'manual withdrawal'
+pair
 rpc "${OWNER_TOKEN}" group_competition_certification_end "$(jq -nc --arg g "${GID}" --arg c "${R_PUBLIC}" \
   '{p_group_id:$g,p_certification_id:$c,p_metric:"e1rm",p_action:"cancel"}')"; expect_ok 'admin cancellation'; assert_wire isCompetitionCertificationResultWire
 check 'safe cancellation metadata' '.certification.certification_id==$c and .certification.end_reason=="cancelled"' --arg c "${R_PUBLIC}"
+rpc "${OWNER_TOKEN}" group_competition_certification_get "$(jq -nc --arg g "${GID}" --arg c "${V_PUBLIC}" \
+  '{p_group_id:$g,p_certification_id:$c,p_metric:"volume"}')"; expect_ok 'read the Volume projection'
+check 'a cancellation through 1RM ends Volume too' '.certification.metric=="volume" and .certification.end_reason=="cancelled"'
 drain 'manual certification ends'
 pass 'stale random tokens, raw correction/deletion, full-precision ranking, unweighted eligibility and manual witness lifecycle'
 

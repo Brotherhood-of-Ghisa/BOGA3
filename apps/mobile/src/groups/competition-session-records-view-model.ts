@@ -8,7 +8,7 @@ import { formatBoardDate, YOU_LABEL } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import type { CompetitionSessionExerciseCard } from './competition-session-view-model';
 import { COMPETITION_UNIT_LABELS, HISTORICAL_METRIC_LABELS } from './competition-view-model';
-import type { CompetitionCertificationWire, CompetitionExerciseWire, CompetitionHistoricalMetric,
+import type { CompetitionCertificationWire, CompetitionEventWire, CompetitionExerciseWire, CompetitionHistoricalMetric,
   CompetitionSessionRecordWire, CompetitionSessionWire } from './competition-wire';
 import type { MetricCertificationTarget } from './metric-record-sheet-view-model';
 import { formatMemberName, formatMetricFigure } from './stream-view-model';
@@ -89,10 +89,11 @@ const recordValue = (record: CompetitionSessionRecordWire, metric: CompetitionHi
   return `${formatMetricFigure('e1rm', value.value)} ${unit}`;
 };
 
-const certificationOf = (record: CompetitionSessionRecordWire, metric: CompetitionHistoricalMetric): SessionRecordCertification | null => {
-  const context = record.event.record_context;
-  const member = record.event.member;
-  const setId = record.event.set_id;
+/** What certifying one metric of a record event needs; null when the current rules have no such board. */
+export const recordCertification = (event: CompetitionEventWire, metric: CompetitionHistoricalMetric): SessionRecordCertification | null => {
+  const context = event.record_context;
+  const member = event.member;
+  const setId = event.set_id;
   if (!isCompetitionMetric(metric) || !context || !member || !setId) return null;
   const entry = context.metrics.find(candidate => candidate.metric === metric);
   if (!entry) return null;
@@ -103,6 +104,18 @@ const certificationOf = (record: CompetitionSessionRecordWire, metric: Competiti
     eligible: entry.eligible,
   };
 };
+
+/**
+ * A record's certification is its set's (one witness per set): the metric row
+ * to read and write it through — the one already certified, else the first
+ * certifiable, 1RM first. Null when the record has no current context.
+ */
+export function setCertification(event: CompetitionEventWire): SessionRecordCertification | null {
+  const metrics = [...(event.record_context?.metrics ?? [])].sort((a, b) => (a.metric === 'e1rm' ? 0 : 1) - (b.metric === 'e1rm' ? 0 : 1));
+  const pick = metrics.find(entry => entry.certification !== null && entry.certification.ended_at_ms === null)
+    ?? metrics.find(entry => entry.eligible) ?? metrics[0];
+  return pick ? recordCertification(event, pick.metric) : null;
+}
 
 /** The Group records card: one row per #1 board, in session order, 1RM before Volume. */
 export function buildSessionRecordRows({ records, places, groupId, userId }: {
@@ -124,7 +137,7 @@ export function buildSessionRecordRows({ records, places, groupId, userId }: {
           value: recordValue(record, board.metric),
           detail: [GROUP_RECORD_LABEL, place?.figure ?? null, passedBy].filter(Boolean).join(' · '),
           boardHref: `/group/${encodeURIComponent(groupId)}/leaderboards/${encodeURIComponent(exercise.group_exercise_id)}${metricQuery}`,
-          certification: certificationOf(record, board.metric),
+          certification: recordCertification(record.event, board.metric),
         },
       };
     });
