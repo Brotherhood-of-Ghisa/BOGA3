@@ -2,18 +2,14 @@ import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import {
   PageSheet,
   SegmentedControl,
   StatePanel,
-  uiFonts,
-  uiGeometry,
-  uiRoles,
   uiSpace,
-  uiTypography,
 } from '@/components/ui';
 import type {
   CalendarHeatmapMetric,
@@ -22,8 +18,8 @@ import type {
 } from '@/src/data';
 
 // The history of one exercise or one muscle on Progress: a sub-page
-// (`PageSheet`) holding the metric control, saved view/window and daily
-// or weekly heatmap. One component for the muscle and the exercise
+// (`PageSheet`) holding the metric control and the saved Daily
+// or Weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
 export type HistoryKind = 'muscle' | 'exercise';
@@ -219,24 +215,16 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
       onDismissed={onDismiss} testID={prefix} title={title} visible={visible}>
       <View style={styles.body} testID={`${prefix}-overlay`}>
         <View style={styles.controls}>
-          <Text allowFontScaling={false} style={styles.controlLabel} testID={`${prefix}-window`}>
-            {view === 'daily' ? 'Daily' : 'Weekly'} · {lookbackWeeks} {lookbackWeeks === 1 ? 'week' : 'weeks'}
-          </Text>
-          <View style={styles.controlGroup}>
-            <Text allowFontScaling={false} style={styles.controlLabel}>
-              Metric
-            </Text>
-            <SegmentedControl
-              accessibilityLabel="Select effort metric"
-              // Four metrics: `Top weight` outgrows an equal quarter.
-              layout="fit"
-              selectedGround="accent"
-              onChange={onSelectMetric}
-              options={metricOptions}
-              testIDPrefix={`${prefix}-metric-chip`}
-              value={metric}
-            />
-          </View>
+          <SegmentedControl
+            accessibilityLabel="Select effort metric"
+            // Four metrics: `Top weight` outgrows an equal quarter.
+            layout="fit"
+            selectedGround="selection"
+            onChange={onSelectMetric}
+            options={metricOptions}
+            testIDPrefix={`${prefix}-metric-chip`}
+            value={metric}
+          />
         </View>
 
         <HistoryHeatmap
@@ -283,29 +271,14 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
   );
 }
 
-const microLabel = {
-  fontFamily: uiFonts.display.family,
-  fontWeight: '700',
-  fontSize: uiTypography.size.xxs,
-  lineHeight: uiTypography.lineHeight.xxs,
-  letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  textTransform: 'uppercase',
-  color: uiRoles.inkMuted,
-} as const;
-
 const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
   controls: {
-    gap: uiSpace.md,
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.md,
   },
-  controlGroup: {
-    gap: uiSpace.sm,
-  },
-  controlLabel: microLabel,
   scroll: {
     flex: 1,
   },

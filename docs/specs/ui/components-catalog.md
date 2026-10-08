@@ -41,7 +41,7 @@ Two standing rules:
 | The inline outcome of an action | `Notice` (`notice.tsx`) |
 | A labelled text or figure input | `FormField` (`form-field.tsx`) |
 | A search input | `SearchField` (`search-field.tsx`) |
-| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, theme-accent or palette-grade selection |
+| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`) |

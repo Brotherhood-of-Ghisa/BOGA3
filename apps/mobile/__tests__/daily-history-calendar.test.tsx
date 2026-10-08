@@ -1,7 +1,7 @@
-import { render, screen, within } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { ScrollView, StyleSheet } from 'react-native';
 import { DailyHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { uiGeometry, uiRoles } from '@/components/ui';
+import { uiBorder, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 
@@ -66,20 +66,22 @@ it('exposes read-only day and week values without selection or black outlines', 
   expect(screen.queryByTestId('calendar-heatmap-day-detail')).toBeNull();
 });
 
-it('distinguishes blank rest, numeric zero, an overflowed volume, future days and future weeks', () => {
+it('leaves rest and unavailable figures blank, retains numeric zero and clips future weeks', () => {
   draw('totalVolume', [sample('2026-10-02', 0), { ...sample('2026-10-03', 0), totalVolume: null }]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01-value')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-01').props.accessibilityLabel).toContain('Rest');
   expect(screen.queryAllByText('Rest')).toEqual([]);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-02-value')).toHaveTextContent('0');
-  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03-value')).toHaveTextContent('?');
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03-value')).toHaveTextContent('', { exact: true });
+  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-09-28-value')).toHaveTextContent('', { exact: true });
+  expect(screen.queryByText(/\?/)).toBeNull();
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toBe('2026-10-03, Volume unavailable');
   expect(screen.queryByText(/incomplete/)).toBeNull();
   expect(style('calendar-heatmap-cell-2026-10-03').borderStyle).toBe('dashed');
   const future = screen.getByLabelText('2026-10-07, Future, no observed value');
   expect(future).toHaveProp('accessibilityRole', 'text');
   expect(within(future).getByTestId(`${future.props.testID}-value`)).toHaveTextContent('', { exact: true });
-  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-12-value')).toHaveTextContent('', { exact: true });
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-12')).toBeNull();
 });
 
 it('de-emphasises adjoining dates by weight while preserving full ink and heat contrast', () => {
@@ -130,4 +132,20 @@ it('updates the displayed history when its metric or look-back window changes', 
   rerender(<DailyHeatmap data={short} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
   expect(screen.getByTestId(`calendar-heatmap-cell-${today}-value`)).toHaveTextContent('840');
   expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-09-28')).toBeNull();
+});
+
+it.each([320, 375, 402])('centres the Sun/Week separator in a wider gap at %ipt', width => {
+  draw();
+  fireEvent(screen.getByTestId('calendar-heatmap'), 'layout', { nativeEvent: { layout: { width } } });
+  const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm - 8 * uiGeometry.tapTarget) / 7));
+  const column = (width - 7 * gap - uiSpace.sm) / 8;
+  const sunRight = 7 * column + 6 * gap;
+  const weekLeft = 7 * column + 7 * gap + uiSpace.sm;
+  const separator = style('calendar-heatmap-week-separator-2026-10');
+  const lineCentre = width * 7 / 8 - uiBorder.width + separator.transform[0].translateX + uiBorder.width / 2;
+  expect(lineCentre - sunRight).toBeCloseTo(weekLeft - lineCentre);
+  expect(style('calendar-heatmap-week-2026-10-2026-10-05').marginLeft).toBe(uiSpace.sm);
+  const date = style('calendar-heatmap-cell-2026-10-05-date');
+  expect(date).toMatchObject({ position: 'absolute', top: uiBorder.width, left: uiBorder.width, fontSize: uiTypography.size.xxs });
+  expect(date.fontSize).toBeLessThan(style('calendar-heatmap-cell-2026-10-05-value').fontSize);
 });

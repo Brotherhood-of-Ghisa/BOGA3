@@ -23,16 +23,15 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
     expect(months[2].weeks.at(-1)?.days[1].inMonth).toBe(false);
   });
 
-it('fills the current month through Sunday with future cells and unscored future weeks', () => {
+it('clips the current month to the current week with blank future day placeholders', () => {
   const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: '2026-10-06', weeks: 1 });
   const months = buildCalendarMonths(data);
   expect(months.map(month => month.key)).toEqual(['2026-10']);
-  expect(months[0].weeks.map(week => week.weekStartDateKey)).toEqual(['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26']);
+  expect(months[0].weeks.map(week => week.weekStartDateKey)).toEqual(['2026-10-05']);
   expect(months[0].weeks[0].week?.value).toBe(300);
   expect(months[0].weeks[0].days[1].day?.isToday).toBe(true);
   expect(months[0].weeks[0].days[2]).toMatchObject({ dateKey: '2026-10-07', future: true, day: undefined });
-  expect(months[0].weeks[1].week).toBeUndefined();
-  expect(months[0].weeks.at(-1)?.days.at(-1)?.dateKey).toBe('2026-11-01');
+  expect(months[0].weeks.at(-1)?.days.at(-1)?.dateKey).toBe('2026-10-11');
 });
 
 it('keeps zero, unavailable and target attainment distinct without recalculating them', () => {
@@ -60,4 +59,10 @@ it('handles leap February, Sunday month starts, year transitions and long saved 
 
 it('renders no months for an empty adapter series', () => {
   expect(buildCalendarMonths({ daily: [], weekly: [], todayDateKey: '2026-10-06' })).toEqual([]);
+});
+
+it.each([1, 4, 52, 104])('keeps every rendered week inside the saved %i-week bounds', weeks => {
+  const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: '2026-10-06', weeks });
+  const keys = buildCalendarMonths(data).flatMap(month => month.weeks.map(week => week.weekStartDateKey));
+  expect([...new Set(keys)].sort()).toEqual(data.weekly.map(week => week.weekStartDateKey));
 });

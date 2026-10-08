@@ -42,8 +42,9 @@ export function buildCalendarMonths(data: HeatmapData): CalendarMonth[] {
     const monthKey = key(start).slice(0, 7);
     const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
     const rows: CalendarWeek[] = [];
-    for (let row = monday(start); row <= end; row = addDays(row, 7)) {
-      // The oldest month is clipped to the saved Monday-aligned window.
+    for (let row = monday(start); row <= end && key(row) <= data.todayDateKey; row = addDays(row, 7)) {
+      // Clip both ends to the saved Monday-aligned window; only the current
+      // week retains blank future day placeholders.
       if (key(row) < firstKey) continue;
       rows.push({ weekStartDateKey: key(row), week: weeks.get(key(row)),
         days: Array.from({ length: 7 }, (_, index) => {

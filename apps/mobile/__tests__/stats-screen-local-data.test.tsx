@@ -186,7 +186,7 @@ describe('Stats over real data', () => {
     await renderStats();
     fireEvent.press(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent(`Daily · ${weeks} ${weeks === 1 ? 'week' : 'weeks'}`);
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(read).toHaveBeenLastCalledWith(expect.objectContaining(calendarWeekBounds(weeks)));
     const panel = within(screen.getByTestId('stats-exercise-history-heatmap-panel-daily'));
     expect(panel.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength((weeks - 1) * 7 + 6);
@@ -321,7 +321,7 @@ describe('Stats over real data', () => {
     await act(async () => {
       updatePreferences({ heatmapView: 'weekly' });
     });
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 52 weeks');
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
     expect(screen.getByText('Weekly training load')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
@@ -357,14 +357,14 @@ describe('Stats over real data', () => {
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
   });
 
   it('selects and clears a weekly row over real data and returns to the same search/sort', async () => {

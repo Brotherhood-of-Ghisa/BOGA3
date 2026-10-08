@@ -1,6 +1,6 @@
 // Newest-first weekly rows. Length uses a shared zero origin; colour retains
 // the adapter's independent intensity/target meaning. Known training weeks
-// supply percentile references; rest stays blank and selection marks only its row.
+// supply percentile references; rest/unknown values stay blank and selection marks only its row.
 import React, { useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -9,7 +9,7 @@ import { Icon, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/com
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
 
 import { HEAT_RAMP } from './heatmap-metric';
-import { HEAT_MARK, heatmapStyles } from './heatmap-style';
+import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
 
@@ -41,16 +41,8 @@ const weekLabel = (week: WeekCell): string => {
   return `${first} – ${end.getUTCDate()} ${MONTHS[end.getUTCMonth()]}`;
 };
 
-const weekValue = (week: WeekCell, formatValue: Props['formatValue']) => {
-  if (week.unavailable) return '?';
-  return isKnownTraining(week) ? formatValue(week.value) : '';
-};
-
-const barBorder = (week: WeekCell, selected: boolean) => {
-  if (selected) return { borderWidth: HEAT_MARK.selectedWidth, borderColor: HEAT_MARK.color };
-  if (week.isCurrentWeek) return { borderWidth: HEAT_MARK.todayWidth, borderColor: HEAT_MARK.color };
-  return null;
-};
+const weekValue = (week: WeekCell, formatValue: Props['formatValue']) =>
+  isKnownTraining(week) ? formatValue(week.value) : '';
 
 // Discrete vertical dashes render consistently on iOS, including at zero.
 function ReferenceRule({ position, testID }: { position: number; testID?: string }) {
@@ -71,20 +63,16 @@ function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetAv
     accessibilityLabel={`Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
     onPress={onPress} testID={`${testID}-cell-${week.weekStartDateKey}`} style={styles.row}>
     <View style={styles.date}>
-      {selected ? <View style={styles.marker} testID={`${testID}-selected-marker`}><Icon color={HEAT_MARK.color} name="caret-down" size="xs" /></View> : null}
+      {selected ? <View style={styles.marker} testID={`${testID}-selected-marker`}><Icon color={uiRoles.ink} name="caret-down" size="xs" /></View> : null}
       <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week)}</Text>
       {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
       {year !== currentYear || year !== endYear ? <Text allowFontScaling={false} style={styles.year}>{year === endYear ? year : `${year}–${endYear}`}</Text> : null}
     </View>
     <View style={styles.plot}>
       <View style={styles.track}>
-        {/* A missing value has no filled length. Zero/rest still get an outline
-            when current or selected, so both marks remain visible. */}
         <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
           { width: `${max > 0 && !week.unavailable ? week.value / max * 100 : 0}%`,
-            backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' },
-          barBorder(week, selected),
-          (week.unavailable || week.value === 0) && (selected || week.isCurrentWeek) ? styles.emptyMark : null]} />
+            backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' }]} />
       </View>
       {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
     </View>
@@ -101,7 +89,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
   const values = recent.map(week => week.value).sort((a, b) => a - b);
   // Six genuine zeros are observations; an all-zero scale has no reference.
   const references: Reference[] = values.length >= 6 && max > 0
-    ? (metricLabel === 'Sets' ? [] : REFERENCE_PERCENTILES).map(([id, label, percentile]) => {
+    ? REFERENCE_PERCENTILES.filter(([id]) => metricLabel !== 'Sets' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);
       return { id, label, value: formatReferenceValue(value), position: value / max * 100 };
     }) : [];
@@ -115,16 +103,13 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
     extraData={selectedWeekKey}
     ListHeaderComponent={<View>{header}<>
       <Text allowFontScaling={false} style={[heatmapStyles.title, styles.title]}>Weekly training load</Text>
-      {references.length > 0 ? <View style={styles.referenceLabels}>
-        {references.map(reference => <Text key={reference.id} allowFontScaling={false} style={styles.referenceLabel}
-          accessibilityLabel={`12-week ${reference.label === 'Median' ? 'median' : reference.label === 'P5' ? '5th percentile' : '95th percentile'} ${reference.value}`}
-          testID={`${testID}-${reference.id}-label`}>{reference.label} {reference.value}</Text>)}
-      </View> : null}
       <View style={styles.axisRow}>
         <View style={styles.date} />
         <View style={styles.axis} testID={`${testID}-axis`}>
           {(max > 0 ? [0, 0.5, 1] : [0]).map(fraction => <Text key={fraction} allowFontScaling={false} style={[styles.axisLabel, { textAlign: fraction === 0 ? 'left' : fraction === 1 ? 'right' : 'center' }]}>{formatValue(max * fraction)}</Text>)}
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
+            accessible accessibilityRole="text"
+            accessibilityLabel={`12-week ${reference.label === 'Median' ? 'median' : reference.label === 'P5' ? '5th percentile' : '95th percentile'} ${reference.value}`}
             style={[styles.axisReference, { left: `${reference.position}%` }]} />)}
         </View>
         <View style={{ width: valueWidth }} />
@@ -136,7 +121,6 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
       max={max} references={references} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
       <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
-      {weeks.some(week => week.unavailable) ? <Text allowFontScaling={false} style={styles.note}>?: unavailable</Text> : null}
     </View>}
   />;
 }
@@ -154,12 +138,9 @@ const styles = StyleSheet.create({
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
-  emptyMark: { width: '100%' },
   value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, textAlign: 'right' },
   reference: { position: 'absolute', top: -uiSpace.sm, bottom: -uiSpace.sm, width: 1, justifyContent: 'space-around' },
   dash: { width: 1, flex: 1, maxHeight: 5, marginBottom: uiSpace.xs, backgroundColor: uiRoles.inkMuted },
-  referenceLabels: { gap: uiSpace.xs, marginBottom: uiSpace.sm },
-  referenceLabel: heatmapStyles.caption,
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.sm },
   axis: { flex: 1, flexDirection: 'row', paddingBottom: uiSpace.sm },

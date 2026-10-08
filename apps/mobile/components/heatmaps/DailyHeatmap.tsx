@@ -1,6 +1,6 @@
 // Newest-first, read-only month calendars. The host owns the single vertical
 // scroller. Week values reuse the Weekly adapter results; a continuous rule
-// separates Sun from Week. Rest/future values stay blank, known zero stays numeric.
+// separates Sun from Week. Rest/future/unknown values stay blank; known zero stays numeric.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -41,16 +41,18 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
   return <View style={styles.month} testID={`${props.testID}-month-${month.key}`}>
     <Text allowFontScaling={false} accessibilityRole="header" style={styles.monthTitle} testID={`${props.testID}-month-title-${month.key}`}>{month.title}</Text>
     <View style={styles.calendar}>
-      <View style={[styles.row, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={styles.column}>{label}</Text>)}</View>
+      <View style={[styles.row, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
       {month.weeks.map(row => <CalendarRow key={row.weekStartDateKey} {...props} row={row} monthKey={month.key} />)}
-      <View pointerEvents="none" style={[styles.weekSeparator, { transform: [{ translateX: props.gap * 3 / 8 }] }]} testID={`${props.testID}-week-separator-${month.key}`} />
+      {/* Eight equal columns, with an extra Week margin: place the rule at
+          the midpoint of the wider gap, accounting for its own width. */}
+      <View pointerEvents="none" style={[styles.weekSeparator, { transform: [{ translateX: (props.gap - uiSpace.sm) * 3 / 8 + uiBorder.width / 2 }] }]} testID={`${props.testID}-week-separator-${month.key}`} />
     </View>
   </View>;
 }
 
 export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, legendLabel = 'Volume per day' }: Props) {
   const [width, setWidth] = useState(0);
-  const gap = Math.max(0, Math.min(uiSpace.xs, (width - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
+  const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
   const testID = `${testIDPrefix}-heatmap`;
   return <View style={styles.wrap} onLayout={event => setWidth(event.nativeEvent.layout.width)} testID={testID}>
@@ -58,9 +60,6 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, leg
     {months.map(month => <Month key={month.key} month={month} data={data}
       metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} />)}
     <HeatmapLegend label={legendLabel} target={!!data.targetGrading} />
-    {data.daily.some(day => day.unavailable) ? <Text allowFontScaling={false} style={heatmapStyles.legendText}>
-      ?: unavailable
-    </Text> : null}
   </View>;
 }
 

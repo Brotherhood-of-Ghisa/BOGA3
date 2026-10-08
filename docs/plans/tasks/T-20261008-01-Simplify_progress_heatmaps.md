@@ -1,196 +1,125 @@
 # T-20261008-01 — Simplify Progress and Daily/Weekly heatmaps
 
-- Status: in progress — Sets clarification and human review pending
+- Status: in progress — human UI review pending
 - Depends on: none
 - Milestone: none
 - Areas: frontend; UI impact: yes
 - Execution: one agent session, one implementation worktree, one branch/PR.
-- Implementation branch: `codex/plan-progress-heatmap-ui` (operator requested existing branch).
+- Implementation branch: `codex/plan-progress-heatmap-ui`.
 
-## Objective
+## Objective and accepted design target
 
-Apply the operator's 2026-10-08 UI edits to Progress and the shared muscle/exercise
-history heatmaps. Commit the implementation on a new branch, make it available
-for human UI testing, and pause before running any automated tests.
-
-## Accepted design target
-
-Target: this operator brief, applied to the latest `origin/main` production UI.
-Capture the current app before editing and compare the changed states against
-the requirements below. Existing repository typography, tokens, accessibility
-and metric contracts govern everything outside these edits.
-
-The main checkout inspected during planning was behind `origin/main`; start
-from current main, which already has Daily month calendars with Mon–Sun and Week
-columns. Do not restore the older sideways daily grid.
+Apply the operator's current UI brief below to the latest-main Progress and
+shared muscle/exercise history UI. Commit locally, supply a runnable native
+preview, and pause before any automated tests until human testing is complete.
+This card always reflects the latest agreed requirements; git preserves prior
+versions. Existing typography, tokens, accessibility and metric contracts govern
+everything outside these changes. Native screenshots are comparison evidence.
 
 ## Deliverables and acceptance
 
-### Progress page
+### Progress
 
-- Remove target-based colour grading from the Progress landing presentation.
-  Planning interpretation of “bar colour grading”: the muscle row attainment
-  shading in `apps/mobile/components/stats/progress-tables.tsx`.
-- Use the existing neutral row background regardless of target attainment;
-  remove colour-only accessible wording and obsolete grading code/props where
-  no caller needs them.
-- Preserve metric values, comparison periods, name links, contribution chevrons
-  and selected-row indication. This request does not remove heatmap colouring
-  or the saved weekly target.
+- Remove target-based muscle-row colour grading and colour-only accessible
+  wording. Keep the neutral background for every attainment level.
+- Preserve figures, comparison periods, name links, contribution chevrons and
+  the selected row's left rule. Keep saved weekly targets and heatmap colouring.
+- Selected top filter segments use white text on a fixed black background,
+  irrespective of the colour theme. Other segments retain their neutral style.
 
-### Daily heatmap — both muscle and exercise
+### Both history kinds and views
 
-- Draw a vertical separator between Sun and Week, aligned through each month's
-  header and calendar rows using existing rule tokens. Keep the eight columns
-  aligned and the Week value readable at narrow widths.
-- Remove the small metric subtitle directly under “Daily training load” for
-  every supported metric.
-- Show no dash in an empty/rest Week tile, including the current future-week
-  placeholder. Keep rest/empty values blank, genuine zero training numeric and
-  unavailable values distinct; preserve date and accessibility descriptions.
-- Retain existing metric controls, month ordering, week aggregation and colours.
+- Retain all supported metric controls, including exercise Top weight. Their
+  selected segment also uses fixed black with white text in every theme.
+- Remove the window subtitle (e.g. Daily/Weekly · 12 weeks), Metric caption,
+  metric subtitle under the training-load title, and visible reference-label
+  stack (P5/Median/P95). Keep accurate reference identities and values accessible.
+- Draw no black outline around tiles/bars, including today/current week and
+  selected states. Keep selection accessible and use the existing caret for
+  the selected Weekly row. Neutral rules and unavailable-value styling remain.
+- Bound history to the History look-back (weeks) setting: no weeks before its
+  Monday-aligned start or after the current week. Current-week future day
+  placeholders are blank. Retain saved view/window, scrolling and calculations.
+- Rest and unavailable values are blank in both Daily and Weekly, including
+  the Daily Week column: no visible Rest wording, question mark or unavailable
+  caption. Genuine zero training remains numeric. Preserve accurate accessible
+  distinctions and date/rest/current semantics.
 
-### Weekly heatmap — both muscle and exercise
+### Daily
 
-- Remove the top selected-week box above “Weekly training load”, including its
-  range/value content. This is the shared `WeekSelectionBanner` in
-  `apps/mobile/components/stats/history-sheet.tsx`; remove its unused code.
-  Do not remove the Metric controls or the “Top weight” metric.
-- Match “Weekly training load” to “Daily training load”: font family, weight,
-  size and line height, using existing tokens/shared styles.
-- Remove the subtitle below “Weekly training load” for every supported metric.
-- Remove the visible Rest indicator; leave a rest week's value blank without
-  substituting a dash or zero. Keep zero training and unavailable values distinct,
-  and keep useful rest semantics in accessibility labels.
-- Sets: show one dashed median reference line (provisional interpretation of
-  the repeated phrase in the request; see Open below).
-- Every supported metric other than Sets: show dashed median, 5th-percentile
-  and 95th-percentile reference lines, with concise, distinguishable labels.
-- Replace the existing average calculation, line, labels and related accessible
-  text with the requested references. Keep references aligned to the same
-  zero-based scale used for the weekly bars.
-- Preserve the Weekly list, saved view/look-back, scrolling and current/selected
-  row indications. Removing the banner does not require redesigning selection.
+- Keep newest-first Mon–Sun plus Week calendars.
+- Widen the Sun/Week gap and centre a continuous vertical rule in that gap,
+  equally distant from Sun and Week, aligned through each month's header/rows.
+  Keep all eight columns and Week figures readable at narrow widths.
+- Monday day numbers are smaller than metric figures, anchored close to the
+  tile's top-left corner. Keep the metric figure readable and separate.
 
-## Statistical defaults proposed for this task
+### Weekly
 
-Reuse the current reference population: known training weeks in the most recent
-12 calendar weeks of the selected history window. Keep the existing minimum
-of six eligible weeks and the positive-scale requirement unless the operator
-requests a different baseline. Include genuine zero training; exclude rest,
-future and unavailable values.
+- Remove the selected-week banner and its unused code.
+- Match Daily's training-load title family, weight, size and line height.
+- No visible Rest indicator, question mark or substitute dash/zero for an empty
+  or unavailable week. Keep unavailable values distinct through accessibility.
+- Sets: one dashed median reference line only.
+- Volume, 1RM and Top weight: dashed median, P5 and P95 lines, aligned to the
+  bars' shared zero-based scale. No visible P5/Median/P95 subtitles; preserve
+  exact calculated positions and accurate accessible values when lines coincide.
+- Preserve the virtualized newest-first list, selection toggling and current
+  week semantics without borders.
 
-Sort a copy of eligible values and reuse
+## Reference calculation defaults
+
+Known training weeks among the most recent twelve calendar weeks of the saved
+history window form the reference population. Require six eligible weeks and a
+positive window maximum. Include genuine zeros; exclude rest, future and unknown
+values. All-zero and sparse histories omit references. Reuse
 `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`
-for P50/P5/P95 if its import fits the dependency rules. Do not add a statistics
-dependency. Keep numeric/accessible labels accurate when references coincide;
-handle overlapping labels without changing the calculated values.
-
-These population/minimum choices are implementation defaults, not additional
-operator requirements. State them when presenting the UI for human review.
-
-## Open — resolve before the affected implementation
-
-The request says “Sets metric: replace median dashed line with median dashed
-line.” Planning asked whether this means a single dashed median for Sets.
-Until answered, the recommendation above is provisional; settle this with the
-operator before implementing the Sets reference.
+on a sorted copy for P50/P5/P95; no new statistics dependency. These population
+defaults remain unchanged unless the operator requests another baseline.
 
 ## UX contract
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Compare Progress | Open Progress; change period/metric and expand contributions | Neutral muscle rows; existing figures and separate name/chevron actions remain | All-zero, previous-only, loading/error and narrow-width rows retain their existing meaning |
-| Inspect Daily | Set Daily in Settings; open a muscle or exercise history and choose each available metric | Sun/Week separator; title without subtitle; empty Week tiles blank | Partial months, future weeks, year boundaries, genuine zeros and unavailable values stay distinguishable |
-| Inspect Weekly | Set Weekly in Settings; open either history and choose each available metric | No top banner, subtitle or visible Rest; matching title; median/P5/P95 references as applicable | Sparse/all-zero history has no misleading references; coincident references remain readable; controls and scrolling stay usable |
-| Human review | Agent commits the UI and supplies branch, worktree and runnable preview instructions; operator tests both views | Operator confirms testing is complete before automated validation starts | Report “human review pending; automated tests not run”; incorporate requested UI fixes without starting tests |
+| Compare Progress | Open Progress; change period/metric; expand contributions | Neutral rows, black/white active filters, separate name and chevron actions | Zero/previous-only, loading/error, long figures and narrow rows preserve meaning |
+| Inspect Daily | Set Daily in Settings; open either history; choose every metric | No subtitles, wider centred Sun/Week rule, small top-left Monday dates, bounded weeks | Partial months, year boundaries, blank rest/unavailable/future and genuine zero remain accessible |
+| Inspect Weekly | Set Weekly in Settings; open either history; choose every metric and select rows | No banner/subtitles/black outlines; Sets median only, other metrics three lines; selection caret | Blank rest/unavailable values, sparse/zero/coincident references, long windows and narrow screens remain usable |
+| Change history window | Change History look-back (weeks) while history is open or reopen it | Read and displayed week bounds follow the saved setting | Old out-of-range figures disappear; current-week future days remain blank |
+| Human review | Agent commits and supplies worktree/native preview; operator tests both views | Explicit human-testing-complete confirmation precedes automated validation | Human review pending; automated tests not run; requested UI fixes precede gates |
 
-Appearance: use existing palette/type/rule tokens; keep long names and figures
-readable, useful accessible labels and existing native navigation. No new
-dependencies, chart framework, durable preference or Maestro flow.
+No new chart framework, dependency, durable preference or Maestro flow.
 
-## Implementation entrypoints
+## Implementation, documentation and validation
 
-- `apps/mobile/components/stats/progress-tables.tsx` — Progress row grading.
-- `apps/mobile/components/heatmaps/DailyHeatmap.tsx`,
-  `apps/mobile/components/heatmaps/calendar-tile.tsx` — calendar separator,
-  subtitle and Week placeholder.
-- `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`,
-  `apps/mobile/components/heatmaps/heatmap-style.ts` — headings and references.
-- `apps/mobile/components/stats/history-sheet.tsx` — selected-week banner.
-- Trace callers before removing helpers/props. Shared components must cover
-  both kinds of history, including every metric each kind actually offers.
+- Trace shared history, calendar, Weekly bar and Progress-control callers.
+- Load AGENTS always-load/UI documents and the training-metrics contract.
+- Update owning component headers, heatmap README and any changed shared style
+  rules. Load `docs/specs/README.md` before persistent documentation edits.
+- Read `apps/mobile/__tests__/README.md` and writing-tests before editing tests.
+  Extend existing calendar/Weekly/marks/real-data Progress suites and theme/control
+  coverage for bounds, references, removed copy/borders and fixed active colours.
+  Author tests now; execute none before human testing is complete.
+- Commit locally with test hooks disabled. Starting the app and manual native
+  captures are allowed. No Jest, Maestro, quality lane, sweep, push or PR yet.
+- After explicit human-testing-complete confirmation: run `./boga test for`,
+  propose the smallest lane set and agree lanes beyond fast. Fast is mandatory;
+  jest-coverage, complexity and dependencies must pass before PR, together with
+  the agreed device lanes. No new Maestro scenario without approval.
+- Then review, follow the PR template, delete this ephemeral card in the PR,
+  stop the stack after PR opening and release the worktree after merge.
 
-When updating tests, first read `apps/mobile/__tests__/README.md`. Extend the
-existing Daily calendar, Weekly bars, heatmap marks and real-data Progress screen
-tests for these changes. Cover reference values/eligibility, removed presentation,
-neutral shading and zero/rest/unavailable distinctions. Tests may be authored
-during implementation; none may be executed before human testing.
+## Current handoff
 
-## Documentation
-
-Load the AGENTS.md always-load and UI documents; load
-`docs/specs/tech/training-metrics-contract.md` for metric/reference work.
-Update `apps/mobile/components/heatmaps/README.md` for banner, blank tiles and
-reference semantics, and the owning UI specs where current contracts change,
-following `docs/specs/ui/README.md`. Load `docs/specs/README.md` before writing
-persistent documentation.
-
-Current code/docs prescribe graded Progress rows, a Weekly banner and an average
-reference. This task explicitly changes those rules; record the change and
-remove stale descriptions. Design inputs remain with the task/PR under the
-current design policy. Do not reference this task from code, tests or specs.
-
-## Branch, review and gates — human first
-
-1. Follow `docs/plans/README.md` task protocol for one task/session. Create a
-   fresh local worktree/branch with `./boga worktree create` from latest
-   `origin/main`; carry this card into that session if the planning branch has
-   not been merged. Use the normal isolated slot and dependencies.
-2. Implement, author regression coverage, update owning docs and commit the UI
-   changes locally on the new branch. Starting the app and taking manual native
-   captures are allowed. Do not run Jest, Maestro, any test/quality lane, a sweep
-   or a commit hook that runs tests; do not push/open a PR that starts CI yet.
-3. Present the committed branch/worktree and a runnable UI for the operator.
-   Capture both history kinds across available metrics, rest/empty, real zero,
-   unavailable and reference edge states at relevant small/large widths.
-   Pause until the operator explicitly confirms human testing is complete.
-4. After that confirmation, run `./boga test for`, propose the smallest appropriate
-   lane set and obtain operator agreement for lanes beyond fast. Expected:
-   `fast`, plus the agreed UI/device lanes and
-   `jest-coverage`, `complexity`, `dependencies` before the PR.
-   Deferral changes the order of validation; it does not waive it.
-5. Run agreed gates to green, record command/artifact evidence, and follow the
-   repository review/PR template and lifecycle. No new Maestro scenario without
-   operator approval. Delete this ephemeral card in the implementation PR.
-   Stop the stack after opening the PR and release the worktree after merge.
-
-## Execution handoff — 2026-10-08
-
-- Implemented neutral Progress rows, Daily separator/blank future Week values,
-  shared heading typography, removed subtitles/banner/visible Rest, and
-  median/P5/P95 for non-Sets metrics. Sets references remain unimplemented
-  pending the clarification above; the current preview has no Sets reference.
-- References use at least six known training weeks among the latest twelve
-  calendar weeks. Genuine zeros count; rest, future and unavailable values do
-  not. All-zero scales omit references. Coincident labels occupy separate lines.
-- Regression coverage authored in the existing suites; **human review pending;
-  automated tests not run**. No quality lanes, test hooks, push or PR yet.
-- Reused the operator's branch, which contains current `origin/main`, with
-  `./boga worktree start`; slot 29. `./boga doctor` passed.
 - Worktree: `/Users/sboschi/Projects/boga-worktrees/codex-plan-progress-heatmap-ui`.
-  Run `./boga ios start` there to open the native preview (Metro port 8111,
-  simulator `BOGA wt29`). Existing development data is seeded on this simulator.
-- Human review: Progress → muscle name or contribution exercise name; choose
-  each available Metric. Switch the saved Daily/Weekly view in Settings and
-  reopen history. Check neutral rows, selection/chevrons, separator, blank
-  rest/future values, numeric zero, unknown values, scrolling and references.
-- Manual native captures: `apps/mobile/artifacts/heatmap-ui/` (ignored).
-  Both history kinds and all metrics were captured at 402pt; 375pt captures
-  include Daily layouts and sparse/zero/coincident Weekly references. Edge
-  states use a temporary host with production components; the host is removed
-  before the local commit. `before-loaded.png` captures the original Progress.
+- Slot 29; simulator `BOGA wt29`; Metro 8111. Run `./boga ios start` there for
+  the native preview. Existing development data is seeded on that simulator.
+- `./boga doctor` passed. Regression tests are authored; **human review pending;
+  automated tests not run**. No quality gates, push or PR yet.
+- Implementation is ready for human testing. Manual native captures in ignored
+  `apps/mobile/artifacts/heatmap-ui/revised/` cover both history kinds/all metrics
+  at 402pt, plus 375pt, one-/four-week bounds, selected, sparse, zero and
+  coincident-reference states. Rest and unavailable figures are blank in both
+  views. The temporary capture host and small simulator have been removed.
 
-Next: settle Sets, finish that reference and its coverage, present the completed
-UI for human testing. Only after explicit testing-complete confirmation, agree
-and run validation lanes as specified above.
+Next: human testing of the committed native preview. Automated validation starts
+only after the operator explicitly confirms that human testing is complete.

@@ -5,8 +5,8 @@ import { DailyHeatmap, HEAT_RAMP, WeeklyHeatmap, buildHeatmapData } from '@/comp
 import { uiRoles } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
 
-// Daily tiles are read-only. Weekly bars retain current/selected marks because
-// selecting a bar marks the row without adding a banner.
+// Daily tiles are read-only. Weekly selection retains its caret and accessible state
+// without adding borders or a banner.
 
 const TODAY = '2026-05-13'; // a Wednesday
 const PREFIX = 'history';
@@ -88,20 +88,20 @@ describe('WeeklyHeatmap marks', () => {
       <WeeklyHeatmap data={data} onSelectWeek={jest.fn()} selectedWeekKey={selectedWeekKey} testIDPrefix={PREFIX} formatValue={String} />
     );
 
-  it('rings the current week and puts no marker up while nothing is selected', () => {
+  it('announces the current week without a border or selected caret', () => {
     renderWeekly(null);
 
-    expect(border(`${PREFIX}-heatmap-bar-2026-05-11`)).toEqual({ borderWidth: 1, borderColor: uiRoles.ink });
+    expect(border(`${PREFIX}-heatmap-bar-2026-05-11`)).toEqual({ borderWidth: undefined, borderColor: undefined });
     expect(screen.queryByTestId(`${PREFIX}-heatmap-selected-marker`)).toBeNull();
   });
 
-  it('gives a selected week a different border from the current week, and the caret', () => {
+  it('keeps selected/current bars borderless and retains the selected caret', () => {
     renderWeekly('2026-05-04');
 
     const selected = border(`${PREFIX}-heatmap-bar-2026-05-04`);
     const current = border(`${PREFIX}-heatmap-bar-2026-05-11`);
-    expect(selected).toEqual({ borderWidth: 2, borderColor: uiRoles.ink });
-    expect(current).toEqual({ borderWidth: 1, borderColor: uiRoles.ink });
+    expect(selected).toEqual({ borderWidth: undefined, borderColor: undefined });
+    expect(current).toEqual({ borderWidth: undefined, borderColor: undefined });
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-04`)).toHaveProp('accessibilityState', { selected: true });
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityState', { selected: false });
     expect(screen.getByTestId(`${PREFIX}-heatmap-selected-marker`)).toBeTruthy();
@@ -119,7 +119,9 @@ describe('Bodyweight heatmap coverage', () => {
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityLabel', '2026-05-11, Volume 0');
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11-value`)).toHaveTextContent('0');
     expect(style(`${PREFIX}-heatmap-cell-2026-05-12`).borderStyle).toBe('dashed');
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12-value`)).toHaveTextContent('?');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12-value`)).toHaveTextContent('', { exact: true });
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-12`)).toHaveProp('accessibilityLabel', '2026-05-12, Volume unavailable');
+    expect(screen.queryByText(/Rest|\?/)).toBeNull();
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain('Rest');
   });
 
@@ -129,7 +131,7 @@ describe('Bodyweight heatmap coverage', () => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
     render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
-    expect(screen.getByTestId(`${PREFIX}-heatmap-median-label`)).toHaveProp('accessibilityLabel', `12-week median ~${median}`);
+    expect(screen.getByTestId(`${PREFIX}-heatmap-median`)).toHaveProp('accessibilityLabel', `12-week median ~${median}`);
     expect(style(`${PREFIX}-heatmap-median`).left).toBe('0%');
     expect(style(`${PREFIX}-heatmap-p5`).left).toBe('0%');
     expect(style(`${PREFIX}-heatmap-p95`).left).toBe('87.5%');

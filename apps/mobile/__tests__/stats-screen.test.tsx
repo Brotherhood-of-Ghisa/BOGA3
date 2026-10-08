@@ -528,7 +528,7 @@ describe('StatsScreenShell', () => {
   });
 
   it.each([['muscle', 'daily'], ['muscle', 'weekly'], ['exercise', 'daily'], ['exercise', 'weekly']] as const)(
-    'uses the theme accent for the active %s history metric in %s mode', (kind, view) => {
+    'uses fixed black and white for the active %s history metric in %s mode', (kind, view) => {
       const onSelectMetric = jest.fn();
       const props = buildShellProps({
         selectedMuscle: kind === 'muscle' ? { muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' } : null,
@@ -540,14 +540,14 @@ describe('StatsScreenShell', () => {
       });
       const { rerender } = render(<StatsScreenShell {...props} />);
       const prefix = `stats-${kind}-history-metric-chip`;
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.accent });
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.selection });
       expect(within(screen.getByTestId(`${prefix}-totalVolume`)).getByText('Volume')).toHaveStyle({ color: uiRoles.surface });
       expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.surface });
       fireEvent.press(screen.getByTestId(`${prefix}-workingSetCount`));
       expect(onSelectMetric).toHaveBeenCalledWith('workingSetCount');
 
       rerender(<StatsScreenShell {...props} muscleHistoryMetric="workingSetCount" exerciseHistoryMetric="workingSetCount" />);
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.accent });
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.selection });
       expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveProp('accessibilityState', { selected: true });
       expect(within(screen.getByTestId(`${prefix}-workingSetCount`)).getByText('Sets')).toHaveStyle({ color: uiRoles.surface });
       expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.surface });
@@ -1165,4 +1165,14 @@ it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async a
   await act(async () => resolve(true));
   expect(focused).not.toHaveBeenCalled();
   enabled.mockRestore(); focused.mockRestore();
+});
+
+it('uses fixed black and white for active Progress filters', () => {
+  renderStatsScreenShell({ periodDays: 28 });
+  for (const id of ['stats-view-mode-chip-muscle', 'stats-period-chip-28', 'stats-metric-chip-workingSetCount']) {
+    const segment = screen.getByTestId(id);
+    expect(segment).toHaveStyle({ backgroundColor: '#000000' });
+    expect(segment).toHaveProp('accessibilityState', { selected: true });
+    expect(StyleSheet.flatten(within(segment).getByText(/.+/).props.style).color).toBe('#FFFFFF');
+  }
 });

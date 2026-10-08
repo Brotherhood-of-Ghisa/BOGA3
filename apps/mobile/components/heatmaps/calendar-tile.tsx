@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { HEAT_RAMP } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import type { DayCell, WeekCell } from './heatmapData';
@@ -19,9 +19,7 @@ type Props = {
 };
 
 export function calendarValue(cell: DayCell | WeekCell | undefined, future: boolean, formatValue: Props['formatValue']): string {
-  if (future) return '';
-  if (!cell) return '';
-  if (cell.unavailable) return '?';
+  if (future || !cell || cell.unavailable) return '';
   return (cell.hasTraining ?? cell.value > 0) ? formatValue(cell.value) : '';
 }
 
@@ -39,7 +37,7 @@ export function CalendarTile(props: Props) {
   return <View accessible accessibilityRole="text"
     accessibilityLabel={`${dateLabel}, ${description(props)}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
     testID={testID}
-    style={[styles.tile, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
+    style={[styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
       cell?.unavailable ? styles.unavailable : null]}>
     {mondayDate === undefined ? null : <Text allowFontScaling={false} style={[styles.date, adjacent ? styles.adjacentFigure : null]} testID={`${testID}-date`}>{mondayDate}</Text>}
     <Text allowFontScaling={false} style={[styles.value, adjacent ? styles.adjacentFigure : null]} numberOfLines={1} testID={`${testID}-value`}>
@@ -51,11 +49,11 @@ export function CalendarTile(props: Props) {
 const styles = StyleSheet.create({
   tile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
     borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
-    ...heatmapStyles.restCell, justifyContent: 'center' },
+    ...heatmapStyles.restCell, justifyContent: 'center', paddingTop: uiSpace.xs },
   adjacentFigure: { fontWeight: '500' },
-  unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: uiRoles.inkMuted },
-  date: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.ink, paddingLeft: uiBorder.width },
-  value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.ink, textAlign: 'center' },
+  unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: uiRoles.rule },
+  date: { position: 'absolute', top: uiBorder.width, left: uiBorder.width, fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.ink },
+  value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.xs,
+    lineHeight: uiTypography.lineHeight.xs, color: uiRoles.ink, textAlign: 'center' },
 });

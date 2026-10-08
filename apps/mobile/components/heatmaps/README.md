@@ -8,7 +8,7 @@ Two heatmap views for the exercise and muscle history sheets on Progress
 |------|-----------|
 | `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `HEAT_RAMP` (the `viz0`…`viz4` roles). |
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
-| `heatmap-style.ts`  | The shared title, caption and micro-label styles, plus the Weekly view's `ink` current / selected marks (`HEAT_MARK`). |
+| `heatmap-style.ts`  | Shared title, micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — read-only month calendars stacked newest first, Monday–Sunday plus Week tiles. |
 | `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; selection lifted to the host. |
@@ -50,11 +50,12 @@ report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
-unknown load never gets a filled length, rest is blank, and known zero reads `0`.
-For metrics other than Sets, median, P5 and P95 use known training weeks
+unknown load never gets a filled length; rest and unknown values are blank, and known zero reads `0`.
+Sets uses median only; other metrics use median, P5 and P95 from known training weeks
 (including zeros) among the latest twelve calendar weeks; rest, future and
 unavailable weeks do not contribute. A Volume sum that is not finite is never
-plotted: its cells are dashed, show `?`, and read `Volume unavailable`.
+plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
+Daily retains a neutral dashed rule.
 
 ## Props & selection
 
@@ -83,13 +84,15 @@ Daily tiles are read-only; Weekly bars select a row:
 - **Daily** displays figures inside read-only tiles, without selection or
   black outlines. Adjacent
   months repeat the same full week value/colour. Rest tiles are blank, zero is
-  numeric, unknown load is `?`, and future days and weeks are blank.
-  A vertical `rule` separates Sun and Week through each month’s header and rows;
+  numeric, unknown load is blank, and current-week future days are blank.
+  No visible Rest wording or question mark is displayed.
+  No future week rows extend the saved history window.
+  A vertical `rule` centres in a wider Sun/Week gap through each header and row;
   all eight read-only columns can shrink on narrow screens.
-  Full dates, today/current week, rest and known incomplete subtotals are announced accessibly.
+  Monday dates are small, top-left figures. Full dates, today/current week and rest are announced accessibly.
 - **Weekly** lifts selection to the host; a second tap clears the selected
-  row. No selected-week banner or visible Rest indicator is displayed.
-  Rest semantics remain in accessibility labels. Current and selected marks remain visible for zero/rest/unknown rows.
+  row. No selected-week banner, visible Rest indicator or question mark is displayed.
+  Rest/current semantics remain accessible; selected rows retain their caret, including zero/rest/unknown rows.
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -107,9 +110,9 @@ the current week when excluded and survives look-back edits while in range.
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
-- **Weekly current and selected differ**: the current week is a 1px
-  `ink` ring, the selected row a 2px `ink` border with the selected
-  accessibility state and a filled `ink` caret. Daily tiles have neither mark.
+- **No black outlines:** current and selected tiles/bars have no black border.
+  Weekly selection retains its accessible state and filled `ink` caret.
+  Current-week wording remains beside its row.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history sheet keeps both views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
@@ -123,8 +126,9 @@ the current week when excluded and survives look-back edits while in range.
 - Weekly references use discrete vertical dashes on the same zero-based scale
   as the bars. At least six known training weeks among the latest twelve are
   required; an all-zero scale has no reference. Numeric labels use whole
-  Volume or the canonical one-decimal formatter for 1RM/Top weight; row values
-  retain the selected metric format. Each reference label occupies its own line,
-  so coincident references keep their exact positions and all labels stay readable.
-- Daily and Weekly share title typography, with no metric subtitle.
-  Current-week wording stays beside its row.
+  Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
+  retain the selected metric format. Axis marks announce each reference and value
+  accessibly, including coincident references; no visible label stack is drawn.
+- Daily and Weekly share title typography. Window/Metric captions, metric
+  subtitles and visible P5/Median/P95 labels are omitted. Selected metric controls
+  use fixed black `selection` with white `surface` labels in every theme.
