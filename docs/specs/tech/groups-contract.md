@@ -261,15 +261,14 @@ converges.
 
 ## Certification
 
-Attests the raw synced values of a record set (a current All entry or a
-non-voided record), by a current member other than the lifter, on an
-unarchived exercise. One witness per set (P10), a row per current score under
-one public id, so the set counts on every Certified board. Certify takes any
-score's token and checks every score's live fingerprint (`CONFLICT`); a repeat
-returns the witness (`created: false`). Ending any row ends the witness. Only
-the certifier withdraws; owners and admins cancel; both are idempotent. Ended
-rows never reopen, and undelete revives nothing. Writers: the RPCs and the
-apply, never a Sync v2 trigger.
+Implements [[groups.certification]]: attests the raw synced values of a
+record set (a current All entry or a non-voided record) on an unarchived
+exercise, stored as a row per current score under one public id. Certify takes
+any score's token and checks every score's live fingerprint (`CONFLICT`); a
+repeat returns it (`created: false`). Ending any row ends them all. Only the
+certifier withdraws; owners and admins cancel; both are idempotent. Ended rows
+never reopen, and undelete revives nothing. Writers: the RPCs and the apply,
+never a Sync v2 trigger.
 
 ## Comparisons (bodyweight-aware)
 

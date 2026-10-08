@@ -117,7 +117,8 @@ instant and kg, not a rounded score or bookkeeping clock. An authoritative
 change ends each already-bound dependent projection (`voided`), recomputes All
 when eligible and removes Certified eligibility. Keep original audit and append
 terminal metadata. Restore never reopens an ended projection; a new witness is
-needed. A witness is one per set: ending any of its projections ends it.
+needed. A witness is the set's ([[groups.certification]]): ending any of its
+projections ends it.
 
 Value/date edits, delete/invalid input with fallback or missing context, winning
 backdated/restore/equal-time ID selection changes all follow this rule. Losing,
@@ -144,9 +145,9 @@ corrections are never blessed with today's reading. A legacy kg certification is
 imported the same way while its comparison is live and its member active;
 archived and departed ones wait for unarchive or rejoin.
 
-Several witnesses of one set were merged into the earliest (the others ended,
-their audit kept), and every surviving witness gained a projection on each
-current score it lacked. Preserve original raw legacy rows and ended audit
+Several witnesses of one set were merged as [[groups.certification]] records
+(ended ones keep their audit), and every surviving witness gained a
+projection on each current score it lacked. Preserve original raw legacy rows and ended audit
 throughout. Certifications are metric projections of a witnessed single set,
 not aggregate attestations.
 
