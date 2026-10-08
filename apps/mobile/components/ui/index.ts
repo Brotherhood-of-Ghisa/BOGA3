@@ -37,6 +37,7 @@ export {
   type SegmentedControlProps,
 } from '@/components/ui/segmented-control';
 export { Sheet, type SheetProps } from '@/components/ui/sheet';
+export { SwitchRow, type SwitchRowProps } from '@/components/ui/switch-row';
 export {
   Stat,
   type StatEmphasis,

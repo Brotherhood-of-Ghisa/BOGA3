@@ -23,9 +23,10 @@ purpose, in its own PR.
 | `copy` | `copy.md` | Words on screen: titles, subtitles, explanations |
 | `comparison` | `comparison.md` | Which periods are compared and how a change between them is shown |
 | `notifications` | `notifications.md` | Group workout alerts, recipients, defaults, batching and freshness |
+| `session` | `session.md` | How the completed session history is grouped and shown |
 | `groups` | `groups.md` | Group competition: what certification covers and how it ends |
 
-Not yet here: volume totals, records, sessions, bodyweight, groups-only
+Not yet here: volume totals, records, session counts, bodyweight, groups-only
 scoring. Until they move in, `docs/specs/tech/training-metrics-contract.md`
 owns them.
 

@@ -38,7 +38,6 @@ export {
 } from './local-gyms';
 export {
   calculateSessionDurationSec,
-  appendCompletedSessionAsPlanned,
   completeSessionDraft,
   createDrizzleSessionDraftStore,
   createSessionDraftRepository,
@@ -50,8 +49,6 @@ export {
   reopenCompletedSessionDraft,
   type CompleteSessionOptions,
   type CompleteSessionResult,
-  type AppendCompletedSessionAsPlannedOptions,
-  type AppendCompletedSessionAsPlannedResult,
   type CompletedSessionAnalysisRecord,
   type ListCompletedSessionsOptions,
   type PersistCompletedSessionInput,

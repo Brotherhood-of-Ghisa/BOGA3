@@ -6,13 +6,13 @@
 
 import {
   CHART_RIGHT_GUTTER,
-  formatLatestFigures,
+  formatSessionSummaryFigures,
   formatPacePhrase,
   formatPersonalRecordLead,
   formatSignedCount,
   formatWeekRange,
-  latestRecordLine,
-  latestSessionAccessibilityLabel,
+  sessionSummaryRecordLine,
+  sessionSummaryAccessibilityLabel,
   monthChartAccessibilityLabel,
   monthChartGeometry,
   paceDifference,
@@ -213,18 +213,18 @@ describe('the month chart geometry', () => {
 
 describe('the latest session row', () => {
   it('says its figures and its whole summary', () => {
-    expect(formatLatestFigures(latest())).toBe('12 sets · 4 exercises');
-    expect(formatLatestFigures(latest({ exerciseCount: 1 }))).toBe('12 sets · 1 exercise');
-    expect(latestSessionAccessibilityLabel(latest())).toBe(
+    expect(formatSessionSummaryFigures(latest())).toBe('12 sets · 4 exercises');
+    expect(formatSessionSummaryFigures(latest({ exerciseCount: 1 }))).toBe('12 sets · 1 exercise');
+    expect(sessionSummaryAccessibilityLabel(latest())).toBe(
       'Completed session on 10/15 07:12, 1h 5m, 12 sets, 4 exercises, at Canal Street Gym, 2 PRs',
     );
   });
 
   it('leaves out a missing gym and a session without PRs', () => {
-    expect(latestSessionAccessibilityLabel(latest({ gymName: '  ', records: [], workingSets: 1, exerciseCount: 1 }))).toBe(
+    expect(sessionSummaryAccessibilityLabel(latest({ gymName: '  ', records: [], workingSets: 1, exerciseCount: 1 }))).toBe(
       'Completed session on 10/15 07:12, 1h 5m, 1 set, 1 exercise',
     );
-    expect(latestSessionAccessibilityLabel(latest({ gymName: null, records: [BENCH_1RM] })))
+    expect(sessionSummaryAccessibilityLabel(latest({ gymName: null, records: [BENCH_1RM] })))
       .toContain('4 exercises, Bench Press 1RM 102.5 · PR');
   });
 });
@@ -239,10 +239,10 @@ describe("the latest session's PRs", () => {
   });
 
   it('names one PR and only counts several, one per record kind', () => {
-    expect(latestRecordLine(latest({ records: [] }))).toBeNull();
-    expect(latestRecordLine(latest({ records: [BENCH_WEIGHT] })))
+    expect(sessionSummaryRecordLine(latest({ records: [] }))).toBeNull();
+    expect(sessionSummaryRecordLine(latest({ records: [BENCH_WEIGHT] })))
       .toEqual({ kind: 'one', lead: 'Bench Press Weight 90.0 × 5', note: 'PR' });
     // One exercise taking 1RM and Weight is two PRs.
-    expect(latestRecordLine(latest())).toEqual({ kind: 'many', count: '2 PRs' });
+    expect(sessionSummaryRecordLine(latest())).toEqual({ kind: 'many', count: '2 PRs' });
   });
 });

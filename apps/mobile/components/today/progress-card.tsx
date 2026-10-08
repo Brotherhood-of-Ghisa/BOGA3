@@ -8,10 +8,10 @@ import { formatMonthDayTime } from '@/src/utils/local-time';
 
 import { MonthPace } from './month-pace';
 import {
-  formatLatestDuration,
-  formatLatestFigures,
-  latestRecordLine,
-  latestSessionAccessibilityLabel,
+  formatSessionSummaryDuration,
+  formatSessionSummaryFigures,
+  sessionSummaryRecordLine,
+  sessionSummaryAccessibilityLabel,
 } from './progress-format';
 import { SessionSummaryRow } from './session-summary-row';
 import { todayText } from './text-styles';
@@ -31,12 +31,12 @@ function LatestSessionRow({ latest, onPress }: { latest: LatestSessionSummary; o
   return (
     <SessionSummaryRow
       accessibilityHint="Opens the completed session"
-      accessibilityLabel={latestSessionAccessibilityLabel(latest)}
-      duration={formatLatestDuration(latest)}
-      figures={formatLatestFigures(latest)}
+      accessibilityLabel={sessionSummaryAccessibilityLabel(latest)}
+      duration={formatSessionSummaryDuration(latest)}
+      figures={formatSessionSummaryFigures(latest)}
       gym={latest.gymName}
       onPress={onPress}
-      record={latestRecordLine(latest)}
+      record={sessionSummaryRecordLine(latest)}
       stamp={formatMonthDayTime(latest.startedAt.getTime())}
       testID="today-latest-session"
     />
