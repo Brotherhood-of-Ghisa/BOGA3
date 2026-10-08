@@ -67,15 +67,16 @@ everything outside these changes. Native screenshots are comparison evidence.
 - Preserve the virtualized newest-first list, selection toggling and current
   week semantics without borders.
 
-## Reference calculation defaults
+## Reference calculations
 
-Known training weeks among the most recent twelve calendar weeks of the saved
-history window form the reference population. Require six eligible weeks and a
-positive window maximum. Include genuine zeros; exclude rest, future and unknown
-values. All-zero and sparse histories omit references. Reuse
-`calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`
-on a sorted copy for P50/P5/P95; no new statistics dependency. These population
-defaults remain unchanged unless the operator requests another baseline.
+Known training weeks across the complete History look-back (weeks) setting form
+the reference population. Calculations and displayed weeks use the same saved,
+Monday-aligned window; no independent twelve-week cap. Accessible reference labels
+name that window accurately. Require six eligible weeks and a positive window
+maximum. Include genuine zeros; exclude rest, future and unknown values. All-zero
+and sparse histories omit references. Reuse `calculateLinearPercentile` in
+`apps/mobile/src/session-insights/calculations.ts` on a sorted copy for P50/P5/P95;
+no new statistics dependency.
 
 ## UX contract
 
@@ -84,7 +85,7 @@ defaults remain unchanged unless the operator requests another baseline.
 | Compare Progress | Open Progress; change period/metric; expand contributions | Neutral rows, black/white active filters, separate name and chevron actions | Zero/previous-only, loading/error, long figures and narrow rows preserve meaning |
 | Inspect Daily | Set Daily in Settings; open either history; choose every metric | No subtitles, wider centred Sun/Week rule, small top-left Monday dates, bounded weeks | Partial months, year boundaries, blank rest/unavailable/future and genuine zero remain accessible |
 | Inspect Weekly | Set Weekly in Settings; open either history; choose every metric and select rows | No banner/subtitles/black outlines; Sets median only, other metrics three lines; selection caret | Blank rest/unavailable values, sparse/zero/coincident references, long windows and narrow screens remain usable |
-| Change history window | Change History look-back (weeks) while history is open or reopen it | Read and displayed week bounds follow the saved setting | Old out-of-range figures disappear; current-week future days remain blank |
+| Change history window | Change History look-back (weeks) while history is open or reopen it | Read, displayed weeks and median/percentile calculations follow the same saved setting | Old out-of-range figures disappear; current-week future days remain blank |
 | Human review | Agent commits and supplies worktree/native preview; operator tests both views | Explicit human-testing-complete confirmation precedes automated validation | Human review pending; automated tests not run; requested UI fixes precede gates |
 
 No new chart framework, dependency, durable preference or Maestro flow.
@@ -97,7 +98,8 @@ No new chart framework, dependency, durable preference or Maestro flow.
   rules. Load `docs/specs/README.md` before persistent documentation edits.
 - Read `apps/mobile/__tests__/README.md` and writing-tests before editing tests.
   Extend existing calendar/Weekly/marks/real-data Progress suites and theme/control
-  coverage for bounds, references, removed copy/borders and fixed active colours.
+  coverage for full-window bounds/references, window changes, omitted references,
+  removed copy/borders and fixed active colours.
   Author tests now; execute none before human testing is complete.
 - Commit locally with test hooks disabled. Starting the app and manual native
   captures and publishing the branch are authorized. No Jest, Maestro, quality
@@ -117,6 +119,7 @@ No new chart framework, dependency, durable preference or Maestro flow.
 - `./boga doctor` passed. Regression tests are authored; **human review pending;
   automated tests not run**. Branch publication is authorized; no quality gates
   or PR yet.
+- Calculations and displayed weeks use the complete saved History look-back.
 - Implementation is ready for human testing. Manual native captures in ignored
   `apps/mobile/artifacts/heatmap-ui/revised/` cover both history kinds/all metrics
   at 402pt, plus 375pt, one-/four-week bounds, selected, sparse, zero and

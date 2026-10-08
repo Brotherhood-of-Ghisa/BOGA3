@@ -1,6 +1,6 @@
 // Newest-first weekly rows. Length uses a shared zero origin; colour retains
 // the adapter's independent intensity/target meaning. Known training weeks
-// supply percentile references; rest/unknown values stay blank and selection marks only its row.
+// across the saved history window supply references; rest/unknown values stay blank.
 import React, { useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -85,8 +85,8 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
   // The adapter is chronological; reverse only the displayed copy.
   const weeks = useMemo(() => [...data.weekly].reverse(), [data.weekly]);
   const max = data.weekly.reduce((largest, week) => week.unavailable ? largest : Math.max(largest, week.value), 0);
-  const recent = data.weekly.slice(-12).filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
-  const values = recent.map(week => week.value).sort((a, b) => a - b);
+  const trainingWeeks = data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
+  const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
   // Six genuine zeros are observations; an all-zero scale has no reference.
   const references: Reference[] = values.length >= 6 && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metricLabel !== 'Sets' || id === 'median').map(([id, label, percentile]) => {
@@ -109,7 +109,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
           {(max > 0 ? [0, 0.5, 1] : [0]).map(fraction => <Text key={fraction} allowFontScaling={false} style={[styles.axisLabel, { textAlign: fraction === 0 ? 'left' : fraction === 1 ? 'right' : 'center' }]}>{formatValue(max * fraction)}</Text>)}
           {references.map(reference => <View key={reference.id} testID={`${testID}-${reference.id}`}
             accessible accessibilityRole="text"
-            accessibilityLabel={`12-week ${reference.label === 'Median' ? 'median' : reference.label === 'P5' ? '5th percentile' : '95th percentile'} ${reference.value}`}
+            accessibilityLabel={`${data.weekly.length}-week ${reference.label === 'Median' ? 'median' : reference.label === 'P5' ? '5th percentile' : '95th percentile'} ${reference.value}`}
             style={[styles.axisReference, { left: `${reference.position}%` }]} />)}
         </View>
         <View style={{ width: valueWidth }} />

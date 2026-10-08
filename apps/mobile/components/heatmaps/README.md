@@ -52,7 +52,7 @@ Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
 unknown load never gets a filled length; rest and unknown values are blank, and known zero reads `0`.
 Sets uses median only; other metrics use median, P5 and P95 from known training weeks
-(including zeros) among the latest twelve calendar weeks; rest, future and
+(including zeros) across the full saved history window; rest, future and
 unavailable weeks do not contribute. A Volume sum that is not finite is never
 plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
 Daily retains a neutral dashed rule.
@@ -124,11 +124,12 @@ the current week when excluded and survives look-back edits while in range.
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
 - Weekly references use discrete vertical dashes on the same zero-based scale
-  as the bars. At least six known training weeks among the latest twelve are
+  as the bars. At least six known training weeks within the saved history are
   required; an all-zero scale has no reference. Numeric labels use whole
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
-  retain the selected metric format. Axis marks announce each reference and value
-  accessibly, including coincident references; no visible label stack is drawn.
+  retain the selected metric format. Axis marks announce the saved window, each
+  reference and value accessibly, including coincident references; no visible
+  label stack is drawn. References and displayed weeks use the same look-back.
 - Daily and Weekly share title typography. Window/Metric captions, metric
   subtitles and visible P5/Median/P95 labels are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.
