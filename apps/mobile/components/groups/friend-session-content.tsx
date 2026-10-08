@@ -13,20 +13,20 @@ import {
 } from '@/src/groups/competition-session-records-view-model';
 import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
 import type { CompetitionSessionRecordWire, CompetitionSessionWire } from '@/src/groups/competition-wire';
-import {
-  formatGroupDateTime,
-  formatSessionStatusLabel,
-} from '@/src/groups';
+import { formatGroupDateTime } from '@/src/groups';
+import { formatGroupSessionDuration } from '@/src/groups/competition-session-records-view-model';
 
 import { GroupSessionRecordsCard } from './group-session-records-card';
 
-const IN_PROGRESS_LABEL = 'In progress';
+const STATUS_LABELS = { active: 'In progress', draft: 'Draft' } as const;
 
 const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
 
 /**
  * The group session body, in the design language and on the cards View
- * Session uses (`components/session-detail/`): the session's status and facts,
+ * Session uses (`components/session-detail/`): an `In progress` mark while it
+ * runs, View Session's facts card (Start, Duration — elapsed while it runs —
+ * Gym, Ex, Sets, Volume),
  * the Group records card, then one card per exercise with its performed sets
  * as `type · weight × reps · 1RM · VOL` and a `#1 in group` band on the set
  * that took a group record. Who and when are the screen title's. Read-only for
@@ -52,10 +52,15 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
     return { rows: buildSessionRecordRows({ records: shown, places, groupId, userId }), bands: buildSessionRecordBands(shown, places) };
   }, [session, records, model.cards, groupId, userId]);
 
-  const isActive = session.status === 'active';
-
   return (
     <>
+      {session.status === 'completed' ? null : (
+        // A ring marks "current" in the design language (§5).
+        <View style={styles.status} testID="group-session-status-row">
+          {session.status === 'active' ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
+          <Text allowFontScaling={false} style={styles.statusText} testID="group-session-status">{STATUS_LABELS[session.status]}</Text>
+        </View>
+      )}
       <SessionFactsCard
         facts={[
           { label: 'Gym', value: session.gym_name?.trim() || 'No gym', kind: 'text', testID: 'group-session-gym' },
@@ -63,21 +68,10 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
           { label: 'Sets', value: String(model.setCount), testID: 'group-session-sets' },
           { label: 'Volume', value: model.volume, align: 'end', testID: 'group-session-volume' },
         ]}
-        header={
-          <View style={styles.header} testID="group-session-header">
-            <View style={styles.status}>
-              {/* A ring marks "current" in the design language (§5). */}
-              {isActive ? <Icon color={uiRoles.accent} name="set-current" size="xs" /> : null}
-              <Text allowFontScaling={false} style={styles.statusText} testID="group-session-status">
-                {isActive ? IN_PROGRESS_LABEL : session.status === 'draft' ? 'Draft' : formatSessionStatusLabel({ ...session,status: session.status })}
-              </Text>
-            </View>
-          </View>
-        }
         testID="group-session-summary"
         times={{
           start: formatGroupDateTime(session.started_at_ms),
-          end: session.completed_at_ms === null ? '—' : formatGroupDateTime(session.completed_at_ms),
+          duration: formatGroupSessionDuration(session),
           testID: 'group-session-times',
         }}
       />
@@ -106,11 +100,6 @@ export function FriendSessionContent({ session, records, groupId, userId, myRole
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.md,
-    gap: uiSpace.xs,
-  },
   status: {
     flexDirection: 'row',
     alignItems: 'center',

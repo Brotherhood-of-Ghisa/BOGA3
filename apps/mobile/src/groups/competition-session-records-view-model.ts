@@ -1,6 +1,7 @@
 // The group session view's records, as plain data: the Group records card's
 // rows (one per #1 board), each exercise card's record band (one line per
 // record set), and the screen's title. No React, no I/O.
+import { formatCompactDuration } from '@/src/data/session-list';
 import type { RecordLine } from '@/src/session-insights/record-band';
 
 import { formatBoardDate, YOU_LABEL } from './board-view-model';
@@ -53,10 +54,23 @@ export function groupSessionTitle(session: Pick<CompetitionSessionWire, 'member'
 export const groupSessionEyebrow = (groupName: string | null): string =>
   groupName?.trim() ? `${groupName.trim()} · ${GROUP_VIEW_LABEL}` : `Group view`;
 
+/** View Session's Duration: the session's own once completed, else the time since it started. */
+export function formatGroupSessionDuration(session: Pick<CompetitionSessionWire, 'status' | 'started_at_ms' | 'completed_at_ms' | 'duration_sec'>,
+  nowMs = Date.now()): string {
+  if (session.status !== 'completed') return formatCompactDuration(Math.floor(Math.max(0, nowMs - session.started_at_ms) / 1000));
+  if (session.duration_sec !== null) return formatCompactDuration(session.duration_sec);
+  return session.completed_at_ms === null ? '—' : formatCompactDuration(Math.floor(Math.max(0, session.completed_at_ms - session.started_at_ms) / 1000));
+}
+
+/** Group competition no longer ranks Volume; only the boards it keeps show. */
+const SHOWN_BOARD = (metric: string): boolean => metric !== 'volume';
+
 /** Records only once the session is completed: an in-progress record can still move or vanish. */
 export const shownSessionRecords = (session: Pick<CompetitionSessionWire, 'status'>,
   records: readonly CompetitionSessionRecordWire[]): CompetitionSessionRecordWire[] =>
-  session.status === 'completed' ? records.filter(record => !record.event.provisional && !record.event.voided) : [];
+  session.status === 'completed' ? records.filter(record => !record.event.provisional && !record.event.voided)
+    .map(record => ({ ...record, boards: record.boards.filter(board => SHOWN_BOARD(board.metric)) }))
+    .filter(record => record.boards.length > 0) : [];
 
 type SetPlace = { figure: string; cardId: string; order: number };
 

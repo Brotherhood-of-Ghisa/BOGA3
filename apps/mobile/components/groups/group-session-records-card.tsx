@@ -24,9 +24,9 @@ type CardProps = {
 
 /**
  * The group session view's Group records: one row per board the session took
- * #1 on, its value as the record set it, and its certification now. A row
- * opens that board; a co-member certifies in one tap and the witness withdraws
- * (confirmed), both the same outline button. The lifter sees the status only.
+ * #1 on, its value as the record set it, and its certification now. A row's
+ * text opens that board; a co-member certifies in one tap and the witness withdraws
+ * (confirmed), both the same compact outline button. The lifter sees the status only.
  * Nothing renders without a row.
  */
 export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
@@ -42,7 +42,7 @@ export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
   );
 }
 
-// The link (title, value, detail, chevron) and the certification line are
+// The link (title, value, detail) and the certification line are
 // siblings: a button inside the link would hand a disabled tap to the link, and
 // one accessible link would hide the status and the button from VoiceOver.
 function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps, 'rows'>) {
@@ -64,7 +64,6 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
           </View>
           <Text allowFontScaling={false} style={styles.detail} testID={`${testID}-detail`}>{row.detail}</Text>
         </View>
-        <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
       </Pressable>
       {row.certification ? <RecordCertification certification={row.certification} testID={testID} {...rest} /> : null}
     </View>
@@ -103,6 +102,7 @@ function RecordCertification({ certification, testID, groupId, userId, myRole, o
             disabled={model.blocked}
             label={action.label}
             onPress={action.onPress}
+            size="compact"
             testID={`${testID}-${action.label.toLowerCase()}`}
             variant="outline"
           />
@@ -198,8 +198,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
-    // Under the link's text, clear of its chevron.
-    paddingRight: uiSpace.lg + uiSpace.sm,
   },
   status: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 export {
   ActionButton,
   type ActionButtonProps,
+  type ActionButtonSize,
   type ActionButtonTone,
   type ActionButtonVariant,
 } from '@/components/ui/action-button';
