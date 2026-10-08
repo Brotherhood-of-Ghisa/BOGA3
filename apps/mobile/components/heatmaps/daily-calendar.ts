@@ -44,8 +44,8 @@ export function buildCalendarMonths(data: HeatmapData): CalendarMonth[] {
     const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
     const rows: CalendarWeek[] = [];
     for (let row = monday(start); row <= end && key(row) <= data.todayDateKey; row = addDays(row, 7)) {
-      // Retain a partial first row's sampled days. Only the current week
-      // keeps blank future day placeholders.
+      // Retain a partial first row's sampled days. Future positions remain
+      // calendar metadata; the renderer leaves them as empty spacers.
       const sundayKey = key(addDays(row, 6));
       if (sundayKey < firstKey) continue;
       const rowDays = Array.from({ length: 7 }, (_, index) => {

@@ -1,8 +1,8 @@
 // Months and their week rows run newest first; each month shows only its own
 // day tiles. Week totals require seven sampled days, including rest days
 // across month boundaries, and appear beside an in-month Sunday once it arrives.
-// The host owns scrolling;
-// rest/future/unknown figures stay blank, and known zero stays numeric.
+// Future days are empty spacers. The host owns scrolling; rest and unknown
+// figures stay blank, and known zero stays numeric.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -27,7 +27,7 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
   data: HeatmapData; metricLabel: string; formatValue: Props['formatValue']; testID: string; gap: number;
 }) {
   return <View style={[styles.row, { gap }]}>
-    {row.days.map((day, index) => day.inMonth && (day.day || day.future) ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={day.dateKey}
+    {row.days.map((day, index) => day.inMonth && day.day && !day.future ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={day.dateKey}
       mondayDate={index === 0 ? day.dayOfMonth : undefined} future={day.future}
       current={!!day.day?.isToday}
       metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}

@@ -28,7 +28,7 @@ it('orders months and their own-day rows newest first, with eight headers and Mo
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05-date')).toHaveTextContent('5');
   expect(screen.queryByTestId('calendar-heatmap-cell-2026-10-06-date')).toBeNull();
   expect(october.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID)).toEqual(
-    [5, 6, 7, 8, 9, 10, 11, 1, 2, 3, 4].map(day => `calendar-heatmap-cell-2026-10-${String(day).padStart(2, '0')}`));
+    [5, 6, 1, 2, 3, 4].map(day => `calendar-heatmap-cell-2026-10-${String(day).padStart(2, '0')}`));
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
   expect(screen.UNSAFE_queryAllByType(ScrollView)).toEqual([]);
   expect(style('calendar-heatmap-cell-2026-10-05').minHeight).toBeGreaterThanOrEqual(uiGeometry.tapTarget);
@@ -80,9 +80,9 @@ it('leaves rest and unavailable figures blank, retains numeric zero and clips fu
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-03').props.accessibilityLabel).toBe('2026-10-03, Volume unavailable');
   expect(screen.queryByText(/incomplete/)).toBeNull();
   expect(style('calendar-heatmap-cell-2026-10-03').borderStyle).toBe('dashed');
-  const future = screen.getByLabelText('2026-10-07, Future, no observed value');
-  expect(future).toHaveProp('accessibilityRole', 'text');
-  expect(within(future).getByTestId(`${future.props.testID}-value`)).toHaveTextContent('', { exact: true });
+  expect(screen.queryByTestId('calendar-heatmap-cell-2026-10-07')).toBeNull();
+  expect(screen.queryByLabelText('2026-10-07, Future, no observed value')).toBeNull();
+  expect(style('calendar-heatmap-empty-2026-10-2026-10-07').backgroundColor).toBeUndefined();
   expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-12')).toBeNull();
 });
 
@@ -188,3 +188,18 @@ it('shows a cross-month total on Sunday with sampled rest days preceding the fir
   expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-09-28').props.accessibilityLabel).toContain('Current week');
   expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-28')).toBeNull();
 });
+
+it.each(['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'])(
+  'shows daily tiles only through today and a Week tile once Sunday arrives (%s)', date => {
+    const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: date, weeks: 1 });
+    render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+    expect(screen.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID))
+      .toEqual(data.daily.map(day => `calendar-heatmap-cell-${day.dateKey}`));
+    expect(screen.queryAllByLabelText(/Future/)).toEqual([]);
+    expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-05') !== null).toBe(date === '2026-10-11');
+    if (date < '2026-10-11') {
+      const empty = screen.getByTestId('calendar-heatmap-empty-2026-10-2026-10-11');
+      expect(StyleSheet.flatten(empty.props.style).backgroundColor).toBeUndefined();
+      expect(empty.props.accessibilityLabel).toBeUndefined();
+    }
+  });

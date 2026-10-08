@@ -91,8 +91,8 @@ Daily tiles are read-only; Weekly bars select a row:
   The complete adapter value/colour spans month boundaries.
   The current Week tile appears only on Sunday; rows whose Sunday is in the
   next month have no Week tile. Tiles are read-only, without selection or black
-  outlines. Rest and unknown load are blank, zero is numeric, and current-week
-  future days are blank.
+  outlines. Rest and unknown load are blank, and zero is numeric.
+  Future day positions are empty spacers with no tile or accessible day value.
   No visible Rest wording or question mark is displayed.
   No future week rows extend the saved history window.
   A vertical `rule` centres in a wider Sun/Week gap through each header and row;

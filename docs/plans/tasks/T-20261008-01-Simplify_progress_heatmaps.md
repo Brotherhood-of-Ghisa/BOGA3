@@ -38,8 +38,8 @@ everything outside these changes. Native screenshots are comparison evidence.
   selected states. Keep selection accessible and use the existing caret for
   the selected Weekly row. Neutral rules and unavailable-value styling remain.
 - Bound history to the History look-back (weeks) setting: no weeks before its
-  Monday-aligned start or after the current week. Current-week future day
-  placeholders are blank. Retain saved view/window, scrolling and calculations.
+  Monday-aligned start or after the current week. Future day positions have
+  no tiles. Retain saved view/window, scrolling and calculations.
 - Rest and unavailable values are blank in both Daily and Weekly, including
   the Daily Week column: no visible Rest wording, question mark or unavailable
   caption. Genuine zero training remains numeric. Preserve accurate accessible
@@ -61,6 +61,8 @@ everything outside these changes. Native screenshots are comparison evidence.
 - Display the current week's tile on Sunday when it meets that seven-day rule.
   Monday–Saturday have no current Week tile; rows ending outside the month
   also have none.
+- Never render future-day tiles, even as blank placeholders. Keep empty spacers
+  for weekday alignment; show daily tiles only through today.
 - Widen the Sun/Week gap and centre a continuous vertical rule in that gap,
   equally distant from Sun and Week, aligned through each month's header/rows.
   Keep all eight columns and Week figures readable at narrow widths.
@@ -96,9 +98,9 @@ no new statistics dependency.
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
 | Compare Progress | Open Progress; change period/metric; expand contributions | Neutral rows, black/white active filters, separate name and chevron actions | Zero/previous-only, loading/error, long figures and narrow rows preserve meaning |
-| Inspect Daily | Set Daily in Settings; open either history; choose every metric | Own-month days and rows newest first, seven-day Week totals beside Sunday, including today on Sunday, wider centred rule and small Monday dates | Partial months, year boundaries, blank rest/unavailable/future and genuine zero remain accessible |
+| Inspect Daily | Set Daily in Settings; open either history; choose every metric | Own-month days and rows newest first, seven-day Week totals beside Sunday, including today on Sunday, wider centred rule and small Monday dates | Partial months, year boundaries, rest/unavailable stay blank, future tiles are absent and genuine zero remains accessible |
 | Inspect Weekly | Set Weekly in Settings; open either history; choose every metric and select rows | No banner/subtitles/black outlines; Sets median only, other metrics three lines; selection caret | Blank rest/unavailable values, sparse/zero/coincident references, long windows and narrow screens remain usable |
-| Change history window | Change History look-back (weeks) while history is open or reopen it | Read, displayed weeks and median/percentile calculations follow the same saved setting | Old out-of-range figures disappear; current-week future days remain blank |
+| Change history window | Change History look-back (weeks) while history is open or reopen it | Read, displayed weeks and median/percentile calculations follow the same saved setting | Old out-of-range figures disappear; future day tiles remain absent |
 | Human review | Agent commits and supplies worktree/native preview; operator tests both views | Explicit human-testing-complete confirmation precedes automated validation | Human review pending; automated tests not run; requested UI fixes precede gates |
 
 No new chart framework, dependency, durable preference or Maestro flow.
@@ -113,7 +115,8 @@ No new chart framework, dependency, durable preference or Maestro flow.
   Extend existing calendar/Weekly/marks/real-data Progress suites and theme/control
   coverage for reversed month rows, unique day tiles, Sunday-only cross-month
   Week totals, first partial weeks, rest-day coverage, Sunday inclusion,
-  full-window bounds/references, window changes, omitted references, removed
+  absent future tiles, full-window bounds/references, window changes,
+  omitted references, removed
   copy/borders and fixed active colours.
   Author tests now; execute none before human testing is complete.
 - Commit locally with test hooks disabled. Starting the app and manual native
@@ -136,15 +139,16 @@ No new chart framework, dependency, durable preference or Maestro flow.
   or PR yet.
 - Calculations and displayed weeks use the complete saved History look-back.
 - Implementation is ready for human testing. Latest Daily native captures in
-  ignored `apps/mobile/artifacts/heatmap-ui/sample-weeks/` cover both history
-  kinds and all metrics at 402pt: seven sampled dates across September/October
-  produce the full total on Sunday, including Monday's rest before the first
-  Tuesday workout. A sample beginning Tuesday keeps its six daily tiles and
-  omits the Week tile. Saturday omits the current Week tile. Own-month day tiles
-  are unique and rows run newest first. Weekly captures in
-  `apps/mobile/artifacts/heatmap-ui/revised/` cover selected, sparse, zero and
-  coincident references. Rest and unavailable figures are blank in both views.
-  The temporary capture host and small simulator have been removed.
+  ignored `apps/mobile/artifacts/heatmap-ui/no-future-days/` cover exercise
+  Volume and muscle Sets at 402pt: Saturday October 3 has no Sunday day tile
+  and no current Week tile; Sunday October 4 has its day tile and the full
+  September 28–October 4 Week total, counting sampled rest days. Own-month day
+  tiles are unique, rows run newest first, and future day positions are empty
+  spacers. Partial first samples retain their daily tiles without a Week tile.
+  Weekly captures in `apps/mobile/artifacts/heatmap-ui/revised/` cover selected,
+  sparse, zero and coincident references. Rest and unavailable figures are
+  blank in both views. The temporary capture host and small simulator have
+  been removed.
 
 Next: human testing of the committed native preview. Automated validation starts
 only after the operator explicitly confirms that human testing is complete.
