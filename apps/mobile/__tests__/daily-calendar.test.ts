@@ -85,15 +85,15 @@ it.each([1, 4, 52, 104])('keeps rows and unique completed Week tiles inside the 
   const rows = buildCalendarMonths(data).flatMap(month => month.weeks);
   expect([...new Set(rows.map(row => row.weekStartDateKey))].sort()).toEqual(data.weekly.map(week => week.weekStartDateKey));
   const displayed = rows.filter(row => row.week).map(row => row.weekStartDateKey).sort();
-  const firstRecordedKey = data.daily.find(day => day.hasTraining)!.dateKey;
-  expect(displayed).toEqual(data.weekly.filter(week => !week.isCurrentWeek && week.weekStartDateKey >= firstRecordedKey)
+  expect(displayed).toEqual(data.weekly.filter(week => !week.isCurrentWeek)
     .map(week => week.weekStartDateKey));
 });
 
 it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
-  'omits the first partial %s week and counts rest days in subsequent seven-day weeks', metric => {
+  'keeps a partial first sample week without its %s Week tile and counts subsequent rest days', metric => {
     const data = buildHeatmapData([source('2026-09-29', 100), source('2026-10-05', 200)],
       metric, { todayDateKey: '2026-10-11', weeks: 3 });
+    data.daily = data.daily.filter(day => day.dateKey >= '2026-09-29');
     const months = buildCalendarMonths(data);
     expect(months[0].weeks[1].week).toBeUndefined();
     expect(months[1].weeks[0].days[1].day?.value).toBe(100);
@@ -101,16 +101,29 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
     expect(months[0].weeks[0].week?.sessions).toBe(1);
   });
 
-it('counts rest days from a Monday workout, including across months, but rejects any absent calendar day', () => {
+it('checks all seven dates across months and rejects any absent calendar day', () => {
   const data = buildHeatmapData([source('2026-09-28', 100)], 'totalVolume', { todayDateKey: '2026-10-04', weeks: 1 });
   expect(buildCalendarMonths(data)[0].weeks[0].week).toBe(data.weekly[0]);
   data.daily = data.daily.filter(day => day.dateKey !== '2026-10-01');
   expect(buildCalendarMonths(data)[0].weeks[0].week).toBeUndefined();
 });
 
-it('does not invent Week coverage before any recorded workout, or for a first workout on Sunday', () => {
+it('counts sampled rest days even before the first workout or throughout a rest week', () => {
   for (const input of [[], [source('2026-10-11', 100)]]) {
     const data = buildHeatmapData(input, 'totalVolume', { todayDateKey: '2026-10-11', weeks: 2 });
-    expect(buildCalendarMonths(data).flatMap(month => month.weeks).every(row => row.week === undefined)).toBe(true);
+    const displayed = buildCalendarMonths(data).flatMap(month => month.weeks)
+      .filter(row => row.week).map(row => row.weekStartDateKey).sort();
+    expect(displayed).toEqual(data.weekly.map(week => week.weekStartDateKey));
   }
 });
+
+it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
+  'includes a cross-month %s week on Sunday when Monday is sampled rest before the first workout', metric => {
+    const data = buildHeatmapData([source('2026-09-29', 100), source('2026-10-04', 200)],
+      metric, { todayDateKey: '2026-10-04', weeks: 1 });
+    const months = buildCalendarMonths(data);
+    expect(data.daily[0]).toMatchObject({ dateKey: '2026-09-28', hasTraining: false });
+    expect(months[0].weeks[0].week).toBe(data.weekly[0]);
+    expect(months[0].weeks[0].week?.value).toBe(metric === 'totalVolume' || metric === 'workingSetCount' ? 300 : 200);
+    expect(months[1].weeks[0].week).toBeUndefined();
+  });

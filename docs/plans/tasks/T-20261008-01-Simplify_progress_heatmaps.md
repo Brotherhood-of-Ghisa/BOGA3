@@ -52,10 +52,12 @@ everything outside these changes. Native screenshots are comparison evidence.
   the top row (current month remains clipped to the saved window/current week).
 - Render only each month's own day tiles. Positions belonging to adjoining
   months are empty spacers, with no tile or duplicated day/date/value.
-- Show a Week tile beside an in-month Sunday only when all seven calendar
-  days are covered from the first recorded workout onwards. Rest days count;
-  a partial first week or a missing day has no Week tile. Use the entire
-  Monday–Sunday week's value and colour, including preceding-month days.
+- Show a Week tile beside an in-month Sunday only when all seven Monday–Sunday
+  dates are present in the full data sample. Rest days and preceding-month days
+  count. Eligibility depends on sample coverage, irrespective of the first
+  recorded workout date. A partial first sample week or any missing day has no
+  Week tile, while its sampled daily tiles remain. Use the entire week's value
+  and colour across month boundaries.
 - Display the current week's tile on Sunday when it meets that seven-day rule.
   Monday–Saturday have no current Week tile; rows ending outside the month
   also have none.
@@ -134,11 +136,12 @@ No new chart framework, dependency, durable preference or Maestro flow.
   or PR yet.
 - Calculations and displayed weeks use the complete saved History look-back.
 - Implementation is ready for human testing. Latest Daily native captures in
-  ignored `apps/mobile/artifacts/heatmap-ui/complete-weeks/` cover both history
-  kinds and all metrics at 402pt: a first Tuesday leaves its partial Week tile
-  empty, a full Sunday week counts rest days, a Monday start retains the full
-  cross-month total, and Saturday omits the current Week tile. Own-month day
-  tiles are unique and rows run newest first. Weekly captures in
+  ignored `apps/mobile/artifacts/heatmap-ui/sample-weeks/` cover both history
+  kinds and all metrics at 402pt: seven sampled dates across September/October
+  produce the full total on Sunday, including Monday's rest before the first
+  Tuesday workout. A sample beginning Tuesday keeps its six daily tiles and
+  omits the Week tile. Saturday omits the current Week tile. Own-month day tiles
+  are unique and rows run newest first. Weekly captures in
   `apps/mobile/artifacts/heatmap-ui/revised/` cover selected, sparse, zero and
   coincident references. Rest and unavailable figures are blank in both views.
   The temporary capture host and small simulator have been removed.

@@ -111,11 +111,13 @@ it.each(['2026-10-10', '2026-10-11', '2026-10-12'])('adds a seven-day Week tile 
   }
 });
 
-it('keeps daily figures but omits a first partial Week tile, then includes a Sunday week with rest days', () => {
+it('keeps a partial first sample row without a Week tile, then includes a Sunday week with rest days', () => {
   const data = buildHeatmapData([sample('2026-09-29', 100), sample('2026-10-05', 200)],
     'totalVolume', { todayDateKey: '2026-10-11', weeks: 3 });
+  data.daily = data.daily.filter(day => day.dateKey >= '2026-09-29');
   render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
   expect(screen.getByTestId('calendar-heatmap-cell-2026-09-29-value')).toHaveTextContent('100');
+  expect(screen.queryByTestId('calendar-heatmap-cell-2026-09-28')).toBeNull();
   expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-09-28')).toBeNull();
   expect(style('calendar-heatmap-empty-week-2026-10-2026-09-28').backgroundColor).toBeUndefined();
   expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-21')).toBeNull();
@@ -175,4 +177,14 @@ it.each([320, 375, 402])('centres the Sun/Week separator in a wider gap at %ipt'
   const date = style('calendar-heatmap-cell-2026-10-05-date');
   expect(date).toMatchObject({ position: 'absolute', top: uiBorder.width, left: uiBorder.width, fontSize: uiTypography.size.xxs });
   expect(date.fontSize).toBeLessThan(style('calendar-heatmap-cell-2026-10-05-value').fontSize);
+});
+
+it('shows a cross-month total on Sunday with sampled rest days preceding the first workout', () => {
+  const data = buildHeatmapData([sample('2026-09-29', 100), sample('2026-10-04', 200)],
+    'totalVolume', { todayDateKey: '2026-10-04', weeks: 1 });
+  render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+  expect(screen.getByTestId('calendar-heatmap-cell-2026-09-28-value')).toHaveTextContent('', { exact: true });
+  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-09-28-value')).toHaveTextContent('300');
+  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-09-28').props.accessibilityLabel).toContain('Current week');
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-28')).toBeNull();
 });
