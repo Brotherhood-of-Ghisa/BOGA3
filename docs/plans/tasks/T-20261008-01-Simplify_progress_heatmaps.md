@@ -100,7 +100,8 @@ No new chart framework, dependency, durable preference or Maestro flow.
   coverage for bounds, references, removed copy/borders and fixed active colours.
   Author tests now; execute none before human testing is complete.
 - Commit locally with test hooks disabled. Starting the app and manual native
-  captures are allowed. No Jest, Maestro, quality lane, sweep, push or PR yet.
+  captures and publishing the branch are authorized. No Jest, Maestro, quality
+  lane, sweep or PR before human testing is complete.
 - After explicit human-testing-complete confirmation: run `./boga test for`,
   propose the smallest lane set and agree lanes beyond fast. Fast is mandatory;
   jest-coverage, complexity and dependencies must pass before PR, together with
@@ -114,7 +115,8 @@ No new chart framework, dependency, durable preference or Maestro flow.
 - Slot 29; simulator `BOGA wt29`; Metro 8111. Run `./boga ios start` there for
   the native preview. Existing development data is seeded on that simulator.
 - `./boga doctor` passed. Regression tests are authored; **human review pending;
-  automated tests not run**. No quality gates, push or PR yet.
+  automated tests not run**. Branch publication is authorized; no quality gates
+  or PR yet.
 - Implementation is ready for human testing. Manual native captures in ignored
   `apps/mobile/artifacts/heatmap-ui/revised/` cover both history kinds/all metrics
   at 402pt, plus 375pt, one-/four-week bounds, selected, sparse, zero and
