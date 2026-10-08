@@ -332,7 +332,7 @@ export function StatsScreenShell({
       <View style={styles.controls} testID="stats-controls">
         <View testID="stats-view-switch">
           <SegmentedControl accessibilityLabel="Select stats breakdown" options={VIEW_MODE_OPTIONS}
-            value={viewMode} onChange={onSelectViewMode} selectedGround="viz" testIDPrefix="stats-view-mode-chip" />
+            value={viewMode} onChange={onSelectViewMode} selectedGround="selection" testIDPrefix="stats-view-mode-chip" />
         </View>
         <SegmentedControl
           accessibilityLabel="Select stats time range"
@@ -340,11 +340,11 @@ export function StatsScreenShell({
             { value: targetWindowWeeks * 7, label: `${targetWindowWeeks} weeks` }, { value: 7, label: 'This week' }])
             .map(option => ({ ...option, accessibilityLabel:
               `${option.label}, ${formatPeriodComparison(option.value)}, same elapsed calendar span` }))}
-          value={periodDays} onChange={onSelectPeriod} selectedGround="viz" testIDPrefix="stats-period-chip" />
+          value={periodDays} onChange={onSelectPeriod} selectedGround="selection" testIDPrefix="stats-period-chip" />
         {viewMode === 'muscle' ? (
           <SegmentedControl accessibilityLabel="Select progress metric"
             options={[{ value: 'workingSetCount', label: 'Working sets' }, { value: 'totalVolume', label: 'Volume' }]}
-            value={tableMetric} onChange={setTableMetric} selectedGround="viz" testIDPrefix="stats-metric-chip" />
+            value={tableMetric} onChange={setTableMetric} selectedGround="selection" testIDPrefix="stats-metric-chip" />
         ) : (
           <SearchField accessibilityLabel="Exercise filter input" autoCapitalize="none" clearLabel="Clear search input"
             onChangeText={onSearchQueryChange} placeholder="Filter by exercise..." testID="stats-search-input" value={searchQuery} />
@@ -359,7 +359,7 @@ export function StatsScreenShell({
           <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
             isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
         ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
-          weeks={periodDays / 7} weeklyTarget={weeklyWorkingSetTarget} onSelect={showContributions}
+          onSelect={showContributions}
           onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
           onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
           /> : null}

@@ -1,8 +1,8 @@
 import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
 
 // The colours a theme is made from (`docs/specs/ui/design-language.md` §2,
-// "Derivation"). Every colour role is generated from these four; `danger` is
-// the one role no theme changes.
+// "Derivation"). The palette follows these seeds; danger, surface and
+// filter selection retain fixed colours in every theme.
 export type ThemeSeeds = {
   // A mid neutral. Its hue and chroma tint every neutral role, from `ink` to
   // `paper`, so the whole ground reads as one warm (or cool) family.
@@ -76,6 +76,8 @@ export type UiRoles = {
   paper: string;
   // Cards, sheets and inputs.
   surface: string;
+  // Active Progress/history filters: fixed black in every theme.
+  selection: string;
   // Hairlines. Depth is a rule plus a ground change — never a shadow. `rule`
   // borders cards and controls and draws the sheet handle; `ruleSoft` divides
   // rows inside a card or panel.
@@ -124,6 +126,7 @@ export function generateRoles(seeds: ThemeSeeds): UiRoles {
     paper: at(STEPS.paper),
     // Cards stay white in every theme; the ground's tint is carried by `paper`.
     surface: '#FFFFFF',
+    selection: '#000000',
     rule: at(STEPS.rule),
     ruleSoft: at(STEPS.ruleSoft),
     accent: seeds.accent.toUpperCase(),

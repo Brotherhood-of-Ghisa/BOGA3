@@ -8,10 +8,10 @@ Two heatmap views for the exercise and muscle history sheets on Progress
 |------|-----------|
 | `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `HEAT_RAMP` (the `viz0`…`viz4` roles). |
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
-| `heatmap-style.ts`  | The shared title, caption and micro-label styles, plus the Weekly view's `ink` current / selected marks (`HEAT_MARK`). |
+| `heatmap-style.ts`  | Shared title, micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — read-only month calendars stacked newest first, Monday–Sunday plus Week tiles. |
-| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, vertical 12-wk average; selection lifted to the host. |
+| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; selection lifted to the host. |
 
 ## Data flow
 
@@ -31,7 +31,7 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: savedLookbackWeeks 
 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
 highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
-weekly effort the same screen already loads powers the sheet's week banner.
+weekly effort the same screen already loads determines its empty state.
 Muscle history offers per-side, role-weighted `totalVolume`, and
 `workingSetCount` ([[muscle.set-count]]); exercise Volume and 1RM use the current private calculation
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
@@ -50,20 +50,21 @@ report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
-unknown load never gets a filled length, rest reads `Rest`, and known zero reads `0`.
-Only known training weeks contribute to the 12-week average (including zeros);
-rest and unavailable weeks do not. A Volume sum that is not finite is never
-plotted: its cells are dashed, show `?`, and read `Volume unavailable`.
+unknown load never gets a filled length. Figure visibility follows
+[[copy.blank-history]]; Weekly reference calculations follow
+[[comparison.weekly-reference]] across [[comparison.history-window]]. A Volume sum that is not finite is never
+plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
+Daily retains a neutral dashed rule.
 
 ## Props & selection
 
-Daily tiles are read-only; Weekly bars select a detail banner:
+Daily tiles are read-only; Weekly bars select a row:
 
 ```tsx
 <DailyHeatmap
   data={data}
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap", "<prefix>-heatmap-cell-<dateKey>"
-  metricLabel="Volume"                  // tile accessibility and metric heading
+  metricLabel="Volume"                  // tile accessibility
   formatValue={(v) => String(v)}
   legendLabel="Volume per day"
 />
@@ -74,19 +75,31 @@ Daily tiles are read-only; Weekly bars select a detail banner:
   onSelectWeek={onSelectWeek}           // (weekStartDateKey | null) => void
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap-cell-<weekStartDateKey>", "-bar-<key>"
   formatValue={formatValue}             // rows, axis and accessible values
-  formatAverageValue={formatAverageValue} // optional; defaults to formatValue
+  formatReferenceValue={formatReferenceValue} // optional; defaults to formatValue
   metricLabel="Sets"
 />
 ```
 
-- **Daily** displays figures inside read-only tiles, without selection or
-  black outlines. Adjacent
-  months repeat the same full week value/colour. Rest tiles are blank, zero is
-  numeric, unknown load is `?`, future days are blank and future weeks are `—`.
-  Full dates, today/current week, rest and known incomplete subtotals are announced accessibly.
-- **Weekly** lifts selection to the host, so the sheet's week banner can show
-  the full range/value. A second tap clears it and removes the band. No instruction
-  is displayed. Current and selected marks remain visible for zero/rest/unknown rows.
+- **Daily** follows [[comparison.daily-history]]: months and week rows run newest first; the month's first
+  day is in the bottom row, its last observed week in the top row. Each month
+  shows only its own day tiles; adjoining-month positions are empty spacers.
+  A Week tile appears beside that month's Sunday once Sunday has arrived,
+  provided all seven Monday–Sunday dates are present in the full data sample,
+  including rest days and preceding-month days. A partial first sample week or
+  missing date omits its Week tile while keeping the sampled daily tiles.
+  The complete adapter value/colour spans month boundaries.
+  The current Week tile appears only on Sunday; rows whose Sunday is in the
+  next month have no Week tile. Tiles are read-only, without selection or black
+  outlines. Figure visibility follows [[copy.blank-history]].
+  Future day positions are empty spacers with no tile or accessible day value.
+  No visible Rest wording or question mark is displayed.
+  No future week rows extend the saved history window.
+  A vertical `rule` centres in a wider Sun/Week gap through each header and row;
+  all eight read-only columns can shrink on narrow screens.
+  Monday dates are small, top-left figures. Full dates, today/current week and rest are announced accessibly.
+- **Weekly** lifts selection to the host; a second tap clears the selected
+  row. No selected-week banner is displayed; figure visibility follows [[copy.blank-history]].
+  Rest/current semantics remain accessible; selected rows retain their caret, including zero/rest/unknown rows.
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -104,9 +117,9 @@ the current week when excluded and survives look-back edits while in range.
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
-- **Weekly current and selected differ**: the current week is a 1px
-  `ink` ring, the selected row a 2px `ink` border with the selected
-  accessibility state and a filled `ink` caret. Daily tiles have neither mark.
+- **No black outlines:** current and selected tiles/bars have no black border.
+  Weekly selection retains its accessible state and filled `ink` caret.
+  Current-week wording remains beside its row.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history sheet keeps both views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
@@ -117,10 +130,12 @@ the current week when excluded and survives look-back edits while in range.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- The weekly average uses discrete vertical dashes on the same scale, plus
-  a formatted label. At least six known training weeks among the latest twelve
-  are required; an all-zero scale has no misleading reference. Averages use whole
-  volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row
-  values retain the selected metric format.
-- Current-week wording stays beside its row and the average stays above its
-  reference; the footer omits the repeated current-week and average sentences.
+- Weekly references use discrete vertical dashes on the same zero-based scale
+  as the bars ([[comparison.weekly-reference]]). Accessible values use whole
+  Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
+  retain the selected metric format. Axis marks announce the saved window, each
+  reference and value accessibly, including coincident references; no visible
+  label stack is drawn. References and displayed weeks use the same look-back.
+- Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
+  subtitles and visible reference labels are omitted. Selected metric controls
+  use fixed black `selection` with white `surface` labels in every theme.

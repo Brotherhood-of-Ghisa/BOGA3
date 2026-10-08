@@ -23,10 +23,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
-  // The selected segment: `ink` (default); `viz` is `viz4` with `ink` text,
-  // for Progress's selectors; `accent` with `surface` text, for the history
-  // metric control.
-  selectedGround?: 'ink' | 'viz' | 'accent';
+  // `selection`: fixed black/white for Progress and history filters.
+  selectedGround?: 'ink' | 'selection';
   hitSlop?: number;
   // Every segment inert and faded, e.g. while the form it belongs to saves.
   disabled?: boolean;
@@ -84,7 +82,7 @@ export function SegmentedControl<TValue extends string | number>({
             <Text
               allowFontScaling={false}
               numberOfLines={1}
-              style={[styles.label, selected ? (selectedGround === 'viz' ? styles.labelSelectedViz : styles.labelSelected) : null,
+              style={[styles.label, selected ? styles.labelSelected : null,
                 disabled && !selected ? styles.labelDisabled : null]}>
               {option.label}
             </Text>
@@ -127,11 +125,8 @@ const styles = StyleSheet.create({
   segmentSelected: {
     backgroundColor: uiRoles.ink,
   },
-  segmentSelectedAccent: {
-    backgroundColor: uiRoles.accent,
-  },
-  segmentSelectedViz: {
-    backgroundColor: uiRoles.viz4,
+  segmentSelectedFilter: {
+    backgroundColor: uiRoles.selection,
   },
   segmentSelectedDisabled: {
     backgroundColor: uiRoles.inkGhost,
@@ -148,12 +143,9 @@ const styles = StyleSheet.create({
   labelSelected: {
     color: uiRoles.surface,
   },
-  labelSelectedViz: {
-    color: uiRoles.ink,
-  },
   labelDisabled: {
     color: uiRoles.inkGhost,
   },
 });
 
-const selectedStyles = { ink: styles.segmentSelected, viz: styles.segmentSelectedViz, accent: styles.segmentSelectedAccent };
+const selectedStyles = { ink: styles.segmentSelected, selection: styles.segmentSelectedFilter };

@@ -30,3 +30,46 @@ time.
 Why: Progress compares like with like, so a part week never looks like a
 drop; Today's week bar shows progress toward last week's whole total.
 Code: `calendarWeekBounds`, `shiftCalendarWeeks` in `apps/mobile/src/utils/calendar-weeks.ts`; `computeProgressComparisons` in `apps/mobile/src/data/stats.ts`; the week and month windows in `apps/mobile/src/progress-summary/calculations.ts`.
+
+### comparison.history-window · definition · accepted
+
+Exercise and muscle history use Settings' History look-back (weeks): the Monday
+N − 1 weeks before the current week through today. Both displayed weeks and
+Weekly reference calculations use this entire window.
+
+Why: a history setting must select the same sample for the chart and its baseline.
+Code: `HistoryHeatmap` in `apps/mobile/components/stats/history-sheet.tsx`.
+
+### comparison.daily-history · presentation · accepted
+
+Daily history months and their rows are newest first. Each sampled day appears
+once, in its own month; future and out-of-sample positions have no tile. The
+month's first day is in its bottom row and its last sampled day in its top row.
+
+A Week tile appears beside its Sunday's row, in Sunday's month, only when
+Sunday has arrived and all seven Monday–Sunday dates are in the full sample.
+Rest days count; a week may span two months. Today counts when it is Sunday.
+Use the whole week's value and colour; a missing date or partial first sample
+week omits its Week tile while retaining sampled daily tiles.
+
+Why: each daily figure and completed weekly total should appear once in the calendar.
+Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/components/heatmaps/DailyHeatmap.tsx`.
+
+### comparison.weekly-reference · calculation · accepted
+
+Within [[comparison.history-window]], known training weeks form the reference
+population, including genuine zeros and excluding rest, future and unavailable
+weeks. Require at least six eligible weeks and a positive window maximum;
+otherwise omit references.
+
+| Metric | Reference lines |
+| --- | --- |
+| Sets | Median |
+| Volume, 1RM, Top weight | 25th percentile, median, 75th percentile |
+
+Calculate percentiles by linear interpolation on sorted weekly values. Place
+lines on the bars' shared zero-based scale, keeping exact positions even when
+they coincide. Values remain accessible without visible reference labels.
+
+Why: the middle half of the selected history supplies a consistent reference range.
+Code: `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`; `calculateLinearPercentile` in `apps/mobile/src/session-insights/calculations.ts`.

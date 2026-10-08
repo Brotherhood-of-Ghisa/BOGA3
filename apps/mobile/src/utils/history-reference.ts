@@ -1,3 +1,3 @@
-// [[session.volume-comparison]]: six known observations in both weekly
-// history and session volume comparisons. Each caller owns its history window.
+// Shared minimum in [[session.volume-comparison]] and [[comparison.weekly-reference]].
+// Each caller owns its history window and eligibility.
 export const MIN_HISTORY_OBSERVATIONS = 6;
