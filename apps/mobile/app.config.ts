@@ -68,7 +68,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     name: process.env.APP_NAME ?? "Boga3",
     slug: "boga3",
-    version: "2.0.0",
+    version: "2.1.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "boga3",
