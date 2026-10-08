@@ -123,7 +123,8 @@ micro-labels Archivo 700, sheet titles Archivo 800.
   and a `rule` handle. **Tapping outside or dragging the handle down
   dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
   page sheet instead: grabber, title, X (`ux-rules.md` "Sheets").
-- Tap targets ≥44. The iOS status bar and the tab bar are never redrawn in
+- Tap targets ≥44; a compact control draws 28 (`compactControlHeight`) and
+  keeps 44 by hit slop. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each

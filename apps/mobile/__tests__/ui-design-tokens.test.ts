@@ -51,6 +51,7 @@ describe('design-language tokens', () => {
     expect(uiGeometry).toEqual({
       radius: { card: 6, sheet: 16, control: 4, pill: 999 },
       tapTarget: 44,
+      compactControlHeight: 28,
       metricValueWidth: 38,
       sheetHandle: { width: 38, height: 4 },
       fieldHeight: 50,
