@@ -49,6 +49,7 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
+import * as exerciseSessionFacts from '@/src/data/exercise-session-facts';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
@@ -71,7 +72,7 @@ const openSessions = async (prepare?: () => Promise<unknown>) => {
 
 const showDeletedSessions = () => {
   fireEvent.press(screen.getByTestId('sessions-options-button'));
-  fireEvent.press(screen.getByTestId('toggle-deleted-sessions-deleted'));
+  fireEvent.press(screen.getByTestId('toggle-deleted-sessions'));
 };
 
 const loadSpy = () => jest.spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions');
@@ -185,7 +186,8 @@ describe('Sessions over real data', () => {
 
     expect(screen.queryByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeNull();
     fireEvent.press(screen.getByTestId('sessions-options-button'));
-    const toggle = screen.getByTestId('toggle-deleted-sessions-deleted');
+    const toggle = screen.getByTestId('toggle-deleted-sessions');
+    expect(toggle).toHaveProp('accessibilityRole', 'switch');
     expect(toggle).toHaveProp('accessibilityState', { checked: false });
     expect(toggle).toHaveProp('accessibilityLabel', 'Show deleted sessions');
 
@@ -196,8 +198,8 @@ describe('Sessions over real data', () => {
       'accessibilityLabel',
       expect.stringMatching(/^Deleted\. Completed session on /)
     );
-    expect(screen.getByTestId('toggle-deleted-sessions-deleted')).toHaveProp('accessibilityState', { checked: true });
-    expect(screen.getByTestId('toggle-deleted-sessions-deleted')).toHaveProp('accessibilityLabel', 'Hide deleted sessions');
+    expect(screen.getByTestId('toggle-deleted-sessions')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('toggle-deleted-sessions-switch', { includeHiddenElements: true })).toHaveProp('value', true);
     expect(load.mock.calls).toEqual([[{ showDeletedSessions: false }], [{ showDeletedSessions: true }]]);
   });
 
@@ -258,6 +260,19 @@ describe('Sessions over real data', () => {
       'accessibilityHint',
       'Opens the completed session'
     );
+  });
+
+  it('lists the history without PR lines when the records read fails (optional enrichment)', async () => {
+    const recordsRead = jest
+      .spyOn(exerciseSessionFacts, 'loadFlaggedExerciseSessionFacts')
+      .mockRejectedValueOnce(new Error('facts unavailable'));
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    await openSessions();
+
+    expect(recordsRead).toHaveBeenCalled();
+    expect(screen.getAllByTestId(/^completed-session-row-/).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId(/-record$/)).toBeNull();
+    expect(screen.queryByTestId('session-list-load-error')).toBeNull();
   });
 
   it('stamps a row with the local start time, not the stored UTC clock', async () => {

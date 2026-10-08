@@ -27,6 +27,7 @@ import {
   Sheet,
   Stat,
   StatePanel,
+  SwitchRow,
   Tag,
   uiGeometry,
   uiRoles,
@@ -812,6 +813,25 @@ describe('Tag', () => {
     render(<Tag label="Archived" testID="tag" />);
     expect(flatStyle(screen.getByTestId('tag'))).toMatchObject({ borderRadius: uiGeometry.radius.pill, borderColor: uiRoles.rule });
     expect(flatStyle(screen.getByText('Archived'))).toMatchObject({ textTransform: 'uppercase', color: uiRoles.inkMuted });
+  });
+});
+
+describe('SwitchRow', () => {
+  it('is one accessible switch across the row: the row or the drawn switch turns it', () => {
+    const onValueChange = jest.fn();
+    const { rerender } = render(<SwitchRow label="Show deleted sessions" onValueChange={onValueChange} testID="row" value={false} />);
+    const row = screen.getByTestId('row');
+    expect(row).toHaveProp('accessibilityRole', 'switch');
+    expect(row).toHaveProp('accessibilityState', { checked: false });
+    expect(row).toHaveProp('accessibilityLabel', 'Show deleted sessions');
+
+    fireEvent.press(row);
+    expect(onValueChange).toHaveBeenLastCalledWith(true);
+
+    rerender(<SwitchRow label="Show deleted sessions" onValueChange={onValueChange} testID="row" value />);
+    expect(screen.getByTestId('row')).toHaveProp('accessibilityState', { checked: true });
+    fireEvent(screen.getByTestId('row-switch', { includeHiddenElements: true }), 'valueChange', false);
+    expect(onValueChange).toHaveBeenLastCalledWith(false);
   });
 });
 

@@ -14,10 +14,10 @@ import {
 import { PlanSection, PlanSessionAction, usePlanSections } from '@/components/session-planner/plan-sections';
 import { StatePanel } from '@/components/ui/state-panel';
 import {
-  ChipGroup,
   IconButton,
   Screen,
   Sheet,
+  SwitchRow,
   uiFonts,
   uiGeometry,
   uiRoles,
@@ -196,22 +196,14 @@ export function SessionsScreen({
         dismissLabel="Close session list options"
         onDismiss={() => setOptionsVisible(false)}
         testID="sessions-options-sheet"
-        title="Sessions"
         visible={optionsVisible}>
+        {/* A view option: deleted sessions join their weeks, faded and tagged. */}
         <View style={styles.options}>
-          {/* A view toggle: deleted sessions join their weeks, faded and tagged. */}
-          <ChipGroup
-            mode="multi"
-            onToggle={() => setShowDeletedSessions((current) => !current)}
-            options={[
-              {
-                value: 'deleted',
-                label: 'Show deleted',
-                accessibilityLabel: showDeletedSessions ? 'Hide deleted sessions' : 'Show deleted sessions',
-              },
-            ]}
-            testIDPrefix="toggle-deleted-sessions"
-            values={showDeletedSessions ? ['deleted'] : []}
+          <SwitchRow
+            label="Show deleted sessions"
+            onValueChange={setShowDeletedSessions}
+            testID="toggle-deleted-sessions"
+            value={showDeletedSessions}
           />
         </View>
       </Sheet>
@@ -234,8 +226,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
   },
   options: {
-    paddingHorizontal: uiSpace.lg,
-    paddingBottom: uiSpace.sm,
+    paddingBottom: uiSpace.lg,
   },
   microLabel: {
     fontFamily: uiFonts.display.family,

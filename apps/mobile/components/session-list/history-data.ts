@@ -6,6 +6,7 @@ import {
   persistSessionDraftSnapshot,
   setSessionDeletedState,
 } from '@/src/data';
+import { logEvent } from '@/src/logging';
 import {
   createDrizzleProgressSummaryStore,
   type PersonalRecordFact,
@@ -79,7 +80,17 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
     const completed = buckets.completed
       .map((summary) => mapRepositorySummaryToSessionListItem(summary))
       .filter((summary): summary is SessionListItem => summary !== null);
-    const completedWithRecords = await attachSessionRecords(completed);
+    // PR lines are enrichment: a failed read leaves the history listed
+    // without them (`ux-rules.md` "States and feedback" 4).
+    const completedWithRecords = await attachSessionRecords(completed).catch((error: unknown) => {
+      void logEvent({
+        level: 'warn',
+        source: 'database',
+        event: 'sessions.records_read_failed',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return completed;
+    });
 
     return active ? [active, ...completedWithRecords] : completedWithRecords;
   },

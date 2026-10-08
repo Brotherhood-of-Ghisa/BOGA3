@@ -14,7 +14,10 @@ export type HistoryWeekSection = {
   weeksAgo: number;
   /** Empty weeks between this week and the listed week above it (this week, for the first). */
   emptyWeeksBefore: number;
-  /** Live sessions: a deleted row is listed, never counted. */
+  /**
+   * Sessions that count ([[set.eligibility]]: live, with a working set); a
+   * deleted or warm-up-only row is listed, never counted.
+   */
   sessionCount: number;
   data: SessionListItem[];
 };
@@ -58,7 +61,7 @@ export const groupSessionsByWeek = (sessions: SessionListItem[], now: Date): His
       sections.push(section);
     }
     section.data.push(session);
-    if (session.deletedAt === null) section.sessionCount += 1;
+    if (session.deletedAt === null && session.setCount > 0) section.sessionCount += 1;
   }
   return sections;
 };

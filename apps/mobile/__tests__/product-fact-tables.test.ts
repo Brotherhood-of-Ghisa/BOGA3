@@ -179,11 +179,11 @@ describe('session.history-weeks', () => {
   const NOW = new Date(2026, 9, 8, 12);
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  /** `Wed 7 Oct`, `Mon 5 Oct 00:00`, `Wed 31 Dec 2025`, `Mon 5 Oct deleted`: one completed session. */
+  /** `Wed 7 Oct`, `Mon 5 Oct 00:00`, `Wed 31 Dec 2025`, `Mon 5 Oct deleted`, `… no working set`: one completed session. */
   const session = (entry: string, index: number): SessionListItem => {
-    const match = /^\w{3} (\d{1,2}) (\w{3})(?: (\d{4}))?(?: (\d{2}):(\d{2}))?( deleted)?$/.exec(entry);
+    const match = /^\w{3} (\d{1,2}) (\w{3})(?: (\d{4}))?(?: (\d{2}):(\d{2}))?( deleted)?( no working set)?$/.exec(entry);
     if (!match) throw new Error(`unreadable session '${entry}'`);
-    const [, day, month, year, hours, minutes, deleted] = match;
+    const [, day, month, year, hours, minutes, deleted, noWorkingSet] = match;
     const completedAt = new Date(Number(year ?? 2026), MONTHS.indexOf(month), Number(day), Number(hours ?? 18), Number(minutes ?? 0));
     if (!entry.startsWith(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][completedAt.getDay()])) {
       throw new Error(`'${entry}' names the wrong weekday`);
@@ -197,7 +197,7 @@ describe('session.history-weeks', () => {
       durationDisplay: '1h',
       gymName: null,
       exerciseCount: 1,
-      setCount: 3,
+      setCount: noWorkingSet ? 0 : 3,
       totalWeight: 0,
       deletedAt: deleted ? completedAt.toISOString() : null,
       records: [],

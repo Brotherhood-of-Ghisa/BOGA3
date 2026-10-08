@@ -87,7 +87,7 @@
   },
   "src/data/session-drafts.ts": {
     "max-lines-per-function": {
-      "count": 2
+      "count": 1
     }
   }
 }

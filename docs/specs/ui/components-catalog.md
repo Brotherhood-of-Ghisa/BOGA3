@@ -43,6 +43,7 @@ Two standing rules:
 | A search input | `SearchField` (`search-field.tsx`) |
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, theme-accent or palette-grade selection |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
+| One view option on or off, in a sheet (`Show deleted sessions`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`) |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
@@ -93,7 +94,7 @@ folder rather than re-implementing its row, card or sheet.
 | `session-detail/` | the read-only session cards — `SetSummaryRow`, `ExerciseSetsCard`, `SessionFactsCard` — shared by the session view, View Session, exercise history and the group session view. Row and card models: `src/session-recorder/session-view-model.ts`, `completed-session-detail-model.ts` |
 | `session-complete/` | the post-submit presentation: `SessionCompletionScreen`, `SessionMuscleBreakdown` / `SessionSummaryContent` (shared with historical review), `PersonalRecordCard`, `ExerciseVolumeCard`, and `SessionShareSheet` / `SessionShareCard`. The share image is privacy-limited: all PRs and exercise comparisons, never gym or location data |
 | `view-session/` | View Session's composition, top bar and sheets (route `app/completed-session/[sessionId].tsx`) |
-| `session-list/` | `SessionSummaryLine`, `ActiveSessionRow`, `HistoryList` (Sessions' one virtualized `SectionList`: the hub blocks as its header, a section per week, rows drawn by `today/`'s `SessionSummaryRow`), the week grouping (`history-weeks.ts`), and the `SessionListItem` types plus the `useSessionListData` hook and data client (`history-data.ts`, which attaches each session's PRs) |
+| `session-list/` | `SessionSummaryLine`, `ActiveSessionRow`, `HistoryList` (Sessions' one virtualized `SectionList`, the hub blocks as its header: [[session.history-weeks]]), the week grouping (`history-weeks.ts`), and the `SessionListItem` types plus the `useSessionListData` hook and data client (`history-data.ts`, which attaches each session's PRs) |
 | `today/` | the Today cards: `TodayProgressCard` with `WeekFigures`, `ShareBar` and `MonthPace`; the group card; and `SessionSummaryRow` + `TrainingNowMark`, the session row both cards and Sessions' history share. Reads: `apps/mobile/src/progress-summary/` |
 | `train/` | `StartDisc`, Train's one action |
 | `heatmaps/` | `DailyHeatmap` / `WeeklyHeatmap`, `HeatmapLegend` and their data and metric modules; semantics in `apps/mobile/components/heatmaps/README.md` |

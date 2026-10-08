@@ -47,11 +47,9 @@ const toSummaryFigures = (session: SessionListItem): SessionSummaryFigures => ({
 });
 
 /**
- * The page's one scroll: the host's `header`, then the completed history as
- * one virtualized section per week, so a long history renders only what is
- * near the screen. A row is Today's session row without its chevron, the
- * whole row one link to the completed session (`ux-rules.md` "Lists and
- * rows" 3); a deleted row is faded and tagged.
+ * The page's one scroll: the host's `header`, then the completed history
+ * ([[session.history-weeks]]) as one virtualized section per week, so a long
+ * history renders only what is near the screen.
  */
 export function HistoryList({
   sessions,
@@ -168,14 +166,14 @@ function HistoryState({
 }: Pick<HistoryListProps, 'isLoading' | 'loadErrorMessage' | 'onRetryLoad'>) {
   if (isLoading) {
     return (
-      <Card>
+      <Card style={styles.state}>
         <StatePanel body="Loading sessions…" fill={false} kind="loading" testID="session-list-loading-state" />
       </Card>
     );
   }
   if (loadErrorMessage) {
     return (
-      <Card>
+      <Card style={styles.state}>
         <StatePanel
           action={{ label: 'Retry', onPress: onRetryLoad, testID: 'session-list-load-error-retry' }}
           body={loadErrorMessage}
@@ -188,7 +186,7 @@ function HistoryState({
     );
   }
   return (
-    <Card>
+    <Card style={styles.state}>
       <StatePanel body="No completed sessions" fill={false} />
     </Card>
   );
@@ -217,6 +215,10 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: uiSpace.md,
+  },
+  // The states and the empty panel keep the header's rhythm.
+  state: {
+    marginTop: uiSpace.md,
   },
   footer: {
     marginTop: uiSpace.md,
