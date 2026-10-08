@@ -19,7 +19,7 @@ type Props = {
 };
 
 export function calendarValue(cell: DayCell | WeekCell | undefined, future: boolean, formatValue: Props['formatValue']): string {
-  if (future) return '—';
+  if (future) return '';
   if (!cell) return '';
   if (cell.unavailable) return '?';
   return (cell.hasTraining ?? cell.value > 0) ? formatValue(cell.value) : '';
@@ -43,13 +43,13 @@ export function CalendarTile(props: Props) {
       cell?.unavailable ? styles.unavailable : null]}>
     {mondayDate === undefined ? null : <Text allowFontScaling={false} style={[styles.date, adjacent ? styles.adjacentFigure : null]} testID={`${testID}-date`}>{mondayDate}</Text>}
     <Text allowFontScaling={false} style={[styles.value, adjacent ? styles.adjacentFigure : null]} numberOfLines={1} testID={`${testID}-value`}>
-      {future && !weekly ? '' : value}
+      {value}
     </Text>
   </View>;
 }
 
 const styles = StyleSheet.create({
-  tile: { flex: 1, minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget,
+  tile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
     borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
     ...heatmapStyles.restCell, justifyContent: 'center' },
   adjacentFigure: { fontWeight: '500' },

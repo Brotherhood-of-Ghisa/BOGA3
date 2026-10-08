@@ -6,7 +6,7 @@ import { uiRoles } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
 
 // Daily tiles are read-only. Weekly bars retain current/selected marks because
-// selecting a bar opens the host's week details.
+// selecting a bar marks the row without adding a banner.
 
 const TODAY = '2026-05-13'; // a Wednesday
 const PREFIX = 'history';
@@ -124,12 +124,14 @@ describe('Bodyweight heatmap coverage', () => {
   });
 
   it.each([
-    [[0, 0, 0, 0, 100, 200], 50],
-  ])('places the average on the zero-based horizontal scale including known zero training', (values, average) => {
+    [[0, 0, 0, 0, 100, 200], 0],
+  ])('places the median and percentiles on the zero-based horizontal scale including known zero training', (values, median) => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
     render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
-    expect(screen.getByTestId(`${PREFIX}-heatmap-average-label`)).toHaveProp('accessibilityLabel', `12-week average ~${average}`);
-    expect(style(`${PREFIX}-heatmap-average`).left).toBe('25%');
+    expect(screen.getByTestId(`${PREFIX}-heatmap-median-label`)).toHaveProp('accessibilityLabel', `12-week median ~${median}`);
+    expect(style(`${PREFIX}-heatmap-median`).left).toBe('0%');
+    expect(style(`${PREFIX}-heatmap-p5`).left).toBe('0%');
+    expect(style(`${PREFIX}-heatmap-p95`).left).toBe('87.5%');
   });
 });

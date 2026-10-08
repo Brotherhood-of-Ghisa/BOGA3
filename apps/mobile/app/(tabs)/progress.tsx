@@ -359,7 +359,7 @@ export function StatsScreenShell({
           <ExerciseListView items={filteredExerciseListItems} onPressExercise={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory(row); }}
             isFiltered={Boolean(searchQuery.trim())} sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} />
         ) : summary ? <ProgressTables muscles={summary.muscles} metric={tableMetric} selectedId={contributionId}
-          weeks={periodDays / 7} weeklyTarget={weeklyWorkingSetTarget} onSelect={showContributions}
+          onSelect={showContributions}
           onMuscleHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressMuscleHistory({ muscleGroupIds: [row.muscleGroupId], displayName: row.displayName, familyName: row.familyName }); }}
           onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
           /> : null}

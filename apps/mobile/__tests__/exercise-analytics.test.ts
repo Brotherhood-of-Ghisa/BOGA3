@@ -116,7 +116,7 @@ describe('aggregateExerciseWeeklyEffort', () => {
   it('keeps the 5th week of a month (no layout clipping)', () => {
     // June 2026: weeks start 2026-06-01, 2026-06-08, 2026-06-15, 2026-06-22, 2026-06-29 → 5 Mon-start weeks.
     // 2026-06-29's monthKey = '2026-06' → weekOfMonth = 5. It must still be returned so the
-    // weekly bar and the WeekSelectionBanner agree on that week.
+    // weekly bar and the Daily Week tile agree on that week.
     const sessions = [
       makeSession('2026-06-01T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),
       makeSession('2026-06-08T10:00:00Z', [{ setType: null, weight: 100, reps: 5 }]),

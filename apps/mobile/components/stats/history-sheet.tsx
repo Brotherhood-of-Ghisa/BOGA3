@@ -1,7 +1,6 @@
 import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -23,7 +22,7 @@ import type {
 } from '@/src/data';
 
 // The history of one exercise or one muscle on Progress: a sub-page
-// (`PageSheet`) holding the metric control, saved view/window, week banner and daily
+// (`PageSheet`) holding the metric control, saved view/window and daily
 // or weekly heatmap. One component for the muscle and the exercise
 // sheet; `kind` names its testIDs (`stats-<kind>-history-…`) and its copy.
 
@@ -56,31 +55,6 @@ export const MUSCLE_HISTORY_METRIC_OPTIONS: readonly HistoryMetricOption<MuscleH
   { value: 'workingSetCount', label: METRIC_LABELS.workingSetCount },
 ];
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-
-const formatWeekDateRange = (weekStartDateKey: string): string => {
-  const [y, m, d] = weekStartDateKey.split('-').map(Number);
-  const start = new Date(Date.UTC(y, m - 1, d));
-  const end = new Date(start.getTime() + 6 * MS_PER_DAY);
-  const fmt = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'UTC',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-  return `${fmt.format(start)} – ${fmt.format(end)}`;
-};
-
-const formatWeekValue = (week: SelectedMuscleWeeklyEffort, metric: CalendarHeatmapMetric): string => {
-  switch (metric) {
-    case 'totalVolume': return formatVolumeFigure(week.totalVolume);
-    case 'workingSetCount': return String(week.workingSetCount);
-    case 'estimatedRM1': return week.estimatedRM1 !== null ? formatOneRepMax(week.estimatedRM1) : '—';
-    case 'highestWeight': return week.highestWeight !== null ? formatWeight(week.highestWeight) : '—';
-  }
-};
-
 // One day's value inside its calendar tile, in the metric's format.
 const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
@@ -90,39 +64,6 @@ const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string =>
     case 'highestWeight': return formatWeight(value);
   }
 };
-
-function WeekSelectionBanner({
-  weeklyEffort,
-  selectedWeekKey,
-  metric,
-  metricLabel,
-  testID,
-}: {
-  weeklyEffort: SelectedMuscleWeeklyEffort[];
-  selectedWeekKey: string | null;
-  metric: CalendarHeatmapMetric;
-  metricLabel: string;
-  testID: string;
-}) {
-  const week =
-    selectedWeekKey !== null
-      ? (weeklyEffort.find((w) => w.weekStartDateKey === selectedWeekKey) ?? null)
-      : null;
-
-  if (selectedWeekKey === null) return null;
-
-  return (
-    <View style={styles.banner} testID={testID}>
-      <Text allowFontScaling={false} style={styles.bannerRange} testID={`${testID}-range`}>
-        {formatWeekDateRange(selectedWeekKey)}
-      </Text>
-      <Text allowFontScaling={false} style={styles.bannerLabel} testID={`${testID}-value`}>
-        {metricLabel}:{' '}
-        <Text allowFontScaling={false} style={styles.bannerFigure}>{week !== null ? formatWeekValue(week, metric) : '—'}</Text>
-      </Text>
-    </View>
-  );
-}
 
 function HistoryHeatmap({
   dailyMetrics,
@@ -178,7 +119,7 @@ function HistoryHeatmap({
         testIDPrefix={testIDPrefix}
         formatValue={formatDailyValue}
         metricLabel={metricLabel}
-        formatAverageValue={metric === 'totalVolume' ? formatVolume : formatOneRepMax}
+        formatReferenceValue={metric === 'totalVolume' ? formatVolume : formatOneRepMax}
         header={chartHidden ? null : status}
       />
     ),
@@ -298,16 +239,6 @@ export function HistorySheet<TMetric extends CalendarHeatmapMetric>({
           </View>
         </View>
 
-        {view === 'weekly' ? (
-          <WeekSelectionBanner
-            metric={metric}
-            metricLabel={metricLabel}
-            selectedWeekKey={selectedWeekKey}
-            testID={`${prefix}-week-banner`}
-            weeklyEffort={weeklyEffort}
-          />
-        ) : null}
-
         <HistoryHeatmap
           dailyMetrics={dailyMetrics}
           lookbackWeeks={lookbackWeeks}
@@ -375,38 +306,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   controlLabel: microLabel,
-  // A `rule-soft` band across the sheet: the week's range, then its figure.
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-    minHeight: uiGeometry.tapTarget,
-    paddingHorizontal: uiSpace.lg,
-    paddingVertical: uiSpace.sm,
-    backgroundColor: uiRoles.ruleSoft,
-  },
-  bannerRange: {
-    flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  bannerLabel: {
-    flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  bannerFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-    color: uiRoles.ink,
-  },
   scroll: {
     flex: 1,
   },

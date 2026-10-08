@@ -348,13 +348,14 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
   });
 
-  it('opens a saved Weekly choice with its banner and retains it on reopening', async () => {
+  it('opens a saved Weekly choice without a banner and retains it on reopening', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 104 }));
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
@@ -362,6 +363,7 @@ describe('Stats over real data', () => {
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
   });
 
@@ -383,7 +385,9 @@ describe('Stats over real data', () => {
     fireEvent.press(row);
     const expected = (await exerciseAnalytics.computeSelectedExerciseWeeklyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT }))
       .find(week => week.weekStartDateKey === current)!;
-    expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent(`Sets: ${expected.workingSetCount}`);
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
+    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`)).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId(`stats-exercise-history-heatmap-value-${current}`)).toHaveTextContent(String(expected.workingSetCount));
     fireEvent.press(row);
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.queryByText(/Tap a week/)).toBeNull();
@@ -394,6 +398,22 @@ describe('Stats over real data', () => {
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
+  });
+
+  it('keeps populated and empty muscle rows neutral while preserving contribution selection', async () => {
+    await renderSeededStats();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    for (const metric of ['workingSetCount', 'totalVolume']) {
+      fireEvent.press(screen.getByTestId(`stats-metric-chip-${metric}`));
+      for (const row of screen.getAllByTestId(/^stats-muscle-row-[^-]+$/)) {
+        expect(row).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
+        expect(row).not.toHaveStyle({ backgroundColor: uiRoles.viz4 });
+      }
+      expect(screen.queryAllByLabelText(/Colour:/)).toEqual([]);
+    }
+    fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
+    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ borderLeftColor: uiRoles.ink });
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: true });
   });
 
   it('keeps seeded families inert and opens only an individual muscle', async () => {

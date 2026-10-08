@@ -11,7 +11,7 @@ Two heatmap views for the exercise and muscle history sheets on Progress
 | `heatmap-style.ts`  | The shared title, caption and micro-label styles, plus the Weekly view's `ink` current / selected marks (`HEAT_MARK`). |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — read-only month calendars stacked newest first, Monday–Sunday plus Week tiles. |
-| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, vertical 12-wk average; selection lifted to the host. |
+| `WeeklyHeatmap.tsx` | **Weekly** — one horizontal bar per week, stacked newest first in a virtualized vertical list; zero-based proportional length, independent colour, dashed percentile references; selection lifted to the host. |
 
 ## Data flow
 
@@ -31,7 +31,7 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: savedLookbackWeeks 
 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
 highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
-weekly effort the same screen already loads powers the sheet's week banner.
+weekly effort the same screen already loads determines its empty state.
 Muscle history offers per-side, role-weighted `totalVolume`, and
 `workingSetCount` ([[muscle.set-count]]); exercise Volume and 1RM use the current private calculation
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
@@ -50,20 +50,21 @@ report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
-unknown load never gets a filled length, rest reads `Rest`, and known zero reads `0`.
-Only known training weeks contribute to the 12-week average (including zeros);
-rest and unavailable weeks do not. A Volume sum that is not finite is never
+unknown load never gets a filled length, rest is blank, and known zero reads `0`.
+For metrics other than Sets, median, P5 and P95 use known training weeks
+(including zeros) among the latest twelve calendar weeks; rest, future and
+unavailable weeks do not contribute. A Volume sum that is not finite is never
 plotted: its cells are dashed, show `?`, and read `Volume unavailable`.
 
 ## Props & selection
 
-Daily tiles are read-only; Weekly bars select a detail banner:
+Daily tiles are read-only; Weekly bars select a row:
 
 ```tsx
 <DailyHeatmap
   data={data}
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap", "<prefix>-heatmap-cell-<dateKey>"
-  metricLabel="Volume"                  // tile accessibility and metric heading
+  metricLabel="Volume"                  // tile accessibility
   formatValue={(v) => String(v)}
   legendLabel="Volume per day"
 />
@@ -74,7 +75,7 @@ Daily tiles are read-only; Weekly bars select a detail banner:
   onSelectWeek={onSelectWeek}           // (weekStartDateKey | null) => void
   testIDPrefix="stats-muscle-history"   // → "<prefix>-heatmap-cell-<weekStartDateKey>", "-bar-<key>"
   formatValue={formatValue}             // rows, axis and accessible values
-  formatAverageValue={formatAverageValue} // optional; defaults to formatValue
+  formatReferenceValue={formatReferenceValue} // optional; defaults to formatValue
   metricLabel="Sets"
 />
 ```
@@ -82,11 +83,13 @@ Daily tiles are read-only; Weekly bars select a detail banner:
 - **Daily** displays figures inside read-only tiles, without selection or
   black outlines. Adjacent
   months repeat the same full week value/colour. Rest tiles are blank, zero is
-  numeric, unknown load is `?`, future days are blank and future weeks are `—`.
+  numeric, unknown load is `?`, and future days and weeks are blank.
+  A vertical `rule` separates Sun and Week through each month’s header and rows;
+  all eight read-only columns can shrink on narrow screens.
   Full dates, today/current week, rest and known incomplete subtotals are announced accessibly.
-- **Weekly** lifts selection to the host, so the sheet's week banner can show
-  the full range/value. A second tap clears it and removes the band. No instruction
-  is displayed. Current and selected marks remain visible for zero/rest/unknown rows.
+- **Weekly** lifts selection to the host; a second tap clears the selected
+  row. No selected-week banner or visible Rest indicator is displayed.
+  Rest semantics remain in accessibility labels. Current and selected marks remain visible for zero/rest/unknown rows.
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
@@ -117,10 +120,11 @@ the current week when excluded and survives look-back edits while in range.
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
-- The weekly average uses discrete vertical dashes on the same scale, plus
-  a formatted label. At least six known training weeks among the latest twelve
-  are required; an all-zero scale has no misleading reference. Averages use whole
-  volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row
-  values retain the selected metric format.
-- Current-week wording stays beside its row and the average stays above its
-  reference; the footer omits the repeated current-week and average sentences.
+- Weekly references use discrete vertical dashes on the same zero-based scale
+  as the bars. At least six known training weeks among the latest twelve are
+  required; an all-zero scale has no reference. Numeric labels use whole
+  Volume or the canonical one-decimal formatter for 1RM/Top weight; row values
+  retain the selected metric format. Each reference label occupies its own line,
+  so coincident references keep their exact positions and all labels stay readable.
+- Daily and Weekly share title typography, with no metric subtitle.
+  Current-week wording stays beside its row.

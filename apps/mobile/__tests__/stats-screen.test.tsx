@@ -421,11 +421,11 @@ describe('StatsScreenShell', () => {
       .not.toHaveStyle({ textDecorationLine: 'underline' });
   });
 
-  it('grades counts against the saved quota and selected weeks in either metric', () => {
+  it('keeps muscle rows neutral in either metric', () => {
     renderStatsScreenShell();
-    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    expect(screen.getByTestId('stats-muscle-row-chest')).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
     fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    expect(screen.getByTestId('stats-muscle-row-chest')).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+20%');
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveStyle({ color: uiRoles.ink });
   });
@@ -670,43 +670,15 @@ describe('StatsScreenShell', () => {
     expect(screen.queryByText('Sets per day')).toBeNull();
   });
 
-  it('shows the selected metric in the week selection banner', () => {
-    const props = {
-      selectedMuscle: {
-        muscleGroupIds: ['front_delts'] as [string],
-        displayName: 'Front Delts',
-        familyName: 'Shoulders',
-      },
+  it.each(['totalVolume', 'workingSetCount'] as const)('omits the selected-week banner for %s and keeps Metric controls', metric => {
+    renderStatsScreenShell({
+      selectedMuscle: { muscleGroupIds: ['front_delts'], displayName: 'Front Delts', familyName: 'Shoulders' },
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
       selectedMuscleHistoryWeekKey: '2026-05-11',
-    };
-    const { rerender } = render(
-      <StatsScreenShell
-        {...buildShellProps({
-          ...props,
-          muscleHistoryMetric: 'totalVolume',
-        })}
-      />
-    );
-
-    const banner = screen.getByTestId('stats-muscle-history-week-banner');
-    expect(banner).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
-    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /Volume: 1100/
-    );
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          ...props,
-          muscleHistoryMetric: 'workingSetCount',
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /Sets: 2/
-    );
+      muscleHistoryMetric: metric,
+    });
+    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
+    expect(screen.getByTestId(`stats-muscle-history-metric-chip-${metric}`)).toBeTruthy();
   });
 
   it('omits the banner and instruction when no week is selected', () => {

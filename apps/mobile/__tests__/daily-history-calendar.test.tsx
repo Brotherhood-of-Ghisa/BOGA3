@@ -30,12 +30,14 @@ it('stacks full month calendars newest first, with eight headers and Monday-only
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
   expect(screen.UNSAFE_queryAllByType(ScrollView)).toEqual([]);
   expect(style('calendar-heatmap-cell-2026-10-05').minHeight).toBeGreaterThanOrEqual(uiGeometry.tapTarget);
-  expect(style('calendar-heatmap-cell-2026-10-05').minWidth).toBeGreaterThanOrEqual(uiGeometry.tapTarget);
+  expect(style('calendar-heatmap-cell-2026-10-05').minWidth).toBe(0);
+  expect(style('calendar-heatmap-week-separator-2026-10')).toMatchObject({ right: '12.5%', width: 1, backgroundColor: uiRoles.rule, top: 0, bottom: 0 });
 });
 
 it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
   'shows formatted %s figures and the same weekly value and colour in each adjoining month', metric => {
     const { data } = draw(metric);
+    expect(screen.queryByText(labels[metric], { exact: true })).toBeNull();
     const week = data.weekly.find(week => week.weekStartDateKey === '2026-09-28')!;
     for (const month of ['2026-09', '2026-10']) {
       const id = `calendar-heatmap-week-${month}-2026-09-28`;
@@ -77,7 +79,7 @@ it('distinguishes blank rest, numeric zero, an overflowed volume, future days an
   const future = screen.getByLabelText('2026-10-07, Future, no observed value');
   expect(future).toHaveProp('accessibilityRole', 'text');
   expect(within(future).getByTestId(`${future.props.testID}-value`)).toHaveTextContent('', { exact: true });
-  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-12-value')).toHaveTextContent('—');
+  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-12-value')).toHaveTextContent('', { exact: true });
 });
 
 it('de-emphasises adjoining dates by weight while preserving full ink and heat contrast', () => {

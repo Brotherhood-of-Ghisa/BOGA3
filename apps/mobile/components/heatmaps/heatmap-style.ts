@@ -34,8 +34,8 @@ export const heatmapStyles = StyleSheet.create({
   title: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
+    fontSize: uiTypography.size.xl,
+    lineHeight: uiTypography.lineHeight.xl,
     color: uiRoles.ink,
   },
   caption: {

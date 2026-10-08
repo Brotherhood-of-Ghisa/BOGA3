@@ -1,11 +1,11 @@
 # T-20261008-01 — Simplify Progress and Daily/Weekly heatmaps
 
-- Status: planned
+- Status: in progress — Sets clarification and human review pending
 - Depends on: none
 - Milestone: none
 - Areas: frontend; UI impact: yes
 - Execution: one agent session, one implementation worktree, one branch/PR.
-- Proposed implementation branch: `codex/progress-heatmap-ui`.
+- Implementation branch: `codex/plan-progress-heatmap-ui` (operator requested existing branch).
 
 ## Objective
 
@@ -164,3 +164,33 @@ current design policy. Do not reference this task from code, tests or specs.
    repository review/PR template and lifecycle. No new Maestro scenario without
    operator approval. Delete this ephemeral card in the implementation PR.
    Stop the stack after opening the PR and release the worktree after merge.
+
+## Execution handoff — 2026-10-08
+
+- Implemented neutral Progress rows, Daily separator/blank future Week values,
+  shared heading typography, removed subtitles/banner/visible Rest, and
+  median/P5/P95 for non-Sets metrics. Sets references remain unimplemented
+  pending the clarification above; the current preview has no Sets reference.
+- References use at least six known training weeks among the latest twelve
+  calendar weeks. Genuine zeros count; rest, future and unavailable values do
+  not. All-zero scales omit references. Coincident labels occupy separate lines.
+- Regression coverage authored in the existing suites; **human review pending;
+  automated tests not run**. No quality lanes, test hooks, push or PR yet.
+- Reused the operator's branch, which contains current `origin/main`, with
+  `./boga worktree start`; slot 29. `./boga doctor` passed.
+- Worktree: `/Users/sboschi/Projects/boga-worktrees/codex-plan-progress-heatmap-ui`.
+  Run `./boga ios start` there to open the native preview (Metro port 8111,
+  simulator `BOGA wt29`). Existing development data is seeded on this simulator.
+- Human review: Progress → muscle name or contribution exercise name; choose
+  each available Metric. Switch the saved Daily/Weekly view in Settings and
+  reopen history. Check neutral rows, selection/chevrons, separator, blank
+  rest/future values, numeric zero, unknown values, scrolling and references.
+- Manual native captures: `apps/mobile/artifacts/heatmap-ui/` (ignored).
+  Both history kinds and all metrics were captured at 402pt; 375pt captures
+  include Daily layouts and sparse/zero/coincident Weekly references. Edge
+  states use a temporary host with production components; the host is removed
+  before the local commit. `before-loaded.png` captures the original Progress.
+
+Next: settle Sets, finish that reference and its coverage, present the completed
+UI for human testing. Only after explicit testing-complete confirmation, agree
+and run validation lanes as specified above.
