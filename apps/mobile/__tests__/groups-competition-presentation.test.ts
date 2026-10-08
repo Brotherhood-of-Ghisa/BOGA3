@@ -39,7 +39,8 @@ test('podiums preserve server order, unit and default metric; rebuilding has no 
 test('normalized full sessions keep permitted reps and effort without derived load columns or totals', () => {
   const model=buildCompetitionSession(competitionSession.session);
   expect(model).toMatchObject({ setCount: 1,exerciseCount: 1,cards: [{ hideDerivedMetrics: true,rows: [{ weightReps: '5 reps' }] }] });
-  expect(model).not.toHaveProperty('volume');expect(model).not.toHaveProperty('volumeKg');
+  // No kg is visible, so no Volume figure either.
+  expect(model.volume).toBe('—');expect(model).not.toHaveProperty('volumeKg');
   expect(JSON.stringify(model)).not.toMatch(/body_weight|reading|fingerprint/);
 });
 
@@ -48,7 +49,7 @@ test.each(['bad', '-1', '1e3'])('ordinary full-session invalid Weight %s is not 
   const exercise=competitionSession.session.exercises[0];
   const session={ ...competitionSession.session,exercises: [{ ...exercise,visibility: 'ordinary' as const,
     sets: [{ ...exercise.sets[0],weight_value: weight }] }] };
-  expect(buildCompetitionSession(session)).toEqual({ cards: [],setCount: 0,exerciseCount: 0 });
+  expect(buildCompetitionSession(session)).toEqual({ cards: [],setCount: 0,exerciseCount: 0,volume: '—' });
 });
 test.each(['', '0'])('ordinary full-session Weight %s remains a valid zero-load performed set', weight => {
   const exercise=competitionSession.session.exercises[0];

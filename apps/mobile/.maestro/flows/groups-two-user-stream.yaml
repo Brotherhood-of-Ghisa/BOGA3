@@ -327,9 +327,10 @@ appId: com.dinoderek.mobile
     visible:
       id: "group-session-header"
     timeout: 15000
+# The header title names whose session and which day; its eyebrow, the group.
 - assertVisible:
-    id: "group-session-member"
-    text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME}"
+    id: "group-session-title-text"
+    text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} · .*"
 - assertVisible:
     id: "group-session-status"
     text: "Completed · 45m"
