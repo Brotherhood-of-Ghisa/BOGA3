@@ -60,11 +60,6 @@
       "count": 1
     }
   },
-  "components/session-complete/exercise-volume-card.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/session-recorder/exercise-picker.tsx": {
     "max-lines-per-function": {
       "count": 1

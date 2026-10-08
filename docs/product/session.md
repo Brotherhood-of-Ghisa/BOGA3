@@ -40,9 +40,9 @@ Signature: `No sessions · `
 ### session.volume-comparison · presentation · accepted
 
 Session Summary, live comparison and the share image use the same volume
-card. The name and set count share a row; current Volume has a black dot.
+card. The name and set count share a row.
 After six known prior comparable sessions, show P25, Median and P75 as
-vertical marks and the current volume's median delta. Genuine zero history
+vertical marks, current Volume as a black dot and its median delta. Genuine zero history
 counts. Earlier history scope and set eligibility stay unchanged.
 
 The linear scale centers the median and includes the current reading.

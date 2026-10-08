@@ -24,7 +24,7 @@ it.each([0, 1, 2, 3, 4, 5])('shows Building history with %i prior observations a
     medianVolume: count ? 400 : null, percentile25Volume: count ? 300 : null, percentile75Volume: count ? 600 : null }} testID="card" />);
   expect(screen.getByText('500')).toBeTruthy();
   expect(screen.getByText('2 sets')).toBeTruthy();
-  expect(screen.getByText('2 sets').parent).toBe(screen.getByText('Bench Press').parent);
+  expect(screen.getByTestId('card-heading')).toHaveTextContent(/Bench Press.*2 sets/);
   expect(screen.getByText('Building history')).toBeTruthy();
   expect(screen.queryByTestId('card-distribution')).toBeNull();
   expect(screen.queryByText(/prior|median|first comparable/i)).toBeNull();
@@ -57,7 +57,7 @@ it.each(['app', 'share'] as const)('shows quartiles after six observations in th
   expect(p75).toHaveStyle({ opacity: 1, transform: [{ translateX: 250 }] });
   expect(screen.getByText('25% above median')).toBeTruthy();
   expect(screen.queryByText('Building history')).toBeNull();
-  expect(screen.getByText('2 sets').parent).toBe(screen.getByText('Bench Press').parent);
+  expect(screen.getByTestId('card-heading')).toHaveTextContent(/Bench Press.*2 sets/);
   expect(screen.getByTestId('card-median', { includeHiddenElements: true })).toHaveStyle({ left: '50%' });
   expect(screen.getByTestId('card-p25', { includeHiddenElements: true })).toHaveStyle({ left: '30%' });
   expect(screen.getByTestId('card-p75', { includeHiddenElements: true })).toHaveStyle({ left: '90%' });

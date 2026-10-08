@@ -1,6 +1,6 @@
 # Session volume cards
 
-- Status: in_progress — implementation ready for human review; tests on hold
+- Status: in_progress — human review approved; agreed checks underway
 - Branch: `codex/session-volume-quartiles`
 - Areas: frontend; UI impact: yes
 
@@ -46,11 +46,9 @@ P25 / Median / P75 and Building history. Add no headings or explanatory copy.
 ## Delivery
 
 - Commit and push major changes.
-- Finish implementation, commit and push, then wait for human code review.
-  Run no more tests until the user approves them after reviewing the code.
-- Validation is pending. The fast run started before the review hold was
-  interrupted; updated assertions have not been rerun.
-- Agreed future lane set: fast, jest-coverage, complexity, dependencies,
+- Design and human code review are approved. Finish the agreed checks before
+  opening the PR; validation remains pending until they pass.
+- Agreed lane set: fast, jest-coverage, complexity, dependencies,
   ios-data-smoke and ios-session-view. The last two cover completion/share
   and the session view; other frontend-ui lanes are outside this card change.
 - Review the rendered browser options and native card preview now. Capture

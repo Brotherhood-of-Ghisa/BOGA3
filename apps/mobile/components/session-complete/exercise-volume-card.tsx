@@ -66,7 +66,8 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
 };
 
 /**
- * Exercise or muscle volume: current value and sets, then P25/median/P75 and
+ * Implements [[session.volume-comparison]] for exercise and muscle volume:
+ * current value and sets, then P25/median/P75 and
  * delta after six known prior observations. The linear scale centers the
  * median, vertical rules mark the references, and a black dot marks current.
  * Equal quartiles collapse to a rule; low history shows "Building history".
@@ -94,7 +95,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
   return (
     <Card style={variant === 'share' ? styles.shareCard : null} testID={testID}>
       <View accessibilityLabel={buildAccessibilityLabel(comparison)} accessible style={styles.body}>
-        <View style={styles.headingRow}>
+        <View style={styles.headingRow} testID={testID ? `${testID}-heading` : undefined}>
           <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
             {comparison.exerciseName}
           </Text>
