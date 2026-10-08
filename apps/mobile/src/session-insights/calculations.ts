@@ -176,8 +176,8 @@ export type ExerciseVolumeComparison = {
   currentVolume: number | null;
   historicalSessionCount: number;
   medianVolume: number | null;
-  percentile5Volume: number | null;
-  percentile95Volume: number | null;
+  percentile25Volume: number | null;
+  percentile75Volume: number | null;
   state: ExerciseVolumeComparisonState;
 };
 
@@ -695,25 +695,25 @@ export const deriveSessionExerciseVolumeComparisons = (
           currentVolume: volume,
           historicalSessionCount: 0,
           medianVolume: null,
-          percentile5Volume: null,
-          percentile95Volume: null,
+          percentile25Volume: null,
+          percentile75Volume: null,
           state: volume === null ? "unavailable" as const : "no-history" as const,
         };
       }
 
       const medianVolume = calculateLinearPercentile(historicalVolumes, 0.5);
-      const percentile5Volume = calculateLinearPercentile(
+      const percentile25Volume = calculateLinearPercentile(
         historicalVolumes,
-        0.05,
+        0.25,
       );
-      const percentile95Volume = calculateLinearPercentile(
+      const percentile75Volume = calculateLinearPercentile(
         historicalVolumes,
-        0.95,
+        0.75,
       );
       const state: ExerciseVolumeComparisonState =
         historicalVolumes.length === 1
           ? "single-baseline"
-          : percentile5Volume === percentile95Volume
+          : percentile25Volume === percentile75Volume
             ? "constant-baseline"
             : "distribution";
 
@@ -722,8 +722,8 @@ export const deriveSessionExerciseVolumeComparisons = (
         currentVolume: volume,
         historicalSessionCount: historicalVolumes.length,
         medianVolume,
-        percentile5Volume,
-        percentile95Volume,
+        percentile25Volume,
+        percentile75Volume,
         state,
       };
     },
@@ -813,10 +813,10 @@ export const deriveSessionMuscleVolumeComparisons = (
       ? calculateLinearPercentile(history, 0.5)
       : null;
     const low = history.length
-      ? calculateLinearPercentile(history, 0.05)
+      ? calculateLinearPercentile(history, 0.25)
       : null;
     const high = history.length
-      ? calculateLinearPercentile(history, 0.95)
+      ? calculateLinearPercentile(history, 0.75)
       : null;
     return {
       exerciseDefinitionId: muscle.id,
@@ -827,8 +827,8 @@ export const deriveSessionMuscleVolumeComparisons = (
       currentVolume: muscle.weightedVolume,
       historicalSessionCount: history.length,
       medianVolume: median,
-      percentile5Volume: low,
-      percentile95Volume: high,
+      percentile25Volume: low,
+      percentile75Volume: high,
       state:
         muscle.weightedVolume === null ? "unavailable" : history.length === 0
           ? "no-history"

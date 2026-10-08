@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ExerciseVolumeComparison } from '@/src/session-insights';
+import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 type ExerciseVolumeCardProps = {
   comparison: ExerciseVolumeComparison;
@@ -11,7 +12,6 @@ type ExerciseVolumeCardProps = {
   variant?: 'app' | 'share';
   testID?: string;
 };
-
 
 // The spoken form keeps the unit: a screen reader has no legend to lean on.
 const formatSpokenVolume = (value: number | null): string => value === null ? 'unavailable' : `${formatVolume(value)} kg reps`;
@@ -33,31 +33,33 @@ export const formatExerciseVolumeComparison = (comparison: ExerciseVolumeCompari
   return `${percentage}% ${delta > 0 ? 'above' : 'below'} median`;
 };
 
+const hasVolumeReference = (comparison: ExerciseVolumeComparison): boolean =>
+  comparison.currentVolume !== null &&
+  comparison.historicalSessionCount >= MIN_HISTORY_OBSERVATIONS &&
+  comparison.medianVolume !== null && comparison.percentile25Volume !== null && comparison.percentile75Volume !== null;
+
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
   const base = `${comparison.exerciseName}, ${formatExerciseSetCount(comparison.workingSetCount)}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.`;
-  if (comparison.currentVolume === null) return base;
-  if (
-    comparison.medianVolume === null ||
-    comparison.percentile5Volume === null ||
-    comparison.percentile95Volume === null
-  ) {
-    return `${base} ${formatExerciseVolumeComparison(comparison)}.`;
-  }
+  if (!hasVolumeReference(comparison)) return base;
 
   return `${base} ${formatExerciseVolumeComparison(comparison)}. Historical median ${formatSpokenVolume(
     comparison.medianVolume
-  )}; fifth to ninety-fifth percentile ${formatSpokenVolume(
-    comparison.percentile5Volume
-  )} to ${formatSpokenVolume(comparison.percentile95Volume)}, from ${comparison.historicalSessionCount} earlier ${
-    comparison.historicalSessionCount === 1 ? 'session' : 'sessions'
-  }.`;
+  )}; twenty-fifth to seventy-fifth percentile ${formatSpokenVolume(
+    comparison.percentile25Volume
+  )} to ${formatSpokenVolume(comparison.percentile75Volume)}.`;
 };
 
-const markerPosition = (comparison: ExerciseVolumeComparison): number => {
-  const low = comparison.percentile5Volume;
-  const high = comparison.percentile95Volume;
-  if (comparison.currentVolume === null || low === null || high === null || low === high) return 0.5;
-  return Math.max(0, Math.min(1, (comparison.currentVolume - low) / (high - low)));
+const markerPosition = (value: number, comparison: ExerciseVolumeComparison): number => {
+  const median = comparison.medianVolume as number;
+  // Symmetric, linear extent around the median; include the current value so
+  // outliers keep their actual position instead of being pinned to a quartile.
+  // Dividing before multiplying avoids overflowing for very large volumes.
+  const radius = Math.max(
+    median - (comparison.percentile25Volume as number),
+    (comparison.percentile75Volume as number) - median,
+    Math.abs((comparison.currentVolume as number) - median),
+  );
+  return radius === 0 ? 50 : 50 + ((value - median) / radius) * 40;
 };
 
 function Legend({ label, value }: { label: string; value: string }) {
@@ -70,25 +72,16 @@ function Legend({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * One exercise's volume this session against its history: the figure, the
- * delta from the median, and the P5–P95 range with median and current markers
- * (or the single/equal-baseline and no-history states). Descriptive context,
- * never a target — so no `accent`, which marks the screen's one action.
+ * Exercise or muscle volume: current value and sets, then P25/median/P75 and
+ * delta after six known prior observations. The linear scale centers the
+ * median, vertical rules mark the references, and a black dot marks current.
+ * Equal quartiles collapse to a rule; low history shows just the known volume.
+ * Shared by the session summary, live comparison and captured share image.
  */
 export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: ExerciseVolumeCardProps) {
-  const hasDistribution =
-    comparison.currentVolume !== null && comparison.state === 'distribution' &&
-    comparison.medianVolume !== null &&
-    comparison.percentile5Volume !== null &&
-    comparison.percentile95Volume !== null;
-  const hasBaseline =
-    comparison.currentVolume !== null && comparison.medianVolume !== null &&
-    (comparison.state === 'single-baseline' || comparison.state === 'constant-baseline');
-  const position = markerPosition(comparison);
-  const outsideRange =
-    hasDistribution && comparison.currentVolume !== null &&
-    (comparison.currentVolume < (comparison.percentile5Volume as number) ||
-      comparison.currentVolume > (comparison.percentile95Volume as number));
+  const hasDistribution = hasVolumeReference(comparison);
+  const low = hasDistribution ? markerPosition(comparison.percentile25Volume as number, comparison) : 50;
+  const high = hasDistribution ? markerPosition(comparison.percentile75Volume as number, comparison) : 50;
 
   return (
     <Card style={variant === 'share' ? styles.shareCard : null} testID={testID}>
@@ -104,51 +97,28 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
             <Text allowFontScaling={false} style={styles.microLabel}>Vol</Text>
             <Text allowFontScaling={false} style={styles.volume}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
           </View>
-          <Text allowFontScaling={false} style={comparison.medianVolume === null ? styles.deltaMuted : styles.delta}>
+          {hasDistribution ? <Text allowFontScaling={false} style={styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
-          </Text>
+          </Text> : null}
         </View>
 
         {hasDistribution ? (
           <View testID={testID ? `${testID}-distribution` : undefined}>
             <View style={styles.rangeLabels}>
-              <Legend label="P5" value={formatVolume(comparison.percentile5Volume as number)} />
+              <Legend label="P25" value={formatVolume(comparison.percentile25Volume as number)} />
               <Legend label="Median" value={formatVolume(comparison.medianVolume as number)} />
-              <Legend label="P95" value={formatVolume(comparison.percentile95Volume as number)} />
+              <Legend label="P75" value={formatVolume(comparison.percentile75Volume as number)} />
             </View>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackWrap}>
               <View style={styles.track} />
-              <View style={[styles.endpoint, styles.leftEndpoint]} />
-              <View style={[styles.endpoint, styles.rightEndpoint]} />
-              <View style={styles.medianMarker} />
-              <View style={[styles.currentMarker, { left: `${position * 100}%` }]} />
-            </View>
-            <View style={styles.historyRow}>
-              <Text allowFontScaling={false} style={styles.history}>{`${comparison.historicalSessionCount} prior sessions`}</Text>
-              {outsideRange ? (
-                <Text allowFontScaling={false} style={styles.microLabel}>
-                  {comparison.currentVolume !== null && comparison.currentVolume < (comparison.percentile5Volume as number) ? 'Below P5' : 'Above P95'}
-                </Text>
-              ) : null}
+              <View style={[styles.interval, { left: `${low}%`, width: `${high - low}%` }]} />
+              <View style={[styles.referenceMarker, { left: `${low}%` }]} testID={testID ? `${testID}-p25` : undefined} />
+              <View style={[styles.referenceMarker, { left: '50%' }]} testID={testID ? `${testID}-median` : undefined} />
+              <View style={[styles.referenceMarker, { left: `${high}%` }]} testID={testID ? `${testID}-p75` : undefined} />
+              <View style={[styles.currentMarker, { left: `${markerPosition(comparison.currentVolume as number, comparison)}%` }]} testID={testID ? `${testID}-current` : undefined} />
             </View>
           </View>
-        ) : hasBaseline ? (
-          <View style={styles.baseline} testID={testID ? `${testID}-baseline` : undefined}>
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.baselineGlyph}>
-              <View style={styles.baselineTrack} />
-              <View style={styles.medianMarker} />
-            </View>
-            <Text allowFontScaling={false} style={styles.history}>
-              {`${
-                comparison.state === 'single-baseline'
-                  ? '1 prior session'
-                  : `${comparison.historicalSessionCount} equal prior sessions`
-              } · baseline ${formatVolume(comparison.medianVolume as number)}`}
-            </Text>
-          </View>
-        ) : comparison.currentVolume === null ? null : (
-          <Text allowFontScaling={false} style={styles.history}>This is the first comparable completed session.</Text>
-        )}
+        ) : null}
       </View>
     </Card>
   );
@@ -231,14 +201,6 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
   },
-  deltaMuted: {
-    flexShrink: 1, textAlign: 'right',
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
   rangeLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -252,29 +214,19 @@ const styles = StyleSheet.create({
   track: {
     height: uiSpace.xs,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.rule,
+    backgroundColor: uiRoles.ruleSoft,
   },
-  endpoint: {
+  interval: {
     position: 'absolute',
-    width: uiSpace.sm,
-    height: uiSpace.sm,
-    marginLeft: -uiSpace.xs,
+    height: uiSpace.xs,
     borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.rule,
   },
-  leftEndpoint: {
-    left: 0,
-  },
-  rightEndpoint: {
-    left: '100%',
-  },
-  medianMarker: {
+  referenceMarker: {
     position: 'absolute',
-    left: '50%',
     width: uiBorder.width * 2,
-    height: uiSpace.md,
+    height: uiSpace.lg,
     marginLeft: -uiBorder.width,
-    borderRadius: uiGeometry.radius.pill,
     backgroundColor: uiRoles.inkMuted,
   },
   currentMarker: {
@@ -286,31 +238,5 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width * 2,
     borderColor: uiRoles.surface,
     backgroundColor: uiRoles.ink,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    gap: uiSpace.sm,
-  },
-  history: {
-    flexShrink: 1,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-  baseline: {
-    gap: uiSpace.xs,
-  },
-  baselineGlyph: {
-    height: uiSpace.md,
-    justifyContent: 'center',
-  },
-  baselineTrack: {
-    height: uiBorder.width * 2,
-    borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.rule,
   },
 });

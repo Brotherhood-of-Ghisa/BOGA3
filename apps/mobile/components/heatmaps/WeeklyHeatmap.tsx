@@ -4,6 +4,7 @@ import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { HEAT_RAMP } from './heatmap-metric';
 import { HEAT_MARK, heatmapStyles } from './heatmap-style';
@@ -95,7 +96,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
   const average = recent.reduce((mean, week, index) => mean + (week.value - mean) / (index + 1), 0);
   // Six genuine zero observations are valid, but an all-zero scale cannot
   // carry a meaningful reference. Never substitute an artificial full bar.
-  const showAverage = recent.length >= 6 && max > 0;
+  const showAverage = recent.length >= MIN_HISTORY_OBSERVATIONS && max > 0;
   const averagePosition = showAverage ? average / max * 100 : null;
   const averageLabel = formatAverageValue(average);
   const valueWidth = Math.min(96, Math.max(36, ...weeks.map(week => weekValue(week, formatValue).length * uiTypography.size.base * 0.6)));

@@ -264,7 +264,8 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('completed-session-detail-error')).toBeNull();
     expect(screen.queryByTestId('session-completion-personal-records')).toBeNull();
     expect(screen.getByTestId('session-completion-exercise-exercise-1')).toBeTruthy();
-    expect(screen.getAllByText('No comparison history yet')).toHaveLength(2);
+    expect(screen.queryByText('No comparison history yet')).toBeNull();
+    expect(screen.queryByTestId('session-completion-exercise-exercise-1-distribution')).toBeNull();
     expect(screen.getByTestId('session-completion-done')).toBeTruthy();
   });
 
