@@ -1,11 +1,11 @@
 // Service-only adapter. SQL owns source/pin checks and atomic publication;
 // public readers must construct allowlisted protocol-4 projections separately.
 import { isWorkingSetType } from '../exercise-calculations/set-semantics.ts';
+import type { LoadInputMode } from '../exercise-core/index.ts';
 import { isNormalizedCompetition, validateCompetitionRules, type CompetitionMetric,
   type CompetitionValue } from './competition-contract.ts';
 import { scoreCompetitionPerformance } from './competition-score.ts';
 import type { CompetitionRulesWire } from './competition-wire.ts';
-import type { LoadInputMode } from '../exercise-core/index.ts';
 
 /** The performed set an evaluated score came from; private calculation context never is. */
 export type CompetitionPerformanceSnapshot = {
