@@ -114,8 +114,6 @@ export type GroupExercise = {
   source_exercise_id: string | null;
   /** Null while active. Archived: keeps its links and a read-only board, not offered for new links (D8). */
   archived_at_ms: number | null;
-  /** The group's shared rules line (`describeCompetitionRules`), shown wherever a member links to it. */
-  standard: string;
 };
 
 // ---- Errors -----------------------------------------------------------------

@@ -117,7 +117,7 @@ export type GroupRpcName =
   | 'group_competition_certification_end'
   | 'group_competition_revisions'
   | 'group_competition_history'
-  | 'group_competition_stream'
+  | 'group_competition_stream_v2'
   | 'group_competition_session_detail'
   | 'group_competition_session_records'
   | 'group_competition_week_summary';
@@ -302,7 +302,7 @@ export const getCompetitionHistory = ({ groupId, exerciseId, metric, certified, 
     p_certified: certified, p_revision: revision, p_before: before, p_limit: limit },isCompetitionHistoryWire,p => p.exercise.group_exercise_id === exerciseId && p.metric === metric &&
       p.certified === certified && p.revision.rules_revision === (revision ?? p.exercise.rules.rules_revision));
 export const getCompetitionStream = (groupId: string | null = null, before: string | null = null, limit = 20): Promise<CompetitionStreamWire> =>
-  competitionRpc('group_competition_stream',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
+  competitionRpc('group_competition_stream_v2',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
     p => groupId === null || p.items.every(item => item.kind === 'session' ? item.groups.every(g => g.group_id === groupId) :
       item.kind === 'competition' ? item.event.group.group_id === groupId : item.group.group_id === groupId));
 export const getCompetitionSession = (groupId: string, memberId: string, sessionId: string): Promise<CompetitionSessionDetailWire> =>

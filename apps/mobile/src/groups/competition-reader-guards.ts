@@ -1,6 +1,6 @@
 // Exact schemas are a privacy boundary, including every nested history/session.
 import { isCompetitionMetric } from './competition-contract.ts';
-import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionRulesWire } from './competition-wire-guards.ts';
+import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionRulesWire } from './competition-wire-guards.ts';
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
   CompetitionExerciseListWire, CompetitionExerciseWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
@@ -136,9 +136,25 @@ export function isCompetitionSessionRecordsWire(v: unknown): v is CompetitionSes
     arrayOf(v.records,r => sessionRecord(r,v.member_user_id as string,v.session_id as string) &&
       (r as { event: CompetitionEventWire }).event.group.group_id === v.group_id);
 }
+const performedSet = (v: unknown) => v === null ||
+  (typeof v === 'object' && isCompetitionPerformanceWire(v,(v as { visibility?: unknown }).visibility === 'normalized'));
+// A record's set follows the record's own visibility. A previous holder's may
+// be stricter, never looser: a normalized record discloses no holder's kg.
+function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
+  const normalized = event.visibility === 'normalized';
+  const visibility = (set: unknown) => (set as { visibility: string }).visibility;
+  return exact(v,['performance','previous']) && event.kind === 'record' && performedSet(v.performance) &&
+    (v.performance === null || visibility(v.performance) === event.visibility) &&
+    arrayOf(v.previous,p => exact(p,['value','performance']) && performedSet(p.performance) &&
+      (p.value as { role?: unknown }).role === 'previous' &&
+      historyValue(p.value,normalized || (p.performance !== null && visibility(p.performance) === 'normalized')) &&
+      (!normalized || p.performance === null || visibility(p.performance) === 'normalized'));
+}
 function streamItem(v: unknown): boolean {
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key;
+  if (exact(v,['kind','key','sort_at_ms','event','record']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamRecord(v.record,v.event);
   if (exact(v,['kind','key','sort_at_ms','groups','session']) && v.kind === 'session') return id(v.key) && integer(v.sort_at_ms) &&
     Array.isArray(v.groups) && v.groups.length > 0 && v.groups.every(group) && isCompetitionSessionWire(v.session);
   return exact(v,['kind','key','sort_at_ms','event','group','member']) && v.kind === 'membership' && id(v.key) && integer(v.sort_at_ms) &&

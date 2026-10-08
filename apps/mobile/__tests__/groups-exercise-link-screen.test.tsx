@@ -157,8 +157,9 @@ describe('Link screen', () => {
 
     const suggested = await screen.findByTestId('exercise-link-row-gx-bench');
     expect(within(suggested).getByText(/Bench Press/)).toBeTruthy();
-    // Tuesday's "Bench" is a name match → Suggested too, with the load-mode note.
-    expect(screen.getByText(/Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load/)).toBeTruthy();
+    // Tuesday's "Bench" is a name match → Suggested too; no rules line on any row.
+    expect(screen.getByTestId('exercise-link-row-gx-tue-bench')).toBeTruthy();
+    expect(screen.queryByText(/Rules \d|Bodyweight scoring/)).toBeNull();
     expect(screen.getByTestId('exercise-link-row-gx-deadlift')).toBeTruthy();
 
     await act(async () => {

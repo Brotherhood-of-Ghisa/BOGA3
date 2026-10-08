@@ -210,7 +210,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
                 testID={`exercise-link-linked-row-${row.groupExerciseId}`}>
                 <RowText
                   groupName={row.groupName}
-                  lines={[row.statusLabel, row.loadModeNote]}
+                  lines={[row.statusLabel]}
                   name={row.groupExerciseName}
                 />
               </ListRow>
@@ -346,7 +346,7 @@ function AvailableRow({
       testID={`exercise-link-row-${row.groupExercise.group_exercise_id}`}>
       <RowText
         groupName={showGroup ? row.groupName : undefined}
-        lines={[row.unavailableReason ?? row.loadModeNote]}
+        lines={[row.unavailableReason]}
         name={name}
       />
     </ListRow>

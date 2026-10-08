@@ -78,6 +78,15 @@ formula notes, hints under fields, or "how this works" lines.
   - `Coaches get read-only training access …` under AI coaching and
     `Configure how dates and other details are displayed …` in Settings'
     Preferences (decided 2026-10-07).
+  - Every rules line on group screens (decided 2026-10-08): `Rules N · …%
+    contribution · Bodyweight scoring … · … load` on the board, its row
+    sheet, the exercise rows and actions and the link notes (with `Your
+    personal exercise settings stay unchanged.`); `· Rules N` on podium
+    cards and stream cards; the history's rules line, revision chips and
+    `History keeps each value's original unit. …`; `Scores use the group's
+    … rules …`, `Certification attests …` and `Observed under rules N; …`
+    on the record sheets; `View rules history`. `As logged: …` is gone: the
+    set has its own line.
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.

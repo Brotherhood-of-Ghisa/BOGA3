@@ -36,8 +36,11 @@ const history = { contract_version: 4, exercise, revision, metric: 'e1rm', certi
 const detail = { contract_version: 4, group_id: 'g', session };
 const records = { contract_version: 4, group_id: 'g', member_user_id: 'u1', session_id: 's',
   records: [{ event, boards: [{ metric: 'e1rm', leader: { user_id: 'u2', username: 'Rival' }, leads: false }] }] };
+const previousHolder = { user_id: 'u2', username: 'Rival' };
+const recordDetail = { performance, previous: [{ value: { ...historicalValue, role: 'previous', value: 120, member: previousHolder },
+  performance: null }] };
 const stream = { contract_version: 4, items: [
-  { kind: 'competition', key: 'ev', sort_at_ms: 100, event },
+  { kind: 'competition', key: 'ev', sort_at_ms: 100, event, record: recordDetail },
   { kind: 'session', key: 'u1:s', sort_at_ms: 100, groups: [{ group_id: 'g', name: 'Crew' }], session },
   { kind: 'membership', key: 'm:joined', sort_at_ms: 90, event: 'joined', group: { group_id: 'g', name: 'Crew' }, member },
 ], next_cursor: null, has_more: false };
@@ -110,6 +113,29 @@ test('group-bound sessions keep ordinary context while rejecting normalized kg a
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ kind: 'future', key: 'k' }] })).toBe(false);
 });
 
+test('a record stream item carries its set and previous #1, exactly, or nothing (a payload cached from the first reader)', () => {
+  const item = stream.items[0];
+  const withRecord = (record: unknown) => guards.isCompetitionStreamWire({ ...stream, items: [{ ...item, record }] });
+  expect(withRecord(recordDetail)).toBe(true);
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ kind: 'competition', key: 'ev', sort_at_ms: 100, event }] })).toBe(true);
+  expect(withRecord({ performance: null, previous: [] })).toBe(true);
+  expect(withRecord({ ...recordDetail, extra: 1 })).toBe(false);
+  expect(withRecord({ ...recordDetail, performance: { ...performance, visibility: 'ordinary', weight_value: '100' } })).toBe(false);
+  expect(withRecord({ ...recordDetail, performance: { ...performance, weight_value: '100' } })).toBe(false);
+  expect(withRecord({ ...recordDetail, previous: [{ ...recordDetail.previous[0], value: historicalValue }] })).toBe(false);
+  expect(withRecord({ ...recordDetail, previous: [{ value: recordDetail.previous[0].value }] })).toBe(false);
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...item, event: { ...event, kind: 'link' }, record: recordDetail }] })).toBe(false);
+  // The fixture's event is normalized: a previous holder's kg or ordinary set never passes.
+  const normalizedPrevious = { value: { ...historicalValue, role: 'previous', value: 120, member: previousHolder }, performance: { ...performance, set_id: 'set0' } };
+  expect(withRecord({ ...recordDetail, previous: [normalizedPrevious] })).toBe(true);
+  expect(withRecord({ ...recordDetail, previous: [{ ...normalizedPrevious, value: { ...normalizedPrevious.value, unit: 'kg' } }] })).toBe(false);
+  // An ordinary record may show an ordinary holder's kg, and a normalized holder only normalized units.
+  const ordinaryItem = { ...item, event: { ...event, visibility: 'ordinary' } };
+  const ordinaryPrevious = { value: { ...normalizedPrevious.value, unit: 'kg' }, performance: { ...performance, set_id: 'set0', visibility: 'ordinary', weight_value: '100' } };
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null, previous: [ordinaryPrevious] } }] })).toBe(true);
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null,
+    previous: [{ ...ordinaryPrevious, performance: { ...performance, set_id: 'set0' } }] } }] })).toBe(false);
+});
 test('session records name only this session\'s records, one board each, never a leading board without a leader', () => {
   const record = records.records[0];
   const variant = (patch: Record<string, unknown>) => ({ ...records, records: [{ ...record, ...patch }] });
@@ -161,7 +187,7 @@ describe('request-scoped protocol-4 API', () => {
     ['podiums',() => api.getCompetitionPodiums('g'),podiums],
     ['revisions',() => api.getCompetitionRevisions('g','ge'),{ contract_version: 4, exercise, revisions: [revision] }],
     ['history',() => api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),history],
-    ['stream',() => api.getCompetitionStream('g'),stream],
+    ['stream_v2',() => api.getCompetitionStream('g'),stream],
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
     ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],

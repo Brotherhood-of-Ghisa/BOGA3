@@ -1,17 +1,11 @@
 import { useRouter, type Href } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Icon, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
-import {
-  sessionRecordCertificationStatus,
-  type SessionRecordCertification,
-  type SessionRecordRow,
-} from '@/src/groups/competition-session-records-view-model';
-import { buildMetricRecordSheetModel, metricCertificationEndConfirmation } from '@/src/groups/metric-record-sheet-view-model';
-import { useMetricCertification } from '@/src/groups/use-metric-certification';
+import type { SessionRecordRow } from '@/src/groups/competition-session-records-view-model';
 
-import { GroupWriteNotice } from './write-notice';
+import { GroupSetCertification } from './set-certification';
 
 type CardProps = {
   rows: SessionRecordRow[];
@@ -65,51 +59,9 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
           <Text allowFontScaling={false} style={styles.detail} testID={`${testID}-detail`}>{row.detail}</Text>
         </View>
       </Pressable>
-      {row.certification ? <RecordCertification certification={row.certification} testID={testID} {...rest} /> : null}
+      {row.certification ? <GroupSetCertification certification={row.certification} testID={testID}
+        readOnlyReason={row.certification.eligible ? undefined : 'no longer a current entry'} {...rest} /> : null}
     </View>
-  );
-}
-
-function RecordCertification({ certification, testID, groupId, userId, myRole, online, onChanged }: {
-  certification: SessionRecordCertification; testID: string;
-} & Omit<CardProps, 'rows'>) {
-  const readOnlyReason = certification.eligible ? undefined : 'no longer a current entry';
-  const state = useMetricCertification({ groupId, userId, row: certification.target, exercise: certification.exercise,
-    online, readOnlyReason, onChanged });
-  const model = buildMetricRecordSheetModel({ row: certification.target, exercise: certification.exercise, userId, myRole,
-    certification: state.certification, readOnlyReason, online, pending: state.pending, needsReview: state.needsReview, notice: state.notice });
-  const guard = { blocked: model.blocked, active: model.active };
-  const withdraw = () => {
-    const { title, message, confirmLabel } = metricCertificationEndConfirmation('withdraw');
-    Alert.alert(title, message, [{ text: 'Keep', style: 'cancel' },
-      { text: confirmLabel, style: 'destructive', onPress: () => void state.perform('withdraw', guard) }]);
-  };
-  const action = model.canCertify ? { label: 'Certify', onPress: () => void state.perform('certify', guard) }
-    : model.canWithdraw ? { label: 'Withdraw', onPress: withdraw } : null;
-
-  return (
-    <>
-      <View style={styles.statusLine}>
-        <View style={styles.status} accessible accessibilityLabel={sessionRecordCertificationStatus(model.active, userId)} testID={`${testID}-status`}>
-          {model.active ? <Icon color={uiRoles.ink} name="check" size="xs" /> : <Icon color={uiRoles.inkMuted} name="circle" size="xs" />}
-          <Text allowFontScaling={false} style={[styles.statusText, model.active ? styles.statusCertified : null]}>
-            {sessionRecordCertificationStatus(model.active, userId)}
-          </Text>
-        </View>
-        {action ? (
-          <ActionButton
-            accessibilityLabel={`${action.label} ${certification.target.metric === 'e1rm' ? '1RM' : 'Volume'}`}
-            disabled={model.blocked}
-            label={action.label}
-            onPress={action.onPress}
-            size="compact"
-            testID={`${testID}-${action.label.toLowerCase()}`}
-            variant="outline"
-          />
-        ) : null}
-      </View>
-      {state.notice?.tone === 'error' ? <GroupWriteNotice {...state.notice} testID={`${testID}-notice`} /> : null}
-    </>
   );
 }
 
@@ -192,27 +144,5 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.inkMuted,
-  },
-  statusLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-  },
-  status: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    flexShrink: 1,
-  },
-  statusText: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  statusCertified: {
-    color: uiRoles.ink,
   },
 });

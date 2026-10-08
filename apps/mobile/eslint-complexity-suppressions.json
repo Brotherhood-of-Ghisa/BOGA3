@@ -42,22 +42,12 @@
       "count": 1
     }
   },
-  "components/groups/group-exercise-pick-sheet.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
   "components/groups/group-exercises-page.tsx": {
     "max-lines-per-function": {
       "count": 1
     }
   },
   "components/groups/group-metric-board.tsx": {
-    "sonarjs/cognitive-complexity": {
-      "count": 1
-    }
-  },
-  "components/groups/group-metric-history.tsx": {
     "sonarjs/cognitive-complexity": {
       "count": 1
     }
