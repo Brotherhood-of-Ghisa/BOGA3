@@ -31,9 +31,6 @@
 #     group_competition_exercise_create and the table CHECKs, the role matrix,
 #     targets, rule-neutral update, and the archive round trip.
 #
-# Runs on the protocol-4-active baseline (require_active_group_competitions,
-# groups-fixtures.sh).
-#
 # Hermetic: every run provisions its own seven users (owner, admin, member,
 # outsider, joiner, athlete, viewer) with a per-run tag, never reads fixture
 # users, and deletes its users, groups, and diagnostics rows on exit. Repeated
@@ -65,7 +62,6 @@ load_supabase_status_env
   fail "JWT_SECRET missing from 'supabase status'; it is required to mint the client_id probe token"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-require_active_group_competitions
 
 RUN_TAG="${GROUPS_CONTRACT_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -170,7 +166,7 @@ HELPERS=(group_require_app_user group_active_role group_require_member group_req
   group_write_invite_code group_summary_json group_members_json group_detail_json group_require_target
   group_share_session group_member_ref_json
   group_exercise_trim group_exercise_validate_name group_exercise_validate_load_input_mode
-  group_exercise_validate_source_id group_exercise_require_manager group_exercise_require group_exercise_json)
+  group_exercise_validate_source_id group_exercise_require_manager group_exercise_require)
 rpc_list="$(printf "'%s'," "${RPCS[@]}")"
 helper_list="$(printf "'%s'," "${HELPERS[@]}")"
 [[ "$(run_psql "
@@ -190,7 +186,7 @@ helper_list="$(printf "'%s'," "${HELPERS[@]}")"
 [[ "$(run_psql "
   select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'app_public' and p.prosecdef
-     and p.proname in ('group_exercise_require_manager', 'group_exercise_require', 'group_exercise_json');")" == "0" ]] ||
+     and p.proname in ('group_exercise_require_manager', 'group_exercise_require');")" == "0" ]] ||
   fail "the group-exercise helpers run only inside the definer RPCs and must not be SECURITY DEFINER"
 # The share trigger: AFTER INSERT OR UPDATE, FOR EACH ROW (tgtype ROW=1 |
 # INSERT=4 | UPDATE=16 = 21, no BEFORE bit), enabled, on app_public.sessions,

@@ -116,7 +116,7 @@ http_call() {
 }
 
 # Every group call speaks the current group contract (protocol 4), as the app
-# does: once protocol 4 is active, a group RPC without it is UPDATE_REQUIRED.
+# does: a group RPC without it is UPDATE_REQUIRED.
 GROUP_CONTRACT_HEADER="x-boga-group-contract: 4"
 
 # rpc <bearer> <function> <json-body>
@@ -153,14 +153,6 @@ eval_drain() {
     -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-4}" -H "Content-Type: application/json" \
     -H "x-group-eval-secret: ${1-${EVAL_SECRET}}" \
     --data '{}' "${API_URL}/functions/v1/group-eval"
-}
-
-# require_active_group_competitions: the bodies assert protocol 4, which the
-# baseline preflight activates (ensure-local-runtime-baseline.sh). A pending
-# stack (reset since the last preflight) fails here, not on the first RPC.
-require_active_group_competitions() {
-  [[ "$(run_psql "select app_public.group_competition_active();")" == t ]] ||
-    fail "group competitions are pending on this stack; run the lane through ./boga test (its baseline preflight activates them)"
 }
 
 expect_ok() {

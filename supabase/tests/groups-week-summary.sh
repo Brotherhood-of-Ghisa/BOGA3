@@ -24,8 +24,7 @@
 #   - a removed member leaves the board, training now and the latest session,
 #     and reads NOT_FOUND.
 #
-# Runs on the protocol-4-active baseline (require_active_group_competitions,
-# groups-fixtures.sh), so every comparison ranks
+# Every comparison ranks
 # Volume (kg × reps) and 1RM. Direct-drain mode as groups-boards.sh: the kick
 # URL is unset and the sweep paused for the run; the lane POSTs group-eval
 # itself. Hermetic: per-run users, deleted on exit with everything they own.
@@ -51,7 +50,6 @@ load_supabase_status_env
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-require_active_group_competitions
 
 RUN_TAG="${GROUPS_WEEK_SUMMARY_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -306,15 +304,13 @@ expect_sql "the RPC is security definer with a pinned search_path, executable by
           and not has_function_privilege('anon', p.oid, 'execute')
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and p.proname = 'group_competition_week_summary';" "t"
-# group_week_summary is the protocol-3 endpoint: refused (UPDATE_REQUIRED) on a
-# protocol-4 stack.
 expect_sql "no group_week_* helper is client-executable" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%' and p.proname <> 'group_week_summary'
+    where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%'
       and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'));" "0"
 expect_sql "the helpers pin search_path and are not security definer" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%' and p.proname <> 'group_week_summary'
+    where n.nspname = 'app_public' and p.proname like 'group\\_week\\_%'
       and (p.prosecdef or not coalesce(p.proconfig @> array['search_path=app_public, pg_temp'], false));" "0"
 
 summary "${ATHLETE_TOKEN}" "${WS}" "${WE}" "$(run_psql "select gen_random_uuid();")"

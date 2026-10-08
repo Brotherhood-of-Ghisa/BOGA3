@@ -19,7 +19,7 @@ const pull: GroupExerciseRules = {
 };
 
 describe('group metric contract', () => {
-  it('matches the shared D6 load-factor vectors the server runs against group_board_load_factor', () => {
+  it('matches the shared D6 load-factor vectors', () => {
     expect(loadFactorVectors.cases).toHaveLength(4);
     for (const { source, target, factor } of loadFactorVectors.cases) {
       expect(groupEnteredWeightFactor(source as LoadInputMode, target as LoadInputMode)).toBe(factor);

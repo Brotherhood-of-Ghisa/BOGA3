@@ -2,7 +2,7 @@
 # The app's protocol-4 groups client against the live server (lane
 # groups-api-live, its second body). Provisions its own owner and member, runs
 # apps/mobile's groups-competition-api-live Jest suite against this worktree's
-# protocol-4-active local stack, then deletes the users and everything they
+# local stack, then deletes the users and everything they
 # made. The suite needs the live evaluator (the baseline's kick URL) to publish
 # a board. The membership and settings wire is groups-api-live.sh's job.
 # Execute only through its Boga lane.
@@ -26,7 +26,6 @@ done
 load_supabase_status_env
 [[ -n "${API_URL:-}" && -n "${ANON_KEY:-}" ]] || fail "local Supabase status env is incomplete (API_URL/ANON_KEY)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
-require_active_group_competitions
 
 RUN_TAG="$(printf '%s' "$(date +%s)-$$-${RANDOM}" | tr -c 'a-z0-9-' '-')"
 PASSWORD="GroupsCompetitionLive!${RUN_TAG}"
