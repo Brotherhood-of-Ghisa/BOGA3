@@ -70,16 +70,15 @@ certification response exposes its value, date, identifier, history, provenance
 or digest. Worker-only claim/prepare/publish/fail RPCs require service-role
 access; the Edge endpoint still requires its Vault-held secret.
 
-### Pending competition disclosure contract
+### Competition disclosure contract
 
-[The protocol-4 competition contract](tech/group-competition-contract.md) adds
-an exact capability negotiation RPC with existing app-user/OAuth/membership
-checks and pending activation. It changes no current data-reader permissions.
-The subsequent atomic reader cutover must enforce normalized disclosure across
-current/legacy/history/session/summary RPCs, hide absolute counterparts and
-private dependency digests, and use random write tokens. No old endpoint may
-bypass that boundary. Ordinary Off sharing intentionally retains the documented
-cross-mode/cross-group inference limit. Private Sync v2 remains protocol 3.
+[The protocol-4 competition contract](tech/group-competition-contract.md)
+requires the exact capability header on every group RPC, after the
+app-user/OAuth checks. Its readers enforce normalized disclosure across board,
+history, session and summary RPCs, hide absolute counterparts and private
+dependency digests, and use random write tokens. Ordinary Off sharing
+intentionally retains the documented cross-mode/cross-group inference limit.
+Private Sync v2 protocols are separate.
 
 ## Read-only coaching projections
 

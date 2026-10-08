@@ -30,6 +30,10 @@ operator's explicit authority, and verify V4 is unchanged for users.
   parked its comparison's publication. If the operator has not applied it on
   hosted already, apply it in order here, before T04's.
 - Repair forward on failure; never restore pre-V4 readers.
+- T04's migration (`20261008120000_group_competition_v4_only.sql`) raises if
+  the database is pending and holds groups (hosted is active), and drops
+  `group_competition_activation`: run the "activation set" check before it.
+  Redeploy group-eval with it; T04 removed the protocol-3 dispatch.
 
 ## Open — resolve with the user at session start
 

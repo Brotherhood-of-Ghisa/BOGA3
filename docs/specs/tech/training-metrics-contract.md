@@ -318,8 +318,5 @@ kernel rather than copying it; the SQL load factor matches
 records in §3. It uses this kernel's effective total-load Volume/estimated 1RM
 and the same private dated B for public percentages; ordinary group scores
 convert source entered units to the declared group target. Display rounding does
-not determine competitive rank. Versioned worker/publication and safe readers
-are implemented and remain pending after installation until service-only
-activation. Compatible UI and authorized hosted release remain separate.
-Personal/coaching calculations,
+not determine competitive rank. Personal/coaching calculations,
 raw kg storage and existing records retain their current semantics.

@@ -18,7 +18,9 @@ scorers or view models, and no dead V4 surface.
   `performance-score.ts` `scoreGroupPerformance`, `metric-contract.ts`
   (mixed: link-compatibility rules stay), `metric-wire.ts`,
   `metric-wire-guards.ts`, `metric-view-model.ts`, the M25 shapes in
-  `types.ts`. Confirm each has no V4 caller. Also the stale comments naming
+  `types.ts`. Confirm each has no V4 caller. T04 removed the worker
+  dispatch (`evaluateGroupComparisonGraph`), so `evaluateGroupMetricGraph` and
+  `scoreGroupPerformance` have only tests as callers. Also the stale comments naming
   old RPCs (listed in §4's header). The unused
   `getCompetitionContract`; the `pending` branch of the activation-state type
   if nothing decodes it; their tests; complexity/dependency baselines that shrink.
