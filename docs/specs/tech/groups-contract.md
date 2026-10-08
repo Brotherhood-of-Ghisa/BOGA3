@@ -146,7 +146,8 @@ session detail, not in it: exact readers reject a new key. One shared session's
 non-voided records that took #1 in the group, as stream events whose `record`
 values are those boards, each with the All board's current leader (`leads`
 while its own set holds #1; no leader for an earlier revision). The app shows
-them once the session completes: a provisional record can still move.
+them once the session completes (a provisional record can still move), and
+no Volume board: groups are dropping that metric.
 
 ## Device-computed card metrics
 

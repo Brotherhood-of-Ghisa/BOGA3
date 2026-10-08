@@ -4,6 +4,7 @@
  * board link, certification target) and the exercise cards' merged band.
  */
 import {
+  formatGroupSessionDuration,
   buildSessionRecordBands,
   buildSessionRecordRows,
   groupSessionEyebrow,
@@ -66,9 +67,11 @@ test('the title names the member (You for me) and the day; the eyebrow names the
   expect(groupSessionEyebrow('  ')).toBe('Group view');
 });
 
-test('records show only once the session is completed, never provisional or voided', () => {
+test('records show only once the session is completed, never provisional or voided, and never a Volume board', () => {
   const kept = record();
-  expect(shownSessionRecords(session(), [kept, record({ eventId: 'p', provisional: true }), record({ eventId: 'v', voided: true })])).toEqual([kept]);
+  const rmOnly = { ...kept, boards: [kept.boards[0]] };
+  expect(shownSessionRecords(session(), [kept, record({ eventId: 'p', provisional: true }), record({ eventId: 'v', voided: true }),
+    record({ eventId: 'vol', boards: [{ metric: 'volume', leader: alex, leads: true }] })])).toEqual([rmOnly]);
   expect(shownSessionRecords(session({ status: 'active' }), [kept])).toEqual([]);
   expect(shownSessionRecords(session({ status: 'draft' }), [kept])).toEqual([]);
 });
@@ -129,4 +132,12 @@ test('Volume sums only the ordinary volume-included sets; none reads —', () =>
     { set_id: 'x', order_index: 2, weight_value: '100', reps_value: '5', set_type: null, performance_status: 'skipped' }] }] });
   expect(buildCompetitionSession(withWarmUp).volume).toBe('500');
   expect(buildCompetitionSession(session({ exercises: [session().exercises[1]] })).volume).toBe('—');
+});
+
+test('Duration: the session own duration once completed, else the time since it started', () => {
+  expect(formatGroupSessionDuration(session())).toBe('1h 4m');
+  expect(formatGroupSessionDuration(session({ duration_sec: null }))).toBe('1h 4m');
+  expect(formatGroupSessionDuration(session({ duration_sec: null, completed_at_ms: null }))).toBe('—');
+  expect(formatGroupSessionDuration(session({ status: 'active', completed_at_ms: null, duration_sec: null }), STARTED + 32 * 60_000)).toBe('32m');
+  expect(formatGroupSessionDuration(session({ status: 'active' }), STARTED - 1000)).toBe('0m');
 });

@@ -34,7 +34,7 @@ Two standing rules:
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
-| The screen's one primary action, or an outline / text button | `ActionButton` (`action-button.tsx`) |
+| The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action | `ActionButton` (`action-button.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`) |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |

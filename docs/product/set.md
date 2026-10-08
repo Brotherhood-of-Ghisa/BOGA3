@@ -63,8 +63,8 @@ set can make a 1RM or Weight record, a volume-included set a Volume record,
 and a set that is neither is never a record, PR or best. The only highlights
 on a set list are the exercise's record sets: the set that took the 1RM record
 and the set that took the Weight record (one set may take both). The group
-session view highlights instead the set that took #1 on a group board, 1RM or
-Volume: one `#1 in group` band per set, its boards joined (decided 2026-10-08).
+session view highlights instead the set that took #1 on a group 1RM board:
+one `#1 in group` band per set (decided 2026-10-08).
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.

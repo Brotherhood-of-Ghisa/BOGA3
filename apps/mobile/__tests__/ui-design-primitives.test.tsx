@@ -498,6 +498,18 @@ describe('ActionButton', () => {
     expect(flatStyle(screen.getByText('Archive')).color).toBe(uiRoles.danger);
   });
 
+  it('draws a compact row action 28 tall, with hit slop keeping its 44 tap target', () => {
+    const { rerender } = render(<ActionButton label="Certify" onPress={jest.fn()} size="compact" testID="compact" variant="outline" />);
+    const compact = screen.getByTestId('compact');
+    expect(flatStyle(compact).minHeight).toBe(uiGeometry.compactControlHeight);
+    const slop = (uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2;
+    expect(compact.props.hitSlop).toBe(slop);
+    expect(uiGeometry.compactControlHeight + 2 * slop).toBe(uiGeometry.tapTarget);
+    rerender(<ActionButton label="Certify" onPress={jest.fn()} testID="compact" variant="outline" />);
+    expect(flatStyle(screen.getByTestId('compact')).minHeight).toBe(uiGeometry.tapTarget);
+    expect(screen.getByTestId('compact').props.hitSlop).toBeUndefined();
+  });
+
   it('fades when disabled and ignores presses', () => {
     const onPress = jest.fn();
     render(<ActionButton disabled label="Done" onPress={onPress} testID="button" variant="primary" />);

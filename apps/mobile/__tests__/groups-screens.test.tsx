@@ -201,7 +201,7 @@ const BENCH = { group_exercise_id: 'ge-bench', name: 'Bench', source_exercise_id
   published_revision: 1, rebuilding: false };
 const certificationBy = (user_id: string, username: string): CompetitionCertificationWire => ({ certification_id: 'cert-1', metric: 'e1rm',
   certified_by: { user_id, username }, certified_at_ms: T0, observed_rules_revision: 1, ended_at_ms: null, end_reason: null });
-/** alex's 102.5 × 5 took #1 on 1RM (still held) and Volume (since passed by sam). */
+/** alex's 102.5 × 5 took #1 on 1RM (since passed by sam) and on Volume, a board the view no longer shows. */
 const sessionRecords = ({ member = { user_id: 'friend-1', username: 'alex' }, certification = null as CompetitionCertificationWire | null,
   provisional = false } = {}): CompetitionSessionRecordsWire => ({
   contract_version: 4, group_id: 'group-a', member_user_id: member.user_id, session_id: 's-1',
@@ -215,7 +215,7 @@ const sessionRecords = ({ member = { user_id: 'friend-1', username: 'alex' }, ce
       record_context: { exercise: BENCH, former: false, metrics: [
         { metric: 'e1rm', write_token: 'tok-1rm', eligible: true, certification },
         { metric: 'volume', write_token: 'tok-vol', eligible: true, certification: null }] } },
-    boards: [{ metric: 'e1rm', leader: member, leads: true }, { metric: 'volume', leader: { user_id: 'friend-2', username: 'sam' }, leads: false }],
+    boards: [{ metric: 'e1rm', leader: { user_id: 'friend-2', username: 'sam' }, leads: false }, { metric: 'volume', leader: member, leads: true }],
   }],
 });
 
@@ -610,7 +610,9 @@ describe("Friend's session view", () => {
     // `Sets` counts working sets: the warm-up keeps its row but is no set.
     expect(screen.getByTestId('group-session-sets').props.accessibilityLabel).toBe('Sets 1');
     expect(screen.getByText('Bench Press')).toBeTruthy();
-    expect(screen.getByText('Completed · 1h 5m')).toBeTruthy();
+    // View Session's card: Start and Duration, no status line once completed.
+    expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 1h 5m');
+    expect(screen.queryByTestId('group-session-status')).toBeNull();
     expect(screen.queryByTestId('group-session-records')).toBeNull();
     expect(screen.getByText('2026-09-11 09:05')).toBeTruthy();
     expect(api.getCompetitionSession).toHaveBeenCalledWith('group-a','friend-1','s-1');
@@ -639,19 +641,18 @@ describe("Friend's session view", () => {
     api.certifyCompetition.mockResolvedValue({ contract_version: 4, created: true, certification: certificationBy(USER_ID, 'me') });
     render(<GroupSessionRoute />);
     const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
-    expect(screen.getByTestId('group-session-records-count')).toHaveTextContent('2');
+    // Groups no longer rank Volume: its board shows neither a row nor in the band.
+    expect(screen.getByTestId('group-session-records-count')).toHaveTextContent('1');
+    expect(screen.queryByTestId('group-session-record-ev-1:volume')).toBeNull();
+    expect(screen.queryByText(/kg·reps/)).toBeNull();
     expect(rm.getByText('Bench · 1RM')).toBeTruthy();
     expect(rm.getByText('119.6 kg')).toBeTruthy();
-    expect(rm.getByText('#1 in group · 102.5 × 5')).toBeTruthy();
-    const volume = within(screen.getByTestId('group-session-record-ev-1:volume'));
-    expect(volume.getByText('512.5 kg·reps')).toBeTruthy();
-    expect(volume.getByText('#1 in group · 102.5 × 5 · since passed by sam')).toBeTruthy();
-    expect(volume.getByText('Not certified')).toBeTruthy();
-    // One band on the set that took both: the exercise card's record line.
-    expect(screen.getByText('#1 in group · 1RM + Volume')).toBeTruthy();
+    expect(rm.getByText('#1 in group · 102.5 × 5 · since passed by sam')).toBeTruthy();
+    expect(rm.getByText('Not certified')).toBeTruthy();
+    expect(screen.getByText('#1 in group · 1RM')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('group-session-record-ev-1:volume-link'));
-    expect(mockPush).toHaveBeenCalledWith('/group/group-a/leaderboards/ge-bench?metric=volume&scope=all');
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-link'));
+    expect(mockPush).toHaveBeenCalledWith('/group/group-a/leaderboards/ge-bench?metric=e1rm&scope=all');
 
     fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-certify'));
     await waitFor(() => expect(api.certifyCompetition).toHaveBeenCalledWith({ groupId: 'group-a', exerciseId: 'ge-bench',
@@ -730,16 +731,16 @@ describe("Friend's session view", () => {
     expect(screen.queryByText(/#1 in group/)).toBeNull();
   });
 
-  it('shows "In progress" for an active session, and pull-to-refresh updates it', async () => {
+  it('marks an active session In progress with its elapsed Duration, and pull-to-refresh updates it', async () => {
     api.getCompetitionSession
-      .mockResolvedValueOnce(sessionDetail({ status: 'active', completed_at_ms: null, duration_sec: null }))
+      .mockResolvedValueOnce(sessionDetail({ status: 'active', started_at_ms: Date.now() - 32 * 60_000, completed_at_ms: null, duration_sec: null }))
       .mockResolvedValue(sessionDetail());
     render(<GroupSessionRoute />);
     expect(await screen.findByText('In progress')).toBeTruthy();
-    expect(screen.getByTestId('group-session-times-end').props.accessibilityLabel).toBe('End —');
+    expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 32m');
 
     await pullToRefresh('group-session-screen');
-    expect(await screen.findByText('Completed · 1h 5m')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('group-session-times-duration').props.accessibilityLabel).toBe('Duration 1h 5m'));
     expect(screen.queryByText('In progress')).toBeNull();
   });
 

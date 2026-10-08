@@ -138,6 +138,9 @@ micro-labels Archivo 700, sheet titles Archivo 800.
 
 **One primary action per screen**, in `accent`. Everything else is an outline or
 a plain text button. Two saturated buttons on one screen is a bug.
+A row-level action inside a list row (a group record's Certify / Withdraw) is a
+compact outline (`compactControlHeight` 28), its tap target kept at 44 by hit
+slop.
 
 **One superlative: `record`.** A figure that beats the lifter's all-time best is
 bold `record`, and earns a band on the containing card where the screen has one

@@ -314,7 +314,7 @@ appId: com.dinoderek.mobile
           id: "^group-stream-session-card-${output.groupsCardKey}$"
       - extendedWaitUntil:
           visible:
-            id: "group-session-header"
+            id: "group-session-summary"
           timeout: 15000
       - tapOn: "Back"
       - extendedWaitUntil:
@@ -325,15 +325,16 @@ appId: com.dinoderek.mobile
     id: "^group-stream-session-card-${output.groupsCardKey}$"
 - extendedWaitUntil:
     visible:
-      id: "group-session-header"
+      id: "group-session-summary"
     timeout: 15000
 # The header title names whose session and which day; its eyebrow, the group.
 - assertVisible:
     id: "group-session-title-text"
     text: "${MAESTRO_GROUPS_COUNTERPARTY_USERNAME} · .*"
+# View Session's card: Start and Duration (no status line once completed).
 - assertVisible:
-    id: "group-session-status"
-    text: "Completed · 45m"
+    id: "group-session-times-duration"
+    text: "Duration 45m"
 # Each exercise is a session-detail card (the View Session restyle, PR C):
 # its name, set count and performed sets.
 - assertVisible: "Bench Press"
