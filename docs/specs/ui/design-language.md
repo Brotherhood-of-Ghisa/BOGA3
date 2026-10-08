@@ -69,10 +69,11 @@ are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
-labels still say how much. Marks on a cell are `ink`; an empty `viz0` cell takes
-a `rule` hairline, being only 1.18:1 against `surface`. Progress's selectors
-also use the strongest grade, `viz4` with `ink` text, for selection
-(`SegmentedControl`'s `selectedGround`).
+labels still say how much. An empty `viz0` cell takes a `rule` hairline,
+being only 1.18:1 against `surface`. Progress/history filters use fixed black
+`selection` with white `surface` text in every theme
+(`SegmentedControl`'s `selectedGround`); heatmap tiles/bars have no black
+current/selected outlines. Weekly selection uses a caret and accessible state.
 
 ## 3. Typography
 

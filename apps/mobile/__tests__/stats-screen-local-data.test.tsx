@@ -186,7 +186,7 @@ describe('Stats over real data', () => {
     await renderStats();
     fireEvent.press(await screen.findByTestId(`stats-exercise-row-${PULLDOWN}`));
     await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull(), { timeout: 10_000 });
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent(`Daily · ${weeks} ${weeks === 1 ? 'week' : 'weeks'}`);
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(read).toHaveBeenLastCalledWith(expect.objectContaining(calendarWeekBounds(weeks)));
     const panel = within(screen.getByTestId('stats-exercise-history-heatmap-panel-daily'));
     expect(panel.getAllByTestId(/^stats-exercise-history-heatmap-cell-\d{4}-\d{2}-\d{2}$/)).toHaveLength((weeks - 1) * 7 + 6);
@@ -324,7 +324,7 @@ describe('Stats over real data', () => {
     await act(async () => {
       updatePreferences({ heatmapView: 'weekly' });
     });
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 52 weeks');
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
     expect(screen.getByText('Weekly training load')).toBeTruthy();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily', { includeHiddenElements: true })).toBeTruthy();
@@ -351,21 +351,23 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
   });
 
-  it('opens a saved Weekly choice with its banner and retains it on reopening', async () => {
+  it('opens a saved Weekly choice without a banner and retains it on reopening', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'weekly', historyLookbackWeeks: 104 }));
     await renderStats();
     await screen.findByTestId(SQUAT_ROW);
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-weekly')).toHaveProp('pointerEvents', 'auto');
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
     expect(screen.queryByLabelText('Select heatmap view')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-exercise-history-close'));
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     fireEvent.press(screen.getByTestId(SQUAT_ROW));
     expect(await screen.findByText('Weekly training load')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-history-window')).toHaveTextContent('Weekly · 104 weeks');
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
+    expect(screen.queryByTestId('stats-exercise-history-window')).toBeNull();
   });
 
   it('selects and clears a weekly row over real data and returns to the same search/sort', async () => {
@@ -386,7 +388,9 @@ describe('Stats over real data', () => {
     fireEvent.press(row);
     const expected = (await exerciseAnalytics.computeSelectedExerciseWeeklyEffort({ ...calendarWeekBounds(8), exerciseDefinitionId: SQUAT }))
       .find(week => week.weekStartDateKey === current)!;
-    expect(screen.getByTestId('stats-exercise-history-week-banner-value')).toHaveTextContent(`Sets: ${expected.workingSetCount}`);
+    expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
+    expect(screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`)).toHaveProp('accessibilityState', { selected: true });
+    expect(screen.getByTestId(`stats-exercise-history-heatmap-value-${current}`)).toHaveTextContent(String(expected.workingSetCount));
     fireEvent.press(row);
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.queryByText(/Tap a week/)).toBeNull();
@@ -397,6 +401,22 @@ describe('Stats over real data', () => {
     fireEvent(screen.UNSAFE_getByType(Modal), 'dismiss');
     expect(screen.getByTestId('stats-search-input')).toHaveProp('value', 'Squat');
     expect(screen.getByTestId('stats-exercise-sort-volume')).toHaveProp('accessibilityState', { selected: true });
+  });
+
+  it('keeps populated and empty muscle rows neutral while preserving contribution selection', async () => {
+    await renderSeededStats();
+    fireEvent.press(screen.getByTestId('stats-view-mode-chip-muscle'));
+    for (const metric of ['workingSetCount', 'totalVolume']) {
+      fireEvent.press(screen.getByTestId(`stats-metric-chip-${metric}`));
+      for (const row of screen.getAllByTestId(/^stats-muscle-row-[^-]+$/)) {
+        expect(row).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
+        expect(row).not.toHaveStyle({ backgroundColor: uiRoles.viz4 });
+      }
+      expect(screen.queryAllByLabelText(/Colour:/)).toEqual([]);
+    }
+    fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
+    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ borderLeftColor: uiRoles.ink });
+    expect(screen.getByTestId('stats-muscle-select-chest')).toHaveProp('accessibilityState', { expanded: true });
   });
 
   it('keeps seeded families inert and opens only an individual muscle', async () => {
@@ -490,7 +510,7 @@ describe('Stats over real data', () => {
         expect(scroll.queryByTestId(id)).toBeNull();
       }
       for (const tab of controls.getAllByRole('tab')) {
-        expect(tab).toHaveStyle({ backgroundColor: tab.props.accessibilityState.selected ? uiRoles.viz4 : uiRoles.surface });
+        expect(tab).toHaveStyle({ backgroundColor: tab.props.accessibilityState.selected ? uiRoles.selection : uiRoles.surface });
       }
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
       const content = scroll.getAllByTestId(

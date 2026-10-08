@@ -3,11 +3,9 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { Icon, StatePanel, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import type { ProgressComparison, ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
-import { muscleTargetAttainment } from '@/src/preferences/targets';
 import { formatCountDelta, formatVolumeDelta } from './comparison-format';
 
 export type ProgressTableMetric = 'workingSetCount' | 'totalVolume';
-const shades = [uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4];
 const figures = (row: ProgressComparison, metric: ProgressTableMetric) => metric === 'workingSetCount'
   ? [String(row.current.workingSetCount), String(row.previous.workingSetCount), formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount).text]
   : [formatVolumeFigure(row.current.totalVolume), formatVolumeFigure(row.previous.totalVolume), formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume).text];
@@ -17,7 +15,7 @@ const hasMetric = (row: ProgressComparison, metric: ProgressTableMetric) => metr
 
 type Props = {
   muscles: ProgressMuscleComparison[]; metric: ProgressTableMetric; selectedId: string | null;
-  weeks: number; weeklyTarget: number; onSelect: (id: string) => void;
+  onSelect: (id: string) => void;
   onMuscleHistory: (row: ProgressMuscleComparison, target: ComponentRef<typeof View> | null) => void;
   onExerciseHistory: (row: ProgressExerciseComparison, target: ComponentRef<typeof View> | null) => void;
 };
@@ -28,9 +26,9 @@ type Props = {
 // Contributors reconcile with their muscle row in both periods, but no Total
 // row is drawn. Figures never shrink or abbreviate: when they do not fit they
 // move to a full-width second line, then to labelled Now/Previous/Change
-// lines. The selection rule stays distinct from target-attainment shading.
+// lines. Neutral rows keep the selected muscle’s ink rule.
 export function ProgressTables(props: Props) {
-  const { muscles, metric, selectedId, weeks, weeklyTarget, onSelect, onMuscleHistory, onExerciseHistory } = props;
+  const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory } = props;
   const { width } = useWindowDimensions();
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasMetric(row, metric)) ?? [];
@@ -51,7 +49,7 @@ export function ProgressTables(props: Props) {
           allowFontScaling={false} accessibilityRole="header" style={styles.family}
           testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`}>{row.familyName}</Text> : null}
         <MuscleRow row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical}
-          selected={row.muscleGroupId === selectedId} weeks={weeks} weeklyTarget={weeklyTarget}
+          selected={row.muscleGroupId === selectedId}
           onSelect={onSelect} onHistory={onMuscleHistory} />
         {row.muscleGroupId === selectedId && selected ? <View
           testID="stats-contributions" style={styles.contributions}>
@@ -89,15 +87,13 @@ function Values({ row, metric, columns, stacked, vertical, prefix }: { row: Prog
   </View>;
 }
 
-function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, weeklyTarget, onSelect, onHistory }: {
+function MuscleRow({ row, metric, columns, stacked, vertical, selected, onSelect, onHistory }: {
   row: ProgressMuscleComparison; metric: ProgressTableMetric; columns: number[]; stacked: boolean; vertical: boolean; selected: boolean;
-  weeks: number; weeklyTarget: number; onSelect: Props['onSelect']; onHistory: Props['onMuscleHistory'];
+  onSelect: Props['onSelect']; onHistory: Props['onMuscleHistory'];
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
-  const attainment = muscleTargetAttainment(row.current.workingSetCount, weeklyTarget, weeks);
-  const shade = attainment <= 0 ? undefined : shades[Math.ceil(attainment * shades.length) - 1];
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
-  return <View style={[styles.row, styles.dataRow, stacked && styles.stacked, { backgroundColor: shade }, selected && styles.selected]}
+  return <View style={[styles.row, styles.dataRow, stacked && styles.stacked, selected && styles.selected]}
     testID={prefix}>
     <View style={[styles.nameActions, !stacked && styles.nameCell, stacked && styles.stackedName]}>
       <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
@@ -105,7 +101,7 @@ function MuscleRow({ row, metric, columns, stacked, vertical, selected, weeks, w
         <Text allowFontScaling={false} style={styles.name}>{row.displayName}</Text>
       </Pressable>
     </View>
-    <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${metric === 'totalVolume' ? 'kg·reps per side. ' : 'Working sets. '}Colour: ${row.current.workingSetCount} of ${weeklyTarget * weeks} working sets; ${weeklyTarget} per week over ${weeks} weeks`}
+    <View accessible accessibilityLabel={`Now ${figures(row, metric)[0]}, previous ${figures(row, metric)[1]}, change ${figures(row, metric)[2]}. ${metric === 'totalVolume' ? 'kg·reps per side.' : 'Working sets.'}`}
       style={stacked ? styles.fullWidth : undefined}>
       <Values row={row} metric={metric} columns={columns} stacked={stacked} vertical={vertical} prefix={prefix} />
     </View>

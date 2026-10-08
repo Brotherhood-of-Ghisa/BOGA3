@@ -37,6 +37,7 @@ describe('design-language tokens', () => {
         'rule',
         'ruleSoft',
         'scrim',
+        'selection',
         'surface',
         'viz0',
         'viz1',

@@ -27,7 +27,7 @@ const key = (value: Date) => value.toISOString().slice(0, 10);
 const addDays = (value: Date, count: number) => new Date(value.getTime() + count * DAY_MS);
 const monday = (value: Date) => addDays(value, -(value.getUTCDay() + 6) % 7);
 
-/** Calendar framing only: observed days/weeks retain the adapter's exact values and colours. */
+// Calendar framing follows [[comparison.daily-history]]; adapter values/colours are reused.
 export function buildCalendarMonths(data: HeatmapData): CalendarMonth[] {
   const firstKey = data.daily[0]?.dateKey;
   if (!firstKey) return [];
@@ -42,18 +42,23 @@ export function buildCalendarMonths(data: HeatmapData): CalendarMonth[] {
     const monthKey = key(start).slice(0, 7);
     const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0));
     const rows: CalendarWeek[] = [];
-    for (let row = monday(start); row <= end; row = addDays(row, 7)) {
-      // The oldest month is clipped to the saved Monday-aligned window.
-      if (key(row) < firstKey) continue;
-      rows.push({ weekStartDateKey: key(row), week: weeks.get(key(row)),
-        days: Array.from({ length: 7 }, (_, index) => {
-          const value = addDays(row, index);
-          const dateKey = key(value);
-          return { dateKey, dayOfMonth: value.getUTCDate(), inMonth: dateKey.startsWith(monthKey),
-            future: dateKey > data.todayDateKey, day: days.get(dateKey) };
-        }) });
+    for (let row = monday(start); row <= end && key(row) <= data.todayDateKey; row = addDays(row, 7)) {
+      // Retain a partial first row's sampled days. Future positions remain
+      // calendar metadata; the renderer leaves them as empty spacers.
+      const sundayKey = key(addDays(row, 6));
+      if (sundayKey < firstKey) continue;
+      const rowDays = Array.from({ length: 7 }, (_, index) => {
+        const value = addDays(row, index);
+        const dateKey = key(value);
+        const inMonth = dateKey.startsWith(monthKey);
+        return { dateKey, dayOfMonth: value.getUTCDate(), inMonth,
+          future: dateKey > data.todayDateKey, day: inMonth ? days.get(dateKey) : undefined };
+      });
+      const fullWeek = rowDays.every(day => days.has(day.dateKey));
+      rows.push({ weekStartDateKey: key(row), days: rowDays,
+        week: fullWeek && sundayKey.startsWith(monthKey) && sundayKey <= data.todayDateKey ? weeks.get(key(row)) : undefined });
     }
-    months.push({ key: monthKey, title: monthFormatter.format(start), weeks: rows });
+    months.push({ key: monthKey, title: monthFormatter.format(start), weeks: rows.reverse() });
   }
   return months;
 }

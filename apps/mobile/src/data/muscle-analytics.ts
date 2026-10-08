@@ -440,8 +440,7 @@ export const aggregateSelectedMuscleWeeklyEffort = (
   );
 
   // Track week-of-month index per month. Every training week is kept — the
-  // heatmaps draw a bar/column per week and the WeekSelectionBanner resolves
-  // any of them, so there is no 4-week-per-month layout cap to clip against.
+  // heatmaps draw every week, with no 4-week-per-month layout cap.
   const monthWeekCount = new Map<string, number>();
   const result: SelectedMuscleWeeklyEffort[] = [];
 

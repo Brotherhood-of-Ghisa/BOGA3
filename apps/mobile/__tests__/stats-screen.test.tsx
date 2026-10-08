@@ -421,11 +421,11 @@ describe('StatsScreenShell', () => {
       .not.toHaveStyle({ textDecorationLine: 'underline' });
   });
 
-  it('grades counts against the saved quota and selected weeks in either metric', () => {
+  it('keeps muscle rows neutral in either metric', () => {
     renderStatsScreenShell();
-    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    expect(screen.getByTestId('stats-muscle-row-chest')).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
     fireEvent.press(screen.getByTestId('stats-metric-chip-totalVolume'));
-    expect(screen.getByTestId('stats-muscle-row-chest')).toHaveStyle({ backgroundColor: uiRoles.viz2 });
+    expect(screen.getByTestId('stats-muscle-row-chest')).not.toHaveStyle({ backgroundColor: uiRoles.viz2 });
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveTextContent('+20%');
     expect(screen.getByTestId('stats-muscle-row-chest-change')).toHaveStyle({ color: uiRoles.ink });
   });
@@ -528,7 +528,7 @@ describe('StatsScreenShell', () => {
   });
 
   it.each([['muscle', 'daily'], ['muscle', 'weekly'], ['exercise', 'daily'], ['exercise', 'weekly']] as const)(
-    'uses the theme accent for the active %s history metric in %s mode', (kind, view) => {
+    'uses fixed black and white for the active %s history metric in %s mode', (kind, view) => {
       const onSelectMetric = jest.fn();
       const props = buildShellProps({
         selectedMuscle: kind === 'muscle' ? { muscleGroupIds: ['chest'], displayName: 'Chest', familyName: 'Chest' } : null,
@@ -540,14 +540,14 @@ describe('StatsScreenShell', () => {
       });
       const { rerender } = render(<StatsScreenShell {...props} />);
       const prefix = `stats-${kind}-history-metric-chip`;
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.accent });
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.selection });
       expect(within(screen.getByTestId(`${prefix}-totalVolume`)).getByText('Volume')).toHaveStyle({ color: uiRoles.surface });
       expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.surface });
       fireEvent.press(screen.getByTestId(`${prefix}-workingSetCount`));
       expect(onSelectMetric).toHaveBeenCalledWith('workingSetCount');
 
       rerender(<StatsScreenShell {...props} muscleHistoryMetric="workingSetCount" exerciseHistoryMetric="workingSetCount" />);
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.accent });
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ backgroundColor: uiRoles.selection });
       expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveProp('accessibilityState', { selected: true });
       expect(within(screen.getByTestId(`${prefix}-workingSetCount`)).getByText('Sets')).toHaveStyle({ color: uiRoles.surface });
       expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ backgroundColor: uiRoles.surface });
@@ -670,43 +670,15 @@ describe('StatsScreenShell', () => {
     expect(screen.queryByText('Sets per day')).toBeNull();
   });
 
-  it('shows the selected metric in the week selection banner', () => {
-    const props = {
-      selectedMuscle: {
-        muscleGroupIds: ['front_delts'] as [string],
-        displayName: 'Front Delts',
-        familyName: 'Shoulders',
-      },
+  it.each(['totalVolume', 'workingSetCount'] as const)('omits the selected-week banner for %s and keeps Metric controls', metric => {
+    renderStatsScreenShell({
+      selectedMuscle: { muscleGroupIds: ['front_delts'], displayName: 'Front Delts', familyName: 'Shoulders' },
       muscleHistoryWeeklyEffort: [buildWeeklyEffort()],
       selectedMuscleHistoryWeekKey: '2026-05-11',
-    };
-    const { rerender } = render(
-      <StatsScreenShell
-        {...buildShellProps({
-          ...props,
-          muscleHistoryMetric: 'totalVolume',
-        })}
-      />
-    );
-
-    const banner = screen.getByTestId('stats-muscle-history-week-banner');
-    expect(banner).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-history-week-banner-range')).toHaveTextContent(/May/);
-    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /Volume: 1100/
-    );
-
-    rerender(
-      <StatsScreenShell
-        {...buildShellProps({
-          ...props,
-          muscleHistoryMetric: 'workingSetCount',
-        })}
-      />
-    );
-    expect(screen.getByTestId('stats-muscle-history-week-banner-value')).toHaveTextContent(
-      /Sets: 2/
-    );
+      muscleHistoryMetric: metric,
+    });
+    expect(screen.queryByTestId('stats-muscle-history-week-banner')).toBeNull();
+    expect(screen.getByTestId(`stats-muscle-history-metric-chip-${metric}`)).toBeTruthy();
   });
 
   it('omits the banner and instruction when no week is selected', () => {
@@ -1193,4 +1165,14 @@ it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async a
   await act(async () => resolve(true));
   expect(focused).not.toHaveBeenCalled();
   enabled.mockRestore(); focused.mockRestore();
+});
+
+it('uses fixed black and white for active Progress filters', () => {
+  renderStatsScreenShell({ periodDays: 28 });
+  for (const id of ['stats-view-mode-chip-muscle', 'stats-period-chip-28', 'stats-metric-chip-workingSetCount']) {
+    const segment = screen.getByTestId(id);
+    expect(segment).toHaveStyle({ backgroundColor: '#000000' });
+    expect(segment).toHaveProp('accessibilityState', { selected: true });
+    expect(StyleSheet.flatten(within(segment).getByText(/.+/).props.style).color).toBe('#FFFFFF');
+  }
 });
