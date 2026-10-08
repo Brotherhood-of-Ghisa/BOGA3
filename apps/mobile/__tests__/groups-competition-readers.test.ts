@@ -119,6 +119,9 @@ test('session records name only this session\'s records, one board each, never a
   // A legacy record's historic Weight board has no current leader.
   expect(guards.isCompetitionSessionRecordsWire(variant({ event: { ...event, values: [{ ...historicalValue, metric: 'weight', unit: 'kg', value: null, unavailable: true }] },
     boards: [{ metric: 'weight', leader: null, leads: false }] }))).toBe(true);
+  // No current board has a Weight leader.
+  expect(guards.isCompetitionSessionRecordsWire(variant({ event: { ...event, values: [{ ...historicalValue, metric: 'weight', unit: 'kg', value: null, unavailable: true }] },
+    boards: [{ metric: 'weight', leader: member, leads: false }] }))).toBe(false);
   for (const rejected of [
     variant({ boards: [] }),
     variant({ boards: [{ metric: 'e1rm', leader: null, leads: true }] }),
@@ -129,6 +132,8 @@ test('session records name only this session\'s records, one board each, never a
     variant({ event: { ...event, session_id: 'other' } }),
     variant({ event: { ...event, member: { user_id: 'u2', username: null } } }),
     variant({ event: { ...event, group: { group_id: 'other', name: 'Crew' } } }),
+    variant({ event: { ...event, voided: true } }),
+    variant({ boards: [{ metric: 'e1rm', leader: { user_id: 'u2', username: 'Rival' }, leads: true }] }),
   ]) expect(guards.isCompetitionSessionRecordsWire(rejected)).toBe(false);
 });
 

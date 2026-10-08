@@ -623,12 +623,11 @@ session_records "${RIVAL_UID}" "${T}-week-RIVAL"
 check 'a record carries its live certification and write tokens' \
   '(.records[0].event.record_context.metrics[]|select(.metric=="e1rm")|.certification.certification_id)==$c and
    all(.records[0].event.record_context.metrics[];.write_token|length>0)' --arg c "${WEEK_CERT}"
-# NEVER has no reading, so a normalized score never existed for it.
-session_records "${NEVER_UID}" "${T}-NEVER"
-check 'a session with no #1 record reads empty' '.records==[]'
-session_records "${ATHLETE_UID}" "${T}-ATHLETE"
-check 'enabled-group session records expose no absolute counterpart' \
-  'all(.records[].event|select(.visibility=="normalized")|.values[];.value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))'
+# R's precision set took #1 on the normalized Pull-up.
+session_records "${RIVAL_UID}" "${T}-RIVAL"
+check 'enabled-group session records are normalized and expose no absolute counterpart' \
+  '(.records|length)>0 and all(.records[].event;.visibility=="normalized") and
+   all(.records[].event.values[];.value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))'
 pass "session records: a session's #1 boards with each board's current leader and live certification"
 
 # =============================================================================

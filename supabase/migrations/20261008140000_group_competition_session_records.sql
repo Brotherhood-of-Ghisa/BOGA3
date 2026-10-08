@@ -38,7 +38,6 @@ returns jsonb language plpgsql volatile security definer set search_path=app_pub
 declare _uid uuid:=app_public.group_require_app_user(); _records jsonb;
 begin
   perform app_public.group_competition_require_member(p_group_id,_uid);
-  perform app_public.group_competition_require_active();
   -- The session view's own existence check: an unshared or deleted session
   -- reads exactly like group_competition_session_detail's.
   if not exists(select 1 from app_public.group_session_shares sh where sh.group_id=p_group_id

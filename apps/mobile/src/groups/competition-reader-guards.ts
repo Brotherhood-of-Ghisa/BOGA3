@@ -116,16 +116,18 @@ export function isCompetitionSessionWire(v: unknown): v is CompetitionSessionWir
 export function isCompetitionSessionDetailWire(v: unknown): v is CompetitionSessionDetailWire {
   return exact(v,['contract_version','group_id','session']) && v.contract_version === 4 && id(v.group_id) && isCompetitionSessionWire(v.session);
 }
-function sessionRecordBoard(v: unknown): boolean {
-  return exact(v,['metric','leader','leads']) && historicalMetric(v.metric) && (v.leader === null || member(v.leader)) &&
-    typeof v.leads === 'boolean' && !(v.leads && v.leader === null);
+// A board's leader comes only from a current Volume/1RM board; `leads` means that leader's set is this record's.
+function sessionRecordBoard(v: unknown, memberId: string): boolean {
+  if (!exact(v,['metric','leader','leads']) || !historicalMetric(v.metric) || typeof v.leads !== 'boolean') return false;
+  if (v.leader === null) return !v.leads;
+  return member(v.leader) && isCompetitionMetric(v.metric) && (!v.leads || (v.leader as { user_id: string }).user_id === memberId);
 }
 function sessionRecord(v: unknown, memberId: string, sessionId: string): boolean {
   if (!exact(v,['event','boards']) || !isCompetitionEventWire(v.event) || !Array.isArray(v.boards) || v.boards.length === 0 ||
-    !v.boards.every(sessionRecordBoard)) return false;
+    !v.boards.every(board => sessionRecordBoard(board,memberId))) return false;
   const event = v.event, metrics = v.boards.map(board => (board as { metric: string }).metric);
   const recordMetrics = event.values.filter(value => value.role === 'record').map(value => value.metric);
-  return event.kind === 'record' && event.member?.user_id === memberId && event.session_id === sessionId && event.set_id !== null &&
+  return event.kind === 'record' && !event.voided && event.member?.user_id === memberId && event.session_id === sessionId && event.set_id !== null &&
     new Set(metrics).size === metrics.length && recordMetrics.every(metric => metrics.includes(metric));
 }
 export function isCompetitionSessionRecordsWire(v: unknown): v is CompetitionSessionRecordsWire {
