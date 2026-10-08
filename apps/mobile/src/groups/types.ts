@@ -114,21 +114,8 @@ export type GroupExercise = {
   source_exercise_id: string | null;
   /** Null while active. Archived: keeps its links and a read-only board, not offered for new links (D8). */
   archived_at_ms: number | null;
-};
-
-// ---- Boards (contract) -----------------------------------------
-
-export type GroupBoardMetric = 'weight' | 'e1rm';
-
-// ---- Week summary (contract) ---------------------------------------------
-
-/** One current member's week: working sets and group records from completed shared sessions in the window. */
-export type GroupWeekBoardRow = {
-  /** Competition rank: equal (working sets, group records) share a rank. */
-  rank: number;
-  member: GroupMemberRef;
-  working_sets: number;
-  group_records: number;
+  /** The group's shared rules line (`describeCompetitionRules`), shown wherever a member links to it. */
+  standard: string;
 };
 
 // ---- Errors -----------------------------------------------------------------

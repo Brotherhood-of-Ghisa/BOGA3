@@ -308,8 +308,8 @@ adds ` kg` itself.
 | Volume | whole kg·reps | `2560` |
 
 The agent API, the group evaluator and the SQL group functions call this
-kernel rather than copying it; the SQL load factor matches
-`metric-contract.ts` (`groups-bodyweight.sh` vector).
+kernel rather than copying it; the group load-mode factor is
+`link-compatibility.ts` alone.
 
 ## 5. Versioned group competition representation
 

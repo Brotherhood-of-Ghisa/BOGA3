@@ -1,5 +1,5 @@
 /**
- * Today's group card rules over a `group_week_summary` payload: the top three
+ * Today's group card rules over a `group_competition_week_summary` payload: the top three
  * and the caller's own line, the bars, and the three latest-activity forms.
  * Pure; the suite runs in Europe/London (jest.config.js).
  */

@@ -35,12 +35,6 @@ export function describeCompetitionRules(exercise: { rules: Omit<CompetitionRule
   const r=exercise.rules;
   return `Rules ${r.rules_revision} · ${formatContributionPercent(r.bodyweight_contribution)}% contribution · Bodyweight scoring ${r.bodyweight_calculations_enabled ? 'On' : 'Off'} · ${r.load_input_mode === 'per_side_load' ? 'per-side' : 'total'} load`;
 }
-/** Linking consumes public catalogue identity; it never copies personal settings. */
-export function competitionExerciseCore(exercise: CompetitionExerciseWire): GroupExercise {
-  return { group_exercise_id: exercise.group_exercise_id,name: exercise.name,
-    load_input_mode: exercise.rules.load_input_mode,source_exercise_id: exercise.source_exercise_id,
-    archived_at_ms: exercise.archived_at_ms };
-}
 export function buildCompetitionRow(row: CompetitionBoardRowWire,scope: GroupBoardScope,userId: string | null,
   nowMs: number = Date.now()): BoardRowViewModel {
   const memberLabel=formatBoardMemberLabel(row.member,row.former,userId);
@@ -88,6 +82,9 @@ export function formatCompetitionHistoricalValue(value: CompetitionHistoryValueW
   return `${HISTORICAL_METRIC_LABELS[value.metric]} ${formatMetricFigure('e1rm',value.value)} ${COMPETITION_UNIT_LABELS[value.unit as keyof typeof COMPETITION_UNIT_LABELS] ?? value.unit}`;
 }
 
-export function competitionLinkExercise(exercise: CompetitionExerciseWire): GroupExercise & { standard: string } {
-  return { ...competitionExerciseCore(exercise),standard: describeCompetitionRules(exercise) };
+/** Linking consumes public catalogue identity; it never copies personal settings. */
+export function competitionLinkExercise(exercise: CompetitionExerciseWire): GroupExercise {
+  return { group_exercise_id: exercise.group_exercise_id,name: exercise.name,
+    load_input_mode: exercise.rules.load_input_mode,source_exercise_id: exercise.source_exercise_id,
+    archived_at_ms: exercise.archived_at_ms,standard: describeCompetitionRules(exercise) };
 }
