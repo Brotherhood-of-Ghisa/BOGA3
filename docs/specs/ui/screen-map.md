@@ -79,7 +79,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/group/[groupId]/exercises/[exerciseId]/edit` | Owner/admin rename a group exercise or change its weight entry | `group/[groupId]/exercises/[exerciseId]/edit.tsx` |
 | `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board: `Volume` \| `1RM` × `Certified` \| `All`, ranked rows, row detail sheet with certification actions | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
 | `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes, newest first | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
-| `/group-session/[memberId]/[sessionId]` | A friend's session, read-only, drawn with View Session's cards | `group-session/[memberId]/[sessionId].tsx` |
+| `/group-session/[memberId]/[sessionId]` | A member's shared session as the group sees it, drawn with View Session's cards, View Session's facts card (an `In progress` mark while it runs), its #1 group 1RM records (row → leaderboard); my own adds a full-session action | `group-session/[memberId]/[sessionId].tsx` |
 
 ## Dev-only routes
 

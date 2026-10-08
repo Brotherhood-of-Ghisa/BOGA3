@@ -145,7 +145,9 @@ exercises, sets); latest completed is any time.
 session detail, not in it: exact readers reject a new key. One shared session's
 non-voided records that took #1 in the group, as stream events whose `record`
 values are those boards, each with the All board's current leader (`leads`
-while its own set holds #1; no leader for an earlier revision).
+while its own set holds #1; no leader for an earlier revision). The app shows
+them once the session completes (a provisional record can still move), and
+no Volume board: groups are dropping that metric.
 
 ## Device-computed card metrics
 
@@ -154,8 +156,10 @@ Session cards and the friend view count on the viewing device
 `apps/mobile/src/groups/competition-session-view-model.ts`) with the session
 screens' TS. Counts come only from permitted set context: `Sets` as
 [[set.count-display]], `exercises` those holding a working set. A normalized exercise
-shows reps and effort, never a load figure, and no session total is
-reconstructed. Nothing is mirrored in SQL: SQL mirrors once duplicated set
+shows reps and effort, never a load figure. The friend view's `Volume` sums
+only ordinary exercises' volume-included sets ([[set.eligibility]],
+[[copy.no-inline-explanation]]): hidden kg never enters it, so nothing is
+recovered by subtraction; `—` with none. Nothing is mirrored in SQL: SQL mirrors once duplicated set
 rules in two languages. The cost: a co-member's device receives every permitted
 live set. Ordinary rows use ordinary kg and never read a personal preference,
 contribution or reading.

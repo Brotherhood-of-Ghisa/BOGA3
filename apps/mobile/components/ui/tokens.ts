@@ -27,6 +27,9 @@ export const uiGeometry = {
   // The minimum tap target, and the width of the set row's type and control
   // columns — every control in a list sits on this one vertical axis.
   tapTarget: 44,
+  // A compact control's drawn height inside a list row (`ActionButton
+  // size="compact"`); hit slop keeps its tap target at `tapTarget`.
+  compactControlHeight: 28,
   // A metric's fixed-width value column (`1RM` / `VOL`), so figures align down
   // a list.
   metricValueWidth: 38,
