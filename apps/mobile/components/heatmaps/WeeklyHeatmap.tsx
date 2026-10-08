@@ -5,6 +5,7 @@ import React, { useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
 
@@ -88,7 +89,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
   const trainingWeeks = data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
   // Reference eligibility follows [[comparison.weekly-reference]].
-  const references: Reference[] = values.length >= 6 && max > 0
+  const references: Reference[] = values.length >= MIN_HISTORY_OBSERVATIONS && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metricLabel !== 'Sets' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);
       return { id, label, value: formatReferenceValue(value), position: value / max * 100 };

@@ -36,3 +36,28 @@ Code: `groupSessionsByWeek`, `historyWeekHeading` and `formatEmptyWeeks` in
 `apps/mobile/components/session-list/history-weeks.ts`; `HistoryList` in
 `apps/mobile/components/session-list/history-list.tsx`.
 Signature: `No sessions · `
+
+### session.volume-comparison · presentation · accepted
+
+Session Summary, live comparison and the share image use the same volume
+card. The name and set count share a row.
+After six known prior comparable sessions, show P25, Median and P75 as
+vertical marks, current Volume as a black dot and its median delta. Genuine zero history
+counts. Earlier history scope and set eligibility stay unchanged.
+
+The linear scale centers the median and includes the current reading.
+Each reference label sits above its mark, its value below. If annotations
+overlap or extend beyond the bar, keep only Median and its value; the marks
+and current dot remain. Equal quartiles collapse to one mark.
+
+With fewer observations, show Volume and `Building history`, without a
+comparison. An unavailable Volume is `—` with no history label. There is no
+prior-session subtitle or comparison footnote.
+
+Why: a readable typical range and a consistent low-history card.
+Code: `ExerciseVolumeCard` in
+`apps/mobile/components/session-complete/exercise-volume-card.tsx`;
+`apps/mobile/src/session-insights/calculations.ts`;
+`apps/mobile/src/utils/history-reference.ts` shares the cutoff with the
+weekly heatmap.
+Signature: `Building history`

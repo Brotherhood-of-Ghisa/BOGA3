@@ -1134,14 +1134,23 @@ describe('Session view: editing a completed session', () => {
 });
 
 describe('Session vs history', () => {
-  it('compares the open session with its exercise and muscle history', async () => {
+  it('shows the open session volume while its exercise and muscle history builds', async () => {
     await seed();
     render(<SessionCompareScreen sessionId={SESSION} />);
 
-    await screen.findByText(/above median/);
-    expect(screen.getByLabelText(/Barbell Bench Press, 2 sets\. .*Historical median/)).toBeTruthy();
+    expect(await screen.findByLabelText(/Barbell Bench Press, 2 sets\. .*Building history/)).toBeTruthy();
+    expect(screen.queryByTestId(`session-insight-exercise-${BENCH}-distribution`)).toBeNull();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(screen.getByLabelText(/Chest, \d+ sets?\. .*Historical median/)).toBeTruthy();
+    expect(await screen.findByLabelText(/Chest, \d+ sets?\. .*Building history/)).toBeTruthy();
+  });
+
+  it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {
+    await seed();
+    render(<SessionCompareScreen sessionId={EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId} />);
+
+    expect(await screen.findByLabelText(/Barbell Back Squat, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
+    expect(await screen.findByLabelText(/Quads, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
   });
 
   it('says the comparisons are unavailable when the history read fails', async () => {

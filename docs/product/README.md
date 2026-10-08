@@ -23,7 +23,7 @@ purpose, in its own PR.
 | `copy` | `copy.md` | Words on screen: titles, subtitles, explanations |
 | `comparison` | `comparison.md` | Which periods are compared and how a change between them is shown |
 | `notifications` | `notifications.md` | Group workout alerts, recipients, defaults, batching and freshness |
-| `session` | `session.md` | How the completed session history is grouped and shown |
+| `session` | `session.md` | Completed history grouping and session volume comparison cards |
 | `groups` | `groups.md` | Group competition: what certification covers and how it ends |
 
 Not yet here: volume totals, records, session counts, bodyweight, groups-only

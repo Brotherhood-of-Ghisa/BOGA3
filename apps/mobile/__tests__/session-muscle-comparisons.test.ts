@@ -65,7 +65,7 @@ describe('muscle volume comparisons', () => {
     const input = { ...catalog, targetSession: session('target', '25', [set('target-set', '100')]), historicalSessions: [zero, positive] };
     expect(deriveSessionMuscleVolumeComparisons(input)[0]).toMatchObject({
       currentVolume: 500, historicalSessionCount: 2, medianVolume: 125,
-      percentile5Volume: 12.5, percentile95Volume: 237.5, state: 'distribution',
+      percentile25Volume: 62.5, percentile75Volume: 187.5, state: 'distribution',
     });
     expect(deriveSessionMuscleVolumeComparisons({ ...input, targetSession: zero, historicalSessions: [] })[0]).toMatchObject({
       exerciseDefinitionId: 'chest', currentVolume: 0, workingSetCount: 1, state: 'no-history',

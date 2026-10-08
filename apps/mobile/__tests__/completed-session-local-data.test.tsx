@@ -310,10 +310,13 @@ describe('completion presentation over real data', () => {
     // One fixed heading above the grouping; no subtitle.
     expect(screen.getByText('Volume')).toBeTruthy();
     expect(screen.queryByText('Session vs history')).toBeNull();
-    // The squat has completed history in the fixture, so it is compared, not "no history".
+    // Squat has at least six prior observations; the bench history is shorter.
     expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat')).toHaveTextContent(
-      /\d+% (above|below) median|At median/
+      /Vol1500/
     );
+    expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_two_prs_squat-distribution')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-exercise-maestro_m24_completion_two_prs_bench-distribution')).toBeNull();
+    expect(screen.queryByText(/prior sessions/)).toBeNull();
     // Neither set has an effort; untagged sets are working sets.
     expect(label('session-completion-muscle-quads')).toBe('Quads, 1 set: 1 primary, 0 secondary');
     expect(screen.queryByText('No mapped working sets for this session.')).toBeNull();
@@ -379,14 +382,15 @@ describe('completed-session detail over real data', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows no-history and unmapped copy for a session without mapped history', async () => {
+  it('shows current volume and the unmapped state without a history subtitle', async () => {
     await openSession({ sessionId: UNMAPPED });
 
     expect(await screen.findByText('No mapped working sets for this session.')).toBeTruthy();
     expect(
       within(screen.getByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise'))
-        .getByText(/No comparison history yet/)
-    ).toBeTruthy();
+        .queryByText(/No comparison history yet/)
+    ).toBeNull();
+    expect(screen.getByTestId('session-completion-exercise-maestro_m24_completion_unmapped_exercise')).toHaveTextContent(/Vol500Building history/);
 
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
     expect(await screen.findByTestId('session-insight-empty')).toHaveTextContent('No mapped working sets for this session.');
