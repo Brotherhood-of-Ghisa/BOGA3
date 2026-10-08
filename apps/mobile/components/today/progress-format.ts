@@ -33,14 +33,15 @@ const MONTHS = [
 export const monthName = (date: Date): string => MONTHS[date.getMonth()];
 export const shortMonthName = (date: Date): string => monthName(date).slice(0, 3);
 
-const dayLabel = (date: Date, withMonth: boolean): string =>
+/** `Mon 13`, or `Mon 13 Oct` with its month. */
+export const weekDayLabel = (date: Date, withMonth: boolean): string =>
   `${WEEKDAYS[date.getDay()]} ${date.getDate()}${withMonth ? ` ${shortMonthName(date)}` : ''}`;
 
 /** `Mon 13 – Sun 19`; a week across two months names both (`Mon 29 Sep – Sun 5 Oct`). */
 export const formatWeekRange = (window: LocalWindow): string => {
   const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
   const acrossMonths = sunday.getMonth() !== window.start.getMonth();
-  return `${dayLabel(window.start, acrossMonths)} – ${dayLabel(sunday, acrossMonths)}`;
+  return `${weekDayLabel(window.start, acrossMonths)} – ${weekDayLabel(sunday, acrossMonths)}`;
 };
 
 /** A count's signed absolute difference: `+4`, `−3`, `±0`. */
@@ -108,26 +109,32 @@ const formatRecordValue = (record: SessionPersonalRecord): string => {
 export const formatPersonalRecordLead = (record: SessionPersonalRecord): string =>
   [record.exerciseName.trim(), RECORD_KIND_LABELS[record.kind], formatRecordValue(record)].filter(Boolean).join(' ');
 
-/** The latest session's PRs: the one PR named, else only counted. */
-export const latestRecordLine = (latest: LatestSessionSummary): SessionRecordLine | null =>
-  buildSessionRecordLine(latest.records, formatPersonalRecordLead, PERSONAL_RECORD_NOUN);
+/** What a session summary row says: the latest session on Today, a row on Sessions. */
+export type SessionSummaryFigures = Pick<
+  LatestSessionSummary,
+  'startedAt' | 'durationSec' | 'gymName' | 'workingSets' | 'exerciseCount' | 'records'
+>;
+
+/** A session's PRs: the one PR named, else only counted. */
+export const sessionSummaryRecordLine = (session: SessionSummaryFigures): SessionRecordLine | null =>
+  buildSessionRecordLine(session.records, formatPersonalRecordLead, PERSONAL_RECORD_NOUN);
 
 /** `12 sets · 4 exercises`: the working sets (`training-metrics-contract.md` "Counted set"). */
-export const formatLatestFigures = (latest: LatestSessionSummary): string =>
-  `${plural(latest.workingSets, 'set', 'sets')} · ${plural(latest.exerciseCount, 'exercise', 'exercises')}`;
+export const formatSessionSummaryFigures = (session: SessionSummaryFigures): string =>
+  `${plural(session.workingSets, 'set', 'sets')} · ${plural(session.exerciseCount, 'exercise', 'exercises')}`;
 
-export const formatLatestDuration = (latest: LatestSessionSummary): string =>
-  formatCompactDuration(latest.durationSec);
+export const formatSessionSummaryDuration = (session: SessionSummaryFigures): string =>
+  formatCompactDuration(session.durationSec);
 
-export const latestSessionAccessibilityLabel = (latest: LatestSessionSummary): string => {
-  const gym = latest.gymName?.trim();
+export const sessionSummaryAccessibilityLabel = (session: SessionSummaryFigures): string => {
+  const gym = session.gymName?.trim();
   return [
-    `Completed session on ${formatMonthDayTime(latest.startedAt.getTime())}`,
-    formatLatestDuration(latest),
-    plural(latest.workingSets, 'set', 'sets'),
-    plural(latest.exerciseCount, 'exercise', 'exercises'),
+    `Completed session on ${formatMonthDayTime(session.startedAt.getTime())}`,
+    formatSessionSummaryDuration(session),
+    plural(session.workingSets, 'set', 'sets'),
+    plural(session.exerciseCount, 'exercise', 'exercises'),
     gym ? `at ${gym}` : null,
-    sessionRecordLineText(latestRecordLine(latest)),
+    sessionRecordLineText(sessionSummaryRecordLine(session)),
   ]
     .filter((part): part is string => part !== null)
     .join(', ');

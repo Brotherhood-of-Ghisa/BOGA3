@@ -1,6 +1,6 @@
-import { useIsFocused, useRouter, type Href } from 'expo-router';
+import { Stack, useIsFocused, useRouter, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   ActiveSessionRow,
@@ -13,8 +13,17 @@ import {
 } from '@/components/session-list';
 import { PlanSection, PlanSessionAction, usePlanSections } from '@/components/session-planner/plan-sections';
 import { StatePanel } from '@/components/ui/state-panel';
-import { Screen, ScreenScroll, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
-import { appendCompletedSessionAsPlanned } from '@/src/data';
+import {
+  ChipGroup,
+  IconButton,
+  Screen,
+  Sheet,
+  uiFonts,
+  uiGeometry,
+  uiRoles,
+  uiSpace,
+  uiTypography,
+} from '@/components/ui';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
 export type SessionsScreenProps = {
@@ -30,9 +39,10 @@ export function SessionsScreen({
 }: SessionsScreenProps) {
   const router = useRouter();
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
+  const [optionsVisible, setOptionsVisible] = useState(false);
   const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
 
-  const { sessions, setSessions, isLoadingSessions, loadErrorMessage, reloadSessions } =
+  const { sessions, setSessions, isLoadingSessions, loadErrorMessage, loadedAtMs, reloadSessions } =
     useSessionListData({
       dataClient,
       initialSessions,
@@ -97,33 +107,6 @@ export function SessionsScreen({
     );
   };
 
-  const setCompletedSessionDeleted = (sessionId: string, isDeleted: boolean) => {
-    if (dataClient) {
-      return (async () => {
-        await dataClient.setCompletedSessionDeletedState(sessionId, isDeleted);
-        await reloadSessions();
-      })();
-    }
-
-    setSessions((currentSessions) =>
-      currentSessions.map((session) => {
-        if (session.id !== sessionId) {
-          return session;
-        }
-
-        return {
-          ...session,
-          deletedAt: isDeleted ? '2026-02-23T12:00:00.000Z' : null,
-        };
-      })
-    );
-  };
-
-  // Completed sessions are edited in the session view.
-  const openCompletedSessionEdit = (sessionId: string) => {
-    router.push(sessionViewHref(sessionId));
-  };
-
   const openPlanNew = () => {
     // The routes land with the plan form and detail; the cast falls away then.
     router.push('/session-plan/new' as Href);
@@ -137,79 +120,101 @@ export function SessionsScreen({
     router.push(`/completed-session/${encodeURIComponent(sessionId)}`);
   };
 
-  const appendCompletedSession = (sessionId: string) => {
-    if (dataClient) {
-      return (async () => {
-        await dataClient.appendCompletedSessionAsPlanned(sessionId);
-        await reloadSessions();
-      })();
-    }
-    return (async () => {
-      await appendCompletedSessionAsPlanned(sessionId);
-      await reloadSessions();
-    })();
-  };
+  const hub = (
+    <>
+      {activeSession ? (
+        <View style={styles.block}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
+            Active
+          </Text>
+          <ActiveSessionRow
+            session={activeSession}
+            nowMs={activeDurationNowMs}
+            onResume={() => openActiveSession(activeSession.id)}
+            onComplete={() => openActiveSession(activeSession.id)}
+            onDelete={() => {
+              void discardActiveSession();
+            }}
+          />
+        </View>
+      ) : null}
+
+      {/* The hub's persistent authoring entry; the planning sections' rows
+          open the plan detail. */}
+      <PlanSessionAction onPress={openPlanNew} testID="sessions-plan-session-action" />
+      {planSections.loadErrorMessage ? (
+        <StatePanel
+          body={planSections.loadErrorMessage}
+          fill={false}
+          kind="error"
+          testID="sessions-plans-error"
+        />
+      ) : null}
+      <PlanSection
+        label="Upcoming"
+        onOpenPlan={openPlan}
+        plans={planSections.upcoming}
+        testID="sessions-plan-section-upcoming"
+      />
+      <PlanSection
+        label="Unscheduled"
+        onOpenPlan={openPlan}
+        plans={planSections.unscheduled}
+        testID="sessions-plan-section-unscheduled"
+      />
+    </>
+  );
 
   return (
     <Screen testID="sessions-screen">
-      <ScreenScroll keyboardShouldPersistTaps="handled" testID="completed-history-scroll">
-        {activeSession ? (
-          <>
-            <Text allowFontScaling={false} accessibilityRole="header" style={styles.microLabel}>
-              Active
-            </Text>
-            <ActiveSessionRow
-              session={activeSession}
-              nowMs={activeDurationNowMs}
-              onResume={() => openActiveSession(activeSession.id)}
-              onComplete={() => openActiveSession(activeSession.id)}
-              onDelete={() => {
-                void discardActiveSession();
-              }}
+      {/* The list's view options sit behind the header's options button, as on the exercise catalog. */}
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <IconButton
+              accessibilityLabel="Session list options"
+              name="more-vertical"
+              onPress={() => setOptionsVisible(true)}
+              testID="sessions-options-button"
             />
-          </>
-        ) : null}
-
-        {/* The hub's persistent authoring entry; the planning sections' rows
-            open the plan detail. */}
-        <PlanSessionAction onPress={openPlanNew} testID="sessions-plan-session-action" />
-        {planSections.loadErrorMessage ? (
-          <StatePanel
-            body={planSections.loadErrorMessage}
-            fill={false}
-            kind="error"
-            testID="sessions-plans-error"
+          ),
+        }}
+      />
+      <HistoryList
+        header={hub}
+        isLoading={isLoadingSessions}
+        loadErrorMessage={loadErrorMessage}
+        nowMs={loadedAtMs}
+        onOpenCompletedSession={openCompletedSessionSummary}
+        onRetryLoad={() => {
+          void reloadSessions();
+        }}
+        sessions={completedSessions}
+        showGlobalEmptyState={showGlobalEmptyState}
+      />
+      <Sheet
+        dismissLabel="Close session list options"
+        onDismiss={() => setOptionsVisible(false)}
+        testID="sessions-options-sheet"
+        title="Sessions"
+        visible={optionsVisible}>
+        <View style={styles.options}>
+          {/* A view toggle: deleted sessions join their weeks, faded and tagged. */}
+          <ChipGroup
+            mode="multi"
+            onToggle={() => setShowDeletedSessions((current) => !current)}
+            options={[
+              {
+                value: 'deleted',
+                label: 'Show deleted',
+                accessibilityLabel: showDeletedSessions ? 'Hide deleted sessions' : 'Show deleted sessions',
+              },
+            ]}
+            testIDPrefix="toggle-deleted-sessions"
+            values={showDeletedSessions ? ['deleted'] : []}
           />
-        ) : null}
-        <PlanSection
-          label="Upcoming"
-          onOpenPlan={openPlan}
-          plans={planSections.upcoming}
-          testID="sessions-plan-section-upcoming"
-        />
-        <PlanSection
-          label="Unscheduled"
-          onOpenPlan={openPlan}
-          plans={planSections.unscheduled}
-          testID="sessions-plan-section-unscheduled"
-        />
-
-        <HistoryList
-          sessions={completedSessions}
-          isLoading={isLoadingSessions}
-          loadErrorMessage={loadErrorMessage}
-          onRetryLoad={() => {
-            void reloadSessions();
-          }}
-          showDeletedSessions={showDeletedSessions}
-          onToggleShowDeletedSessions={() => setShowDeletedSessions((current) => !current)}
-          showGlobalEmptyState={showGlobalEmptyState}
-          onOpenCompletedSession={openCompletedSessionSummary}
-          onSetCompletedSessionDeleted={setCompletedSessionDeleted}
-          onEditCompletedSession={openCompletedSessionEdit}
-          onAppendCompletedSession={appendCompletedSession}
-        />
-      </ScreenScroll>
+        </View>
+      </Sheet>
     </Screen>
   );
 }
@@ -225,6 +230,13 @@ export default function SessionsRoute() {
 }
 
 const styles = StyleSheet.create({
+  block: {
+    gap: uiSpace.md,
+  },
+  options: {
+    paddingHorizontal: uiSpace.lg,
+    paddingBottom: uiSpace.sm,
+  },
   microLabel: {
     fontFamily: uiFonts.display.family,
     fontWeight: '700',

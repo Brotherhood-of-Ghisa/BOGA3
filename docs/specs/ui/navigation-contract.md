@@ -159,7 +159,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History. Progress's own muscle and exercise names open in-route history sheets, not this route |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row, and its overflow `Edit` (`push`). `/sessions` never completes an active session directly |
+| `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
 | `/session-plan/new` | `/session-plan/new?edit=`, `?from=` | the detail's `Edit` (pencil) and duplicate actions (`push`) |

@@ -1,4 +1,5 @@
 import { formatSessionListCompactDuration } from '@/src/data';
+import type { SessionPersonalRecord } from '@/src/progress-summary';
 
 export type SessionListItem = {
   id: string;
@@ -12,6 +13,8 @@ export type SessionListItem = {
   setCount: number;
   totalWeight: number;
   deletedAt: string | null;
+  /** Its PRs, one per record kind; a deleted or active session has none. */
+  records: SessionPersonalRecord[];
 };
 
 export type SessionListDataClient = {
@@ -19,8 +22,6 @@ export type SessionListDataClient = {
   startSession(): Promise<void>;
   completeActiveSession(sessionId: string): Promise<void>;
   discardActiveSession(sessionId: string): Promise<void>;
-  setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
-  appendCompletedSessionAsPlanned(sessionId: string): Promise<void>;
 };
 
 export const DEFAULT_SESSION_LIST_ITEMS: SessionListItem[] = [
@@ -36,6 +37,7 @@ export const DEFAULT_SESSION_LIST_ITEMS: SessionListItem[] = [
     setCount: 14,
     totalWeight: 6125,
     deletedAt: null,
+    records: [],
   },
   {
     id: 'session-completed-1',
@@ -49,6 +51,7 @@ export const DEFAULT_SESSION_LIST_ITEMS: SessionListItem[] = [
     setCount: 18,
     totalWeight: 9420,
     deletedAt: null,
+    records: [],
   },
   {
     id: 'session-completed-2',
@@ -62,6 +65,7 @@ export const DEFAULT_SESSION_LIST_ITEMS: SessionListItem[] = [
     setCount: 16,
     totalWeight: 7840,
     deletedAt: '2026-02-18T08:00:00.000Z',
+    records: [],
   },
 ];
 

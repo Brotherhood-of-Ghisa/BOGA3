@@ -75,11 +75,6 @@
       "count": 1
     }
   },
-  "components/session-list/history-list.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "components/session-recorder/exercise-picker.tsx": {
     "max-lines-per-function": {
       "count": 1

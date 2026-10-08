@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
@@ -28,6 +28,12 @@ export type SessionSummaryRowProps = {
   accessibilityHint: string;
   onPress: () => void;
   testID: string;
+  /** The trailing chevron; Sessions' history rows leave it out. */
+  chevron?: boolean;
+  /** Under the record line: Sessions' `Deleted` tag. */
+  children?: ReactNode;
+  /** The row's insets where its container gives none (a Sessions history row). */
+  style?: StyleProp<ViewStyle>;
 };
 
 /** The `set-current` ring before a training-now label. */
@@ -96,6 +102,9 @@ export function SessionSummaryRow({
   accessibilityHint,
   onPress,
   testID,
+  chevron = true,
+  children,
+  style,
 }: SessionSummaryRowProps) {
   const gymName = gym?.trim();
   return (
@@ -104,7 +113,7 @@ export function SessionSummaryRow({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [styles.row, style, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.copy}>
         {member ? <MemberHeader member={member} testID={testID} /> : null}
@@ -129,8 +138,9 @@ export function SessionSummaryRow({
           {figures}
         </Text>
         {record ? <RecordLine line={record} testID={testID} /> : null}
+        {children}
       </View>
-      <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
+      {chevron ? <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" /> : null}
     </Pressable>
   );
 }

@@ -2,11 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   completeSessionDraft,
-  appendCompletedSessionAsPlanned as appendCompletedSessionAsPlannedDraft,
   listSessionListBuckets,
   persistSessionDraftSnapshot,
   setSessionDeletedState,
 } from '@/src/data';
+import {
+  createDrizzleProgressSummaryStore,
+  type PersonalRecordFact,
+  type ProgressSummaryStore,
+  type SessionPersonalRecord,
+} from '@/src/progress-summary';
 
 import type { SessionListDataClient, SessionListItem } from './types';
 
@@ -33,7 +38,35 @@ export const mapRepositorySummaryToSessionListItem = (
     setCount: summary.setCount,
     totalWeight: 0,
     deletedAt: summary.deletedAt ? summary.deletedAt.toISOString() : null,
+    records: [],
   };
+};
+
+const withoutPlacement = ({ kind, exerciseName, value, reps }: PersonalRecordFact): SessionPersonalRecord =>
+  ({ kind, exerciseName, value, reps });
+
+/**
+ * Each completed session's PRs, read once over the span of the listed
+ * completions (the same read as Today's latest session). Facts exist only for
+ * live sessions, so a deleted row has none.
+ */
+export const attachSessionRecords = async (
+  sessions: SessionListItem[],
+  store: Pick<ProgressSummaryStore, 'loadRecordFacts'> = createDrizzleProgressSummaryStore(),
+): Promise<SessionListItem[]> => {
+  const completedAtMs = sessions.flatMap((session) => (session.completedAt ? [Date.parse(session.completedAt)] : []));
+  if (completedAtMs.length === 0) return sessions;
+  const facts = await store.loadRecordFacts({
+    start: new Date(completedAtMs.reduce((min, ms) => Math.min(min, ms))),
+    end: new Date(completedAtMs.reduce((max, ms) => Math.max(max, ms)) + 1),
+  });
+  const bySession = new Map<string, SessionPersonalRecord[]>();
+  for (const fact of facts) {
+    const records = bySession.get(fact.sessionId) ?? [];
+    records.push(withoutPlacement(fact));
+    bySession.set(fact.sessionId, records);
+  }
+  return sessions.map((session) => ({ ...session, records: bySession.get(session.id) ?? [] }));
 };
 
 export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
@@ -46,8 +79,9 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
     const completed = buckets.completed
       .map((summary) => mapRepositorySummaryToSessionListItem(summary))
       .filter((summary): summary is SessionListItem => summary !== null);
+    const completedWithRecords = await attachSessionRecords(completed);
 
-    return active ? [active, ...completed] : completed;
+    return active ? [active, ...completedWithRecords] : completedWithRecords;
   },
   async startSession() {
     await persistSessionDraftSnapshot({
@@ -62,12 +96,6 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
   },
   async discardActiveSession(sessionId) {
     await setSessionDeletedState(sessionId, true);
-  },
-  async setCompletedSessionDeletedState(sessionId, isDeleted) {
-    await setSessionDeletedState(sessionId, isDeleted);
-  },
-  async appendCompletedSessionAsPlanned(sessionId) {
-    await appendCompletedSessionAsPlannedDraft(sessionId);
   },
 };
 

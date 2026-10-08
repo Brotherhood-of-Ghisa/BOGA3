@@ -87,7 +87,8 @@ the names of its Jest tests are the specification of that component.
    the ⋮ opens a sheet titled with the item's name.
 2. **Deleted and archived items stay in their list behind a toggle** (`Show
    deleted`, `Show archived`), never a separate route: faded, marked with a
-   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet.
+   `Deleted` / `Archived` `Tag` in words, and restored from their row's sheet,
+   or on the destination when the row is a link (Sessions' history).
 3. **A summary card that opens a destination is one link** with no controls
    inside it and an accessibility label that states its summary (spec 08,
    "Read-only link card pattern"). Editing and removal live on the destination.

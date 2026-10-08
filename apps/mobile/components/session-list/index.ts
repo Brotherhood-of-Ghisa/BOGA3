@@ -1,11 +1,15 @@
 export { ActiveSessionRow, type ActiveSessionRowProps } from './active-session-row';
+export { HistoryList, type HistoryListProps } from './history-list';
 export {
-  HistoryList,
-  type CompletedSessionMenuAction,
-  type CompletedSessionMenuState,
-  type HistoryListProps,
-} from './history-list';
+  formatEmptyWeeks,
+  formatHistoryWeekRange,
+  groupSessionsByWeek,
+  historyWeekHeading,
+  type HistoryWeekHeading,
+  type HistoryWeekSection,
+} from './history-weeks';
 export {
+  attachSessionRecords,
   DEFAULT_SESSION_LIST_DATA_CLIENT,
   mapRepositorySummaryToSessionListItem,
   useSessionListData,
