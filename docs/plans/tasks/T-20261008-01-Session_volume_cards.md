@@ -12,6 +12,8 @@ including the live comparison and share surfaces that reuse the card.
 - Replace P5/P95 calculations and labels with P25/P75.
 - Use the black dot for the current volume; vertical lines for P25, median,
   and P75. Highlight the interval between the quartiles.
+- Put the P25, Median and P75 labels above the bar and their numeric values
+  below it, in matching columns.
 - Remove prior-session subtitles and redundant comparison footnotes.
 - Show the percentile comparison only after six known prior comparable
   sessions, matching the weekly heatmap's observation cutoff via one shared
@@ -20,21 +22,21 @@ including the live comparison and share surfaces that reuse the card.
 - Try a symmetric linear scale with the median at the center. Include the
   current reading in its extent so outliers remain visible. This compresses
   the interquartile interval when the current reading is far from the median.
-- Present three low-data choices: volume alone (initial implementation),
-  a short Building history label, or progress toward six observations. All
-  three appear in the temporary browser/native preview; only volume alone is
-  integrated while the choice is pending.
+- With fewer than six prior observations, show the current volume and a quiet
+  Building history label in its value row. The user selected this option.
+- Keep the set count directly beside the exercise or muscle name, consistent
+  across low-data and data-rich cards. Unavailable volume has no history label.
 - Keep this card current with the latest requirements, without a decision log.
 
 ## Design target and UX contract
 
 Repo-native brief: the requirements above, using the existing card, theme,
-typography, and exercise/muscle selector. The low-data choice and centered
-scale remain subject to the user's design review.
+typography, and exercise/muscle selector. The low-data choice is settled;
+the centered scale and overall design remain subject to the user's review.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Read volume | Open session Summary or the live comparison; switch By exercise / By muscle | Current volume and sets; at six prior observations, P25/median/P75 with a current dot | Fewer observations show the selected low-data card; unavailable volume stays dashed |
+| Read volume | Open session Summary or the live comparison; switch By exercise / By muscle | Current volume with sets beside the name; at six prior observations, P25/median/P75 with a current dot | Fewer observations show Building history; unavailable volume stays dashed without the label |
 | Compare unusual volume | Read a card below P25 or above P75 | Median stays centered; the current dot stays visible on the same linear scale | Equal quartiles collapse to a line; identical current and history overlap naturally |
 | Share summary | Open Share from completion | The same card semantics in the captured image | Existing share errors and privacy rules remain intact |
 

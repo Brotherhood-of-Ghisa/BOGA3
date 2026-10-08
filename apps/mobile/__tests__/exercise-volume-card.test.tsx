@@ -19,14 +19,16 @@ it('dashes an unavailable Volume with no note and no comparison line', () => {
   expect(screen.getByLabelText('Bench Press, 2 sets. Session volume unavailable.')).toBeTruthy();
 });
 
-it.each([0, 1, 2, 3, 4, 5])('shows only current volume and sets with %i prior observations', count => {
+it.each([0, 1, 2, 3, 4, 5])('shows Building history with %i prior observations and keeps sets beside the name', count => {
   render(<ExerciseVolumeCard comparison={{ ...comparison, historicalSessionCount: count,
     medianVolume: count ? 400 : null, percentile25Volume: count ? 300 : null, percentile75Volume: count ? 600 : null }} testID="card" />);
   expect(screen.getByText('500')).toBeTruthy();
   expect(screen.getByText('2 sets')).toBeTruthy();
+  expect(screen.getByText('2 sets').parent).toBe(screen.getByText('Bench Press').parent);
+  expect(screen.getByText('Building history')).toBeTruthy();
   expect(screen.queryByTestId('card-distribution')).toBeNull();
-  expect(screen.queryByText(/history|prior|median|first comparable/i)).toBeNull();
-  expect(screen.getByLabelText('Bench Press, 2 sets. Session volume 500 kg reps.')).toBeTruthy();
+  expect(screen.queryByText(/prior|median|first comparable/i)).toBeNull();
+  expect(screen.getByLabelText('Bench Press, 2 sets. Session volume 500 kg reps. Building history.')).toBeTruthy();
 });
 
 const distribution: ExerciseVolumeComparison = { ...comparison, historicalSessionCount: 6,
@@ -36,7 +38,13 @@ it.each(['app', 'share'] as const)('shows quartiles after six observations in th
   render(<ExerciseVolumeCard comparison={distribution} variant={variant} testID="card" />);
   expect(screen.getByText('P25')).toBeTruthy();
   expect(screen.getByText('P75')).toBeTruthy();
+  expect(screen.getByText('P25').parent).toBe(screen.getByText('Median').parent);
+  expect(screen.getByText('P25').parent).not.toBe(screen.getByText('300').parent);
+  expect(screen.getByText('300').parent).toBe(screen.getByText('400').parent);
+  expect(screen.getByText('300').parent).toBe(screen.getByText('600').parent);
   expect(screen.getByText('25% above median')).toBeTruthy();
+  expect(screen.queryByText('Building history')).toBeNull();
+  expect(screen.getByText('2 sets').parent).toBe(screen.getByText('Bench Press').parent);
   expect(screen.getByTestId('card-median')).toHaveStyle({ left: '50%' });
   expect(screen.getByTestId('card-p25')).toHaveStyle({ left: '30%' });
   expect(screen.getByTestId('card-p75')).toHaveStyle({ left: '90%' });

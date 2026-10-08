@@ -40,7 +40,9 @@ const hasVolumeReference = (comparison: ExerciseVolumeComparison): boolean =>
 
 const buildAccessibilityLabel = (comparison: ExerciseVolumeComparison): string => {
   const base = `${comparison.exerciseName}, ${formatExerciseSetCount(comparison.workingSetCount)}. Session volume ${formatSpokenVolume(comparison.currentVolume)}.`;
-  if (!hasVolumeReference(comparison)) return base;
+  if (!hasVolumeReference(comparison)) {
+    return comparison.currentVolume === null ? base : `${base} Building history.`;
+  }
 
   return `${base} ${formatExerciseVolumeComparison(comparison)}. Historical median ${formatSpokenVolume(
     comparison.medianVolume
@@ -62,20 +64,12 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
   return radius === 0 ? 50 : 50 + ((value - median) / radius) * 40;
 };
 
-function Legend({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.legend}>
-      <Text allowFontScaling={false} style={styles.microLabel}>{label}</Text>
-      <Text allowFontScaling={false} style={styles.legendValue}>{value}</Text>
-    </View>
-  );
-}
-
 /**
  * Exercise or muscle volume: current value and sets, then P25/median/P75 and
  * delta after six known prior observations. The linear scale centers the
  * median, vertical rules mark the references, and a black dot marks current.
- * Equal quartiles collapse to a rule; low history shows just the known volume.
+ * Equal quartiles collapse to a rule; low history shows "Building history".
+ * Reference labels sit above the bar, values below; sets sit beside the name.
  * Shared by the session summary, live comparison and captured share image.
  */
 export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: ExerciseVolumeCardProps) {
@@ -99,15 +93,17 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
           </View>
           {hasDistribution ? <Text allowFontScaling={false} style={styles.delta}>
             {formatExerciseVolumeComparison(comparison)}
+          </Text> : comparison.currentVolume !== null ? <Text allowFontScaling={false} style={styles.historyStatus}>
+            Building history
           </Text> : null}
         </View>
 
         {hasDistribution ? (
-          <View testID={testID ? `${testID}-distribution` : undefined}>
+          <View style={styles.distribution} testID={testID ? `${testID}-distribution` : undefined}>
             <View style={styles.rangeLabels}>
-              <Legend label="P25" value={formatVolume(comparison.percentile25Volume as number)} />
-              <Legend label="Median" value={formatVolume(comparison.medianVolume as number)} />
-              <Legend label="P75" value={formatVolume(comparison.percentile75Volume as number)} />
+              <Text allowFontScaling={false} style={[styles.microLabel, styles.rangeCell]}>P25</Text>
+              <Text allowFontScaling={false} style={[styles.microLabel, styles.rangeCell, styles.centerCell]}>Median</Text>
+              <Text allowFontScaling={false} style={[styles.microLabel, styles.rangeCell, styles.endCell]}>P75</Text>
             </View>
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackWrap}>
               <View style={styles.track} />
@@ -116,6 +112,11 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
               <View style={[styles.referenceMarker, { left: '50%' }]} testID={testID ? `${testID}-median` : undefined} />
               <View style={[styles.referenceMarker, { left: `${high}%` }]} testID={testID ? `${testID}-p75` : undefined} />
               <View style={[styles.currentMarker, { left: `${markerPosition(comparison.currentVolume as number, comparison)}%` }]} testID={testID ? `${testID}-current` : undefined} />
+            </View>
+            <View style={styles.rangeLabels}>
+              <Text allowFontScaling={false} style={[styles.legendValue, styles.rangeCell]}>{formatVolume(comparison.percentile25Volume as number)}</Text>
+              <Text allowFontScaling={false} style={[styles.legendValue, styles.rangeCell, styles.centerCell]}>{formatVolume(comparison.medianVolume as number)}</Text>
+              <Text allowFontScaling={false} style={[styles.legendValue, styles.rangeCell, styles.endCell]}>{formatVolume(comparison.percentile75Volume as number)}</Text>
             </View>
           </View>
         ) : null}
@@ -201,11 +202,24 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.sm,
     color: uiRoles.ink,
   },
-  rangeLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  historyStatus: {
+    flexShrink: 1, textAlign: 'right',
+    fontFamily: uiFonts.body.family,
+    fontWeight: '400',
+    fontSize: uiTypography.size.sm,
+    lineHeight: uiTypography.lineHeight.sm,
+    color: uiRoles.inkMuted,
+  },
+  distribution: {
     gap: uiSpace.xs,
   },
+  rangeLabels: {
+    flexDirection: 'row',
+    gap: uiSpace.xs,
+  },
+  rangeCell: { flex: 1 },
+  centerCell: { textAlign: 'center' },
+  endCell: { textAlign: 'right' },
   trackWrap: {
     height: uiSpace.lg,
     marginHorizontal: uiSpace.xs,
