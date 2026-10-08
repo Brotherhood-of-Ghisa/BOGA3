@@ -47,7 +47,15 @@ everything outside these changes. Native screenshots are comparison evidence.
 
 ### Daily
 
-- Keep newest-first Mon–Sun plus Week calendars.
+- Keep Mon–Sun plus Week columns. Order months and each month's rows newest
+  first: the month's first day belongs to the bottom row and its last day to
+  the top row (current month remains clipped to the saved window/current week).
+- Render only each month's own day tiles. Positions belonging to adjoining
+  months are empty spacers, with no tile or duplicated day/date/value.
+- Show a Week tile only for a completed (lapsed) week beside a row with an
+  in-month Sunday tile. Use the entire Monday–Sunday week's value and colour,
+  including days in the preceding month. The current week has no Week tile,
+  even on Sunday; rows ending outside the month also have none.
 - Widen the Sun/Week gap and centre a continuous vertical rule in that gap,
   equally distant from Sun and Week, aligned through each month's header/rows.
   Keep all eight columns and Week figures readable at narrow widths.
@@ -83,7 +91,7 @@ no new statistics dependency.
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
 | Compare Progress | Open Progress; change period/metric; expand contributions | Neutral rows, black/white active filters, separate name and chevron actions | Zero/previous-only, loading/error, long figures and narrow rows preserve meaning |
-| Inspect Daily | Set Daily in Settings; open either history; choose every metric | No subtitles, wider centred Sun/Week rule, small top-left Monday dates, bounded weeks | Partial months, year boundaries, blank rest/unavailable/future and genuine zero remain accessible |
+| Inspect Daily | Set Daily in Settings; open either history; choose every metric | Own-month days and rows newest first, completed Week totals only beside Sunday, wider centred rule and small Monday dates | Partial months, year boundaries, blank rest/unavailable/future and genuine zero remain accessible |
 | Inspect Weekly | Set Weekly in Settings; open either history; choose every metric and select rows | No banner/subtitles/black outlines; Sets median only, other metrics three lines; selection caret | Blank rest/unavailable values, sparse/zero/coincident references, long windows and narrow screens remain usable |
 | Change history window | Change History look-back (weeks) while history is open or reopen it | Read, displayed weeks and median/percentile calculations follow the same saved setting | Old out-of-range figures disappear; current-week future days remain blank |
 | Human review | Agent commits and supplies worktree/native preview; operator tests both views | Explicit human-testing-complete confirmation precedes automated validation | Human review pending; automated tests not run; requested UI fixes precede gates |
@@ -98,7 +106,8 @@ No new chart framework, dependency, durable preference or Maestro flow.
   rules. Load `docs/specs/README.md` before persistent documentation edits.
 - Read `apps/mobile/__tests__/README.md` and writing-tests before editing tests.
   Extend existing calendar/Weekly/marks/real-data Progress suites and theme/control
-  coverage for full-window bounds/references, window changes, omitted references,
+  coverage for reversed month rows, unique day tiles, Sunday-only cross-month
+  Week totals, full-window bounds/references, window changes, omitted references,
   removed copy/borders and fixed active colours.
   Author tests now; execute none before human testing is complete.
 - Commit locally with test hooks disabled. Starting the app and manual native
@@ -120,11 +129,15 @@ No new chart framework, dependency, durable preference or Maestro flow.
   automated tests not run**. Branch publication is authorized; no quality gates
   or PR yet.
 - Calculations and displayed weeks use the complete saved History look-back.
-- Implementation is ready for human testing. Manual native captures in ignored
-  `apps/mobile/artifacts/heatmap-ui/revised/` cover both history kinds/all metrics
-  at 402pt, plus 375pt, one-/four-week bounds, selected, sparse, zero and
-  coincident-reference states. Rest and unavailable figures are blank in both
-  views. The temporary capture host and small simulator have been removed.
+- Implementation is ready for human testing. Latest Daily native captures in
+  ignored `apps/mobile/artifacts/heatmap-ui/month-rows/` cover both history kinds
+  and all metrics at 402pt, plus 375pt, month/year boundaries, leap February,
+  Sunday month starts/ends, Sunday-to-Monday completion and one-week bounds.
+  Own-month day tiles are unique; completed full Week totals appear only beside
+  their Sunday. Weekly captures in `apps/mobile/artifacts/heatmap-ui/revised/`
+  cover selected, sparse, zero and coincident references. Rest and unavailable
+  figures are blank in both views. The temporary capture host and small
+  simulator have been removed.
 
 Next: human testing of the committed native preview. Automated validation starts
 only after the operator explicitly confirms that human testing is complete.

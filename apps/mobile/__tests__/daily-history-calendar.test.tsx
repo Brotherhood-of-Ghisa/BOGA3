@@ -19,7 +19,7 @@ const draw = (metric: CalendarHeatmapMetric = 'totalVolume', input = samples) =>
 };
 const style = (id: string) => StyleSheet.flatten(screen.getByTestId(id).props.style);
 
-it('stacks full month calendars newest first, with eight headers and Monday-only dates', () => {
+it('orders months and their own-day rows newest first, with eight headers and Monday-only dates', () => {
   draw();
   expect(screen.getAllByTestId(/^calendar-heatmap-month-\d{4}-\d{2}$/).map(month => month.props.testID))
     .toEqual(['calendar-heatmap-month-2026-10', 'calendar-heatmap-month-2026-09']);
@@ -27,6 +27,8 @@ it('stacks full month calendars newest first, with eight headers and Monday-only
   for (const label of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Week']) expect(october.getByText(label)).toBeTruthy();
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05-date')).toHaveTextContent('5');
   expect(screen.queryByTestId('calendar-heatmap-cell-2026-10-06-date')).toBeNull();
+  expect(october.getAllByTestId(/^calendar-heatmap-cell-\d{4}-\d{2}-\d{2}$/).map(tile => tile.props.testID)).toEqual(
+    [5, 6, 7, 8, 9, 10, 11, 1, 2, 3, 4].map(day => `calendar-heatmap-cell-2026-10-${String(day).padStart(2, '0')}`));
   expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
   expect(screen.UNSAFE_queryAllByType(ScrollView)).toEqual([]);
   expect(style('calendar-heatmap-cell-2026-10-05').minHeight).toBeGreaterThanOrEqual(uiGeometry.tapTarget);
@@ -35,15 +37,15 @@ it('stacks full month calendars newest first, with eight headers and Monday-only
 });
 
 it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
-  'shows formatted %s figures and the same weekly value and colour in each adjoining month', metric => {
+  'shows formatted %s and a full cross-month Week total only beside its completed Sunday', metric => {
     const { data } = draw(metric);
     expect(screen.queryByText(labels[metric], { exact: true })).toBeNull();
     const week = data.weekly.find(week => week.weekStartDateKey === '2026-09-28')!;
-    for (const month of ['2026-09', '2026-10']) {
-      const id = `calendar-heatmap-week-${month}-2026-09-28`;
-      expect(screen.getByTestId(`${id}-value`)).toHaveTextContent(formats[metric](week.value));
-      expect(style(id).backgroundColor).toBe([uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4][week.level]);
-    }
+    const id = 'calendar-heatmap-week-2026-10-2026-09-28';
+    expect(screen.getByTestId(`${id}-value`)).toHaveTextContent(formats[metric](week.value));
+    expect(style(id).backgroundColor).toBe([uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4][week.level]);
+    expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-28')).toBeNull();
+    expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-05')).toBeNull();
     expect(screen.getByTestId('calendar-heatmap-cell-2026-10-05-value')).toHaveTextContent(formats[metric](samples[4][metric]!));
     expect(screen.queryByTestId('calendar-heatmap-day-detail')).toBeNull();
   });
@@ -51,7 +53,7 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
 it('exposes read-only day and week values without selection or black outlines', () => {
   draw();
   const ids = ['calendar-heatmap-cell-2026-10-05', `calendar-heatmap-cell-${today}`,
-    'calendar-heatmap-week-2026-10-2026-09-28', 'calendar-heatmap-week-2026-10-2026-10-05'];
+    'calendar-heatmap-week-2026-10-2026-09-28'];
   for (const id of ids) {
     const tile = screen.getByTestId(id);
     expect(tile).toHaveProp('accessible', true);
@@ -62,7 +64,7 @@ it('exposes read-only day and week values without selection or black outlines', 
   }
   expect(screen.queryAllByRole('button')).toEqual([]);
   expect(screen.getByTestId(`calendar-heatmap-cell-${today}`).props.accessibilityLabel).toContain('Today');
-  expect(screen.getByTestId('calendar-heatmap-week-2026-10-2026-10-05').props.accessibilityLabel).toContain('Current week');
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-05')).toBeNull();
   expect(screen.queryByTestId('calendar-heatmap-day-detail')).toBeNull();
 });
 
@@ -84,21 +86,30 @@ it('leaves rest and unavailable figures blank, retains numeric zero and clips fu
   expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-12')).toBeNull();
 });
 
-it('de-emphasises adjoining dates by weight while preserving full ink and heat contrast', () => {
+it('uses empty spacers instead of adjoining-month day tiles or an in-progress Week tile', () => {
   draw();
-  const adjacent = 'calendar-heatmap-adjacent-2026-10-cell-2026-09-28';
-  const primary = 'calendar-heatmap-cell-2026-09-28';
-  expect(style(adjacent).opacity).toBeUndefined();
-  expect(style(adjacent).backgroundColor).toBe(style(primary).backgroundColor);
-  expect(style(`${adjacent}-date`)).toMatchObject({ fontWeight: '500', color: uiRoles.ink });
-  expect(style(`${primary}-date`)).toMatchObject({ fontWeight: '600', color: uiRoles.ink });
-  expect(style(`${adjacent}-value`)).toMatchObject({ fontWeight: '500', color: uiRoles.ink });
-  expect(style(`${primary}-value`)).toMatchObject({ fontWeight: '600', color: uiRoles.ink });
+  const october = within(screen.getByTestId('calendar-heatmap-month-2026-10'));
+  expect(october.queryByTestId('calendar-heatmap-cell-2026-09-28')).toBeNull();
+  expect(screen.getAllByTestId('calendar-heatmap-cell-2026-09-28')).toHaveLength(1);
+  const empty = screen.getByTestId('calendar-heatmap-empty-2026-10-2026-09-28');
+  expect(empty.props.accessibilityLabel).toBeUndefined();
+  expect(StyleSheet.flatten(empty.props.style).backgroundColor).toBeUndefined();
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-09-2026-09-28')).toBeNull();
+  expect(style('calendar-heatmap-empty-week-2026-09-2026-09-28').marginLeft).toBe(uiSpace.sm);
+  expect(screen.queryByTestId('calendar-heatmap-week-2026-10-2026-10-05')).toBeNull();
+});
+
+it.each(['2026-10-11', '2026-10-12'])('adds a completed Week tile only after Sunday (%s)', date => {
+  const data = buildHeatmapData(samples, 'totalVolume', { todayDateKey: date, weeks: 2 });
+  render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Volume" formatValue={formatVolume} />);
+  const id = 'calendar-heatmap-week-2026-10-2026-10-05';
+  if (date === '2026-10-11') expect(screen.queryByTestId(id)).toBeNull();
+  else expect(screen.getByTestId(`${id}-value`)).toHaveTextContent('3400');
 });
 
 it('preserves muscle target grading on daily and weekly tiles', () => {
   const data = buildHeatmapData([{ ...sample('2026-10-05', 1), workingSetCount: 3, workingSetCountsByMuscle: { chest: 3 } }],
-    'workingSetCount', { todayDateKey: today, weeks: 1, muscleTargets: { muscleIds: ['chest'], weeklyTarget: 10 } });
+    'workingSetCount', { todayDateKey: '2026-10-12', weeks: 2, muscleTargets: { muscleIds: ['chest'], weeklyTarget: 10 } });
   render(<DailyHeatmap data={data} testIDPrefix={prefix} metricLabel="Sets" formatValue={String} />);
   expect(style('calendar-heatmap-cell-2026-10-05').backgroundColor).toBe(uiRoles.viz2);
   expect(style('calendar-heatmap-week-2026-10-2026-10-05').backgroundColor).toBe(uiRoles.viz2);
@@ -144,7 +155,8 @@ it.each([320, 375, 402])('centres the Sun/Week separator in a wider gap at %ipt'
   const separator = style('calendar-heatmap-week-separator-2026-10');
   const lineCentre = width * 7 / 8 - uiBorder.width + separator.transform[0].translateX + uiBorder.width / 2;
   expect(lineCentre - sunRight).toBeCloseTo(weekLeft - lineCentre);
-  expect(style('calendar-heatmap-week-2026-10-2026-10-05').marginLeft).toBe(uiSpace.sm);
+  expect(style('calendar-heatmap-week-2026-10-2026-09-28').marginLeft).toBe(uiSpace.sm);
+  expect(style('calendar-heatmap-empty-week-2026-10-2026-10-05').marginLeft).toBe(uiSpace.sm);
   const date = style('calendar-heatmap-cell-2026-10-05-date');
   expect(date).toMatchObject({ position: 'absolute', top: uiBorder.width, left: uiBorder.width, fontSize: uiTypography.size.xxs });
   expect(date.fontSize).toBeLessThan(style('calendar-heatmap-cell-2026-10-05-value').fontSize);

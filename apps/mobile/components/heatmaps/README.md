@@ -81,9 +81,14 @@ Daily tiles are read-only; Weekly bars select a row:
 />
 ```
 
-- **Daily** displays figures inside read-only tiles, without selection or
-  black outlines. Adjacent
-  months repeat the same full week value/colour. Rest tiles are blank, zero is
+- **Daily** orders months and their week rows newest first: the month's first
+  day is in the bottom row, its last observed week in the top row. Each month
+  shows only its own day tiles; adjoining-month positions are empty spacers.
+  A Week tile appears only for a completed week beside that month's Sunday,
+  retaining the complete Monday–Sunday adapter value/colour across month
+  boundaries. No Week tile is shown for the current week or beside a row whose
+  Sunday belongs to the next month. Tiles are read-only, without selection or
+  black outlines. Rest is blank, zero is
   numeric, unknown load is blank, and current-week future days are blank.
   No visible Rest wording or question mark is displayed.
   No future week rows extend the saved history window.

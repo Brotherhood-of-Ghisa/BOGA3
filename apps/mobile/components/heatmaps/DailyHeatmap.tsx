@@ -1,6 +1,7 @@
-// Newest-first, read-only month calendars. The host owns the single vertical
-// scroller. Week values reuse the Weekly adapter results; a continuous rule
-// separates Sun from Week. Rest/future/unknown values stay blank; known zero stays numeric.
+// Months and their week rows run newest first; each month shows only its own
+// day tiles. Completed-week totals sit beside an in-month Sunday and include the full
+// Monday–Sunday adapter week across month boundaries. The host owns scrolling;
+// rest/future/unknown figures stay blank, and known zero stays numeric.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -25,15 +26,17 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
   data: HeatmapData; metricLabel: string; formatValue: Props['formatValue']; testID: string; gap: number;
 }) {
   return <View style={[styles.row, { gap }]}>
-    {row.days.map((day, index) => <CalendarTile key={day.dateKey} cell={day.day} dateLabel={day.dateKey}
-      mondayDate={index === 0 ? day.dayOfMonth : undefined} future={day.future} adjacent={!day.inMonth}
+    {row.days.map((day, index) => day.inMonth ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={day.dateKey}
+      mondayDate={index === 0 ? day.dayOfMonth : undefined} future={day.future}
       current={!!day.day?.isToday}
       metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
-      testID={day.inMonth && day.day ? `${testID}-cell-${day.dateKey}` : `${testID}-adjacent-${monthKey}-cell-${day.dateKey}`} />)}
-    <CalendarTile weekly cell={row.week} dateLabel={`Week of ${row.weekStartDateKey}`} future={row.weekStartDateKey > data.todayDateKey}
-      current={!!row.week?.isCurrentWeek}
+      testID={`${testID}-cell-${day.dateKey}`} />
+      : <View key={day.dateKey} style={styles.blankTile} testID={`${testID}-empty-${monthKey}-${day.dateKey}`} />)}
+    {row.week ? <CalendarTile weekly cell={row.week} dateLabel={`Week of ${row.weekStartDateKey}`} future={row.weekStartDateKey > data.todayDateKey}
+      current={!!row.week.isCurrentWeek}
       metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
       testID={`${testID}-week-${monthKey}-${row.weekStartDateKey}`} />
+      : <View style={[styles.blankTile, heatmapStyles.weekColumn]} testID={`${testID}-empty-week-${monthKey}-${row.weekStartDateKey}`} />}
   </View>;
 }
 
@@ -71,6 +74,7 @@ const styles = StyleSheet.create({
   calendar: { position: 'relative', gap: uiSpace.xs },
   weekSeparator: { position: 'absolute', top: 0, bottom: 0, right: '12.5%', width: uiBorder.width, backgroundColor: uiRoles.rule },
   row: { flexDirection: 'row', gap: uiSpace.xs },
+  blankTile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget },
   column: { flex: 1, minWidth: 0, textAlign: 'center', fontFamily: uiFonts.display.family,
     fontWeight: '600', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
 });

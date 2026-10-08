@@ -9,7 +9,6 @@ type Props = {
   dateLabel: string;
   mondayDate?: number;
   future: boolean;
-  adjacent?: boolean;
   weekly?: boolean;
   current: boolean;
   metricLabel: string;
@@ -31,7 +30,7 @@ function description({ cell, future, metricLabel, formatValue }: Props) {
 }
 
 export function CalendarTile(props: Props) {
-  const { cell, dateLabel, mondayDate, future, adjacent, weekly, current, formatValue, targetAveraged, testID } = props;
+  const { cell, dateLabel, mondayDate, future, weekly, current, formatValue, targetAveraged, testID } = props;
   const value = calendarValue(cell, future, formatValue);
   const target = cell?.targetAttainment;
   return <View accessible accessibilityRole="text"
@@ -39,8 +38,8 @@ export function CalendarTile(props: Props) {
     testID={testID}
     style={[styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
       cell?.unavailable ? styles.unavailable : null]}>
-    {mondayDate === undefined ? null : <Text allowFontScaling={false} style={[styles.date, adjacent ? styles.adjacentFigure : null]} testID={`${testID}-date`}>{mondayDate}</Text>}
-    <Text allowFontScaling={false} style={[styles.value, adjacent ? styles.adjacentFigure : null]} numberOfLines={1} testID={`${testID}-value`}>
+    {mondayDate === undefined ? null : <Text allowFontScaling={false} style={styles.date} testID={`${testID}-date`}>{mondayDate}</Text>}
+    <Text allowFontScaling={false} style={styles.value} numberOfLines={1} testID={`${testID}-value`}>
       {value}
     </Text>
   </View>;
@@ -50,7 +49,6 @@ const styles = StyleSheet.create({
   tile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
     borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
     ...heatmapStyles.restCell, justifyContent: 'center', paddingTop: uiSpace.xs },
-  adjacentFigure: { fontWeight: '500' },
   unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: uiRoles.rule },
   date: { position: 'absolute', top: uiBorder.width, left: uiBorder.width, fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.xxs,
     lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.ink },
