@@ -128,7 +128,7 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
                 }}
                 style={[styles.annotation, {
                   transform: [{ translateX: reference.position / 100 * plotWidth - annotationWidths[index] / 2 }],
-                  opacity: plotWidth > 0 && (index === 1 || showQuartileLabels) ? 1 : 0,
+                  opacity: plotWidth > 0 && annotationWidths[index] > 0 && (index === 1 || showQuartileLabels) ? 1 : 0,
                 }]}>
                 <Text allowFontScaling={false} style={styles.microLabel}>{reference.label}</Text>
                 <View style={styles.annotationGap} />

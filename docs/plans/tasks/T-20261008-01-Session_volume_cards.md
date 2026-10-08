@@ -1,6 +1,6 @@
 # Session volume cards
 
-- Status: in_progress — implementation pushed; awaiting design review
+- Status: in_progress — implementation ready for human review; tests on hold
 - Branch: `codex/session-volume-quartiles`
 - Areas: frontend; UI impact: yes
 
@@ -20,7 +20,7 @@ including the live comparison and share surfaces that reuse the card.
   sessions, matching the weekly heatmap's observation cutoff via one shared
   constant. The cutoff gates both the chart and the median delta. Preserve the
   existing history scope and eligibility, including genuine zero observations.
-- Try a symmetric linear scale with the median at the center. Include the
+- Use a symmetric linear scale with the median at the center. Include the
   current reading in its extent so outliers remain visible. This compresses
   the interquartile interval when the current reading is far from the median.
 - With fewer than six prior observations, show the current volume and a quiet
@@ -32,8 +32,10 @@ including the live comparison and share surfaces that reuse the card.
 ## Design target and UX contract
 
 Repo-native brief: the requirements above, using the existing card, theme,
-typography, and exercise/muscle selector. The low-data choice is settled;
-the centered scale and overall design remain subject to the user's review.
+typography, and exercise/muscle selector. The user approved the rendered
+design, including the low-data state and centered scale.
+Only the approved card wording ships: name, sets, Vol, median delta,
+P25 / Median / P75 and Building history. Add no headings or explanatory copy.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
@@ -44,10 +46,13 @@ the centered scale and overall design remain subject to the user's review.
 ## Delivery
 
 - Commit and push major changes.
-- Do not run tests or open a PR until the user approves the design and is
-  happy to proceed. Update Jest coverage now; leave it unrun.
-- At that point, agree the slower lane set and run the fast and quality gates
-  plus the agreed device lanes before opening the PR.
+- Finish implementation, commit and push, then wait for human code review.
+  Run no more tests until the user approves them after reviewing the code.
+- Validation is pending. The fast run started before the review hold was
+  interrupted; updated assertions have not been rerun.
+- Agreed future lane set: fast, jest-coverage, complexity, dependencies,
+  ios-data-smoke and ios-session-view. The last two cover completion/share
+  and the session view; other frontend-ui lanes are outside this card change.
 - Review the rendered browser options and native card preview now. Capture
   the accepted states on small/large phones in their session routes before
   closeout; the standalone previews do not complete device acceptance.

@@ -44,6 +44,7 @@ const layoutAnnotations = (plotWidth = 300, widths = [40, 60, 40]) => {
 
 it.each(['app', 'share'] as const)('shows quartiles after six observations in the %s card, with a centered median and current dot', variant => {
   render(<ExerciseVolumeCard comparison={distribution} variant={variant} testID="card" />);
+  expect(screen.getByTestId('card-median-annotation', { includeHiddenElements: true })).toHaveStyle({ opacity: 0 });
   layoutAnnotations();
   const p25 = screen.getByTestId('card-p25-annotation', { includeHiddenElements: true });
   const median = screen.getByTestId('card-median-annotation', { includeHiddenElements: true });

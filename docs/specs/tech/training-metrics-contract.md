@@ -85,6 +85,9 @@ sessions those sets come from. That is the same rule, not a second one: the
 facts table, catalog stats, heatmaps and session comparisons work this way.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
+Session volume comparison presentation is [[session.volume-comparison]];
+its history and quartiles derive in `apps/mobile/src/session-insights/calculations.ts`.
+
 **Counted-session statistics.**
 
 | Figure | Scope |
