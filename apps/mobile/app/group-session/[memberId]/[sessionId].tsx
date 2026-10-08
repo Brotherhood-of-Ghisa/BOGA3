@@ -76,8 +76,31 @@ function UnavailableState() {
 const fullSessionHref = (session: CompetitionSessionWire): Href =>
   session.status === 'completed' ? `/completed-session/${encodeURIComponent(session.session_id)}` as Href : sessionViewHref(session.session_id);
 
-function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId: string; groupId: string; memberId: string; sessionId: string }) {
+/** The native header: which group's view, whose session and when; on my own session, the full-session action. */
+function GroupSessionHeader({ session, groupName, userId }: { session: CompetitionSessionWire | null; groupName: string | null; userId: string }) {
   const router = useRouter();
+  return (
+    <Stack.Screen
+      options={{
+        headerTitle: session
+          ? () => <GroupSessionHeaderTitle eyebrow={groupSessionEyebrow(groupName)} title={groupSessionTitle(session, userId)} />
+          : 'Session',
+        headerRight: session?.member.user_id === userId
+          ? () => (
+            <IconButton
+              accessibilityLabel="View full session"
+              name="arrow-up-right"
+              onPress={() => router.push(fullSessionHref(session))}
+              testID="group-session-full-view"
+            />
+          )
+          : undefined,
+      }}
+    />
+  );
+}
+
+function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId: string; groupId: string; memberId: string; sessionId: string }) {
   const online = useNetworkOnline();
   const fetcher = useCallback(() => getCompetitionSession(groupId,memberId,sessionId), [groupId,memberId,sessionId]);
   // NOT_FOUND deletes this entry from the cache (the hook evicts its own key).
@@ -99,30 +122,12 @@ function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId:
   const inlineError = pickInlineError(detail.error);
   // A failed records read says so; it never passes for a session without records.
   const recordsError = session && !inlineError ? pickInlineError(records.error) : null;
-  const groupName = group.data?.group.name ?? null;
-  const isMine = session?.member.user_id === userId;
 
   return (
     <ScreenScroll
       refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       testID="group-session-screen">
-      <Stack.Screen
-        options={{
-          headerTitle: session
-            ? () => <GroupSessionHeaderTitle eyebrow={groupSessionEyebrow(groupName)} title={groupSessionTitle(session, userId)} />
-            : 'Session',
-          headerRight: session && isMine
-            ? () => (
-              <IconButton
-                accessibilityLabel="View full session"
-                name="arrow-up-right"
-                onPress={() => router.push(fullSessionHref(session))}
-                testID="group-session-full-view"
-              />
-            )
-            : undefined,
-        }}
-      />
+      <GroupSessionHeader groupName={group.data?.group.name ?? null} session={session} userId={userId} />
       {detail.lostAccess || records.lostAccess ? (
         <UnavailableState />
       ) : (
