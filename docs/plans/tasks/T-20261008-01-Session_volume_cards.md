@@ -1,6 +1,6 @@
 # Session volume cards
 
-- Status: in_progress — human review approved; agreed checks underway
+- Status: in_review — implementation, human review and agreed checks complete
 - Branch: `codex/session-volume-quartiles`
 - Areas: frontend; UI impact: yes
 
@@ -46,13 +46,50 @@ P25 / Median / P75 and Building history. Add no headings or explanatory copy.
 ## Delivery
 
 - Commit and push major changes.
-- Design and human code review are approved. Finish the agreed checks before
-  opening the PR; validation remains pending until they pass.
+- Design and human code review are approved; the agreed checks are green.
 - Agreed lane set: fast, jest-coverage, complexity, dependencies,
   ios-data-smoke and ios-session-view. The last two cover completion/share
   and the session view; other frontend-ui lanes are outside this card change.
-- Review the rendered browser options and native card preview now. Capture
-  the accepted states on small/large phones in their session routes before
-  closeout; the standalone previews do not complete device acceptance.
+- Browser and native screenshots match the approved target; no material
+  design deviations. Actual session routes were checked on small/large phones.
 - Delete this card when the work ships; preserve lasting behavior in the
   component, tests, and owning product/spec documentation.
+
+## Validation
+
+Production code checked at `f2306e9d`; subsequent changes only update docs.
+Local evidence is under `apps/mobile/artifacts/volume-cards-preview/`.
+
+| Agreed lane | Result | Evidence file |
+| --- | --- | --- |
+| fast | Pass, including 251 mobile Jest suites / 3,377 tests | `fast-final.log` |
+| jest-coverage | Pass: branches 86.61%, lines 94.20% | `coverage-final.log` |
+| complexity | Pass; retired the card's old exemption | `complexity-final.log` |
+| dependencies | Pass; no new violations | `dependencies-final.log` |
+| ios-data-smoke | Pass: runtime smoke, completion/share, catalogue | `ios-data-smoke.log` |
+| ios-session-view | Pass: session view | `ios-session-view.log` |
+
+Additional docs-check passed (`docs-check-final.log`). Product review: clean;
+the approved behavior is owned by `session.volume-comparison`.
+The operator agreed to narrow frontend-ui to the two relevant iPhone lanes;
+the other flows and release sweep are outside this card change.
+
+Native evidence under `native/` uses iPhone 17e (390 × 844) and iPhone 18 Pro
+Max (440 × 956), iOS 27, with isolated fixture data:
+
+- `small-summary-exercise.png`, `small-summary-muscle.png`,
+  `large-summary-exercise.png`, `large-summary-muscle.png`: rich and low-data
+  cards in historical Summary, both groupings.
+- `small-compare-exercise.png`, `small-compare-muscle.png`: full references
+  in the comparison route, both groupings.
+- `small-live-exercise.png`, `small-live-muscle.png`: active-session comparison
+  with the selected low-data state and sets beside each name.
+- `large-compare-outlier.png`, `large-compare-muscle-outlier.png`,
+  `large-compare-zero.png`: median-only crowded annotations and equal zero
+  references, with current and median positions retained.
+- `small-compare-unavailable.png`: unavailable Volume has no history label.
+
+Completion and captured share-image evidence is in
+`apps/mobile/artifacts/maestro/session-volume-cards/20261008-212548-94658/`;
+the session-view lane is in the sibling `20261008-213147-10938/` directory.
+Screenshots remain ignored artifacts; no new Maestro flow was added.
