@@ -1,6 +1,6 @@
 # T-20261008-01 — Simplify Progress and Daily/Weekly heatmaps
 
-- Status: in progress — human UI review pending
+- Status: PR preparation — human UI review and gate agreement pending
 - Depends on: none
 - Milestone: none
 - Areas: frontend; UI impact: yes
@@ -134,9 +134,12 @@ No new chart framework, dependency, durable preference or Maestro flow.
 - UI implementation and regression coverage are committed and published.
   Native previews have been inspected; `./boga doctor` passed. **Human review
   pending; automated tests not run.** No quality gates or PR yet.
+- Proposed checks: fast, jest-coverage, complexity, dependencies and
+  ios-data-smoke; agreement pending. Product and code review completed; the
+  durable calendar/reference/blank-figure rules are recorded in product facts.
 - Preview files: Daily in `apps/mobile/artifacts/heatmap-ui/no-future-days/`;
   Weekly in `apps/mobile/artifacts/heatmap-ui/quartiles/`. Temporary capture code
   and the temporary small simulator have been removed.
 
-Next: human testing of the committed native preview. Automated validation starts
+Next: confirm human testing and the proposed PR checks. Automated validation starts
 only after the operator explicitly confirms that human testing is complete.

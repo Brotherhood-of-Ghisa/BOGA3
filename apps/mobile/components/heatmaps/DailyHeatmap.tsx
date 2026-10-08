@@ -1,8 +1,5 @@
-// Months and their week rows run newest first; each month shows only its own
-// day tiles. Week totals require seven sampled days, including rest days
-// across month boundaries, and appear beside an in-month Sunday once it arrives.
-// Future days are empty spacers. The host owns scrolling; rest and unknown
-// figures stay blank, and known zero stays numeric.
+// Calendar layout follows [[comparison.daily-history]]. The host owns scrolling;
+// figure visibility follows [[copy.blank-history]].
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 

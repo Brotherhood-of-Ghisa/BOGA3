@@ -18,6 +18,9 @@ that describes it.
   - The sentence under each Settings and More row (`Review access and
     revoke existing connections.`, `Sign in and manage your account.`, …);
     the signed-in email under Account is data and stays.
+  - History heatmaps omit the window/Metric captions and percentile label
+    stack. Metric controls and chart figures remain; reference identities,
+    values and the history window are accessible.
 
 Why: the screen's content already says what the screen is; a describing line
 costs space and is read once.
@@ -75,3 +78,13 @@ formula notes, hints under fields, or "how this works" lines.
 
 Why: an explanation on screen means the label or the layout failed; fixing
 those helps every user, every time.
+
+### copy.blank-history · presentation · accepted
+
+Daily and Weekly history leave rest and unavailable figures visibly blank,
+including Daily's Week column: no `Rest`, `?`, substitute dash or zero. Known
+zero training stays numeric. Accessibility preserves the difference between
+rest, unavailable and known zero values.
+
+Why: an absent training figure should not look like a measurement or an error marker.
+Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.

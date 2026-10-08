@@ -1,7 +1,6 @@
 // Newest-first weekly rows. Length uses a shared zero origin; colour retains
-// the adapter's independent intensity/target meaning. Known training weeks
-// across the saved history window supply unlabelled P25/median/P75 references
-// (Sets: median only); rest/unknown values stay blank.
+// the adapter's independent intensity/target meaning. Reference calculations
+// follow [[comparison.weekly-reference]]; figure visibility follows [[copy.blank-history]].
 import React, { useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -88,7 +87,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
   const max = data.weekly.reduce((largest, week) => week.unavailable ? largest : Math.max(largest, week.value), 0);
   const trainingWeeks = data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey && isKnownTraining(week));
   const values = trainingWeeks.map(week => week.value).sort((a, b) => a - b);
-  // Six genuine zeros are observations; an all-zero scale has no reference.
+  // Reference eligibility follows [[comparison.weekly-reference]].
   const references: Reference[] = values.length >= 6 && max > 0
     ? REFERENCE_PERCENTILES.filter(([id]) => metricLabel !== 'Sets' || id === 'median').map(([id, label, percentile]) => {
       const value = calculateLinearPercentile(values, percentile);

@@ -50,10 +50,9 @@ report each cell's share. Displayed metrics and
 eligibility retain their existing rules.
 Volume / working sets aggregate (sum) per week; 1RM / top weight are best-of
 (max). Weekly lengths share a zero origin and the known window maximum;
-unknown load never gets a filled length; rest and unknown values are blank, and known zero reads `0`.
-Sets uses median only; other metrics use P25, median and P75 from known training weeks
-(including zeros) across the full saved history window; rest, future and
-unavailable weeks do not contribute. A Volume sum that is not finite is never
+unknown load never gets a filled length. Figure visibility follows
+[[copy.blank-history]]; Weekly reference calculations follow
+[[comparison.weekly-reference]] across [[comparison.history-window]]. A Volume sum that is not finite is never
 plotted: Daily and Weekly values are blank and announce `Volume unavailable`;
 Daily retains a neutral dashed rule.
 
@@ -81,7 +80,7 @@ Daily tiles are read-only; Weekly bars select a row:
 />
 ```
 
-- **Daily** orders months and their week rows newest first: the month's first
+- **Daily** follows [[comparison.daily-history]]: months and week rows run newest first; the month's first
   day is in the bottom row, its last observed week in the top row. Each month
   shows only its own day tiles; adjoining-month positions are empty spacers.
   A Week tile appears beside that month's Sunday once Sunday has arrived,
@@ -91,7 +90,7 @@ Daily tiles are read-only; Weekly bars select a row:
   The complete adapter value/colour spans month boundaries.
   The current Week tile appears only on Sunday; rows whose Sunday is in the
   next month have no Week tile. Tiles are read-only, without selection or black
-  outlines. Rest and unknown load are blank, and zero is numeric.
+  outlines. Figure visibility follows [[copy.blank-history]].
   Future day positions are empty spacers with no tile or accessible day value.
   No visible Rest wording or question mark is displayed.
   No future week rows extend the saved history window.
@@ -99,7 +98,7 @@ Daily tiles are read-only; Weekly bars select a row:
   all eight read-only columns can shrink on narrow screens.
   Monday dates are small, top-left figures. Full dates, today/current week and rest are announced accessibly.
 - **Weekly** lifts selection to the host; a second tap clears the selected
-  row. No selected-week banner, visible Rest indicator or question mark is displayed.
+  row. No selected-week banner is displayed; figure visibility follows [[copy.blank-history]].
   Rest/current semantics remain accessible; selected rows retain their caret, including zero/rest/unknown rows.
 
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
@@ -132,12 +131,11 @@ the current week when excluded and survives look-back edits while in range.
   disambiguate multi-year windows and value columns cap their width and wrap.
 - **No new dependencies.** RN primitives and the existing `Icon` / `Card`.
 - Weekly references use discrete vertical dashes on the same zero-based scale
-  as the bars. At least six known training weeks within the saved history are
-  required; an all-zero scale has no reference. Numeric labels use whole
+  as the bars ([[comparison.weekly-reference]]). Accessible values use whole
   Volume or the canonical one-decimal formatter for Sets/1RM/Top weight; row values
   retain the selected metric format. Axis marks announce the saved window, each
   reference and value accessibly, including coincident references; no visible
   label stack is drawn. References and displayed weeks use the same look-back.
-- Daily and Weekly share title typography. Window/Metric captions, metric
+- Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
   subtitles and visible reference labels are omitted. Selected metric controls
   use fixed black `selection` with white `surface` labels in every theme.

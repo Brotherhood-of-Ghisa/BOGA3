@@ -27,8 +27,7 @@ const key = (value: Date) => value.toISOString().slice(0, 10);
 const addDays = (value: Date, count: number) => new Date(value.getTime() + count * DAY_MS);
 const monday = (value: Date) => addDays(value, -(value.getUTCDay() + 6) % 7);
 
-// Newest-first month rows. Week tiles require all seven calendar days in
-// the data sample across month boundaries, and appear in their Sunday's month.
+// Calendar framing follows [[comparison.daily-history]]; adapter values/colours are reused.
 export function buildCalendarMonths(data: HeatmapData): CalendarMonth[] {
   const firstKey = data.daily[0]?.dateKey;
   if (!firstKey) return [];
