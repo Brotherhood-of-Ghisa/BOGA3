@@ -146,9 +146,4 @@ fi
 echo "[dev-baseline] seeding the Dev crew group (history@ owner, b@ member) and recent sessions (idempotent)"
 (cd "${SCRIPT_DIR}/../../apps/mobile" && npm run seed:dev-groups)
 
-# The app reads groups only through competition protocol 4, which migrations
-# install pending; activate it once (one-way, a no-op when already active).
-echo "[dev-baseline] activating group competitions (protocol 4; idempotent)"
-"${SCRIPT_DIR}/group-competitions-activate.sh"
-
 echo "[dev-baseline] dev baseline ready on the ${TARGET} stack — dev data preserved, no reset performed"

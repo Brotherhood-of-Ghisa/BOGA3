@@ -182,22 +182,19 @@ physical source distribution, ordinary target conversion, missing/invalid/zero
 omission, full-precision scores and exact public allowlists. Nested kg/private
 fields, dependency digests and unsupported units/versions must fail decoding.
 `groups-cache.test.ts` proves group-scoped version-5 session keys and account-only
-whole-group-cache eviction across generations. The backend bodyweight fixture
+whole-group-cache eviction across generations. The backend competition fixture
 runs the actual negotiation response through the mobile decoder and proves
-pending activation plus anonymous/OAuth/outsider/unsupported-protocol denial.
-`groups-competition-evaluation.test.ts` covers worker dispatch, complete
-versioned graphs, shared-kernel precision, eligibility and private-context
+anonymous/OAuth/outsider/unsupported-protocol denial.
+`groups-competition-evaluation.test.ts` covers complete versioned graphs, shared-kernel precision, eligibility and private-context
 short-circuiting. `groups-competition-readers.test.ts` covers every exact nested
 reader shape, scope coherence, request-local capability headers, normalized kg
 rejection and server-normalized write responses.
-The backend competition fixture performs a populated prior-schema upgrade and
-local activation, tests both-metric selected-reading corrections, exact witness
-audit, legacy aliases, frozen membership catch-up, paired-reader privacy and
-publication failure/fence behavior. It restores pending state on exit. These do
-not replace the retained protocol-3 assertions; current safe UI tests cover explicit units, normalized details/full sessions,
+The backend competition fixture tests both-metric selected-reading corrections,
+exact witness audit, SQL-seeded protocol-3 history, paired-reader privacy and
+publication failure/fence behavior. Current safe UI tests cover explicit units,
+normalized details/full sessions,
 account and generation races, unknown disclosure retirement, SQL cleanup failure,
 positive/c=0 rule review, decimal name-only saves and saved confirmation guards.
-`groups-competition-api-live.test.ts` runs every safe client RPC against activated
-local protocol 4 inside `groups-api-live`; the wrapper restores initially pending
-state. Three-size runtime rendering, integrated human acceptance and authorized
-hosted activation remain separate evidence requirements.
+`groups-competition-api-live.test.ts` runs every safe client RPC against the
+local protocol-4 server inside `groups-api-live`. Three-size runtime rendering
+and integrated human acceptance remain separate evidence requirements.

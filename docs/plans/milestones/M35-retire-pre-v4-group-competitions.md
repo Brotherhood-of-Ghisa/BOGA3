@@ -94,7 +94,7 @@ group data (no silent skip of the cutover).
 | M35-T01-Inventory_and_test_map | Pre-V4 object inventory with callers, hosted verification, assertion port/delete map ([results](../M35-pre-v4-inventory-and-test-map.md)) | none | completed |
 | M35-T02-Port_light_suites_to_V4 | Header; port groups-contract, leaderboards, week-summary; V4 competitions chapters to a default lane (`groups-competitions`); SQL-seeded history fixture; fix found on the way: publish reps cast (`20261007180000`) | T01 | completed |
 | M35-T03-Port_heavy_suites_and_flip_the_baseline | Port boards, certification, bodyweight; local baseline active (preflight activates, stamp hashes activation); V4 client suite moved to groups-api-live; groups-protocol4 down to cutover chapters | T02 | completed |
-| [M35-T04-Remove_pre_V4_server_code](../tasks/M35-T04-Remove_pre_V4_server_code.md) | Removal migration, group-eval protocol-3 path, activation tooling, specs | T03 | planned |
+| M35-T04-Remove_pre_V4_server_code | Removal migration `20261008120000_group_competition_v4_only.sql` (99 functions + activation table dropped, 8 bodies folded into V4, fails loud on a pending DB with groups); group-eval dispatch; activation script, reset marker and groups-protocol4 retired; catalog assertion in groups-competitions | T03 | completed |
 | [M35-T05-Simplify_the_V4_client](../tasks/M35-T05-Simplify_the_V4_client.md) | Delete protocol-3 TS and dead V4 client surface | T04 | planned |
 | [M35-T06-Hosted_rollout](../tasks/M35-T06-Hosted_rollout.md) | Operator-authorised hosted deploy and verification of T04 | T04 | planned |
 
@@ -105,8 +105,8 @@ delete it with the milestone.
 ## Risks / dependencies
 
 - M34-T02 (group workout notifications) touches rank movement and
-  publication SQL that T04 rewrites. Whichever lands second rebases;
-  check M34's status before starting T04.
+  publication SQL. T04 landed first (operator, 2026-10-08); M34-T02 builds
+  on the V4-only SQL.
 - T04 is irreversible on hosted. T06 needs the operator's explicit authority
   (group-competition contract §5) and hosted access (Supabase MCP or the
   operator running SQL).

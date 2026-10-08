@@ -24,8 +24,7 @@
 #     unlink events and cursor paging. Anonymous, OAuth and outsider denials
 #     and the wire shapes of every reader: groups-competitions.sh.
 #
-# Runs on the protocol-4-active baseline (require_active_group_competitions,
-# groups-fixtures.sh). Direct-drain mode as groups-leaderboards.sh: the kick
+# Direct-drain mode as groups-leaderboards.sh: the kick
 # URL is unset and the sweep paused for the run; the lane POSTs group-eval
 # itself. Hermetic: per-run users, deleted on exit with everything they own.
 
@@ -50,7 +49,6 @@ load_supabase_status_env
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-require_active_group_competitions
 
 RUN_TAG="${GROUPS_BOARDS_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -391,10 +389,7 @@ for table in group_board_entries group_board_state group_metric_board_entries gr
 done
 
 READS="'group_competition_board', 'group_competition_history', 'group_competition_podiums', 'group_competition_stream'"
-# The old public board wrappers are not board internals (their contract is
-# UPDATE_REQUIRED on this stack).
-OLD_READS="'group_board', 'group_board_history', 'group_board_podiums'"
-BOARD_FNS="p.proname like 'group\\_board%' or p.proname in ('group_eval_apply', 'group_stream_event_json', ${READS})"
+BOARD_FNS="p.proname like 'group\\_board%' or p.proname in ('group_eval_apply', ${READS})"
 expect_sql "every board function pins search_path" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${BOARD_FNS})
@@ -408,12 +403,12 @@ expect_sql "signed-in clients execute the four reads; anonymous callers none" \
 expect_sql "clients execute no board internal" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${BOARD_FNS})
-      and p.proname not in (${READS}, ${OLD_READS})
+      and p.proname not in (${READS})
       and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'));" "0"
 expect_sql "service_role executes no board internal" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${BOARD_FNS})
-      and p.proname not in (${READS}, ${OLD_READS})
+      and p.proname not in (${READS})
       and has_function_privilege('service_role', p.oid, 'execute');" "0"
 expect_sql "the four reads are security definer" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

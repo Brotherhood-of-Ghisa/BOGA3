@@ -24,8 +24,7 @@
 #   - enqueue failure isolation and repair;
 #   - a rules-revision rebuild republishes silently and keeps the certification.
 #
-# Runs on the protocol-4-active baseline (require_active_group_competitions,
-# groups-fixtures.sh). Direct-drain mode as groups-boards.sh: the kick URL is
+# Direct-drain mode as groups-boards.sh: the kick URL is
 # unset and the sweep paused for the run; the lane POSTs group-eval itself.
 # Hermetic: per-run users, deleted on exit with everything they own (a group's
 # comparison jobs cascade from it).
@@ -51,7 +50,6 @@ load_supabase_status_env
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-require_active_group_competitions
 
 RUN_TAG="${GROUPS_CERTIFICATION_RUN_TAG:-$(date +%s)-$$-${RANDOM}}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9-' '-')"
@@ -455,7 +453,6 @@ expect_sql "anon executes no competition certification function" \
 expect_sql "service_role executes no certification internal" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public' and (${CERT_FNS})
-      and p.proname not in ('group_certify', 'group_certification_withdraw', 'group_certification_cancel')
       and has_function_privilege('service_role', p.oid, 'execute');" "0"
 expect_sql "the three RPCs are security definer" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -463,7 +460,7 @@ expect_sql "the three RPCs are security definer" \
 expect_sql "service_role executes neither an apply nor a Certified compute" \
   "select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'app_public'
-      and p.proname in ('group_eval_apply', 'group_board_compute', 'group_metric_apply_member', 'group_metric_compute')
+      and p.proname in ('group_eval_apply', 'group_metric_apply_member', 'group_metric_compute')
       and has_function_privilege('service_role', p.oid, 'execute');" "0"
 expect_sql "both queues accept the certification cause" \
   "select count(*) || ':' || bool_and(pg_get_constraintdef(oid) like '%certification%') from pg_constraint

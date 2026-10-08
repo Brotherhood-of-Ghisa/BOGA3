@@ -76,8 +76,8 @@ Define the canonical repository structure, path ownership, and placement convent
     type-only imports. `metric-wire.ts` / `metric-wire-guards.ts` own versioned
     comparison rules and their privacy validation; `competition-session-view-model.ts`
     owns the public shared-session projection and never a private reading context.
-    `competition-score.ts` / `competition-evaluation.ts` own activated
-    protocol-4 scoring/worker dispatch; competition wire guards own its exact
+    `competition-score.ts` / `competition-evaluation.ts` own protocol-4
+    scoring and the worker's evaluation; competition wire guards own its exact
     safe reader shapes at the same API boundary. They follow the same `.ts`
     relative-import rule where shared with the Edge worker.
 - `apps/mobile/src/exercise-core/`

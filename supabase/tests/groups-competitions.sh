@@ -6,8 +6,7 @@
 # week summary's record values, and stored protocol-3-era history read through
 # the protocol-4 readers (an SQL-seeded fixture).
 #
-# Contract: docs/specs/tech/group-competition-contract.md. Runs on the
-# protocol-4-active baseline (require_active_group_competitions, groups-fixtures.sh).
+# Contract: docs/specs/tech/group-competition-contract.md.
 # Direct-drain mode: the kick URL is unset and the sweep paused for the run,
 # both restored on exit. Hermetic: per-run users, deleted on exit with
 # everything they own.
@@ -29,7 +28,6 @@ load_supabase_status_env
   fail "local Supabase status env is incomplete (API_URL/ANON_KEY/JWT_SECRET)"
 DB_CONTAINER="$(resolve_db_container)" || exit 1
 psql_session_start
-require_active_group_competitions
 
 RUN_TAG="$(date +%s)-$$-${RANDOM}"
 PASSWORD="Competition!${RUN_TAG}"
@@ -237,7 +235,7 @@ pass 'fixture: comparisons, readings, normalized Volume from the private as-of r
 echo "[${LANE_LABEL}] header, authorization, private helpers"
 # =============================================================================
 
-# Every group RPC requires the current contract header once protocol 4 is active.
+# Every group RPC requires the current contract header.
 for protocol in '' 3 invalid 04 4.0; do
   rpc_with_contract "${protocol}" "${OWNER_TOKEN}" group_get "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
   expect_error UPDATE_REQUIRED "group read with contract header '${protocol}'"
@@ -255,6 +253,22 @@ expect_sql 'private helpers are not callable by clients/service' \
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app_public' and
       p.proname in ('group_competition_event_json','group_competition_history_value','group_competition_session_json');" t
 pass 'contract header, private helper/direct table and app authorization denial'
+
+# Protocol 4 is the only group representation: no old public RPC (legacy kg
+# boards, protocol 3, *_v2), private pre-competition body or activation object
+# exists, so none can be granted or reached with a forged header.
+expect_sql 'no pre-V4 group function or activation object exists' \
+  "select (select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='app_public' and (p.proname like '%\\_pre\\_competition' or p.proname like 'group\\_competition\\_activ%'
+        or p.proname in ('group_board','group_board_podiums','group_board_history','group_certify',
+          'group_certification_withdraw','group_certification_cancel','group_exercise_list','group_exercise_create',
+          'group_exercise_update','group_exercise_archive','group_exercise_unarchive','group_exercise_list_v2',
+          'group_exercise_create_v2','group_exercise_update_v2','group_exercise_archive_v2','group_exercise_unarchive_v2',
+          'group_metric_board','group_metric_podiums','group_metric_history','group_metric_revisions','group_metric_certify',
+          'group_metric_certification_get','group_metric_certification_end','group_stream','group_stream_v2',
+          'group_session_detail','group_week_summary','group_metric_is_legacy','group_metric_eval_source_graph_v3')))
+    + (select count(*) from pg_class where relnamespace='app_public'::regnamespace and relname='group_competition_activation');" 0
+pass 'no pre-V4 group function or activation object'
 
 while IFS=$'\t' read -r name args; do
   rpc "${OUTSIDER_TOKEN}" "${name}" "${args}"; expect_error NOT_FOUND "outsider ${name}"

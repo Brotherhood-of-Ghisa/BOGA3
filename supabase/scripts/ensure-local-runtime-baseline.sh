@@ -128,9 +128,8 @@ apply_pending_local_migrations() {
 #   - any db reset re-runs seed.sql, which truncates the markers table, so the
 #     stamp dies with the database whichever path reset it;
 #   - the state hash covers everything the repairs fix (applied migrations,
-#     fixture principals, the fixture auth users, the group-eval kick URL,
-#     group-competition activation), so a body that changed any of it — a reset
-#     leaves competitions pending — sends the next lane down the full path.
+#     fixture principals, the fixture auth users, the group-eval kick URL), so
+#     a body that changed any of it sends the next lane down the full path.
 # No gate id (a lane run by name, a direct script call) → always the full path.
 BASELINE_STAMP_MARKER="baseline_ready"
 
@@ -168,8 +167,7 @@ select coalesce((select details from public.local_runtime_bootstrap_markers wher
        from public.dev_fixture_principals p),
     (select string_agg(row(u.id, u.email, u.encrypted_password, u.email_confirmed_at, u.banned_until, u.deleted_at)::text, ';' order by u.email)
        from auth.users u where u.email = any(string_to_array(:'emails', ','))),
-    app_public.group_eval_config('group_eval_url'),
-    app_public.group_competition_active()
+    app_public.group_eval_config('group_eval_url')
   )::text);
 SQL
 }
@@ -221,20 +219,6 @@ SQL
   echo "[supabase] stamped baseline for gate ${BOGA_GATE_RUN_ID}"
 }
 
-# ---------- restoring a stack a one-way body left behind ----------
-#
-# Destructive bodies (a reset to an old migration) do not restore the stack
-# themselves: they mark it first (mark_stack_needs_reset, _common.sh) and this
-# preflight resets it before the next lane, so a killed run cannot hand that
-# lane a broken baseline.
-# Prints why the stack needs a reset; false when it does not.
-stack_reset_reason() {
-  local marker
-  marker="$(stack_reset_marker)"
-  [[ -s "${marker}" ]] || return 1
-  tr '\n' ';' <"${marker}" | sed 's/;$//'
-}
-
 ensure_runtime_and_baseline() {
   local runtime_was_running=0
 
@@ -250,11 +234,7 @@ ensure_runtime_and_baseline() {
 
   ensure_function_routes_registered
 
-  local reset_reason
-  if (( runtime_was_running == 1 )) && reset_reason="$(stack_reset_reason)"; then
-    echo "[supabase] a one-way body left this stack needing a reset (${reset_reason}); resetting"
-    "${SCRIPT_DIR}/reset-local.sh"
-  elif (( runtime_was_running == 1 )) && baseline_stamp_current; then
+  if (( runtime_was_running == 1 )) && baseline_stamp_current; then
     echo "[supabase] local runtime baseline ready (verified against gate ${BOGA_GATE_RUN_ID}'s stamp; repairs skipped)"
     return 0
   fi
@@ -278,10 +258,6 @@ ensure_runtime_and_baseline() {
 
   echo "[supabase] verifying baseline fixtures after auth provisioning"
   "${SCRIPT_DIR}/smoke-seed.sh"
-
-  # Group competitions run protocol 4, as production does. Migrations install
-  # it pending and a reset returns it there; activation is idempotent.
-  "${SCRIPT_DIR}/group-competitions-activate.sh"
 
   write_baseline_stamp
   echo "[supabase] local runtime baseline ready"

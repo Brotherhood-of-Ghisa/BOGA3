@@ -5,8 +5,7 @@ import { isNormalizedCompetition, validateCompetitionRules, type CompetitionMetr
   type CompetitionValue } from './competition-contract.ts';
 import { scoreCompetitionPerformance } from './competition-score.ts';
 import type { CompetitionRulesWire } from './competition-wire.ts';
-import { evaluateGroupMetricGraph, type EvaluatedGroupMetricSet, type GroupMetricEvaluationGraph,
-  type GroupMetricSourceSet } from './metric-evaluation.ts';
+import type { EvaluatedGroupMetricSet, GroupMetricEvaluationGraph, GroupMetricSourceSet } from './metric-evaluation.ts';
 import type { GroupPerformanceSnapshotWire } from './metric-wire.ts';
 
 export type CompetitionSourceSet = Omit<GroupMetricSourceSet, 'fingerprints'> & {
@@ -75,11 +74,4 @@ export function evaluateCompetitionGraph(graph: CompetitionEvaluationGraph): Com
   }
   return { contract_version: 4, group_id: graph.group_id, group_exercise_id: graph.group_exercise_id,
     rules_revision: wire.rules_revision, source_token: graph.source_token, scores };
-}
-
-/** Pending installations continue to evaluate their existing protocol-3 graph. */
-export function evaluateGroupComparisonGraph(graph: GroupMetricEvaluationGraph | CompetitionEvaluationGraph) {
-  if (!('contract_version' in graph)) return evaluateGroupMetricGraph(graph);
-  if (graph.contract_version !== 4) throw new Error('Unsupported competition evaluation contract');
-  return evaluateCompetitionGraph(graph);
 }

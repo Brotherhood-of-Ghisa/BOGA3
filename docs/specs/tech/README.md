@@ -18,9 +18,9 @@ Current docs:
   planning and programmes: data model, schema, 16-entity Sync v2 expansion,
   materialization algorithms, block lifecycle, set reordering invariants, agent
   write permissions/API, and MCP tools.
-- `group-competition-contract.md`: group competition representation and the
-  versioned cutover — metric/unit revisions, witness migration, publication
-  fences and the public-reader guard.
+- `group-competition-contract.md`: group competition representation —
+  metric/unit meaning, the public boundary and disclosure, witness history and
+  the protocol-4 server surface.
 
 Maintenance rule:
 
