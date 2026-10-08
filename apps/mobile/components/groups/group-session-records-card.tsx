@@ -42,27 +42,32 @@ export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
   );
 }
 
+// The link (title, value, detail, chevron) and the certification line are
+// siblings: a button inside the link would hand a disabled tap to the link, and
+// one accessible link would hide the status and the button from VoiceOver.
 function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps, 'rows'>) {
   const router = useRouter();
   const testID = `group-session-record-${row.key}`;
   return (
-    <Pressable
-      accessibilityHint="Opens the leaderboard"
-      accessibilityLabel={`${row.title}, ${row.value}, ${row.detail}`}
-      accessibilityRole="link"
-      onPress={() => router.push(row.boardHref as Href)}
-      style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
-      testID={testID}>
-      <View style={styles.rowBody}>
-        <View style={styles.titleLine}>
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>{row.title}</Text>
-          <Text allowFontScaling={false} style={styles.value} testID={`${testID}-value`}>{row.value}</Text>
+    <View style={styles.row} testID={testID}>
+      <Pressable
+        accessibilityHint="Opens the leaderboard"
+        accessibilityLabel={`${row.title}, ${row.value}, ${row.detail}`}
+        accessibilityRole="link"
+        onPress={() => router.push(row.boardHref as Href)}
+        style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
+        testID={`${testID}-link`}>
+        <View style={styles.rowBody}>
+          <View style={styles.titleLine}>
+            <Text allowFontScaling={false} numberOfLines={1} style={styles.title}>{row.title}</Text>
+            <Text allowFontScaling={false} style={styles.value} testID={`${testID}-value`}>{row.value}</Text>
+          </View>
+          <Text allowFontScaling={false} style={styles.detail} testID={`${testID}-detail`}>{row.detail}</Text>
         </View>
-        <Text allowFontScaling={false} style={styles.detail} testID={`${testID}-detail`}>{row.detail}</Text>
-        {row.certification ? <RecordCertification certification={row.certification} testID={testID} {...rest} /> : null}
-      </View>
-      <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
-    </Pressable>
+        <Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />
+      </Pressable>
+      {row.certification ? <RecordCertification certification={row.certification} testID={testID} {...rest} /> : null}
+    </View>
   );
 }
 
@@ -141,13 +146,16 @@ const styles = StyleSheet.create({
     color: uiRoles.record,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
+    gap: uiSpace.xs,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.recordRule,
+  },
+  link: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
   },
   pressed: {
     backgroundColor: uiRoles.recordWash,
@@ -190,6 +198,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
+    // Under the link's text, clear of its chevron.
+    paddingRight: uiSpace.lg + uiSpace.sm,
   },
   status: {
     flexDirection: 'row',

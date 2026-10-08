@@ -97,6 +97,8 @@ function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId:
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
   const session = detail.data?.session ?? null;
   const inlineError = pickInlineError(detail.error);
+  // A failed records read says so; it never passes for a session without records.
+  const recordsError = session && !inlineError ? pickInlineError(records.error) : null;
   const groupName = group.data?.group.name ?? null;
   const isMine = session?.member.user_id === userId;
 
@@ -128,6 +130,9 @@ function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId:
           {detail.offline ? <GroupOfflineBanner lastUpdatedAtMs={detail.lastUpdatedAtMs} /> : null}
           {session && inlineError ? (
             <GroupInlineError error={inlineError} onRetry={onRefresh} testID="group-session-inline-error" />
+          ) : null}
+          {recordsError ? (
+            <GroupInlineError error={recordsError} onRetry={() => void records.refresh()} testID="group-session-records-error" />
           ) : null}
           {session ? (
             <FriendSessionContent

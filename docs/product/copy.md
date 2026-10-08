@@ -10,6 +10,9 @@ that describes it.
   count, `3 sets · 1RM 102.5`), it is data and stays.
 - **Bad:** a line like "Your training at a glance" under `Today`.
 - **Good:** `Mon 6 Oct · 52 min` under a session title.
+- **Kept:** `<group> · group view` above a group session's title: it says
+  whose view of the session this is, which the screen cannot show otherwise
+  (decided 2026-10-08).
 - **Cases** (removed after the fact, decided 2026-10-07):
   - `Sign in to load your data and keep it in sync.` under Sign in,
     `Agents can read training data only. …` under Connected agents, and
@@ -59,6 +62,9 @@ formula notes, hints under fields, or "how this works" lines.
     information.` beside a Volume figure: a set whose load cannot be
     calculated is left out and the Volume of the rest is shown, with no note
     (decided 2026-10-07).
+  - A group session's Volume leaves out the sets whose kg the group cannot
+    see (normalized exercises) and is shown as `Volume`, with no note
+    (decided 2026-10-08).
   - The preview under a group's scoring-rules form (`Apply rules revision N:
     … The whole board will rebuild together. …` and the certification note):
     removed, with nothing in its place (decided 2026-10-07).

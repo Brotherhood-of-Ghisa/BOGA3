@@ -650,7 +650,7 @@ describe("Friend's session view", () => {
     // One band on the set that took both: the exercise card's record line.
     expect(screen.getByText('#1 in group · 1RM + Volume')).toBeTruthy();
 
-    fireEvent.press(screen.getByTestId('group-session-record-ev-1:volume'));
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:volume-link'));
     expect(mockPush).toHaveBeenCalledWith('/group/group-a/leaderboards/ge-bench?metric=volume&scope=all');
 
     fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-certify'));
@@ -658,6 +658,27 @@ describe("Friend's session view", () => {
       metric: 'e1rm', memberId: 'friend-1', setId: 'set-2', revision: 1, token: 'tok-1rm' }));
     expect(await rm.findByText('Certified by you · 11 Sep')).toBeTruthy();
     expect(api.getCompetitionSessionRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it('a disabled Certify never opens the board, and a failed records read says so with Retry', async () => {
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    api.getCompetitionCertification.mockResolvedValue({ contract_version: 4, certification: certificationBy(USER_ID, 'me') });
+    let finish!: (value: Awaited<ReturnType<typeof api.certifyCompetition>>) => void;
+    api.certifyCompetition.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    render(<GroupSessionRoute />);
+    fireEvent.press(await screen.findByTestId('group-session-record-ev-1:e1rm-certify'));
+    // Pending: the button is disabled, and a second tap lands nowhere.
+    fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-certify'));
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(api.certifyCompetition).toHaveBeenCalledTimes(1);
+    await act(async () => { finish({ contract_version: 4, created: true, certification: certificationBy(USER_ID, 'me') }); });
+
+    api.getCompetitionSessionRecords.mockRejectedValue(new GroupApiError('INTERNAL', 'boom'));
+    await pullToRefresh('group-session-screen');
+    expect(await screen.findByTestId('group-session-records-error')).toBeTruthy();
+    api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
+    fireEvent.press(screen.getByTestId('group-session-records-error-retry'));
+    await waitFor(() => expect(screen.queryByTestId('group-session-records-error')).toBeNull());
   });
 
   it('withdraws my certification after the confirmation, with the same button', async () => {
