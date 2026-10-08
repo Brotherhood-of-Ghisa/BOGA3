@@ -1,6 +1,6 @@
 # Session volume cards
 
-- Status: in_progress — design review
+- Status: in_progress — implementation pushed; awaiting design review
 - Branch: `codex/session-volume-quartiles`
 - Areas: frontend; UI impact: yes
 
@@ -14,12 +14,16 @@ including the live comparison and share surfaces that reuse the card.
   and P75. Highlight the interval between the quartiles.
 - Remove prior-session subtitles and redundant comparison footnotes.
 - Show the percentile comparison only after six known prior comparable
-  sessions, matching the weekly heatmap's observation cutoff. Preserve the
+  sessions, matching the weekly heatmap's observation cutoff via one shared
+  constant. The cutoff gates both the chart and the median delta. Preserve the
   existing history scope and eligibility, including genuine zero observations.
 - Try a symmetric linear scale with the median at the center. Include the
-  current reading in its extent so outliers remain visible.
+  current reading in its extent so outliers remain visible. This compresses
+  the interquartile interval when the current reading is far from the median.
 - Present three low-data choices: volume alone (initial implementation),
-  a short Building history label, or progress toward six observations.
+  a short Building history label, or progress toward six observations. All
+  three appear in the temporary browser/native preview; only volume alone is
+  integrated while the choice is pending.
 - Keep this card current with the latest requirements, without a decision log.
 
 ## Design target and UX contract
@@ -41,7 +45,8 @@ scale remain subject to the user's design review.
   happy to proceed. Update Jest coverage now; leave it unrun.
 - At that point, agree the slower lane set and run the fast and quality gates
   plus the agreed device lanes before opening the PR.
-- Capture small/large phone rendering before closeout. Browser card previews
-  support iteration; they do not complete device acceptance.
+- Review the rendered browser options and native card preview now. Capture
+  the accepted states on small/large phones in their session routes before
+  closeout; the standalone previews do not complete device acceptance.
 - Delete this card when the work ships; preserve lasting behavior in the
   component, tests, and owning product/spec documentation.
