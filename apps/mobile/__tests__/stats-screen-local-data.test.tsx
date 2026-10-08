@@ -507,7 +507,7 @@ describe('Stats over real data', () => {
         expect(scroll.queryByTestId(id)).toBeNull();
       }
       for (const tab of controls.getAllByRole('tab')) {
-        expect(tab).toHaveStyle({ backgroundColor: tab.props.accessibilityState.selected ? uiRoles.viz4 : uiRoles.surface });
+        expect(tab).toHaveStyle({ backgroundColor: tab.props.accessibilityState.selected ? uiRoles.selection : uiRoles.surface });
       }
       expect(screen.queryByTestId('stats-browse-exercises')).toBeNull();
       const content = scroll.getAllByTestId(
