@@ -325,16 +325,18 @@ VOLUME_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-athlete" volume)"
 E1RM_CERT="$(certify_metric "${ATHLETE_UID}" "${T}-athlete" e1rm)"
 # A rules-only change projects the SAME witnessed observation at a new score.
 # Exact audit equality catches accidental replacement or silent audit rewriting.
+# cert_audit <public-id> <metric>: one witness has a row per metric under one public id.
 cert_audit() {
   run_psql "select (to_jsonb(c)-'observed_set_pin'-'reading_pin'-'current_fingerprint')::text
-    from app_public.group_metric_certifications c where id='$1';"
+    from app_public.group_metric_certifications c
+    where coalesce(c.legacy_certification_id,c.witness_certification_id,c.id)='$1' and c.metric='$2';"
 }
 drain 'publish original Certified entries'
-VOLUME_AUDIT="$(cert_audit "${VOLUME_CERT}")"
-E1RM_AUDIT="$(cert_audit "${E1RM_CERT}")"
+VOLUME_AUDIT="$(cert_audit "${VOLUME_CERT}" volume)"
+E1RM_AUDIT="$(cert_audit "${E1RM_CERT}" e1rm)"
 assert_retained() {
-  [[ "$(cert_audit "${VOLUME_CERT}")" == "${VOLUME_AUDIT}" ]] || fail "$1: Volume audit changed"
-  [[ "$(cert_audit "${E1RM_CERT}")" == "${E1RM_AUDIT}" ]] || fail "$1: 1RM audit changed"
+  [[ "$(cert_audit "${VOLUME_CERT}" volume)" == "${VOLUME_AUDIT}" ]] || fail "$1: Volume audit changed"
+  [[ "$(cert_audit "${E1RM_CERT}" e1rm)" == "${E1RM_AUDIT}" ]] || fail "$1: 1RM audit changed"
   for metric in volume e1rm; do
     metric_board "${metric}" true
     check "$1: same set remains Certified at its CURRENT score" '
@@ -385,19 +387,21 @@ pass 'rule changes retain exact witness audits and recalculate Certified entries
 MIGRATION_SQL="$(sed -n '/^-- Establish/,/^-- One legacy witness/p' "${SUPABASE_DIR}"/migrations/*_group_certification_observations.sql)"
 expect_sql 'active pins migrate under observed rules, with their audit intact' "begin;
   update app_public.group_metric_certifications set observed_set_pin=null,reading_pin=null,current_fingerprint=null
-    where id in ('${VOLUME_CERT}','${E1RM_CERT}');
+    where coalesce(witness_certification_id,id) in ('${VOLUME_CERT}','${E1RM_CERT}');
   ${MIGRATION_SQL}
   select observed_set_pin is not null and reading_pin<>'pending-correction'
-    and current_fingerprint=pinned_fingerprint from app_public.group_metric_certifications where id='${E1RM_CERT}';
+    and current_fingerprint=pinned_fingerprint from app_public.group_metric_certifications
+    where coalesce(witness_certification_id,id)='${E1RM_CERT}' and metric='e1rm';
   rollback;" t
 expect_sql 'migration preserves a pending relevant reading correction for invalidation' "begin;
   set local request.jwt.claims='{\"sub\":\"${ATHLETE_UID}\",\"role\":\"authenticated\"}';
   update app_public.body_weight_measurements set weight_kg=81
     where owner_user_id='${ATHLETE_UID}' and id='${T}-athlete-reading';
   update app_public.group_metric_certifications set observed_set_pin=null,reading_pin=null,current_fingerprint=null
-    where id='${E1RM_CERT}';
+    where coalesce(witness_certification_id,id)='${E1RM_CERT}' and metric='e1rm';
   ${MIGRATION_SQL}
-  select reading_pin='pending-correction' from app_public.group_metric_certifications where id='${E1RM_CERT}';
+  select reading_pin='pending-correction' from app_public.group_metric_certifications
+    where coalesce(witness_certification_id,id)='${E1RM_CERT}' and metric='e1rm';
   rollback;" t
 assert_retained 'forward migration audit preservation'
 
@@ -405,9 +409,9 @@ assert_retained 'forward migration audit preservation'
 # because of a RULE change; returning to ordinary rules restores its entry.
 set_group_policy false; drain 'ordinary rival certification'
 RIVAL_CERT="$(certify_metric "${RIVAL_UID}" "${T}-rival" e1rm)"
-RIVAL_AUDIT="$(cert_audit "${RIVAL_CERT}")"
+RIVAL_AUDIT="$(cert_audit "${RIVAL_CERT}" e1rm)"
 set_group_policy true; drain 'ineligible rival under bodyweight rules'
-[[ "$(cert_audit "${RIVAL_CERT}")" == "${RIVAL_AUDIT}" ]] || fail 'ineligible observation lost its certification'
+[[ "$(cert_audit "${RIVAL_CERT}" e1rm)" == "${RIVAL_AUDIT}" ]] || fail 'ineligible observation lost its certification'
 metric_board e1rm true
 check 'missing reading omits Certified entry without ending its witness' '[.entries[]|select(.member.user_id==$u)]|length==0' --arg u "${RIVAL_UID}"
 update_comparison 0 total_load; drain 'rival eligible again through rules'
@@ -441,7 +445,7 @@ for metric in weight reps relative absolute; do
   expect_error VALIDATION "unsupported metric ${metric}"
   check "unsupported metric ${metric}" '.message=="VALIDATION: invalid competition board dimensions"'
 done
-# Stored pre-protocol-4 rows keep Weight in kg; a Volume witness alias has no
+# Stored pre-protocol-4 rows keep Weight in kg; a Volume alias of a Weight witness has no
 # observed value of its own (its kg audit is the referenced Weight witness).
 COMPETITION_VALUE="(metric='volume' and unit in ('kg_reps','percent_bw_reps')) or (metric='e1rm' and unit in ('kg','percent_bw'))
   or (metric='weight' and unit='kg')"

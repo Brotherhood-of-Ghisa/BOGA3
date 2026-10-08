@@ -28,13 +28,16 @@ export function formatCompetitionPerformance(performance: CompetitionPerformance
   const value = Number(performance.weight_value);
   return `Weight ${Number.isFinite(value) ? formatWeight(value) : performance.weight_value} kg${distribution} × ${performance.reps}`;
 }
+/** A performed set as the session cards show it: `120.0 × 5`, `20.0 × 5 per side`; `5 reps` where the group hides kg. */
+export function formatSetFigure(performance: CompetitionPerformanceWire): string {
+  if (performance.visibility === 'normalized') return `${performance.reps} reps`;
+  const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
+  const value = Number(performance.weight_value);
+  return `${Number.isFinite(value) ? formatWeight(value) : performance.weight_value} × ${performance.reps}${distribution}`;
+}
 export const formatContributionPercent = (contribution: number): string =>
   String(Number((contribution * 100).toPrecision(15)));
 
-export function describeCompetitionRules(exercise: { rules: Omit<CompetitionRulesWire,'default_metric'> }): string {
-  const r=exercise.rules;
-  return `Rules ${r.rules_revision} · ${formatContributionPercent(r.bodyweight_contribution)}% contribution · Bodyweight scoring ${r.bodyweight_calculations_enabled ? 'On' : 'Off'} · ${r.load_input_mode === 'per_side_load' ? 'per-side' : 'total'} load`;
-}
 export function buildCompetitionRow(row: CompetitionBoardRowWire,scope: GroupBoardScope,userId: string | null,
   nowMs: number = Date.now()): BoardRowViewModel {
   const memberLabel=formatBoardMemberLabel(row.member,row.former,userId);
@@ -53,7 +56,7 @@ export function buildCompetitionPodiums(payload: CompetitionPodiumsWire,userId: 
     const rows=board.state === 'rebuilding' ? [] : board.entries.slice(0,3).map(row => ({ key: row.member.user_id,
       rank: row.rank,memberLabel: formatBoardMemberLabel(row.member,row.former,userId),isMe: row.member.user_id === userId,
       valueLabel: formatCompetitionValue(row),dateLabel: formatBoardDate(row.performance.achieved_at_ms,nowMs) }));
-    const viewLabel=`${board.certified ? 'Certified' : 'All'} · ${competitionViewLabel(board.metric,board.rules)} · Rules ${board.rules.rules_revision}`;
+    const viewLabel=`${board.certified ? 'Certified' : 'All'} · ${competitionViewLabel(board.metric,board.rules)}`;
     const emptyLabel=board.state === 'rebuilding' ? 'Recalculating under the new rules…'
       : rows.length === 0 ? board.certified ? 'No certified sets yet' : 'Score unavailable' : null;
     const youLabel=board.state === 'rebuilding' ? null : board.me && board.me.rank > 3 ? `You: ${formatOrdinal(board.me.rank)}`
@@ -65,7 +68,7 @@ export function buildCompetitionPodiums(payload: CompetitionPodiumsWire,userId: 
   });
 }
 export function describeCompetitionEvent(event: CompetitionEventWire,userId: string | null = null): string {
-  if (event.kind === 'rules_change') return `Rules revision ${event.rules_revision}. The comparison was recalculated under the shared standard.`;
+  if (event.kind === 'rules_change') return 'Group rules changed.';
   if (event.kind === 'record_voided' || event.voided) return 'Certification ended. Score unavailable.';
   const who=event.member?.user_id === userId ? 'You' : formatMemberName(event.member?.username ?? null);
   if (event.kind === 'link' || event.kind === 'unlink') return `${who} ${event.kind === 'link' ? 'linked' : 'unlinked'} an exercise to ${event.group_exercise.name}.`;
@@ -86,5 +89,5 @@ export function formatCompetitionHistoricalValue(value: CompetitionHistoryValueW
 export function competitionLinkExercise(exercise: CompetitionExerciseWire): GroupExercise {
   return { group_exercise_id: exercise.group_exercise_id,name: exercise.name,
     load_input_mode: exercise.rules.load_input_mode,source_exercise_id: exercise.source_exercise_id,
-    archived_at_ms: exercise.archived_at_ms,standard: describeCompetitionRules(exercise) };
+    archived_at_ms: exercise.archived_at_ms };
 }

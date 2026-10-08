@@ -39,7 +39,7 @@ import {
 } from '@/src/groups';
 import { buildAddAsNewPrefill } from '@/src/groups/add-as-new';
 import { archiveCompetitionExercise } from '@/src/groups/api';
-import { competitionLinkExercise,describeCompetitionRules } from '@/src/groups/competition-view-model';
+import { competitionLinkExercise } from '@/src/groups/competition-view-model';
 import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
 import { useExerciseUnlink, type ExerciseUnlinkTarget } from '@/src/groups/use-exercise-unlink';
@@ -235,8 +235,6 @@ export function GroupExercisesPage({
     );
   }
 
-  const wireById = new Map(exercises.data.exercises.map(exercise => [exercise.group_exercise_id,exercise]));
-  const sheetStandard = sheetExercise ? wireById.get(sheetExercise.group_exercise_id) : null;
   const presented = exercises.data.exercises.map(competitionLinkExercise);
   const byId = new Map(presented.map((exercise) => [exercise.group_exercise_id, exercise]));
   const rows = buildGroupExerciseRows(presented, links.links);
@@ -283,7 +281,6 @@ export function GroupExercisesPage({
                 onLink={row.linkable && exercise && !unlink.pending ? () => openLink(exercise) : undefined}
                 onPress={canManage && !archiveWrite.pending ? () => setSheetExercise(exercise) : undefined}
                 row={row}
-                standard={describeCompetitionRules(wireById.get(row.groupExerciseId)!)}
               />
             );
           })}
@@ -316,7 +313,7 @@ export function GroupExercisesPage({
           sheetExercise
             ? sheetExercise.archived_at_ms !== null
               ? 'Archived'
-              : sheetStandard ? describeCompetitionRules(sheetStandard) : LOAD_INPUT_MODE_LABELS[sheetExercise.load_input_mode]
+              : LOAD_INPUT_MODE_LABELS[sheetExercise.load_input_mode]
             : undefined
         }
         testIDPrefix="group-exercise-actions"

@@ -125,8 +125,15 @@ export type CompetitionSessionRecordWire = { event: CompetitionEventWire; boards
 export type CompetitionSessionRecordsWire = {
   contract_version: 4; group_id: string; member_user_id: string; session_id: string; records: CompetitionSessionRecordWire[];
 };
+/** A stream record's set as performed, and the group's previous #1 on each board it took (1RM first). */
+export type CompetitionStreamRecordWire = {
+  performance: CompetitionPerformanceWire | null;
+  previous: { value: CompetitionHistoryValueWire; performance: CompetitionPerformanceWire | null }[];
+};
 export type CompetitionStreamItemWire =
-  | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire }
+  | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire;
+      /** Record events only, from group_competition_stream_v2; absent in a payload cached from the first reader. */
+      record?: CompetitionStreamRecordWire }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef };

@@ -16,7 +16,6 @@ import {
   buildPickSheetModel,
   buildPickerGroupSections,
   describeLinkRetroactivity,
-  describeGroupLinkLoadNote,
   describeUnlinkConfirm,
   describeUnlinkSuccess,
   filterPickSheetChoices,
@@ -37,7 +36,6 @@ const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, '
   load_input_mode: 'total_load',
   source_exercise_id: null,
   archived_at_ms: null,
-  standard: 'Rules 1 · 0% contribution · Bodyweight scoring Off · total load',
   ...overrides,
 });
 
@@ -49,8 +47,7 @@ const exercise = (overrides: Partial<LinkableExercise> & Pick<LinkableExercise, 
 const GX_BENCH_IRON = groupExercise({ group_exercise_id: 'gx-bench-iron', name: 'Bench Press', source_exercise_id: 'seed_barbell_bench_press' });
 const GX_DEADLIFT_IRON = groupExercise({ group_exercise_id: 'gx-deadlift-iron', name: 'Deadlift' });
 const GX_OLD_IRON = groupExercise({ group_exercise_id: 'gx-old-iron', name: 'Bench (old)', archived_at_ms: 1 });
-const GX_BENCH_TUE = groupExercise({ group_exercise_id: 'gx-bench-tue', name: 'Bench', load_input_mode: 'per_side_load',
-  standard: 'Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load' });
+const GX_BENCH_TUE = groupExercise({ group_exercise_id: 'gx-bench-tue', name: 'Bench', load_input_mode: 'per_side_load' });
 
 const IRON: GroupExerciseCatalog = {
   groupId: 'g-iron',
@@ -84,12 +81,6 @@ describe('groupExercisesLoaded', () => {
 });
 
 describe('notes', () => {
-  it('the load note is the group\'s shared standard, never a personal setting', () => {
-    expect(describeGroupLinkLoadNote(GX_BENCH_TUE)).toBe(
-      'Rules 1 · 0% contribution · Bodyweight scoring Off · per-side load. Your personal exercise settings stay unchanged.',
-    );
-  });
-
   it('retroactivity and unlink wording (E0.2, E0.3)', () => {
     expect(describeLinkRetroactivity('Bench (comp grip)', 'Tuesday Crew')).toBe(
       'Your past Bench (comp grip) sets shared with Tuesday Crew will count.',
@@ -264,7 +255,7 @@ describe('Link screen (E0.3)', () => {
     ]);
     // Tuesday's Bench is a name match (comp grip contains "bench") → Suggested, not repeated below.
     expect(model.suggested.map((row) => row.key)).toEqual(['g-tue:gx-bench-tue']);
-    expect(model.suggested[0].loadModeNote).toBe(describeGroupLinkLoadNote(GX_BENCH_TUE));
+    expect(model.suggested[0]).not.toHaveProperty('loadModeNote');
     // Iron: the linked target is gone from the list, archived is never offered, Deadlift is unavailable.
     expect(model.groups).toEqual([
       {
@@ -383,11 +374,6 @@ describe('competition exercise linking', () => {
       exercises: [mine], links: [] });
     expect(model.suggestion).toBe(mine);
     expect(model.choices.find(row => row.exercise.id === 'mine')?.unavailableReason).toBeNull();
-  });
-
-  it('describes the group calculation, leaving personal exercise settings unchanged', () => {
-    expect(describeGroupLinkLoadNote(target)).toBe(
-      'Rules 2 · 100% contribution · Bodyweight scoring On · per-side load. Your personal exercise settings stay unchanged.');
   });
 
   it('prefills the shared exercise core for a linked creation', () => {

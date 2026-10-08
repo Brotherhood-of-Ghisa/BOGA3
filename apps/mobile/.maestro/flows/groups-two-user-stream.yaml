@@ -178,10 +178,9 @@ appId: com.dinoderek.mobile
     visible:
       id: "groups-stream-list"
     timeout: 15000
-- assertVisible:
-    id: "groups-stream-filter-${output.groupsGroupId}"
+# One group: no group picker.
 - assertNotVisible:
-    id: "groups-stream-filter-all"
+    id: "groups-stream-filter-row"
 # Refresh: leave for My groups and come back (the Groups screen re-reads on focus).
 - openLink: "boga3://group/mine"
 - extendedWaitUntil:
@@ -253,7 +252,7 @@ appId: com.dinoderek.mobile
     id: "group-exercise-form-submit"
 - extendedWaitUntil:
     visible:
-      text: "Sled Push, Per side, Rules 1.*per-side load, Not linked"
+      text: "Sled Push, Per side, Not linked"
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: "groups-04b-1-exercises-added"

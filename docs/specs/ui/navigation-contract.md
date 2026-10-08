@@ -119,7 +119,6 @@ access level, and `useRootRouteAccess`
 | `/group/join` | `code` | prefills the code field and runs the preview once the username gate is satisfied |
 | `/group-session/[memberId]/[sessionId]` | `groupId` | required authorised scope, read through the group-scoped safe reader/cache; missing renders generic session unavailable |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
-| `…/history` | `revision` | the positive rules revision the board carried; recorded units are kept, and a retired revision's scores are unavailable |
 
 `source=more` is a navigation marker, not screen state:
 `apps/mobile/components/navigation/more-hub-back-button.tsx` renders the

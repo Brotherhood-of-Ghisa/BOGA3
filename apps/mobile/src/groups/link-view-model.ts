@@ -95,10 +95,6 @@ export const describeUnlinkSuccess = (context: ExerciseUnlinkContext, offline: b
 
 export const describeAlreadyLinkedIn = (groupName: string): string => `already linked in ${groupName}`;
 
-/** Linking consumes the group's shared standard; it never copies personal settings. */
-export const describeGroupLinkLoadNote = (target: Pick<GroupExercise, 'standard'>): string =>
-  `${target.standard}. Your personal exercise settings stay unchanged.`;
-
 // ---- Shared lookups ---------------------------------------------------------
 
 /** Ids of my exercises with a live link in `groupId` (one link per group, P2). */
@@ -326,7 +322,6 @@ export type LinkScreenLinkedRow = {
   inactive: boolean;
   /** `archived` / `inactive — not a member`; null while active. */
   statusLabel: string | null;
-  loadModeNote: string | null;
 };
 
 export type LinkScreenAvailableRow = {
@@ -335,7 +330,6 @@ export type LinkScreenAvailableRow = {
   groupName: string;
   groupExercise: GroupExercise;
   unavailableReason: string | null;
-  loadModeNote: string | null;
 };
 
 export type LinkScreenGroup = {
@@ -394,7 +388,6 @@ export const buildLinkScreenModel = ({
         archived,
         inactive,
         statusLabel: [inactive ? INACTIVE_LINK_LABEL : null, archived ? ARCHIVED_LINK_LABEL : null].filter(Boolean).join(' · ') || null,
-        loadModeNote: groupExercise ? describeGroupLinkLoadNote(groupExercise) : null,
       };
     })
     .sort((left, right) => left.groupName.localeCompare(right.groupName) || left.groupExerciseName.localeCompare(right.groupExerciseName));
@@ -422,7 +415,6 @@ export const buildLinkScreenModel = ({
           groupName: catalog.groupName,
           groupExercise,
           unavailableReason: linkedGroupIds.has(catalog.groupId) ? describeAlreadyLinkedIn(catalog.groupName) : null,
-          loadModeNote: describeGroupLinkLoadNote(groupExercise),
         }),
       );
     for (const row of rows) {

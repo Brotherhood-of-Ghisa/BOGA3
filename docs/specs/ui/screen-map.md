@@ -38,7 +38,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Exercise catalogue management: create / edit / soft-delete / undelete, load-entry mode, muscle mappings. Also the picker's `Manage` target | `(tabs)/exercise-catalog.tsx` |
-| `/groups` | One group at a time (chips, no `All`): a newest-first `Stream` of sessions, records and membership events, or `Leaderboards` podiums | `(tabs)/groups.tsx`, `components/groups/` |
+| `/groups` | One group at a time (chips, no `All`; none with one group): a newest-first `Stream` of sessions, records and membership events (a record card shows its set with the set's one certification status, then its values; it opens a sheet: the set with its status and one Certify, each value, the group's previous #1 per board, `Session`, `Leaderboard`), or `Leaderboards` podiums under an exercise-name search | `(tabs)/groups.tsx`, `components/groups/` |
 | `/settings` | Account, AI coaching, preferences, sync status, About, and dev-only tools in one support surface | `(tabs)/settings.tsx` |
 
 ## Sessions
@@ -78,7 +78,7 @@ addressable, each resolving to a canonical owner for tab selection.
 | `/group/[groupId]/exercises/new` | Owner/admin add a group exercise, `From catalogue` or `Custom` | `group/[groupId]/exercises/new.tsx` |
 | `/group/[groupId]/exercises/[exerciseId]/edit` | Owner/admin rename a group exercise or change its weight entry | `group/[groupId]/exercises/[exerciseId]/edit.tsx` |
 | `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board: `Volume` \| `1RM` × `Certified` \| `All`, ranked rows, row detail sheet with certification actions | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
-| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes, newest first | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
+| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes under the current rules, newest first, below one row of tap-to-cycle filters: metric, `Certified` \| `All`, `History` \| `Scores` | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
 | `/group-session/[memberId]/[sessionId]` | A member's shared session as the group sees it, drawn with View Session's cards, View Session's facts card (an `In progress` mark while it runs), its #1 group 1RM records (row → leaderboard); my own adds a full-session action | `group-session/[memberId]/[sessionId].tsx` |
 
 ## Dev-only routes
