@@ -157,7 +157,7 @@ contribution or reading.
 ## Evaluator
 
 **Queues.** `group_eval_queue` holds session jobs (re-normalize, then re-apply
-targets) and target jobs (re-apply one member × group exercise);
+targets) and target jobs (enqueue one comparison evaluation);
 `group_metric_eval_queue` holds comparisons. Jobs coalesce on their natural
 key: a re-enqueue merges `causes`, bumps `generation`, and is available now.
 Completion writes only if `generation` is unchanged since the claim. Failures

@@ -66,8 +66,9 @@ to what only that lane can prove.
    lane routed by `scripts/triggers.tsv`, never in a default gate. Within a
    lane it runs **last**: it leaves no configured baseline for the bodies after
    it, and a body that needs one then fails for a reason that looks nothing
-   like the cause. It never restores the stack on exit: a reset truncates the
-   baseline stamp, so the next lane's preflight runs the full repair path.
+   like the cause. It never restores the stack on exit, so it must leave state
+   the next preflight detects (a reset truncates the baseline stamp; a changed
+   state hash sends that lane down the full repair path).
 4. **Bodies are chapters; lanes are concepts.** Split a large surface into
    several bodies in one lane for readability. Splitting it into lanes instead
    makes every piece pay the baseline preflight again.

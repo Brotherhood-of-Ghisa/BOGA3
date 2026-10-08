@@ -44,7 +44,7 @@ are no pending migrations: record the verified no-op.
    `docs/specs/tech/sync-v2-server-contract.md`, "Migration-in-flight contract";
    coordinate compatible-client availability and the server cutover in their
    required order. If group publication changes, load
-   `docs/specs/tech/group-competition-contract.md`, "Activation order and evidence".
+   `docs/specs/tech/group-competition-contract.md`, "Hosted changes".
    Record any staged migration as outstanding until its cutover and hosted
    verification finish.
 5. Recheck hosted migration history against the pinned commit, then verify the

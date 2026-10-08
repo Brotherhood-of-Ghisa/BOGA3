@@ -598,6 +598,10 @@ $old$,''),
     ('app_public.group_metric_apply_member(uuid,uuid,uuid,bigint,jsonb,boolean)',1,
       $old$_metrics := app_public.group_metric_names();$old$,
       $new$_metrics := array['volume','e1rm'];$new$),
+    -- Every source graph is contract 4.
+    ('app_public.group_competition_import_witnesses(uuid,uuid,uuid,jsonb)',1,
+      $old$
+    and (p_graph->>'contract_version')='4'$old$,''),
     -- Archived comparisons and departed members keep their legacy witnesses for
     -- an unarchive or rejoin.
     ('app_public.group_metric_import_legacy_certifications(app_public.group_exercises)',2,
