@@ -77,7 +77,7 @@ export {
 export {
   archiveCompetitionExercise, certifyCompetition, createCompetitionExercise, endCompetitionCertification,
   getCompetitionBoard, getCompetitionCertification, getCompetitionContract, getCompetitionHistory,
-  getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionStream,
+  getCompetitionPodiums, getCompetitionRevisions, getCompetitionSession, getCompetitionSessionRecords, getCompetitionStream,
   getCompetitionWeek, listCompetitionExercises, updateCompetitionExercise,
 } from './api';
 export type * from './competition-wire';

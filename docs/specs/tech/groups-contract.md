@@ -141,6 +141,12 @@ included, on `(working_sets desc, group_records desc)`. Training now is an
 active session written within 2 h (max `server_received_at` over session,
 exercises, sets); latest completed is any time.
 
+**Session records** (`group_competition_session_records`) sit beside the
+session detail, not in it: exact readers reject a new key. One shared session's
+non-voided records that took #1 in the group, as stream events whose `record`
+values are those boards, each with the All board's current leader (`leads`
+while its own set holds #1; no leader for an earlier revision).
+
 ## Device-computed card metrics
 
 Session cards and the friend view count on the viewing device

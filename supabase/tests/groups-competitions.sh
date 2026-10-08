@@ -251,7 +251,8 @@ rest GET "${OWNER_TOKEN}" group_metric_set_scores 'select=*'; [[ ! "${STATUS}" =
 expect_sql 'private helpers are not callable by clients/service' \
   "select bool_and(not has_function_privilege('authenticated',p.oid,'execute') and not has_function_privilege('service_role',p.oid,'execute'))
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app_public' and
-      p.proname in ('group_competition_event_json','group_competition_history_value','group_competition_session_json');" t
+      p.proname in ('group_competition_event_json','group_competition_history_value','group_competition_session_json',
+        'group_competition_session_record_boards');" t
 pass 'contract header, private helper/direct table and app authorization denial'
 
 # Protocol 4 is the only group representation: no old public RPC (legacy kg
@@ -281,6 +282,8 @@ done < <(run_psql "select p.proname||E'\\t'||coalesce((select jsonb_object_agg(a
     and p.proname like 'group_competition_%' and has_function_privilege('authenticated',p.oid,'execute') order by p.proname;")
 rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${OUTSIDER_UID}" --arg s "${T}-ATHLETE" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_error NOT_FOUND 'unshared member/session pair'
+rpc "${OWNER_TOKEN}" group_competition_session_records "$(jq -nc --arg g "${GID}" --arg u "${OUTSIDER_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_error NOT_FOUND 'unshared member/session pair records'
 pass 'every current reader/write denies anonymous, OAuth and outsider before payload validation'
 
 rpc "${OWNER_TOKEN}" group_competition_exercise_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_ok catalog; assert_wire isCompetitionExerciseListWire
@@ -596,6 +599,37 @@ check "the latest session's group records are its #1 boards only" \
   '.latest_completed.session_id==$s and [.latest_completed.group_records[].values[]|select(.role=="record")|.metric]==["volume"]' \
   --arg s "${T}-week-ATHLETE"
 pass 'week summary: a record keeps only the record values of the boards it took #1 on'
+
+# Session records: each #1 record of one session with its boards' current
+# leaders. R's 100 x 5 still leads 1RM but A's 60 x 12 passed it on Volume;
+# A's record took #1 on Volume only and still leads it.
+session_records() {
+  rpc "${OWNER_TOKEN}" group_competition_session_records "$(jq -nc --arg g "${GID}" --arg u "$1" --arg s "$2" \
+    '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
+  expect_ok "session records $2"; assert_wire isCompetitionSessionRecordsWire
+}
+session_records "${RIVAL_UID}" "${T}-week-RIVAL"
+check "R's record: 1RM still held, Volume passed by A, both record values kept" \
+  '(.records|length)==1 and (.records[0].event.set_id==$set) and
+   ([.records[0].boards[]|[.metric,.leads,.leader.user_id]]==[["e1rm",true,$r],["volume",false,$a]]) and
+   ([.records[0].event.values[]|select(.role=="record")|.metric]|sort)==["e1rm","volume"]' \
+  --arg set "${T}-week-RIVAL-set" --arg r "${RIVAL_UID}" --arg a "${ATHLETE_UID}"
+session_records "${ATHLETE_UID}" "${T}-week-ATHLETE"
+check "A's record: only its #1 board, still held" \
+  '(.records|length)==1 and ([.records[0].boards[]|[.metric,.leads]]==[["volume",true]]) and
+   [.records[0].event.values[]|select(.role=="record")|.metric]==["volume"]'
+GX="${WEEK_GX}"; WEEK_CERT="$(certify "${RIVAL_UID}" "${T}-week-RIVAL-set" e1rm)"; GX="${MAIN_GX}"
+session_records "${RIVAL_UID}" "${T}-week-RIVAL"
+check 'a record carries its live certification and write tokens' \
+  '(.records[0].event.record_context.metrics[]|select(.metric=="e1rm")|.certification.certification_id)==$c and
+   all(.records[0].event.record_context.metrics[];.write_token|length>0)' --arg c "${WEEK_CERT}"
+# NEVER has no reading, so a normalized score never existed for it.
+session_records "${NEVER_UID}" "${T}-NEVER"
+check 'a session with no #1 record reads empty' '.records==[]'
+session_records "${ATHLETE_UID}" "${T}-ATHLETE"
+check 'enabled-group session records expose no absolute counterpart' \
+  'all(.records[].event|select(.visibility=="normalized")|.values[];.value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))'
+pass "session records: a session's #1 boards with each board's current leader and live certification"
 
 # =============================================================================
 echo "[${LANE_LABEL}] stored pre-protocol-4 history through the protocol-4 readers"
