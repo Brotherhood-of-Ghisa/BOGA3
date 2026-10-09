@@ -42,17 +42,19 @@ Code: `HistoryHeatmap` in `apps/mobile/components/stats/history-sheet.tsx`.
 
 ### comparison.daily-history · presentation · accepted
 
-Daily history months and their rows are newest first. Each sampled day appears
-once, in its own month; future and out-of-sample positions have no tile. The
-month's first day is in its bottom row and its last sampled day in its top row.
+Daily history months and week rows are newest first. Each Monday–Sunday row
+belongs to the month in which Monday falls, including its adjoining-month
+days. Each sampled day appears once; future and out-of-sample positions have
+no tile. The week's start-day number sits outside the tiles as its row label;
+month headings use smaller secondary text.
 
-A Week tile appears beside its Sunday's row, in Sunday's month, only when
-Sunday has arrived and all seven Monday–Sunday dates are in the full sample.
-Rest days count; a week may span two months. Today counts when it is Sunday.
-Use the whole week's value and colour; a missing date or partial first sample
-week omits its Week tile while retaining sampled daily tiles.
+A Week tile appears on that row only when Sunday has arrived and all seven
+Monday–Sunday dates are in the full sample. Rest days count; a week may span
+two months. Today counts when it is Sunday. Use the whole week's value and
+colour; a missing date or partial first sample week omits its Week tile while
+retaining sampled daily tiles.
 
-Why: each daily figure and completed weekly total should appear once in the calendar.
+Why: each daily figure and completed weekly total appears once, in its starting week.
 Code: `apps/mobile/components/heatmaps/daily-calendar.ts`; `apps/mobile/components/heatmaps/DailyHeatmap.tsx`.
 
 ### comparison.weekly-reference · calculation · accepted
