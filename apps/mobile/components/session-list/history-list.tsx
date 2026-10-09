@@ -14,7 +14,7 @@ import { Card, StatePanel, Tag, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace,
 import { logEvent } from '@/src/logging';
 import { formatMonthDayTime } from '@/src/utils/local-time';
 
-import { historyJumpLocation, type HistoryJump, type HistoryJumpLocation } from './history-jump';
+import { historyJumpListIndex, historyJumpLocation, type HistoryJump, type HistoryJumpLocation } from './history-jump';
 
 import {
   formatEmptyWeeks,
@@ -77,15 +77,18 @@ export function HistoryList({
   const showRows = !loadErrorMessage && (!isLoading || sessions.length > 0);
   const sections = showRows ? groupSessionsByWeek(sessions, now) : [];
   const listRef = useRef<SectionList<SessionListItem, HistoryWeekSection>>(null);
-  const onScrollToIndexFailed = useJumpOnce(listRef, jumpTo ? historyJumpLocation(sections, jumpTo) : null);
+  const jumpLocation = jumpTo ? historyJumpLocation(sections, jumpTo) : null;
+  const onScrollToIndexFailed = useJumpOnce(listRef, jumpLocation);
 
   return (
     <SectionList
       onScrollToIndexFailed={onScrollToIndexFailed}
       ref={listRef}
       contentContainerStyle={styles.content}
-      // A screenful of rows and week headings and more; the rest render as they near the screen.
-      initialNumToRender={24}
+      // A screenful of rows and week headings and more; the rest render as they
+      // near the screen. A jump renders every row down to its target, so the
+      // target's offset is measured rather than estimated (rows differ in height).
+      initialNumToRender={24 + (jumpLocation ? historyJumpListIndex(sections, jumpLocation) : 0)}
       keyboardShouldPersistTaps="handled"
       keyExtractor={(session) => session.id}
       ListEmptyComponent={
@@ -110,12 +113,12 @@ export function HistoryList({
   );
 }
 
-// A jump into rows not yet laid out: bring that part of the list in from an
-// estimated offset, then aim again once it has been measured.
+// The jump's rows are rendered but may not be measured yet: aim again shortly,
+// for up to two seconds.
 const JUMP_RETRY_MS = 50;
-const JUMP_ATTEMPTS = 10;
+const JUMP_ATTEMPTS = 40;
 
-type ScrollToIndexFailure = { index: number; averageItemLength: number };
+type ScrollToIndexFailure = { index: number };
 
 /**
  * Scrolls once to `location` the first time it exists (the first load holding
@@ -158,9 +161,8 @@ function useJumpOnce(
       });
       return;
     }
-    listRef.current?.getScrollResponder()?.scrollTo({ y: failure.averageItemLength * failure.index, animated: false });
     retryRef.current = setTimeout(scrollToTarget, JUMP_RETRY_MS);
-  }, [listRef, scrollToTarget]);
+  }, [scrollToTarget]);
 }
 
 function WeekHeading({ section, now }: { section: HistoryWeekSection; now: Date }) {

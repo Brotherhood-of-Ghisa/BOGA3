@@ -410,7 +410,15 @@ describe('Sessions opened at a week or day of a history grid', () => {
     expect(scrollToLocation).toHaveBeenCalledTimes(1);
   });
 
-  it('aims again once rows not yet laid out are measured, and logs a jump it cannot make', async () => {
+  it('renders every row down to the target up front, so its offset is measured, not estimated', async () => {
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+
+    // Week 0: heading, row, footer; then the target week's heading, Friday and Wednesday's newest.
+    expect(screen.UNSAFE_getByType(SectionList).props.initialNumToRender).toBe(24 + 5);
+  });
+
+  it('aims again until the rows are measured, and logs a jump it cannot make', async () => {
     const warn = jest.spyOn(logEventModule, 'logEvent').mockResolvedValue();
     render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
     await screen.findByTestId('completed-session-row-friday');
@@ -419,16 +427,19 @@ describe('Sessions opened at a week or day of a history grid', () => {
     jest.useFakeTimers();
     try {
 
-      act(() => list.props.onScrollToIndexFailed({ index: 3, averageItemLength: 80, highestMeasuredFrameIndex: 1 }));
+      const fail = () => list.props.onScrollToIndexFailed({ index: 3, averageItemLength: 80, highestMeasuredFrameIndex: 1 });
+      act(fail);
       expect(scrollToLocation).toHaveBeenCalledTimes(1);
       act(() => jest.advanceTimersByTime(50));
       expect(scrollToLocation).toHaveBeenCalledTimes(2);
+      expect(warn).not.toHaveBeenCalled();
 
-      for (let attempt = 2; attempt <= 11; attempt += 1) {
-        act(() => list.props.onScrollToIndexFailed({ index: 3, averageItemLength: 80, highestMeasuredFrameIndex: 1 }));
+      // Forty attempts (two seconds), then it says so instead of trying forever.
+      for (let attempt = 2; attempt <= 41; attempt += 1) {
+        act(fail);
         act(() => jest.advanceTimersByTime(50));
       }
-      expect(scrollToLocation).toHaveBeenCalledTimes(11);
+      expect(scrollToLocation).toHaveBeenCalledTimes(41);
       expect(warn).toHaveBeenCalledWith(expect.objectContaining({ level: 'warn', event: 'sessions.history_jump_failed' }));
     } finally {
       jest.useRealTimers();

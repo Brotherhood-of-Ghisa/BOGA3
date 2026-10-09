@@ -60,3 +60,10 @@ export const historyJumpLocation = (
     : sections[sectionIndex].data.findIndex((session) => localDateKey(sessionInstant(session)) === jump.dayKey);
   return { sectionIndex, itemIndex: row + 1 };
 };
+
+/** The list's own index of a location: each section counts its heading, its rows and a footer. */
+export const historyJumpListIndex = (
+  sections: readonly HistoryWeekSection[],
+  location: HistoryJumpLocation,
+): number =>
+  sections.slice(0, location.sectionIndex).reduce((index, section) => index + section.data.length + 2, location.itemIndex);

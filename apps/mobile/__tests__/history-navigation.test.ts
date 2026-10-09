@@ -3,6 +3,7 @@
 
 import {
   groupSessionsByWeek,
+  historyJumpListIndex,
   historyJumpLocation,
   parseHistoryJump,
   type SessionListItem,
@@ -73,5 +74,13 @@ describe('historyJumpLocation', () => {
   it('lands a day without a listed row on its week heading, and a week without one nowhere', () => {
     expect(historyJumpLocation(sections, { weekKey: '2026-10-05', dayKey: '2026-10-06' })).toEqual({ sectionIndex: 1, itemIndex: 0 });
     expect(historyJumpLocation(sections, { weekKey: '2026-09-28' })).toBeNull();
+  });
+
+  it('counts each earlier week as its heading, its rows and a footer', () => {
+    expect(historyJumpListIndex(sections, { sectionIndex: 0, itemIndex: 0 })).toBe(0);
+    // Week 0 holds one row: heading, row, footer.
+    expect(historyJumpListIndex(sections, { sectionIndex: 1, itemIndex: 2 })).toBe(5);
+    // Week 1 holds four rows.
+    expect(historyJumpListIndex(sections, { sectionIndex: 2, itemIndex: 0 })).toBe(9);
   });
 });
