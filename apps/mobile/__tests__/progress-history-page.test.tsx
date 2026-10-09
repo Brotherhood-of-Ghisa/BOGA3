@@ -23,6 +23,7 @@ jest.mock('@/src/data/bootstrap', () =>
 
 let mockScreenOptions: { title?: string } = {};
 let mockSearchParams: Record<string, string | string[]> = {};
+const mockPush = jest.fn();
 
 jest.mock('expo-router', () => ({
   Stack: {
@@ -32,6 +33,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
+  useRouter: () => ({ push: mockPush }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -111,8 +113,8 @@ const buildViewProps = (
   isLoading: false,
   errorMessage: null,
   lookbackWeeks: 52,
-  selectedWeekKey: null,
-  onSelectWeek: jest.fn(),
+  onOpenDay: jest.fn(),
+  onOpenWeek: jest.fn(),
   onRetry: jest.fn(),
   todayDateKey: '2026-06-05',
   ...overrides,
@@ -155,31 +157,31 @@ describe('resolveHistorySubject', () => {
 describe('HistoryView', () => {
   it('renders the carried-over states: loading, error with retry, empty, then the chart', () => {
     const onRetry = jest.fn();
-    const onSelectWeek = jest.fn();
-    const { rerender, toJSON } = render(<HistoryView {...buildViewProps({ isLoading: true, onRetry, onSelectWeek })} />);
+    const onOpenWeek = jest.fn();
+    const { rerender, toJSON } = render(<HistoryView {...buildViewProps({ isLoading: true, onRetry, onOpenWeek })} />);
     expect(screen.getByTestId('stats-muscle-history-loading')).toHaveTextContent('Loading Side delts history...');
     expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
     captureUiEvidence('stats-muscle-history-loading', toJSON());
 
-    rerender(<HistoryView {...buildViewProps({ errorMessage: 'Nope', onRetry, onSelectWeek })} />);
+    rerender(<HistoryView {...buildViewProps({ errorMessage: 'Nope', onRetry, onOpenWeek })} />);
     expect(screen.getByTestId('stats-muscle-history-error')).toHaveTextContent(/Nope/);
     fireEvent.press(screen.getByTestId('stats-muscle-history-retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
     captureUiEvidence('stats-muscle-history-error', toJSON());
 
-    rerender(<HistoryView {...buildViewProps({ weeklyEffort: [], onRetry, onSelectWeek })} />);
+    rerender(<HistoryView {...buildViewProps({ weeklyEffort: [], onRetry, onOpenWeek })} />);
     expect(screen.getByTestId('stats-muscle-history-empty')).toHaveTextContent(/No history yet/);
     expect(screen.getByTestId('stats-muscle-history-empty')).toHaveTextContent(/No Side delts training/);
     captureUiEvidence('stats-muscle-history-empty', toJSON());
 
     rerender(<HistoryView {...buildViewProps({
-      weeklyEffort: [buildWeeklyEffort()], selectedWeekKey: '2026-05-11', onRetry, onSelectWeek,
+      weeklyEffort: [buildWeeklyEffort()], dailyMetrics: DAILY_METRICS, onRetry, onOpenWeek,
     })} />);
     expect(screen.getByTestId('stats-muscle-history-heatmap')).toBeTruthy();
     captureUiEvidence('stats-muscle-history-populated', toJSON());
 
-    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-05-11'));
-    expect(onSelectWeek).toHaveBeenCalledWith(null); // deselect since it's already selected
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-01'));
+    expect(onOpenWeek).toHaveBeenCalledWith('2026-06-01');
   });
 
   it('names the subject in neither state while the catalogue is still resolving it', () => {

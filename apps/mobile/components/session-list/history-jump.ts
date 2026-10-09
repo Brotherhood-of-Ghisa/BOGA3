@@ -3,9 +3,10 @@
 // session. Weeks and days are local, as [[session.history-weeks]] places each
 // session.
 
+import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
-import { localDateKey, sessionInstant, type HistoryWeekSection } from './history-weeks';
+import { sessionInstant, type HistoryWeekSection } from './history-weeks';
 
 /** A local week (its Monday), and a day in it for a day jump; `YYYY-MM-DD`. */
 export type HistoryJump = { weekKey: string; dayKey?: string };

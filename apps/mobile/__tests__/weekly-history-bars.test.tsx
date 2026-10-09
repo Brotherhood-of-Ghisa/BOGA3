@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { FlatList, ScrollView, StyleSheet } from 'react-native';
 
@@ -15,8 +15,8 @@ const day = (dateKey: string, value: number | null): DailyEffortMetrics => ({
 });
 const style = (id: string) => StyleSheet.flatten(screen.getByTestId(id).props.style);
 const data = (days: DailyEffortMetrics[], weeks = 8) => buildHeatmapData(days, 'totalVolume', { todayDateKey: TODAY, weeks });
-const chart = (loaded: ReturnType<typeof data>, selectedWeekKey: string | null = null, onSelectWeek: (key: string | null) => void = jest.fn()) =>
-  <WeeklyHeatmap data={loaded} selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix={PREFIX} formatValue={String} metricLabel="Volume" />;
+const chart = (loaded: ReturnType<typeof data>, onOpenWeek: (key: string) => void = jest.fn()) =>
+  <WeeklyHeatmap data={loaded} onOpenWeek={onOpenWeek} testIDPrefix={PREFIX} formatValue={String} metricLabel="Volume" />;
 
 it('shows newest first, full week dates, aligned values and proportional zero-based lengths', () => {
   const loaded = data([day(TODAY, 12), day('2026-09-28', 54), day('2026-09-14', 60)]);
@@ -78,29 +78,24 @@ it.each([[], [0, 0, 0, 0, 0, 0], [20, 20, 20, 20, 20, 20], [10]].map(values => (
   } else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
 });
 
-it('distinguishes current, selected and current-selected weeks and clears on a second tap', () => {
-  const loaded = data([day(TODAY, 12), day('2026-09-28', 54)]);
-  function SelectedChart() {
-    const [key, setKey] = useState<string | null>(null);
-    return chart(loaded, key, setKey);
-  }
-  render(<SelectedChart />);
-  expect(style('bars-heatmap-bar-2026-10-05')).not.toHaveProperty('borderWidth');
-  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-28'));
+it('opens a training week, holds no selection, and announces the current week', () => {
+  const open = jest.fn();
+  render(chart(data([day(TODAY, 12), day('2026-09-28', 54)]), open));
+  const week = screen.getByTestId('bars-heatmap-cell-2026-09-28');
+  expect(week).toHaveProp('accessibilityRole', 'button');
+  expect(week).toHaveProp('accessibilityHint', "Opens the week's sessions");
+  expect(week.props.accessibilityState?.selected).toBeFalsy();
+  fireEvent.press(week);
+  expect(open).toHaveBeenCalledWith('2026-09-28');
   expect(style('bars-heatmap-bar-2026-09-28').borderWidth).toBeUndefined();
-  expect(screen.getByTestId('bars-heatmap-cell-2026-09-28')).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.getByTestId('bars-heatmap-selected-marker')).toBeTruthy();
-  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-28'));
-  expect(screen.queryByTestId('bars-heatmap-selected-marker')).toBeNull();
-  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-10-05'));
-  expect(style('bars-heatmap-bar-2026-10-05').borderWidth).toBeUndefined();
+  expect(style('bars-heatmap-bar-2026-10-05')).not.toHaveProperty('borderWidth');
   expect(screen.getByText('Current week')).toBeTruthy();
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('Current week');
 });
 
 it('leaves rest and unavailable values blank, announces their distinction and retains known zero', () => {
-  const select = jest.fn();
-  render(chart(data([day(TODAY, 0), day('2026-09-28', null)]), '2026-09-28', select));
+  const open = jest.fn();
+  render(chart(data([day(TODAY, 0), day('2026-09-28', null)]), open));
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('', { exact: true });
   expect(screen.getByTestId('bars-heatmap-value-2026-09-21')).toHaveTextContent('', { exact: true });
@@ -110,8 +105,11 @@ it('leaves rest and unavailable values blank, announces their distinction and re
   expect(screen.queryByText(/\?/)).toBeNull();
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
   expect(style('bars-heatmap-bar-2026-09-21')).toMatchObject({ backgroundColor: 'transparent', width: '0%' });
-  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-21'));
-  expect(select).toHaveBeenCalledWith('2026-09-21');
+  // A rest week is not a button; a trained week whose figure is unavailable still opens.
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21')).toHaveProp('accessibilityRole', 'text');
+  expect(screen.getByTestId('bars-heatmap-cell-2026-09-21').props.onPress).toBeUndefined();
+  fireEvent.press(screen.getByTestId('bars-heatmap-cell-2026-09-28'));
+  expect(open).toHaveBeenCalledWith('2026-09-28');
 });
 
 it('retains target colour independently of length and bounds long formatted values', () => {
@@ -119,7 +117,7 @@ it('retains target colour independently of length and bounds long formatted valu
     { ...day(TODAY, 8), workingSetCountsByMuscle: { quads: 8 } },
     { ...day('2026-09-28', 16), workingSetCountsByMuscle: { quads: 16 } },
   ], 'workingSetCount', { todayDateKey: TODAY, weeks: 2, muscleTargets: { muscleIds: ['quads'], weeklyTarget: 8 } });
-  render(<WeeklyHeatmap data={loaded} selectedWeekKey={null} onSelectWeek={jest.fn()} testIDPrefix={PREFIX} formatValue={value => `${value}000000000000000000`} />);
+  render(<WeeklyHeatmap data={loaded} testIDPrefix={PREFIX} formatValue={value => `${value}000000000000000000`} />);
   expect(style('bars-heatmap-bar-2026-10-05')).toMatchObject({ width: '50%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: uiRoles.viz4 });
   expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ width: 96, textAlign: 'right' });
@@ -155,17 +153,14 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
   else expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
 });
 
-it('selects rows without a banner and uses one active vertical scroller', () => {
-  function SelectedHistory() {
-    const [key, setKey] = useState<string | null>(null);
-    return <HistoryView kind="exercise" subject="Bench Press"
-      metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
-      view="weekly" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
-      selectedWeekKey={key} onSelectWeek={setKey} todayDateKey={TODAY}
-      dailyMetrics={[day('2026-09-28', null)]}
-      weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />;
-  }
-  render(<SelectedHistory />);
+it('opens rows without a banner and uses one active vertical scroller', () => {
+  const open = jest.fn();
+  render(<HistoryView kind="exercise" subject="Bench Press"
+    metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
+    view="weekly" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
+    onOpenWeek={open} todayDateKey={TODAY}
+    dailyMetrics={[day('2026-09-28', null)]}
+    weeklyEffort={[{ weekStartDateKey: '2026-09-28', totalVolume: null, workingSetCount: 2, estimatedRM1: null, highestWeight: null, monthKey: '2026-09', weekOfMonth: 5 }]} />);
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
   expect(screen.queryByText(/Tap a week/)).toBeNull();
   expect(screen.getByLabelText('Select history view')).toBeTruthy();
@@ -173,9 +168,7 @@ it('selects rows without a banner and uses one active vertical scroller', () => 
   const weekly = screen.UNSAFE_getByType(FlatList);
   expect(weekly.parent?.type).not.toBe(ScrollView);
   fireEvent.press(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28'));
-  expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
-  expect(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28')).toHaveProp('accessibilityState', { selected: true });
-  fireEvent.press(screen.getByTestId('stats-exercise-history-heatmap-cell-2026-09-28'));
+  expect(open).toHaveBeenCalledWith('2026-09-28');
   expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
 });
 
@@ -185,7 +178,7 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={1} isLoading={state === 'loading'}
     errorMessage={state === 'error' ? 'Read failed' : null}
-    onRetry={retry} selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY}
+    onRetry={retry} todayDateKey={TODAY}
     dailyMetrics={[]} weeklyEffort={[]} />);
   expect(screen.getByTestId(`stats-exercise-history-${state}`)).toBeTruthy();
   if (state !== 'empty') expect(screen.queryByTestId('stats-exercise-history-empty')).toBeNull();
@@ -203,7 +196,7 @@ it('formats fractional Top weight references to one decimal without floating-poi
   render(<HistoryView kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
-    selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} weeklyEffort={[]}
+    todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => ({ ...day(date, 1), highestWeight: index >= 4 ? 11 : 10 }))} />);
   expect(screen.getByTestId('stats-exercise-history-heatmap-median')).toHaveProp('accessibilityLabel', '6-week median 10.0');
   expect(screen.getByTestId('stats-exercise-history-heatmap-p25')).toHaveProp('accessibilityLabel', '6-week 25th percentile 10.0');
@@ -229,7 +222,7 @@ it.each(['muscle', 'exercise'] as const)('shows only the Sets median for %s hist
   render(<HistoryView kind={kind} subject="Training"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="workingSetCount" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
-    selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} weeklyEffort={[]}
+    todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => day(date, index * 2))} />);
   const prefix = `stats-${kind}-history`;
   expect(screen.getByTestId(`${prefix}-heatmap-median`)).toHaveProp('accessibilityLabel', '6-week median 5.0');
@@ -254,7 +247,7 @@ it('draws no view title in either view: the page title and selectors name what i
   const { unmount } = render(<HistoryView kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
     view="daily" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
-    selectedWeekKey={null} onSelectWeek={jest.fn()} todayDateKey={TODAY} dailyMetrics={[day(TODAY, 20)]} weeklyEffort={[]} />);
+    todayDateKey={TODAY} dailyMetrics={[day(TODAY, 20)]} weeklyEffort={[]} />);
   expect(screen.queryByText('Daily training load')).toBeNull();
   expect(screen.queryByText('Bench Press')).toBeNull();
   unmount();

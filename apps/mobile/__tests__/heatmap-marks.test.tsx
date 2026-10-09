@@ -83,28 +83,12 @@ describe('DailyHeatmap marks', () => {
 });
 
 describe('WeeklyHeatmap marks', () => {
-  const renderWeekly = (selectedWeekKey: string | null) =>
-    render(
-      <WeeklyHeatmap data={data} onSelectWeek={jest.fn()} selectedWeekKey={selectedWeekKey} testIDPrefix={PREFIX} formatValue={String} />
-    );
+  it('keeps current and past bars borderless, with no selected state', () => {
+    render(<WeeklyHeatmap data={data} onOpenWeek={jest.fn()} testIDPrefix={PREFIX} formatValue={String} />);
 
-  it('announces the current week without a border or selected caret', () => {
-    renderWeekly(null);
-
+    expect(border(`${PREFIX}-heatmap-bar-2026-05-04`)).toEqual({ borderWidth: undefined, borderColor: undefined });
     expect(border(`${PREFIX}-heatmap-bar-2026-05-11`)).toEqual({ borderWidth: undefined, borderColor: undefined });
-    expect(screen.queryByTestId(`${PREFIX}-heatmap-selected-marker`)).toBeNull();
-  });
-
-  it('keeps selected/current bars borderless and retains the selected caret', () => {
-    renderWeekly('2026-05-04');
-
-    const selected = border(`${PREFIX}-heatmap-bar-2026-05-04`);
-    const current = border(`${PREFIX}-heatmap-bar-2026-05-11`);
-    expect(selected).toEqual({ borderWidth: undefined, borderColor: undefined });
-    expect(current).toEqual({ borderWidth: undefined, borderColor: undefined });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-04`)).toHaveProp('accessibilityState', { selected: true });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`)).toHaveProp('accessibilityState', { selected: false });
-    expect(screen.getByTestId(`${PREFIX}-heatmap-selected-marker`)).toBeTruthy();
+    expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11`).props.accessibilityState?.selected).toBeFalsy();
   });
 });
 
@@ -130,7 +114,7 @@ describe('Bodyweight heatmap coverage', () => {
   ])('places the median and percentiles on the zero-based horizontal scale including known zero training', (values, median) => {
     const dates = ['2026-04-06', '2026-04-13', '2026-04-20', '2026-04-27', '2026-05-04', '2026-05-11'];
     const coverage = buildHeatmapData(dates.map((date, index) => day(date, values[index])), 'totalVolume', { todayDateKey: TODAY });
-    render(<WeeklyHeatmap data={coverage} onSelectWeek={jest.fn()} selectedWeekKey={null} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
+    render(<WeeklyHeatmap data={coverage} testIDPrefix={PREFIX} formatValue={(value) => `~${value}`} />);
     expect(screen.getByTestId(`${PREFIX}-heatmap-median`)).toHaveProp('accessibilityLabel', `52-week median ~${median}`);
     expect(style(`${PREFIX}-heatmap-median`).left).toBe('0%');
     expect(style(`${PREFIX}-heatmap-p25`).left).toBe('0%');

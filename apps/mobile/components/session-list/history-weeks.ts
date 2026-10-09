@@ -2,6 +2,7 @@
 // over [[comparison.window]]'s week, Monday 00:00 local.
 
 import { formatWeekRange, weekDayLabel } from '@/components/today/progress-format';
+import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow, type LocalWindow } from '@/src/utils/local-calendar';
 
 import type { SessionListItem } from './types';
@@ -27,10 +28,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // Whole weeks between two Mondays; rounding absorbs a DST hour.
 const weeksBetween = (later: Date, earlier: Date): number =>
   Math.round((later.getTime() - earlier.getTime()) / (7 * DAY_MS));
-
-/** A local date's `YYYY-MM-DD`. */
-export const localDateKey = (date: Date): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 // A completed session sits in the week of its completion, as on Progress and
 // Today; a row without one falls back to its start.

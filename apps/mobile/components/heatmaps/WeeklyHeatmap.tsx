@@ -4,7 +4,7 @@
 import React, { useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Icon, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
@@ -19,8 +19,8 @@ const DATE_WIDTH = 96;
 
 interface Props {
   data: HeatmapData;
-  selectedWeekKey: string | null;
-  onSelectWeek: (weekStartDateKey: string | null) => void;
+  /** Opens a week's sessions; a rest week is never offered. */
+  onOpenWeek?: (weekStartDateKey: string) => void;
   testIDPrefix: string;
   formatValue: (value: number) => string;
   formatReferenceValue?: (value: number) => string;
@@ -52,19 +52,21 @@ function ReferenceRule({ position, testID }: { position: number; testID?: string
   </View>;
 }
 
-function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetAveraged, max, references, valueWidth, currentYear, testID }: {
-  week: WeekCell; selected: boolean; onPress: () => void; formatValue: Props['formatValue']; metricLabel: string;
+function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, max, references, valueWidth, currentYear, testID }: {
+  week: WeekCell; onPress?: () => void; formatValue: Props['formatValue']; metricLabel: string;
   targetAveraged?: boolean; max: number; references: Reference[]; valueWidth: number; currentYear: number; testID: string;
 }) {
   const year = week.monday.getUTCFullYear();
   const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
   const value = weekValue(week, formatValue);
   const description = week.unavailable ? `${metricLabel} unavailable` : !isKnownTraining(week) ? 'Rest week' : `${metricLabel} ${value}`;
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }}
-    accessibilityLabel={`Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`}
-    onPress={onPress} testID={`${testID}-cell-${week.weekStartDateKey}`} style={styles.row}>
+  const shared = {
+    accessibilityLabel: `Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
+    testID: `${testID}-cell-${week.weekStartDateKey}`,
+    style: styles.row,
+  };
+  const content = <>
     <View style={styles.date}>
-      {selected ? <View style={styles.marker} testID={`${testID}-selected-marker`}><Icon color={uiRoles.ink} name="caret-down" size="xs" /></View> : null}
       <Text allowFontScaling={false} style={styles.dateText}>{weekLabel(week)}</Text>
       {week.isCurrentWeek ? <Text allowFontScaling={false} style={styles.note}>Current week</Text> : null}
       {year !== currentYear || year !== endYear ? <Text allowFontScaling={false} style={styles.year}>{year === endYear ? year : `${year}–${endYear}`}</Text> : null}
@@ -78,10 +80,13 @@ function WeeklyRow({ week, selected, onPress, formatValue, metricLabel, targetAv
       {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
     </View>
     <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
-  </Pressable>;
+  </>;
+  return onPress
+    ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sessions" onPress={onPress} {...shared}>{content}</Pressable>
+    : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 
-export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
+export function WeeklyHeatmap({ data, onOpenWeek, testIDPrefix, formatValue,
   formatReferenceValue = formatValue, metricLabel = 'Value', legendLabel = 'Intensity (per week)', header }: Props) {
   // The adapter is chronological; reverse only the displayed copy.
   const weeks = useMemo(() => [...data.weekly].reverse(), [data.weekly]);
@@ -101,7 +106,6 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
     testID={testID} style={styles.list} contentContainerStyle={styles.content}
     data={weeks} keyExtractor={week => week.weekStartDateKey}
     initialNumToRender={12} windowSize={5} showsVerticalScrollIndicator={false}
-    extraData={selectedWeekKey}
     ListHeaderComponent={<View>{header}<>
       {/* No view title: the page's selectors say which view and metric this is. */}
       <View style={styles.axisRow}>
@@ -116,8 +120,8 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
         <View style={{ width: valueWidth }} />
       </View>
     </></View>}
-    renderItem={({ item }) => <WeeklyRow week={item} selected={item.weekStartDateKey === selectedWeekKey}
-      onPress={() => onSelectWeek(item.weekStartDateKey === selectedWeekKey ? null : item.weekStartDateKey)}
+    renderItem={({ item }) => <WeeklyRow week={item}
+      onPress={onOpenWeek && item.hasTraining ? () => onOpenWeek(item.weekStartDateKey) : undefined}
       formatValue={formatValue} metricLabel={metricLabel} targetAveraged={data.targetGrading?.averaged}
       max={max} references={references} valueWidth={valueWidth} currentYear={Number(data.todayDateKey.slice(0, 4))} testID={testID} />}
     ListFooterComponent={<View style={styles.footer}>
@@ -134,7 +138,6 @@ const styles = StyleSheet.create({
   dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
   note: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xs, lineHeight: uiTypography.lineHeight.xs, color: uiRoles.inkMuted },
   year: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.xxs, lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.inkMuted },
-  marker: { position: 'absolute', left: -uiSpace.lg, top: uiSpace.xs, transform: [{ rotate: '-90deg' }] },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },

@@ -56,9 +56,8 @@ Why: the grid shows where training happened; a tap should reach those
 sessions in the one history the user already knows.
 Code: `DailyHeatmap` in `apps/mobile/components/heatmaps/DailyHeatmap.tsx`;
 `historyDayHref` in `apps/mobile/src/navigation/routes.ts`;
-`historyJumpLocation` in `apps/mobile/components/session-list/history-jump.ts`.
-Pending: the history page does not open them yet, and a Weekly row still
-selects its week instead of opening it.
+`historyJumpLocation` in `apps/mobile/components/session-list/history-jump.ts`;
+the openers in `apps/mobile/app/progress-history.tsx`.
 
 ### session.volume-comparison · presentation · accepted
 

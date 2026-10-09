@@ -108,6 +108,7 @@ access level, and `useRootRouteAccess`
 | `/progress`, `/stats-history` | `period=7` | This week; absent or any other value uses the configured window |
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
 | `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one, required; both, neither or a blank id renders the unavailable state, as does an id the exercise catalogue no longer holds. The page reads the subject's name from that cache — never from a param |
+| `/sessions` | `week`, `day` | where the list opens ([[session.history-open]]); malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
 | | `period` | `7` / `30` / `all`; absent or invalid is `30` |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |
@@ -160,6 +161,7 @@ Nothing outside this table navigates. A route not listed as a source
 | `/progress`, `/stats-history` | `/exercise-history?exerciseDefinitionId=<id>` | the exercise page's History, not Progress's own names |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | a muscle or exercise name, and a contribution row's exercise (`progressHistoryHref`, `push`). Native back returns to Progress with its breakdown, period, search, sort and scroll as left, restoring reader focus once, to the launching row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
+| `/progress-history` | `/completed-session/<id>`, `/sessions?day=`, `?week=` | a training day or week (`historyDayHref`, `sessionsWeekHref`, `push`) |
 | `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
@@ -189,9 +191,8 @@ Nothing outside this table navigates. A route not listed as a source
 
 Progress’s frozen controls change content in-route;
 Sessions is the final scrolling link in both views. A muscle chevron toggles
-its contribution block directly below that row. Muscle/exercise names push
-`/progress-history`, which is a route, not a sheet: Progress stays mounted
-behind it and restores accessible focus to the launching row on return.
+its contribution block directly below that row. `/progress-history` is a
+route, not a sheet.
 
 Not route transitions, and must not become them: every modal, sheet and `Alert`
 is in-route state. That includes the picker's `Add new` editor, group-pick sheet

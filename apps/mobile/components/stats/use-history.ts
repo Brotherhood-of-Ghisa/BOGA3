@@ -3,7 +3,7 @@ import {
   computeSelectedExerciseHistoryEffort, computeSelectedMuscleHistoryEffort,
   type DailyEffortMetrics, type SelectedMuscleWeeklyEffort,
 } from '@/src/data';
-import { calendarWeekBounds, keepHistorySelection } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 
 /** What one history page is about: one exercise definition or one muscle group. */
 export type HistorySubject =
@@ -35,10 +35,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const [loading, setLoading] = useState(id !== null);
   const [loaded, setLoaded] = useState<{ context: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[] } | null>(null);
   const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
-  const [weekKey, setWeekKey] = useState<string | null>(null);
   const [retryRevision, setRetryRevision] = useState(0);
-  const currentWeekKey = weekKey === null ? null : keepHistorySelection(weekKey, weeks);
-  if (weekKey !== null && weekKey !== currentWeekKey) setWeekKey(currentWeekKey);
   useEffect(() => {
     if (kind === null || id === null) return;
     let active = true;
@@ -49,7 +46,6 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
         const next = await loadHistory(kind, id, weeks);
         if (!active) return;
         setLoaded({ context, daily: next.daily, weekly: next.weekly });
-        setWeekKey(previous => keepHistorySelection(previous, weeks));
       } catch (cause) {
         if (active) setFailure({ context, message: cause instanceof Error ? cause.message : 'Unknown error' });
       } finally {
@@ -72,7 +68,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   return {
     daily: current?.daily ?? [], weekly: current?.weekly ?? [],
     loading: id !== null && (loading || (!current && !error)),
-    error, weekKey: currentWeekKey,
-    retry: () => setRetryRevision(value => value + 1), selectWeek: setWeekKey,
+    error,
+    retry: () => setRetryRevision(value => value + 1),
   };
 }

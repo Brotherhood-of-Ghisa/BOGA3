@@ -1,7 +1,8 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import type { DayCell } from '@/components/heatmaps';
 import {
   EXERCISE_HISTORY_METRIC_OPTIONS,
   HistoryView,
@@ -13,6 +14,7 @@ import { ActionButton, Notice, Screen, StatePanel, uiSpace } from '@/components/
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { historyDayHref, sessionsWeekHref } from '@/src/navigation/routes';
 import type { HeatmapView } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -55,6 +57,7 @@ export type ProgressHistoryScreenProps = {
 
 export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistoryScreenProps) {
   const { values, pending, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
+  const router = useRouter();
   const catalog = useExerciseCatalog();
   const revision = useBodyWeightContextRevision();
   const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
@@ -92,8 +95,12 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     lookbackWeeks: values.historyLookbackWeeks,
     onRetry: history.retry,
     onSelectView: (view: HeatmapView) => updatePreferences({ heatmapView: view }),
-    onSelectWeek: history.selectWeek,
-    selectedWeekKey: history.weekKey,
+    // [[session.history-open]]: a day's one session, else Sessions at the day or week.
+    onOpenDay: (day: DayCell) => {
+      const href = historyDayHref(day.dateKey, day.sessionIds);
+      if (href) router.push(href);
+    },
+    onOpenWeek: (weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)),
     subject: name,
     todayDateKey,
     // A view whose save failed stays the chosen one here, as a draft the
