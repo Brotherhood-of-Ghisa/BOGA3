@@ -52,9 +52,10 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, ma
   const year = week.monday.getUTCFullYear();
   const endYear = new Date(week.monday.getTime() + 6 * 86400000).getUTCFullYear();
   const value = weekValue(week, formatValue);
+  const prCount = week.prCount ?? 0;
   const description = week.unavailable ? `${metricLabel} unavailable` : !isKnownTraining(week) ? 'Rest week' : `${metricLabel} ${value}`;
   const shared = {
-    accessibilityLabel: `Week of ${week.weekStartDateKey}, ${description}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
+    accessibilityLabel: `Week of ${week.weekStartDateKey}, ${description}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${week.isCurrentWeek ? ', Current week' : ''}${week.targetAttainment === undefined ? '' : `, ${Math.round(week.targetAttainment * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
     testID: `${testID}-cell-${week.weekStartDateKey}`,
     style: styles.row,
   };
@@ -73,6 +74,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, ma
       {references.map(reference => <ReferenceRule key={reference.id} position={reference.position} testID={`${testID}-reference-${reference.id}-${week.weekStartDateKey}`} />)}
     </View>
     <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
+    {prCount > 0 ? <Text allowFontScaling={false} style={styles.prs} testID={`${testID}-prs-${week.weekStartDateKey}`}>{prCount} PR{prCount === 1 ? '' : 's'}</Text> : null}
   </>;
   return onPress
     ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sessions" onPress={onPress} {...shared}
@@ -136,6 +138,10 @@ const styles = StyleSheet.create({
   track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
   value: { fontFamily: uiFonts.figure.family, fontWeight: '600', fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base, color: uiRoles.ink, textAlign: 'right' },
+  // Keep the existing metric/bar axis when adding [[comparison.history-prs]].
+  prs: { position: 'absolute', top: '50%', marginTop: uiSpace.sm + uiTypography.lineHeight.base / 2, right: 0,
+    fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.xxs,
+    lineHeight: uiTypography.lineHeight.xxs, color: uiRoles.record, textAlign: 'right' },
   reference: { position: 'absolute', top: -uiSpace.sm, bottom: -uiSpace.sm, width: 1, justifyContent: 'space-around' },
   dash: { width: 1, flex: 1, maxHeight: 5, marginBottom: uiSpace.xs, backgroundColor: uiRoles.inkMuted },
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },

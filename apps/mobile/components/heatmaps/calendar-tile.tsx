@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
+import Svg, { Path } from 'react-native-svg';
+import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
 import { HEAT_RAMP } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import type { DayCell, WeekCell } from './heatmapData';
@@ -35,11 +36,16 @@ export function CalendarTile(props: Props) {
   const { cell, dateLabel, future, weekly, current, formatValue, targetAveraged, testID, onPress, accessibilityHint } = props;
   const value = calendarValue(cell, future, formatValue);
   const target = cell?.targetAttainment;
-  const content = <Text allowFontScaling={false} style={styles.value} numberOfLines={1} testID={`${testID}-value`}>
-    {value}
-  </Text>;
+  const prCount = cell?.prCount ?? 0;
+  const content = <>
+    <Text allowFontScaling={false} style={styles.value} numberOfLines={1} testID={`${testID}-value`}>{value}</Text>
+    {!weekly && !future && prCount > 0 ? <Svg accessible={false} accessibilityElementsHidden pointerEvents="none"
+      width={uiSpace.sm} height={uiSpace.sm} viewBox="0 0 8 8" style={styles.pr} testID={`${testID}-pr`}>
+      <Path d="M0 0H8V8Z" fill={uiRoles.record} />
+    </Svg> : null}
+  </>;
   const shared = {
-    accessibilityLabel: `${dateLabel}, ${description(props)}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
+    accessibilityLabel: `${dateLabel}, ${description(props)}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
     testID,
     style: [styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
       cell?.unavailable ? styles.unavailable : null],
@@ -51,6 +57,7 @@ export function CalendarTile(props: Props) {
 }
 
 const styles = StyleSheet.create({
+  pr: { position: 'absolute', top: uiSpace.xs, right: uiSpace.xs },
   tile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
     borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
     ...heatmapStyles.restCell, justifyContent: 'center' },
