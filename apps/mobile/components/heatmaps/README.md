@@ -1,14 +1,14 @@
 # BoGa Heatmaps — Progress history integration
 
-Two heatmap views and a Timeline chart for the exercise and muscle history sheets on Progress
-(`components/stats/history-sheet.tsx`). They replace the older month-grid
-`CalendarHeatmap`.
+Two heatmap views and a Timeline chart for the exercise and muscle history page
+Progress pushes (`components/stats/history-view.tsx`, route
+`app/progress-history.tsx`). They replace the older month-grid `CalendarHeatmap`.
 
 | File | What it is |
 |------|-----------|
 | `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `HEAT_RAMP` (the `viz0`…`viz4` roles). |
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
-| `heatmap-style.ts`  | Shared title, micro-label and Week-column spacing styles. |
+| `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The metric legend and the Less…More ramp under both views. |
 | `DailyHeatmap.tsx`  | **Daily** — read-only month calendars stacked newest first, Monday–Sunday plus Week tiles. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → columns and the month labels that fit. Pure. |
@@ -17,7 +17,7 @@ Two heatmap views and a Timeline chart for the exercise and muscle history sheet
 
 ## Data flow
 
-These components do **not** take raw sessions. The history sheet fetches the
+These components do **not** take raw sessions. The history page fetches the
 app's pre-aggregated per-day metrics and feeds them through the adapter:
 
 ```ts
@@ -33,7 +33,7 @@ const data = buildHeatmapData(dailyMetrics, metric, { weeks: savedLookbackWeeks 
 
 `DailyEffortMetrics` (`{ dateKey, totalVolume, workingSetCount, estimatedRM1,
 highestWeight }`) comes from the muscle/exercise analytics in `src/data`; the
-weekly effort the same screen already loads determines its empty state.
+weekly effort the same page already loads determines its empty state.
 Muscle history offers per-side, role-weighted `totalVolume`, and
 `workingSetCount` ([[muscle.set-count]]); exercise Volume and 1RM use the current private calculation
 policy and as-of reading. Missing personal reading uses zero. Top weight remains
@@ -96,11 +96,12 @@ Daily tiles are read-only; Weekly bars select a row:
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
 
-Settings is the sole Daily/Weekly selector. Missing or invalid choices use
-Daily; valid saved Daily or Weekly choices survive restart and account
-switching. Progress history targets one muscle ID or one exercise definition,
-never a family. Progress renders the saved choice
-without an in-chart switch. Numeric `weeks` controls the exact query/grid span;
+The history page's view selector (`Grid` | `Weekly`, icons) is the sole
+Daily/Weekly choice, and it writes the saved `heatmapView` preference: Settings
+has no such row. Missing or invalid choices use Daily; valid saved Daily or
+Weekly choices survive restart and account switching. Progress history targets
+one muscle ID or one exercise definition, never a family.
+Numeric `weeks` controls the exact query/grid span;
 short windows have no implicit 52-week minimum. Weekly selection returns to
 the current week when excluded and survives look-back edits while in range.
 
@@ -113,11 +114,11 @@ the current week when excluded and survives look-back edits while in range.
   Weekly selection retains its accessible state and filled `ink` caret.
   Current-week wording remains beside its row.
   `__tests__/heatmap-marks.test.tsx` holds this.
-- **Warm switching:** the history sheet mounts each view on first use and keeps visited views mounted. Its inactive
+- **Warm switching:** the history page mounts each view on first use and keeps visited views mounted. Its inactive
   layer is transparent, non-interactive, and hidden from accessibility, avoiding
-  a chart rebuild when the saved view changes while preserving Weekly selection
+  a chart rebuild when the chosen view changes while preserving Weekly selection
   and body scroll state.
-- **One active vertical scroller.** The weekly `FlatList` owns the sheet body;
+- **One active vertical scroller.** The weekly `FlatList` owns the page body;
   Daily owns a virtualized `FlatList` of month calendars. Inline loading/error/empty
   states share the active body. Row targets are at least 44pt; old-year labels
   disambiguate multi-year windows and value columns cap their width and wrap.

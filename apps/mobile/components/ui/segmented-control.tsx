@@ -1,10 +1,15 @@
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Icon, type IconName } from '@/components/ui/icon';
 import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type SegmentedControlOption<TValue extends string | number> = {
   value: TValue;
   label: string;
+  // Drawn instead of the label, which stays the segment's accessible name: for
+  // a control whose choices are modes rather than values, and which has to
+  // share its row (the history view switch beside the metric selector).
+  icon?: IconName;
   accessibilityLabel?: string;
 };
 
@@ -15,6 +20,9 @@ export type SegmentedControlOption<TValue extends string | number> = {
 // history's four metrics).
 export type SegmentedControlLayout = 'fill' | 'inline' | 'fit';
 
+// `compact` halves the horizontal padding, for two controls sharing one row.
+export type SegmentedControlDensity = 'default' | 'compact';
+
 export type SegmentedControlProps<TValue extends string | number> = {
   options: readonly SegmentedControlOption<TValue>[];
   value: TValue;
@@ -23,6 +31,7 @@ export type SegmentedControlProps<TValue extends string | number> = {
   testIDPrefix: string;
   accessibilityLabel?: string;
   layout?: SegmentedControlLayout;
+  density?: SegmentedControlDensity;
   // `selection`: fixed black/white for Progress and history filters.
   selectedGround?: 'ink' | 'selection';
   hitSlop?: number;
@@ -41,6 +50,7 @@ export function SegmentedControl<TValue extends string | number>({
   testIDPrefix,
   accessibilityLabel,
   layout = 'fill',
+  density = 'default',
   selectedGround = 'ink',
   hitSlop,
   disabled = false,
@@ -48,6 +58,7 @@ export function SegmentedControl<TValue extends string | number>({
 }: SegmentedControlProps<TValue>) {
   const fill = layout === 'fill';
   const fit = layout === 'fit';
+  const compact = density === 'compact';
   return (
     <View
       accessibilityLabel={accessibilityLabel}
@@ -72,6 +83,7 @@ export function SegmentedControl<TValue extends string | number>({
             }}
             style={[
               styles.segment,
+              compact ? styles.segmentCompact : null,
               fill ? styles.segmentFill : null,
               fit ? styles.segmentFit : null,
               index > 0 ? styles.segmentDivider : null,
@@ -79,13 +91,21 @@ export function SegmentedControl<TValue extends string | number>({
               disabled && selected ? styles.segmentSelectedDisabled : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
-            <Text
-              allowFontScaling={false}
-              numberOfLines={1}
-              style={[styles.label, selected ? styles.labelSelected : null,
-                disabled && !selected ? styles.labelDisabled : null]}>
-              {option.label}
-            </Text>
+            {option.icon ? (
+              <Icon
+                color={labelColor(selected, disabled)}
+                name={option.icon}
+                size="sm"
+              />
+            ) : (
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                style={[styles.label, selected ? styles.labelSelected : null,
+                  disabled && !selected ? styles.labelDisabled : null]}>
+                {option.label}
+              </Text>
+            )}
           </Pressable>
         );
       })}
@@ -109,6 +129,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
     backgroundColor: uiRoles.surface,
+  },
+  segmentCompact: {
+    paddingHorizontal: uiSpace.sm,
   },
   segmentFill: {
     flex: 1,
@@ -149,3 +172,8 @@ const styles = StyleSheet.create({
 });
 
 const selectedStyles = { ink: styles.segmentSelected, selection: styles.segmentSelectedFilter };
+
+// An icon segment takes the label's colour, so the selected and disabled
+// states read the same whichever a segment draws.
+const labelColor = (selected: boolean, disabled: boolean): string =>
+  selected ? uiRoles.surface : disabled ? uiRoles.inkGhost : uiRoles.inkMuted;

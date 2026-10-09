@@ -38,7 +38,7 @@ N − 1 weeks before the current week through today. Both displayed weeks and
 Weekly reference calculations use this entire window.
 
 Why: a history setting must select the same sample for the chart and its baseline.
-Code: `HistoryHeatmap` in `apps/mobile/components/stats/history-sheet.tsx`.
+Code: `HistoryHeatmap` in `apps/mobile/components/stats/history-view.tsx`.
 
 ### comparison.daily-history · presentation · accepted
 

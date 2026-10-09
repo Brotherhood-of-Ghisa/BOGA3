@@ -96,7 +96,7 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
     initialNumToRender={12} windowSize={5} showsVerticalScrollIndicator={false}
     extraData={selectedWeekKey}
     ListHeaderComponent={<View>{header}<>
-      <Text allowFontScaling={false} style={[heatmapStyles.title, styles.title]}>Weekly training load</Text>
+      {/* No view title: the page's selectors say which view and metric this is. */}
       <View style={styles.axisRow}>
         <View style={styles.date} />
         <View style={styles.axis} testID={`${testID}-axis`}>
@@ -122,7 +122,6 @@ export function WeeklyHeatmap({ data, selectedWeekKey, onSelectWeek, testIDPrefi
 const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: uiSpace.lg },
-  title: { marginTop: uiSpace.xs, marginBottom: uiSpace.md },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, paddingVertical: uiSpace.sm },
   date: { width: DATE_WIDTH },
   dateText: { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm, color: uiRoles.ink },
@@ -136,7 +135,7 @@ const styles = StyleSheet.create({
   reference: { position: 'absolute', top: -uiSpace.sm, bottom: -uiSpace.sm, width: 1, justifyContent: 'space-around' },
   dash: { width: 1, flex: 1, maxHeight: 5, marginBottom: uiSpace.xs, backgroundColor: uiRoles.inkMuted },
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
-  axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.sm },
+  axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
   axis: { flex: 1, flexDirection: 'row', paddingBottom: uiSpace.sm },
   axisLabel: { ...heatmapStyles.legendText, flex: 1, flexShrink: 1 },
   footer: { gap: uiSpace.xs, paddingTop: uiSpace.lg },
