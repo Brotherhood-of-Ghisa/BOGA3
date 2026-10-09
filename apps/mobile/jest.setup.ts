@@ -1,4 +1,6 @@
 import { cleanup, configure } from '@testing-library/react-native';
+
+import { createUncaughtErrorSink } from '@/__tests__/helpers/uncaught-react-errors';
 import {
   __resetAccountLocalPreferencesForTests,
 } from '@/src/preferences/account-local';
@@ -28,24 +30,20 @@ afterEach(() => {
 // destroyed, and that TypeError escapes into whichever test the event loop is
 // running by then, blaming an innocent test.
 //
-// This hook exists to SURFACE those errors, never to swallow them: it records
-// the real error, and the `afterEach` below rethrows it so the test that threw
-// fails with the real message and stack. Returning `false` (the DOM meaning of
-// "preventDefault was called") stops React from `console.error`-ing it as well,
-// so there is exactly one report — the failure. Never make this hook drop an
-// error: a React error with nowhere to go is a bug, not noise.
-const uncaughtReactErrors: unknown[] = [];
+// This hook exists to SURFACE those errors, never to swallow them: the sink
+// records the real error and the `afterEach` below rethrows it, so the test
+// that threw fails with the real message and stack. Two errors in one test
+// come back as an `AggregateError` naming both rather than one of them
+// silently winning (`__tests__/helpers/uncaught-react-errors.ts`).
+const uncaughtReactErrors = createUncaughtErrorSink();
 const partialWindow = (globalThis as { window?: { dispatchEvent?: unknown } }).window;
 if (partialWindow && typeof partialWindow.dispatchEvent !== 'function') {
-  partialWindow.dispatchEvent = (event: { error?: unknown }) => {
-    uncaughtReactErrors.push(event?.error ?? event);
-    return false;
-  };
+  partialWindow.dispatchEvent = uncaughtReactErrors.record;
 }
 
 afterEach(() => {
-  if (uncaughtReactErrors.length === 0) return;
-  throw uncaughtReactErrors.splice(0, uncaughtReactErrors.length)[0];
+  const failure = uncaughtReactErrors.drain();
+  if (failure !== null) throw failure;
 });
 
 // Worklets installs its native runtime on import; Jest has none, so any suite
