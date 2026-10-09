@@ -648,6 +648,9 @@ describe("Friend's session view", () => {
   it('lists the #1 records, frozen, with who passed them since, a board link, and one-tap Certify', async () => {
     api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords());
     api.certifyCompetition.mockResolvedValue({ contract_version: 4, created: true, certification: certificationBy(USER_ID, 'me') });
+    // A landed certify re-reads it from the server (`src/groups/use-metric-certification.ts`),
+    // so this read is part of the one-tap Certify path, not optional setup.
+    api.getCompetitionCertification.mockResolvedValue({ contract_version: 4, certification: certificationBy(USER_ID, 'me') });
     render(<GroupSessionRoute />);
     const rm = within(await screen.findByTestId('group-session-record-ev-1:e1rm'));
     // Groups no longer rank Volume: its board shows neither a row nor in the band.
