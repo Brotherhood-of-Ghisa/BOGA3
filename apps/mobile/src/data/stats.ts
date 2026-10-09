@@ -414,6 +414,16 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     const daily = aggregateSelectedMuscleDailyEffort(input, options);
     return aggregateSelectedMuscleWeeklyEffort(daily);
   },
+  async computeSelectedMuscleHistoryEffort(options: ComputeSelectedMuscleDailyEffortOptions) {
+    ensureDate(options.start, 'start');
+    ensureDate(options.end, 'end');
+    const input = await store.loadAggregationInput({ start: options.start, end: options.end });
+    const effort = aggregateSelectedMuscleDailyEffort(input, options);
+    return {
+      daily: aggregateSelectedMuscleDailyEffortMetrics(effort),
+      weekly: aggregateSelectedMuscleWeeklyEffort(effort),
+    };
+  },
   async computeSelectedMuscleDailyEffortMetrics(
     options: ComputeSelectedMuscleDailyEffortOptions
   ): Promise<DailyEffortMetrics[]> {
@@ -439,3 +449,5 @@ export const computeSelectedMuscleWeeklyEffort =
   defaultStatsRepository.computeSelectedMuscleWeeklyEffort;
 export const computeSelectedMuscleDailyEffortMetrics =
   defaultStatsRepository.computeSelectedMuscleDailyEffortMetrics;
+
+export const computeSelectedMuscleHistoryEffort = defaultStatsRepository.computeSelectedMuscleHistoryEffort;
