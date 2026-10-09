@@ -45,7 +45,8 @@ export function CalendarTile(props: Props) {
       cell?.unavailable ? styles.unavailable : null],
   };
   return onPress
-    ? <Pressable accessibilityRole="button" accessibilityHint={accessibilityHint} onPress={onPress} {...shared}>{content}</Pressable>
+    ? <Pressable accessibilityRole="button" accessibilityHint={accessibilityHint} onPress={onPress} {...shared}
+      style={({ pressed }) => [shared.style, pressed ? heatmapStyles.pressed : null]}>{content}</Pressable>
     : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 

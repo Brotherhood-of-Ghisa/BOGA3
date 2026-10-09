@@ -19,7 +19,7 @@ const DATE_WIDTH = 96;
 
 interface Props {
   data: HeatmapData;
-  /** Opens a week's sessions; a rest week is never offered. */
+  /** Opens a week's sessions ([[session.history-open]]). */
   onOpenWeek?: (weekStartDateKey: string) => void;
   testIDPrefix: string;
   formatValue: (value: number) => string;
@@ -82,7 +82,8 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, ma
     <Text allowFontScaling={false} style={[styles.value, { width: valueWidth }]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
   </>;
   return onPress
-    ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sessions" onPress={onPress} {...shared}>{content}</Pressable>
+    ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sessions" onPress={onPress} {...shared}
+      style={({ pressed }) => [styles.row, pressed ? heatmapStyles.pressed : null]}>{content}</Pressable>
     : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 

@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import type { DayCell } from '@/components/heatmaps';
@@ -74,6 +74,12 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
   const unavailable = !subject || (catalog.status === 'ready' && name === null);
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision);
+  // [[session.history-open]]. Stable, so the charts' memoised trees survive a re-render.
+  const openDay = useCallback((day: DayCell) => {
+    const href = historyDayHref(day.dateKey, day.sessionIds);
+    if (href) router.push(href);
+  }, [router]);
+  const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
 
   if (unavailable) {
     return (
@@ -95,12 +101,8 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     lookbackWeeks: values.historyLookbackWeeks,
     onRetry: history.retry,
     onSelectView: (view: HeatmapView) => updatePreferences({ heatmapView: view }),
-    // [[session.history-open]]: a day's one session, else Sessions at the day or week.
-    onOpenDay: (day: DayCell) => {
-      const href = historyDayHref(day.dateKey, day.sessionIds);
-      if (href) router.push(href);
-    },
-    onOpenWeek: (weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)),
+    onOpenDay: openDay,
+    onOpenWeek: openWeek,
     subject: name,
     todayDateKey,
     // A view whose save failed stays the chosen one here, as a draft the

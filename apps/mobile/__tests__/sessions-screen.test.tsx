@@ -63,7 +63,7 @@ import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnaps
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
-import { planRepository } from '@/src/session-planner';
+import { planQueries, planRepository } from '@/src/session-planner';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
 
@@ -408,6 +408,42 @@ describe('Sessions opened at a week or day of a history grid', () => {
     await waitFor(() => expect(client.loadSessions).toHaveBeenCalledTimes(2));
 
     expect(scrollToLocation).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a target the first load lacks, rather than jumping to it on a later load', async () => {
+    // The target week's sessions are not there yet on the first read (deleted
+    // since, then shown by a later reload).
+    const loadSessions = jest.fn()
+      .mockResolvedValueOnce(sessions.slice(0, 1))
+      .mockResolvedValue(sessions);
+    const client = { ...clientWith(sessions), loadSessions };
+    const jumpTo = parseHistoryJump({ week: localDateKey(wednesday) });
+    const view = render(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await screen.findByTestId('completed-session-row-today');
+
+    view.rerender(<SessionsScreen dataClient={client} isFocused={false} jumpTo={jumpTo} />);
+    view.rerender(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    await screen.findByTestId('completed-session-row-friday');
+
+    expect(scrollToLocation).not.toHaveBeenCalled();
+  });
+
+  it('jumps only once the plans above the history have loaded, so they cannot push the target down', async () => {
+    let releasePlans!: () => void;
+    const plansLoaded = new Promise<void>((resolve) => { releasePlans = resolve; });
+    const upcoming = jest.spyOn(planQueries, 'listUpcomingPlans').mockImplementation(async () => {
+      await plansLoaded;
+      return [];
+    });
+    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
+    await screen.findByTestId('completed-session-row-friday');
+    expect(upcoming).toHaveBeenCalled();
+    expect(scrollToLocation).not.toHaveBeenCalled();
+
+    await act(async () => releasePlans());
+
+    await waitFor(() => expect(scrollToLocation).toHaveBeenCalledTimes(1));
+    expect(scrollToLocation).toHaveBeenCalledWith({ sectionIndex: 1, itemIndex: 0, viewPosition: 0, animated: false });
   });
 
   it('renders every row down to the target up front, so its offset is measured, not estimated', async () => {

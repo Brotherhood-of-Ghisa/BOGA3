@@ -196,11 +196,10 @@ describe('The history page over real data', () => {
     expect(single.sessionIds).toHaveLength(1);
     fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${single.dateKey}`));
     expect(mockPush).toHaveBeenLastCalledWith(`/completed-session/${single.sessionIds![0]}`);
-    const several = days.find(day => (day.sessionIds?.length ?? 0) > 1);
-    if (several) {
-      fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${several.dateKey}`));
-      expect(mockPush).toHaveBeenLastCalledWith(`/sessions?day=${several.dateKey}`);
-    }
+    const several = days.find(day => (day.sessionIds?.length ?? 0) > 1)!;
+    expect(several.sessionIds!.length).toBeGreaterThan(1);
+    fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${several.dateKey}`));
+    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?day=${several.dateKey}`);
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-weekly')); });
     const current = localDateKey(calendarWeekBounds(1).start);

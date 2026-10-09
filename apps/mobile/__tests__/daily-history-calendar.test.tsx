@@ -82,6 +82,12 @@ it('opens a day with sessions and a Week tile with training, and offers no rest 
   expect(one).toHaveProp('accessibilityLabel', '2026-10-05, Volume 2560');
   expect(one).toHaveProp('accessibilityHint', 'Opens the session');
   expect(screen.getByTestId('calendar-heatmap-cell-2026-09-30')).toHaveProp('accessibilityHint', "Opens the day's sessions");
+  // Held, it dims like a button; released, it does not.
+  // Pressable's style takes its pressed state; read it from the composite element.
+  const [pressable] = screen.UNSAFE_root.findAll(node =>
+    node.props.testID === 'calendar-heatmap-cell-2026-10-05' && typeof node.props.style === 'function');
+  expect(StyleSheet.flatten(pressable.props.style({ pressed: true })).opacity).toBe(0.7);
+  expect(StyleSheet.flatten(pressable.props.style({ pressed: false })).opacity).toBeUndefined();
   fireEvent.press(one);
   expect(onOpenDay).toHaveBeenCalledWith(expect.objectContaining({ dateKey: '2026-10-05', sessionIds: ['s-4'] }));
 

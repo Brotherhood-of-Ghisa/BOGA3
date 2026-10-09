@@ -1,7 +1,5 @@
-// Where Sessions opens when a history grid's week or day leads here (pure):
-// the whole list, positioned at that week's heading or that day's newest
-// session. Weeks and days are local, as [[session.history-weeks]] places each
-// session.
+// Where Sessions opens for a history grid's week or day (pure):
+// [[session.history-open]], over the weeks of [[session.history-weeks]].
 
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -44,11 +42,7 @@ export const parseHistoryJump = (params: { week?: RouteParam; day?: RouteParam }
   return week !== undefined ? { weekKey } : { weekKey, dayKey: localDateKey(date) };
 };
 
-/**
- * Where the jump lands in the listed weeks: a week's heading, or the day's
- * newest row (rows run newest first), else its week's heading. A week with no
- * listed session has no location.
- */
+/** Where the jump lands in the listed weeks ([[session.history-open]]); null when it has none. */
 export const historyJumpLocation = (
   sections: readonly HistoryWeekSection[],
   jump: HistoryJump,

@@ -33,10 +33,7 @@ export const sessionsWeekHref = (dateKey: string): Href =>
 export const sessionsDayHref = (dateKey: string): Href =>
   `/sessions?day=${encodeURIComponent(dateKey)}` as Href;
 
-/**
- * Where a history day leads: its one session, or Sessions at that day when it
- * holds several. A day without a session leads nowhere.
- */
+/** Where a history day leads ([[session.history-open]]); null for a day without a session. */
 export const historyDayHref = (dateKey: string, sessionIds: readonly string[]): Href | null => {
   if (sessionIds.length === 0) return null;
   return sessionIds.length === 1 ? completedSessionHref(sessionIds[0]) : sessionsDayHref(dateKey);

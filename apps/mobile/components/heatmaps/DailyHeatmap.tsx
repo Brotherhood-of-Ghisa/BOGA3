@@ -20,16 +20,16 @@ interface Props {
   formatValue: (value: number) => string;
   legendLabel?: string;
   header?: ReactNode;
-  /** Opens a day's sessions; a rest day is never offered. */
+  /** Opens a day's sessions ([[session.history-open]]). */
   onOpenDay?: (day: DayCell) => void;
-  /** Opens a Week tile's sessions; a rest week is never offered. */
+  /** Opens a Week tile's sessions ([[session.history-open]]). */
   onOpenWeek?: (weekStartDateKey: string) => void;
 }
 
 type Openers = Pick<Props, 'onOpenDay' | 'onOpenWeek'>;
 
 const dayHint = (day: DayCell) => day.sessionIds.length === 1 ? 'Opens the session' : "Opens the day's sessions";
-// Only a day with a session opens anything.
+// [[session.history-open]]: a day opens by its sessions.
 const dayOpener = (day: DayCell, onOpenDay: Props['onOpenDay']) =>
   onOpenDay && day.sessionIds.length > 0 ? () => onOpenDay(day) : undefined;
 

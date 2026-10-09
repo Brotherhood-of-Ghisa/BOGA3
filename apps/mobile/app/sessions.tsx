@@ -188,7 +188,9 @@ export function SessionsScreen({
       <HistoryList
         header={hub}
         isLoading={isLoadingSessions}
-        jumpTo={jumpTo}
+        // The plans above the history load on their own: jump once they have,
+        // so they cannot push the target down after it lands.
+        jumpTo={planSections.isLoading ? null : jumpTo}
         loadErrorMessage={loadErrorMessage}
         nowMs={loadedAtMs}
         onOpenCompletedSession={openCompletedSessionSummary}

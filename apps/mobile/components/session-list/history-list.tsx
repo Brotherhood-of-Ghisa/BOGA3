@@ -39,8 +39,9 @@ export type HistoryListProps = {
   /** The blocks above the history (active session, planning). */
   header: ReactElement;
   /**
-   * A week or day to open at, once its rows first load: a history grid's
-   * week or day leads here. The list stays whole.
+   * Where to open, applied once on the first settled load
+   * ([[session.history-open]]). The host passes it only once everything above
+   * the history has loaded, so the target is not pushed down after it lands.
    */
   jumpTo?: HistoryJump | null;
 };
@@ -78,7 +79,10 @@ export function HistoryList({
   const sections = showRows ? groupSessionsByWeek(sessions, now) : [];
   const listRef = useRef<SectionList<SessionListItem, HistoryWeekSection>>(null);
   const jumpLocation = jumpTo ? historyJumpLocation(sections, jumpTo) : null;
-  const onScrollToIndexFailed = useJumpOnce(listRef, jumpLocation);
+  // The first settled load consumes the jump, landing or not: a later reload
+  // (focus, Show deleted) never moves a list the reader has scrolled.
+  const jumpReady = jumpTo !== null && !isLoading && !loadErrorMessage;
+  const onScrollToIndexFailed = useJumpOnce(listRef, jumpLocation, jumpReady);
 
   return (
     <SectionList
@@ -121,13 +125,14 @@ const JUMP_ATTEMPTS = 40;
 type ScrollToIndexFailure = { index: number };
 
 /**
- * Scrolls once to `location` the first time it exists (the first load holding
- * the target), never again on a reload. Returns the list's
+ * Scrolls to `location` once, when the list is first `ready`; a target the
+ * first load lacks is dropped, never jumped to later. Returns the list's
  * `onScrollToIndexFailed`.
  */
 function useJumpOnce(
   listRef: RefObject<SectionList<SessionListItem, HistoryWeekSection> | null>,
   location: HistoryJumpLocation | null,
+  ready: boolean,
 ) {
   const jumpedRef = useRef(false);
   const attemptsRef = useRef(0);
@@ -141,10 +146,10 @@ function useJumpOnce(
   }, [listRef, sectionIndex, itemIndex]);
 
   useEffect(() => {
-    if (jumpedRef.current || sectionIndex === undefined) return;
+    if (jumpedRef.current || !ready) return;
     jumpedRef.current = true;
     scrollToTarget();
-  }, [scrollToTarget, sectionIndex]);
+  }, [scrollToTarget, ready]);
 
   useEffect(() => () => {
     if (retryRef.current) clearTimeout(retryRef.current);
