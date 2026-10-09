@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -18,7 +18,7 @@ import { updatePreferences, useAccountLocalPreferenceState } from '@/src/prefere
 
 // One exercise's or one muscle's history, pushed from Progress. The subject is
 // the page's native title, and the view and metric selectors sit in one row
-// above the heatmap. The params carry an id, never a name: the page resolves
+// above the chart. The params carry an id, never a name: the page resolves
 // the name from the exercise catalogue cache, which also decides the
 // unavailable state (`navigation-contract.md`: a bad id renders in route).
 
@@ -59,6 +59,10 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
   const revision = useBodyWeightContextRevision();
   const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>('totalVolume');
   const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>('totalVolume');
+  const router = useRouter();
+  // The session list cannot filter to one week yet, so View sessions opens all of it.
+  const onViewSessions = useCallback(() => router.push('/sessions'), [router]);
+  const onOpenSession = useCallback((sessionId: string) => router.push(`/completed-session/${encodeURIComponent(sessionId)}`), [router]);
 
   // The catalogue is the one name source for both kinds, and it is already
   // loaded by boot. Until it is, the page keeps its declared title; once it is
@@ -100,6 +104,11 @@ export function ProgressHistoryScreen({ subject, todayDateKey }: ProgressHistory
     // preference store will retry; the band below says it is not saved yet.
     view: pending.heatmapView ?? values.heatmapView,
     weeklyEffort: history.weekly,
+    timeline: {
+      weekSetsTarget: subject.kind === 'muscle' ? { muscleGroupIds: [subject.id] } : { exerciseDefinitionId: subject.id },
+      onViewSessions,
+      onOpenSession,
+    },
   };
 
   return (

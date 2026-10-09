@@ -25,6 +25,7 @@ jest.mock('@/src/data/bootstrap', () =>
 let mockScreenOptions: { title?: string } = {};
 let mockSearchParams: Record<string, string | string[]> = {};
 
+const mockRouter = { push: jest.fn() };
 jest.mock('expo-router', () => ({
   Stack: {
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
@@ -33,6 +34,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
+  useRouter: () => mockRouter,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -160,6 +162,35 @@ describe('The history page over real data', () => {
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
     expect(mockScreenOptions.title).toMatch(/Squat/);
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
+  });
+
+  it('opens the saved Timeline with the selected week\'s sets, whose cards and View sessions navigate', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ exerciseDefinitionId: SQUAT });
+
+    await waitFor(() => expect(screen.getByTestId('stats-exercise-history-heatmap-panel-timeline')).toHaveProp('pointerEvents', 'auto'));
+    expect(screen.getByTestId('stats-exercise-history-view-chip-timeline')).toHaveProp('accessibilityState', { selected: true });
+    // The selection starts on the current week, where the fixture's squat sessions are.
+    const cards = await screen.findAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+$/);
+    expect(cards.length).toBeGreaterThan(0);
+    fireEvent.press(cards[0]);
+    expect(mockRouter.push).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
+    fireEvent.press(screen.getByTestId('stats-exercise-history-timeline-view-sessions'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/sessions');
+
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-daily')); });
+    expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
+  });
+
+  it('lists a muscle\'s week by the exercises that worked it', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ heatmapView: 'timeline' }));
+    await openHistory({ muscleGroupId: 'quads' });
+
+    const cards = await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/);
+    expect(cards.length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Squat/).length).toBeGreaterThan(0);
   });
 
   it('opens in the saved Weekly view without a banner, and again on the next visit', async () => {

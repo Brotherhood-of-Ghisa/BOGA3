@@ -96,10 +96,11 @@ Daily tiles are read-only; Weekly bars select a row:
 `buildHeatmapData` accepts an optional `todayDateKey` (`opts.todayDateKey`) as a
 determinism seam for tests.
 
-The history page's view selector (`Grid` | `Weekly`, icons) is the sole
-Daily/Weekly choice, and it writes the saved `heatmapView` preference: Settings
-has no such row. Missing or invalid choices use Daily; valid saved Daily or
-Weekly choices survive restart and account switching. Progress history targets
+The history page's view selector (`Timeline` | `Grid` | `Weekly`, icons) is
+the sole view choice, and it writes the saved `heatmapView` preference
+(`timeline`, `daily`, `weekly`): Settings has no such row. Missing or invalid
+choices use Daily; a valid saved choice survives restart and account
+switching. The Timeline's week list is read only while that view shows. Progress history targets
 one muscle ID or one exercise definition, never a family.
 Numeric `weeks` controls the exact query/grid span;
 short windows have no implicit 52-week minimum. Weekly selection returns to

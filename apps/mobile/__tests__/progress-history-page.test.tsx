@@ -24,6 +24,7 @@ jest.mock('@/src/data/bootstrap', () =>
 let mockScreenOptions: { title?: string } = {};
 let mockSearchParams: Record<string, string | string[]> = {};
 
+const mockRouter = { push: jest.fn() };
 jest.mock('expo-router', () => ({
   Stack: {
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
@@ -32,6 +33,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
+  useRouter: () => mockRouter,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
@@ -115,6 +117,7 @@ const buildViewProps = (
   onSelectWeek: jest.fn(),
   onRetry: jest.fn(),
   todayDateKey: '2026-06-05',
+  timeline: { weekSetsTarget: { muscleGroupIds: ['side_delts'] }, onViewSessions: jest.fn(), onOpenSession: jest.fn() },
   ...overrides,
 });
 
@@ -215,6 +218,7 @@ describe('HistoryView', () => {
 
   it('labels each view option by name, drawing it as an icon', () => {
     expect(HISTORY_VIEW_OPTIONS.map(option => [option.value, option.label, option.icon])).toEqual([
+      ['timeline', 'Timeline', 'timeline-columns'],
       ['daily', 'Grid', 'calendar-grid'],
       ['weekly', 'Weekly', 'weekly-bars'],
     ]);

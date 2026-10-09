@@ -4,7 +4,9 @@ import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calc
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import { DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import { WeekSetList } from '@/components/stats/week-set-list';
+import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
 import {
   SegmentedControl,
   StatePanel,
@@ -17,7 +19,7 @@ import type {
 } from '@/src/data';
 
 // The body of the history page (`app/progress-history.tsx`): the view and
-// metric selectors in one row, then the chosen Grid or Weekly heatmap. The
+// metric selectors in one row, then the chosen Timeline, Grid or Weekly view. The
 // subject's name is the page's native title, so nothing here repeats it.
 // Pending/error bodies mount only their StatePanel; chart work starts after
 // data. One component for the muscle and the exercise page; `kind` names its
@@ -62,6 +64,24 @@ const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string =>
   }
 };
 
+// The readout's unit word under the Timeline chart.
+const UNIT_LABELS: Record<CalendarHeatmapMetric, string> = {
+  totalVolume: 'volume',
+  workingSetCount: 'sets',
+  estimatedRM1: 'kg',
+  highestWeight: 'kg',
+};
+
+// What the Timeline needs beyond the heatmaps: the subject whose week it
+// lists, and where its buttons and cards go.
+export type TimelineLinks = {
+  weekSetsTarget: WeekSetsTarget;
+  onViewSessions: (weekStartDateKey: string) => void;
+  onOpenSession: (sessionId: string) => void;
+};
+
+const VIEWS: readonly HeatmapView[] = ['timeline', 'daily', 'weekly'];
+
 function HistoryHeatmap({
   dailyMetrics,
   metric,
@@ -74,6 +94,7 @@ function HistoryHeatmap({
   lookbackWeeks,
   muscleTargets,
   status,
+  timeline,
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
@@ -86,13 +107,35 @@ function HistoryHeatmap({
   lookbackWeeks: number;
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
   status: ReactNode;
+  timeline: TimelineLinks;
 }) {
-  // Both views span the saved window and scroll vertically.
+  // Every view spans the saved window and scrolls vertically.
   const data = useMemo(
     () => buildHeatmapData(dailyMetrics, metric, { todayDateKey, weeks: lookbackWeeks, muscleTargets }),
     [dailyMetrics, metric, todayDateKey, lookbackWeeks, muscleTargets]
   );
   const formatDailyValue = useCallback((value: number) => formatDayValue(value, metric), [metric]);
+  // The week's sets are read only while the Timeline shows them.
+  const weekSets = useWeekSets(view === 'timeline' ? timeline.weekSetsTarget : null, selectedWeekKey);
+  const { onViewSessions, onOpenSession } = timeline;
+  const timelineChart = useMemo(
+    () => (
+      <TimelineHeatmap
+        data={data}
+        metric={metric}
+        selectedWeekKey={selectedWeekKey}
+        onSelectWeek={onSelectWeek}
+        onViewSessions={onViewSessions}
+        testIDPrefix={testIDPrefix}
+        formatValue={formatDailyValue}
+        metricLabel={metricLabel}
+        unitLabel={UNIT_LABELS[metric]}
+        header={status}>
+        <WeekSetList {...weekSets} onOpenSession={onOpenSession} testID={`${testIDPrefix}-week-sets`} />
+      </TimelineHeatmap>
+    ),
+    [data, metric, selectedWeekKey, onSelectWeek, onViewSessions, testIDPrefix, formatDailyValue, metricLabel, status, weekSets, onOpenSession]
+  );
   const dailyHeatmap = useMemo(
     () => (
       <DailyHeatmap
@@ -121,39 +164,38 @@ function HistoryHeatmap({
     ),
     [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix, metric, metricLabel, status]
   );
-  const [visited, setVisited] = useState({ daily: view === 'daily', weekly: view === 'weekly' });
+  const charts: Record<HeatmapView, ReactNode> = { timeline: timelineChart, daily: dailyHeatmap, weekly: weeklyHeatmap };
+  const [visited, setVisited] = useState<Partial<Record<HeatmapView, true>>>({ [view]: true });
   if (!visited[view]) setVisited(previous => ({ ...previous, [view]: true }));
-  const dailyVisible = view === 'daily';
 
   // Visited trees stay mounted so a switch reuses the laid-out chart and keeps its
-  // selection and scroll; the inactive one is transparent, inert and hidden
+  // selection and scroll; the inactive ones are transparent, inert and hidden
   // from assistive tech.
   return (
     <View style={styles.heatmapLayers}>
-      <View
-        accessibilityElementsHidden={!dailyVisible}
-        importantForAccessibility={dailyVisible ? 'auto' : 'no-hide-descendants'}
-        pointerEvents={dailyVisible ? 'auto' : 'none'}
-        style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerActive : styles.heatmapLayerInactive]}
-        testID={`${testIDPrefix}-heatmap-panel-daily`}>
-        {visited.daily ? dailyHeatmap : null}
-      </View>
-      <View
-        accessibilityElementsHidden={dailyVisible}
-        importantForAccessibility={dailyVisible ? 'no-hide-descendants' : 'auto'}
-        pointerEvents={dailyVisible ? 'none' : 'auto'}
-        style={[styles.heatmapLayer, dailyVisible ? styles.heatmapLayerInactive : styles.heatmapLayerActive]}
-        testID={`${testIDPrefix}-heatmap-panel-weekly`}>
-        {visited.weekly ? weeklyHeatmap : null}
-      </View>
+      {VIEWS.map(layer => {
+        const active = layer === view;
+        return (
+          <View
+            key={layer}
+            accessibilityElementsHidden={!active}
+            importantForAccessibility={active ? 'auto' : 'no-hide-descendants'}
+            pointerEvents={active ? 'auto' : 'none'}
+            style={[styles.heatmapLayer, active ? styles.heatmapLayerActive : styles.heatmapLayerInactive]}
+            testID={`${testIDPrefix}-heatmap-panel-${layer}`}>
+            {visited[layer] ? charts[layer] : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
 
-// The two history views, labelled by their icons: the month calendars (Grid)
-// and the weekly bars. Switching writes the saved `heatmapView` preference, so
-// the choice survives leaving the page. A third, Timeline view is planned.
+// The three history views, labelled by their icons: the weekly columns
+// (Timeline), the month calendars (Grid) and the weekly bars. Switching writes
+// the saved `heatmapView` preference, so the choice survives leaving the page.
 export const HISTORY_VIEW_OPTIONS = [
+  { value: 'timeline' as HeatmapView, label: 'Timeline', icon: 'timeline-columns' as const },
   { value: 'daily' as HeatmapView, label: 'Grid', icon: 'calendar-grid' as const },
   { value: 'weekly' as HeatmapView, label: 'Weekly', icon: 'weekly-bars' as const },
 ];
@@ -180,6 +222,7 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   onSelectWeek: (weekKey: string | null) => void;
   onRetry?: () => void;
   todayDateKey?: string;
+  timeline: TimelineLinks;
 };
 
 export function HistoryView<TMetric extends CalendarHeatmapMetric>({
@@ -200,6 +243,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   onSelectWeek,
   onRetry,
   todayDateKey,
+  timeline,
 }: HistoryViewProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
@@ -279,6 +323,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
         todayDateKey={todayDateKey}
         view={view}
         status={status}
+        timeline={timeline}
       />}
     </View>
   );
