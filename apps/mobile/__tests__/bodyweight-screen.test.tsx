@@ -35,6 +35,7 @@ import { bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import * as userSettingsRepository from '@/src/data/user-settings';
 import { formatCurrentDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 // A reading or preference write invalidates the exercise catalog, whose reload
 // runs on Jest's synchronous SQLite driver: it can hold the event loop past
@@ -96,7 +97,7 @@ describe('body weight log', () => {
     expect(screen.queryByTestId('weight-entry-unit-lb')).toBeNull();
     fireEvent.press(screen.getByTestId('weight-entry-save'));
 
-    await waitFor(() => expect(screen.queryByTestId('weight-entry-sheet')).toBeNull(), AFTER_WRITE);
+    await waitForGone(() => screen.queryByTestId('weight-entry-sheet'), AFTER_WRITE);
     expect(screen.getByText('Reading saved.')).toBeTruthy();
     const [saved] = readings();
     expect(saved).toMatchObject({ weightKg: 82, deletedAt: null, localDirty: true });
@@ -127,7 +128,7 @@ describe('body weight log', () => {
     expect(readings()).toEqual([]);
 
     fireEvent.press(screen.getByTestId('weight-entry-save'));
-    await waitFor(() => expect(screen.queryByTestId('weight-entry-sheet')).toBeNull(), AFTER_WRITE);
+    await waitForGone(() => screen.queryByTestId('weight-entry-sheet'), AFTER_WRITE);
     expect(readings()).toEqual([expect.objectContaining({ weightKg: 80.25 })]);
     expect(formatCurrentDateTime(readings()[0].measuredAt)).toBe(measuredAt);
   });
@@ -164,7 +165,7 @@ describe('body weight log', () => {
 
     fireEvent.press(screen.getByTestId('weight-entry-delete'));
     pressAlertButton('destructive');
-    await waitFor(() => expect(screen.queryByTestId(`body-weight-reading-${id}`)).toBeNull(), AFTER_WRITE);
+    await waitForGone(() => screen.queryByTestId(`body-weight-reading-${id}`), AFTER_WRITE);
     expect(screen.getByTestId('body-weight-empty')).toBeTruthy();
     expect(readings()[0].deletedAt).toBeInstanceOf(Date);
   });

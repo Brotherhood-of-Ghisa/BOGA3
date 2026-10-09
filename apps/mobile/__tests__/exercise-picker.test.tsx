@@ -86,6 +86,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -507,7 +508,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
     expect(screen.getByText('Add empty set')).toBeTruthy();
     const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
-    await waitFor(() => expect(screen.queryByTestId('exercise-picker-plan-source')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-picker-plan-source'));
     expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
     expect(screen.queryByText(/Unable/i)).toBeNull();
     // Choosing a row only preselects; nothing reaches the host yet.
@@ -517,10 +518,8 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(onAppendPlan).not.toHaveBeenCalled();
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'bench');
-    await waitFor(() => {
-      expect(screen.queryByTestId('exercise-picker-preselection-panel')).toBeNull();
-      expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
-    });
+    await waitForGone(() => screen.queryByTestId('exercise-picker-preselection-panel'));
+    expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
     expect(onSelectExercise).not.toHaveBeenCalled();
   });
 
@@ -626,45 +625,23 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(screen.getByLabelText('Select exercise Overhead Press')).toBeTruthy();
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '   squAT   press  ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-    });
+    const rows = (...names: string[]) => () => names.map((name) => screen.queryByLabelText(`Select exercise ${name}`));
+    await waitForGone(rows('Barbell Squat', 'Bench Press', 'Deadlift', 'Overhead Press'));
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  CHEST bench ');
-    await waitFor(() => {
-      expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-    });
+    expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
+    await waitForGone(rows('Barbell Squat', 'Deadlift', 'Overhead Press'));
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  front press ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.getByLabelText('Select exercise Overhead Press')).toBeTruthy();
-    });
+    expect(await screen.findByLabelText('Select exercise Overhead Press')).toBeTruthy();
+    await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift'));
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  triceps ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-      expect(screen.getByText('No exercises match that filter.')).toBeTruthy();
-    });
+    expect(await screen.findByText('No exercises match that filter.')).toBeTruthy();
+    await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift', 'Overhead Press'));
 
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  delts_front ');
-    await waitFor(() => {
-      expect(screen.queryByLabelText('Select exercise Bench Press')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Deadlift')).toBeNull();
-      expect(screen.queryByLabelText('Select exercise Overhead Press')).toBeNull();
-    });
+    await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift', 'Overhead Press'));
   }, 30000);
 
   it('starts with family rows collapsed and shared history', async () => {

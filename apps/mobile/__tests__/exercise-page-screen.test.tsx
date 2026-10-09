@@ -79,6 +79,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const SESSION = EXERCISE_PAGE_FIXTURE.activeSessionId;
 const BENCH = EXERCISE_PAGE_FIXTURE.benchSessionExerciseId;
@@ -271,7 +272,7 @@ describe('ExercisePageScreen', () => {
       expect((await benchSets())[2]).toMatchObject({ weightValue: '82.5', repsValue: '6', performanceStatus: null })
     );
     // The cursor moved on: the swipe shell now sits on set 4, not 3.
-    await waitFor(() => expect(screen.queryByTestId('exercise-set-swipe-3')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-set-swipe-3'));
     expect(screen.getByTestId('exercise-set-swipe-4')).toBeTruthy();
   });
 
@@ -780,7 +781,7 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-swap-sheet-modal')).toHaveProp('presentationStyle', 'pageSheet');
     fireEvent.press(screen.getByLabelText('Close swap exercise'));
 
-    await waitFor(() => expect(screen.queryByTestId('exercise-swap-sheet')).toBeNull());
+    await waitForGone(() => screen.queryByTestId('exercise-swap-sheet'));
     expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press');
     expect((await readSession())?.exercises[0]).toMatchObject({ exerciseDefinitionId: BENCH_DEF });
   });

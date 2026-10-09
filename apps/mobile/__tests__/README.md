@@ -14,6 +14,9 @@
   with `jest.mock('@/src/data')`. Fake the data layer only for states real data
   cannot produce (loading, a failed read, a race), and name that state.
 - Rule and rationale: `docs/specs/06-testing-strategy.md`, "Jest test shapes".
+- If your test awaits a render (`waitFor`, `findBy*`, an element leaving),
+  load `docs/specs/writing-tests.md`, "Async waits": wait on the rendered
+  outcome, and use `helpers/wait-for-gone.ts` for absence.
 
 ## GPS gym-location coverage policy
 

@@ -56,6 +56,7 @@ import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-his
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { planRepository } from '@/src/session-planner';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
+import { waitForGone } from './helpers/wait-for-gone';
 
 const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
 const NEWEST_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedCompletionSessionId;
@@ -227,7 +228,7 @@ describe('Sessions over real data', () => {
     });
 
     expect((await loadSessionSnapshotById(ACTIVE))?.deletedAt).toBeInstanceOf(Date);
-    await waitFor(() => expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull());
+    await waitForGone(() => screen.queryByTestId(`active-session-row-${ACTIVE}`));
     expect(load).toHaveBeenCalledTimes(2);
   });
 
