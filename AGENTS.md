@@ -150,6 +150,7 @@ never a spec of the result: what must outlive the build moves to its owner.
 | Deep testing strategy / adding or changing a test lane | `docs/specs/06-testing-strategy.md` |
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
+| iOS release (build, database migration, submission, optional tag) | `docs/procedures/ios-release.md` (agree profile, name/version and tagging upfront) |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
