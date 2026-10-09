@@ -86,20 +86,20 @@ access level, and `useRootRouteAccess`
 
 ## Param rules
 
-- **A param is an opening selection, not state.** A screen reads its params on
-  mount and does not rewrite the query as the user changes things; period, tag,
-  section, grouping, search and sort changes are in-route state. The one
-  exception is a leaderboard board, which writes its metric/scope selection back
-  to the query because Expo may reuse the screen.
+- **A param is an opening selection, not state.** A screen applies it on entry
+  and never rewrites the query (except a leaderboard board, which writes its
+  metric/scope back because Expo may reuse the screen); period, tag, section,
+  grouping, search and sort changes are in-route state. A link changing a
+  mounted tab's param re-enters it; one repeating its value does not.
 - **A missing, unknown, deleted or unauthorised target renders an in-route
   unavailable state.** No route crashes on a bad param and none redirects away:
   an out-of-reach `groupId` shows the lost-access state, a dead session or group
   exercise "no longer available", a bad `exerciseDefinitionId` an error state.
 - **Params carry ids and small enum values, nothing else.** Never a token,
-  session, credential, serialized object, or private reading context: the one
-  external transition (the first-party `/connect` page) carries no OAuth state,
-  session, callback, user identifier or token, and a record sheet never routes
-  private context out. Pass an id and let the destination read it.
+  session, credential, serialized object, or private reading context, nor OAuth
+  state, a callback or a user identifier on the one external transition (the
+  first-party `/connect` page); a record sheet never routes private context
+  out. Pass an id and let the destination read it.
 - Dev/test-only params exist (`completed-session`'s `maestroShare`,
   `maestroCatalog`, `maestroInsights`) and are each gated by `isDevMode()`.
 
