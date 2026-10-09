@@ -136,8 +136,9 @@ describe('domain schema and runtime migrations', () => {
     // derived exercise session facts are m0011 (tables) and m0012 (triggers),
     // the local store's owning account (`account_user_id`) is m0015, and the
     // session planning schema (0016) plus pull-cursor reset (0017) append after it,
-    // and m0018 drops the facts' volume completeness flag.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(19);
+    // m0018 drops the facts' volume completeness flag, and m0019 drops the plan
+    // block's machine snapshot.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(20);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -186,12 +187,19 @@ describe('domain schema and runtime migrations', () => {
       'm0016',
       'm0017',
       'm0018',
+      'm0019',
     ]);
   });
 
   it('drops the facts volume completeness flag in m0018', () => {
     expect(localRuntimeMigrations.migrations.m0018).toContain(
       'ALTER TABLE `exercise_session_facts` DROP COLUMN `volume_complete`;',
+    );
+  });
+
+  it('drops the plan block machine snapshot in m0019', () => {
+    expect(localRuntimeMigrations.migrations.m0019).toContain(
+      'ALTER TABLE `session_plan_exercises` DROP COLUMN `machine_name`;',
     );
   });
 

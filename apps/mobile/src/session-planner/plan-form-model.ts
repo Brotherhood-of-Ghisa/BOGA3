@@ -25,7 +25,6 @@ export type PlanFormBlock = {
   sourceBlockId: string | null;
   exerciseDefinitionId: string | null;
   name: string;
-  machineName: string;
   /** The picked exercise's load input mode; null until one is picked. */
   loadInputMode: 'total_load' | 'per_side_load' | null;
   sets: PlanFormSet[];
@@ -54,7 +53,6 @@ export const emptyPlanFormBlock = (): PlanFormBlock => ({
   sourceBlockId: null,
   exerciseDefinitionId: null,
   name: '',
-  machineName: '',
   loadInputMode: null,
   sets: [emptyPlanFormSet()],
 });
@@ -100,7 +98,6 @@ export const planFormFromDetail = (
     sourceBlockId: block.id,
     exerciseDefinitionId: block.exerciseDefinitionId,
     name: block.name,
-    machineName: block.machineName ?? '',
     loadInputMode: resolveBlockLoadInputMode(block.exerciseDefinitionId, catalogExercises),
     sets: block.targets.map((target) => ({
       id: nextKey('set'),
@@ -145,7 +142,6 @@ export const planFormToDraft = (
       exercises: state.blocks.map((block) => ({
         exerciseDefinitionId: block.exerciseDefinitionId,
         name: block.name,
-        machineName: block.machineName,
         sets: block.sets.map((set) => ({
           targetWeightText: set.targetWeightText,
           targetRepsText: set.targetRepsText,

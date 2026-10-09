@@ -83,7 +83,6 @@ const planStore: SessionPlanStore = createDrizzleSessionPlanStore();
 const toStoreExercise = (exercise: NormalizedPlan['exercises'][number]): SavePlanExerciseGraphInput => ({
   exerciseDefinitionId: exercise.exerciseDefinitionId,
   name: exercise.name,
-  machineName: exercise.machineName,
   sets: exercise.sets.map((set) => ({
     targetWeightValue: set.targetWeightValue,
     targetReps: set.targetReps,
@@ -159,7 +158,6 @@ const toDuplicatePlanInput = (
     exercises: graph.exercises.map((exercise) => ({
       exerciseDefinitionId: exercise.exerciseDefinitionId,
       name: exercise.name,
-      machineName: exercise.machineName,
       sets: exercise.sets.map((set) => ({
         targetWeightValue: set.targetWeightValue,
         targetReps: set.targetReps,
@@ -235,7 +233,6 @@ export const createPlanRepository = (): PlanRepository => ({
       planExerciseId,
       exerciseDefinitionId: validation.value.exercise.exerciseDefinitionId,
       name: validation.value.exercise.name,
-      machineName: validation.value.exercise.machineName,
       sets: validation.value.exercise.sets,
       now,
     });

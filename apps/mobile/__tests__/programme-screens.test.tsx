@@ -216,7 +216,6 @@ describe('programme screens', () => {
               {
                 exerciseDefinitionId: 'ex-squat',
                 name: 'Barbell Squat',
-                machineName: '',
                 sets: [
                   { targetWeightText: '140', targetRepsText: '5', targetSetType: null },
                 ],
@@ -231,7 +230,6 @@ describe('programme screens', () => {
               {
                 exerciseDefinitionId: 'ex-bench',
                 name: 'Bench Press',
-                machineName: '',
                 sets: [
                   { targetWeightText: '100', targetRepsText: '5', targetSetType: null },
                 ],

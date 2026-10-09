@@ -104,7 +104,6 @@ describe('programme-form-model', () => {
               planId: 'plan-1',
               exerciseDefinitionId: 'ex-1',
               name: 'Barbell Squat',
-              machineName: null,
               orderIndex: 0,
               progressStatus: 'pending',
               status: 'pending',

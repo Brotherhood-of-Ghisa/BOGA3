@@ -366,7 +366,6 @@ describe('Sessions planning sections', () => {
       {
         exerciseDefinitionId: null,
         name: 'Back Squat',
-        machineName: '',
         sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
       },
     ],

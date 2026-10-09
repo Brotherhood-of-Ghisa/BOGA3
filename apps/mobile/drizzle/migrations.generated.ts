@@ -121,6 +121,12 @@ export const generatedMigrationBundle = {
     tag: "0018_facts_drop_volume_complete",
     breakpoints: true,
   },
+  {
+    idx: 19,
+    when: 1791576308080,
+    tag: "0019_ambitious_slyde",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -784,6 +790,7 @@ UPDATE \`sync_runtime_state\` SET \`pull_cursor\` = '{}';
 -- version bump in exercise-session-facts-derive.ts rebuilds the rows.
 ALTER TABLE \`exercise_session_facts\` DROP COLUMN \`volume_complete\`;
 `,
+  m0019: `ALTER TABLE \`session_plan_exercises\` DROP COLUMN \`machine_name\`;`,
   },
 } as const;
 

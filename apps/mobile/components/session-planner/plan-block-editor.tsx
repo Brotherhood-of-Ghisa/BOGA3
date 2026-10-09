@@ -58,9 +58,9 @@ function TypeField({
 
 /**
  * One block's editor in the plan form: the picked exercise (its name row
- * opens the pick sheet), an optional machine note, and the ordered target
- * sets — type, weight, reps per set. The weight field's label follows the
- * exercise's load input mode (`per side · kg` when loaded per side).
+ * opens the pick sheet) and the ordered target sets — type, weight, reps per
+ * set. The weight field's label follows the exercise's load input mode
+ * (`per side · kg` when loaded per side).
  */
 export function PlanBlockEditor({
   block,
@@ -122,16 +122,6 @@ export function PlanBlockEditor({
           {errors.get(`${blockPath}.name`)}
         </Text>
       ) : null}
-      <FormField
-        accessibilityLabel={`Machine note for ${block.name || 'exercise'}`}
-        autoCapitalize="none"
-        error={errors.get(`${blockPath}.machineName`)}
-        face="text"
-        label="Machine (optional)"
-        onChangeText={(machineName) => onChangeBlock(block.id, { machineName })}
-        testID={`plan-form-block-${index + 1}-machine`}
-        value={block.machineName}
-      />
       {block.sets.map((set, setIndex) => {
         const weightError = errors.get(`${blockPath}.sets.${setIndex}.targetWeight`);
         const repsError = errors.get(`${blockPath}.sets.${setIndex}.targetReps`);

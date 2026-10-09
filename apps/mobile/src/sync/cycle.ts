@@ -593,7 +593,6 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('exercise_definition_id', 'exerciseDefinitionId'),
     SC('order_index', 'orderIndex'),
     SC('name', 'name'),
-    SC('machine_name', 'machineName'),
     SC('progress_status', 'progressStatus'),
     TS('resolved_at', 'resolvedAt'),
     TS('created_at', 'createdAt'),

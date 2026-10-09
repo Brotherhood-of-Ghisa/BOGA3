@@ -48,11 +48,6 @@ export function NextProgrammeBlockCard({
         <Text allowFontScaling={false} numberOfLines={1} style={styles.exerciseName} testID="programme-next-block-name">
           {nextBlock.name}
         </Text>
-        {nextBlock.machineName ? (
-          <Text allowFontScaling={false} numberOfLines={1} style={styles.machineName}>
-            {nextBlock.machineName}
-          </Text>
-        ) : null}
         <Text allowFontScaling={false} numberOfLines={1} style={styles.targetLine} testID="programme-next-block-targets">
           {formatTargetLine(nextBlock.targets)}
         </Text>
@@ -110,11 +105,6 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md,
     color: uiRoles.ink,
-  },
-  machineName: {
-    fontFamily: uiFonts.display.family,
-    fontSize: uiTypography.size.xs,
-    color: uiRoles.inkMuted,
   },
   targetLine: {
     fontFamily: uiFonts.display.family,

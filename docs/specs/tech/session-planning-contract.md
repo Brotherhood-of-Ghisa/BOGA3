@@ -65,8 +65,7 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500.
 - `exercise_definition_id` — nullable FK → `exercise_definitions`,
   `ON DELETE SET NULL`
 - `order_index` — 0-based dense sequence within the plan
-- `name` / `machine_name` — exercise and equipment name snapshots; `name`
-  required 1..100 chars
+- `name` — exercise name snapshot; required 1..100 chars
 - `progress_status` — `'pending' | 'completed' | 'skipped'`, default
   `'pending'`, `CHECK`-constrained
 - `resolved_at` — nullable;
