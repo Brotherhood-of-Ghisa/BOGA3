@@ -37,6 +37,29 @@ Code: `groupSessionsByWeek`, `historyWeekHeading` and `formatEmptyWeeks` in
 `apps/mobile/components/session-list/history-list.tsx`.
 Signature: `No sessions · `
 
+### session.history-open · presentation · accepted
+
+A tap on an exercise or muscle history grid opens the sessions behind it.
+
+| Tapped | Opens |
+| --- | --- |
+| A day with one session | that completed session |
+| A day with several sessions | Sessions, at that day's newest session |
+| A Daily Week tile or a Weekly row with training | Sessions, at that week's heading |
+| A rest day or a rest week | nothing: it is not a button |
+
+Sessions opens whole, as [[session.history-weeks]] lists it, only scrolled:
+nothing is filtered or hidden. A day without a listed session opens at its
+week's heading; a week without one opens at the top.
+
+Why: the grid shows where training happened; a tap should reach those
+sessions in the one history the user already knows.
+Code: `DailyHeatmap` in `apps/mobile/components/heatmaps/DailyHeatmap.tsx`;
+`historyDayHref` in `apps/mobile/src/navigation/routes.ts`;
+`historyJumpLocation` in `apps/mobile/components/session-list/history-jump.ts`.
+Pending: the history page does not open them yet, and a Weekly row still
+selects its week instead of opening it.
+
 ### session.volume-comparison · presentation · accepted
 
 Session Summary, live comparison and the share image use the same volume
