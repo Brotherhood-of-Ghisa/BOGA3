@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  computeSelectedExerciseDailyEffort, computeSelectedExerciseWeeklyEffort,
-  computeSelectedMuscleDailyEffortMetrics, computeSelectedMuscleWeeklyEffort,
+  computeSelectedExerciseHistoryEffort, computeSelectedMuscleHistoryEffort,
   type DailyEffortMetrics, type SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 import { calendarWeekBounds, keepHistorySelection } from '@/src/utils/calendar-weeks';
@@ -14,14 +13,9 @@ export const isIndividualMuscleHistoryTarget = (target: MuscleTarget): boolean =
 
 const loadHistory = async (target: MuscleTarget | ExerciseTarget, weeks: number) => {
   const bounds = calendarWeekBounds(weeks);
-  const [weekly, daily] = 'muscleGroupIds' in target ? await Promise.all([
-    computeSelectedMuscleWeeklyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds }),
-    computeSelectedMuscleDailyEffortMetrics({ ...bounds, muscleGroupIds: target.muscleGroupIds }),
-  ]) : await Promise.all([
-    computeSelectedExerciseWeeklyEffort({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId }),
-    computeSelectedExerciseDailyEffort({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId }),
-  ]);
-  return { weekly, daily };
+  return 'muscleGroupIds' in target
+    ? computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds })
+    : computeSelectedExerciseHistoryEffort({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId });
 };
 
 /** A superseded window, dismissed sheet or account unmount cannot publish its read. */
@@ -55,8 +49,15 @@ export function useHistory<T extends MuscleTarget | ExerciseTarget>(weeks: numbe
         if (active) setLoading(false);
       }
     };
-    void read();
-    return () => { active = false; };
+    // Commit the sheet and its spinner to native before any synchronous SQLite
+    // or aggregation work. The timer yields after the first animation frame.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const frame = requestAnimationFrame(() => { timer = setTimeout(() => { void read(); }, 0); });
+    return () => {
+      active = false;
+      cancelAnimationFrame(frame);
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, [selected, weeks, revision, retryRevision]);
   const select = (target: T) => {
     const valid = !('muscleGroupIds' in target) || isIndividualMuscleHistoryTarget(target);

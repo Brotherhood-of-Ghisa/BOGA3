@@ -303,3 +303,28 @@ describe('createStatsRepository.computeSummary', () => {
     });
   });
 });
+
+
+describe('selected-muscle history snapshot', () => {
+  it('derives both chart views from one read, preserving the standalone projections', async () => {
+    const store: jest.Mocked<StatsStore> = {
+      loadAggregationInput: jest.fn().mockResolvedValue(buildAggregationInput()),
+      loadMuscleGroupTaxonomy: jest.fn(),
+    };
+    const repository = createStatsRepository(store);
+    const options = { start: new Date('2026-05-01'), end: new Date('2026-06-01'), muscleGroupIds: ['chest_sternal'], timeZone: 'UTC' };
+    const history = await repository.computeSelectedMuscleHistoryEffort(options);
+    expect(store.loadAggregationInput).toHaveBeenCalledTimes(1);
+    expect(store.loadAggregationInput).toHaveBeenCalledWith({ start: options.start, end: options.end });
+    expect(history.daily).toEqual(await repository.computeSelectedMuscleDailyEffortMetrics(options));
+    expect(history.weekly).toEqual(await repository.computeSelectedMuscleWeeklyEffort(options));
+    expect(history.daily).toHaveLength(2);
+  });
+
+  it.each(['start', 'end'] as const)('rejects an invalid %s before reading', async field => {
+    const store: jest.Mocked<StatsStore> = { loadAggregationInput: jest.fn(), loadMuscleGroupTaxonomy: jest.fn() };
+    const options = { start: new Date('2026-05-01'), end: new Date('2026-06-01'), muscleGroupIds: ['chest_sternal'], [field]: new Date(NaN) };
+    await expect(createStatsRepository(store).computeSelectedMuscleHistoryEffort(options)).rejects.toThrow();
+    expect(store.loadAggregationInput).not.toHaveBeenCalled();
+  });
+});
