@@ -18,6 +18,7 @@ import {
   StatsScreenShell,
   type StatsScreenShellProps,
   type ExerciseListItem,
+  type ExerciseSortHeader,
   type MuscleHistoryTarget,
   describeExerciseSortMode,
   formatCountDelta,
@@ -229,7 +230,7 @@ const buildShellProps = (
 });
 
 /** Which arrow a sort header's indicator shows; the icon is decorative, so hidden. */
-const sortArrow = (header: 'exercise' | 'sets' | 'volume'): 'up' | 'down' | null => {
+const sortArrow = (header: ExerciseSortHeader): 'up' | 'down' | null => {
   const find = (direction: 'up' | 'down') =>
     screen.queryByTestId(`stats-exercise-sort-${header}-indicator-${direction}`, {
       includeHiddenElements: true,
@@ -328,6 +329,10 @@ describe('sortExerciseListItems', () => {
     expect(nextExerciseSortMode('sets-asc', 'volume')).toBe('volume-desc');
     expect(nextExerciseSortMode('volume-desc', 'volume')).toBe('volume-asc');
     expect(nextExerciseSortMode('volume-asc', 'volume')).toBe('volume-desc');
+    expect(nextExerciseSortMode('volume-asc', 'oneRepMax')).toBe('oneRepMax-desc');
+    expect(nextExerciseSortMode('oneRepMax-desc', 'oneRepMax')).toBe('oneRepMax-asc');
+    expect(nextExerciseSortMode('oneRepMax-asc', 'oneRepMax')).toBe('oneRepMax-desc');
+    expect(nextExerciseSortMode('oneRepMax-desc', 'sets')).toBe('sets-desc');
   });
 
   it('formats unambiguous accessibility descriptions for every sort state', () => {
@@ -338,6 +343,8 @@ describe('sortExerciseListItems', () => {
       'sets-asc',
       'volume-desc',
       'volume-asc',
+      'oneRepMax-desc',
+      'oneRepMax-asc',
     ].map((mode) => describeExerciseSortMode(mode as Parameters<typeof describeExerciseSortMode>[0])))
       .toEqual([
         'Most recent exercise',
@@ -346,6 +353,8 @@ describe('sortExerciseListItems', () => {
         'Sets — low to high',
         'Volume — high to low',
         'Volume — low to high',
+        '1RM — high to low',
+        '1RM — low to high',
       ]);
   });
 
@@ -376,6 +385,25 @@ describe('sortExerciseListItems', () => {
     expect(sortExerciseListItems(items, 'sets-asc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
     expect(sortExerciseListItems(items, 'volume-desc').map(({ id }) => id)).toEqual(['alpha', 'gamma', 'beta']);
     expect(sortExerciseListItems(items, 'volume-asc').map(({ id }) => id)).toEqual(['beta', 'gamma', 'alpha']);
+  });
+
+  it('sorts estimated 1RM in both directions, keeping rows without one last', () => {
+    const items = [
+      item('none-b', { name: 'Same', estimatedOneRepMax: null }),
+      item('heavy', { name: 'Heavy', estimatedOneRepMax: 140 }),
+      item('none-a', { name: 'Same', estimatedOneRepMax: null }),
+      item('light', { name: 'Light', estimatedOneRepMax: 60 }),
+      item('mid', { name: 'Mid', estimatedOneRepMax: 100 }),
+    ];
+
+    expect(sortExerciseListItems(items, 'oneRepMax-desc').map(({ id }) => id)).toEqual([
+      'heavy', 'mid', 'light', 'none-a', 'none-b',
+    ]);
+    // Ascending flips the estimates but still parks the missing rows at the
+    // bottom, so the arrow never reveals a run of em dashes.
+    expect(sortExerciseListItems(items, 'oneRepMax-asc').map(({ id }) => id)).toEqual([
+      'light', 'mid', 'heavy', 'none-a', 'none-b',
+    ]);
   });
 
   it('uses name then ID tie-breakers and never mutates the input array', () => {
@@ -751,10 +779,13 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(header.getByText('Sets')).toBeTruthy();
     expect(screen.getByText('Vol')).toBeTruthy();
     expect(screen.getByText('1RM')).toBeTruthy();
-    expect(screen.getByTestId('stats-exercise-header-oneRepMax').props.accessibilityRole).toBe(
-      'header'
+    expect(screen.queryByTestId('stats-exercise-header-oneRepMax')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-sort-oneRepMax').props.accessibilityRole).toBe(
+      'button'
     );
-    expect(screen.queryByTestId('stats-exercise-sort-oneRepMax')).toBeNull();
+    expect(screen.getByTestId('stats-exercise-sort-oneRepMax').props.accessibilityLabel).toContain(
+      '1RM. Activate to sort 1RM — high to low.'
+    );
     expect(screen.queryByTestId('stats-exercise-sort-status')).toBeNull();
     expect(screen.queryByText(/^Sorted by:/)).toBeNull();
     expect(screen.getByTestId('stats-exercise-sort-sets').props.accessibilityState).toEqual({
@@ -771,6 +802,12 @@ describe('StatsScreenShell — view mode toggle', () => {
       minHeight: uiGeometry.tapTarget,
     });
     expect(header.getByText('Sets').props.numberOfLines).toBe(1);
+    // A numeric header that outgrows its column clips on one line rather than
+    // wrapping; only Exercise is allowed to wrap `Recent` under its label.
+    expect(header.getByText('1RM').props.numberOfLines).toBe(1);
+    expect(screen.getByTestId('stats-exercise-sort-oneRepMax')).not.toHaveStyle({
+      flexWrap: 'wrap',
+    });
     expect(screen.getByTestId('stats-exercise-1rm-missing')).toHaveTextContent('—');
     expect(screen.getByTestId('stats-exercise-row-missing').props.accessibilityLabel).toContain(
       'Estimated one rep max unavailable'
@@ -786,6 +823,8 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).not.toHaveStyle({ opacity: 0 });
     expect(screen.getByTestId('stats-exercise-sort-volume-indicator')).toHaveStyle({ opacity: 0 });
     expect(sortArrow('volume')).toBe('down');
+    expect(screen.getByTestId('stats-exercise-sort-oneRepMax-indicator')).toHaveStyle({ opacity: 0 });
+    expect(sortArrow('oneRepMax')).toBe('down');
     expect(screen.getByTestId('stats-exercise-name-missing').props.numberOfLines).toBeUndefined();
   });
 
@@ -855,6 +894,37 @@ describe('StatsScreenShell — view mode toggle', () => {
       exerciseDefinitionId: 'gamma',
       displayName: 'Gamma',
     });
+  });
+
+  it('sorts by 1RM on tap, flips on the second tap, and sinks rows with no estimate', () => {
+    renderStatsScreenShell({
+      viewMode: 'exercise',
+      exerciseListItems: [
+        buildExerciseListItem('mid', 'Mid', { estimatedOneRepMax: 100 }),
+        buildExerciseListItem('none', 'None', { estimatedOneRepMax: null }),
+        buildExerciseListItem('heavy', 'Heavy', { estimatedOneRepMax: 140 }),
+      ],
+    });
+
+    const header = () => screen.getByTestId('stats-exercise-sort-oneRepMax');
+    expect(header().props.accessibilityState).toEqual({ selected: false });
+
+    fireEvent.press(header());
+    expect(sortedExerciseIds()).toEqual(['heavy', 'mid', 'none']);
+    expect(header().props.accessibilityState).toEqual({ selected: true });
+    expect(header().props.accessibilityLabel).toContain(
+      'Current sort: 1RM — high to low. Activate to sort 1RM — low to high.'
+    );
+    expect(sortArrow('oneRepMax')).toBe('down');
+    expect(screen.getByTestId('stats-exercise-sort-oneRepMax-indicator')).not.toHaveStyle({
+      opacity: 0,
+    });
+    expect(screen.getByTestId('stats-exercise-sort-sets-indicator')).toHaveStyle({ opacity: 0 });
+
+    fireEvent.press(header());
+    expect(sortedExerciseIds()).toEqual(['mid', 'heavy', 'none']);
+    expect(header().props.accessibilityLabel).toContain('Current sort: 1RM — low to high');
+    expect(sortArrow('oneRepMax')).toBe('up');
   });
 
   it('preserves sort state while new period data, search, and Breakdown props arrive', () => {

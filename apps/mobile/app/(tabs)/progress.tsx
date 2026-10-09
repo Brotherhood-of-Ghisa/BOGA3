@@ -72,14 +72,16 @@ export type ExerciseListItem = {
   lastCompletedAt: Date | null;
 };
 
-export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume';
+export type ExerciseSortHeader = 'exercise' | 'sets' | 'volume' | 'oneRepMax';
 export type ExerciseSortMode =
   | 'recency-desc'
   | 'recency-asc'
   | 'sets-desc'
   | 'sets-asc'
   | 'volume-desc'
-  | 'volume-asc';
+  | 'volume-asc'
+  | 'oneRepMax-desc'
+  | 'oneRepMax-asc';
 
 export const DEFAULT_EXERCISE_SORT_MODE: ExerciseSortMode = 'sets-desc';
 
@@ -87,6 +89,7 @@ const EXERCISE_SORT_CYCLES: Record<ExerciseSortHeader, ExerciseSortMode[]> = {
   exercise: ['recency-desc', 'recency-asc'],
   sets: ['sets-desc', 'sets-asc'],
   volume: ['volume-desc', 'volume-asc'],
+  oneRepMax: ['oneRepMax-desc', 'oneRepMax-asc'],
 };
 
 const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader> = {
@@ -96,6 +99,8 @@ const EXERCISE_SORT_HEADER_BY_MODE: Record<ExerciseSortMode, ExerciseSortHeader>
   'sets-asc': 'sets',
   'volume-desc': 'volume',
   'volume-asc': 'volume',
+  'oneRepMax-desc': 'oneRepMax',
+  'oneRepMax-asc': 'oneRepMax',
 };
 
 export type StatsViewMode = 'exercise' | 'muscle';
@@ -140,6 +145,10 @@ export const describeExerciseSortMode = (mode: ExerciseSortMode): string => {
       return 'Volume — high to low';
     case 'volume-asc':
       return 'Volume — low to high';
+    case 'oneRepMax-desc':
+      return '1RM — high to low';
+    case 'oneRepMax-asc':
+      return '1RM — low to high';
   }
 };
 
@@ -196,6 +205,14 @@ export const sortExerciseListItems = (
         break;
       case 'volume-asc':
         comparison = compareOptionalNumbers(left.totalVolume, right.totalVolume, false);
+        break;
+      // Rows with no estimate sort last in both directions
+      // (`compareOptionalNumbers`), so the column never leads with blanks.
+      case 'oneRepMax-desc':
+        comparison = compareOptionalNumbers(left.estimatedOneRepMax, right.estimatedOneRepMax, true);
+        break;
+      case 'oneRepMax-asc':
+        comparison = compareOptionalNumbers(left.estimatedOneRepMax, right.estimatedOneRepMax, false);
         break;
     }
     return comparison === 0 ? compareExerciseIdentity(left, right) : comparison;
@@ -469,14 +486,14 @@ function ExerciseListView({
             style={styles.volumeColumn}
             numeric
           />
-          <View
-            accessibilityRole="header"
-            style={[styles.headerCell, styles.headerCellNumeric, styles.oneRepMaxColumn]}
-            testID="stats-exercise-header-oneRepMax">
-            <Text allowFontScaling={false} numberOfLines={1} style={styles.headerLabel}>
-              1RM
-            </Text>
-          </View>
+          <ExerciseSortHeaderCell
+            header="oneRepMax"
+            label="1RM"
+            sortMode={sortMode}
+            onPress={onPressSortHeader}
+            style={styles.oneRepMaxColumn}
+            numeric
+          />
         </View>
       </View>
       {items.map((item) => (
@@ -535,6 +552,8 @@ const exerciseSortHeaderLabel = (header: ExerciseSortHeader): string => {
       return 'Sets';
     case 'volume':
       return 'Volume';
+    case 'oneRepMax':
+      return '1RM';
   }
 };
 
@@ -711,7 +730,9 @@ const styles = StyleSheet.create({
   },
   // The table's columns: the name takes the rest; the figures sit in fixed,
   // right-aligned columns so digits align down the list. `Vol` fits a
-  // six-digit volume (`123456`) in Plex Mono.
+  // six-digit volume (`123456`) in Plex Mono, and `1RM` a six-character
+  // estimate (`1234.5`) — 46.8pt — which also clears the 41pt its header label
+  // plus sort arrow need now that the column sorts.
   nameColumn: {
     flex: 1,
     minWidth: 0,
@@ -726,7 +747,7 @@ const styles = StyleSheet.create({
     width: 52,
   },
   oneRepMaxColumn: {
-    width: 40,
+    width: 48,
   },
   exerciseName: {
     fontFamily: uiFonts.display.family,
