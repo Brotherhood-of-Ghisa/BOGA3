@@ -24,6 +24,8 @@ export interface DayCell {
   isToday: boolean;
   level: CalendarHeatmapBucket;
   value: number;
+  /** Matching exercise PRs ([[comparison.history-prs]]). */
+  prCount?: number;
   unavailable?: boolean;
   hasTraining?: boolean;
   targetAttainment?: number;
@@ -40,6 +42,7 @@ export interface WeekCell {
   sessions: number;
   level: CalendarHeatmapBucket;
   value: number;
+  prCount?: number;
   unavailable?: boolean;
   hasTraining?: boolean;
   targetAttainment?: number;
@@ -165,6 +168,7 @@ const toDayCell = (
     dow: mondayIndex(date),
     isToday: dateKey === todayDateKey,
     value,
+    prCount: metric === 'workingSetCount' ? 0 : source?.personalRecordCounts?.[metric] ?? 0,
     unavailable,
     hasTraining: source !== undefined,
     workingSetCountsByMuscle: source?.workingSetCountsByMuscle,
@@ -176,6 +180,7 @@ type WeekTotals = {
   monday: Date;
   sessions: number;
   value: number;
+  prCount: number;
   unavailable: boolean;
   hasKnown: boolean;
   workingSetCountsByMuscle: Record<string, number>;
@@ -185,12 +190,14 @@ const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
   monday: dateKeyToUtcDate(weekStartDateKey),
   sessions: 0,
   value: 0,
+  prCount: 0,
   unavailable: false,
   hasKnown: false,
   workingSetCountsByMuscle: {},
 });
 
 const addDayToWeek = (week: WeekTotals, day: DayCell, metric: CalendarHeatmapMetric): void => {
+  week.prCount += day.prCount ?? 0;
   for (const [id, count] of Object.entries(day.workingSetCountsByMuscle ?? {})) {
     week.workingSetCountsByMuscle[id] = (week.workingSetCountsByMuscle[id] ?? 0) + count;
   }
@@ -228,6 +235,7 @@ const toWeekCell = (weekStartDateKey: string, week: WeekTotals, todayWeekKey: st
     isCurrentWeek: weekStartDateKey === todayWeekKey,
     sessions: week.sessions,
     value: unavailable ? 0 : week.value,
+    prCount: week.prCount,
     unavailable,
     hasTraining: week.sessions > 0,
   };

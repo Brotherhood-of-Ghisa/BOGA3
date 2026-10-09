@@ -1,5 +1,17 @@
 # Comparison
 
+### comparison.history-prs · presentation · accepted
+
+Exercise history PRs follow the selected metric: Volume, 1RM or Top weight,
+using the existing all-time session records. Sets and muscle history have no
+PRs. Daily shows one top-right triangle on a day with matching PRs, regardless
+of their count, without a bottom detail box. Weekly shows the matching PR
+count beneath the metric value when positive. Accessibility announces the count.
+
+Why: the record mark must describe the figure being viewed.
+Code: `computeSelectedExerciseHistoryEffort` in `apps/mobile/src/data/exercise-analytics.ts`;
+`apps/mobile/components/heatmaps/heatmapData.ts`, `calendar-tile.tsx`, `WeeklyHeatmap.tsx`.
+
 ### comparison.change-display · presentation · accepted
 
 How a change between two periods is shown.

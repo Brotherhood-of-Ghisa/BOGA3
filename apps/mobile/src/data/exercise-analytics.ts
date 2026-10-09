@@ -9,6 +9,7 @@ import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { normalizeSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 import { bootstrapLocalDataLayer } from './bootstrap';
+import { loadExerciseSessionFacts } from './exercise-session-facts';
 import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-analytics';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, userSettings } from './schema';
 
@@ -321,6 +322,16 @@ export const computeSelectedExerciseDailyEffort = async (
 /** Both chart views share one graph read and one daily aggregation. */
 export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions) => {
   const rawSessions = await loadExerciseRawSessions(options);
-  const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone);
+  const facts = new Map((await loadExerciseSessionFacts(options.exerciseDefinitionId)).map(fact => [fact.sessionId, fact]));
+  const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone).map(day => {
+    const personalRecordCounts = { totalVolume: 0, estimatedRM1: 0, highestWeight: 0 };
+    for (const sessionId of day.sessionIds ?? []) {
+      const fact = facts.get(sessionId);
+      if (fact?.prVolume) personalRecordCounts.totalVolume++;
+      if (fact?.prE1rm) personalRecordCounts.estimatedRM1++;
+      if (fact?.prWeight) personalRecordCounts.highestWeight++;
+    }
+    return { ...day, personalRecordCounts };
+  });
   return { daily, weekly: aggregateExerciseWeeksFromDaily(daily) };
 };
