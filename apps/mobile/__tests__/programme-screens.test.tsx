@@ -38,6 +38,7 @@ jest.mock('expo-router', () => {
   };
 });
 
+import { uiSpace } from '@/components/ui';
 import { ProgrammeNewScreen } from '@/app/programme/new';
 import { ProgrammeDetailScreen } from '@/app/programme/[programmeId]';
 import { planQueries, planRepository } from '@/src/session-planner';
@@ -186,6 +187,16 @@ describe('programme screens', () => {
       fireEvent.press(screen.getByTestId('programme-form-plan-3-up'));
       // The duplicated session is now session 2
       expect(screen.getByTestId('programme-form-plan-2')).toBeTruthy();
+    });
+
+    it('insets the child session editor body to the sheet gutter', () => {
+      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+
+      expect(screen.getByTestId('programme-child-plan-editor-body')).toHaveStyle({
+        paddingHorizontal: uiSpace.lg,
+      });
     });
   });
 

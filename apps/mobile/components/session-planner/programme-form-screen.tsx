@@ -156,7 +156,7 @@ function ProgrammeSessionEditSheet({
       testID="programme-child-plan-editor-sheet"
       title={`Edit ${plan.title || 'Session'}`}
       visible={visible}>
-      <View style={styles.childEditorBody}>
+      <View style={styles.childEditorBody} testID="programme-child-plan-editor-body">
         <FormField
           accessibilityLabel="Session title"
           error={errors.get(`${prefix}.title`)}
@@ -592,6 +592,7 @@ const styles = StyleSheet.create({
   },
   childEditorBody: {
     gap: uiSpace.md,
+    paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
   },
   fieldBlock: {
