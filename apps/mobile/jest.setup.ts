@@ -101,7 +101,8 @@ jest.mock('react-native-reanimated', () => {
 // not have. An in-memory store per test file: the chosen theme preset
 // (`components/ui/theme-launch.ts`) is read from it when `tokens.ts` loads, so
 // every suite starts in the default theme unless it sets the key before
-// importing tokens.
+// importing tokens. As in the real store, an async write lands when its promise
+// settles, not when it is called (`ui-theme-launch.test.ts` pins this).
 jest.mock('expo-sqlite/kv-store', () => {
   const items = new Map<string, string>();
   const Storage = {
@@ -111,6 +112,7 @@ jest.mock('expo-sqlite/kv-store', () => {
       items.set(key, value);
     },
     setItem: async (key: string, value: string) => {
+      await Promise.resolve();
       items.set(key, value);
     },
     removeItemSync: (key: string) => items.delete(key),

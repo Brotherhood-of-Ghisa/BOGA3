@@ -632,16 +632,20 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(await screen.findByLabelText('Select exercise Bench Press')).toBeTruthy();
     await waitForGone(rows('Barbell Squat', 'Deadlift', 'Overhead Press'));
 
+    // Bench Press's secondary muscle is triceps: secondaries are not searched.
+    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  triceps ');
+    expect(await screen.findByText('No exercises match that filter.')).toBeTruthy();
+    await waitForGone(rows('Bench Press'));
+
+    // Overhead Press's primary muscle is Front Delts (id `delts_front`).
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  front press ');
     expect(await screen.findByLabelText('Select exercise Overhead Press')).toBeTruthy();
     await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift'));
 
-    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  triceps ');
-    expect(await screen.findByText('No exercises match that filter.')).toBeTruthy();
-    await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift', 'Overhead Press'));
-
+    // The muscle's display name is searched, never its id.
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), '  delts_front ');
-    await waitForGone(rows('Bench Press', 'Barbell Squat', 'Deadlift', 'Overhead Press'));
+    expect(await screen.findByText('No exercises match that filter.')).toBeTruthy();
+    await waitForGone(rows('Overhead Press'));
   }, 30000);
 
   it('starts with family rows collapsed and shared history', async () => {
