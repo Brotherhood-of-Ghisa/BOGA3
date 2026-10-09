@@ -176,3 +176,57 @@ it('places sessions by completedAt in half-open calendar bounds, including the D
   expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 1, totalVolume: 100 },
     previous: { workingSetCount: 1, totalVolume: 100 } });
 });
+
+it('includes the whole preceding four-week block, retaining 27 current sets and 7 previous sets', async () => {
+  const db = mockFixture.database;
+  db.delete(sessions).run();
+  const at = new Date(2026, 9, 9, 9, 50);
+  const trainingDays = [
+    [8, 4, 3], [8, 11, 4], [8, 16, 3], [8, 18, 2],
+    [8, 24, 3], [8, 25, 2], [8, 27, 3], [8, 29, 3],
+    [8, 30, 2], [9, 1, 3], [9, 6, 2], [9, 8, 4],
+  ];
+  for (const [month, day, count] of trainingDays) {
+    const id = `${month}-${day}`;
+    const completedAt = new Date(2026, month, day, 18);
+    db.insert(sessions).values({ id, status: 'completed', startedAt: completedAt, completedAt }).run();
+    db.insert(sessionExercises).values({ id: `${id}-block`, sessionId: id, exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
+    db.insert(exerciseSets).values(Array.from({ length: count }, (_, index) => ({
+      id: `${id}-set-${index}`, sessionExerciseId: `${id}-block`, orderIndex: index,
+      setType: 'rir_2', weightValue: '40', repsValue: '5',
+    }))).run();
+  }
+  const selected = { periodWeeks: 4, now: at };
+  const result = await computeProgressComparisons(selected);
+  const summary = await computeStatsSummary(selected);
+  expect(result.current).toEqual(summary.current);
+  expect(result.previous).toEqual(summary.previous);
+  expect(result.current.period).toMatchObject({ start: new Date(2026, 8, 14), end: at });
+  expect(result.previous.period).toMatchObject({ start: new Date(2026, 7, 17), end: new Date(2026, 8, 14) });
+  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 27, totalVolume: 2700 },
+    previous: { workingSetCount: 7, totalVolume: 700 }, workingSetChange: 20,
+    volumeChange: { kind: 'percent', percent: 286 } });
+});
+
+it('keeps multiweek periods adjacent at local Monday midnight across DST', async () => {
+  const db = mockFixture.database;
+  db.delete(sessions).run();
+  const at = new Date(2026, 2, 30, 12);
+  const boundaries = [
+    ['before-previous', new Date(2026, 1, 8, 23, 59, 59)],
+    ['previous-start', new Date(2026, 1, 9)],
+    ['previous-last', new Date(2026, 2, 8, 23, 59, 59)],
+    ['current-start', new Date(2026, 2, 9)],
+    ['current-end', at],
+  ] as const;
+  for (const [id, completedAt] of boundaries) {
+    db.insert(sessions).values({ id, status: 'completed', startedAt: completedAt, completedAt }).run();
+    db.insert(sessionExercises).values({ id: `${id}-block`, sessionId: id, exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
+    db.insert(exerciseSets).values({ id: `${id}-set`, sessionExerciseId: `${id}-block`, orderIndex: 0, setType: 'rir_2', weightValue: '40', repsValue: '5' }).run();
+  }
+  const result = await computeProgressComparisons({ periodWeeks: 4, now: at });
+  expect(result.current.period).toMatchObject({ start: new Date(2026, 2, 9), end: at });
+  expect(result.previous.period).toMatchObject({ start: new Date(2026, 1, 9), end: new Date(2026, 2, 9) });
+  expect(result.muscles[0]).toMatchObject({ current: { workingSetCount: 1, totalVolume: 100 },
+    previous: { workingSetCount: 2, totalVolume: 200 } });
+});
