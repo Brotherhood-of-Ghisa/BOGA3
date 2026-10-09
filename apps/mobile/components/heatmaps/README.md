@@ -80,23 +80,13 @@ Daily tiles are read-only; Weekly bars select a row:
 />
 ```
 
-- **Daily** follows [[comparison.daily-history]]: months and week rows run newest first; the month's first
-  day is in the bottom row, its last observed week in the top row. Each month
-  shows only its own day tiles; adjoining-month positions are empty spacers.
-  A Week tile appears beside that month's Sunday once Sunday has arrived,
-  provided all seven Monday–Sunday dates are present in the full data sample,
-  including rest days and preceding-month days. A partial first sample week or
-  missing date omits its Week tile while keeping the sampled daily tiles.
-  The complete adapter value/colour spans month boundaries.
-  The current Week tile appears only on Sunday; rows whose Sunday is in the
-  next month have no Week tile. Tiles are read-only, without selection or black
-  outlines. Figure visibility follows [[copy.blank-history]].
-  Future day positions are empty spacers with no tile or accessible day value.
-  No visible Rest wording or question mark is displayed.
-  No future week rows extend the saved history window.
-  A vertical `rule` centres in a wider Sun/Week gap through each header and row;
-  all eight read-only columns can shrink on narrow screens.
-  Monday dates are small, top-left figures. Full dates, today/current week and rest are announced accessibly.
+- **Daily** follows [[comparison.daily-history]]. `daily-calendar.ts` builds
+  the month/row framing without changing adapter values or colours. Tiles are
+  read-only, without selection or black outlines. Figure visibility follows
+  [[copy.blank-history]]. Missing/future positions are empty spacers without
+  accessible day values. A vertical `rule` centres in a wider Sun/Week gap;
+  the eight tile columns shrink independently of the outside date gutter.
+  Full dates, today/current week and rest are announced accessibly.
 - **Weekly** lifts selection to the host; a second tap clears the selected
   row. No selected-week banner is displayed; figure visibility follows [[copy.blank-history]].
   Rest/current semantics remain accessible; selected rows retain their caret, including zero/rest/unknown rows.
