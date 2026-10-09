@@ -30,11 +30,8 @@ import {
   SearchField,
   SegmentedControl,
   StatePanel,
-  uiFonts,
-  uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
 } from '@/components/ui';
 import {
   type CalendarHeatmapMetric,
@@ -47,6 +44,13 @@ import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import type { HeatmapView } from '@/src/preferences/model';
 import { ProgressTables, type ProgressTableMetric } from '@/components/stats/progress-tables';
+import {
+  StatsTable,
+  StatsTableFigures,
+  StatsTableHeader,
+  StatsTableHeaderLabel,
+  statsTableStyles,
+} from '@/components/stats/stats-table';
 import { isIndividualMuscleHistoryTarget, useHistory } from '@/components/stats/use-history';
 import { useStatsSummary } from '@/components/stats/use-summary';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -381,7 +385,7 @@ export function StatsScreenShell({
           onExerciseHistory={(row, target) => { focusRequest.current += 1; Keyboard.dismiss(); launchTarget.current = target; onPressExerciseHistory({ exerciseDefinitionId: row.exerciseDefinitionId, displayName: row.displayName }); }}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
-          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={styles.exerciseName}>Sessions</Text></ListRow>
+          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={statsTableStyles.name}>Sessions</Text></ListRow>
       </ScreenScroll>
 
       {selectedMuscle && isIndividualMuscleHistoryTarget(selectedMuscle) ? (
@@ -460,16 +464,16 @@ function ExerciseListView({
   }
 
   return (
-    <Card testID="stats-exercise-list">
-      <View style={styles.tableHeader} testID="stats-exercise-table-header">
+    <StatsTable testID="stats-exercise-list">
+      <StatsTableHeader testID="stats-exercise-table-header">
         <ExerciseSortHeaderCell
           header="exercise"
           label="Exercise"
           sortMode={sortMode}
           onPress={onPressSortHeader}
-          style={styles.nameColumn}
+          style={[statsTableStyles.nameCell, styles.nameColumn]}
         />
-        <View style={styles.tableColumns}>
+        <StatsTableFigures>
           <ExerciseSortHeaderCell
             header="sets"
             label="Sets"
@@ -494,8 +498,8 @@ function ExerciseListView({
             style={styles.oneRepMaxColumn}
             numeric
           />
-        </View>
-      </View>
+        </StatsTableFigures>
+      </StatsTableHeader>
       {items.map((item) => (
         <ListRow
           key={item.id}
@@ -509,35 +513,35 @@ function ExerciseListView({
           }`}
           density="list"
           meta={
-            <View style={styles.tableColumns}>
+            <StatsTableFigures>
               <Text
                 allowFontScaling={false}
-                style={[styles.tableFigure, styles.setsColumn]}
+                style={[statsTableStyles.figure, styles.setsColumn]}
                 testID={`stats-exercise-sets-${item.id}`}>
                 {String(item.workingSetCount)}
               </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.tableFigure, styles.volumeColumn]}
+                style={[statsTableStyles.figure, styles.volumeColumn]}
                 testID={`stats-exercise-volume-${item.id}`}>
                 {formatVolumeFigure(item.totalVolume)}
               </Text>
               <Text
                 allowFontScaling={false}
-                style={[styles.tableFigure, styles.oneRepMaxColumn]}
+                style={[statsTableStyles.figure, styles.oneRepMaxColumn]}
                 testID={`stats-exercise-1rm-${item.id}`}>
                 {item.estimatedOneRepMax === null ? '—' : formatOneRepMax(item.estimatedOneRepMax)}
               </Text>
-            </View>
+            </StatsTableFigures>
           }
           onPress={() => onPressExercise({ exerciseDefinitionId: item.id, displayName: item.name }, links.current.get(item.id) ?? null)}
           testID={`stats-exercise-row-${item.id}`}>
-          <Text allowFontScaling={false} style={styles.exerciseName} testID={`stats-exercise-name-${item.id}`}>
+          <Text allowFontScaling={false} style={statsTableStyles.name} testID={`stats-exercise-name-${item.id}`}>
             {item.name}
           </Text>
         </ListRow>
       ))}
-    </Card>
+    </StatsTable>
   );
 }
 
@@ -590,18 +594,13 @@ function ExerciseSortHeaderCell({
       accessibilityState={{ selected: isActive }}
       onPress={() => onPress(header)}
       style={({ pressed }) => [
-        styles.headerCell,
+        statsTableStyles.headerCell,
         style,
-        numeric && styles.headerCellNumeric,
+        numeric && statsTableStyles.headerCellNumeric,
         pressed && styles.headerCellPressed,
       ]}
       testID={`stats-exercise-sort-${header}`}>
-      <Text
-        allowFontScaling={false}
-        numberOfLines={1}
-        style={[styles.headerLabel, isActive && styles.headerLabelActive]}>
-        {label}
-      </Text>
+      <StatsTableHeaderLabel active={isActive} label={label} />
       <View
         accessible={false}
         style={[
@@ -611,9 +610,7 @@ function ExerciseSortHeaderCell({
         ]}
         testID={`stats-exercise-sort-${header}-indicator`}>
         {header === 'exercise' ? (
-          <Text allowFontScaling={false} accessible={false} style={styles.headerLabel}>
-            Recent
-          </Text>
+          <StatsTableHeaderLabel label="Recent" />
         ) : null}
         <Icon
           color={uiRoles.ink}
@@ -677,45 +674,11 @@ function StatsContent() {
 // visible or not, so the label never moves when the sort changes.
 const RECENCY_INDICATOR_WIDTH = 64;
 
-const microLabel = {
-  fontFamily: uiFonts.display.family,
-  fontWeight: '700',
-  fontSize: uiTypography.size.xxs,
-  lineHeight: uiTypography.lineHeight.xxs,
-  letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  textTransform: 'uppercase',
-  color: uiRoles.inkMuted,
-} as const;
-
 // The screen body, in the design language.
 const styles = StyleSheet.create({
   controls: { paddingHorizontal: uiSpace.lg, paddingTop: uiSpace.lg, paddingBottom: uiSpace.md, gap: uiSpace.md },
-  tableHeader: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: uiSpace.md,
-    paddingHorizontal: uiSpace.md,
-  },
-  tableColumns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  headerCell: {
-    minHeight: uiGeometry.tapTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  headerCellNumeric: {
-    justifyContent: 'flex-end',
-  },
   headerCellPressed: {
     backgroundColor: uiRoles.paper,
-  },
-  headerLabel: microLabel,
-  headerLabelActive: {
-    color: uiRoles.ink,
   },
   headerIndicator: {
     flexDirection: 'row',
@@ -734,8 +697,6 @@ const styles = StyleSheet.create({
   // estimate (`1234.5`) — 46.8pt — which also clears the 41pt its header label
   // plus sort arrow need now that the column sorts.
   nameColumn: {
-    flex: 1,
-    minWidth: 0,
     // Let Recent wrap below the label when both cannot fit beside Sets.
     flexWrap: 'wrap',
     alignContent: 'center',
@@ -748,21 +709,5 @@ const styles = StyleSheet.create({
   },
   oneRepMaxColumn: {
     width: 48,
-  },
-  exerciseName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-    paddingVertical: uiSpace.xs,
-  },
-  tableFigure: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
-    textAlign: 'right',
   },
 });
