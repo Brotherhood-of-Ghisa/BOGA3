@@ -8,7 +8,7 @@ import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue, preferenceValidat
 import { preferenceKey } from '@/src/preferences/storage';
 import { getSessionSetTypeCycle, nextSessionSetType, defaultSessionSetType } from '@/src/data/set-types';
 import { groupedTargetAttainment, muscleTargetAttainment } from '@/src/preferences/targets';
-import { calendarWeekBounds, keepHistorySelection, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 
 const account = async (id: string | null = 'A', configured = true) => {
   setAccountLocalPreferenceAccount(id, configured);
@@ -191,14 +191,12 @@ it('caps constituent muscle attainment before averaging, including untrained mus
   expect(groupedTargetAttainment([], {}, 8)).toBe(0);
 });
 
-it('aligns to local Monday, keeps the same elapsed previous span, and recovers week selection', () => {
+it('aligns to local Monday and keeps the same elapsed previous span', () => {
   const now = new Date(2026, 9, 3, 15, 20);
   expect(calendarWeekBounds(1, now).start).toEqual(new Date(2026, 8, 28));
   const bounds = calendarWeekBounds(4, now);
   expect(bounds.start).toEqual(new Date(2026, 8, 7));
   expect(shiftCalendarWeeks(now, -4)).toEqual(new Date(2026, 8, 5, 15, 20));
-  expect(keepHistorySelection('2026-09-14', 4, now)).toBe('2026-09-14');
-  expect(keepHistorySelection('2025-01-06', 4, now)).toBe('2026-09-28');
 });
 
 it.each([[2, 8, 167, '2026-03-02T05:00:00.000Z'], [10, 1, 169, '2026-10-26T04:00:00.000Z']])

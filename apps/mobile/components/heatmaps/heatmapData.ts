@@ -27,6 +27,8 @@ export interface DayCell {
   hasTraining?: boolean;
   targetAttainment?: number;
   workingSetCountsByMuscle?: Record<string, number>;
+  /** The sessions behind the day's figure; empty on a rest day. */
+  sessionIds: string[];
 }
 
 export interface WeekCell {
@@ -164,6 +166,7 @@ const toDayCell = (
     unavailable,
     hasTraining: source !== undefined,
     workingSetCountsByMuscle: source?.workingSetCountsByMuscle,
+    sessionIds: source?.sessionIds ?? [],
   };
 };
 

@@ -14,9 +14,3 @@ export const calendarWeekBounds = (weeks: number, now = new Date()) => {
 
 export const localDateKey = (date: Date): string =>
   `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-export const keepHistorySelection = (key: string | null, weeks: number, now = new Date()): string => {
-  const { start } = calendarWeekBounds(weeks, now);
-  const currentWeek = localDateKey(calendarWeekBounds(1, now).start);
-  return key && key >= localDateKey(start) && key <= currentWeek ? key : currentWeek;
-};

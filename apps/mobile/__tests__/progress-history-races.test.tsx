@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import * as stats from '@/src/data/stats';
 import type { SelectedMuscleWeeklyEffort } from '@/src/data';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
-import { calendarWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
+import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 
 // Delayed reads are injected at the real repository boundary to prove races.
 const weekly = (count: number): SelectedMuscleWeeklyEffort[] => [{
@@ -37,20 +37,17 @@ it.each([{ id: '' }, { id: ' ' }, { subject: null }])('reads nothing for a subje
   expect(read).not.toHaveBeenCalled();
 });
 
-it('retries the same subject after a policy change without retaining old values, preserving its selected week', async () => {
+it('retries the same subject after a policy change without retaining old values', async () => {
   const read = jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort')
     .mockResolvedValueOnce(history(4)).mockRejectedValueOnce(Error('read failed')).mockResolvedValueOnce(history(8));
   const { result, rerender } = renderHistory(muscle('quads'));
   await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
-  const selected = localDateKey(calendarWeekBounds(52).start);
-  act(() => result.current.selectWeek(selected));
   rerender({ subject: muscle('quads'), weeks: 52, revision: 1 });
   await waitFor(() => expect(result.current.error).toBe('read failed'));
   expect(result.current.weekly).toEqual([]);
   act(() => result.current.retry());
   await waitFor(() => expect(result.current.weekly).toEqual(weekly(8)));
   expect(result.current.error).toBeNull();
-  expect(result.current.weekKey).toBe(selected);
   expect(read).toHaveBeenCalledTimes(3);
   for (const [options] of read.mock.calls) {
     expect(options).toMatchObject({ muscleGroupIds: ['quads'], start: calendarWeekBounds(52).start });
@@ -93,30 +90,8 @@ it('cannot publish an old account’s history into the next mounted account', as
   accountA.unmount();
   const accountB = renderHistory(muscle('chest'), 4);
   await waitFor(() => expect(accountB.result.current.weekly).toEqual(weekly(4)));
-  act(() => accountB.result.current.selectWeek(null));
-  expect(accountB.result.current.weekKey).toBeNull();
   await act(async () => old.resolve(weekly(100)));
   expect(accountB.result.current.weekly).toEqual(weekly(4));
-});
-
-it('resets an excluded week immediately even when the shortened-window read fails', async () => {
-  const next = deferred();
-  jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort')
-    .mockResolvedValueOnce(history(8)).mockReturnValueOnce(next.promise).mockResolvedValue({ weekly: [], daily: [] });
-  const { result, rerender } = renderHistory(muscle('quads'), 104);
-  await waitFor(() => expect(result.current.loading).toBe(false));
-  const previous = localDateKey(calendarWeekBounds(104).start);
-  act(() => result.current.selectWeek(previous));
-  expect(result.current.weekKey).toBe(previous);
-  rerender({ subject: muscle('quads'), weeks: 1, revision: 0 });
-  const current = localDateKey(calendarWeekBounds(1).start);
-  expect(result.current.weekKey).toBe(current);
-  await started(2);
-  await act(async () => next.reject(Error('new window read failed')));
-  expect(result.current.error).toBe('new window read failed');
-  expect(result.current.weekKey).toBe(current);
-  rerender({ subject: muscle('quads'), weeks: 104, revision: 0 });
-  expect(result.current.weekKey).toBe(current);
 });
 
 it('publishes its loading state before starting the read, cancelling the read a left page scheduled', async () => {

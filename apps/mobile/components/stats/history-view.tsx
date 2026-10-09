@@ -1,10 +1,11 @@
-import type { BuildHeatmapDataOptions } from '@/components/heatmaps';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import {
+  DailyHeatmap, WeeklyHeatmap, buildHeatmapData, type BuildHeatmapDataOptions, type DayCell,
+} from '@/components/heatmaps';
 import {
   SegmentedControl,
   StatePanel,
@@ -67,8 +68,8 @@ function HistoryHeatmap({
   metric,
   metricLabel,
   view,
-  selectedWeekKey,
-  onSelectWeek,
+  onOpenDay,
+  onOpenWeek,
   testIDPrefix,
   todayDateKey,
   lookbackWeeks,
@@ -79,8 +80,8 @@ function HistoryHeatmap({
   metric: CalendarHeatmapMetric;
   metricLabel: string;
   view: HeatmapView;
-  selectedWeekKey: string | null;
-  onSelectWeek: (weekKey: string | null) => void;
+  onOpenDay?: (day: DayCell) => void;
+  onOpenWeek?: (weekStartDateKey: string) => void;
   testIDPrefix: string;
   todayDateKey?: string;
   lookbackWeeks: number;
@@ -102,16 +103,17 @@ function HistoryHeatmap({
         formatValue={formatDailyValue}
         legendLabel={`${metricLabel} per day`}
         header={status}
+        onOpenDay={onOpenDay}
+        onOpenWeek={onOpenWeek}
       />
     ),
-    [data, formatDailyValue, metricLabel, testIDPrefix, status]
+    [data, formatDailyValue, metricLabel, testIDPrefix, status, onOpenDay, onOpenWeek]
   );
   const weeklyHeatmap = useMemo(
     () => (
       <WeeklyHeatmap
         data={data}
-        selectedWeekKey={selectedWeekKey}
-        onSelectWeek={onSelectWeek}
+        onOpenWeek={onOpenWeek}
         testIDPrefix={testIDPrefix}
         formatValue={formatDailyValue}
         metricLabel={metricLabel}
@@ -119,14 +121,14 @@ function HistoryHeatmap({
         header={status}
       />
     ),
-    [data, formatDailyValue, onSelectWeek, selectedWeekKey, testIDPrefix, metric, metricLabel, status]
+    [data, formatDailyValue, onOpenWeek, testIDPrefix, metric, metricLabel, status]
   );
   const [visited, setVisited] = useState({ daily: view === 'daily', weekly: view === 'weekly' });
   if (!visited[view]) setVisited(previous => ({ ...previous, [view]: true }));
   const dailyVisible = view === 'daily';
 
   // Visited trees stay mounted so a switch reuses the laid-out chart and keeps its
-  // selection and scroll; the inactive one is transparent, inert and hidden
+  // scroll; the inactive one is transparent, inert and hidden
   // from assistive tech.
   return (
     <View style={styles.heatmapLayers}>
@@ -176,8 +178,9 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   // The loaded window, named in the empty state.
   lookbackWeeks: number;
   muscleTargets?: BuildHeatmapDataOptions['muscleTargets'];
-  selectedWeekKey: string | null;
-  onSelectWeek: (weekKey: string | null) => void;
+  // A day or week with training opens its sessions ([[session.history-open]]).
+  onOpenDay?: (day: DayCell) => void;
+  onOpenWeek?: (weekStartDateKey: string) => void;
   onRetry?: () => void;
   todayDateKey?: string;
 };
@@ -196,8 +199,8 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   errorMessage,
   lookbackWeeks,
   muscleTargets,
-  selectedWeekKey,
-  onSelectWeek,
+  onOpenDay,
+  onOpenWeek,
   onRetry,
   todayDateKey,
 }: HistoryViewProps<TMetric>) {
@@ -273,8 +276,8 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
         muscleTargets={muscleTargets}
         metric={metric}
         metricLabel={metricLabel}
-        onSelectWeek={onSelectWeek}
-        selectedWeekKey={selectedWeekKey}
+        onOpenDay={onOpenDay}
+        onOpenWeek={onOpenWeek}
         testIDPrefix={prefix}
         todayDateKey={todayDateKey}
         view={view}
