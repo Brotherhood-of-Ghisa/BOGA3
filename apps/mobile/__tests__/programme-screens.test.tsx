@@ -189,6 +189,36 @@ describe('programme screens', () => {
       expect(screen.getByTestId('programme-form-plan-2')).toBeTruthy();
     });
 
+    it('saves a programme whose sessions use a seeded gym that has no gyms row yet', async () => {
+      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Gym Wave');
+
+      // Session 1 at the seeded "Downtown Iron Temple" gym — its gyms row is
+      // only written when a gym is picked.
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
+      await pickExercise('Barbell Squat');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '140');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '5');
+      fireEvent.press(screen.getByTestId('programme-child-plan-gym-row'));
+      fireEvent.press(await screen.findByTestId('plan-form-gym-downtown-iron-temple'));
+      fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
+
+      // Session 2.
+      fireEvent.press(screen.getByTestId('programme-form-plan-2-edit'));
+      await pickExercise('Bench Press');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-weight'), '100');
+      fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '5');
+      fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('programme-form-save'));
+      });
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith(expect.stringMatching(/^\/programme\//));
+      });
+    });
+
     it('insets the child session editor body to the sheet gutter', () => {
       render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
 
